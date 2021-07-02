@@ -3,8 +3,15 @@ uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 authors = ["Jonathan <edelman.jonathan.s@gmail.com> and contributors"]
 version = "0.1.0"
 
+[deps]
+IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
+
 [compat]
 julia = "1"
+SciMLBase = "1"
+IterativeSolvers = "0.9"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

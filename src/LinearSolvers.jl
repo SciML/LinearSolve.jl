@@ -1,7 +1,11 @@
 module LinearSolvers
 
 using SciMLBase: AbstractLinearAlgorithm, AbstractDiffEqOperator
-using SciMLBase
+using Reexport
+using LinearAlgebra
+@reexport using SciMLBase
+
+export LUFactorization, QRFactorization, SVDFactorization
 
 struct LUFactorization{P} <: AbstractLinearAlgorithm
     pivot::P
@@ -22,7 +26,7 @@ function SciMLBase.solve(prob::LinearProblem, alg::QRFactorization)
     qr(prob.A, alg.pivot; blocksize=alg.blocksize) \ prob.b
 end
 
-struct SVDFactorization{A} <: AbstractLinearAlgorith
+struct SVDFactorization{A} <: AbstractLinearAlgorithm
     full::Bool
     alg::A
 end

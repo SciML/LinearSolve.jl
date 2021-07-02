@@ -166,6 +166,11 @@ git-tree-sha1 = "b20384ee84f3e0e89cee36dbcb9c44b8bd61e133"
 uuid = "731186ca-8d62-57ce-b412-fbd966d074cd"
 version = "2.14.3"
 
+[[Reexport]]
+git-tree-sha1 = "5f6c21241f0f655da3952fd60aa18477cf96c220"
+uuid = "189a3867-3050-52da-a836-e630ba90ab69"
+version = "1.1.0"
+
 [[Requires]]
 deps = ["UUIDs"]
 git-tree-sha1 = "4036a3bd08ac7e968e27c203d45f5fff15020621"

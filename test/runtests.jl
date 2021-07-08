@@ -1,7 +1,7 @@
-using LinearSolvers
+using LinearSolve
 using Test
 
-@testset "LinearSolvers.jl" begin
+@testset "LinearSolve.jl" begin
     A = rand(5, 5)
     b = rand(5)
     prob = LinearProblem(A, b)

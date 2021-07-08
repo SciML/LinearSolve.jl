@@ -1,4 +1,4 @@
-module LinearSolvers
+module LinearSolve
 
 using SciMLBase: AbstractLinearAlgorithm, AbstractDiffEqOperator
 using Reexport

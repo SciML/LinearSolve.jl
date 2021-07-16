@@ -42,6 +42,7 @@ function set_cacheval(cache::LinearCache,alg)
         @set! cache.cacheval = alg
         @set! cache.isfresh = false
     end
+end
 
 function SciMLBase.init(prob::LinearProblem, alg; kwargs...)
     @unpack A, b, p = prob

@@ -37,6 +37,12 @@ function set_p(cache, p)
     # @set! cache.isfresh = true
 end
 
+function set_cacheval(cache::LinearCache,alg)
+    if cache.isfresh
+        @set! cache.cacheval = alg
+        @set! cache.isfresh = false
+    end
+
 function SciMLBase.init(prob::LinearProblem, alg; kwargs...)
     @unpack A, b, p = prob
     if alg isa LUFactorization
@@ -54,20 +60,17 @@ function SciMLBase.init(prob::LinearProblem, alg; kwargs...)
     return cache
 end
 
-SciMLBase.solve!(prob::LinearProblem, alg; kwargs...) = solve!(init(prob, alg; kwargs...))
-SciMLBase.solve!(cache) = solve!(cache, cache.alg)
+SciMLBase.solve(prob::LinearProblem, alg; kwargs...) = solve(init(prob, alg; kwargs...))
+SciMLBase.solve(cache) = solve(cache, cache.alg)
 
 struct LUFactorization{P} <: AbstractLinearAlgorithm
     pivot::P
 end
 LUFactorization() = LUFactorization(Val(true))
 
-function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization)
+function SciMLBase.solve(cache::LinearCache, alg::LUFactorization)
     cache.A isa Union{AbstractMatrix, AbstractDiffEqOperator} || error("LU is not defined for $(typeof(prob.A))")
-    if cache.isfresh
-        @set! cache.cacheval = lu!(cache.A, alg.pivot)
-        @set! cache.isfresh = false
-    end
+    set_cacheval(cache,lu!(cache.A, alg.pivot))
     ldiv!(cache.cacheval, cache.b)
 end
 
@@ -77,12 +80,9 @@ struct QRFactorization{P} <: AbstractLinearAlgorithm
 end
 QRFactorization() = QRFactorization(Val(false), 16)
 
-function SciMLBase.solve!(cache::LinearCache, alg::QRFactorization)
+function SciMLBase.solve(cache::LinearCache, alg::QRFactorization)
     cache.A isa Union{AbstractMatrix, AbstractDiffEqOperator} || error("QR is not defined for $(typeof(prob.A))")
-    if cache.isfresh
-        @set! cache.cacheval = qr!(cache.A.A, alg.pivot; blocksize=alg.blocksize)
-        @set! cache.isfresh = false
-    end
+    set_cacheval(cache,qr!(cache.A.A, alg.pivot; blocksize=alg.blocksize))
     ldiv!(cache.cacheval, cache.b)
 end
 
@@ -92,12 +92,9 @@ struct SVDFactorization{A} <: AbstractLinearAlgorithm
 end
 SVDFactorization() = SVDFactorization(false, LinearAlgebra.DivideAndConquer())
 
-function SciMLBase.solve!(cache::LinearCache, alg::SVDFactorization)
+function SciMLBase.solve(cache::LinearCache, alg::SVDFactorization)
     cache.A isa Union{AbstractMatrix, AbstractDiffEqOperator} || error("SVD is not defined for $(typeof(prob.A))")
-    if cache.isfresh
-        @set! cache.cacheval = svd!(cache.A; full=alg.full, alg=alg.alg)
-        @set! cache.isfresh = false
-    end
+    set_cacheval(cache,svd!(cache.A; full=alg.full, alg=alg.alg))
     ldiv!(cache.cacheval, cache.b)
 end
 

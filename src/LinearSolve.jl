@@ -42,6 +42,7 @@ function set_cacheval(cache::LinearCache,alg)
         @set! cache.cacheval = alg
         @set! cache.isfresh = false
     end
+    return cache
 end
 
 function SciMLBase.init(prob::LinearProblem, alg; kwargs...)
@@ -71,7 +72,7 @@ LUFactorization() = LUFactorization(Val(true))
 
 function SciMLBase.solve(cache::LinearCache, alg::LUFactorization)
     cache.A isa Union{AbstractMatrix, AbstractDiffEqOperator} || error("LU is not defined for $(typeof(prob.A))")
-    set_cacheval(cache,lu!(cache.A, alg.pivot))
+    cache = set_cacheval(cache,lu!(cache.A, alg.pivot))
     ldiv!(cache.cacheval, cache.b)
 end
 
@@ -83,7 +84,7 @@ QRFactorization() = QRFactorization(Val(false), 16)
 
 function SciMLBase.solve(cache::LinearCache, alg::QRFactorization)
     cache.A isa Union{AbstractMatrix, AbstractDiffEqOperator} || error("QR is not defined for $(typeof(prob.A))")
-    set_cacheval(cache,qr!(cache.A.A, alg.pivot; blocksize=alg.blocksize))
+    cache = set_cacheval(cache,qr!(cache.A.A, alg.pivot; blocksize=alg.blocksize))
     ldiv!(cache.cacheval, cache.b)
 end
 
@@ -95,7 +96,7 @@ SVDFactorization() = SVDFactorization(false, LinearAlgebra.DivideAndConquer())
 
 function SciMLBase.solve(cache::LinearCache, alg::SVDFactorization)
     cache.A isa Union{AbstractMatrix, AbstractDiffEqOperator} || error("SVD is not defined for $(typeof(prob.A))")
-    set_cacheval(cache,svd!(cache.A; full=alg.full, alg=alg.alg))
+    cache = set_cacheval(cache,svd!(cache.A; full=alg.full, alg=alg.alg))
     ldiv!(cache.cacheval, cache.b)
 end
 

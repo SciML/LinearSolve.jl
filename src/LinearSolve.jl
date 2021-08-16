@@ -37,7 +37,17 @@ function set_p(cache, p)
     # @set! cache.isfresh = true
 end
 
-function SciMLBase.init(prob::LinearProblem, alg; kwargs...)
+function set_cacheval(cache::LinearCache,alg)
+    if cache.isfresh
+        @set! cache.cacheval = alg
+        @set! cache.isfresh = false
+    end
+    return cache
+end
+
+function SciMLBase.init(prob::LinearProblem, alg;
+                        alias_A = false, alias_b = false,
+                        kwargs...)
     @unpack A, b, p = prob
     if alg isa LUFactorization
         fact = lu_instance(A)
@@ -48,26 +58,34 @@ function SciMLBase.init(prob::LinearProblem, alg; kwargs...)
     end
     Pr = nothing
     Pl = nothing
+
+    A = alias_A ? A : copy(A)
+    b = alias_b ? b : copy(b)
+
     cache = LinearCache{typeof(A),typeof(b),typeof(p),typeof(alg),Tfact,typeof(Pr),typeof(Pl)}(
         A, b, p, alg, fact, true, Pr, Pl
     )
     return cache
 end
 
-SciMLBase.solve!(prob::LinearProblem, alg; kwargs...) = solve!(init(prob, alg; kwargs...))
-SciMLBase.solve!(cache) = solve!(cache, cache.alg)
+SciMLBase.solve(prob::LinearProblem, alg; kwargs...) = solve(init(prob, alg; kwargs...))
+SciMLBase.solve(cache) = solve(cache, cache.alg)
 
 struct LUFactorization{P} <: AbstractLinearAlgorithm
     pivot::P
 end
-LUFactorization() = LUFactorization(Val(true))
-
-function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization)
-    cache.A isa Union{AbstractMatrix, AbstractDiffEqOperator} || error("LU is not defined for $(typeof(prob.A))")
-    if cache.isfresh
-        @set! cache.cacheval = lu!(cache.A, alg.pivot)
-        @set! cache.isfresh = false
+function LUFactorization()
+    pivot = @static if VERSION < v"1.7beta"
+        Val(true)
+    else
+        RowMaximum()
     end
+    LUFactorization(pivot)
+end
+
+function SciMLBase.solve(cache::LinearCache, alg::LUFactorization)
+    cache.A isa Union{AbstractMatrix, AbstractDiffEqOperator} || error("LU is not defined for $(typeof(prob.A))")
+    cache = set_cacheval(cache,lu!(cache.A, alg.pivot))
     ldiv!(cache.cacheval, cache.b)
 end
 
@@ -75,14 +93,18 @@ struct QRFactorization{P} <: AbstractLinearAlgorithm
     pivot::P
     blocksize::Int
 end
-QRFactorization() = QRFactorization(Val(false), 16)
-
-function SciMLBase.solve!(cache::LinearCache, alg::QRFactorization)
-    cache.A isa Union{AbstractMatrix, AbstractDiffEqOperator} || error("QR is not defined for $(typeof(prob.A))")
-    if cache.isfresh
-        @set! cache.cacheval = qr!(cache.A.A, alg.pivot; blocksize=alg.blocksize)
-        @set! cache.isfresh = false
+function QRFactorization()
+    pivot = @static if VERSION < v"1.7beta"
+        Val(false)
+    else
+        NoPivot()
     end
+    QRFactorization(pivot, 16)
+end
+
+function SciMLBase.solve(cache::LinearCache, alg::QRFactorization)
+    cache.A isa Union{AbstractMatrix, AbstractDiffEqOperator} || error("QR is not defined for $(typeof(prob.A))")
+    cache = set_cacheval(cache,qr!(cache.A.A, alg.pivot; blocksize=alg.blocksize))
     ldiv!(cache.cacheval, cache.b)
 end
 
@@ -92,12 +114,9 @@ struct SVDFactorization{A} <: AbstractLinearAlgorithm
 end
 SVDFactorization() = SVDFactorization(false, LinearAlgebra.DivideAndConquer())
 
-function SciMLBase.solve!(cache::LinearCache, alg::SVDFactorization)
+function SciMLBase.solve(cache::LinearCache, alg::SVDFactorization)
     cache.A isa Union{AbstractMatrix, AbstractDiffEqOperator} || error("SVD is not defined for $(typeof(prob.A))")
-    if cache.isfresh
-        @set! cache.cacheval = svd!(cache.A; full=alg.full, alg=alg.alg)
-        @set! cache.isfresh = false
-    end
+    cache = set_cacheval(cache,svd!(cache.A; full=alg.full, alg=alg.alg))
     ldiv!(cache.cacheval, cache.b)
 end
 

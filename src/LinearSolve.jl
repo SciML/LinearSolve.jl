@@ -74,7 +74,14 @@ SciMLBase.solve(cache) = solve(cache, cache.alg)
 struct LUFactorization{P} <: AbstractLinearAlgorithm
     pivot::P
 end
-LUFactorization() = LUFactorization(Val(true))
+function LUFactorization()
+    pivot = @static if VERSION < v"1.7beta"
+        Val(true)
+    else
+        RowMaximum()
+    end
+    LUFactorization(pivot)
+end
 
 function SciMLBase.solve(cache::LinearCache, alg::LUFactorization)
     cache.A isa Union{AbstractMatrix, AbstractDiffEqOperator} || error("LU is not defined for $(typeof(prob.A))")
@@ -86,7 +93,14 @@ struct QRFactorization{P} <: AbstractLinearAlgorithm
     pivot::P
     blocksize::Int
 end
-QRFactorization() = QRFactorization(NoPivot(), 16)
+function QRFactorization()
+    pivot = @static if VERSION < v"1.7beta"
+        Val(false)
+    else
+        NoPivot()
+    end
+    QRFactorization(pivot, 16)
+end
 
 function SciMLBase.solve(cache::LinearCache, alg::QRFactorization)
     cache.A isa Union{AbstractMatrix, AbstractDiffEqOperator} || error("QR is not defined for $(typeof(prob.A))")

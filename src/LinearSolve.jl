@@ -45,7 +45,9 @@ function set_cacheval(cache::LinearCache,alg)
     return cache
 end
 
-function SciMLBase.init(prob::LinearProblem, alg; kwargs...)
+function SciMLBase.init(prob::LinearProblem, alg;
+                        alias_A = false, alias_b = false,
+                        kwargs...)
     @unpack A, b, p = prob
     if alg isa LUFactorization
         fact = lu_instance(A)
@@ -56,6 +58,10 @@ function SciMLBase.init(prob::LinearProblem, alg; kwargs...)
     end
     Pr = nothing
     Pl = nothing
+
+    A = alias_A ? A : copy(A)
+    b = alias_b ? b : copy(b)
+
     cache = LinearCache{typeof(A),typeof(b),typeof(p),typeof(alg),Tfact,typeof(Pr),typeof(Pl)}(
         A, b, p, alg, fact, true, Pr, Pl
     )
@@ -80,7 +86,7 @@ struct QRFactorization{P} <: AbstractLinearAlgorithm
     pivot::P
     blocksize::Int
 end
-QRFactorization() = QRFactorization(Val(false), 16)
+QRFactorization() = QRFactorization(NoPivot(), 16)
 
 function SciMLBase.solve(cache::LinearCache, alg::QRFactorization)
     cache.A isa Union{AbstractMatrix, AbstractDiffEqOperator} || error("QR is not defined for $(typeof(prob.A))")

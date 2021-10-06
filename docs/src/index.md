@@ -4,7 +4,7 @@ CurrentModule = LinearSolvers
 
 # LinearSolvers
 
-Documentation for [LinearSolvers](https://github.com/EdelmanJonathan/LinearSolvers.jl).
+Documentation for [LinearSolvers](https://github.com/SciML/LinearSolvers.jl).
 
 ```@index
 ```

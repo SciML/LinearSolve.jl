@@ -1,14 +1,14 @@
 ```@meta
-CurrentModule = LinearSolvers
+CurrentModule = LinearSolve
 ```
 
-# LinearSolvers
+# LinearSolve
 
-Documentation for [LinearSolvers](https://github.com/SciML/LinearSolvers.jl).
+Documentation for [LinearSolve](https://github.com/SciML/LinearSolve.jl).
 
 ```@index
 ```
 
 ```@autodocs
-Modules = [LinearSolvers]
+Modules = [LinearSolve]
 ```

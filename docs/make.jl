@@ -6,11 +6,11 @@ DocMeta.setdocmeta!(LinearSolvers, :DocTestSetup, :(using LinearSolvers); recurs
 makedocs(;
     modules=[LinearSolvers],
     authors="Jonathan <edelman.jonathan.s@gmail.com> and contributors",
-    repo="https://github.com/EdelmanJonathan/LinearSolvers.jl/blob/{commit}{path}#{line}",
+    repo="https://github.com/SciML/LinearSolvers.jl/blob/{commit}{path}#{line}",
     sitename="LinearSolvers.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://EdelmanJonathan.github.io/LinearSolvers.jl",
+        canonical="https://linearsolve.sciml.ai/",
         assets=String[],
     ),
     pages=[
@@ -19,5 +19,5 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/EdelmanJonathan/LinearSolvers.jl",
+    repo="github.com/SciML/LinearSolvers.jl",
 )

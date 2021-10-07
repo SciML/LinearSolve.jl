@@ -1,16 +1,16 @@
-using LinearSolvers
+using LinearSolve
 using Documenter
 
-DocMeta.setdocmeta!(LinearSolvers, :DocTestSetup, :(using LinearSolvers); recursive=true)
+DocMeta.setdocmeta!(LinearSolve, :DocTestSetup, :(using LinearSolve); recursive=true)
 
 makedocs(;
-    modules=[LinearSolvers],
+    modules=[LinearSolve],
     authors="Jonathan <edelman.jonathan.s@gmail.com> and contributors",
-    repo="https://github.com/EdelmanJonathan/LinearSolvers.jl/blob/{commit}{path}#{line}",
+    repo="https://github.com/SciML/LinearSolve.jl/blob/{commit}{path}#{line}",
     sitename="LinearSolvers.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://EdelmanJonathan.github.io/LinearSolvers.jl",
+        canonical="https://linearsolve.sciml.ai/",
         assets=String[],
     ),
     pages=[
@@ -19,5 +19,5 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/EdelmanJonathan/LinearSolvers.jl",
+    repo="github.com/SciML/LinearSolve.jl",
 )

@@ -13,7 +13,7 @@ end
 function SciMLBase.solve(prob::LinearProblem, alg::KrylovJL, args...; kwargs...)
     @unpack A, b, p = prob
     x, stats = alg.solver(A, b, args...; kwargs...)
-    resid = A * x - b
+    resid = mul!(similar(b), A, x) - b
     retcode = stats.solved ? :Success : :Failure
     return SciMLBase.build_solution(prob, alg, x, resid; retcode = retcode)
 end

@@ -156,7 +156,7 @@ struct LinSolveKrylov{S,A,K}
 end
 
 LinSolveKrylov(solver = Krylov.gmres, args...; kwargs...) =
-    LinSolveKrylov(solver, args, kwargs)
+    LinSolveKrylov(solver, args, _krylov_update_kwargs(kwargs))
 
 function (l::LinSolveKrylov)(x, A, b, matrix_updated = false)
     x .= l.solver(A, b, l.args...; l.kwargs...)[1]
@@ -164,6 +164,26 @@ function (l::LinSolveKrylov)(x, A, b, matrix_updated = false)
 end
 
 (l::LinSolveKrylov)(::Type{Val{:init}}, f, u0_prototype) = l
+
+
+# Make the kwargs consistent
+function _krylov_update_kwargs(kwargs::Base.Pairs)
+    key_list = []
+    value_list = []
+    for (k, v) in kwargs
+        if k == :reltol
+            push!(key_list, :rtol)
+        elseif k == :abstol
+            push!(key_list, :atol)
+        elseif k ∈ [:maxiter, :maxiters]
+            push!(key_list, :itmax)
+        else
+            push!(key_list, k)
+        end
+        push!(value_list, v)
+    end
+    return pairs(NamedTuple(zip(key_list, value_list)))
+end
 
 
 ## Use Krylov if CUDA is loaded to be safe else just return IterativeSolvers

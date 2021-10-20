@@ -27,20 +27,6 @@ function __init__()
 
         is_cuda_available() = true
 
-        function LinearAlgebra.ldiv!(
-            x::CUDA.CuArray,
-            _qr::CUDA.CUSOLVER.CuQR,
-            b::CUDA.CuArray,
-        )
-            _x = UpperTriangular(_qr.R) \ (_qr.Q' * reshape(b, length(b), 1))
-            x .= vec(_x)
-            CUDA.unsafe_free!(_x)
-            return x
-        end
-        # make `\` work
-        LinearAlgebra.ldiv!(F::CUDA.CUSOLVER.CuQR, b::CUDA.CuArray) =
-            (x = similar(b); ldiv!(x, F, b); x)
-
         default_factorize(A::CUDA.CuArray) = qr(A)
     end
 end
@@ -58,14 +44,13 @@ end
 include("arrays.jl")
 include("factorization.jl")
 include("wrappers.jl")
+include("default.jl")
 
 
 export LinSolveFactorize, LinSolveGPUFactorize, LinSolveLUFactorize
 export LinSolveIterativeSolvers, LinSolveKrylov
 export LinSolveBiCGStabl,
     LinSolveCG, LinSolveChebyshev, LinSolveGMRES, LinSolveMINRES
-
-# export LUFactorization, SVDFactorization, QRFactorization
-# export KrylovJL
+export DefaultLinSolve
 
 end

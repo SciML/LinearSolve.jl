@@ -78,3 +78,9 @@ SciMLBase.solve(prob::LinearProblem, alg, args...; kwargs...) =
     solve(init(prob, alg, args...; kwargs...))
 
 SciMLBase.solve(cache) = solve(cache, cache.alg)
+
+function (alg::SciMLLinearSolveAlgorithm)(x,A,b,args...;u0=nothing,kwargs...)
+    prob = LinearProblem(A,b;u0=x)
+    x = solve(prob,alg,args...;kwargs...)
+    return x
+end

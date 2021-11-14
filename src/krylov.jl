@@ -1,18 +1,16 @@
-struct KrylovJL{AT,bT,A,K} <: SciMLLinearSolveAlgorithm
+struct KrylovJL{A,K} <: SciMLLinearSolveAlgorithm
     solver::Function
-    A::AT
-    b::bT
     args::A
     kwargs::K
 end
 
-function KrylovJL(A, b, args...; solver = gmres, kwargs...)
-    return KrylovJL(solver, A, b, args, kwargs)
+function KrylovJL(args...; solver = gmres, kwargs...)
+    return KrylovJL(solver, args, kwargs)
 end
 
 function SciMLBase.solve(cache::LinearCache, alg::KrylovJL,args...;kwargs...)
-    @unpack A, b = cache
-    x, stats = alg.solver(A, b, args...; kwargs...)
+    @unpack A, b, Pl,Pr = cache
+    x, stats = alg.solver(A, b, args...; M=Pl, N=Pr, kwargs...)
     resid = A * x - b
     retcode = stats.solved ? :Success : :Failure
     return x #SciMLBase.build_solution(prob, alg, x, resid; retcode = retcode)

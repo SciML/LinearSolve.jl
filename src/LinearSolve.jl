@@ -2,16 +2,19 @@ module LinearSolve
 
 using ArrayInterface: lu_instance
 using Base: cache_dependencies, Bool
-using Krylov
 using LinearAlgebra
 using Reexport
 using SciMLBase: AbstractDiffEqOperator, AbstractLinearAlgorithm
 using Setfield
 using UnPack
 
+# wrap
+using Krylov
+#using IterativeSolvers
+
 @reexport using SciMLBase
 
-abstract type SciMLLinearSolveAlgorithm end
+abstract type SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
 
 include("common.jl")
 include("factorization.jl")

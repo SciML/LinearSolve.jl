@@ -1,5 +1,5 @@
 
-struct LUFactorization{P} <: AbstractLinearAlgorithm
+struct LUFactorization{P} <: SciMLLinearSolveAlgorithm
     pivot::P
 end
 
@@ -19,7 +19,7 @@ function SciMLBase.solve(cache::LinearCache, alg::LUFactorization)
     ldiv!(cache.cacheval, cache.b)
 end
 
-struct QRFactorization{P} <: AbstractLinearAlgorithm
+struct QRFactorization{P} <: SciMLLinearSolveAlgorithm
     pivot::P
     blocksize::Int
 end
@@ -43,7 +43,7 @@ function SciMLBase.solve(cache::LinearCache, alg::QRFactorization)
     ldiv!(cache.cacheval, cache.b)
 end
 
-struct SVDFactorization{A} <: AbstractLinearAlgorithm
+struct SVDFactorization{A} <: SciMLLinearSolveAlgorithm
     full::Bool
     alg::A
 end

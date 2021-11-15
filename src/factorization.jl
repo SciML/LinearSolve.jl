@@ -16,7 +16,7 @@ function SciMLBase.solve(cache::LinearCache, alg::LUFactorization)
     cache.A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("LU is not defined for $(typeof(prob.A))")
     cache = set_cacheval(cache, lu!(cache.A, alg.pivot))
-    ldiv!(cache.cacheval, cache.b)
+    ldiv!(cache.u,cache.cacheval, cache.b)
 end
 
 struct QRFactorization{P} <: SciMLLinearSolveAlgorithm
@@ -40,7 +40,7 @@ function SciMLBase.solve(cache::LinearCache, alg::QRFactorization)
         cache,
         qr!(cache.A.A, alg.pivot; blocksize = alg.blocksize),
     )
-    ldiv!(cache.cacheval, cache.b)
+    ldiv!(cache.u,cache.cacheval, cache.b)
 end
 
 struct SVDFactorization{A} <: SciMLLinearSolveAlgorithm
@@ -54,5 +54,5 @@ function SciMLBase.solve(cache::LinearCache, alg::SVDFactorization)
     cache.A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("SVD is not defined for $(typeof(prob.A))")
     cache = set_cacheval(cache, svd!(cache.A; full = alg.full, alg = alg.alg))
-    ldiv!(cache.cacheval, cache.b)
+    ldiv!(cache.u,cache.cacheval, cache.b)
 end

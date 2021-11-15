@@ -20,5 +20,8 @@ using Test
     # make algorithm callable - interoperable with DiffEq ecosystem
     @test A * LUFactorization()(x,A,b) ≈ b 
     @test A * KrylovJL()(x,A,b) ≈ b 
-    @test_broken A * x ≈ b # in place
+
+    # in place
+    KrylovJL()(x,A,b)
+    @test A * x ≈ b
 end

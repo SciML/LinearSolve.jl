@@ -1,12 +1,14 @@
-struct LinearCache{TA,Tb,Tp,Talg,Tc,Tr,Tl}
+struct LinearCache{TA,Tb,Tu,Tp,Talg,Tc,Tr,Tl}
     A::TA
     b::Tb
+    u::Tu
     p::Tp
     alg::Talg
     cacheval::Tc
     isfresh::Bool
     Pr::Tr
     Pl::Tl
+#   k::Tk # iteration count
 end
 
 function set_A(cache, A)
@@ -39,7 +41,7 @@ function SciMLBase.init(
     alias_b = false,
     kwargs...,
 )
-    @unpack A, b, p = prob
+    @unpack A, b, u0, p = prob
     if alg isa LUFactorization
         fact = lu_instance(A)
         Tfact = typeof(fact)
@@ -47,15 +49,20 @@ function SciMLBase.init(
         fact = nothing
         Tfact = Any
     end
-    Pr = nothing
-    Pl = nothing
+    Pr = LinearAlgebra.I
+    Pl = LinearAlgebra.I
 
     A = alias_A ? A : copy(A)
     b = alias_b ? b : copy(b)
 
+    if u0 == nothing
+        u0 = zero(b)
+    end
+
     cache = LinearCache{
         typeof(A),
         typeof(b),
+        typeof(u0),
         typeof(p),
         typeof(alg),
         Tfact,
@@ -64,6 +71,7 @@ function SciMLBase.init(
     }(
         A,
         b,
+        u0,
         p,
         alg,
         fact,

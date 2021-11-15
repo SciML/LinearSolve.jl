@@ -9,9 +9,9 @@ function KrylovJL(args...; solver = gmres, kwargs...)
 end
 
 function SciMLBase.solve(cache::LinearCache, alg::KrylovJL,args...;kwargs...)
-    @unpack A, b, Pl,Pr = cache
-    x, stats = alg.solver(A, b, args...; M=Pl, N=Pr, kwargs...)
-    resid = A * x - b
+    @unpack A, b, u, Pr, Pl = cache
+    u, stats = alg.solver(A, b, args...; M=Pl, N=Pr, kwargs...)
+    resid = A * u - b
     retcode = stats.solved ? :Success : :Failure
-    return x #SciMLBase.build_solution(prob, alg, x, resid; retcode = retcode)
+    return u #SciMLBase.build_solution(prob, alg, x, resid; retcode = retcode)
 end

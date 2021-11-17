@@ -9,8 +9,9 @@ using Setfield
 using UnPack
 
 # wrap
-using Krylov
-#using IterativeSolvers
+import Krylov
+import KrylovKit
+import IterativeSolvers
 
 @reexport using SciMLBase
 

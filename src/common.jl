@@ -42,6 +42,11 @@ function SciMLBase.init(
     kwargs...,
 )
     @unpack A, b, u0, p = prob
+
+    if u0 == nothing
+        u0 = zero(b)
+    end
+
     if alg isa LUFactorization
         fact = lu_instance(A)
         Tfact = typeof(fact)
@@ -52,12 +57,10 @@ function SciMLBase.init(
     Pr = LinearAlgebra.I
     Pl = LinearAlgebra.I
 
+#   @show (A, b, u0, p) |> typeof
+
     A = alias_A ? A : copy(A)
     b = alias_b ? b : copy(b)
-
-    if u0 == nothing
-        u0 = zero(b)
-    end
 
     cache = LinearCache{
         typeof(A),

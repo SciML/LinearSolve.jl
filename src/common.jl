@@ -11,13 +11,17 @@ struct LinearCache{TA,Tb,Tu,Tp,Talg,Tc,Tr,Tl}
 #   k::Tk # iteration count
 end
 
-function set_A(cache, A)
+function set_A(cache, A) # and ! to function name
     @set! cache.A = A
     @set! cache.isfresh = true
 end
 
 function set_b(cache, b)
     @set! cache.b = b
+end
+
+function set_u(cache, u)
+    @set! cache.u = u
 end
 
 function set_p(cache, p)
@@ -57,10 +61,8 @@ function SciMLBase.init(
     Pr = LinearAlgebra.I
     Pl = LinearAlgebra.I
 
-#   @show (A, b, u0, p) |> typeof
-
-    A = alias_A ? A : copy(A)
-    b = alias_b ? b : copy(b)
+    A = alias_A ? A : deepcopy(A)
+    b = alias_b ? b : deepcopy(b)
 
     cache = LinearCache{
         typeof(A),
@@ -93,5 +95,23 @@ SciMLBase.solve(cache) = solve(cache, cache.alg)
 function (alg::SciMLLinearSolveAlgorithm)(x,A,b,args...;u0=nothing,kwargs...)
     prob = LinearProblem(A,b;u0=x)
     x = solve(prob,alg,args...;kwargs...)
+    return x
+end
+
+# how to initialize cahce?
+
+# use the same cache to solve multiple linear problems
+function (cache::LinearCache)(x,A,b,args...;u0=nothing,kwargs...)
+    set_A(cache, A)
+    set_b(cache, b)
+
+    if u0 == nothing
+        x = zero(x)
+    else
+        x = u0
+    end
+    set_u(cache, x)
+
+    x = solve(cache)
     return x
 end

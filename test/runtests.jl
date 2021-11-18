@@ -24,20 +24,23 @@ using Test
 
     # Factorization
     for alg in (:LUFactorization, :QRFactorization, :SVDFactorization,
-                :KrylovJL)
+                :KrylovJL,
+#               :KrylovKitJL,
+               )
         @eval begin
             @test $A * solve($prob, $alg();) ≈ $b
-            $alg()($x,$A,$b)
+            $alg()($x, $A, $b)
+            @test $A * $x ≈ $b
+
+            cache = SciMLBase.init($prob, $alg())
+            cache($x, $A, $b)
             @test $A * $x ≈ $b
         end
     end
 
     # test on some ODEProblem
-    using OrdinaryDiffEq
-    using DiffEqProblemLibrary.ODEProblemLibrary
-    ODEProblemLibrary.importodeproblems()
-
-    #   add this problem to DiffEqProblemLibrary
+#   using OrdinaryDiffEq
+#   #   add this problem to DiffEqProblemLibrary
 #   kx = 1
 #   kt = 1
 #   ut(x,t) = sin(kx*pi*x)*cos(kt*pi*t)
@@ -50,8 +53,12 @@ using Test
 #   func = ODEFunction(dudt!)
 #   prob = ODEProblem(func,u0,tspn)
 
-    prob = ODEProblemLibrary.prob_ode_linear
-    sol  = solve(prob, Rodas5(linsolve=SVDFactorization()); saveat=0.1)
-    @show sol.retcode
+#   using OrdinaryDiffEq
+#   using DiffEqProblemLibrary.ODEProblemLibrary
+#   ODEProblemLibrary.importodeproblems()
+#   prob = ODEProblemLibrary.prob_ode_linear
+#   @show prob
+#   sol  = solve(prob, Rodas5(linsolve=KrylovJL()); saveat=0.1)
+#   @show sol.retcode
 
 end

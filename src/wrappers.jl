@@ -8,7 +8,7 @@ struct KrylovJL{F,A,K} <: SciMLLinearSolveAlgorithm
     kwargs::K
 end
 
-function KrylovJL(args...; solver = Krylov.gmres, kwargs...)
+function KrylovJL(args...; solver = Krylov.bicgstab, kwargs...)
     return KrylovJL(solver, args, kwargs)
 end
 
@@ -19,6 +19,10 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL,args...;kwargs...)
     retcode = stats.solved ? :Success : :Failure
     return u
 end
+
+KrylovJL_CG(args...;kwargs...) = KrylovJL(Krylov.cg!, args...; kwargs...)
+KrylovJL_GMRES(args...;kwargs...) = KrylovJL(Krylov.gmres!, args...; kwargs...)
+KrylovJL_BICGSTAB(args...;kwargs...) = KrylovJL(Krylov.bicgstab!, args...; kwargs...)
 
 ## IterativeSolvers.jl
 

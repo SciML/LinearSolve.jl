@@ -1,50 +1,54 @@
-struct LinearCache{TA,Tb,Tu,Tp,Talg,Tc,Tr,Tl}
+struct LinearCache{TA,Tb,Tu,Tp,Talg,Tc,Tl,Tr}
     A::TA
     b::Tb
     u::Tu
     p::Tp
     alg::Talg
-    cacheval::Tc
+    cacheval::Tc # store alg cache here 
     isfresh::Bool
-    Pr::Tr
     Pl::Tl
-#   k::Tk # iteration count
+    Pr::Tr
 end
 
 function set_A(cache, A) # and ! to function name
     @set! cache.A = A
     @set! cache.isfresh = true
+    return cache
 end
 
 function set_b(cache, b)
     @set! cache.b = b
+    return cache
 end
 
 function set_u(cache, u)
     @set! cache.u = u
+    return cache
 end
 
 function set_p(cache, p)
     @set! cache.p = p
     # @set! cache.isfresh = true
+    return cache
 end
 
-function set_cacheval(cache::LinearCache, alg)
+function set_cacheval(cache, alg_cache)
     if cache.isfresh
-        @set! cache.cacheval = alg
+        @set! cache.cacheval = alg_cache
         @set! cache.isfresh = false
     end
     return cache
 end
 
-function SciMLBase.init(
-    prob::LinearProblem,
-    alg,
-    args...;
-    alias_A = false,
-    alias_b = false,
-    kwargs...,
-)
+#function init_cacheval(cacheval, alg::SciMLLinearSolveAlgorithm)
+#
+#    return
+#end
+
+function SciMLBase.init(prob::LinearProblem, alg, args...;
+                        alias_A = false, alias_b = false,
+                        kwargs...,
+                       )
     @unpack A, b, u0, p = prob
 
     if u0 == nothing
@@ -58,8 +62,8 @@ function SciMLBase.init(
         fact = nothing
         Tfact = Any
     end
-    Pr = LinearAlgebra.I
     Pl = LinearAlgebra.I
+    Pr = LinearAlgebra.I
 
     A = alias_A ? A : deepcopy(A)
     b = alias_b ? b : deepcopy(b)
@@ -71,8 +75,8 @@ function SciMLBase.init(
         typeof(p),
         typeof(alg),
         Tfact,
-        typeof(Pr),
         typeof(Pl),
+        typeof(Pr),
     }(
         A,
         b,
@@ -81,8 +85,8 @@ function SciMLBase.init(
         alg,
         fact,
         true,
-        Pr,
         Pl,
+        Pr,
     )
     return cache
 end
@@ -92,26 +96,35 @@ SciMLBase.solve(prob::LinearProblem, alg, args...; kwargs...) =
 
 SciMLBase.solve(cache) = solve(cache, cache.alg)
 
-function (alg::SciMLLinearSolveAlgorithm)(x,A,b,args...;u0=nothing,kwargs...)
-    prob = LinearProblem(A,b;u0=x)
-    x = solve(prob,alg,args...;kwargs...)
+function (alg::SciMLLinearSolveAlgorithm)(prob::LinearProblem,args...;
+                                          u0=nothing,kwargs...)
+    x = solve(prob, alg, args...; kwargs...)
     return x
 end
 
-# how to initialize cahce?
+function (alg::SciMLLinearSolveAlgorithm)(x,A,b,args...;u0=nothing,kwargs...)
+    prob = LinearProblem(A,b;u0=x)
+    x = alg(prob, args...; kwargs...)
+    return x
+end
 
-# use the same cache to solve multiple linear problems
-function (cache::LinearCache)(x,A,b,args...;u0=nothing,kwargs...)
-    set_A(cache, A)
-    set_b(cache, b)
+function (cache::LinearCache)(prob::LinearProblem,args...;u0=nothing,kwargs...)
 
-    if u0 == nothing
-        x = zero(x)
-    else
-        x = u0
+    if prob.u0 == nothing
+        prob.u0 = zero(x)
     end
-    set_u(cache, x)
 
-    x = solve(cache)
+    cache = set_A(cache, prob.A)
+    cache = set_b(cache, prob.b)
+    cache = set_u(cache, prob.u0)
+
+    x = solve(cache,args...;kwargs...)
+    return x
+end
+
+function (cache::LinearCache)(x,A,b,args...;u0=nothing,kwargs...)
+
+    prob = LinearProblem(A,b;u0=x)
+    x = cache(prob, args...; kwargs...)
     return x
 end

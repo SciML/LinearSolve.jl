@@ -3,7 +3,7 @@ using Test
 
 @testset "LinearSolve.jl" begin
     using LinearAlgebra
-    n = 100
+    n = 32
     dx = 2/(n-1)
 
     xx = Array(range(start=-1,stop=1,length=n))
@@ -19,25 +19,6 @@ using Test
     u = R * uu
     b = A * u #R * bb
 
-    x    = zero(b)
-    prob = LinearProblem(A, b;u0=x)
-
-    # Factorization
-    for alg in (:LUFactorization, :QRFactorization, :SVDFactorization,
-                :KrylovJL,
-#               :KrylovKitJL,
-               )
-        @eval begin
-            @test $A * solve($prob, $alg();) ≈ $b
-            $alg()($x, $A, $b)
-            @test $A * $x ≈ $b
-
-            cache = SciMLBase.init($prob, $alg())
-            cache($x, $A, $b)
-            @test $A * $x ≈ $b
-        end
-    end
-
     # test on some ODEProblem
 #   using OrdinaryDiffEq
 #   #   add this problem to DiffEqProblemLibrary
@@ -52,6 +33,44 @@ using Test
 #   tspn = (0.0,1.0)
 #   func = ODEFunction(dudt!)
 #   prob = ODEProblem(func,u0,tspn)
+
+    x = zero(b)
+    A1 =  A; b1 =  b
+    A2 = 2A; b2 = 3b
+    A3 = 3A; b3 = 2b
+
+    prob1 = LinearProblem(A1, b1; u0=x)
+    prob2 = LinearProblem(A2, b2; u0=x)
+    prob3 = LinearProblem(A3, b3; u0=x)
+
+    for alg in (
+                :LUFactorization,
+                :QRFactorization,
+                :SVDFactorization,
+
+#               :DefaultLinSolve,
+
+                :KrylovJL,
+#               :KrylovJL,
+#               :KrylovKitJL,
+
+               )
+        @eval begin
+            y = solve($prob1, $alg())
+            @test $A1 *  y ≈ $b1
+            @test $A1 * $x ≈ $b1
+
+            y = $alg()($x, $A2, $b2)
+            @test $A2 *  y ≈ $b2
+            @test $A2 * $x ≈ $b2
+
+            cache = SciMLBase.init($prob1, $alg())
+            y = cache($x, $A3, $b3)
+            @test $A3 * $x ≈ $b3
+            @test $A3 *  y ≈ $b3
+        end
+    end
+
 
 #   using OrdinaryDiffEq
 #   using DiffEqProblemLibrary.ODEProblemLibrary

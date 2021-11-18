@@ -3,7 +3,6 @@ module LinearSolve
 using ArrayInterface: lu_instance
 using Base: cache_dependencies, Bool
 using LinearAlgebra
-using Reexport
 using SciMLBase: AbstractDiffEqOperator, AbstractLinearAlgorithm
 using Setfield
 using UnPack
@@ -13,6 +12,7 @@ import Krylov
 import KrylovKit
 import IterativeSolvers
 
+using Reexport
 @reexport using SciMLBase
 
 abstract type SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
@@ -22,6 +22,6 @@ include("factorization.jl")
 include("krylov.jl")
 
 export LUFactorization, SVDFactorization, QRFactorization
-export KrylovJL
+export KrylovJL, IterativeSolversJL, KrylovKitJL 
 
 end

@@ -52,7 +52,7 @@ SVDFactorization() = SVDFactorization(false, LinearAlgebra.DivideAndConquer())
 
 function SciMLBase.solve(cache::LinearCache, alg::SVDFactorization)
     cache.A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
-        error("SVD is not defined for $(typeof(prob.A))")
+        error("SVD is not defined for $(typeof(cache.A))")
     cache = set_cacheval(cache, svd!(cache.A; full = alg.full, alg = alg.alg))
     ldiv!(cache.u,cache.cacheval, cache.b)
 end

@@ -1,5 +1,5 @@
 #
-mutable struct DefaultLinSolve
+mutable struct DefaultLinSolve <: SciMLLinearSolveAlgorithm
     iterable
 end
 
@@ -13,6 +13,3 @@ function SciMLBase.solve(cache::LinearCache,
 
     return A \ u
 end
-
-
-function

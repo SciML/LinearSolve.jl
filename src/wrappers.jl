@@ -1,17 +1,25 @@
 ## Krylov.jl
 
-# place Krylov.CGsolver in LinearCache.cacheval, and resule
-
 struct KrylovJL{F,A,K} <: SciMLLinearSolveAlgorithm
     solver::F
     args::A
     kwargs::K
 end
 
-function KrylovJL(args...; solver = Krylov.bicgstab, kwargs...)
+function KrylovJL(args...; solver = Krylov.gmres, kwargs...)
     return KrylovJL(solver, args, kwargs)
 end
 
+# place Krylov.CGsolver in LinearCache.cacheval for reuse
+function init_cacheval(prob::LinearProblem, alg::KrylovJL)
+    if alg.solver === Krylov.cg!
+    elseif alg.solver === Krylov.gmres!
+    elseif alg.solver === Krylov.bicgstab!
+    end
+    return
+end
+
+# KrylovJL failing in-place
 function SciMLBase.solve(cache::LinearCache, alg::KrylovJL,args...;kwargs...)
     @unpack A, b, u, Pr, Pl = cache
     u, stats = alg.solver(A, b, args...; M=Pl, N=Pr, kwargs...)

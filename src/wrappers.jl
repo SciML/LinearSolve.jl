@@ -1,31 +1,40 @@
 ## Krylov.jl
 
 struct KrylovJL{F,A,K} <: SciMLLinearSolveAlgorithm
-    solver::F
+    KrylovAlg::F
     args::A
     kwargs::K
 end
 
-function KrylovJL(args...; solver = Krylov.gmres, kwargs...)
-    return KrylovJL(solver, args, kwargs)
+function KrylovJL(args...; KrylovAlg = Krylov.gmres!, kwargs...)
+    return KrylovJL(KrylovAlg, args, kwargs)
 end
 
-# place Krylov.CGsolver in LinearCache.cacheval for reuse
-function init_cacheval(prob::LinearProblem, alg::KrylovJL)
-    if alg.solver === Krylov.cg!
-    elseif alg.solver === Krylov.gmres!
-    elseif alg.solver === Krylov.bicgstab!
+function init_cacheval(alg::KrylovJL, A, b, u)
+    cacheval = if alg.KrylovAlg === Krylov.cg!
+        CgSolver(A,b)
+    elseif alg.KrylovAlg === Krylov.gmres!
+        GmresSolver(A,b,20)
+    elseif alg.KrylovAlg === Krylov.bicgstab!
+        BicgstabSolver(A,b)
+    else
+        nothing
     end
-    return
+    return cacheval
 end
 
-# KrylovJL failing in-place
-function SciMLBase.solve(cache::LinearCache, alg::KrylovJL,args...;kwargs...)
-    @unpack A, b, u, Pr, Pl = cache
-    u, stats = alg.solver(A, b, args...; M=Pl, N=Pr, kwargs...)
-    resid = A * u - b
-    retcode = stats.solved ? :Success : :Failure
-    return u
+function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
+    @unpack A, b, u, Pr, Pl, cacheval = cache
+
+    if cache.isfresh
+        solver = init_cacheval(alg.KrylovAlg, A, b, u)
+        solver.x = u
+        cache = set_cacheval(cache, solver)
+    end
+
+    alg.solver(cacheval, A, b; M=Pl, N=Pr, alg.kwargs...)
+
+    return cache.u
 end
 
 KrylovJL_CG(args...;kwargs...) = KrylovJL(Krylov.cg!, args...; kwargs...)

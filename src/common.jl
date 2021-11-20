@@ -40,7 +40,7 @@ function set_cacheval(cache, alg_cache)
     return cache
 end
 
-init_cacheval(A, alg::SciMLLinearSolveAlgorithm) = nothing
+init_cacheval(alg::SciMLLinearSolveAlgorithm, A, b, u) = nothing
 
 function SciMLBase.init(prob::LinearProblem, alg, args...;
                         alias_A = false, alias_b = false,
@@ -52,7 +52,7 @@ function SciMLBase.init(prob::LinearProblem, alg, args...;
         u0 = zero(b)
     end
 
-    cacheval = init_cacheval(prob.A, alg)
+    cacheval = init_cacheval(alg, A, b, u0)
     Tc = cacheval == nothing ? Any : typeof(cacheval)
     isfresh = cacheval == nothing
 

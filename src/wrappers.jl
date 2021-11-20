@@ -12,11 +12,11 @@ end
 
 function init_cacheval(alg::KrylovJL, A, b, u)
     cacheval = if alg.KrylovAlg === Krylov.cg!
-        CgSolver(A,b)
+        Krylov.CgSolver(A,b)
     elseif alg.KrylovAlg === Krylov.gmres!
-        GmresSolver(A,b,20)
+        Krylov.GmresSolver(A,b,20)
     elseif alg.KrylovAlg === Krylov.bicgstab!
-        BicgstabSolver(A,b)
+        Krylov.BicgstabSolver(A,b)
     else
         nothing
     end
@@ -24,15 +24,14 @@ function init_cacheval(alg::KrylovJL, A, b, u)
 end
 
 function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
-    @unpack A, b, u, Pr, Pl, cacheval = cache
-
     if cache.isfresh
-        solver = init_cacheval(alg.KrylovAlg, A, b, u)
-        solver.x = u
+        solver = init_cacheval(alg, cache.A, cache.b, cache.u)
         cache = set_cacheval(cache, solver)
     end
 
-    alg.solver(cacheval, A, b; M=Pl, N=Pr, alg.kwargs...)
+    cache.cacheval.x = cache.u
+    alg.KrylovAlg(cache.cacheval, cache.A, cache.b;
+                  M=cache.Pl, N=cache.Pr, alg.kwargs...)
 
     return cache.u
 end

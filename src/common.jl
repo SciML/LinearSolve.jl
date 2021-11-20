@@ -10,29 +10,29 @@ struct LinearCache{TA,Tb,Tu,Tp,Talg,Tc,Tl,Tr}
     Pr::Tr
 end
 
-function set_A(cache, A) # and ! to function name
+function set_A(cache::LinearCache, A) # and ! to function name
     @set! cache.A = A
     @set! cache.isfresh = true
     return cache
 end
 
-function set_b(cache, b)
+function set_b(cache::LinearCache, b)
     @set! cache.b = b
     return cache
 end
 
-function set_u(cache, u)
+function set_u(cache::LinearCache, u)
     @set! cache.u = u
     return cache
 end
 
-function set_p(cache, p)
+function set_p(cache::LinearCache, p)
     @set! cache.p = p
 #   @set! cache.isfresh = true
     return cache
 end
 
-function set_cacheval(cache, alg_cache)
+function set_cacheval(cache::LinearCache, alg_cache)
     if cache.isfresh
         @set! cache.cacheval = alg_cache
         @set! cache.isfresh = false
@@ -53,8 +53,8 @@ function SciMLBase.init(prob::LinearProblem, alg, args...;
     end
 
     cacheval = init_cacheval(alg, A, b, u0)
-    Tc = cacheval == nothing ? Any : typeof(cacheval)
     isfresh = cacheval == nothing
+    Tc = isfresh ? Any : typeof(cacheval)
 
     Pl = LinearAlgebra.I
     Pr = LinearAlgebra.I
@@ -108,8 +108,8 @@ end
 
 function (cache::LinearCache)(prob::LinearProblem, args...; kwargs...)
 
-    if(prob.A  != cache.A) cache = set_A(cache, prob.A) end
-    if(prob.b  != cache.b) cache = set_b(cache, prob.b) end
+    if(prob.A != cache.A) cache = set_A(cache, prob.A) end
+    if(prob.b != cache.b) cache = set_b(cache, prob.b) end
 
     if(prob.u0 == nothing)
         prob.u0 = zero(x)

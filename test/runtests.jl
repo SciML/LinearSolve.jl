@@ -3,13 +3,13 @@ using Test
 
 @testset "LinearSolve.jl" begin
     using LinearAlgebra
-    n = 8
+    n = 2
 
     A = Matrix(I,n,n)
     b = ones(n)
-    A1 = A/1; b1 = rand(n); x1 = zero(b)
-    A2 = A/2; b2 = rand(n); x2 = zero(b)
-    A3 = A/3; b3 = rand(n); x3 = zero(b)
+    A1 = A/1; b1 = ones(n); x1 = zero(b)
+    A2 = A/2; b2 = ones(n); x2 = zero(b)
+    A3 = A/3; b3 = ones(n); x3 = zero(b)
 
     prob1 = LinearProblem(A1, b1; u0=x1)
     prob2 = LinearProblem(A2, b2; u0=x2)
@@ -22,7 +22,7 @@ using Test
 
 #               :DefaultLinSolve,
 
-#               :KrylovJL, KrylovJL_CG, KrylovJL_GMRES, KrylovJL_BICGSTAB,
+                :KrylovJL, :KrylovJL_CG, :KrylovJL_GMRES, :KrylovJL_BICGSTAB,
 #               :IterativeSolversJL
 #               :KrylovKitJL,
 

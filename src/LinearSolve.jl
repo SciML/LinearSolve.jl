@@ -25,7 +25,7 @@ include("wrappers.jl")
 
 export DefaultLinSolve
 export LUFactorization, SVDFactorization, QRFactorization
-export KrylovJL #, KrylovJL_CG, KrylovJL_GMRES, KrylovJL_BICGSTAB
+export KrylovJL, KrylovJL_CG, KrylovJL_GMRES, KrylovJL_BICGSTAB
 export IterativeSolversJL #, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
        #IterativeSolversJL_BICGSTAB
 export KrylovKitJL #, KrylovKitJL_CG, KrylovKitJL_GMRES, KrylovKitJL_BICGSTAB

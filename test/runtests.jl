@@ -22,31 +22,31 @@ using Test
 
 #               :DefaultLinSolve,
 
-#               :KrylovJL,
-#               :IterativeSolvers.jl
+#               :KrylovJL, KrylovJL_CG, KrylovJL_GMRES, KrylovJL_BICGSTAB,
+#               :IterativeSolversJL
 #               :KrylovKitJL,
 
                )
         @eval begin
             y = solve($prob1, $alg())
-            @test $A1 *  y  ≈ $b1
-            @test $A1 * $x1 ≈ $b1
+            @test $A1 *  y  ≈ $b1 # out of place
+            @test $A1 * $x1 ≈ $b1 # in place
 
-            y = $alg()($x2, $A2, $b2)
+            y = $alg()($x2, $A2, $b2)              # alg is callable
             @test $A2 *  y  ≈ $b2
             @test $A2 * $x2 ≈ $b2
 
-            cache = SciMLBase.init($prob1, $alg())
-            y = cache($x3, $A1, $b1)
+            cache = SciMLBase.init($prob1, $alg()) # initialize cache
+            y = cache($x3, $A1, $b1)               # cache is callable
             @test $A1 *  y  ≈ $b1
             @test $A1 * $x3 ≈ $b1
 
-            y = cache($x3, $A1, $b2)
+            y = cache($x3, $A1, $b2)               # reuse factorization
             @test $A1 *  y  ≈ $b2
             @test $A1 * $x3 ≈ $b2
 
-            y = cache($x3, $A2, $b3)
-            @test $A2 *  y  ≈ $b3
+            y = cache($x3, $A2, $b3)               # new factorization
+            @test $A2 *  y  ≈ $b3                  # same old cache
             @test $A2 * $x3 ≈ $b3
         end
     end

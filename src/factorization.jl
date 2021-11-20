@@ -1,7 +1,17 @@
 
+
+function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization)
+    if cache.isfresh
+        fact = init_cacheval(alg, cache.A, cache.b, cache.u)
+        cache = set_cacheval(cache, fact)
+    end
+
+    ldiv!(cache.u,cache.cacheval, cache.b)
+end
+
 ## LUFactorization
 
-struct LUFactorization{P} <: SciMLLinearSolveAlgorithm
+struct LUFactorization{P} <: AbstractFactorization
     pivot::P
 end
 
@@ -14,25 +24,16 @@ function LUFactorization()
     LUFactorization(pivot)
 end
 
-function init_cacheval(A, alg::LUFactorization)
+function init_cacheval(alg::LUFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("LU is not defined for $(typeof(A))")
     fact = lu!(A, alg.pivot)
     return fact
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::LUFactorization)
-    if cache.isfresh
-        fact = init_cacheval(cache.A, alg)
-        cache = set_cacheval(cache, fact)
-    end
-
-    ldiv!(cache.u,cache.cacheval, cache.b)
-end
-
 ## QRFactorization
 
-struct QRFactorization{P} <: SciMLLinearSolveAlgorithm
+struct QRFactorization{P} <: AbstractFactorization
     pivot::P
     blocksize::Int
 end
@@ -46,7 +47,7 @@ function QRFactorization()
     QRFactorization(pivot, 16)
 end
 
-function init_cacheval(A, alg::QRFactorization)
+function init_cacheval(alg::QRFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("QR is not defined for $(typeof(A))")
 
@@ -54,25 +55,16 @@ function init_cacheval(A, alg::QRFactorization)
     return fact
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::QRFactorization)
-    if cache.isfresh
-        fact = init_cacheval(cache.A, alg)
-        cache = set_cacheval(cache, fact)
-    end
-
-    ldiv!(cache.u,cache.cacheval, cache.b)
-end
-
 ## SVDFactorization
 
-struct SVDFactorization{A} <: SciMLLinearSolveAlgorithm
+struct SVDFactorization{A} <: AbstractFactorization
     full::Bool
     alg::A
 end
 
 SVDFactorization() = SVDFactorization(false, LinearAlgebra.DivideAndConquer())
 
-function init_cacheval(A, alg::SVDFactorization)
+function init_cacheval(alg::SVDFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("SVD is not defined for $(typeof(A))")
 
@@ -80,11 +72,3 @@ function init_cacheval(A, alg::SVDFactorization)
     return fact
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::SVDFactorization)
-    if cache.isfresh
-        fact = init_cacheval(cache.A, alg)
-        cache = set_cacheval(cache, fact)
-    end
-
-    ldiv!(cache.u,cache.cacheval, cache.b)
-end

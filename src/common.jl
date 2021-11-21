@@ -121,7 +121,6 @@ function (cache::LinearCache)(prob::LinearProblem, args...; kwargs...)
 end
 
 function (cache::LinearCache)(x, A, b, args...; kwargs...)
-
     prob = LinearProblem(A, b; u0=x)
     x = cache(prob, args...; kwargs...)
     return x

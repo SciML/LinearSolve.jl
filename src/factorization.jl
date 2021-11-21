@@ -72,3 +72,15 @@ function init_cacheval(alg::SVDFactorization, A, b, u)
     return fact
 end
 
+## DefaultFactorization
+
+struct DefaultFactorization <: AbstractFactorization
+end
+
+function init_cacheval(alg::DefaultFactorization, A, b, u)
+    A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
+        error("DefaultFactorization is not defined for $(typeof(A))")
+
+    fact = factorize(A)
+    return fact
+end

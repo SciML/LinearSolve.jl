@@ -23,7 +23,8 @@ using Test
 #               :DefaultLinSolve,
 
                 :KrylovJL, :KrylovJL_CG, :KrylovJL_GMRES, :KrylovJL_BICGSTAB,
-                :IterativeSolversJL,#:IterativeSolversJL_GMRES, :IterativeSolversJL_BICGSTAB,
+                :IterativeSolversJL, :IterativeSolversJL_GMRES,
+                :IterativeSolversJL_BICGSTAB,
                )
         @eval begin
             y = solve($prob1, $alg())

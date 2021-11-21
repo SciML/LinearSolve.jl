@@ -48,9 +48,7 @@ function SciMLBase.init(prob::LinearProblem, alg, args...;
                        )
     @unpack A, b, u0, p = prob
 
-    if u0 == nothing
-        u0 = zero(b)
-    end
+    u0 = (u0 == nothing) ? zero(b) : u0
 
     cacheval = init_cacheval(alg, A, b, u0)
     isfresh = cacheval == nothing

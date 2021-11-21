@@ -1,12 +1,4 @@
 
-"""
-TODO
-    - account for standard kwargs: abstol, reltol, maxiter, restart, window
-        - KrylovJL: memory, window <-- Solver, itmax, atol, rtol <-- Solve
-        - IterativeSolversJL: restart
-"""
-
-
 ## Preconditioners
 
 struct ScaleVector{T}
@@ -36,7 +28,7 @@ end
 
 ## Krylov.jl
 
-struct KrylovJL{F,Tl,Tr,A,K, T, I} <: SciMLLinearSolveAlgorithm
+struct KrylovJL{F,Tl,Tr,T,I,A,K} <: SciMLLinearSolveAlgorithm
     KrylovAlg::F
     Pl::Tl
     Pr::Tr
@@ -59,9 +51,14 @@ function KrylovJL(args...; KrylovAlg = Krylov.gmres!, Pl=I, Pr=I,
                     args, kwargs)
 end
 
-KrylovJL_CG(args...;kwargs...) = KrylovJL(Krylov.cg!, args...; kwargs...)
-KrylovJL_GMRES(args...;kwargs...) = KrylovJL(Krylov.gmres!, args...; kwargs...)
-KrylovJL_BICGSTAB(args...;kwargs...) = KrylovJL(Krylov.bicgstab!, args...; kwargs...)
+KrylovJL_CG(args...;kwargs...) =
+    KrylovJL(Krylov.cg!, args...; kwargs...)
+KrylovJL_GMRES(args...;kwargs...) =
+    KrylovJL(Krylov.gmres!, args...; kwargs...)
+KrylovJL_BICGSTAB(args...;kwargs...) =
+    KrylovJL(Krylov.bicgstab!, args...; kwargs...)
+KrylovJL_MINRES(args...;kwargs...) =
+    KrylovJL(Krylov.minres!, args...; kwargs...)
 
 const KrylovJL_solvers = Dict(
   (Krylov.lsmr!       => Krylov.LsmrSolver          ),
@@ -101,8 +98,8 @@ function init_cacheval(alg::KrylovJL, A, b, u)
 
     KS = KrylovJL_solvers[alg.KrylovAlg]
 
-    solver =
-    if (KS === Krylov.DqgmresSolver ||
+    solver = if(
+        KS === Krylov.DqgmresSolver ||
         KS === Krylov.DiomSolver    ||
         KS === Krylov.GmresSolver   ||
         KS === Krylov.FormSovler
@@ -135,7 +132,7 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
     maxiter = (alg.reltol == 0) ? length(cache.b)       : alg.maxiter
 
     Krylov.solve!(cache.cacheval, cache.A, cache.b;
-                  M=cache.Pl, N=cache.Pr,
+                  M=alg.Pl, N=alg.Pr,
                   atol = abstol, rtol = reltol, itmax = maxiter,
                   alg.kwargs...)
 
@@ -144,24 +141,27 @@ end
 
 ## IterativeSolvers.jl
 
-struct IterativeSolversJL{F,Tl,Tr,A,K} <: SciMLLinearSolveAlgorithm
+struct IterativeSolversJL{F,Tl,Tr,T,I,A,K} <: SciMLLinearSolveAlgorithm
     generate_iterator::F
     Pl::Tl
     Pr::Tr
+    abstol::T
+    reltol::T
+    maxiter::I
+    restart::I
     args::A
     kwargs::K
-#   abstol::T
-#   reltol::T
-#   maxiter::I
-#   restart::I
 end
 
 function IterativeSolversJL(args...;
+                            generate_iterator = IterativeSolvers.gmres_iterable!,
                             Pl=IterativeSolvers.Identity(),
                             Pr=IterativeSolvers.Identity(),
-                            generate_iterator = IterativeSolvers.gmres_iterable!,
+                            abstol=0.0, reltol=0.0, maxiter=0, restart=0,
                             kwargs...)
-    return IterativeSolversJL(generate_iterator, Pl, Pr, args, kwargs)
+    return IterativeSolversJL(generate_iterator, Pl, Pr,
+                              abstol, reltol, maxiter, restart,
+                              args, kwargs)
 end
 
 IterativeSolversJL_CG(args...; kwargs...) =
@@ -170,43 +170,51 @@ IterativeSolversJL_GMRES(args...;kwargs...) =
     IterativeSolversJL(IterativeSolvers.gmres_iterable!, args...; kwargs...)
 IterativeSolversJL_BICGSTAB(args...;kwargs...) =
     IterativeSolversJL(IterativeSolvers.bicgstabl_iterator!, args...;kwargs...)
+IterativeSolversJL_MINRES(args...;kwargs...) =
+    IterativeSolversJL(IterativeSolvers.minres_iterable!, args...;kwargs...)
 
-function init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr)
-    Pl = (Pl == LinearAlgebra.I) ? IterativeSolvers.Identity() : Pl
-    Pr = (Pr == LinearAlgebra.I) ? IterativeSolvers.Identity() : Pr
+function init_cacheval(alg::IterativeSolversJL, A, b, u)
+    Pl = (alg.Pl == LinearAlgebra.I) ? IterativeSolvers.Identity() : alg.Pl
+    Pr = (alg.Pr == LinearAlgebra.I) ? IterativeSolvers.Identity() : alg.Pr
 
-    # standard kwargs: abstol, reltol
-    #
-    # cg: kw: maxiter
-    # gmres:  kw: restart=20, maxiter=length(b)
-    # bicgstabl: kw: max_mv_products
+    abstol  = (alg.abstol == 0) ? √eps(eltype(b)) : alg.abstol
+    reltol  = (alg.reltol == 0) ? √eps(eltype(b)) : alg.reltol
+    maxiter = (alg.reltol == 0) ? length(b)       : alg.maxiter
 
-    cacheval = if alg.generate_iterator === IterativeSolvers.cg_iterator!
+    iterable = if alg.generate_iterator === IterativeSolvers.cg_iterator!
         Pr != IterativeSolvers.Identity() &&
-            @warn "$(alg.generate_iterator) doesn't support right preconditioning"
-        alg.generate_iterator(u, A, b, Pl; alg.kwargs...)
+          @warn "$(alg.generate_iterator) doesn't support right preconditioning"
+        alg.generate_iterator(u, A, b, Pl;
+                              abstol=abstol, reltol=reltol, maxiter=maxiter,
+                              alg.kwargs...)
     elseif alg.generate_iterator === IterativeSolvers.gmres_iterable!
-        alg.generate_iterator(u, A, b; Pl=Pl, Pr=Pr, alg.kwargs...)
+        alg.generate_iterator(u, A, b; Pl=Pl, Pr=Pr,
+                              abstol=abstol, reltol=reltol, maxiter=maxiter,
+                              alg.kwargs...)
     elseif alg.generate_iterator === IterativeSolvers.bicgstabl_iterator!
         Pr != IterativeSolvers.Identity() &&
-            @warn "$(alg.generate_iterator) doesn't support right preconditioning"
-        alg.generate_iterator(u, A, b, alg.args...; Pl=Pl, alg.kwargs...)
-    else
-        alg.generate_iterator(u, A, b, alg.args...; alg.kwargs...)
+          @warn "$(alg.generate_iterator) doesn't support right preconditioning"
+        alg.generate_iterator(u, A, b, alg.args...; Pl=Pl,
+                              abstol=abstol, reltol=reltol,
+                              max_mv_products=maxiter*2,
+                              alg.kwargs...)
+    else # minres, qmr
+        alg.generate_iterator(u, A, b, alg.args...;
+                              abstol=abstol, reltol=reltol, maxiter=maxiter,
+                              alg.kwargs...)
     end
-    return cacheval
+    return iterable
 end
 
 function SciMLBase.solve(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
     if cache.isfresh
-        solver = init_cacheval(alg, cache.A, cache.b, cache.u,
-                               cache.Pl,  cache.Pr)
+        solver = init_cacheval(alg, cache.A, cache.b, cache.u)
         cache = set_cacheval(cache, solver)
     end
 
     for resi in cache.cacheval
         # allow for verbose, log
-        # inject specific code into KSP solve
+        # inject specific code into KSP solve func!(cache.cacheval)
     end
 
     return cache.u

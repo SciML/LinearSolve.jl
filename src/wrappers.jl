@@ -138,13 +138,13 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
     args   = (cache.cacheval, cache.A, cache.b)
     kwargs = (atol=abstol, rtol=reltol, itmax=maxiter, alg.kwargs...)
 
-    if cache.cacheval == Krylov.CgSolver
+    if cache.cacheval == Krylov.GmresSolver
+        Krylov.solve!(args...; M=alg.Pl, N=alg.Pr,
+                      kwargs...)
+    elseif cache.cacheval == Krylov.CgSolver
         alg.Pr != LinearAlgebra.I  &&
             @warn "$(alg.KrylovAlg) doesn't support right preconditioning."
         Krylov.solve!(args...; M=alg.Pl,
-                      kwargs...)
-    elseif cache.cacheval == Krylov.GmresSolver
-        Krylov.solve!(args...; M=alg.Pl, N=alg.Pr,
                       kwargs...)
     else
         Krylov.solve!(args...; M=alg.Pl, N=alg.Pr,

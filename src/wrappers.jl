@@ -1,4 +1,7 @@
 
+#TODO: composed preconditioners, preconditioner setter for cache, 
+#   detailed tests for wrappers
+
 ## Preconditioners
 
 struct ScaleVector{T}
@@ -127,14 +130,26 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
         cache = set_cacheval(cache, solver)
     end
 
-    abstol  = (alg.abstol == 0) ? √eps(eltype(cache.b)) : alg.abstol
-    reltol  = (alg.reltol == 0) ? √eps(eltype(cache.b)) : alg.reltol
-    maxiter = (alg.reltol == 0) ? length(cache.b)       : alg.maxiter
+    abstol  = (alg.abstol  == 0) ? √eps(eltype(cache.b)) : alg.abstol
+    reltol  = (alg.reltol  == 0) ? √eps(eltype(cache.b)) : alg.reltol
+    maxiter = (alg.maxiter == 0) ? length(cache.b)       : alg.maxiter
 
-    Krylov.solve!(cache.cacheval, cache.A, cache.b;
-                  M=alg.Pl, N=alg.Pr,
-                  atol = abstol, rtol = reltol, itmax = maxiter,
-                  alg.kwargs...)
+
+    args   = (cache.cacheval, cache.A, cache.b)
+    kwargs = (atol=abstol, rtol=reltol, itmax=maxiter, alg.kwargs...)
+
+    if cache.cacheval == Krylov.CgSolver
+        alg.Pr != LinearAlgebra.I  &&
+            @warn "$(alg.KrylovAlg) doesn't support right preconditioning."
+        Krylov.solve!(args...; M=alg.Pl,
+                      kwargs...)
+    elseif cache.cacheval == Krylov.GmresSolver
+        Krylov.solve!(args...; M=alg.Pl, N=alg.Pr,
+                      kwargs...)
+    else
+        Krylov.solve!(args...; M=alg.Pl, N=alg.Pr,
+                      kwargs...)
+    end
 
     return cache.u
 end
@@ -177,20 +192,21 @@ function init_cacheval(alg::IterativeSolversJL, A, b, u)
     Pl = (alg.Pl == LinearAlgebra.I) ? IterativeSolvers.Identity() : alg.Pl
     Pr = (alg.Pr == LinearAlgebra.I) ? IterativeSolvers.Identity() : alg.Pr
 
-    abstol  = (alg.abstol == 0) ? √eps(eltype(b)) : alg.abstol
-    reltol  = (alg.reltol == 0) ? √eps(eltype(b)) : alg.reltol
-    maxiter = (alg.reltol == 0) ? length(b)       : alg.maxiter
+    abstol  = (alg.abstol  == 0) ? √eps(eltype(b)) : alg.abstol
+    reltol  = (alg.reltol  == 0) ? √eps(eltype(b)) : alg.reltol
+    maxiter = (alg.maxiter == 0) ? length(b)       : alg.maxiter
+
+#   args   = (u, A, b)
+    kwargs = (abstol=abstol, reltol=reltol, maxiter=maxiter, alg.kwargs...)
 
     iterable = if alg.generate_iterator === IterativeSolvers.cg_iterator!
         Pr != IterativeSolvers.Identity() &&
           @warn "$(alg.generate_iterator) doesn't support right preconditioning"
         alg.generate_iterator(u, A, b, Pl;
-                              abstol=abstol, reltol=reltol, maxiter=maxiter,
-                              alg.kwargs...)
+                              kwargs...)
     elseif alg.generate_iterator === IterativeSolvers.gmres_iterable!
         alg.generate_iterator(u, A, b; Pl=Pl, Pr=Pr,
-                              abstol=abstol, reltol=reltol, maxiter=maxiter,
-                              alg.kwargs...)
+                              kwargs...)
     elseif alg.generate_iterator === IterativeSolvers.bicgstabl_iterator!
         Pr != IterativeSolvers.Identity() &&
           @warn "$(alg.generate_iterator) doesn't support right preconditioning"

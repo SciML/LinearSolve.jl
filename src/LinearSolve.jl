@@ -17,6 +17,7 @@ using Reexport
 
 abstract type SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
 abstract type AbstractFactorization <: SciMLLinearSolveAlgorithm end
+abstract type AbstractKrylovSubspaceMethod <: SciMLLinearSolveAlgorithm end
 
 include("common.jl")
 include("default.jl")

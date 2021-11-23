@@ -31,9 +31,9 @@ function SciMLBase.solve(cache::LinearCache, alg::DefaultLinSolve,
           else
               LUFactorization()
           end
-      elseif A isa Union{Tridiagonal,} # ForwardSensitivityJacobian
+      elseif A isa Tridiagonal
           DefaultFactorization(;fact_alg=lu!)
-      elseif A isa Union{SymTridiagonal}
+      elseif A isa SymTridiagonal
           DefaultFactorization(;fact_alg=ldlt!)
       elseif A isa SparseMatrixCSC
           LUFactorization()

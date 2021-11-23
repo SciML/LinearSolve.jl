@@ -29,8 +29,8 @@ using Test
             @test $A2 *  y  ≈ $b2
             @test $A2 * $x2 ≈ $b2
 
-            cache = SciMLBase.init($prob1,            # initialize cache
-                                   $alg(;$kwargs...)) 
+            cache = SciMLBase.init($prob1,           
+                                   $alg(;$kwargs...)) # initialize cache 
             y = cache($x3, $A1, $b1)                  # cache is callable
             @test $A1 *  y  ≈ $b1
             @test $A1 * $x3 ≈ $b1
@@ -59,7 +59,7 @@ using Test
     end
 
     # KrylovJL
-    kwargs = :(ifverbose=true, abstol=1e-2, reltol=1e-1, maxiter=3,
+    kwargs = :(ifverbose=true, abstol=1e-8, reltol=1e-8, maxiter=30,
                gmres_restart=5)
     for alg in (
                 :KrylovJL,
@@ -72,7 +72,7 @@ using Test
     end
 
     # IterativeSolversJL
-    kwargs = :(ifverbose=true, abstol=1e-1, reltol=1e-2, maxiter=3,
+    kwargs = :(ifverbose=true, abstol=1e-8, reltol=1e-8, maxiter=30,
                gmres_restart=5)
     for alg in (
                 :IterativeSolversJL,

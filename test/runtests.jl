@@ -51,55 +51,70 @@ using Test
         return
     end
 
-    kwargs = :()
-    for alg in (
-                :LUFactorization,
-                :QRFactorization,
-                :SVDFactorization,
-    #           :DefaultLinSolve
-               )
-        test_interface(alg, kwargs, prob1, prob2, prob3)
+    @testset "factorization" begin
+        kwargs = :()
+        for alg in (
+                    :LUFactorization,
+                    :QRFactorization,
+                    :SVDFactorization,
+        #           :DefaultLinSolve
+                   )
+            @testset "$alg" begin
+                test_interface(alg, kwargs, prob1, prob2, prob3)
+            end
+        end
+
+        alg = :DefaultFactorization
+        @testset "$alg" begin
+            for fact_alg in (
+                             :lu, :lu!,
+                             :qr, :qr!,
+                             :cholesky, :cholesky!,
+            #                :ldlt, :ldlt!,
+                             :bunchkaufman, :bunchkaufman!,
+                             :lq, :lq!,
+                             :svd, :svd!,
+                             :(LinearAlgebra.factorize), 
+                            )
+                @testset "fact_alg = $fact_alg" begin
+                    kwargs = :(fact_alg=$fact_alg,)
+                    test_interface(alg, kwargs, prob1, prob2, prob3)
+                end
+            end
+        end
+
     end
 
-#   alg = :DefaultFactorization
-#   for fact_alg in (
-#                    :lu, :lu!,
-#                    :qr, :qr!,
-#                    :cholesky, :cholesky!,
-#   #                :ldlt, :ldlt!,
-#                    :bunchkaufman, :bunchkaufman!,
-#                    :lq, :lq!,
-#                    :svd, :svd!,
-#                    :(LinearAlgebra.factorize), 
-#                   )
-#       kwargs = :(fact_alg=$fact_alg,)
-#       test_interface(alg, kwargs, prob1, prob2, prob3)
-#   end
-
-    # KrylovJL
-    kwargs = :(ifverbose=false, abstol=1e-8, reltol=1e-8, maxiter=30,
-               gmres_restart=5)
-    for alg in (
-                :KrylovJL,
-                :KrylovJL_CG,
-                :KrylovJL_GMRES,
-    #           :KrylovJL_BICGSTAB,
-                :KrylovJL_MINRES,
-               )
-        test_interface(alg, kwargs, prob1, prob2, prob3)
+    @testset "KrylovJL" begin
+        kwargs = :(ifverbose=false, abstol=1e-8, reltol=1e-8, maxiter=30,
+                   gmres_restart=5)
+        for alg in (
+                    :KrylovJL,
+                    :KrylovJL_CG,
+                    :KrylovJL_GMRES,
+        #           :KrylovJL_BICGSTAB,
+                    :KrylovJL_MINRES,
+                   )
+            @testset "$alg" begin
+                test_interface(alg, kwargs, prob1, prob2, prob3)
+            end
+        end
     end
 
-    # IterativeSolversJL
-    kwargs = :(ifverbose=false, abstol=1e-8, reltol=1e-8, maxiter=30,
-               gmres_restart=5)
-    for alg in (
-                :IterativeSolversJL,
-                :IterativeSolversJL_CG,
-                :IterativeSolversJL_GMRES,
-    #           :IterativeSolversJL_BICGSTAB,
-                :IterativeSolversJL_MINRES,
-               )
-        test_interface(alg, kwargs, prob1, prob2, prob3)
+    @testset "IterativeSolversJL" begin
+        kwargs = :(ifverbose=false, abstol=1e-8, reltol=1e-8, maxiter=30,
+                   gmres_restart=5)
+        for alg in (
+                    :IterativeSolversJL,
+                    :IterativeSolversJL_CG,
+                    :IterativeSolversJL_GMRES,
+        #           :IterativeSolversJL_BICGSTAB,
+                    :IterativeSolversJL_MINRES,
+                   )
+            @testset "$alg" begin
+                test_interface(alg, kwargs, prob1, prob2, prob3)
+            end
+        end
     end
 
 end

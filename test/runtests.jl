@@ -36,13 +36,17 @@ using Test
             @test $A1 * $x3 ≈ $b1
 
             y = cache($x3, $A1, $b2)                  # reuse factorization
-            @test $A1 *  y  ≈ $b2
+            @test $A1 *  y  ≈ $b2                     # with different RHS
             @test $A1 * $x3 ≈ $b2
 
             y = cache($x3, $A2, $b3)                  # new factorization
             @test $A2 *  y  ≈ $b3                     # same old cache
             @test $A2 * $x3 ≈ $b3
         end
+
+        x1 .= 0.0
+        x2 .= 0.0
+        x3 .= 0.0
 
         return
     end
@@ -52,33 +56,47 @@ using Test
                 :LUFactorization,
                 :QRFactorization,
                 :SVDFactorization,
-                :DefaultFactorization,
-                :DefaultLinSolve
+    #           :DefaultLinSolve
                )
         test_interface(alg, kwargs, prob1, prob2, prob3)
     end
 
+#   alg = :DefaultFactorization
+#   for fact_alg in (
+#                    :lu, :lu!,
+#                    :qr, :qr!,
+#                    :cholesky, :cholesky!,
+#   #                :ldlt, :ldlt!,
+#                    :bunchkaufman, :bunchkaufman!,
+#                    :lq, :lq!,
+#                    :svd, :svd!,
+#                    :(LinearAlgebra.factorize), 
+#                   )
+#       kwargs = :(fact_alg=$fact_alg,)
+#       test_interface(alg, kwargs, prob1, prob2, prob3)
+#   end
+
     # KrylovJL
-    kwargs = :(ifverbose=true, abstol=1e-8, reltol=1e-8, maxiter=30,
+    kwargs = :(ifverbose=false, abstol=1e-8, reltol=1e-8, maxiter=30,
                gmres_restart=5)
     for alg in (
                 :KrylovJL,
                 :KrylovJL_CG,
                 :KrylovJL_GMRES,
-    #           :KrylovJL_BICGSTAB, # fails
+    #           :KrylovJL_BICGSTAB,
                 :KrylovJL_MINRES,
                )
         test_interface(alg, kwargs, prob1, prob2, prob3)
     end
 
     # IterativeSolversJL
-    kwargs = :(ifverbose=true, abstol=1e-8, reltol=1e-8, maxiter=30,
+    kwargs = :(ifverbose=false, abstol=1e-8, reltol=1e-8, maxiter=30,
                gmres_restart=5)
     for alg in (
                 :IterativeSolversJL,
                 :IterativeSolversJL_CG,
                 :IterativeSolversJL_GMRES,
-    #           :IterativeSolversJL_BICGSTAB,   # fails
+    #           :IterativeSolversJL_BICGSTAB,
                 :IterativeSolversJL_MINRES,
                )
         test_interface(alg, kwargs, prob1, prob2, prob3)

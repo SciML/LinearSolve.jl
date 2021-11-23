@@ -65,7 +65,7 @@ KrylovJL_MINRES(args...;kwargs...) =
     KrylovJL(args...; KrylovAlg=Krylov.minres!, kwargs...)
 
 function get_KrylovJL_solver(KrylovAlg)
-    solver = 
+    KS = 
     if     (KrylovAlg === Krylov.lsmr!      ) Krylov.LsmrSolver
     elseif (KrylovAlg === Krylov.cgs!       ) Krylov.CgsSolver
     elseif (KrylovAlg === Krylov.usymlq!    ) Krylov.UsymlqSolver
@@ -99,7 +99,7 @@ function get_KrylovJL_solver(KrylovAlg)
     elseif (KrylovAlg === Krylov.fom!       ) Krylov.FomSolver
     end
 
-    return solver
+    return KS
 end
 
 function init_cacheval(alg::KrylovJL, A, b, u)
@@ -107,17 +107,18 @@ function init_cacheval(alg::KrylovJL, A, b, u)
     KS = get_KrylovJL_solver(alg.KrylovAlg)
 
     solver = if(
-        KS === Krylov.DqgmresSolver ||
-        KS === Krylov.DiomSolver    ||
-        KS === Krylov.GmresSolver   ||
-        KS === Krylov.FomSolver
+        alg.KrylovAlg === Krylov.dqgmres! ||
+        alg.KrylovAlg === Krylov.diom!    ||
+        alg.KrylovAlg === Krylov.gmres!   ||
+        alg.KrylovAlg === Krylov.fom!
        )
         KS(A, b, alg.gmres_restart)
-    elseif(KS === Krylov.MinresSolver ||
-           KS === Krylov.SymmlqSolver ||
-           KS === Krylov.LslqSolver   ||
-           KS === Krylov.LsqrSolver   ||
-           KS === Krylov.LsmrSolver
+    elseif(
+           alg.KrylovAlg === Krylov.minres! ||
+           alg.KrylovAlg === Krylov.symmlq! ||
+           alg.KrylovAlg === Krylov.lslq!   ||
+           alg.KrylovAlg === Krylov.lsqr!   ||
+           alg.KrylovAlg === Krylov.lsmr!
           )
         (alg.window != 0) ? KS(A,b; window=alg.window) : KS(A, b)
     else

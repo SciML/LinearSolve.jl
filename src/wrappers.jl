@@ -64,43 +64,47 @@ KrylovJL_BICGSTAB(args...;kwargs...) =
 KrylovJL_MINRES(args...;kwargs...) =
     KrylovJL(args...; KrylovAlg=Krylov.minres!, kwargs...)
 
-const KrylovJL_solvers = Dict(
-  (Krylov.lsmr!       => Krylov.LsmrSolver          ),
-  (Krylov.cgs!        => Krylov.CgsSolver           ),
-  (Krylov.usymlq!     => Krylov.UsymlqSolver        ),
-  (Krylov.lnlq!       => Krylov.LnlqSolver          ),
-  (Krylov.bicgstab!   => Krylov.BicgstabSolver      ),
-  (Krylov.crls!       => Krylov.CrlsSolver          ),
-  (Krylov.lsqr!       => Krylov.LsqrSolver          ),
-  (Krylov.minres!     => Krylov.MinresSolver        ),
-  (Krylov.cgne!       => Krylov.CgneSolver          ),
-  (Krylov.dqgmres!    => Krylov.DqgmresSolver       ),
-  (Krylov.symmlq!     => Krylov.SymmlqSolver        ),
-  (Krylov.trimr!      => Krylov.TrimrSolver         ),
-  (Krylov.usymqr!     => Krylov.UsymqrSolver        ),
-  (Krylov.bilqr!      => Krylov.BilqrSolver         ),
-  (Krylov.cr!         => Krylov.CrSolver            ),
-  (Krylov.craigmr!    => Krylov.CraigmrSolver       ),
-  (Krylov.tricg!      => Krylov.TricgSolver         ),
-  (Krylov.craig!      => Krylov.CraigSolver         ),
-  (Krylov.diom!       => Krylov.DiomSolver          ),
-  (Krylov.lslq!       => Krylov.LslqSolver          ),
-  (Krylov.trilqr!     => Krylov.TrilqrSolver        ),
-  (Krylov.crmr!       => Krylov.CrmrSolver          ),
-  (Krylov.cg!         => Krylov.CgSolver            ),
-  (Krylov.cg_lanczos! => Krylov.CgLanczosShiftSolver),
-  (Krylov.cgls!       => Krylov.CglsSolver          ),
-  (Krylov.cg_lanczos! => Krylov.CgLanczosSolver     ),
-  (Krylov.bilq!       => Krylov.BilqSolver          ),
-  (Krylov.minres_qlp! => Krylov.MinresQlpSolver     ),
-  (Krylov.qmr!        => Krylov.QmrSolver           ),
-  (Krylov.gmres!      => Krylov.GmresSolver         ),
-  (Krylov.fom!        => Krylov.FomSolver           ),
- )
+function get_KrylovJL_solver(KrylovAlg)
+    solver = 
+    if     (KrylovAlg === Krylov.lsmr!      ) Krylov.LsmrSolver
+    elseif (KrylovAlg === Krylov.cgs!       ) Krylov.CgsSolver
+    elseif (KrylovAlg === Krylov.usymlq!    ) Krylov.UsymlqSolver
+    elseif (KrylovAlg === Krylov.lnlq!      ) Krylov.LnlqSolver
+    elseif (KrylovAlg === Krylov.bicgstab!  ) Krylov.BicgstabSolver
+    elseif (KrylovAlg === Krylov.crls!      ) Krylov.CrlsSolver
+    elseif (KrylovAlg === Krylov.lsqr!      ) Krylov.LsqrSolver
+    elseif (KrylovAlg === Krylov.minres!    ) Krylov.MinresSolver
+    elseif (KrylovAlg === Krylov.cgne!      ) Krylov.CgneSolver
+    elseif (KrylovAlg === Krylov.dqgmres!   ) Krylov.DqgmresSolver
+    elseif (KrylovAlg === Krylov.symmlq!    ) Krylov.SymmlqSolver
+    elseif (KrylovAlg === Krylov.trimr!     ) Krylov.TrimrSolver
+    elseif (KrylovAlg === Krylov.usymqr!    ) Krylov.UsymqrSolver
+    elseif (KrylovAlg === Krylov.bilqr!     ) Krylov.BilqrSolver
+    elseif (KrylovAlg === Krylov.cr!        ) Krylov.CrSolver
+    elseif (KrylovAlg === Krylov.craigmr!   ) Krylov.CraigmrSolver
+    elseif (KrylovAlg === Krylov.tricg!     ) Krylov.TricgSolver
+    elseif (KrylovAlg === Krylov.craig!     ) Krylov.CraigSolver
+    elseif (KrylovAlg === Krylov.diom!      ) Krylov.DiomSolver
+    elseif (KrylovAlg === Krylov.lslq!      ) Krylov.LslqSolver
+    elseif (KrylovAlg === Krylov.trilqr!    ) Krylov.TrilqrSolver
+    elseif (KrylovAlg === Krylov.crmr!      ) Krylov.CrmrSolver
+    elseif (KrylovAlg === Krylov.cg!        ) Krylov.CgSolver
+    elseif (KrylovAlg === Krylov.cg_lanczos!) Krylov.CgLanczosShiftSolver
+    elseif (KrylovAlg === Krylov.cgls!      ) Krylov.CglsSolver
+    elseif (KrylovAlg === Krylov.cg_lanczos!) Krylov.CgLanczosSolver
+    elseif (KrylovAlg === Krylov.bilq!      ) Krylov.BilqSolver
+    elseif (KrylovAlg === Krylov.minres_qlp!) Krylov.MinresQlpSolver
+    elseif (KrylovAlg === Krylov.qmr!       ) Krylov.QmrSolver
+    elseif (KrylovAlg === Krylov.gmres!     ) Krylov.GmresSolver
+    elseif (KrylovAlg === Krylov.fom!       ) Krylov.FomSolver
+    end
+
+    return solver
+end
 
 function init_cacheval(alg::KrylovJL, A, b, u)
 
-    KS = KrylovJL_solvers[alg.KrylovAlg]
+    KS = get_KrylovJL_solver(alg.KrylovAlg)
 
     solver = if(
         KS === Krylov.DqgmresSolver ||

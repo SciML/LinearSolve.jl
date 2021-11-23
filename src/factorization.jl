@@ -1,5 +1,4 @@
 
-
 function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization)
     if cache.isfresh
         fact = init_cacheval(alg, cache.A, cache.b, cache.u)
@@ -78,11 +77,8 @@ struct DefaultFactorization{F} <: AbstractFactorization
     fact_alg::F
 end
 
-DefaultFactorization(
-                     # https://github.com/SciML/SciMLBase.jl/pull/119
-#                    ;fact_alg = LinearAlgebra.factorize
-                     ;fact_alg = lu!
-                    ) = DefaultFactorization(fact_alg)
+DefaultFactorization(;fact_alg = LinearAlgebra.factorize) =
+    DefaultFactorization(fact_alg)
 
 function init_cacheval(alg::DefaultFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||

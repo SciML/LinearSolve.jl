@@ -6,8 +6,9 @@ struct LinearCache{TA,Tb,Tu,Tp,Talg,Tc,Tl,Tr}
     alg::Talg
     cacheval::Tc  # store alg cache here 
     isfresh::Bool # false => cacheval is set wrt A, true => update cacheval wrt A
-    Pl::Tl        # store final preconditioner here
-    Pr::Tr
+#
+    Pl::Tl        # store final preconditioner here. not being used rn
+    Pr::Tr        # wrappers are using preconditioner in cache.alg for now
 end
 
 function set_A(cache::LinearCache, A) # and ! to function name

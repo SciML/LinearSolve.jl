@@ -6,12 +6,11 @@ struct LinearCache{TA,Tb,Tu,Tp,Talg,Tc,Tl,Tr}
     alg::Talg
     cacheval::Tc  # store alg cache here 
     isfresh::Bool # false => cacheval is set wrt A, true => update cacheval wrt A
-#
     Pl::Tl        # store final preconditioner here. not being used rn
     Pr::Tr        # wrappers are using preconditioner in cache.alg for now
 end
 
-function set_A(cache::LinearCache, A) # and ! to function name
+function set_A(cache::LinearCache, A)
     @set! cache.A = A
     @set! cache.isfresh = true
     return cache
@@ -49,10 +48,10 @@ function SciMLBase.init(prob::LinearProblem, alg, args...;
                        )
     @unpack A, b, u0, p = prob
 
-    u0 = (u0 == nothing) ? zero(b) : u0
+    u0 = (u0 === nothing) ? zero(b) : u0
 
     cacheval = init_cacheval(alg, A, b, u0)
-    isfresh = cacheval == nothing
+    isfresh = cacheval === nothing
     Tc = isfresh ? Any : typeof(cacheval)
 
     Pl = LinearAlgebra.I

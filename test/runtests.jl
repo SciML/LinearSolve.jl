@@ -47,35 +47,38 @@ using Test
         return
     end
 
-    # Factorizations
     kwargs = :()
     for alg in (
                 :LUFactorization,
                 :QRFactorization,
                 :SVDFactorization,
+                :DefaultFactorization,
+                :DefaultLinSolve
                )
         test_interface(alg, kwargs, prob1, prob2, prob3)
     end
 
     # KrylovJL
-    kwargs = :(ifverbose=true, abstol=1e-1, reltol=1e-1, maxiter=3, restart=5)
+    kwargs = :(ifverbose=true, abstol=1e-2, reltol=1e-1, maxiter=3,
+               gmres_restart=5)
     for alg in (
                 :KrylovJL,
                 :KrylovJL_CG,
-#               :KrylovJL_GMRES,    # same as default wrapper
-#               :KrylovJL_BICGSTAB, # fails
+                :KrylovJL_GMRES,
+    #           :KrylovJL_BICGSTAB, # fails
                 :KrylovJL_MINRES,
                )
         test_interface(alg, kwargs, prob1, prob2, prob3)
     end
 
     # IterativeSolversJL
-    kwargs = :(abstol=1e-1, reltol=1e-1, maxiter=3, restart=5)
+    kwargs = :(ifverbose=true, abstol=1e-1, reltol=1e-2, maxiter=3,
+               gmres_restart=5)
     for alg in (
                 :IterativeSolversJL,
                 :IterativeSolversJL_CG,
-#               :IterativeSolversJL_GMRES,      # same as default wrapper
-#               :IterativeSolversJL_BICGSTAB,   # fails
+                :IterativeSolversJL_GMRES,
+    #           :IterativeSolversJL_BICGSTAB,   # fails
                 :IterativeSolversJL_MINRES,
                )
         test_interface(alg, kwargs, prob1, prob2, prob3)

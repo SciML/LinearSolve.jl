@@ -6,7 +6,7 @@ struct LinearCache{TA,Tb,Tu,Tp,Talg,Tc,Tl,Tr}
     alg::Talg
     cacheval::Tc  # store alg cache here 
     isfresh::Bool # false => cacheval is set wrt A, true => update cacheval wrt A
-    Pl::Tl
+    Pl::Tl        # store final preconditioner here
     Pr::Tr
 end
 

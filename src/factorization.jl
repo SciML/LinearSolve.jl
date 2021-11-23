@@ -74,13 +74,20 @@ end
 
 ## DefaultFactorization
 
-struct DefaultFactorization <: AbstractFactorization
+struct DefaultFactorization{F} <: AbstractFactorization
+    fact_alg::F
 end
+
+DefaultFactorization(
+                     # https://github.com/SciML/SciMLBase.jl/pull/119
+#                    ;fact_alg = LinearAlgebra.factorize
+                     ;fact_alg = lu!
+                    ) = DefaultFactorization(fact_alg)
 
 function init_cacheval(alg::DefaultFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("DefaultFactorization is not defined for $(typeof(A))")
 
-    fact = factorize(A)
+    fact = alg.fact_alg(A)
     return fact
 end

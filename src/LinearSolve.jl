@@ -1,8 +1,10 @@
 module LinearSolve
 
-using ArrayInterface: lu_instance
+using ArrayInterface
+using RecursiveFactorization
 using Base: cache_dependencies, Bool
 using LinearAlgebra
+using SparseArrays
 using SciMLBase: AbstractDiffEqOperator, AbstractLinearAlgorithm
 using Setfield
 using UnPack
@@ -20,15 +22,15 @@ abstract type AbstractFactorization <: SciMLLinearSolveAlgorithm end
 abstract type AbstractKrylovSubspaceMethod <: SciMLLinearSolveAlgorithm end
 
 include("common.jl")
-include("default.jl")
 include("factorization.jl")
 include("wrappers.jl")
+include("default.jl")
 
-export DefaultLinSolve
-export LUFactorization, SVDFactorization, QRFactorization
+export LUFactorization, SVDFactorization, QRFactorization, DefaultFactorization
 export KrylovJL, KrylovJL_CG, KrylovJL_GMRES, KrylovJL_BICGSTAB,
        KrylovJL_MINRES, 
        IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
        IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES
+export DefaultLinSolve
 
 end

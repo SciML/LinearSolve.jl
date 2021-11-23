@@ -22,7 +22,8 @@ function SciMLBase.solve(cache::LinearCache, alg::DefaultLinSolve,
     @unpack A = cache
 
     if alg.isset
-      linalg = if A isa Matrix
+      linalg =
+      if A isa Matrix
           if ArrayInterface.can_setindex(x) && (size(A,1) <= 100 ||
                                                 (p.openblas && size(A,1) <= 500)
                                                )
@@ -37,7 +38,7 @@ function SciMLBase.solve(cache::LinearCache, alg::DefaultLinSolve,
       elseif A isa SparseMatrixCSC
           LUFactorization()
       elseif ArrayInterface.isstructured(A)
-          DefaultFactorization() # change fact_alg=LinearAlgebra.factorize
+          DefaultFactorization()
       elseif !(A isa AbstractDiffEqOperator)
           QRFactorization()
       else

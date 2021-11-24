@@ -25,18 +25,12 @@ function test_interface(alg, prob1, prob2)
     y = solve(cache)
     @test A2 *  y  ≈ b1
 
-    @show A2, b2
-
     cache = LinearSolve.set_b(cache,b2)
     y = solve(cache)
-    @show cache.A, cache.b, y
     @test A2 *  y  ≈ b2
 
     return
 end
-
-alg = GenericFactorization(fact_alg=cholesky!)
-test_interface(alg, prob1, prob2)
 
 @testset "Concrete Factorizations" begin
     for alg in (

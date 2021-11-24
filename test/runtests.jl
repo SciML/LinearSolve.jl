@@ -1,120 +1,97 @@
-using LinearSolve
+using LinearSolve, LinearAlgebra
 using Test
 
-@testset "LinearSolve.jl" begin
-    using LinearAlgebra
-    n = 8
+n = 8
 
-    A = Matrix(I,n,n)
-    b = ones(n)
-    A1 = A/1; b1 = rand(n); x1 = zero(b)
-    A2 = A/2; b2 = rand(n); x2 = zero(b)
-    A3 = A/3; b3 = rand(n); x3 = zero(b)
+A = Matrix(I,n,n)
+b = ones(n)
+A1 = A/1; b1 = rand(n); x1 = zero(b)
+A2 = A/2; b2 = rand(n); x2 = zero(b)
 
-    prob1 = LinearProblem(A1, b1; u0=x1)
-    prob2 = LinearProblem(A2, b2; u0=x2)
-    prob3 = LinearProblem(A3, b3; u0=x3)
+prob1 = LinearProblem(A1, b1; u0=x1)
+prob2 = LinearProblem(A2, b2; u0=x2)
 
-    function test_interface(alg, kwargs, prob1, prob2, prob3)
-        A1 = prob1.A; b1 = prob1.b; x1 = prob1.u0
-        A2 = prob2.A; b2 = prob2.b; x2 = prob2.u0
-        A3 = prob3.A; b3 = prob3.b; x3 = prob3.u0
+function test_interface(alg, prob1, prob2, prob3)
+    A1 = prob1.A; b1 = prob1.b; x1 = prob1.u0
+    A2 = prob2.A; b2 = prob2.b; x2 = prob2.u0
 
-        @eval begin
-            y = solve($prob1, $alg(;$kwargs...))
-            @test $A1 *  y  ≈ $b1 # out of place
-            @test $A1 * $x1 ≈ $b1 # in place
+    y = solve(prob1, alg)
+    @test A1 *  y  ≈ b1
 
-            y = $alg(;$kwargs...)($x2, $A2, $b2)      # alg is callable
-            @test $A2 *  y  ≈ $b2
-            @test $A2 * $x2 ≈ $b2
+    cache = SciMLBase.init(prob1,alg) # initialize cache
+    y = solve(cache)
+    @test A1 *  y  ≈ b1
 
-            cache = SciMLBase.init($prob1,           
-                                   $alg(;$kwargs...)) # initialize cache 
-            y = cache($x3, $A1, $b1)                  # cache is callable
-            @test $A1 *  y  ≈ $b1
-            @test $A1 * $x3 ≈ $b1
+    cache = LinearSolve.set_A(cache,A2)
+    y = solve(cache)
+    @test A2 *  y  ≈ b1
 
-            y = cache($x3, $A1, $b2)                  # reuse factorization
-            @test $A1 *  y  ≈ $b2                     # with different RHS
-            @test $A1 * $x3 ≈ $b2
+    cache = LinearSolve.set_b(cache,b2)
+    y = solve(cache)
+    @test A2 *  y  ≈ b2
 
-            y = cache($x3, $A2, $b3)                  # new factorization
-            @test $A2 *  y  ≈ $b3                     # same old cache
-            @test $A2 * $x3 ≈ $b3
-        end
+    return
+end
 
-        x1 .= 0.0
-        x2 .= 0.0
-        x3 .= 0.0
-
-        return
-    end
-
-    @testset "factorization" begin
-        kwargs = :()
-        for alg in (
-                    :LUFactorization,
-                    :QRFactorization,
-                    :SVDFactorization,
-        #           :DefaultLinSolve
-                   )
-            @testset "$alg" begin
-                test_interface(alg, kwargs, prob1, prob2, prob3)
-            end
-        end
-
-        alg = :DefaultFactorization
+@testset "Concrete Factorizations" begin
+    for alg in (
+                LUFactorization(),
+                QRFactorization(),
+                SVDFactorization(),
+    #           DefaultLinSolve()
+               )
         @testset "$alg" begin
-            for fact_alg in (
-                             :lu, :lu!,
-                             :qr, :qr!,
-                             :cholesky, :cholesky!,
-            #                :ldlt, :ldlt!,
-                             :bunchkaufman, :bunchkaufman!,
-                             :lq, :lq!,
-                             :svd, :svd!,
-                             :(LinearAlgebra.factorize), 
-                            )
-                @testset "fact_alg = $fact_alg" begin
-                    kwargs = :(fact_alg=$fact_alg,)
-                    test_interface(alg, kwargs, prob1, prob2, prob3)
-                end
-            end
-        end
-
-    end
-
-    @testset "KrylovJL" begin
-        kwargs = :(ifverbose=false, abstol=1e-8, reltol=1e-8, maxiter=30,
-                   gmres_restart=5)
-        for alg in (
-                    :KrylovJL,
-                    :KrylovJL_CG,
-                    :KrylovJL_GMRES,
-        #           :KrylovJL_BICGSTAB,
-                    :KrylovJL_MINRES,
-                   )
-            @testset "$alg" begin
-                test_interface(alg, kwargs, prob1, prob2, prob3)
-            end
+            test_interface(alg, prob1, prob2, prob3)
         end
     end
+end
 
-    @testset "IterativeSolversJL" begin
-        kwargs = :(ifverbose=false, abstol=1e-8, reltol=1e-8, maxiter=30,
-                   gmres_restart=5)
-        for alg in (
-                    :IterativeSolversJL,
-                    :IterativeSolversJL_CG,
-                    :IterativeSolversJL_GMRES,
-        #           :IterativeSolversJL_BICGSTAB,
-                    :IterativeSolversJL_MINRES,
-                   )
-            @testset "$alg" begin
-                test_interface(alg, kwargs, prob1, prob2, prob3)
-            end
+@testset "Generic Factorizations" begin
+    for fact_alg in (
+                     lu, lu!,
+                     qr, qr!,
+                     cholesky, cholesky!,
+    #                ldlt, ldlt!,
+                     bunchkaufman, bunchkaufman!,
+                     lq, lq!,
+                     svd, svd!,
+                     LinearAlgebra.factorize,
+                    )
+        @testset "fact_alg = $fact_alg" begin
+            alg = DefaultFactorization(fact_alg=fact_alg)
+            test_interface(alg, prob1, prob2, prob3)
         end
     end
+end
 
+@testset "KrylovJL" begin
+    kwargs = (;ifverbose=false, abstol=1e-8, reltol=1e-8, maxiter=30,
+               gmres_restart=5)
+    for alg in (
+                ("Default",KrylovJL(kwargs...)),
+                ("CG",KrylovJL_CG(kwargs...)),
+                ("GMRES",KrylovJL_GMRES(kwargs...)),
+    #           ("BICGSTAB",KrylovJL_BICGSTAB(kwargs...)),
+                ("MINRES",KrylovJL_MINRES(kwargs...)),
+               )
+        @testset "$(alg[1])" begin
+            test_interface(alg[2], prob1, prob2, prob3)
+        end
+    end
+end
+
+@testset "IterativeSolversJL" begin
+    kwargs = (;ifverbose=false, abstol=1e-8, reltol=1e-8, maxiter=30,
+               gmres_restart=5)
+    for alg in (
+                ("Default", IterativeSolversJL(kwargs...)),
+                ("CG", IterativeSolversJL_CG(kwargs...)),
+                ("GMRES",IterativeSolversJL_GMRES(kwargs...)),
+    #           ("BICGSTAB",IterativeSolversJL_BICGSTAB(kwargs...)),
+                ("MINRES",IterativeSolversJL_MINRES(kwargs...)),
+               )
+        @testset "$(alg[1])" begin
+            test_interface(alg[2], prob1, prob2, prob3)
+        end
+    end
 end

@@ -4,7 +4,7 @@ struct LinearCache{TA,Tb,Tu,Tp,Talg,Tc,Tl,Tr}
     u::Tu
     p::Tp
     alg::Talg
-    cacheval::Tc  # store alg cache here 
+    cacheval::Tc  # store alg cache here
     isfresh::Bool # false => cacheval is set wrt A, true => update cacheval wrt A
     Pl::Tl        # store final preconditioner here. not being used rn
     Pr::Tr        # wrappers are using preconditioner in cache.alg for now
@@ -88,38 +88,3 @@ SciMLBase.solve(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
 
 SciMLBase.solve(cache::LinearCache, args...; kwargs...) =
     solve(cache, cache.alg, args...; kwargs...)
-
-## make alg callable
-
-function (alg::SciMLLinearSolveAlgorithm)(prob::LinearProblem,args...; kwargs...)
-    x = solve(prob, alg, args...; kwargs...)
-    return x
-end
-
-function (alg::SciMLLinearSolveAlgorithm)(x,A,b,args...;u0=nothing,kwargs...)
-    prob = LinearProblem(A, b; u0=x)
-    x = alg(prob, args...; kwargs...)
-    return x
-end
-
-## make cache callable - and reuse
-
-function (cache::LinearCache)(prob::LinearProblem, args...; kwargs...)
-
-    if(prob.A != cache.A) cache = set_A(cache, prob.A) end
-    if(prob.b != cache.b) cache = set_b(cache, prob.b) end
-
-    if(prob.u0 == nothing)
-        prob.u0 = zero(x)
-    end
-
-    cache = set_u(cache, prob.u0)
-    x = solve(cache, args...; kwargs...)
-    return x
-end
-
-function (cache::LinearCache)(x, A, b, args...; kwargs...)
-    prob = LinearProblem(A, b; u0=x)
-    x = cache(prob, args...; kwargs...)
-    return x
-end

@@ -3,3 +3,5 @@
 *.jl.mem
 /docs/build/
 Manifest.toml
+
+*.swp

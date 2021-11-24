@@ -1,4 +1,4 @@
-using LinearSolve, LinearAlgebra
+using LinearSolve, LinearAlgebra, SparseArrays
 using Test
 
 n = 8
@@ -36,6 +36,26 @@ end
     test_interface(nothing, prob1, prob2)
 
     A1 = prob1.A; b1 = prob1.b; x1 = prob1.u0
+    y = solve(prob1)
+    @test A1 *  y  ≈ b1
+
+    _prob = LinearProblem(SymTridiagonal(A1.A), b1; u0=x1)
+    y = solve(prob1)
+    @test A1 *  y  ≈ b1
+
+    _prob = LinearProblem(Tridiagonal(A1.A), b1; u0=x1)
+    y = solve(prob1)
+    @test A1 *  y  ≈ b1
+
+    _prob = LinearProblem(Symmetric(A1.A), b1; u0=x1)
+    y = solve(prob1)
+    @test A1 *  y  ≈ b1
+
+    _prob = LinearProblem(Hermitian(A1.A), b1; u0=x1)
+    y = solve(prob1)
+    @test A1 *  y  ≈ b1
+
+    _prob = LinearProblem(sparse(A1.A), b1; u0=x1)
     y = solve(prob1)
     @test A1 *  y  ≈ b1
 end

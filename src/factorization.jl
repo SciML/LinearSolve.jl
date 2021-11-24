@@ -25,6 +25,10 @@ end
 function init_cacheval(alg::LUFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("LU is not defined for $(typeof(A))")
+
+    if A isa AbstractDiffEqOperator
+        A = A.A
+    end
     fact = lu!(A, alg.pivot)
     return fact
 end
@@ -49,7 +53,10 @@ function init_cacheval(alg::QRFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("QR is not defined for $(typeof(A))")
 
-    fact = qr!(A.A, alg.pivot; blocksize = alg.blocksize)
+    if A isa AbstractDiffEqOperator
+        A = A.A
+    end
+    fact = qr!(A, alg.pivot; blocksize = alg.blocksize)
     return fact
 end
 
@@ -65,6 +72,10 @@ SVDFactorization() = SVDFactorization(false, LinearAlgebra.DivideAndConquer())
 function init_cacheval(alg::SVDFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("SVD is not defined for $(typeof(A))")
+
+    if A isa AbstractDiffEqOperator
+        A = A.A
+    end
 
     fact = svd!(A; full = alg.full, alg = alg.alg)
     return fact
@@ -83,6 +94,9 @@ function init_cacheval(alg::GenericFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("GenericFactorization is not defined for $(typeof(A))")
 
+    if A isa AbstractDiffEqOperator
+        A = A.A
+    end
     fact = alg.fact_alg(A)
     return fact
 end

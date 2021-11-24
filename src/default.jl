@@ -3,11 +3,15 @@
 function SciMLBase.solve(cache::LinearCache, alg::Nothing,
                          args...; kwargs...)
     @unpack A = cache
+    if A isa DiffEqArrayOperator
+        A = A.A
+    end
+
     if A isa Matrix
-        if ArrayInterface.can_setindex(x) && (size(A,1) <= 100 ||
+        if ArrayInterface.can_setindex(cache.b) && (size(A,1) <= 100 ||
                                               (isopenblas() && size(A,1) <= 500)
                                              )
-            alg = GenericFactorization(;fact_alg=:(RecursiveFactorization.lu!))
+            alg = GenericFactorization(;fact_alg=RecursiveFactorization.lu!)
             SciMLBase.solve(cache, alg, args...; kwargs...)
         else
             alg = LUFactorization()

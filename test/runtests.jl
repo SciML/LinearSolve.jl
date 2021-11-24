@@ -32,12 +32,19 @@ function test_interface(alg, prob1, prob2)
     return
 end
 
+@testset "Default Linear Solver" begin
+    test_interface(nothing, prob1, prob2)
+
+    A1 = prob1.A; b1 = prob1.b; x1 = prob1.u0
+    y = solve(prob1)
+    @test A1 *  y  ≈ b1
+end
+
 @testset "Concrete Factorizations" begin
     for alg in (
                 LUFactorization(),
                 QRFactorization(),
-                SVDFactorization(),
-                #nothing
+                SVDFactorization()
                )
         @testset "$alg" begin
             test_interface(alg, prob1, prob2)

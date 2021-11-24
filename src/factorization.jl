@@ -1,4 +1,3 @@
-
 function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization)
     if cache.isfresh
         fact = init_cacheval(alg, cache.A, cache.b, cache.u)
@@ -71,18 +70,18 @@ function init_cacheval(alg::SVDFactorization, A, b, u)
     return fact
 end
 
-## DefaultFactorization
+## GenericFactorization
 
-struct DefaultFactorization{F} <: AbstractFactorization
+struct GenericFactorization{F} <: AbstractFactorization
     fact_alg::F
 end
 
-DefaultFactorization(;fact_alg = LinearAlgebra.factorize) =
-    DefaultFactorization(fact_alg)
+GenericFactorization(;fact_alg = LinearAlgebra.factorize) =
+    GenericFactorization(fact_alg)
 
-function init_cacheval(alg::DefaultFactorization, A, b, u)
+function init_cacheval(alg::GenericFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
-        error("DefaultFactorization is not defined for $(typeof(A))")
+        error("GenericFactorization is not defined for $(typeof(A))")
 
     fact = alg.fact_alg(A)
     return fact

@@ -1,5 +1,5 @@
 
-#TODO: composed preconditioners, preconditioner setter for cache, 
+#TODO: composed preconditioners, preconditioner setter for cache,
 #   detailed tests for wrappers
 
 ## Preconditioners
@@ -65,7 +65,7 @@ KrylovJL_MINRES(args...;kwargs...) =
     KrylovJL(args...; KrylovAlg=Krylov.minres!, kwargs...)
 
 function get_KrylovJL_solver(KrylovAlg)
-    KS = 
+    KS =
     if     (KrylovAlg === Krylov.lsmr!      ) Krylov.LsmrSolver
     elseif (KrylovAlg === Krylov.cgs!       ) Krylov.CgsSolver
     elseif (KrylovAlg === Krylov.usymlq!    ) Krylov.UsymlqSolver
@@ -260,4 +260,3 @@ function SciMLBase.solve(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
 
     return cache.u
 end
-

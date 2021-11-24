@@ -1,52 +1,35 @@
 ## Default algorithm
 
-struct DefaultLinSolve{Ta} <: SciMLLinearSolveAlgorithm
-    linalg::Ta
-    ifopenblas::Union{Bool,Nothing}
-    isset::Bool # true => do nothing, false => find alg
-end
-
-DefaultLinSolve() = DefaultLinSolve(nothing, nothing, true)
-
-function isopenblas()
-    @static if VERSION < v"1.7beta"
-        blas = BLAS.vendor()
-        blas == :openblas64 || blas == :openblas
-    else
-        occursin("openblas", BLAS.get_config().loaded_libs[1].libname)
-    end
-end
-
-function SciMLBase.solve(cache::LinearCache, alg::DefaultLinSolve,
+function SciMLBase.solve(cache::LinearCache, alg::Nothing,
                          args...; kwargs...)
     @unpack A = cache
-
-    if alg.isset
-      linalg =
-      if A isa Matrix
-          if ArrayInterface.can_setindex(x) && (size(A,1) <= 100 ||
-                                                (p.openblas && size(A,1) <= 500)
-                                               )
-              DefaultFactorization(;fact_alg=:(RecursiveFactorization.lu!))
-          else
-              LUFactorization()
-          end
-      elseif A isa Tridiagonal
-          DefaultFactorization(;fact_alg=lu!)
-      elseif A isa SymTridiagonal
-          DefaultFactorization(;fact_alg=ldlt!)
-      elseif A isa SparseMatrixCSC
-          LUFactorization()
-      elseif ArrayInterface.isstructured(A)
-          DefaultFactorization()
-      elseif !(A isa AbstractDiffEqOperator)
-          QRFactorization()
-      else
-          IterativeSolversJL_GMRES()
-      end
-
-      @set! alg.linalg = linalg
+    if A isa Matrix
+        if ArrayInterface.can_setindex(x) && (size(A,1) <= 100 ||
+                                              (isopenblas() && size(A,1) <= 500)
+                                             )
+            alg = GenericFactorization(;fact_alg=:(RecursiveFactorization.lu!))
+            SciMLBase.solve(cache, alg, args...; kwargs...)
+        else
+            alg = LUFactorization()
+            SciMLBase.solve(cache, alg, args...; kwargs...)
+        end
+    elseif A isa Tridiagonal
+        alg = GenericFactorization(;fact_alg=lu!)
+        SciMLBase.solve(cache, alg, args...; kwargs...)
+    elseif A isa SymTridiagonal
+        alg = GenericFactorization(;fact_alg=ldlt!)
+        SciMLBase.solve(cache, alg, args...; kwargs...)
+    elseif A isa SparseMatrixCSC
+        alg = LUFactorization()
+        SciMLBase.solve(cache, alg, args...; kwargs...)
+    elseif ArrayInterface.isstructured(A)
+        alg = GenericFactorization()
+        SciMLBase.solve(cache, alg, args...; kwargs...)
+    elseif !(A isa AbstractDiffEqOperator)
+        alg = QRFactorization()
+        SciMLBase.solve(cache, alg, args...; kwargs...)
+    else
+        alg = IterativeSolversJL_GMRES()
+        SciMLBase.solve(cache, alg, args...; kwargs...)
     end
-
-    SciMLBase.solve(cache, alg.linalg, args...; kwargs...)
 end

@@ -26,9 +26,21 @@ include("factorization.jl")
 include("wrappers.jl")
 include("default.jl")
 
-export LUFactorization, SVDFactorization, QRFactorization, DefaultFactorization
+const IS_OPENBLAS = Ref(true)
+isopenblas() = IS_OPENBLAS[]
+
+function __init__()
+  @static if VERSION < v"1.7beta"
+    blas = BLAS.vendor()
+    IS_OPENBLAS[] = blas == :openblas64 || blas == :openblas
+  else
+    IS_OPENBLAS[] = occursin("openblas", BLAS.get_config().loaded_libs[1].libname)
+  end
+end
+
+export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization
 export KrylovJL, KrylovJL_CG, KrylovJL_GMRES, KrylovJL_BICGSTAB,
-       KrylovJL_MINRES, 
+       KrylovJL_MINRES,
        IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
        IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES
 export DefaultLinSolve

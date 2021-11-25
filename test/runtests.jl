@@ -10,14 +10,16 @@ A2 = A/2; b2 = rand(n); x2 = zero(b)
 prob1 = LinearProblem(A1, b1; u0=x1)
 prob2 = LinearProblem(A2, b2; u0=x2)
 
+cache_kwargs = (;verbose=true, abstol=1e-8, reltol=1e-8, maxiter=30,)
+
 function test_interface(alg, prob1, prob2)
     A1 = prob1.A; b1 = prob1.b; x1 = prob1.u0
     A2 = prob2.A; b2 = prob2.b; x2 = prob2.u0
 
-    y = solve(prob1, alg)
+    y = solve(prob1, alg; cache_kwargs...)
     @test A1 *  y  ≈ b1
 
-    cache = SciMLBase.init(prob1,alg) # initialize cache
+    cache = SciMLBase.init(prob1,alg; cache_kwargs...) # initialize cache
     y = solve(cache)
     @test A1 *  y  ≈ b1
 
@@ -92,8 +94,7 @@ end
 end
 
 @testset "KrylovJL" begin
-    kwargs = (;ifverbose=false, abstol=1e-8, reltol=1e-8, maxiter=30,
-               gmres_restart=5)
+    kwargs = (;gmres_restart=5,)
     for alg in (
                 ("Default",KrylovJL(kwargs...)),
                 ("CG",KrylovJL_CG(kwargs...)),
@@ -108,8 +109,7 @@ end
 end
 
 @testset "IterativeSolversJL" begin
-    kwargs = (;ifverbose=false, abstol=1e-8, reltol=1e-8, maxiter=30,
-               gmres_restart=5)
+    kwargs = (;gmres_restart=5,)
     for alg in (
                 ("Default", IterativeSolversJL(kwargs...)),
                 ("CG", IterativeSolversJL_CG(kwargs...)),

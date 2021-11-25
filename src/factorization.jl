@@ -100,3 +100,7 @@ function init_cacheval(alg::GenericFactorization, A, b, u)
     fact = alg.fact_alg(A)
     return fact
 end
+
+## RFLUFactorization
+
+RFLUFactorizaation() = GenericFactorization(;fact_alg=RecursiveFactorization.lu!)

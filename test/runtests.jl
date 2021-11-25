@@ -66,7 +66,8 @@ end
     for alg in (
                 LUFactorization(),
                 QRFactorization(),
-                SVDFactorization()
+                SVDFactorization(),
+                RFLUFactorizaation(),
                )
         @testset "$alg" begin
             test_interface(alg, prob1, prob2)

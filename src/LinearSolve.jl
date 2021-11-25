@@ -38,7 +38,8 @@ function __init__()
   end
 end
 
-export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization
+export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
+       RFLUFactorizaation
 export KrylovJL, KrylovJL_CG, KrylovJL_GMRES, KrylovJL_BICGSTAB,
        KrylovJL_MINRES,
        IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,

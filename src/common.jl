@@ -44,6 +44,12 @@ function set_cacheval(cache::LinearCache, alg_cache)
     return cache
 end
 
+function set_prec(cache, Pl, Pr)
+    @set! cache.Pl = Pl
+    @set! cache.Pr = Pr
+    return cache
+end
+
 init_cacheval(alg::Union{SciMLLinearSolveAlgorithm,Nothing}, A, b, u) = nothing
 
 SciMLBase.init(prob::LinearProblem, args...; kwargs...) = SciMLBase.init(prob,nothing,args...;kwargs...)

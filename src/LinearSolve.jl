@@ -8,6 +8,7 @@ using SparseArrays
 using SciMLBase: AbstractDiffEqOperator, AbstractLinearAlgorithm
 using Setfield
 using UnPack
+using FastBroadcast
 
 # wrap
 import Krylov

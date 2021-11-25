@@ -1,7 +1,4 @@
 
-#TODO: composed preconditioners, preconditioner setter for cache,
-#   detailed tests for wrappers
-
 ## Preconditioners
 
 struct ScaleVector{T}
@@ -9,10 +6,24 @@ struct ScaleVector{T}
     isleft::Bool
 end
 
-function LinearAlgebra.ldiv!(v::ScaleVector, x)
+function LinearAlgebra.ldiv!(P::ScaleVector, x)
+    P.s == one(eltype(P.s)) && return x
+
+    if P.isleft
+        @. x = x * P.s # @.. doesnt speed up scalar computation
+    else
+        @. x = x / P.s
+    end
 end
 
-function LinearAlgebra.ldiv!(y, v::ScaleVector, x)
+function LinearAlgebra.ldiv!(y, P::ScaleVector, x)
+    P.s == one(eltype(P.s)) && return y = x
+
+    if P.isleft
+        @. y = x / P.s
+    else
+        @. y = x * P.s
+    end
 end
 
 struct ComposePreconditioner{Ti,To}
@@ -21,12 +32,19 @@ struct ComposePreconditioner{Ti,To}
     isleft::Bool
 end
 
-function LinearAlgebra.ldiv!(v::ComposePreconditioner, x)
-    @unpack inner, outer, isleft = v
+function LinearAlgebra.ldiv!(P::ComposePreconditioner, x)
+    @unpack inner, outer, isleft = P
+    if isleft
+        ldiv!(outer, x)
+        ldiv!(inner, x)
+    else
+        ldiv!(inner, x)
+        ldiv!(outer, x)
+    end
 end
 
-function LinearAlgebra.ldiv!(y, v::ComposePreconditioner, x)
-    @unpack inner, outer, isleft = v
+function LinearAlgebra.ldiv!(y, P::ComposePreconditioner, x)
+    @unpack inner, outer, isleft = P
 end
 
 ## Krylov.jl
@@ -132,6 +150,9 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
         cache = set_cacheval(cache, solver)
     end
 
+#   Pl = ComposePreconditioner(alg.Pl, cache.Pl, true)
+#   Pr = ComposePreconditioner(alg.Pr, cache.Pr, false)
+
     atol    = cache.abstol
     rtol    = cache.reltol
     itmax   = cache.maxiters
@@ -204,8 +225,11 @@ IterativeSolversJL_MINRES(args...;kwargs...) =
 function init_cacheval(alg::IterativeSolversJL, cache::LinearCache)
     @unpack A, b, u = cache
 
-    Pl = (alg.Pl == LinearAlgebra.I) ? IterativeSolvers.Identity() : alg.Pl
-    Pr = (alg.Pr == LinearAlgebra.I) ? IterativeSolvers.Identity() : alg.Pr
+    Pl = alg.Pl
+    Pr = alg.Pr
+
+#   Pl = ComposePreconditioner(alg.Pl, cache.Pl, true)
+#   Pr = ComposePreconditioner(alg.Pr, cache.Pr, false)
 
     abstol  = cache.abstol
     reltol  = cache.reltol

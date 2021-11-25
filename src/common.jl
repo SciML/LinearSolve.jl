@@ -1,4 +1,4 @@
-struct LinearCache{TA,Tb,Tu,Tp,Talg,Tc,Tl,Tr,Ttol,Ti}
+struct LinearCache{TA,Tb,Tu,Tp,Talg,Tc,Tl,Tr,Ttol}
     A::TA
     b::Tb
     u::Tu

@@ -31,14 +31,10 @@ end
 
 ## Krylov.jl
 
-struct KrylovJL{F,Tl,Tr,T,I,A,K} <: AbstractKrylovSubspaceMethod
+struct KrylovJL{F,Tl,Tr,I,A,K} <: AbstractKrylovSubspaceMethod
     KrylovAlg::F
     Pl::Tl
     Pr::Tr
-    abstol::T
-    reltol::T
-    maxiter::I
-    ifverbose::Bool
     gmres_restart::I
     window::I
     args::A
@@ -46,12 +42,10 @@ struct KrylovJL{F,Tl,Tr,T,I,A,K} <: AbstractKrylovSubspaceMethod
 end
 
 function KrylovJL(args...; KrylovAlg = Krylov.gmres!, Pl=I, Pr=I,
-                  abstol=0.0, reltol=0.0, maxiter=0, ifverbose=false,
-                  gmres_restart=20, window=0,              # for building solver
+                  gmres_restart=0, window=0,
                   kwargs...)
 
-    return KrylovJL(KrylovAlg, Pl, Pr, abstol, reltol, maxiter, ifverbose,
-                    gmres_restart, window,
+    return KrylovJL(KrylovAlg, Pl, Pr, gmres_restart, window,
                     args, kwargs)
 end
 
@@ -106,13 +100,15 @@ function init_cacheval(alg::KrylovJL, A, b, u)
 
     KS = get_KrylovJL_solver(alg.KrylovAlg)
 
+    memory = (alg.gmres_restart == 0) ? min(20, size(A,1)) : alg.gmres_restart
+
     solver = if(
         alg.KrylovAlg === Krylov.dqgmres! ||
         alg.KrylovAlg === Krylov.diom!    ||
         alg.KrylovAlg === Krylov.gmres!   ||
         alg.KrylovAlg === Krylov.fom!
        )
-        KS(A, b, alg.gmres_restart)
+        KS(A, b, memory)
     elseif(
            alg.KrylovAlg === Krylov.minres! ||
            alg.KrylovAlg === Krylov.symmlq! ||
@@ -136,13 +132,13 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
         cache = set_cacheval(cache, solver)
     end
 
-    abstol  = (alg.abstol  == 0) ? √eps(eltype(cache.b)) : alg.abstol
-    reltol  = (alg.reltol  == 0) ? √eps(eltype(cache.b)) : alg.reltol
-    maxiter = (alg.maxiter == 0) ? length(cache.b)       : alg.maxiter
-    verbose =  alg.ifverbose     ? 1                     : 0
+    atol    = cache.abstol
+    rtol    = cache.reltol
+    itmax   = cache.maxiters
+    verbose = cache.verbose ? 1 : 0
 
     args   = (cache.cacheval, cache.A, cache.b)
-    kwargs = (atol=abstol, rtol=reltol, itmax=maxiter, verbose=verbose,
+    kwargs = (atol=atol, rtol=rtol, itmax=itmax, verbose=verbose,
               alg.kwargs...)
 
     if cache.cacheval isa Krylov.CgSolver
@@ -170,14 +166,10 @@ end
 
 ## IterativeSolvers.jl
 
-struct IterativeSolversJL{F,Tl,Tr,T,I,A,K} <: AbstractKrylovSubspaceMethod
+struct IterativeSolversJL{F,Tl,Tr,I,A,K} <: AbstractKrylovSubspaceMethod
     generate_iterator::F
     Pl::Tl
     Pr::Tr
-    abstol::T
-    reltol::T
-    maxiter::I
-    ifverbose::Bool
     gmres_restart::I
     args::A
     kwargs::K
@@ -187,11 +179,9 @@ function IterativeSolversJL(args...;
                             generate_iterator = IterativeSolvers.gmres_iterable!,
                             Pl=IterativeSolvers.Identity(),
                             Pr=IterativeSolvers.Identity(),
-                            abstol=0.0, reltol=0.0, maxiter=0, ifverbose=true,
                             gmres_restart=0, kwargs...)
-    return IterativeSolversJL(generate_iterator, Pl, Pr,
-                              abstol, reltol, maxiter, ifverbose,
-                              gmres_restart, args, kwargs)
+    return IterativeSolversJL(generate_iterator, Pl, Pr, gmres_restart,
+                              args, kwargs)
 end
 
 IterativeSolversJL_CG(args...; kwargs...) =
@@ -211,16 +201,21 @@ IterativeSolversJL_MINRES(args...;kwargs...) =
                        generate_iterator=IterativeSolvers.minres_iterable!,
                        kwargs...)
 
-function init_cacheval(alg::IterativeSolversJL, A, b, u)
+function init_cacheval(alg::IterativeSolversJL, cache::LinearCache)
+    @unpack A, b, u = cache
+
     Pl = (alg.Pl == LinearAlgebra.I) ? IterativeSolvers.Identity() : alg.Pl
     Pr = (alg.Pr == LinearAlgebra.I) ? IterativeSolvers.Identity() : alg.Pr
 
-    abstol  = (alg.abstol  == 0) ? √eps(eltype(b)) : alg.abstol
-    reltol  = (alg.reltol  == 0) ? √eps(eltype(b)) : alg.reltol
-    maxiter = (alg.maxiter == 0) ? length(b)       : alg.maxiter
+    abstol  = cache.abstol
+    reltol  = cache.reltol
+    maxiter = cache.maxiters
+    verbose = cache.verbose
 
-#   args   = (u, A, b)
-    kwargs = (abstol=abstol, reltol=reltol, maxiter=maxiter, alg.kwargs...)
+    restart = (alg.gmres_restart == 0) ? min(20, size(A,1)) : alg.gmres_restart
+
+    kwargs = (abstol=abstol, reltol=reltol, maxiter=maxiter,
+              alg.kwargs...)
 
     iterable = if alg.generate_iterator === IterativeSolvers.cg_iterator!
         Pr != IterativeSolvers.Identity() &&
@@ -228,7 +223,7 @@ function init_cacheval(alg::IterativeSolversJL, A, b, u)
         alg.generate_iterator(u, A, b, Pl;
                               kwargs...)
     elseif alg.generate_iterator === IterativeSolvers.gmres_iterable!
-        alg.generate_iterator(u, A, b; Pl=Pl, Pr=Pr,
+        alg.generate_iterator(u, A, b; Pl=Pl, Pr=Pr, restart=restart,
                               kwargs...)
     elseif alg.generate_iterator === IterativeSolvers.bicgstabl_iterator!
         Pr != IterativeSolvers.Identity() &&
@@ -247,16 +242,16 @@ end
 
 function SciMLBase.solve(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
     if cache.isfresh
-        solver = init_cacheval(alg, cache.A, cache.b, cache.u)
+        solver = init_cacheval(alg, cache)
         cache = set_cacheval(cache, solver)
     end
 
-    alg.ifverbose && println("Using IterativeSolvers.$(alg.generate_iterator)")
+    cache.verbose && println("Using IterativeSolvers.$(alg.generate_iterator)")
     for iter in enumerate(cache.cacheval)
-        alg.ifverbose && println("Iter: $(iter[1]), residual: $(iter[2])")
-        # inject callbacks KSP into solve cb!(cache.cacheval)
+        cache.verbose && println("Iter: $(iter[1]), residual: $(iter[2])")
+        # TODO inject callbacks KSP into solve cb!(cache.cacheval)
     end
-    alg.ifverbose && println()
+    cache.verbose && println()
 
     return cache.u
 end

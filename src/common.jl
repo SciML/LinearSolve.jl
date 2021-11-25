@@ -1,4 +1,4 @@
-struct LinearCache{TA,Tb,Tu,Tp,Talg,Tc,Tl,Tr}
+struct LinearCache{TA,Tb,Tu,Tp,Talg,Tc,Tl,Tr,Ttol}
     A::TA
     b::Tb
     u::Tu
@@ -8,6 +8,10 @@ struct LinearCache{TA,Tb,Tu,Tp,Talg,Tc,Tl,Tr}
     isfresh::Bool # false => cacheval is set wrt A, true => update cacheval wrt A
     Pl::Tl        # store final preconditioner here. not being used rn
     Pr::Tr        # wrappers are using preconditioner in cache.alg for now
+    abstol::Ttol
+    reltol::Ttol
+    maxiters::Int
+    verbose::Bool
 end
 
 function set_A(cache::LinearCache, A)
@@ -46,6 +50,10 @@ SciMLBase.init(prob::LinearProblem, args...; kwargs...) = SciMLBase.init(prob,no
 
 function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorithm,Nothing}, args...;
                         alias_A = false, alias_b = false,
+                        abstol=√eps(eltype(prob.A)),
+                        reltol=√eps(eltype(prob.A)),
+                        maxiters=length(prob.b),
+                        verbose=false,
                         kwargs...,
                        )
     @unpack A, b, u0, p = prob
@@ -71,6 +79,7 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
         Tc,
         typeof(Pl),
         typeof(Pr),
+        typeof(reltol),
     }(
         A,
         b,
@@ -81,6 +90,10 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
         isfresh,
         Pl,
         Pr,
+        abstol,
+        reltol,
+        maxiters,
+        verbose,
     )
     return cache
 end

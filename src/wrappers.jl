@@ -1,50 +1,72 @@
 
 ## Preconditioners
 
+"""
+ P  *  x = x .* (1/P.s)
+
+ Pi *  x = x .* (P.s)
+"""
 struct ScaleVector{T}
     s::T
     isleft::Bool
 end
 
-function LinearAlgebra.ldiv!(P::ScaleVector, x)
-    P.s == one(eltype(P.s)) && return x
+function LinearAlgebra.mul!(y, A::ScaleVector, x)
+end
 
-    if P.isleft
-        @. x = x * P.s # @.. doesnt speed up scalar computation
+function LinearAlgebra.mul!(C, A::ScaleVector, B, α, β)
+end
+
+function LinearAlgebra.ldiv!(A::ScaleVector, x)
+    A.s == one(eltype(A.s)) && return x
+
+    if A.isleft
+        @. x = x * A.s
     else
-        @. x = x / P.s
+        @. x = x / A.s
     end
 end
 
-function LinearAlgebra.ldiv!(y, P::ScaleVector, x)
-    P.s == one(eltype(P.s)) && return y = x
+function LinearAlgebra.ldiv!(y, A::ScaleVector, x)
+    P.s == one(eltype(A.s)) && return y = x
 
-    if P.isleft
-        @. y = x / P.s
+    if A.isleft
+        @. y = x * A.s
     else
-        @. y = x * P.s
+        @. y = x / A.s
     end
 end
 
+Base.eltype(A::ScaleVector) = eltype(A.s)
+
+"""
+ C  * x = P  * Q  * x
+
+ Ci * x = Qi * Pi * x
+"""
 struct ComposePreconditioner{Ti,To}
     inner::Ti
     outer::To
-    isleft::Bool
 end
 
-function LinearAlgebra.ldiv!(P::ComposePreconditioner, x)
-    @unpack inner, outer, isleft = P
-    if isleft
-        ldiv!(outer, x)
-        ldiv!(inner, x)
-    else
-        ldiv!(inner, x)
-        ldiv!(outer, x)
-    end
+function LinearAlgebra.ldiv!(A::ComposePreconditioner, x)
+    @unpack inner, outer, isleft = A
+
+    ldiv!(inner, x)
+    ldiv!(outer, x)
 end
 
-function LinearAlgebra.ldiv!(y, P::ComposePreconditioner, x)
-    @unpack inner, outer, isleft = P
+function LinearAlgebra.ldiv!(y, A::ComposePreconditioner, x)
+    @unpack inner, outer = A
+
+    ldiv!(y, inner, x)
+    ldiv!(outer, y)
+end
+
+function LinearAlgebra.mul!(y, A::ComposePreconditioner, x)
+end
+
+function LinearAlgebra.mul!(C, A::ComposePreconditioner, B, α, β)
 end
 
 ## Krylov.jl
@@ -150,8 +172,8 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
         cache = set_cacheval(cache, solver)
     end
 
-#   Pl = ComposePreconditioner(alg.Pl, cache.Pl, true)
-#   Pr = ComposePreconditioner(alg.Pr, cache.Pr, false)
+    M = alg.Pl #ComposePreconditioner(alg.Pl, cache.Pl) # left precond
+    N = alg.Pr #ComposePreconditioner(alg.Pr, cache.Pr) # right 
 
     atol    = cache.abstol
     rtol    = cache.reltol
@@ -163,20 +185,20 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
               alg.kwargs...)
 
     if cache.cacheval isa Krylov.CgSolver
-        alg.Pr != LinearAlgebra.I  &&
+        N != LinearAlgebra.I  &&
             @warn "$(alg.KrylovAlg) doesn't support right preconditioning."
-        Krylov.solve!(args...; M=alg.Pl,
+        Krylov.solve!(args...; M=M,
                       kwargs...)
     elseif cache.cacheval isa Krylov.GmresSolver
-        Krylov.solve!(args...; M=alg.Pl, N=alg.Pr,
+        Krylov.solve!(args...; M=M, N=N,
                       kwargs...)
     elseif cache.cacheval isa Krylov.BicgstabSolver
-        Krylov.solve!(args...; M=alg.Pl, N=alg.Pr,
+        Krylov.solve!(args...; M=M, N=N,
                       kwargs...)
     elseif cache.cacheval isa Krylov.MinresSolver
-        alg.Pr != LinearAlgebra.I  &&
+        N != LinearAlgebra.I  &&
             @warn "$(alg.KrylovAlg) doesn't support right preconditioning."
-        Krylov.solve!(args...; M=alg.Pl,
+        Krylov.solve!(args...; M=M,
                       kwargs...)
     else
         Krylov.solve!(args...; kwargs...)
@@ -228,8 +250,8 @@ function init_cacheval(alg::IterativeSolversJL, cache::LinearCache)
     Pl = alg.Pl
     Pr = alg.Pr
 
-#   Pl = ComposePreconditioner(alg.Pl, cache.Pl, true)
-#   Pr = ComposePreconditioner(alg.Pr, cache.Pr, false)
+#   Pl = ComposePreconditioner(alg.Pl, cache.Pl)
+#   Pr = ComposePreconditioner(alg.Pr, cache.Pr)
 
     abstol  = cache.abstol
     reltol  = cache.reltol

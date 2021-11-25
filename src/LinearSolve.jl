@@ -2,7 +2,7 @@ module LinearSolve
 
 using ArrayInterface
 using RecursiveFactorization
-using Base: cache_dependencies, Bool
+using Base: cache_dependencies, Bool, eltype
 using LinearAlgebra
 using SparseArrays
 using SciMLBase: AbstractDiffEqOperator, AbstractLinearAlgorithm

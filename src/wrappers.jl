@@ -11,10 +11,22 @@ struct ScaleVector{T}
     isleft::Bool
 end
 
+# y = A x
 function LinearAlgebra.mul!(y, A::ScaleVector, x)
+    A.s == one(eltype(A.s)) && return y = x
+
+    if A.isleft
+        @. x = x / A.s
+    else
+        @. x = x * A.s
+    end
 end
 
+# A B α + C β
 function LinearAlgebra.mul!(C, A::ScaleVector, B, α, β)
+    
+    tmp = zero(B)
+    C = β * C + α * mul!(tmp, A, B)
 end
 
 function LinearAlgebra.ldiv!(A::ScaleVector, x)
@@ -49,8 +61,20 @@ struct ComposePreconditioner{Ti,To}
     outer::To
 end
 
+# y = A x
+function LinearAlgebra.mul!(y, A::ComposePreconditioner, x)
+    @unpack inner, outer = A
+    mul!(y, inner, x)
+    y = outer * y
+end
+
+# A B α + C β
+function LinearAlgebra.mul!(C, A::ComposePreconditioner, B, α, β)
+    @unpack inner, outer = A
+end
+
 function LinearAlgebra.ldiv!(A::ComposePreconditioner, x)
-    @unpack inner, outer, isleft = A
+    @unpack inner, outer = A
 
     ldiv!(inner, x)
     ldiv!(outer, x)
@@ -61,12 +85,6 @@ function LinearAlgebra.ldiv!(y, A::ComposePreconditioner, x)
 
     ldiv!(y, inner, x)
     ldiv!(outer, y)
-end
-
-function LinearAlgebra.mul!(y, A::ComposePreconditioner, x)
-end
-
-function LinearAlgebra.mul!(C, A::ComposePreconditioner, B, α, β)
 end
 
 ## Krylov.jl

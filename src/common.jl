@@ -12,7 +12,7 @@ struct LinearCache{TA,Tb,Tu,Tp,Talg,Tc,Tl,Tr,Ttol}
     # common arguments
     abstol::Ttol
     reltol::Ttol
-    maxiters::Ti
+    maxiters::Int
     verbose::Bool
 end
 

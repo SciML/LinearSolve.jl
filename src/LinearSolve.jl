@@ -3,13 +3,12 @@ module LinearSolve
 using ArrayInterface
 using RecursiveFactorization
 using Base: cache_dependencies, Bool
-import Base: eltype, *
+import Base: eltype, adjoint, inv
 using LinearAlgebra
 using SparseArrays
 using SciMLBase: AbstractDiffEqOperator, AbstractLinearAlgorithm
 using Setfield
 using UnPack
-using FastBroadcast
 
 # wrap
 import Krylov

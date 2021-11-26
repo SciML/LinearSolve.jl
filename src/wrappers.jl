@@ -6,7 +6,7 @@
  P  *  x = x .* (1/P.s)
  Pi *  x = x .* (P.s)
 
- Right
+ RIGHT
  P  *  x = x .* (P.s)
  Pi *  x = x .* (1/P.s)
 """
@@ -16,11 +16,8 @@ struct ScaleVector{T}
 end
 
 Base.eltype(A::ScaleVector) = eltype(A.s)
-
-#function Base.*(A::ScaleVector, x)
-#    y = similar(x)
-#    mul!(y, A, x)
-#end
+Base.adjoint(A::ScaleVector) = copy(A)
+Base.inv(A::ScaleVector) = ScaleVector(1/A.s, A.isleft)
 
 # y = A x
 function LinearAlgebra.mul!(y, A::ScaleVector, x)
@@ -28,7 +25,6 @@ function LinearAlgebra.mul!(y, A::ScaleVector, x)
 
     s = A.isleft ? 1/A.s : A.s
     mul!(y, s, x)
-
 end
 
 # A B α + C β
@@ -63,6 +59,8 @@ struct ComposePreconditioner{Ti,To}
 end
 
 Base.eltype(A::ComposePreconditioner) = Float64 #eltype(A.inner)
+Base.adjoint(A::ComposePreconditioner) = ComposePreconditioner(A.outer', A.inner')
+Base.inv(A::ComposePreconditioner) = ComposePreconditioner(inv(A.outer), inv(A.inner))
 
 # y = A x
 function LinearAlgebra.mul!(y, A::ComposePreconditioner, x)
@@ -199,6 +197,10 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
 
     M = alg.Pl
     N = alg.Pr
+
+    """
+    TODO - pass in inv(Pl), inv(Pr) to Krylov.jl
+    """
 
 #   M = ComposePreconditioner(alg.Pl, cache.Pl) # left precond
 #   N = ComposePreconditioner(alg.Pr, cache.Pr) # right 

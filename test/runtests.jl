@@ -135,8 +135,8 @@ end
         x = rand(n,n)
         y = rand(n,n)
 
-        Pl = LinearSolve.ScaleVector(s, true)
-        Pr = LinearSolve.ScaleVector(s, false)
+        Pl = LinearSolve.default_preconditioner(s, true)
+        Pr = LinearSolve.default_preconditioner(s, false)
 
         mul!(y, Pl, x)
         mul!(y, Pr, x)
@@ -160,8 +160,8 @@ end
         x = rand(n,n)
         y = rand(n,n)
 
-        Pi = LinearSolve.ScaleVector(s, true)
-        Po = LinearSolve.ScaleVector(s, false)
+        Pi = LinearSolve.default_preconditioner(s, true)
+        Po = LinearSolve.default_preconditioner(s, false)
 
         P = LinearSolve.ComposePreconditioner(Pi,Po)
 

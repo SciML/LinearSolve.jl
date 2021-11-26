@@ -70,8 +70,8 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
     isfresh = cacheval === nothing
     Tc = isfresh ? Any : typeof(cacheval)
 
-    Pl = ScaleVector(one(eltype(A)), true)
-    Pr = ScaleVector(one(eltype(A)), false)
+    Pl = default_preconditioner(one(eltype(A)), true)
+    Pr = default_preconditioner(one(eltype(A)), false)
 
     A = alias_A ? A : deepcopy(A)
     b = alias_b ? b : deepcopy(b)

@@ -1,53 +1,7 @@
 
 ## Preconditioners
 
-"""
- LEFT 
- P  *  x = x .* (1/P.s)
- Pi *  x = x .* (P.s)
-
- RIGHT
- P  *  x = x .* (P.s)
- Pi *  x = x .* (1/P.s)
-"""
-struct ScaleVector{T}
-    s::T
-    isleft::Bool
-end
-
-Base.eltype(A::ScaleVector) = eltype(A.s)
-Base.adjoint(A::ScaleVector) = copy(A)
-Base.inv(A::ScaleVector) = ScaleVector(1/A.s, A.isleft)
-
-# y = A x
-function LinearAlgebra.mul!(y, A::ScaleVector, x)
-    A.s == one(eltype(A.s)) && return y = x
-
-    s = A.isleft ? 1/A.s : A.s
-    mul!(y, s, x)
-end
-
-# A B α + C β
-function LinearAlgebra.mul!(C, A::ScaleVector, B, α, β)
-    A.s == one(eltype(A.s)) && return @. C = α * B + β * C
-
-    s = A.isleft ? 1/A.s : A.s
-    mul!(C, s, B, α, β)
-end
-
-function LinearAlgebra.ldiv!(A::ScaleVector, x)
-    A.s == one(eltype(A.s)) && return x
-
-    s = A.isleft ? A.s : 1/A.s
-    @. x = x * s
-end
-
-function LinearAlgebra.ldiv!(y, A::ScaleVector, x)
-    A.s == one(eltype(A.s)) && return y = x
-
-    s = A.isleft ? A.s : 1/A.s
-    mul!(y, s, x)
-end
+default_preconditioner(s, isleft) = isleft ? I * s : I * (1/s)
 
 """
  C  * x = P  * Q  * x
@@ -60,9 +14,8 @@ end
 
 Base.eltype(A::ComposePreconditioner) = Float64 #eltype(A.inner)
 Base.adjoint(A::ComposePreconditioner) = ComposePreconditioner(A.outer', A.inner')
-Base.inv(A::ComposePreconditioner) = ComposePreconditioner(inv(A.outer), inv(A.inner))
+Base.inv(A::ComposePreconditioner) = InvComposePreconditioner(A)
 
-# y = A x
 function LinearAlgebra.mul!(y, A::ComposePreconditioner, x)
     @unpack inner, outer = A
     tmp = similar(y)
@@ -70,7 +23,6 @@ function LinearAlgebra.mul!(y, A::ComposePreconditioner, x)
     mul!(y, inner, tmp)
 end
 
-# A B α + C β
 function LinearAlgebra.mul!(C, A::ComposePreconditioner, B, α, β)
     @unpack inner, outer = A
     tmp = similar(B)
@@ -90,6 +42,34 @@ function LinearAlgebra.ldiv!(y, A::ComposePreconditioner, x)
 
     ldiv!(y, inner, x)
     ldiv!(outer, y)
+end
+
+struct InvComposePreconditioner{Tp <: ComposePreconditioner}
+    P::Tp
+end
+
+InvComposePreconditioner(inner, outer) = InvComposePreconditioner(ComposePreconditioner(inner, outer))
+
+Base.eltype(A::InvComposePreconditioner) = Float64 #eltype(A.inner)
+#Base.adjoint(A::InvComposePreconditioner) = ComposePreconditioner(A.outer', A.inner')
+Base.inv(A::InvComposePreconditioner) = ComposePreconditioner(A.P)
+
+function LinearAlgebra.mul!(y, A::InvComposePreconditioner, x)
+    @unpack P = A
+    ldiv!(y, P, x)
+end
+
+function LinearAlgebra.mul!(C, A::InvComposePreconditioner, B, α, β)
+    @unpack P = A
+end
+
+function LinearAlgebra.ldiv!(A::InvComposePreconditioner, x)
+    @unpack P = A
+end
+
+function LinearAlgebra.ldiv!(y, A::InvComposePreconditioner, x)
+    @unpack P = A
+    mul!(y, P, x)
 end
 
 ## Krylov.jl
@@ -202,8 +182,8 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
     TODO - pass in inv(Pl), inv(Pr) to Krylov.jl
     """
 
-#   M = ComposePreconditioner(alg.Pl, cache.Pl) # left precond
-#   N = ComposePreconditioner(alg.Pr, cache.Pr) # right 
+#   M = InvComposePreconditioner(alg.Pl, cache.Pl) # left precond
+#   N = InvComposePreconditioner(alg.Pr, cache.Pr) # right 
 
     atol    = cache.abstol
     rtol    = cache.reltol

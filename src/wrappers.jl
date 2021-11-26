@@ -2,58 +2,59 @@
 ## Preconditioners
 
 """
+ LEFT 
  P  *  x = x .* (1/P.s)
-
  Pi *  x = x .* (P.s)
+
+ Right
+ P  *  x = x .* (P.s)
+ Pi *  x = x .* (1/P.s)
 """
 struct ScaleVector{T}
     s::T
     isleft::Bool
 end
 
+Base.eltype(A::ScaleVector) = eltype(A.s)
+
+#function Base.*(A::ScaleVector, x)
+#    y = similar(x)
+#    mul!(y, A, x)
+#end
+
 # y = A x
 function LinearAlgebra.mul!(y, A::ScaleVector, x)
     A.s == one(eltype(A.s)) && return y = x
 
-    if A.isleft
-        @. x = x / A.s
-    else
-        @. x = x * A.s
-    end
+    s = A.isleft ? 1/A.s : A.s
+    mul!(y, s, x)
+
 end
 
 # A B α + C β
 function LinearAlgebra.mul!(C, A::ScaleVector, B, α, β)
-    
-    tmp = zero(B)
-    C = β * C + α * mul!(tmp, A, B)
+    A.s == one(eltype(A.s)) && return @. C = α * B + β * C
+
+    s = A.isleft ? 1/A.s : A.s
+    mul!(C, s, B, α, β)
 end
 
 function LinearAlgebra.ldiv!(A::ScaleVector, x)
     A.s == one(eltype(A.s)) && return x
 
-    if A.isleft
-        @. x = x * A.s
-    else
-        @. x = x / A.s
-    end
+    s = A.isleft ? A.s : 1/A.s
+    @. x = x * s
 end
 
 function LinearAlgebra.ldiv!(y, A::ScaleVector, x)
-    P.s == one(eltype(A.s)) && return y = x
+    A.s == one(eltype(A.s)) && return y = x
 
-    if A.isleft
-        @. y = x * A.s
-    else
-        @. y = x / A.s
-    end
+    s = A.isleft ? A.s : 1/A.s
+    mul!(y, s, x)
 end
-
-Base.eltype(A::ScaleVector) = eltype(A.s)
 
 """
  C  * x = P  * Q  * x
-
  Ci * x = Qi * Pi * x
 """
 struct ComposePreconditioner{Ti,To}
@@ -61,16 +62,22 @@ struct ComposePreconditioner{Ti,To}
     outer::To
 end
 
+Base.eltype(A::ComposePreconditioner) = Float64 #eltype(A.inner)
+
 # y = A x
 function LinearAlgebra.mul!(y, A::ComposePreconditioner, x)
     @unpack inner, outer = A
-    mul!(y, inner, x)
-    y = outer * y
+    tmp = similar(y)
+    mul!(tmp, outer, x)
+    mul!(y, inner, tmp)
 end
 
 # A B α + C β
 function LinearAlgebra.mul!(C, A::ComposePreconditioner, B, α, β)
     @unpack inner, outer = A
+    tmp = similar(B)
+    mul!(tmp, inner, B)
+    mul!(C, outer, tmp, α, β)
 end
 
 function LinearAlgebra.ldiv!(A::ComposePreconditioner, x)
@@ -190,8 +197,11 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
         cache = set_cacheval(cache, solver)
     end
 
-    M = alg.Pl #ComposePreconditioner(alg.Pl, cache.Pl) # left precond
-    N = alg.Pr #ComposePreconditioner(alg.Pr, cache.Pr) # right 
+    M = alg.Pl
+    N = alg.Pr
+
+#   M = ComposePreconditioner(alg.Pl, cache.Pl) # left precond
+#   N = ComposePreconditioner(alg.Pr, cache.Pr) # right 
 
     atol    = cache.abstol
     rtol    = cache.reltol
@@ -265,11 +275,8 @@ IterativeSolversJL_MINRES(args...;kwargs...) =
 function init_cacheval(alg::IterativeSolversJL, cache::LinearCache)
     @unpack A, b, u = cache
 
-    Pl = alg.Pl
-    Pr = alg.Pr
-
-#   Pl = ComposePreconditioner(alg.Pl, cache.Pl)
-#   Pr = ComposePreconditioner(alg.Pr, cache.Pr)
+    Pl = ComposePreconditioner(alg.Pl, cache.Pl)
+    Pr = ComposePreconditioner(alg.Pr, cache.Pr)
 
     abstol  = cache.abstol
     reltol  = cache.reltol

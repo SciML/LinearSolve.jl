@@ -34,6 +34,8 @@ function test_interface(alg, prob1, prob2)
     return
 end
 
+@testset "LinearSolve" begin
+
 @testset "Default Linear Solver" begin
     test_interface(nothing, prob1, prob2)
 
@@ -123,3 +125,53 @@ end
         end
     end
 end
+
+@testset "Preconditioners" begin
+    @testset "ScaleVector" begin
+        s = rand()
+        α = rand()
+        β = rand()
+
+        x = rand(n,n)
+        y = rand(n,n)
+
+        Pl = LinearSolve.ScaleVector(s, true)
+        Pr = LinearSolve.ScaleVector(s, false)
+
+        mul!(y, Pl, x)
+        mul!(y, Pr, x)
+
+        mul!(y, Pl, x, α, β)
+        mul!(y, Pr, x, α, β)
+
+        ldiv!(Pl, x)
+        ldiv!(Pr, x)
+
+        ldiv!(y, Pl, x)
+        ldiv!(y, Pr, x)
+
+    end
+
+    @testset "ComposePreconditioenr" begin
+        s = rand()
+        α = rand()
+        β = rand()
+
+        x = rand(n,n)
+        y = rand(n,n)
+
+        Pi = LinearSolve.ScaleVector(s, true)
+        Po = LinearSolve.ScaleVector(s, false)
+
+        P = LinearSolve.ComposePreconditioner(Pi,Po)
+
+        mul!(y, P, x)
+        mul!(y, P, x, α, β)
+
+        ldiv!(P, x)
+        ldiv!(y, P, x)
+
+    end
+end
+
+end # testset

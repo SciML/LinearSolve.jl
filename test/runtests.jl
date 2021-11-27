@@ -171,18 +171,11 @@ end
         @test P  == inv(Pi)
 
         # ComposePreconditioner
-#       mul!(y, P, x)
-#       mul!(y, P, x, α, β)
-
         ldiv!(P, x)
         ldiv!(y, P, x)
 
         # InvComposePreconditioner
         mul!(y, Pi, x)
-#       mul!(y, Pi, x, α, β)
-
-#       ldiv!(Pi, x)
-#       ldiv!(y, Pi, x)
 
     end
 end

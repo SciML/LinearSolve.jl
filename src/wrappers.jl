@@ -16,22 +16,6 @@ Base.eltype(A::ComposePreconditioner) = Float64 #eltype(A.inner)
 Base.adjoint(A::ComposePreconditioner) = ComposePreconditioner(A.outer', A.inner')
 Base.inv(A::ComposePreconditioner) = InvComposePreconditioner(A)
 
-#= unused
-function LinearAlgebra.mul!(y, A::ComposePreconditioner, x)
-    @unpack inner, outer = A
-    tmp = similar(y)
-    mul!(tmp, outer, x)
-    mul!(y, inner, tmp)
-end
-
-function LinearAlgebra.mul!(C, A::ComposePreconditioner, B, α, β)
-    @unpack inner, outer = A
-    tmp = similar(B)
-    mul!(tmp, inner, B)
-    mul!(C, outer, tmp, α, β)
-end
-=#
-
 function LinearAlgebra.ldiv!(A::ComposePreconditioner, x)
     @unpack inner, outer = A
 
@@ -60,26 +44,6 @@ function LinearAlgebra.mul!(y, A::InvComposePreconditioner, x)
     @unpack P = A
     ldiv!(y, P, x)
 end
-
-#=
-function LinearAlgebra.mul!(C, A::InvComposePreconditioner, B, α, β)
-    @unpack P = A
-    tmp = copy(B)
-    ldiv!(tmp, P, B)
-    mul!(C, I, tmp, α, β)
-end
-
-function LinearAlgebra.ldiv!(A::InvComposePreconditioner, x)
-    @unpack P = A
-    y = copy(x)
-    mul!(x, P, y)
-end
-
-function LinearAlgebra.ldiv!(y, A::InvComposePreconditioner, x)
-    @unpack P = A
-    mul!(y, P, x)
-end
-=#
 
 ## Krylov.jl
 

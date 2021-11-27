@@ -50,9 +50,9 @@ end
 
 InvComposePreconditioner(inner, outer) = InvComposePreconditioner(ComposePreconditioner(inner, outer))
 
-Base.eltype(A::InvComposePreconditioner) = Float64 #eltype(A.inner)
-#Base.adjoint(A::InvComposePreconditioner) = ComposePreconditioner(A.outer', A.inner')
-Base.inv(A::InvComposePreconditioner) = ComposePreconditioner(A.P)
+Base.eltype(A::InvComposePreconditioner) = Base.eltype(A.P)
+Base.adjoint(A::InvComposePreconditioner) = InvComposePreconditioner(A.P')
+Base.inv(A::InvComposePreconditioner) = deepcopy(A.P)
 
 function LinearAlgebra.mul!(y, A::InvComposePreconditioner, x)
     @unpack P = A
@@ -61,10 +61,15 @@ end
 
 function LinearAlgebra.mul!(C, A::InvComposePreconditioner, B, α, β)
     @unpack P = A
+    tmp = copy(B)
+    ldiv!(tmp, P, B)
+    mul!(C, I, tmp, α, β)
 end
 
 function LinearAlgebra.ldiv!(A::InvComposePreconditioner, x)
     @unpack P = A
+    y = copy(x)
+    mul!(x, P, y)
 end
 
 function LinearAlgebra.ldiv!(y, A::InvComposePreconditioner, x)
@@ -175,15 +180,8 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
         cache = set_cacheval(cache, solver)
     end
 
-    M = alg.Pl
-    N = alg.Pr
-
-    """
-    TODO - pass in inv(Pl), inv(Pr) to Krylov.jl
-    """
-
-#   M = InvComposePreconditioner(alg.Pl, cache.Pl) # left precond
-#   N = InvComposePreconditioner(alg.Pr, cache.Pr) # right 
+    M = InvComposePreconditioner(alg.Pl, cache.Pl) # left precond
+    N = InvComposePreconditioner(alg.Pr, cache.Pr) # right 
 
     atol    = cache.abstol
     rtol    = cache.reltol

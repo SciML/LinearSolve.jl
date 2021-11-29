@@ -166,9 +166,10 @@ end
         P  = LinearSolve.ComposePreconditioner(P1,P2)
         Pi = LinearSolve.InvComposePreconditioner(P)
 
-        @test Pi == LinearSolve.InvComposePreconditioner(P1,P2)
-        @test Pi == inv(P)
-        @test P  == inv(Pi)
+        @test Pi  == LinearSolve.InvComposePreconditioner(P1,P2)
+        @test Pi  == inv(P)
+        @test P   == inv(Pi)
+        @test Pi' == inv(P')
 
         # ComposePreconditioner
         ldiv!(P, x)

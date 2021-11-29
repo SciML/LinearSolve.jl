@@ -12,7 +12,7 @@ struct ComposePreconditioner{Ti,To}
     outer::To
 end
 
-Base.eltype(A::ComposePreconditioner) = Float64 #eltype(A.inner)
+Base.eltype(A::ComposePreconditioner) = promote_type(eltype(A.inner), eltype(A.outer))
 Base.adjoint(A::ComposePreconditioner) = ComposePreconditioner(A.outer', A.inner')
 Base.inv(A::ComposePreconditioner) = InvComposePreconditioner(A)
 
@@ -148,8 +148,16 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
         cache = set_cacheval(cache, solver)
     end
 
-    M = InvComposePreconditioner(alg.Pl, cache.Pl) # left precond
-    N = InvComposePreconditioner(alg.Pr, cache.Pr) # right 
+    M = I # left precond
+    N = I # right precond
+
+    if (cache.Pl != I) | (alg.Pl != I)
+        M = InvComposePreconditioner(alg.Pl, cache.Pl)
+    end
+
+    if (cache.Pr != I) | (alg.Pr != I)
+        N = InvComposePreconditioner(alg.Pr, cache.Pr)
+    end
 
     atol    = cache.abstol
     rtol    = cache.reltol
@@ -161,7 +169,7 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
               alg.kwargs...)
 
     if cache.cacheval isa Krylov.CgSolver
-        N != LinearAlgebra.I  &&
+        N != I  &&
             @warn "$(alg.KrylovAlg) doesn't support right preconditioning."
         Krylov.solve!(args...; M=M,
                       kwargs...)
@@ -172,7 +180,7 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
         Krylov.solve!(args...; M=M, N=N,
                       kwargs...)
     elseif cache.cacheval isa Krylov.MinresSolver
-        N != LinearAlgebra.I  &&
+        N != I  &&
             @warn "$(alg.KrylovAlg) doesn't support right preconditioning."
         Krylov.solve!(args...; M=M,
                       kwargs...)
@@ -223,8 +231,16 @@ IterativeSolversJL_MINRES(args...;kwargs...) =
 function init_cacheval(alg::IterativeSolversJL, cache::LinearCache)
     @unpack A, b, u = cache
 
-    Pl = ComposePreconditioner(alg.Pl, cache.Pl)
-    Pr = ComposePreconditioner(alg.Pr, cache.Pr)
+    Pl = IterativeSolvers.Identity()
+    Pr = IterativeSolvers.Identity()
+
+    if (cache.Pl != I) | (alg.Pl != IterativeSolvers.Identity())
+        Pl = ComposePreconditioner(alg.Pl, cache.Pl)
+    end
+
+    if (cache.Pr != I) | (alg.Pr != IterativeSolvers.Identity())
+        Pr = ComposePreconditioner(alg.Pr, cache.Pr)
+    end
 
     abstol  = cache.abstol
     reltol  = cache.reltol

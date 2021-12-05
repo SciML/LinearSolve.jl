@@ -3,10 +3,6 @@
 
 default_preconditioner(s, isleft) = isleft ? I * s : I * (1/s)
 
-"""
- C  * x = P  * Q  * x
- Ci * x = Qi * Pi * x
-"""
 struct ComposePreconditioner{Ti,To}
     inner::Ti
     outer::To

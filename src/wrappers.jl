@@ -1,7 +1,7 @@
 
 ## Preconditioners
 
-default_preconditioner(s, isleft) = isleft ? I * s : I * (1/s)
+scaling_preconditioner(s, isleft) = isleft ? I * s : I * (1/s)
 
 struct ComposePreconditioner{Ti,To}
     inner::Ti

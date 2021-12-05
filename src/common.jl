@@ -60,7 +60,7 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
                         reltol=√eps(eltype(prob.A)),
                         maxiters=length(prob.b),
                         verbose=false,
-                        preconditioner_scale=one(eltype(prob.A)),
+                        scale=one(eltype(prob.A)),
                         kwargs...,
                        )
     @unpack A, b, u0, p = prob
@@ -71,8 +71,8 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
     isfresh = cacheval === nothing
     Tc = isfresh ? Any : typeof(cacheval)
 
-    Pl = default_preconditioner(preconditioner_scale, true)
-    Pr = default_preconditioner(preconditioner_scale, false)
+    Pl = scaling_preconditioner(scale, true)
+    Pr = scaling_preconditioner(scale, false)
 
     A = alias_A ? A : deepcopy(A)
     b = alias_b ? b : deepcopy(b)

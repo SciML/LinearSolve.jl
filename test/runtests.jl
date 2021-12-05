@@ -127,41 +127,35 @@ end
 end
 
 @testset "Preconditioners" begin
-    @testset "ScaleVector" begin
+    @testset "scaling_preconditioner" begin
         s = rand()
-        α = rand()
-        β = rand()
 
         x = rand(n,n)
         y = rand(n,n)
 
-        Pl = LinearSolve.default_preconditioner(s, true)
-        Pr = LinearSolve.default_preconditioner(s, false)
+        Pl = LinearSolve.scaling_preconditioner(s, true)
+        Pr = LinearSolve.scaling_preconditioner(s, false)
 
-        mul!(y, Pl, x)
-        mul!(y, Pr, x)
+        mul!(y, Pl, x); @test y ≈ s * x
+        mul!(y, Pr, x); @test y ≈ s \ x
 
-        mul!(y, Pl, x, α, β)
-        mul!(y, Pr, x, α, β)
+        y .= x; ldiv!(Pl, x); @test x ≈ s \ y
+        y .= x; ldiv!(Pr, x); @test x ≈ s * y
 
-        ldiv!(Pl, x)
-        ldiv!(Pr, x)
-
-        ldiv!(y, Pl, x)
-        ldiv!(y, Pr, x)
+        ldiv!(y, Pl, x); @test y ≈ s \ x
+        ldiv!(y, Pr, x); @test y ≈ s * x
 
     end
 
     @testset "ComposePreconditioenr" begin
-        s = rand()
-        α = rand()
-        β = rand()
+        s1 = rand()
+        s2 = rand()
 
         x = rand(n,n)
         y = rand(n,n)
 
-        P1 = LinearSolve.default_preconditioner(s, true)
-        P2 = LinearSolve.default_preconditioner(s, false)
+        P1 = LinearSolve.scaling_preconditioner(s1, true)
+        P2 = LinearSolve.scaling_preconditioner(s2, true)
 
         P  = LinearSolve.ComposePreconditioner(P1,P2)
         Pi = LinearSolve.InvComposePreconditioner(P)
@@ -172,11 +166,11 @@ end
         @test Pi' == inv(P')
 
         # ComposePreconditioner
-        ldiv!(P, x)
-        ldiv!(y, P, x)
+        ldiv!(y, P, x);      @test y ≈ ldiv!(P2, ldiv!(P1, x))
+        y .= x; ldiv!(P, x); @test x ≈ ldiv!(P2, ldiv!(P1, y))
 
         # InvComposePreconditioner
-        mul!(y, Pi, x)
+        mul!(y, Pi, x); @test y ≈ ldiv!(P2, ldiv!(P1, x))
 
     end
 end

@@ -30,7 +30,7 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
         alg = GenericFactorization(;fact_alg=ldlt!)
         SciMLBase.solve(cache, alg, args...; kwargs...)
     elseif A isa SparseMatrixCSC
-        alg = LUFactorization()
+        alg = UMFPACKFactorization()
         SciMLBase.solve(cache, alg, args...; kwargs...)
     
     # This catches the cases where a factorization overload could exist

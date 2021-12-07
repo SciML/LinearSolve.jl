@@ -7,7 +7,7 @@ function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization)
     ldiv!(cache.u, cache.cacheval, cache.b)
 end
 
-## LUFactorization
+## LU Factorizations
 
 struct LUFactorization{P} <: AbstractFactorization
     pivot::P
@@ -31,6 +31,21 @@ function init_cacheval(alg::LUFactorization, A, b, u)
     end
     fact = lu!(A, alg.pivot)
     return fact
+end
+
+# This could be a GenericFactorization perhaps?
+struct UMFPACKFactorization <: AbstractFactorization
+end
+
+function init_cacheval(alg::UMFPACKFactorization, A, b, u)
+    if A isa AbstractDiffEqOperator
+        A = A.A
+    end
+    if A isa SparseMatrixCSC
+        return lu(A)
+    else
+        error("Sparse LU is not defined for $(typeof(A))")
+    end
 end
 
 ## QRFactorization

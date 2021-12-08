@@ -60,19 +60,19 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
                         reltol=√eps(eltype(prob.A)),
                         maxiters=length(prob.b),
                         verbose=false,
-                        scale=one(eltype(prob.A)),
+                        Pl = nothing,
+                        Pr = nothing,
                         kwargs...,
                        )
     @unpack A, b, u0, p = prob
 
-    u0 = (u0 === nothing) ? zero(b) : u0
+    u0 = (u0 !== nothing) ? u0 : zero(b)   
+    Pl = (Pl !== nothing) ? Pl : Identity()
+    Pr = (Pr !== nothing) ? Pr : Identity()
 
     cacheval = init_cacheval(alg, A, b, u0)
     isfresh = cacheval === nothing
     Tc = isfresh ? Any : typeof(cacheval)
-
-    Pl = scaling_preconditioner(scale, true)
-    Pr = scaling_preconditioner(scale, false)
 
     A = alias_A ? A : deepcopy(A)
     b = alias_b ? b : deepcopy(b)

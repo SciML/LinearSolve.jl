@@ -133,8 +133,7 @@ end
         x = rand(n,n)
         y = rand(n,n)
 
-        Pl = LinearSolve.scaling_preconditioner(s, true)
-        Pr = LinearSolve.scaling_preconditioner(s, false)
+        Pl, Pr = LinearSolve.scaling_preconditioner(s)
 
         mul!(y, Pl, x); @test y ≈ s * x
         mul!(y, Pr, x); @test y ≈ s \ x
@@ -154,13 +153,13 @@ end
         x = rand(n,n)
         y = rand(n,n)
 
-        P1 = LinearSolve.scaling_preconditioner(s1, true)
-        P2 = LinearSolve.scaling_preconditioner(s2, true)
+        P1, _ = LinearSolve.scaling_preconditioner(s1)
+        P2, _ = LinearSolve.scaling_preconditioner(s2)
 
         P  = LinearSolve.ComposePreconditioner(P1,P2)
         Pi = LinearSolve.InvComposePreconditioner(P)
 
-        @test Pi  == LinearSolve.InvComposePreconditioner(P1,P2)
+        @test Pi  == LinearSolve.InvComposePreconditioner(P1, P2)
         @test Pi  == inv(P)
         @test P   == inv(Pi)
         @test Pi' == inv(P')

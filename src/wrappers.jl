@@ -1,32 +1,61 @@
 
-#TODO: composed preconditioners, preconditioner setter for cache,
-#   detailed tests for wrappers
-
 ## Preconditioners
 
-struct ScaleVector{T}
-    s::T
-    isleft::Bool
-end
-
-function LinearAlgebra.ldiv!(v::ScaleVector, x)
-end
-
-function LinearAlgebra.ldiv!(y, v::ScaleVector, x)
-end
+scaling_preconditioner(s) = I * s , I * (1/s)
 
 struct ComposePreconditioner{Ti,To}
     inner::Ti
     outer::To
-    isleft::Bool
 end
 
-function LinearAlgebra.ldiv!(v::ComposePreconditioner, x)
-    @unpack inner, outer, isleft = v
+Base.eltype(A::ComposePreconditioner) = promote_type(eltype(A.inner), eltype(A.outer))
+Base.adjoint(A::ComposePreconditioner) = ComposePreconditioner(A.outer', A.inner')
+Base.inv(A::ComposePreconditioner) = InvComposePreconditioner(A)
+
+function LinearAlgebra.ldiv!(A::ComposePreconditioner, x)
+    @unpack inner, outer = A
+
+    ldiv!(inner, x)
+    ldiv!(outer, x)
 end
 
-function LinearAlgebra.ldiv!(y, v::ComposePreconditioner, x)
-    @unpack inner, outer, isleft = v
+function LinearAlgebra.ldiv!(y, A::ComposePreconditioner, x)
+    @unpack inner, outer = A
+
+    ldiv!(y, inner, x)
+    ldiv!(outer, y)
+end
+
+struct InvComposePreconditioner{Tp <: ComposePreconditioner}
+    P::Tp
+end
+
+InvComposePreconditioner(inner, outer) = InvComposePreconditioner(ComposePreconditioner(inner, outer))
+
+Base.eltype(A::InvComposePreconditioner) = Base.eltype(A.P)
+Base.adjoint(A::InvComposePreconditioner) = InvComposePreconditioner(A.P')
+Base.inv(A::InvComposePreconditioner) = deepcopy(A.P)
+
+function LinearAlgebra.mul!(y, A::InvComposePreconditioner, x)
+    @unpack P = A
+    ldiv!(y, P, x)
+end
+
+function get_preconditioner(Pi, Po)
+
+    ifPi = Pi !== Identity()
+    ifPo = Po !== Identity()
+
+    P = 
+    if ifPi & ifPo
+        ComposePreconditioner(Pi, Po)
+    elseif ifPi | ifPo
+        ifPi ? Pi : Po
+    else
+        Identity()
+    end
+
+    return P
 end
 
 ## Krylov.jl
@@ -41,9 +70,13 @@ struct KrylovJL{F,Tl,Tr,I,A,K} <: AbstractKrylovSubspaceMethod
     kwargs::K
 end
 
-function KrylovJL(args...; KrylovAlg = Krylov.gmres!, Pl=I, Pr=I,
+function KrylovJL(args...; KrylovAlg = Krylov.gmres!,
+                  Pl=nothing, Pr=nothing,
                   gmres_restart=0, window=0,
                   kwargs...)
+
+    Pl = (Pl === nothing) ? Identity() : Pl
+    Pr = (Pr === nothing) ? Identity() : Pr
 
     return KrylovJL(KrylovAlg, Pl, Pr, gmres_restart, window,
                     args, kwargs)
@@ -132,6 +165,12 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
         cache = set_cacheval(cache, solver)
     end
 
+    M = get_preconditioner(alg.Pl, cache.Pl)
+    N = get_preconditioner(alg.Pr, cache.Pr)
+
+    M = (M === Identity()) ? I : inv(M)
+    N = (N === Identity()) ? I : inv(N)
+
     atol    = cache.abstol
     rtol    = cache.reltol
     itmax   = cache.maxiters
@@ -142,20 +181,20 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
               alg.kwargs...)
 
     if cache.cacheval isa Krylov.CgSolver
-        alg.Pr != LinearAlgebra.I  &&
+        N !== I  &&
             @warn "$(alg.KrylovAlg) doesn't support right preconditioning."
-        Krylov.solve!(args...; M=alg.Pl,
+        Krylov.solve!(args...; M=M,
                       kwargs...)
     elseif cache.cacheval isa Krylov.GmresSolver
-        Krylov.solve!(args...; M=alg.Pl, N=alg.Pr,
+        Krylov.solve!(args...; M=M, N=N,
                       kwargs...)
     elseif cache.cacheval isa Krylov.BicgstabSolver
-        Krylov.solve!(args...; M=alg.Pl, N=alg.Pr,
+        Krylov.solve!(args...; M=M, N=N,
                       kwargs...)
     elseif cache.cacheval isa Krylov.MinresSolver
-        alg.Pr != LinearAlgebra.I  &&
+        N !== I  &&
             @warn "$(alg.KrylovAlg) doesn't support right preconditioning."
-        Krylov.solve!(args...; M=alg.Pl,
+        Krylov.solve!(args...; M=M,
                       kwargs...)
     else
         Krylov.solve!(args...; kwargs...)
@@ -177,9 +216,12 @@ end
 
 function IterativeSolversJL(args...;
                             generate_iterator = IterativeSolvers.gmres_iterable!,
-                            Pl=IterativeSolvers.Identity(),
-                            Pr=IterativeSolvers.Identity(),
+                            Pl=nothing, Pr=nothing,
                             gmres_restart=0, kwargs...)
+
+    Pl = (Pl === nothing) ? Identity() : Pl
+    Pr = (Pr === nothing) ? Identity() : Pr
+
     return IterativeSolversJL(generate_iterator, Pl, Pr, gmres_restart,
                               args, kwargs)
 end
@@ -204,8 +246,8 @@ IterativeSolversJL_MINRES(args...;kwargs...) =
 function init_cacheval(alg::IterativeSolversJL, cache::LinearCache)
     @unpack A, b, u = cache
 
-    Pl = (alg.Pl == LinearAlgebra.I) ? IterativeSolvers.Identity() : alg.Pl
-    Pr = (alg.Pr == LinearAlgebra.I) ? IterativeSolvers.Identity() : alg.Pr
+    Pl = get_preconditioner(alg.Pl, cache.Pl)
+    Pr = get_preconditioner(alg.Pr, cache.Pr)
 
     abstol  = cache.abstol
     reltol  = cache.reltol
@@ -218,7 +260,7 @@ function init_cacheval(alg::IterativeSolversJL, cache::LinearCache)
               alg.kwargs...)
 
     iterable = if alg.generate_iterator === IterativeSolvers.cg_iterator!
-        Pr != IterativeSolvers.Identity() &&
+        Pr !== Identity() &&
           @warn "$(alg.generate_iterator) doesn't support right preconditioning"
         alg.generate_iterator(u, A, b, Pl;
                               kwargs...)
@@ -226,7 +268,7 @@ function init_cacheval(alg::IterativeSolversJL, cache::LinearCache)
         alg.generate_iterator(u, A, b; Pl=Pl, Pr=Pr, restart=restart,
                               kwargs...)
     elseif alg.generate_iterator === IterativeSolvers.bicgstabl_iterator!
-        Pr != IterativeSolvers.Identity() &&
+        Pr !== Identity() &&
           @warn "$(alg.generate_iterator) doesn't support right preconditioning"
         alg.generate_iterator(u, A, b, alg.args...; Pl=Pl,
                               abstol=abstol, reltol=reltol,

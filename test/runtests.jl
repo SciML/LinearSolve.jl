@@ -34,6 +34,8 @@ function test_interface(alg, prob1, prob2)
     return
 end
 
+@testset "LinearSolve" begin
+
 @testset "Default Linear Solver" begin
     test_interface(nothing, prob1, prob2)
 
@@ -123,3 +125,53 @@ end
         end
     end
 end
+
+@testset "Preconditioners" begin
+    @testset "scaling_preconditioner" begin
+        s = rand()
+
+        x = rand(n,n)
+        y = rand(n,n)
+
+        Pl, Pr = LinearSolve.scaling_preconditioner(s)
+
+        mul!(y, Pl, x); @test y ≈ s * x
+        mul!(y, Pr, x); @test y ≈ s \ x
+
+        y .= x; ldiv!(Pl, x); @test x ≈ s \ y
+        y .= x; ldiv!(Pr, x); @test x ≈ s * y
+
+        ldiv!(y, Pl, x); @test y ≈ s \ x
+        ldiv!(y, Pr, x); @test y ≈ s * x
+
+    end
+
+    @testset "ComposePreconditioenr" begin
+        s1 = rand()
+        s2 = rand()
+
+        x = rand(n,n)
+        y = rand(n,n)
+
+        P1, _ = LinearSolve.scaling_preconditioner(s1)
+        P2, _ = LinearSolve.scaling_preconditioner(s2)
+
+        P  = LinearSolve.ComposePreconditioner(P1,P2)
+        Pi = LinearSolve.InvComposePreconditioner(P)
+
+        @test Pi  == LinearSolve.InvComposePreconditioner(P1, P2)
+        @test Pi  == inv(P)
+        @test P   == inv(Pi)
+        @test Pi' == inv(P')
+
+        # ComposePreconditioner
+        ldiv!(y, P, x);      @test y ≈ ldiv!(P2, ldiv!(P1, x))
+        y .= x; ldiv!(P, x); @test x ≈ ldiv!(P2, ldiv!(P1, y))
+
+        # InvComposePreconditioner
+        mul!(y, Pi, x); @test y ≈ ldiv!(P2, ldiv!(P1, x))
+
+    end
+end
+
+end # testset

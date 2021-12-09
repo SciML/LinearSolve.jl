@@ -297,3 +297,63 @@ function SciMLBase.solve(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
 
     return cache.u
 end
+
+## Paradiso
+
+struct PardisoJL{F,S,P,A,K} <: SciMLLinearSolveAlgorithm
+    alg_selector::F
+    schur::S
+    parallel::P
+    args::A
+    kwargs::K
+end
+
+function PardisoJL(args...; alg_selector=:default_alg,
+                          schur=:smart,
+                          parallel=:fancy,
+                          kwargs...)
+
+    return PardisoJL(alg_selector, schur, parallel,
+                   args, kwargs)
+end
+
+PardisoJL_Default(args...; kwargs...) = PardisoJL(args...;
+                                             alg_selector=:this_one,
+                                             kwargs...)
+
+function init_cacheval(alg::PardisoJL, cache::LinearCache)
+
+    solver =
+    if alg.alg_selector == :default_alg
+        MKLPardisoSolver()
+    elseif alg_selector == :this_one
+        PardisoSolver()
+    else
+        PardisoSolver()
+    end
+
+    alg.verbose && set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
+
+    return solver
+end
+
+function SciMLBase.solve(cache::LinearCache, alg::PardisoJL; kwargs...)
+    @unpack cacheval, A, b, u = cache
+
+    if cache.isfresh
+        solver = init_cacheval(alg, cache)
+        cache = set_cacheval(cache, solver)
+    end
+
+    abstol  = cache.abstol
+    reltol  = cache.reltol
+    verbose = cache.verbose
+
+    kwargs = (abstol=abstol, reltol=reltol,
+              alg.kwargs...)
+
+    Pardiso.solve!(cacheval, u, A, b)
+
+    return cache.u
+end
+

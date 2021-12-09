@@ -3,7 +3,7 @@
 
 import Pardiso
 
-export PardisoJL
+export PardisoJL, PardisoJLFactorize, PardisoJLIterate
 
 Base.@kwdef struct PardisoJL <: SciMLLinearSolveAlgorithm
     nprocs::Union{Int, Nothing} = nothing
@@ -14,6 +14,11 @@ Base.@kwdef struct PardisoJL <: SciMLLinearSolveAlgorithm
     iparm::Union{Vector{Tuple{Int,Int}}, Nothing} = nothing
     dparm::Union{Vector{Tuple{Int,Int}}, Nothing} = nothing
 end
+
+PardisoJLFactorize(;kwargs...) = PardisoJL(;solver_type=0, kwargs...)
+PardisoJLIterate(;kwargs...) = PardisoJL(;solver_type=1, kwargs...)
+
+# TODO schur complement functionality
 
 function init_cacheval(alg::PardisoJL, cache::LinearCache)
     @unpack nprocs, solver_type, matrix_type, iparm, dparm = alg
@@ -62,7 +67,7 @@ function SciMLBase.solve(cache::LinearCache, alg::PardisoJL; kwargs...)
     can we use phase to store factorization in cache?
     """
     alg.solve_phase !== nothing && Pardiso.set_phase!(cacheval, alg.solve_phase)
-    Pardiso.solve!(cache.cacheval, u, A, b)
+    Pardiso.pardiso(cache.cacheval, u, A, b)
     alg.release_phase !== nothing && Pardiso.set_phase!(cacheval, alg.release_phase) # is this necessary?
 
     return cache.u

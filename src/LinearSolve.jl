@@ -49,7 +49,7 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
 export KrylovJL, KrylovJL_CG, KrylovJL_GMRES, KrylovJL_BICGSTAB, KrylovJL_MINRES,
        IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
        IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES,
-       PardisoJL, PardisoJL_Default
+       PardisoJL
 export DefaultLinSolve
 
 end

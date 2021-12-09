@@ -300,39 +300,50 @@ end
 
 ## Paradiso
 
-struct PardisoJL{F,S,P,A,K} <: SciMLLinearSolveAlgorithm
-    alg_selector::F
-    schur::S
-    parallel::P
+struct PardisoJL{F,A,K} <: SciMLLinearSolveAlgorithm
+    which_paradiso::F
+    matrix_type::Union{Int, Nothing}
+    nthreads::Union{Int, Nothing}
+    solver_type::Union{Int, Nothing}
+    solve_phase::Union{Int, Nothing}
+    release_phase::Union{Int, Nothing}
+    ipram::Union{Int, Nothing}
+    dpram::Union{Int, Nothing}
     args::A
     kwargs::K
 end
 
-function PardisoJL(args...; alg_selector=:default_alg,
-                          schur=:smart,
-                          parallel=:fancy,
+function PardisoJL(args...; which_pardiso=MKLPardisoSolver,
                           kwargs...)
 
-    return PardisoJL(alg_selector, schur, parallel,
+    return PardisoJL(which_pardiso,
                    args, kwargs)
 end
 
+# some standard implementation - maybe SPD, or 
 PardisoJL_Default(args...; kwargs...) = PardisoJL(args...;
-                                             alg_selector=:this_one,
+                                             which_pardiso=:this_one,
                                              kwargs...)
 
 function init_cacheval(alg::PardisoJL, cache::LinearCache)
+    @unpack verbose, matrix_type
 
-    solver =
-    if alg.alg_selector == :default_alg
-        MKLPardisoSolver()
-    elseif alg_selector == :this_one
+    solver = """ is alg.which_pardiso necessary? """
+    if Pardiso.PARDISO_LOADED[]
         PardisoSolver()
     else
-        PardisoSolver()
+        MKLPardisoSolver()
     end
 
-    alg.verbose && set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
+    verbose && Pardiso.set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
+    matrix_type !== nothing  && Pardiso.set_matrixtype!(solver, matrix_type)
+    nthreads !== nothing && set_nprocs!(ps, nthreads)
+#   set_iparm!(solver, 5, 13.37)
+#   set_dparm!(solver, 5, 13.37)
+#   set_solver!(solver, key)
+
+    # inject user code for additional setup stuff
+    # solver_setup!(solver)
 
     return solver
 end
@@ -352,7 +363,12 @@ function SciMLBase.solve(cache::LinearCache, alg::PardisoJL; kwargs...)
     kwargs = (abstol=abstol, reltol=reltol,
               alg.kwargs...)
 
+    Pardiso.set_phase!(ps, alg.phase)
+
     Pardiso.solve!(cacheval, u, A, b)
+
+    # is this necessary?
+    Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
 
     return cache.u
 end

@@ -300,50 +300,45 @@ end
 
 ## Paradiso
 
-struct PardisoJL{F,A,K} <: SciMLLinearSolveAlgorithm
-    which_paradiso::F
-    matrix_type::Union{Int, Nothing}
+struct PardisoJL{A} <: SciMLLinearSolveAlgorithm
     nthreads::Union{Int, Nothing}
-    solver_type::Union{Int, Nothing}
-    solve_phase::Union{Int, Nothing}
+    solver_type::Union{Int, Pardiso.Solver, Nothing}
+    matrix_type::Union{Int, Pardiso.MatrixType, Nothing}
+    solve_phase::Union{Int, Pardiso.Phase, Nothing}
     release_phase::Union{Int, Nothing}
-    ipram::Union{Int, Nothing}
-    dpram::Union{Int, Nothing}
-    args::A
-    kwargs::K
+    iparm::Union{A, Nothing}
+    dparm::Union{A, Nothing}
 end
 
-function PardisoJL(args...; which_pardiso=MKLPardisoSolver,
-                          kwargs...)
+function PardisoJL(solver_type=Pardiso.nothing,)
 
-    return PardisoJL(which_pardiso,
-                   args, kwargs)
+    return PardisoJL(nthreads, solver_type, matrix_type, solve_phase,
+                     release_phase, setup_func)
 end
-
-# some standard implementation - maybe SPD, or 
-PardisoJL_Default(args...; kwargs...) = PardisoJL(args...;
-                                             which_pardiso=:this_one,
-                                             kwargs...)
 
 function init_cacheval(alg::PardisoJL, cache::LinearCache)
-    @unpack verbose, matrix_type
+    @unpack nthreads, solver_type, matrix_type
 
-    solver = """ is alg.which_pardiso necessary? """
-    if Pardiso.PARDISO_LOADED[]
-        PardisoSolver()
-    else
-        MKLPardisoSolver()
+    solver = Pardiso.PARDISO_LOADED[] ? PardisoSolver() : MKLPardisoSolver()
+
+    Pardiso.pardisoinit(solver) # default initialization
+
+    nthreads    !== nothing && Pardiso.set_nprocs!(ps, nthreads)
+    solver_type !== nothing && Pardiso.set_solver!(solver, key)
+    matrix_type !== nothing && Pardiso.set_matrixtype!(solver, matrix_type)
+    cache.verbose && Pardiso.set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
+
+    iparm !== nothing begin # pass in vector of tuples like [(iparm, key)]
+        for i in length(iparm)
+            Pardiso.set_iparm!(solver, iparm[i]...)
+        end
     end
 
-    verbose && Pardiso.set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
-    matrix_type !== nothing  && Pardiso.set_matrixtype!(solver, matrix_type)
-    nthreads !== nothing && set_nprocs!(ps, nthreads)
-#   set_iparm!(solver, 5, 13.37)
-#   set_dparm!(solver, 5, 13.37)
-#   set_solver!(solver, key)
-
-    # inject user code for additional setup stuff
-    # solver_setup!(solver)
+    dparm !== nothing begin
+        for i in length(dparm)
+            Pardiso.set_dparm!(solver, dparm[i]...)
+        end
+    end
 
     return solver
 end
@@ -358,10 +353,8 @@ function SciMLBase.solve(cache::LinearCache, alg::PardisoJL; kwargs...)
 
     abstol  = cache.abstol
     reltol  = cache.reltol
-    verbose = cache.verbose
 
-    kwargs = (abstol=abstol, reltol=reltol,
-              alg.kwargs...)
+    kwargs = (abstol=abstol, reltol=reltol, alg.kwargs...)
 
     Pardiso.set_phase!(ps, alg.phase)
 

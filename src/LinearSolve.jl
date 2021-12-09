@@ -41,7 +41,7 @@ function __init__()
     IS_OPENBLAS[] = occursin("openblas", BLAS.get_config().loaded_libs[1].libname)
   end
 
-  @require Pardiso="46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2" PardisoJL, PardisoJL_Default
+  @require Pardiso="46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2" PardisoJL
 end
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,

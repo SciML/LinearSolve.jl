@@ -16,7 +16,6 @@ using Requires
 import Krylov
 import KrylovKit # TODO
 import IterativeSolvers
-import Pardiso
 
 using Reexport
 @reexport using SciMLBase
@@ -48,8 +47,7 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        RFLUFactorizaation
 export KrylovJL, KrylovJL_CG, KrylovJL_GMRES, KrylovJL_BICGSTAB, KrylovJL_MINRES,
        IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
-       IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES,
-       PardisoJL
+       IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES
 export DefaultLinSolve
 
 end

@@ -174,4 +174,7 @@ end
     end
 end
 
+@testset "PardisoJL" begin
+end
+
 end # testset

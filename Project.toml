@@ -33,6 +33,7 @@ julia = "1.6"
 DiffEqProblemLibrary = "a077e3f3-b75c-5d7f-a0c6-6bc4c8ec64a9"
 OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+Pardiso = "46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2"
 
 [targets]
-test = ["Test", "OrdinaryDiffEq", "DiffEqProblemLibrary"]
+test = ["Test", "OrdinaryDiffEq", "DiffEqProblemLibrary", "Pardiso"]

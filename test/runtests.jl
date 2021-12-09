@@ -126,6 +126,25 @@ end
     end
 end
 
+@testset "PardisoJL" begin
+    #@test_broken alg = PardisoJL()
+
+    using Pardiso, SparseArrays
+    verbose = true
+
+    A = sparse([ 1. 0 -2  3
+                 0  5  1  2
+                -2  1  4 -7
+                 3  2 -7  5 ])
+    b = rand(4)
+
+    prob = LinearProblem(A, b)
+    alg = PardisoJL()
+
+    u = solve(prob, alg; verbose=true)
+
+end
+
 @testset "Preconditioners" begin
     @testset "scaling_preconditioner" begin
         s = rand()
@@ -172,9 +191,6 @@ end
         mul!(y, Pi, x); @test y ≈ ldiv!(P2, ldiv!(P1, x))
 
     end
-end
-
-@testset "PardisoJL" begin
 end
 
 end # testset

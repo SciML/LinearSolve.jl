@@ -56,9 +56,9 @@ SciMLBase.init(prob::LinearProblem, args...; kwargs...) = SciMLBase.init(prob,no
 
 function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorithm,Nothing}, args...;
                         alias_A = false, alias_b = false,
-                        abstol=√eps(eltype(prob.A)),
-                        reltol=√eps(eltype(prob.A)),
-                        maxiters=length(prob.b),
+                        abstol=√eps(eltype(prob.A)), # TODO handle when eps()
+                        reltol=√eps(eltype(prob.A)), # not defined on eltype
+                        maxiters=length(prob.b),     # like Int of Complex
                         verbose=false,
                         Pl = nothing,
                         Pr = nothing,

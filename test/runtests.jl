@@ -127,7 +127,7 @@ end
 end
 
 @testset "PardisoJL" begin
-    #@test_broken alg = PardisoJL()
+    @test_broken alg = PardisoJL()
 
     using Pardiso, SparseArrays
     verbose = true
@@ -137,11 +137,16 @@ end
                 -2  1  4 -7
                  3  2 -7  5 ])
     b = rand(4)
+    u = zero(b)
 
     prob = LinearProblem(A, b)
-    alg = PardisoJL()
+    for alg in (PardisoJL(),
+                PardisoJLFactorize(),
+                PardisoJLIterate(), # not with MKLPardisoSolver
+               )
 
-    u = solve(prob, alg; verbose=true)
+        u = solve(prob, alg; verbose=true)
+    end
 
 end
 

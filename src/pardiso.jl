@@ -15,24 +15,34 @@ Base.@kwdef struct PardisoJL <: SciMLLinearSolveAlgorithm
     dparm::Union{Vector{Tuple{Int,Int}}, Nothing} = nothing
 end
 
-PardisoJLFactorize(;kwargs...) = PardisoJL(;solver_type=0, kwargs...)
-PardisoJLIterate(;kwargs...) = PardisoJL(;solver_type=1, kwargs...)
+PardisoJLFactorize(;kwargs...) = PardisoJL(;solver_type=0,
+                                         solve_phase=Pardiso.NUM_FACT,
+                                         kwargs...)
+PardisoJLIterate(;kwargs...) = PardisoJL(;solver_type=1,
+                                         solve_phase=Pardiso.SOLVE_ITERATIVE_REFINE,
+                                         kwargs...)
 
 # TODO schur complement functionality
 
 function init_cacheval(alg::PardisoJL, cache::LinearCache)
     @unpack nprocs, solver_type, matrix_type, iparm, dparm = alg
 
-    solver = Pardiso.PARDISO_LOADED[] ? Pardiso.PardisoSolver() : Pardiso.MKLPardisoSolver()
+    solver =
+    if Pardiso.PARDISO_LOADED[]
+        Pardiso.PardisoSolver()
+        solver_type !== nothing && Pardiso.set_solver!(solver, solver_type)
+    else
+        Pardiso.MKLPardisoSolver()
+        nprocs !== nothing && Pardiso.set_nprocs!(solver, nprocs)
+    end
 
     Pardiso.pardisoinit(solver) # default initialization
 
-    nprocs      !== nothing && Pardiso.set_nprocs!(ps, nprocs)
-    solver_type !== nothing && Pardiso.set_solver!(solver, key)
+    @show solver
     matrix_type !== nothing && Pardiso.set_matrixtype!(solver, matrix_type)
     cache.verbose && Pardiso.set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
 
-    if iparm !== nothing # pass in vector of tuples like [(iparm, key)]
+    if iparm !== nothing # pass in vector of tuples like [(iparm, key) ...]
         for i in length(iparm)
             Pardiso.set_iparm!(solver, iparm[i]...)
         end
@@ -43,6 +53,8 @@ function init_cacheval(alg::PardisoJL, cache::LinearCache)
             Pardiso.set_dparm!(solver, dparm[i]...)
         end
     end
+
+    Pardiso.set_phase!(cacheval, Pardiso.ANALYSIS)
 
     return solver
 end
@@ -62,13 +74,9 @@ function SciMLBase.solve(cache::LinearCache, alg::PardisoJL; kwargs...)
     reltol = cache.reltol
     kwargs = (abstol=abstol, reltol=reltol)
 
-    """
-    figure out whatever phase is. should set_phase call be in init_cacheval?
-    can we use phase to store factorization in cache?
-    """
     alg.solve_phase !== nothing && Pardiso.set_phase!(cacheval, alg.solve_phase)
     Pardiso.pardiso(cache.cacheval, u, A, b)
-    alg.release_phase !== nothing && Pardiso.set_phase!(cacheval, alg.release_phase) # is this necessary?
+    alg.release_phase !== nothing && Pardiso.set_phase!(cacheval, alg.release_phase)
 
     return cache.u
 end

@@ -127,6 +127,7 @@ end
 end
 
 @testset "PardisoJL" begin
+    using Pardiso
     @test_broken alg = PardisoJL()
 
     using Pardiso, SparseArrays

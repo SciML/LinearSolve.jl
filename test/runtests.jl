@@ -131,22 +131,35 @@ end
 
     using Pardiso, SparseArrays
 
-    A = sparse([ 1. 0 -2  3
+    A1 = sparse([ 1. 0 -2  3
                  0  5  1  2
                 -2  1  4 -7
                  3  2 -7  5 ])
-    b = rand(4)
-    u = zero(b)
+    b1 = rand(4)
+    prob1 = LinearProblem(A1, b1)
 
-    prob = LinearProblem(A, b)
+    lambda = 3
+    e = ones(n)
+    e2 = ones(n-1)
+    A2 = spdiagm(-1 => im*e2, 0 => lambda*e, 1 => -im*e2)
+    b2 = rand(n) + im * zeros(n)
+
+    prob2 = LinearProblem(A2, b2)
+
     for alg in (
                 PardisoJL(),
                 MKLPardisoFactorize(),
                 MKLPardisoIterate(),
                )
 
-        u = solve(prob, alg; cache_kwargs...)
-        @test A * u ≈ b
+        u = solve(prob1, alg; cache_kwargs...)
+        @test A1 * u ≈ b1
+
+        # common interface doesn't support complex types
+        # https://github.com/SciML/LinearSolve.jl/issues/38
+
+#       u = solve(prob2, alg; cache_kwargs...)
+#       @test A2 * u ≈ b2
     end
 
 end

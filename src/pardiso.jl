@@ -1,5 +1,5 @@
 
-## Paradiso
+## Pardiso
 
 import Pardiso
 
@@ -17,10 +17,10 @@ Base.@kwdef struct PardisoJL <: SciMLLinearSolveAlgorithm
 end
 
 MKLPardisoFactorize(;kwargs...) = PardisoJL(;fact_phase=Pardiso.NUM_FACT,
-                                            solve_phase=Pardiso.SOLVE_ITERATIVE_REFINE,
-                                            kwargs...)
+                                             solve_phase=Pardiso.SOLVE_ITERATIVE_REFINE,
+                                             kwargs...)
 MKLPardisoIterate(;kwargs...) = PardisoJL(;solve_phase=Pardiso.NUM_FACT_SOLVE_REFINE,
-                                          kwargs...)
+                                           kwargs...)
 
 # TODO schur complement functionality
 
@@ -50,9 +50,7 @@ function init_cacheval(alg::PardisoJL, cache::LinearCache)
     matrix_type !== nothing && Pardiso.set_matrixtype!(solver, matrix_type)
     cache.verbose && Pardiso.set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
 
-    """
-    pass in vector of tuples like [(iparm::Int, key::Int) ...]
-    """
+    # pass in vector of tuples like [(iparm::Int, key::Int) ...]
     if iparm !== nothing
         for i in length(iparm)
             Pardiso.set_iparm!(solver, iparm[i]...)
@@ -66,7 +64,6 @@ function init_cacheval(alg::PardisoJL, cache::LinearCache)
     end
 
     if (fact_phase !== nothing) | (solve_phase !== nothing)
-        # ensure phase is being changed afterwards?
         Pardiso.set_phase!(solver, Pardiso.ANALYSIS)
         Pardiso.pardiso(solver, u, A, b)
     end
@@ -75,12 +72,6 @@ function init_cacheval(alg::PardisoJL, cache::LinearCache)
         Pardiso.set_phase!(solver, fact_phase)
         Pardiso.pardiso(solver, u, A, b)
     end
-
-    """
-    use ipram/dpram to set tolerances???
-    """
-#   abstol = cache.abstol
-#   reltol = cache.reltol
 
     return solver
 end

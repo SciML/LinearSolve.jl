@@ -11,6 +11,7 @@ KrylovKit = "0b1a1467-8014-51b9-945f-bf0ae24f4b77"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 RecursiveFactorization = "f2c3362d-daeb-58d1-803e-2bc74f2840b4"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
+Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 Setfield = "efcf1570-3423-57d1-acb7-fd33fddbac46"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
@@ -32,6 +33,7 @@ julia = "1.6"
 DiffEqProblemLibrary = "a077e3f3-b75c-5d7f-a0c6-6bc4c8ec64a9"
 OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+Pardiso = "46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2"
 
 [targets]
-test = ["Test", "OrdinaryDiffEq", "DiffEqProblemLibrary"]
+test = ["Test", "OrdinaryDiffEq", "DiffEqProblemLibrary", "Pardiso"]

@@ -76,10 +76,11 @@ function init_cacheval(alg::PardisoJL, cache::LinearCache)
         Pardiso.pardiso(solver, u, A, b)
     end
 
-    #   ipram/dpram
+    """
+    use ipram/dpram to set tolerances???
+    """
 #   abstol = cache.abstol
 #   reltol = cache.reltol
-#   kwargs = (abstol=abstol, reltol=reltol)
 
     return solver
 end

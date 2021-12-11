@@ -145,8 +145,7 @@ end
                 MKLPardisoIterate(),
                )
 
-        u = solve(prob, alg; verbose=true)
-
+        u = solve(prob, alg; cache_kwargs...)
         @test A * u ≈ b
     end
 

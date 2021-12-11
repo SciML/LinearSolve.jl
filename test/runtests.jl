@@ -127,10 +127,9 @@ end
 end
 
 @testset "PardisoJL" begin
-    @test_broken alg = PardisoJL()
+    @test_throws UndefVarError alg = PardisoJL()
 
     using Pardiso, SparseArrays
-    verbose = true
 
     A = sparse([ 1. 0 -2  3
                  0  5  1  2
@@ -140,12 +139,15 @@ end
     u = zero(b)
 
     prob = LinearProblem(A, b)
-    for alg in (PardisoJL(),
-                PardisoJLFactorize(),
-                PardisoJLIterate(), # not with MKLPardisoSolver
+    for alg in (
+                PardisoJL(),
+                MKLPardisoFactorize(),
+                MKLPardisoIterate(),
                )
 
         u = solve(prob, alg; verbose=true)
+
+        @test A * u ≈ b
     end
 
 end

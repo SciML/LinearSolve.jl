@@ -66,7 +66,7 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
                        )
     @unpack A, b, u0, p = prob
 
-    u0 = (u0 !== nothing) ? u0 : zero(b)   
+    u0 = (u0 !== nothing) ? u0 : zero(b)
     Pl = (Pl !== nothing) ? Pl : Identity()
     Pr = (Pr !== nothing) ? Pr : Identity()
 

@@ -46,7 +46,7 @@ function get_preconditioner(Pi, Po)
     ifPi = Pi !== Identity()
     ifPo = Po !== Identity()
 
-    P = 
+    P =
     if ifPi & ifPo
         ComposePreconditioner(Pi, Po)
     elseif ifPi | ifPo
@@ -200,7 +200,7 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
         Krylov.solve!(args...; kwargs...)
     end
 
-    return cache.u
+    return SciMLBase.build_linear_solution(alg,cache.u,nothing)
 end
 
 ## IterativeSolvers.jl
@@ -295,6 +295,5 @@ function SciMLBase.solve(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
     end
     cache.verbose && println()
 
-    return cache.u
+    return SciMLBase.build_linear_solution(alg,cache.u,nothing)
 end
-

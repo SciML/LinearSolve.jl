@@ -4,8 +4,8 @@ function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization)
         cache = set_cacheval(cache, fact)
     end
 
-    ldiv!(cache.u, cache.cacheval, cache.b)
-    SciMLBase.build_linear_solution(alg,cache.u,nothing)
+    y = ldiv!(cache.u, cache.cacheval, cache.b)
+    SciMLBase.build_linear_solution(alg,y,nothing)
 end
 
 ## LU Factorizations

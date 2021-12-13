@@ -74,7 +74,7 @@ end
     test_interface(UMFPACKFactorization(), prob1, prob2)
 
     # Test that refactoring wrong throws.
-    cache = SciMLBase.init(prob1,UMFPACKFactorization(); cache_kwargs...) # initialize cache
+    cache = SciMLBase.init(prob1,UMFPACKFactorization(reuse_symbolic=true); cache_kwargs...) # initialize cache
     y = solve(cache)
     cache = LinearSolve.set_A(cache,sprand(n, n, 0.8))
     @test_throws ArgumentError solve(cache)

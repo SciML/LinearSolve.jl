@@ -35,7 +35,8 @@ function init_cacheval(alg::LUFactorization, A, b, u)
 end
 
 # This could be a GenericFactorization perhaps?
-struct UMFPACKFactorization <: AbstractFactorization
+Base.@kwdef struct UMFPACKFactorization <: AbstractFactorization
+    reuse_symbolic::Bool = false
 end
 
 function init_cacheval(::UMFPACKFactorization, A, b, u)
@@ -55,7 +56,7 @@ function SciMLBase.solve(cache::LinearCache, alg::UMFPACKFactorization)
         A = A.A
     end
     if cache.isfresh
-        if cache.cacheval !== nothing
+        if cache.cacheval !== nothing && alg.reuse_symbolic
             # If we have a cacheval already, run umfpack_symbolic to ensure the symbolic factorization exists
             # This won't recompute if it does.
             SuiteSparse.UMFPACK.umfpack_symbolic!(cache.cacheval)

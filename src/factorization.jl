@@ -1,4 +1,4 @@
-function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization)
+function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization; kwargs...)
     if cache.isfresh
         fact = init_cacheval(alg, cache.A, cache.b, cache.u)
         cache = set_cacheval(cache, fact)

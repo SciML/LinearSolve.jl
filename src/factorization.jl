@@ -1,4 +1,4 @@
-function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization)
+function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization; kwargs...)
     if cache.isfresh
         fact = init_cacheval(alg, cache.A, cache.b, cache.u)
         cache = set_cacheval(cache, fact)
@@ -26,10 +26,6 @@ end
 function init_cacheval(alg::LUFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("LU is not defined for $(typeof(A))")
-
-    if A isa AbstractDiffEqOperator
-        A = A.A
-    end
     fact = lu!(A, alg.pivot)
     return fact
 end
@@ -39,14 +35,7 @@ struct UMFPACKFactorization <: AbstractFactorization
 end
 
 function init_cacheval(alg::UMFPACKFactorization, A, b, u)
-    if A isa AbstractDiffEqOperator
-        A = A.A
-    end
-    if A isa SparseMatrixCSC
-        return lu(A)
-    else
-        error("Sparse LU is not defined for $(typeof(A))")
-    end
+    return lu(A)
 end
 
 ## QRFactorization
@@ -69,9 +58,6 @@ function init_cacheval(alg::QRFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("QR is not defined for $(typeof(A))")
 
-    if A isa AbstractDiffEqOperator
-        A = A.A
-    end
     fact = qr!(A, alg.pivot; blocksize = alg.blocksize)
     return fact
 end
@@ -88,10 +74,6 @@ SVDFactorization() = SVDFactorization(false, LinearAlgebra.DivideAndConquer())
 function init_cacheval(alg::SVDFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("SVD is not defined for $(typeof(A))")
-
-    if A isa AbstractDiffEqOperator
-        A = A.A
-    end
 
     fact = svd!(A; full = alg.full, alg = alg.alg)
     return fact
@@ -110,9 +92,6 @@ function init_cacheval(alg::GenericFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("GenericFactorization is not defined for $(typeof(A))")
 
-    if A isa AbstractDiffEqOperator
-        A = A.A
-    end
     fact = alg.fact_alg(A)
     return fact
 end

@@ -59,9 +59,25 @@ end
     y = solve(_prob)
     @test A1 *  y  ≈ b1
 
+    
     _prob = LinearProblem(sparse(A1.A), b1; u0=x1)
     y = solve(_prob)
     @test A1 *  y  ≈ b1
+end
+
+@testset "UMFPACK Factorization" begin
+    A1 = A/1; b1 = rand(n); x1 = zero(b)
+    A2 = A/2; b2 = rand(n); x2 = zero(b)
+
+    prob1 = LinearProblem(sparse(A1), b1; u0=x1)
+    prob2 = LinearProblem(sparse(A2), b2; u0=x2)
+    test_interface(UMFPACKFactorization(), prob1, prob2)
+
+    # Test that refactoring wrong throws.
+    cache = SciMLBase.init(prob1,UMFPACKFactorization(reuse_symbolic=true); cache_kwargs...) # initialize cache
+    y = solve(cache)
+    cache = LinearSolve.set_A(cache,sprand(n, n, 0.8))
+    @test_throws ArgumentError solve(cache)
 end
 
 @testset "Concrete Factorizations" begin
@@ -69,7 +85,7 @@ end
                 LUFactorization(),
                 QRFactorization(),
                 SVDFactorization(),
-                RFLUFactorizaation(),
+                RFLUFactorizaation()
                )
         @testset "$alg" begin
             test_interface(alg, prob1, prob2)

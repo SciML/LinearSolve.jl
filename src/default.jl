@@ -11,7 +11,8 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
     # it makes sense according to the benchmarks, which is dependent on
     # whether MKL or OpenBLAS is being used
     if A isa Matrix
-        if ArrayInterface.can_setindex(cache.b) && (size(A,1) <= 100 ||
+        if eltype(A) <: Union{Float32,Float64,ComplexF32,ComplexF64} &&
+                    ArrayInterface.can_setindex(cache.b) && (size(A,1) <= 100 ||
                                               (isopenblas() && size(A,1) <= 500)
                                              )
             alg = GenericFactorization(;fact_alg=RecursiveFactorization.lu!)

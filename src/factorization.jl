@@ -38,7 +38,7 @@ end
 struct UMFPACKFactorization <: AbstractFactorization
 end
 
-function init_cacheval(alg::UMFPACKFactorization, A, b, u)
+function init_cacheval(::UMFPACKFactorization, A, b, u)
     if A isa AbstractDiffEqOperator
         A = A.A
     end
@@ -47,6 +47,27 @@ function init_cacheval(alg::UMFPACKFactorization, A, b, u)
     else
         error("Sparse LU is not defined for $(typeof(A))")
     end
+end
+
+function SciMLBase.solve(cache::LinearCache, alg::UMFPACKFactorization)
+    A = cache.A
+    if A isa AbstractDiffEqOperator
+        A = A.A
+    end
+    if cache.isfresh
+        if cache.cacheval !== nothing
+            # If we have a cacheval already, run umfpack_symbolic to ensure the symbolic factorization exists
+            # This won't recompute if it does.
+            SuiteSparse.UMFPACK.umfpack_symbolic!(cache.cacheval)
+            fact = lu!(cache.cacheval, A)
+        else
+            fact = init_cacheval(alg, A, cache.b, cache.u)
+        end
+        cache = set_cacheval(cache, fact)
+    end
+
+    y = ldiv!(cache.u, cache.cacheval, cache.b)
+    SciMLBase.build_linear_solution(alg,y,nothing)
 end
 
 ## QRFactorization

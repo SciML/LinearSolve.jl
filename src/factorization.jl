@@ -36,7 +36,7 @@ end
 
 # This could be a GenericFactorization perhaps?
 Base.@kwdef struct UMFPACKFactorization <: AbstractFactorization
-    reuse_symbolic::Bool = false
+    reuse_symbolic::Bool = true
 end
 
 function init_cacheval(::UMFPACKFactorization, A, b, u)

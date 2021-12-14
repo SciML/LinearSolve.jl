@@ -1,44 +1,50 @@
-# Nonlinear Problems
+# Linear Problems
 
 ## Mathematical Specification of a Nonlinear Problem
 
-To define a Nonlinear Problem, you simply need to give the function ``f``
-which defines the nonlinear system:
+### Concrete LinearProblem
+
+To define a `LinearProblem`, you simply need to give the `AbstractMatrix` ``A``
+and an `AbstractVector` ``b`` which defines the linear system:
 
 ```math
-f(u,p) = 0
+A*u = b
 ```
 
-and an initial guess ``u₀`` of where `f(u,p)=0`. `f` should be specified as `f(u,p)`
-(or in-place as `f(du,u,p)`), and `u₀` should be an AbstractArray (or number)
-whose geometry matches the desired geometry of `u`. Note that we are not limited
-to numbers or vectors for `u₀`; one is allowed to provide `u₀` as arbitrary
-matrices / higher-dimension tensors as well.
+### Matrix-Free LinearProblem
+
+For matrix-free versions, the specification of the problem is given by an
+operator `A(u,p,t)` which computes `A*u`, or in-place as `A(du,u,p,t)`. These
+are specified via the `AbstractSciMLOperator` interface. For more details, see
+the [SciMLBase Documentation](https://scimlbase.sciml.ai/dev/).
+
+Note that matrix-free versions of LinearProblem definitions are not compatible
+with all solvers. To check a solver for compatibility, use the function xxxxx.
 
 ## Problem Type
 
 ### Constructors
 
+Optionally, an initial guess ``u₀`` can be supplied which is used for iterative
+methods.
+
 ```julia
-NonlinearProblem(f::NonlinearFunction,u0,p=NullParameters();kwargs...)
-NonlinearProblem{isinplace}(f,u0,p=NullParameters();kwargs...)
+LinearProblem{isinplace}(A,x,p=NullParameters();u0=nothing,kwargs...)
+LinearProblem(f::AbstractDiffEqOperator,u0,p=NullParameters();u0=nothing,kwargs...)
 ```
 
-`isinplace` optionally sets whether the function is in-place or not. This is
-determined automatically, but not inferred.
+`isinplace` optionally sets whether the function is in-place or not, i.e. whether
+the solvers are allowed to mutate. By default this is true for `AbstractMatrix`,
+and for `AbstractSciMLOperator`s it matches the choice of the operator definition.
 
 Parameters are optional, and if not given, then a `NullParameters()` singleton
 will be used, which will throw nice errors if you try to index non-existent
-parameters. Any extra keyword arguments are passed on to the solvers. For example,
-if you set a `callback` in the problem, then that `callback` will be added in
-every solve call.
-
-For specifying Jacobians and mass matrices, see the [NonlinearFunctions](@ref nonlinearfunctions)
-page.
+parameters. Any extra keyword arguments are passed on to the solvers.
 
 ### Fields
 
-* `f`: The function in the ODE.
-* `u0`: The initial guess for the steady state.
-* `p`: The parameters for the problem. Defaults to `NullParameters`.
+* `A`: The representation of the linear operator.
+* `b`: The right-hand side of the linear system.
+* `p`: The parameters for the problem. Defaults to `NullParameters`. Currently unused.
+* `u0`: The initial condition used by iterative solvers.
 * `kwargs`: The keyword arguments passed on to the solvers.

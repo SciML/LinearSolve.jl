@@ -13,6 +13,8 @@ using UnPack
 using Requires
 using SuiteSparse
 using KLU
+using DocStringExtensions
+
 # wrap
 import Krylov
 import KrylovKit # TODO

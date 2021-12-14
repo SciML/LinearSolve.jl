@@ -103,7 +103,7 @@ end
                 LUFactorization(),
                 QRFactorization(),
                 SVDFactorization(),
-                RFLUFactorizaation()
+                RFLUFactorization()
                )
         @testset "$alg" begin
             test_interface(alg, prob1, prob2)

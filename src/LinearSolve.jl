@@ -13,6 +13,8 @@ using UnPack
 using Requires
 using SuiteSparse
 using KLU
+using DocStringExtensions
+
 # wrap
 import Krylov
 import KrylovKit # TODO
@@ -45,7 +47,7 @@ function __init__()
 end
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
-       RFLUFactorizaation, UMFPACKFactorization, KLUFactorization
+       RFLUFactorization, UMFPACKFactorization, KLUFactorization
 export KrylovJL, KrylovJL_CG, KrylovJL_GMRES, KrylovJL_BICGSTAB, KrylovJL_MINRES,
        IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
        IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES

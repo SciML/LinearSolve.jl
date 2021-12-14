@@ -3,19 +3,29 @@ using Documenter
 
 DocMeta.setdocmeta!(LinearSolve, :DocTestSetup, :(using LinearSolve); recursive=true)
 
-makedocs(;
+makedocs(
+    sitename="LinearSolve.jl",
+    authors="Chris Rackauckas",
     modules=[LinearSolve],
-    authors="Jonathan <edelman.jonathan.s@gmail.com> and contributors",
-    repo="https://github.com/SciML/LinearSolve.jl/blob/{commit}{path}#{line}",
-    sitename="LinearSolvers.jl",
-    format=Documenter.HTML(;
-        prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://linearsolve.sciml.ai/",
-        assets=String[],
-    ),
+    clean=true,doctest=false,
+    format = Documenter.HTML(#analytics = "UA-90474609-3",
+                             assets = ["assets/favicon.ico"],
+                             canonical="https://linearsolve.sciml.ai/stable/"),
     pages=[
         "Home" => "index.md",
-    ],
+        "Tutorials" => Any[
+            "tutorials/linear.md"
+            "tutorials/caching_interface.md"
+        ],
+        "Basics" => Any[
+            "basics/LinearProblem.md",
+            "basics/CachingAPI.md",
+            "basics/FAQ.md"
+        ],
+        "Solvers" => Any[
+            "solvers/solvers.md"
+        ]
+    ]
 )
 
 deploydocs(;

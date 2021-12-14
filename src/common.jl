@@ -14,25 +14,46 @@ struct LinearCache{TA,Tb,Tu,Tp,Talg,Tc,Tl,Tr,Ttol}
     verbose::Bool
 end
 
+"""
+$(SIGNATURES)
+"""
 function set_A(cache::LinearCache, A)
     @set! cache.A = A
     @set! cache.isfresh = true
     return cache
 end
 
+"""
+$(SIGNATURES)
+"""
 function set_b(cache::LinearCache, b)
     @set! cache.b = b
     return cache
 end
 
+"""
+$(SIGNATURES)
+"""
 function set_u(cache::LinearCache, u)
     @set! cache.u = u
     return cache
 end
 
+"""
+$(SIGNATURES)
+"""
 function set_p(cache::LinearCache, p)
     @set! cache.p = p
 #   @set! cache.isfresh = true
+    return cache
+end
+
+"""
+$(SIGNATURES)
+"""
+function set_prec(cache, Pl, Pr)
+    @set! cache.Pl = Pl
+    @set! cache.Pr = Pr
     return cache
 end
 
@@ -41,12 +62,6 @@ function set_cacheval(cache::LinearCache, alg_cache)
         @set! cache.cacheval = alg_cache
         @set! cache.isfresh = false
     end
-    return cache
-end
-
-function set_prec(cache, Pl, Pr)
-    @set! cache.Pl = Pl
-    @set! cache.Pr = Pr
     return cache
 end
 

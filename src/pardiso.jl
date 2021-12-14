@@ -1,10 +1,3 @@
-
-## Pardiso
-
-import Pardiso
-
-export PardisoJL, MKLPardisoFactorize, MKLPardisoIterate
-
 Base.@kwdef struct PardisoJL <: SciMLLinearSolveAlgorithm
     nprocs::Union{Int, Nothing} = nothing
     solver_type::Union{Int, Pardiso.Solver, Nothing} = nothing
@@ -93,3 +86,5 @@ function SciMLBase.solve(cache::LinearCache, alg::PardisoJL; kwargs...)
 
     return SciMLBase.build_linear_solution(alg,cache.u,nothing)
 end
+
+export PardisoJL, MKLPardisoFactorize, MKLPardisoIterate

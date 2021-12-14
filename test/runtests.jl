@@ -205,7 +205,7 @@ end
         x = rand(n,n)
         y = rand(n,n)
 
-        Pl, Pr = LinearSolve.scaling_preconditioner(s)
+        Pl, Pr = LinearSolve.scaling_preconditioner(1/s)
 
         mul!(y, Pl, x); @test y ≈ s * x
         mul!(y, Pr, x); @test y ≈ s \ x
@@ -219,16 +219,19 @@ end
 
     @testset "vector scaling_preconditioner" begin
         s = rand(n)
-        Pl, Pr = LinearSolve.scaling_preconditioner(s)
+        Pl, Pr = LinearSolve.scaling_preconditioner(1 ./ s)
 
-        mul!(y, Pl, x); @test y ≈ s * x
-        mul!(y, Pr, x); @test y ≈ s \ x
+        x = rand(n,n)
+        y = rand(n,n)
 
-        y .= x; ldiv!(Pl, x); @test x ≈ s \ y
-        y .= x; ldiv!(Pr, x); @test x ≈ s * y
+        mul!(y, Pl, x); @test y ≈ s .* x
+        mul!(y, Pr, x); @test y ≈ s .\ x
 
-        ldiv!(y, Pl, x); @test y ≈ s \ x
-        ldiv!(y, Pr, x); @test y ≈ s * x
+        y .= x; ldiv!(Pl, x); @test x ≈ s .\ y
+        y .= x; ldiv!(Pr, x); @test x ≈ s .* y
+
+        ldiv!(y, Pl, x); @test y ≈ s .\ x
+        ldiv!(y, Pr, x); @test y ≈ s .* x
     end
 
     @testset "ComposePreconditioenr" begin

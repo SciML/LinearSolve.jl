@@ -59,7 +59,7 @@ end
     y = solve(_prob)
     @test A1 *  y  ≈ b1
 
-    
+
     _prob = LinearProblem(sparse(A1.A), b1; u0=x1)
     y = solve(_prob)
     @test A1 *  y  ≈ b1
@@ -215,7 +215,20 @@ end
 
         ldiv!(y, Pl, x); @test y ≈ s \ x
         ldiv!(y, Pr, x); @test y ≈ s * x
+    end
 
+    @testset "vector scaling_preconditioner" begin
+        s = rand(n)
+        Pl, Pr = LinearSolve.scaling_preconditioner(s)
+
+        mul!(y, Pl, x); @test y ≈ s * x
+        mul!(y, Pr, x); @test y ≈ s \ x
+
+        y .= x; ldiv!(Pl, x); @test x ≈ s \ y
+        y .= x; ldiv!(Pr, x); @test x ≈ s * y
+
+        ldiv!(y, Pl, x); @test y ≈ s \ x
+        ldiv!(y, Pr, x); @test y ≈ s * x
     end
 
     @testset "ComposePreconditioenr" begin

@@ -1,7 +1,8 @@
 
 ## Preconditioners
 
-scaling_preconditioner(s) = I * s , I * (1/s)
+scaling_preconditioner(s::Number) = I * (1/s), I * s 
+scaling_preconditioner(s::AbstractVector) = Diagonal(inv.(s)),Diagonal(s)
 
 struct ComposePreconditioner{Ti,To}
     inner::Ti

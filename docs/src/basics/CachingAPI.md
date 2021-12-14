@@ -1,9 +1,9 @@
 # Caching Interface API Functions
 
 ```@docs
-set_A
-set_b
-set_u
-set_p
-set_prec
+LinearSolve.set_A
+LinearSolve.set_b
+LinearSolve.set_u
+LinearSolve.set_p
+LinearSolve.set_prec
 ```

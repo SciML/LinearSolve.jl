@@ -71,6 +71,42 @@ function SciMLBase.solve(cache::LinearCache, alg::UMFPACKFactorization)
     SciMLBase.build_linear_solution(alg,y,nothing)
 end
 
+Base.@kwdef struct KLUFactorization <: AbstractFactorization
+    reuse_symbolic::Bool = true
+end
+
+function init_cacheval(::KLUFactorization, A, b, u)
+    if A isa AbstractDiffEqOperator
+        A = A.A
+    end
+    if A isa SparseMatrixCSC
+        return klu(A)
+    else
+        error("KLU is not defined for $(typeof(A))")
+    end
+end
+
+function SciMLBase.solve(cache::LinearCache, alg::KLUFactorization)
+    A = cache.A
+    if A isa AbstractDiffEqOperator
+        A = A.A
+    end
+    if cache.isfresh
+        if cache.cacheval !== nothing && alg.reuse_symbolic
+            # If we have a cacheval already, run umfpack_symbolic to ensure the symbolic factorization exists
+            # This won't recompute if it does.
+            KLU.klu_analyze!(cache.cacheval)
+            fact = klu!(cache.cacheval, A)
+        else
+            fact = init_cacheval(alg, A, cache.b, cache.u)
+        end
+        cache = set_cacheval(cache, fact)
+    end
+
+    y = ldiv!(cache.u, cache.cacheval, cache.b)
+    SciMLBase.build_linear_solution(alg,y,nothing)
+end
+
 ## QRFactorization
 
 struct QRFactorization{P} <: AbstractFactorization

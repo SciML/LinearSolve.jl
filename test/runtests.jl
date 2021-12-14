@@ -74,9 +74,27 @@ end
     test_interface(UMFPACKFactorization(), prob1, prob2)
 
     # Test that refactoring wrong throws.
-    cache = SciMLBase.init(prob1,UMFPACKFactorization(reuse_symbolic=true); cache_kwargs...) # initialize cache
+    cache = SciMLBase.init(prob1,UMFPACKFactorization(); cache_kwargs...) # initialize cache
     y = solve(cache)
     cache = LinearSolve.set_A(cache,sprand(n, n, 0.8))
+    @test_throws ArgumentError solve(cache)
+end
+
+@testset "KLU Factorization" begin
+    A1 = A/1; b1 = rand(n); x1 = zero(b)
+    A2 = A/2; b2 = rand(n); x2 = zero(b)
+
+    prob1 = LinearProblem(sparse(A1), b1; u0=x1)
+    prob2 = LinearProblem(sparse(A2), b2; u0=x2)
+    test_interface(KLUFactorization(), prob1, prob2)
+
+    # Test that refactoring wrong throws.
+    cache = SciMLBase.init(prob1,KLUFactorization(); cache_kwargs...) # initialize cache
+    y = solve(cache)
+    X = copy(A1)
+    X[8,8] = 0.0
+    X[7,8] = 1.0
+    cache = LinearSolve.set_A(cache,sparse(X))
     @test_throws ArgumentError solve(cache)
 end
 

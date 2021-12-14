@@ -177,4 +177,4 @@ end
 
 ## RFLUFactorization
 
-RFLUFactorizaation() = GenericFactorization(;fact_alg=RecursiveFactorization.lu!)
+RFLUFactorization() = GenericFactorization(;fact_alg=RecursiveFactorization.lu!)

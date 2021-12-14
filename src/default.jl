@@ -15,13 +15,13 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
                     ArrayInterface.can_setindex(cache.b) && (size(A,1) <= 100 ||
                                               (isopenblas() && size(A,1) <= 500)
                                              )
-            alg = GenericFactorization(;fact_alg=RecursiveFactorization.lu!)
+            alg = RFLUFactorization()
             SciMLBase.solve(cache, alg, args...; kwargs...)
         else
             alg = LUFactorization()
             SciMLBase.solve(cache, alg, args...; kwargs...)
         end
-    
+
     # These few cases ensure the choice is optimal without the
     # dynamic dispatching of factorize
     elseif A isa Tridiagonal
@@ -33,19 +33,19 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
     elseif A isa SparseMatrixCSC
         alg = UMFPACKFactorization()
         SciMLBase.solve(cache, alg, args...; kwargs...)
-    
+
     # This catches the cases where a factorization overload could exist
     # For example, BlockBandedMatrix
     elseif ArrayInterface.isstructured(A)
         alg = GenericFactorization()
         SciMLBase.solve(cache, alg, args...; kwargs...)
-    
+
     # This catches the case where A is a CuMatrix
     # Which does not have LU fully defined
     elseif !(A isa AbstractDiffEqOperator)
         alg = QRFactorization()
         SciMLBase.solve(cache, alg, args...; kwargs...)
-    
+
     # Not factorizable operator, default to only using A*x
     # IterativeSolvers is faster on CPU but not GPU-compatible
     elseif cache.u isa Array

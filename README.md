@@ -1,9 +1,9 @@
 # LinearSolvers
 
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://EdelmanJonathan.github.io/LinearSolvers.jl/stable)
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://EdelmanJonathan.github.io/LinearSolvers.jl/dev)
-[![Build Status](https://github.com/EdelmanJonathan/LinearSolvers.jl/workflows/CI/badge.svg)](https://github.com/EdelmanJonathan/LinearSolvers.jl/actions)
-[![Coverage](https://codecov.io/gh/EdelmanJonathan/LinearSolvers.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/EdelmanJonathan/LinearSolvers.jl)
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](http://linearsolve.sciml.ai/stale)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](http://linearsolve.sciml.ai/dev)
+[![Build Status](https://github.com/SciML/LinearSolvers.jl/workflows/CI/badge.svg)](https://github.com/SciML/LinearSolvers.jl/actions)
+[![Coverage](https://codecov.io/gh/SciML/LinearSolvers.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/SciML/LinearSolvers.jl)
 
 Fast implementations of linear solving algorithms in Julia that satisfy the SciML
 common interface. LinearSolve.jl makes it easy to define high level algorithms
@@ -11,8 +11,8 @@ which allow for swapping out the linear solver that is used while maintaining
 maximum efficiency.
 
 For information on using the package,
-[see the stable documentation](https://nonlinearsolve.sciml.ai/stable/). Use the
-[in-development documentation](https://nonlinearsolve.sciml.ai/dev/) for the version of
+[see the stable documentation](https://linearsolve.sciml.ai/stable/). Use the
+[in-development documentation](https://linearsolve.sciml.ai/dev/) for the version of
 the documentation which contains the unreleased features.
 
 ## High Level Examples

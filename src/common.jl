@@ -69,10 +69,15 @@ init_cacheval(alg::Union{SciMLLinearSolveAlgorithm,Nothing}, A, b, u) = nothing
 
 SciMLBase.init(prob::LinearProblem, args...; kwargs...) = SciMLBase.init(prob,nothing,args...;kwargs...)
 
+default_tol(::Type{T}) where T = √(eps(T))
+default_tol(::Type{Complex{T}}) where T = √(eps(T))
+default_tol(::Type{<:Rational}) = 0
+default_tol(::Type{<:Integer}) = 0
+
 function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorithm,Nothing}, args...;
                         alias_A = false, alias_b = false,
-                        abstol=√eps(eltype(prob.A)),
-                        reltol=√eps(eltype(prob.A)),
+                        abstol=default_tol(prob.A),
+                        reltol=default_tol(prob.A),
                         maxiters=length(prob.b),
                         verbose=false,
                         Pl = nothing,

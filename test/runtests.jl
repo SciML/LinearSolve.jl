@@ -199,6 +199,7 @@ end
 @testset "Preconditioners" begin
     @testset "scaling_preconditioner" begin
         s = rand()
+        s1 = rand()
 
         x = rand(n,n)
         y = rand(n,n)
@@ -213,6 +214,16 @@ end
 
         ldiv!(y, Pl, x); @test y ≈ s \ x
         ldiv!(y, Pr, x); @test y ≈ s * x
+
+        cache = SciMLBase.init(LinearProblem(rand(n,n), rand(n)))
+
+        cache = LinearSolve.set_scaling_prec(cache, s)
+        @test cache.Pl ≈ I * (1/s)
+        @test cache.Pr ≈ I * s
+
+        cache = LinearSolve.set_scaling_prec(cache, s1)
+        @test cache.Pl ≈ I * (1/s1)
+        @test cache.Pr ≈ I * s1
     end
 
     @testset "vector scaling_preconditioner" begin

@@ -76,8 +76,8 @@ default_tol(::Type{<:Integer}) = 0
 
 function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorithm,Nothing}, args...;
                         alias_A = false, alias_b = false,
-                        abstol=default_tol(prob.A),
-                        reltol=default_tol(prob.A),
+                        abstol=default_tol(eltype(prob.A)),
+                        reltol=default_tol(eltype(prob.A)),
                         maxiters=length(prob.b),
                         verbose=false,
                         Pl = nothing,

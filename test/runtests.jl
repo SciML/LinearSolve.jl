@@ -186,14 +186,12 @@ end
                 MKLPardisoIterate(),
                )
 
-        u = solve(prob1, alg; cache_kwargs...)
+        u = solve(prob1, alg; cache_kwargs...).u
         @test A1 * u ≈ b1
 
-        # common interface doesn't support complex types
-        # https://github.com/SciML/LinearSolve.jl/issues/38
-
-#       u = solve(prob2, alg; cache_kwargs...)
-#       @test A2 * u ≈ b2
+        u = solve(prob2, alg; cache_kwargs...).u
+        @test eltype(u) <: Complex
+        @test_broken A2 * u ≈ b2
     end
 
 end

@@ -40,7 +40,17 @@ function init_cacheval(alg::PardisoJL, cache::LinearCache)
 
     Pardiso.pardisoinit(solver) # default initialization
 
-    matrix_type !== nothing && Pardiso.set_matrixtype!(solver, matrix_type)
+    if matrix_type !== nothing
+        Pardiso.set_matrixtype!(solver, matrix_type)
+    else
+        if eltype(A) <: Real
+            Pardiso.set_matrixtype!(solver, Pardiso.REAL_NONSYM)
+        elseif eltype(A) <: Complex
+            Pardiso.set_matrixtype!(solver, Pardiso.COMPLEX_NONSYM)
+        else
+            error("Number type not supported by Pardiso")
+        end
+    end
     cache.verbose && Pardiso.set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
 
     # pass in vector of tuples like [(iparm::Int, key::Int) ...]

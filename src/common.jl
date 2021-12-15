@@ -73,6 +73,7 @@ default_tol(::Type{T}) where T = √(eps(T))
 default_tol(::Type{Complex{T}}) where T = √(eps(T))
 default_tol(::Type{<:Rational}) = 0
 default_tol(::Type{<:Integer}) = 0
+default_tol(::Type{Any}) = 0
 
 function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorithm,Nothing}, args...;
                         alias_A = false, alias_b = false,

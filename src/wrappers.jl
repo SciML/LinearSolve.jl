@@ -3,6 +3,15 @@
 
 scaling_preconditioner(s::Number) = I * (1/s), I * s 
 scaling_preconditioner(s::AbstractVector) = Diagonal(inv.(s)),Diagonal(s)
+function set_scaling_preconditioner(cache, s)
+    if (cache.Pl isa UniformScaling) && (cache.Pr isa UniformScaling)
+        @set! cache.Pl.λ = (1/s)
+        @set! cache.Pr.λ = s
+    else
+        cache = set_prec(cache, scaling_preconditioner(s)...)
+    end
+    return cache
+end
 
 struct ComposePreconditioner{Ti,To}
     inner::Ti

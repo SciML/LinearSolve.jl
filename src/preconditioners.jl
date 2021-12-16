@@ -1,7 +1,55 @@
-## Preconditioners
+## Diagonal Preconditioners
 
-scaling_preconditioner(s::Number) = I * (1/s), I * s
-scaling_preconditioner(s::AbstractVector) = Diagonal(inv.(s)),Diagonal(s)
+struct DiagonalPreconditioner{D}
+    diag::D
+end
+struct InvDiagonalPreconditioner{D}
+    diag::D
+end
+
+Base.eltype(A::Union{DiagonalPreconditioner,InvDiagonalPreconditioner}) = eltype(A.diag)
+Base.adjoint(A::Union{DiagonalPreconditioner,InvDiagonalPreconditioner}) = A
+Base.inv(A::DiagonalPreconditioner) = InvDiagonalPreconditioner(A.diag)
+Base.inv(A::InvDiagonalPreconditioner) = DiagonalPreconditioner(A.diag)
+
+function LinearAlgebra.ldiv!(A::DiagonalPreconditioner, x)
+    x .= x ./ A.diag
+end
+
+function LinearAlgebra.ldiv!(y, A::DiagonalPreconditioner, x)
+    y .= x ./ A.diag
+end
+
+function ldiv!(y::Array, A::DiagonalPreconditioner, b::Array)
+    @inbounds @simd for j ∈ 1:size(y, 2)
+        for i ∈ 1:length(A.diag)
+            y[i,j] = b[i,j] / A.diag[i]
+        end
+    end
+    return y
+end
+
+function LinearAlgebra.ldiv!(A::InvDiagonalPreconditioner, x)
+    x .= x .* A.diag
+end
+
+function LinearAlgebra.ldiv!(y, A::InvDiagonalPreconditioner, x)
+    y .= x .* A.diag
+end
+
+function ldiv!(y::Array, A::InvDiagonalPreconditioner, b::Array)
+    @inbounds @simd for j ∈ 1:size(y, 2)
+        for i ∈ 1:length(A.diag)
+            y[i,j] = b[i,j] * A.diag[i]
+        end
+    end
+    return y
+end
+
+LinearAlgebra.mul!(y, A::DiagonalPreconditioner, x) = LinearAlgebra.mul!(y, InvDiagonalPreconditioner(A.diag), x)
+LinearAlgebra.mul!(y, A::InvDiagonalPreconditioner, x) = LinearAlgebra.mul!(y, DiagonalPreconditioner(A.diag), x)
+
+## Compose Preconditioner
 
 struct ComposePreconditioner{Ti,To}
     inner::Ti

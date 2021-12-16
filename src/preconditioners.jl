@@ -20,7 +20,8 @@ function LinearAlgebra.ldiv!(y, A::DiagonalPreconditioner, x)
     y .= x ./ A.diag
 end
 
-function ldiv!(y::Array, A::DiagonalPreconditioner, b::Array)
+#=
+function LinearAlgebra.ldiv!(y::Matrix, A::DiagonalPreconditioner, b::Matrix)
     @inbounds @simd for j ∈ 1:size(y, 2)
         for i ∈ 1:length(A.diag)
             y[i,j] = b[i,j] / A.diag[i]
@@ -28,6 +29,7 @@ function ldiv!(y::Array, A::DiagonalPreconditioner, b::Array)
     end
     return y
 end
+=#
 
 function LinearAlgebra.ldiv!(A::InvDiagonalPreconditioner, x)
     x .= x .* A.diag
@@ -37,7 +39,8 @@ function LinearAlgebra.ldiv!(y, A::InvDiagonalPreconditioner, x)
     y .= x .* A.diag
 end
 
-function ldiv!(y::Array, A::InvDiagonalPreconditioner, b::Array)
+#=
+function LinearAlgebra.ldiv!(y::Matrix, A::InvDiagonalPreconditioner, b::Matrix)
     @inbounds @simd for j ∈ 1:size(y, 2)
         for i ∈ 1:length(A.diag)
             y[i,j] = b[i,j] * A.diag[i]
@@ -45,9 +48,10 @@ function ldiv!(y::Array, A::InvDiagonalPreconditioner, b::Array)
     end
     return y
 end
+=#
 
-LinearAlgebra.mul!(y, A::DiagonalPreconditioner, x) = LinearAlgebra.mul!(y, InvDiagonalPreconditioner(A.diag), x)
-LinearAlgebra.mul!(y, A::InvDiagonalPreconditioner, x) = LinearAlgebra.mul!(y, DiagonalPreconditioner(A.diag), x)
+LinearAlgebra.mul!(y, A::DiagonalPreconditioner, x) = LinearAlgebra.ldiv!(y, InvDiagonalPreconditioner(A.diag), x)
+LinearAlgebra.mul!(y, A::InvDiagonalPreconditioner, x) = LinearAlgebra.ldiv!(y, DiagonalPreconditioner(A.diag), x)
 
 ## Compose Preconditioner
 

@@ -43,17 +43,13 @@ of random, `s` is an approximation to the eigenvalues of a system.
 
 ```julia
 s = rand(n)
-
-# Pr applies 1 ./ s .* vec
-Pr = LinearSolve.DiagonalPreconditioner(s)
-# Pl applies s .* vec
 Pl = LinearSolve.DiagonalPreconditioner(s)
 
 A = rand(n,n)
 b = rand(n)
 
 prob = LinearProblem(A,b)
-sol = solve(prob,IterativeSolvers_GMRES(),Pl=Pl,Pr=Pr)
+sol = solve(prob,IterativeSolvers_GMRES(),Pl=Pl)
 ```
 
 ## Pre-Defined Preconditioners
@@ -63,6 +59,11 @@ preconditioners written to match the required interface.
 
 - `DiagonalPreconditioner(s::Union{Number,AbstractVector})`: the diagonal
   preconditioner, defined as a diagonal matrix `Diagonal(s)`.
+- `InvDiagonalPreconditioner(s::Union{Number,AbstractVector})`: the diagonal
+  preconditioner, defined as a diagonal matrix `Diagonal(1./s)`.
+- `ComposePreconditioner(prec1,prec2)`: composes the preconditioners to apply
+  `prec1` before `prec2`.
+- `InvComposePreconditioner(prec1,prec2)`: only god knows what this is for.
 
 ## Preconditioner Interface
 
@@ -73,14 +74,6 @@ following interface:
 
 - `Base.eltype(::Preconditioner)`
 - `Base.adjoint(::Preconditioner)`
-- `Base.inv(::Preconditioner)` (Optional?)
-
-### Required for Right Preconditioners
-
-- `Base.\(::Preconditioner,::AbstractVector)`
 - `LinearAlgebra.ldiv!(::AbstractVector,::Preconditioner,::AbstractVector)`
-
-### Required for Left Preconditioners
-
-- `Base.*(::Preconditioner,::AbstractVector)`
-- `LinearAlgebra.mul!(::AbstractVector,::Preconditioner,::AbstractVector)`
+- `Base.inv(::Preconditioner)` (Dear Jesus Krylov.jl, why?)
+- `LinearAlgebra.mul!(::AbstractVector,::Preconditioner,::AbstractVector)` (Required for Krylov.jl)

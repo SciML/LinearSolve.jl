@@ -197,13 +197,13 @@ end
 end
 
 @testset "Preconditioners" begin
-    @testset "scaling_preconditioner" begin
+    @testset "Scalar Diagonal Preconditioner" begin
         s = rand()
 
         x = rand(n,n)
         y = rand(n,n)
 
-        Pl, Pr = LinearSolve.scaling_preconditioner(1/s)
+        Pl, Pr = LinearSolve.DiagonalPreconditioner(s),LinearSolve.InvDiagonalPreconditioner(s)
 
         mul!(y, Pl, x); @test y ≈ s * x
         mul!(y, Pr, x); @test y ≈ s \ x
@@ -215,9 +215,9 @@ end
         ldiv!(y, Pr, x); @test y ≈ s * x
     end
 
-    @testset "vector scaling_preconditioner" begin
+    @testset "Vector Diagonal Preconditioner" begin
         s = rand(n)
-        Pl, Pr = LinearSolve.scaling_preconditioner(1 ./ s)
+        Pl, Pr = LinearSolve.DiagonalPreconditioner(s),LinearSolve.InvDiagonalPreconditioner(s)
 
         x = rand(n,n)
         y = rand(n,n)
@@ -239,8 +239,8 @@ end
         x = rand(n,n)
         y = rand(n,n)
 
-        P1, _ = LinearSolve.scaling_preconditioner(s1)
-        P2, _ = LinearSolve.scaling_preconditioner(s2)
+        P1 = LinearSolve.DiagonalPreconditioner(s1)
+        P2 = LinearSolve.DiagonalPreconditioner(s2)
 
         P  = LinearSolve.ComposePreconditioner(P1,P2)
         Pi = LinearSolve.InvComposePreconditioner(P)

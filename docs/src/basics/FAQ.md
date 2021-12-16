@@ -9,7 +9,7 @@ IterativeSolvers.jl computes the norm after the application of the left precondt
 hack the system via the following formulation:
 
 ```julia
-Pl = LinearSolve.DiagonalPreconditioner(1 ./ weights)
+Pl = LinearSolve.InvDiagonalPreconditioner(weights)
 Pr = LinearSolve.DiagonalPreconditioner(weights)
 
 A = rand(n,n)

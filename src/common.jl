@@ -92,8 +92,8 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
     Pr = (Pr !== nothing) ? Pr : Identity()
 
     cacheval = init_cacheval(alg, A, b, u0)
-    isfresh = cacheval === nothing
-    Tc = isfresh ? Any : typeof(cacheval)
+    isfresh = true
+    Tc = typeof(cacheval)
 
     A = alias_A ? A : deepcopy(A)
     b = alias_b ? b : deepcopy(b)

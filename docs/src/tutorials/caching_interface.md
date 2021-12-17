@@ -55,7 +55,7 @@ Then refactorization will occur when a new `A` is given:
 
 ```julia
 A2 = rand(n,n)
-linsolve = LinearSolve.set_A(linsolve,A2)
+linsolve = LinearSolve.set_A(sol2.cache,A2)
 sol3 = solve(linsolve)
 
 sol3.u
@@ -67,6 +67,10 @@ sol3.u
  -0.4097250749016653
 =#
 ```
+
+The factorization occurs on the first solve, and it stores the factorization in
+the cache. You can retrieve this cache via `sol.cache`, which is the same object
+as the `init` but updated to know not to re-solve the factorization.
 
 The advantage of course with using LinearSolve.jl in this form is that it is
 efficient while being agnostic to the linear solver. One can easily swap in

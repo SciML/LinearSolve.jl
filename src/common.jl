@@ -81,15 +81,13 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
                         reltol=default_tol(eltype(prob.A)),
                         maxiters=length(prob.b),
                         verbose=false,
-                        Pl = nothing,
-                        Pr = nothing,
+                        Pl = Identity(),
+                        Pr = Identity(),
                         kwargs...,
                        )
     @unpack A, b, u0, p = prob
 
     u0 = (u0 !== nothing) ? u0 : zero(b)
-    Pl = (Pl !== nothing) ? Pl : Identity()
-    Pr = (Pr !== nothing) ? Pr : Identity()
 
     cacheval = init_cacheval(alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, verbose)
     isfresh = true

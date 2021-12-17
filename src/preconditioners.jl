@@ -95,20 +95,3 @@ function LinearAlgebra.mul!(y, A::InvComposePreconditioner, x)
     @unpack P = A
     ldiv!(y, P, x)
 end
-
-function get_preconditioner(Pi, Po)
-
-    ifPi = Pi !== Identity()
-    ifPo = Po !== Identity()
-
-    P =
-    if ifPi & ifPo
-        ComposePreconditioner(Pi, Po)
-    elseif ifPi | ifPo
-        ifPi ? Pi : Po
-    else
-        Identity()
-    end
-
-    return P
-end

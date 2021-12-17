@@ -24,7 +24,7 @@ can use `ComposePreconditioner` to apply the preconditioner after the applicatio
 of the weights like as follows:
 
 ```julia
-Pl = ComposePreconitioner(LinearSolve.DiagonalPreconditioner(1 ./ weights),realprec)
+Pl = ComposePreconitioner(LinearSolve.InvDiagonalPreconditioner(weights),realprec)
 Pr = LinearSolve.DiagonalPreconditioner(weights)
 
 A = rand(n,n)

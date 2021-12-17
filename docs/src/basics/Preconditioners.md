@@ -75,5 +75,3 @@ following interface:
 - `Base.eltype(::Preconditioner)`
 - `Base.adjoint(::Preconditioner)`
 - `LinearAlgebra.ldiv!(::AbstractVector,::Preconditioner,::AbstractVector)`
-- `Base.inv(::Preconditioner)` (Dear Jesus Krylov.jl, why?)
-- `LinearAlgebra.mul!(::AbstractVector,::Preconditioner,::AbstractVector)` (Required for Krylov.jl)

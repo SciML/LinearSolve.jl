@@ -205,6 +205,7 @@ function SciMLBase.solve(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
         solver = init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr, cache.maxiters, cache.abstol, cache.reltol, cache.verbose)
         cache = set_cacheval(cache, solver)
     end
+    purge_history!(cache.cacheval, cache.u, cache.b)
 
     cache.verbose && println("Using IterativeSolvers.$(alg.generate_iterator)")
     for iter in enumerate(cache.cacheval)
@@ -214,4 +215,15 @@ function SciMLBase.solve(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
     cache.verbose && println()
 
     return SciMLBase.build_linear_solution(alg,cache.u,nothing,cache)
+end
+
+function purge_history!(iter::IterativeSolvers.GMRESIterable, x, b)
+  iter.k = 1
+  iter.x  = x
+  iter.b  = b
+
+  iter.residual.current = IterativeSolvers.init!(iter.arnoldi, iter.x, iter.b, iter.Pl, iter.Ax, initially_zero = true)
+  IterativeSolvers.init_residual!(iter.residual, iter.residual.current)
+  iter.β = iter.residual.current
+  nothing
 end

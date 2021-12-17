@@ -102,8 +102,8 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
     M = cache.Pl
     N = cache.Pr
 
-    M = (M === Identity()) ? I : inv(M)
-    N = (N === Identity()) ? I : inv(N)
+    M = (M === Identity()) ? I : InvPreconditioner(M)
+    N = (N === Identity()) ? I : InvPreconditioner(N)
 
     atol    = cache.abstol
     rtol    = cache.reltol

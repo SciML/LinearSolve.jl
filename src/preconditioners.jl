@@ -8,9 +8,6 @@ struct InvDiagonalPreconditioner{D}
 end
 
 Base.eltype(A::Union{DiagonalPreconditioner,InvDiagonalPreconditioner}) = eltype(A.diag)
-Base.adjoint(A::Union{DiagonalPreconditioner,InvDiagonalPreconditioner}) = A
-Base.inv(A::DiagonalPreconditioner) = InvDiagonalPreconditioner(A.diag)
-Base.inv(A::InvDiagonalPreconditioner) = DiagonalPreconditioner(A.diag)
 
 function LinearAlgebra.ldiv!(A::DiagonalPreconditioner, x)
     x .= x ./ A.diag
@@ -61,8 +58,6 @@ struct ComposePreconditioner{Ti,To}
 end
 
 Base.eltype(A::ComposePreconditioner) = promote_type(eltype(A.inner), eltype(A.outer))
-Base.adjoint(A::ComposePreconditioner) = ComposePreconditioner(A.outer', A.inner')
-Base.inv(A::ComposePreconditioner) = InvComposePreconditioner(A)
 
 function LinearAlgebra.ldiv!(A::ComposePreconditioner, x)
     @unpack inner, outer = A
@@ -78,20 +73,9 @@ function LinearAlgebra.ldiv!(y, A::ComposePreconditioner, x)
     ldiv!(outer, y)
 end
 
-# This is just an implementation detail for Krylov.jl
-# It wants to use mul! instead of ldiv! so we convert.
-
-struct InvComposePreconditioner{Tp <: ComposePreconditioner}
-    P::Tp
+struct InvPreconditioner{T}
+    P::T
 end
 
-InvComposePreconditioner(inner, outer) = InvComposePreconditioner(ComposePreconditioner(inner, outer))
-
-Base.eltype(A::InvComposePreconditioner) = Base.eltype(A.P)
-Base.adjoint(A::InvComposePreconditioner) = InvComposePreconditioner(A.P')
-Base.inv(A::InvComposePreconditioner) = deepcopy(A.P)
-
-function LinearAlgebra.mul!(y, A::InvComposePreconditioner, x)
-    @unpack P = A
-    ldiv!(y, P, x)
-end
+Base.eltype(A::InvPreconditioner) = Base.eltype(A.P)
+LinearAlgebra.mul!(y, A::InvPreconditioner, x) = ldiv!(y, A.P, x)

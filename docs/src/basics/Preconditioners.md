@@ -72,5 +72,4 @@ following interface:
 ### General
 
 - `Base.eltype(::Preconditioner)`
-- `Base.adjoint(::Preconditioner)`
 - `LinearAlgebra.ldiv!(::AbstractVector,::Preconditioner,::AbstractVector)`

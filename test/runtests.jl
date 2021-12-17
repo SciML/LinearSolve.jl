@@ -243,19 +243,10 @@ end
         P2 = LinearSolve.DiagonalPreconditioner(s2)
 
         P  = LinearSolve.ComposePreconditioner(P1,P2)
-        Pi = LinearSolve.InvComposePreconditioner(P)
-
-        @test Pi  == LinearSolve.InvComposePreconditioner(P1, P2)
-        @test Pi  == inv(P)
-        @test P   == inv(Pi)
-        @test Pi' == inv(P')
 
         # ComposePreconditioner
         ldiv!(y, P, x);      @test y ≈ ldiv!(P2, ldiv!(P1, x))
         y .= x; ldiv!(P, x); @test x ≈ ldiv!(P2, ldiv!(P1, y))
-
-        # InvComposePreconditioner
-        mul!(y, Pi, x); @test y ≈ ldiv!(P2, ldiv!(P1, x))
 
     end
 end

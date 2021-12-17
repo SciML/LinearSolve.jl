@@ -1,12 +1,16 @@
 function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization; kwargs...)
     if cache.isfresh
-        fact = init_cacheval(alg, cache.A, cache.b, cache.u)
+        fact = do_factorization(alg, cache.A, cache.b, cache.u)
         cache = set_cacheval(cache, fact)
     end
 
     y = ldiv!(cache.u, cache.cacheval, cache.b)
     SciMLBase.build_linear_solution(alg,y,nothing,cache)
 end
+
+# Bad fallback: will fail if `A` is just a stand-in
+# This should instead just create the factorization type.
+init_cacheval(alg::AbstractFactorization, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose) = do_factorization(alg, A, b, u)
 
 ## LU Factorizations
 
@@ -23,7 +27,7 @@ function LUFactorization()
     LUFactorization(pivot)
 end
 
-function init_cacheval(alg::LUFactorization, A, b, u)
+function do_factorization(alg::LUFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("LU is not defined for $(typeof(A))")
 
@@ -34,12 +38,14 @@ function init_cacheval(alg::LUFactorization, A, b, u)
     return fact
 end
 
+init_cacheval(alg::LUFactorization, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose) = ArrayInterface.lu_instance(A)
+
 # This could be a GenericFactorization perhaps?
 Base.@kwdef struct UMFPACKFactorization <: AbstractFactorization
     reuse_symbolic::Bool = true
 end
 
-function init_cacheval(::UMFPACKFactorization, A, b, u)
+function do_factorization(::UMFPACKFactorization, A, b, u)
     if A isa AbstractDiffEqOperator
         A = A.A
     end
@@ -62,7 +68,7 @@ function SciMLBase.solve(cache::LinearCache, alg::UMFPACKFactorization)
             SuiteSparse.UMFPACK.umfpack_symbolic!(cache.cacheval)
             fact = lu!(cache.cacheval, A)
         else
-            fact = init_cacheval(alg, A, cache.b, cache.u)
+            fact = do_factorization(alg, A, cache.b, cache.u)
         end
         cache = set_cacheval(cache, fact)
     end
@@ -75,7 +81,7 @@ Base.@kwdef struct KLUFactorization <: AbstractFactorization
     reuse_symbolic::Bool = true
 end
 
-function init_cacheval(::KLUFactorization, A, b, u)
+function do_factorization(::KLUFactorization, A, b, u)
     if A isa AbstractDiffEqOperator
         A = A.A
     end
@@ -98,7 +104,7 @@ function SciMLBase.solve(cache::LinearCache, alg::KLUFactorization)
             KLU.klu_analyze!(cache.cacheval)
             fact = klu!(cache.cacheval, A)
         else
-            fact = init_cacheval(alg, A, cache.b, cache.u)
+            fact = do_factorization(alg, A, cache.b, cache.u)
         end
         cache = set_cacheval(cache, fact)
     end
@@ -123,7 +129,7 @@ function QRFactorization()
     QRFactorization(pivot, 16)
 end
 
-function init_cacheval(alg::QRFactorization, A, b, u)
+function do_factorization(alg::QRFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("QR is not defined for $(typeof(A))")
 
@@ -143,7 +149,7 @@ end
 
 SVDFactorization() = SVDFactorization(false, LinearAlgebra.DivideAndConquer())
 
-function init_cacheval(alg::SVDFactorization, A, b, u)
+function do_factorization(alg::SVDFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("SVD is not defined for $(typeof(A))")
 
@@ -164,7 +170,7 @@ end
 GenericFactorization(;fact_alg = LinearAlgebra.factorize) =
     GenericFactorization(fact_alg)
 
-function init_cacheval(alg::GenericFactorization, A, b, u)
+function do_factorization(alg::GenericFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("GenericFactorization is not defined for $(typeof(A))")
 

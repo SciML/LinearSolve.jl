@@ -43,24 +43,24 @@ end
     y = solve(prob1)
     @test A1 *  y  ≈ b1
 
-    _prob = LinearProblem(SymTridiagonal(A1.A), b1; u0=x1)
+    _prob = LinearProblem(SymTridiagonal(A1), b1; u0=x1)
     y = solve(_prob)
     @test A1 *  y  ≈ b1
 
-    _prob = LinearProblem(Tridiagonal(A1.A), b1; u0=x1)
+    _prob = LinearProblem(Tridiagonal(A1), b1; u0=x1)
     y = solve(_prob)
     @test A1 *  y  ≈ b1
 
-    _prob = LinearProblem(Symmetric(A1.A), b1; u0=x1)
+    _prob = LinearProblem(Symmetric(A1), b1; u0=x1)
     y = solve(_prob)
     @test A1 *  y  ≈ b1
 
-    _prob = LinearProblem(Hermitian(A1.A), b1; u0=x1)
+    _prob = LinearProblem(Hermitian(A1), b1; u0=x1)
     y = solve(_prob)
     @test A1 *  y  ≈ b1
 
 
-    _prob = LinearProblem(sparse(A1.A), b1; u0=x1)
+    _prob = LinearProblem(sparse(A1), b1; u0=x1)
     y = solve(_prob)
     @test A1 *  y  ≈ b1
 end

@@ -65,7 +65,7 @@ function set_cacheval(cache::LinearCache, alg_cache)
     return cache
 end
 
-init_cacheval(alg::Union{SciMLLinearSolveAlgorithm,Nothing}, A, b, u) = nothing
+init_cacheval(alg::SciMLLinearSolveAlgorithm, A, b, u) = nothing
 
 SciMLBase.init(prob::LinearProblem, args...; kwargs...) = SciMLBase.init(prob,nothing,args...;kwargs...)
 
@@ -91,9 +91,9 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
     Pl = (Pl !== nothing) ? Pl : Identity()
     Pr = (Pr !== nothing) ? Pr : Identity()
 
-    cacheval = init_cacheval(alg, A, b, u0)
-    isfresh = cacheval === nothing
-    Tc = isfresh ? Any : typeof(cacheval)
+    cacheval = init_cacheval(alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, verbose)
+    isfresh = true
+    Tc = typeof(cacheval)
 
     A = alias_A ? A : deepcopy(A)
     b = alias_b ? b : deepcopy(b)

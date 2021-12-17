@@ -38,7 +38,7 @@ sol1.u
   1.8385599677530706
 =#
 
-linsolve = LinearSolve.set_b(linsolve,b2)
+linsolve = LinearSolve.set_b(sol1.cache,b2)
 sol2 = solve(linsolve)
 
 sol2.u

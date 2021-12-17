@@ -140,7 +140,7 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
         Krylov.solve!(args...; kwargs...)
     end
 
-    return SciMLBase.build_linear_solution(alg,cache.u,nothing)
+    return SciMLBase.build_linear_solution(alg,cache.u,nothing,cache)
 end
 
 ## IterativeSolvers.jl
@@ -235,5 +235,5 @@ function SciMLBase.solve(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
     end
     cache.verbose && println()
 
-    return SciMLBase.build_linear_solution(alg,cache.u,nothing)
+    return SciMLBase.build_linear_solution(alg,cache.u,nothing,cache)
 end

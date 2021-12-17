@@ -5,7 +5,7 @@ function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization; kwargs.
     end
 
     y = ldiv!(cache.u, cache.cacheval, cache.b)
-    SciMLBase.build_linear_solution(alg,y,nothing)
+    SciMLBase.build_linear_solution(alg,y,nothing,cache)
 end
 
 ## LU Factorizations
@@ -68,7 +68,7 @@ function SciMLBase.solve(cache::LinearCache, alg::UMFPACKFactorization)
     end
 
     y = ldiv!(cache.u, cache.cacheval, cache.b)
-    SciMLBase.build_linear_solution(alg,y,nothing)
+    SciMLBase.build_linear_solution(alg,y,nothing,cache)
 end
 
 Base.@kwdef struct KLUFactorization <: AbstractFactorization
@@ -104,7 +104,7 @@ function SciMLBase.solve(cache::LinearCache, alg::KLUFactorization)
     end
 
     y = ldiv!(cache.u, cache.cacheval, cache.b)
-    SciMLBase.build_linear_solution(alg,y,nothing)
+    SciMLBase.build_linear_solution(alg,y,nothing,cache)
 end
 
 ## QRFactorization

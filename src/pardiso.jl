@@ -94,7 +94,7 @@ function SciMLBase.solve(cache::LinearCache, alg::PardisoJL; kwargs...)
     Pardiso.pardiso(cache.cacheval, u, A, b)
     alg.release_phase !== nothing && Pardiso.set_phase!(cache.cacheval, alg.release_phase)
 
-    return SciMLBase.build_linear_solution(alg,cache.u,nothing)
+    return SciMLBase.build_linear_solution(alg,cache.u,nothing,cache)
 end
 
 export PardisoJL, MKLPardisoFactorize, MKLPardisoIterate

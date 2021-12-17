@@ -63,7 +63,6 @@ preconditioners written to match the required interface.
   preconditioner, defined as a diagonal matrix `Diagonal(1./s)`.
 - `ComposePreconditioner(prec1,prec2)`: composes the preconditioners to apply
   `prec1` before `prec2`.
-- `InvComposePreconditioner(prec1,prec2)`: only god knows what this is for.
 
 ## Preconditioner Interface
 

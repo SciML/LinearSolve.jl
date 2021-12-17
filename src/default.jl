@@ -103,7 +103,7 @@ function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters, abstol, reltol, 
 
     # Not factorizable operator, default to only using A*x
     # IterativeSolvers is faster on CPU but not GPU-compatible
-    elseif cache.u isa Array
+    elseif u isa Array
         alg = IterativeSolversJL_GMRES()
         init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
     else

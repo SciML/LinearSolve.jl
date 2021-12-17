@@ -78,6 +78,9 @@ function LinearAlgebra.ldiv!(y, A::ComposePreconditioner, x)
     ldiv!(outer, y)
 end
 
+# This is just an implementation detail for Krylov.jl
+# It wants to use mul! instead of ldiv! so we convert.
+
 struct InvComposePreconditioner{Tp <: ComposePreconditioner}
     P::Tp
 end

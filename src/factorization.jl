@@ -184,3 +184,4 @@ end
 ## RFLUFactorization
 
 RFLUFactorization() = GenericFactorization(;fact_alg=RecursiveFactorization.lu!)
+init_cacheval(alg::GenericFactorization{typeof(RecursiveFactorization.lu!)}, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose) = ArrayInterface.lu_instance(A)

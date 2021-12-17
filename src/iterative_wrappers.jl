@@ -1,9 +1,7 @@
 ## Krylov.jl
 
-struct KrylovJL{F,Tl,Tr,I,A,K} <: AbstractKrylovSubspaceMethod
+struct KrylovJL{F,I,A,K} <: AbstractKrylovSubspaceMethod
     KrylovAlg::F
-    Pl::Tl
-    Pr::Tr
     gmres_restart::I
     window::I
     args::A
@@ -11,14 +9,10 @@ struct KrylovJL{F,Tl,Tr,I,A,K} <: AbstractKrylovSubspaceMethod
 end
 
 function KrylovJL(args...; KrylovAlg = Krylov.gmres!,
-                  Pl=nothing, Pr=nothing,
                   gmres_restart=0, window=0,
                   kwargs...)
 
-    Pl = (Pl === nothing) ? Identity() : Pl
-    Pr = (Pr === nothing) ? Identity() : Pr
-
-    return KrylovJL(KrylovAlg, Pl, Pr, gmres_restart, window,
+    return KrylovJL(KrylovAlg, gmres_restart, window,
                     args, kwargs)
 end
 
@@ -105,8 +99,8 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
         cache = set_cacheval(cache, solver)
     end
 
-    M = get_preconditioner(alg.Pl, cache.Pl)
-    N = get_preconditioner(alg.Pr, cache.Pr)
+    M = cache.Pl
+    N = cache.Pr
 
     M = (M === Identity()) ? I : inv(M)
     N = (N === Identity()) ? I : inv(N)
@@ -145,10 +139,8 @@ end
 
 ## IterativeSolvers.jl
 
-struct IterativeSolversJL{F,Tl,Tr,I,A,K} <: AbstractKrylovSubspaceMethod
+struct IterativeSolversJL{F,I,A,K} <: AbstractKrylovSubspaceMethod
     generate_iterator::F
-    Pl::Tl
-    Pr::Tr
     gmres_restart::I
     args::A
     kwargs::K
@@ -156,13 +148,9 @@ end
 
 function IterativeSolversJL(args...;
                             generate_iterator = IterativeSolvers.gmres_iterable!,
-                            Pl=nothing, Pr=nothing,
                             gmres_restart=0, kwargs...)
 
-    Pl = (Pl === nothing) ? Identity() : Pl
-    Pr = (Pr === nothing) ? Identity() : Pr
-
-    return IterativeSolversJL(generate_iterator, Pl, Pr, gmres_restart,
+    return IterativeSolversJL(generate_iterator, gmres_restart,
                               args, kwargs)
 end
 
@@ -184,9 +172,6 @@ IterativeSolversJL_MINRES(args...;kwargs...) =
                        kwargs...)
 
 function init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
-    Pl = get_preconditioner(alg.Pl, Pl)
-    Pr = get_preconditioner(alg.Pr, Pr)
-
     restart = (alg.gmres_restart == 0) ? min(20, size(A,1)) : alg.gmres_restart
 
     kwargs = (abstol=abstol, reltol=reltol, maxiter=maxiters,

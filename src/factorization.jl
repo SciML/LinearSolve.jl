@@ -10,7 +10,7 @@ end
 
 # Bad fallback: will fail if `A` is just a stand-in
 # This should instead just create the factorization type.
-init_cacheval(alg::AbstractFactorization, A, b, u) = do_factorization(alg, A, b, u)
+init_cacheval(alg::AbstractFactorization, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose) = do_factorization(alg, A, b, u)
 
 ## LU Factorizations
 
@@ -38,7 +38,7 @@ function do_factorization(alg::LUFactorization, A, b, u)
     return fact
 end
 
-init_cacheval(alg::LUFactorization, A, b, u) = ArrayInterface.lu_instance(A)
+init_cacheval(alg::LUFactorization, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose) = ArrayInterface.lu_instance(A)
 
 # This could be a GenericFactorization perhaps?
 Base.@kwdef struct UMFPACKFactorization <: AbstractFactorization

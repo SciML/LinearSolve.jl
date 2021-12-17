@@ -69,7 +69,7 @@ function get_KrylovJL_solver(KrylovAlg)
     return KS
 end
 
-function init_cacheval(alg::KrylovJL, A, b, u)
+function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
 
     KS = get_KrylovJL_solver(alg.KrylovAlg)
 
@@ -101,7 +101,7 @@ end
 
 function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
     if cache.isfresh
-        solver = init_cacheval(alg, cache.A, cache.b, cache.u)
+        solver = init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr, cache.maxiters, cache.abstol, cache.reltol, cache.verbose)
         cache = set_cacheval(cache, solver)
     end
 
@@ -183,20 +183,13 @@ IterativeSolversJL_MINRES(args...;kwargs...) =
                        generate_iterator=IterativeSolvers.minres_iterable!,
                        kwargs...)
 
-function init_cacheval(alg::IterativeSolversJL, cache::LinearCache)
-    @unpack A, b, u = cache
-
-    Pl = get_preconditioner(alg.Pl, cache.Pl)
-    Pr = get_preconditioner(alg.Pr, cache.Pr)
-
-    abstol  = cache.abstol
-    reltol  = cache.reltol
-    maxiter = cache.maxiters
-    verbose = cache.verbose
+function init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+    Pl = get_preconditioner(alg.Pl, Pl)
+    Pr = get_preconditioner(alg.Pr, Pr)
 
     restart = (alg.gmres_restart == 0) ? min(20, size(A,1)) : alg.gmres_restart
 
-    kwargs = (abstol=abstol, reltol=reltol, maxiter=maxiter,
+    kwargs = (abstol=abstol, reltol=reltol, maxiter=maxiters,
               alg.kwargs...)
 
     iterable = if alg.generate_iterator === IterativeSolvers.cg_iterator!
@@ -212,11 +205,11 @@ function init_cacheval(alg::IterativeSolversJL, cache::LinearCache)
           @warn "$(alg.generate_iterator) doesn't support right preconditioning"
         alg.generate_iterator(u, A, b, alg.args...; Pl=Pl,
                               abstol=abstol, reltol=reltol,
-                              max_mv_products=maxiter*2,
+                              max_mv_products=maxiters*2,
                               alg.kwargs...)
     else # minres, qmr
         alg.generate_iterator(u, A, b, alg.args...;
-                              abstol=abstol, reltol=reltol, maxiter=maxiter,
+                              abstol=abstol, reltol=reltol, maxiter=maxiters,
                               alg.kwargs...)
     end
     return iterable
@@ -224,7 +217,7 @@ end
 
 function SciMLBase.solve(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
     if cache.isfresh
-        solver = init_cacheval(alg, cache)
+        solver = init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr, cache.maxiters, cache.abstol, cache.reltol, cache.verbose)
         cache = set_cacheval(cache, solver)
     end
 

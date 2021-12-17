@@ -91,7 +91,7 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
     Pl = (Pl !== nothing) ? Pl : Identity()
     Pr = (Pr !== nothing) ? Pr : Identity()
 
-    cacheval = init_cacheval(alg, A, b, u0)
+    cacheval = init_cacheval(alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, verbose)
     isfresh = true
     Tc = typeof(cacheval)
 

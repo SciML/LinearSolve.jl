@@ -201,7 +201,7 @@ function init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, maxiters, absto
 end
 
 function SciMLBase.solve(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
-    if cache.isfresh || !(alg <: IterativeSolvers.GMRESIterable)
+    if cache.isfresh || !(typeof(alg) <: IterativeSolvers.GMRESIterable)
         solver = init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr, cache.maxiters, cache.abstol, cache.reltol, cache.verbose)
         cache = set_cacheval(cache, solver)
     end

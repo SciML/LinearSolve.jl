@@ -16,18 +16,22 @@ function test_interface(alg, prob1, prob2)
     A1 = prob1.A; b1 = prob1.b; x1 = prob1.u0
     A2 = prob2.A; b2 = prob2.b; x2 = prob2.u0
 
+    x1 .= false
     y = solve(prob1, alg; cache_kwargs...)
     @test A1 *  y  ≈ b1
 
     cache = SciMLBase.init(prob1,alg; cache_kwargs...) # initialize cache
+    cache.u .= false
     y = solve(cache)
     @test A1 *  y  ≈ b1
 
     cache = LinearSolve.set_A(cache,copy(A2))
+    cache.u .= false
     y = solve(cache)
     @test A2 *  y  ≈ b1
 
     cache = LinearSolve.set_b(cache,b2)
+    cache.u .= false
     y = solve(cache)
     @test A2 *  y  ≈ b2
 

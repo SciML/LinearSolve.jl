@@ -92,3 +92,8 @@ The following preconditioners match the interface of LinearSolve.jl.
   Requires `A` as a `AbstractMatrix`. Provides the following methods:
   - `PyAMG.RugeStubenSolver(A)`
   - `PyAMG.SmoothedAggregationSolver(A)`
+- [ILUZero.ILU0Precon(A::SparseMatrixCSC{T,N}, b_type = T)](https://github.com/mcovalt/ILUZero.jl):
+  An incomplete LU implementation. Requires `A` as a `SparseMatrixCSC`.
+- [LimitedLDLFactorizations.lldl](https://github.com/JuliaSmoothOptimizers/LimitedLDLFactorizations.jl):
+  A limited-memory LDLᵀ factorization for symmetric matrices. Requires `A` as a
+  `SparseMatrixCSC`.

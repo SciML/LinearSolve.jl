@@ -201,27 +201,9 @@ end
 end
 
 @testset "Preconditioners" begin
-    @testset "Scalar Diagonal Preconditioner" begin
-        s = rand()
-
-        x = rand(n,n)
-        y = rand(n,n)
-
-        Pl, Pr = LinearSolve.DiagonalPreconditioner(s),LinearSolve.InvDiagonalPreconditioner(s)
-
-        mul!(y, Pl, x); @test y ≈ s * x
-        mul!(y, Pr, x); @test y ≈ s \ x
-
-        y .= x; ldiv!(Pl, x); @test x ≈ s \ y
-        y .= x; ldiv!(Pr, x); @test x ≈ s * y
-
-        ldiv!(y, Pl, x); @test y ≈ s \ x
-        ldiv!(y, Pr, x); @test y ≈ s * x
-    end
-
     @testset "Vector Diagonal Preconditioner" begin
         s = rand(n)
-        Pl, Pr = LinearSolve.DiagonalPreconditioner(s),LinearSolve.InvDiagonalPreconditioner(s)
+        Pl, Pr = Diagonal(s),LinearSolve.InvPreconditioner(Diagonal(s))
 
         x = rand(n,n)
         y = rand(n,n)
@@ -237,21 +219,20 @@ end
     end
 
     @testset "ComposePreconditioenr" begin
-        s1 = rand()
-        s2 = rand()
+        s1 = rand(n)
+        s2 = rand(n)
 
         x = rand(n,n)
         y = rand(n,n)
 
-        P1 = LinearSolve.DiagonalPreconditioner(s1)
-        P2 = LinearSolve.DiagonalPreconditioner(s2)
+        P1 = Diagonal(s1)
+        P2 = Diagonal(s2)
 
         P  = LinearSolve.ComposePreconditioner(P1,P2)
 
         # ComposePreconditioner
         ldiv!(y, P, x);      @test y ≈ ldiv!(P2, ldiv!(P1, x))
         y .= x; ldiv!(P, x); @test x ≈ ldiv!(P2, ldiv!(P1, y))
-
     end
 end
 

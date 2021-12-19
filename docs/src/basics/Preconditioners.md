@@ -59,7 +59,8 @@ To define a new preconditioner you define a Julia type which satisfies the
 following interface:
 
 - `Base.eltype(::Preconditioner)` (Required only for Krylov.jl)
-- `LinearAlgebra.ldiv!(::AbstractVector,::Preconditioner,::AbstractVector)`
+- `LinearAlgebra.ldiv!(::AbstractVector,::Preconditioner,::AbstractVector)` and
+  `LinearAlgebra.ldiv!(::Preconditioner,::AbstractVector)`
 
 ## Curated List of Pre-Defined Preconditioners
 

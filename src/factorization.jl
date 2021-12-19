@@ -81,6 +81,10 @@ Base.@kwdef struct KLUFactorization <: AbstractFactorization
     reuse_symbolic::Bool = true
 end
 
+function init_cacheval(alg::KLUFactorization, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+    return KLU.KLUFactorization(A) # this takes care of the copy internally.
+end
+
 function do_factorization(::KLUFactorization, A, b, u)
     if A isa AbstractDiffEqOperator
         A = A.A

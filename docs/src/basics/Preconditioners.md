@@ -69,7 +69,5 @@ preconditioners written to match the required interface.
 To define a new preconditioner you define a Julia type which satisfies the
 following interface:
 
-### General
-
 - `Base.eltype(::Preconditioner)`
 - `LinearAlgebra.ldiv!(::AbstractVector,::Preconditioner,::AbstractVector)`

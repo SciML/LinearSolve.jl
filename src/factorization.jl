@@ -4,7 +4,8 @@ function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization; kwargs.
         cache = set_cacheval(cache, fact)
     end
 
-    y = ldiv!(cache.u, cache.cacheval, cache.b)
+    copyto!(cache.u,cache.b)
+    y = ldiv!(cache.cacheval, cache.u)
     SciMLBase.build_linear_solution(alg,y,nothing,cache)
 end
 

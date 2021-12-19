@@ -1,6 +1,6 @@
 # Linear Problems
 
-## Mathematical Specification of a Nonlinear Problem
+## Mathematical Specification of a Linear Problem
 
 ### Concrete LinearProblem
 

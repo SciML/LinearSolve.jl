@@ -28,7 +28,7 @@ Pkg.add("LinearSolve")
 - There are a few community forums:
     - the #diffeq-bridged channel in the [Julia Slack](https://julialang.org/slack/)
     - [JuliaDiffEq](https://gitter.im/JuliaDiffEq/Lobby) on Gitter
-    - on the Julia Discourse forums (look for the [modelingtoolkit tag](https://discourse.julialang.org/tag/modelingtoolkit)
+    - on the [Julia Discourse forums](https://discourse.julialang.org)
     - see also [SciML Community page](https://sciml.ai/community/)
 
 ## Roadmap

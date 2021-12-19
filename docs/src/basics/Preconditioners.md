@@ -96,4 +96,6 @@ The following preconditioners match the interface of LinearSolve.jl.
   An incomplete LU implementation. Requires `A` as a `SparseMatrixCSC`.
 - [LimitedLDLFactorizations.lldl](https://github.com/JuliaSmoothOptimizers/LimitedLDLFactorizations.jl):
   A limited-memory LDLᵀ factorization for symmetric matrices. Requires `A` as a
-  `SparseMatrixCSC`.
+  `SparseMatrixCSC`. Applying `F = lldl(A); F.D .= abs.(F.D)` before usage as a preconditioner
+  makes the preconditioner symmetric postive definite and thus is required for Krylov methods which
+  are specialized for symmetric linear systems.

@@ -21,6 +21,8 @@ means of solving and resolving linear systems. To do this with LinearSolve.jl,
 you simply `init` a cache, `solve`, replace `b`, and solve again. This looks like:
 
 ```julia
+using LinearSolve
+
 n = 4
 A = rand(n,n)
 b1 = rand(n); b2 = rand(n)

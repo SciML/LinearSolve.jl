@@ -1,4 +1,4 @@
-# LinearSolve.jl: High-Performance Unified Nonlinear Solvers
+# LinearSolve.jl: High-Performance Unified Linear Solvers
 
 LinearSolve.jl is a unified interface for the linear solving packages of
 Julia. It interfaces with other packages of the Julia ecosystem

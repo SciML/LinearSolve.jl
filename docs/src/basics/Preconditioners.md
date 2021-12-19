@@ -64,11 +64,11 @@ following interface:
 
 ## Curated List of Pre-Defined Preconditioners
 
-The following preconditioners are tested to match the interface of LinearSolve.jl.
+The following preconditioners match the interface of LinearSolve.jl.
 
-- `ComposePreconditioner(prec1,prec2)`: composes the preconditioners to apply
+- `LinearSolve.ComposePreconditioner(prec1,prec2)`: composes the preconditioners to apply
   `prec1` before `prec2`.
-- `InvPreconditioner(prec)`: inverts `mul!` and `ldiv!` in a preconditioner
+- `LinearSolve.InvPreconditioner(prec)`: inverts `mul!` and `ldiv!` in a preconditioner
   definition as a lazy inverse.
 - `LinearAlgera.Diagonal(s::Union{Number,AbstractVector})`: the lazy Diagonal
   matrix type of Base.LinearAlgebra. Used for efficient construction of a
@@ -77,3 +77,18 @@ The following preconditioners are tested to match the interface of LinearSolve.j
 - [IncompleteLU.ilu](https://github.com/haampie/IncompleteLU.jl): an implementation
   of the incomplete LU-factorization preconditioner. This requires `A` as a
   `SparseMatrixCSC`.
+- [Preconditioners.CholeskyPreconditioner(A, i)](https://github.com/mohamed82008/Preconditioners.jl):
+  An incomplete Cholesky preconditioner with cut-off level `i`. Requires `A` as
+  a `AbstractMatrix` and positive semi-definite.
+- [AlgebraicMultiGrid](https://github.com/JuliaLinearAlgebra/AlgebraicMultigrid.jl):
+  Implementations of the algebraic multigrid method. Must be converted to a
+  preconditioner via `AlgebraicMultiGrid.aspreconditioner(AlgebraicMultiGrid.precmethod(A))`.
+  Requires `A` as a `AbstractMatrix`. Provides the following methods:
+  - `AlgebraicMultiGrid.ruge_stuben(A)`
+  - `AlgebraicMultiGrid.smoothed_aggregation(A)`
+- [PyAMG](https://github.com/cortner/PyAMG.jl):
+  Implementations of the algebraic multigrid method. Must be converted to a
+  preconditioner via `PyAMG.aspreconditioner(PyAMG.precmethod(A))`.
+  Requires `A` as a `AbstractMatrix`. Provides the following methods:
+  - `PyAMG.RugeStubenSolver(A)`
+  - `PyAMG.SmoothedAggregationSolver(A)`

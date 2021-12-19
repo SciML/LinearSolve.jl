@@ -9,8 +9,9 @@ IterativeSolvers.jl computes the norm after the application of the left precondt
 hack the system via the following formulation:
 
 ```julia
-Pl = LinearSolve.InvDiagonalPreconditioner(weights)
-Pr = LinearSolve.DiagonalPreconditioner(weights)
+using LinearSolve, LinearAlgebra
+Pl = LinearSolve.InvPreconditioner(Diagonal(weights))
+Pr = Diagonal(weights)
 
 A = rand(n,n)
 b = rand(n)
@@ -24,8 +25,9 @@ can use `ComposePreconditioner` to apply the preconditioner after the applicatio
 of the weights like as follows:
 
 ```julia
-Pl = ComposePreconitioner(LinearSolve.InvDiagonalPreconditioner(weights),realprec)
-Pr = LinearSolve.DiagonalPreconditioner(weights)
+using LinearSolve, LinearAlgebra
+Pl = ComposePreconitioner(LinearSolve.InvPreconditioner(Diagonal(weights),realprec))
+Pr = Diagonal(weights)
 
 A = rand(n,n)
 b = rand(n)

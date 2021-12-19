@@ -42,8 +42,9 @@ multiplies by the same values. This is commonly used in the case where if, inste
 of random, `s` is an approximation to the eigenvalues of a system.
 
 ```julia
+using LinearSolve, LinearAlgebra
 s = rand(n)
-Pl = LinearSolve.DiagonalPreconditioner(s)
+Pl = Diagonal(s)
 
 A = rand(n,n)
 b = rand(n)
@@ -52,22 +53,27 @@ prob = LinearProblem(A,b)
 sol = solve(prob,IterativeSolvers_GMRES(),Pl=Pl)
 ```
 
-## Pre-Defined Preconditioners
-
-To simplify the usage of preconditioners, LinearSolve.jl comes with many standard
-preconditioners written to match the required interface.
-
-- `DiagonalPreconditioner(s::Union{Number,AbstractVector})`: the diagonal
-  preconditioner, defined as a diagonal matrix `Diagonal(s)`.
-- `InvDiagonalPreconditioner(s::Union{Number,AbstractVector})`: the diagonal
-  preconditioner, defined as a diagonal matrix `Diagonal(1./s)`.
-- `ComposePreconditioner(prec1,prec2)`: composes the preconditioners to apply
-  `prec1` before `prec2`.
-
 ## Preconditioner Interface
 
 To define a new preconditioner you define a Julia type which satisfies the
 following interface:
 
-- `Base.eltype(::Preconditioner)`
-- `LinearAlgebra.ldiv!(::AbstractVector,::Preconditioner,::AbstractVector)`
+- `Base.eltype(::Preconditioner)` (Required only for Krylov.jl)
+- `LinearAlgebra.ldiv!(::AbstractVector,::Preconditioner,::AbstractVector)` and
+  `LinearAlgebra.ldiv!(::Preconditioner,::AbstractVector)`
+
+## Curated List of Pre-Defined Preconditioners
+
+The following preconditioners are tested to match the interface of LinearSolve.jl.
+
+- `ComposePreconditioner(prec1,prec2)`: composes the preconditioners to apply
+  `prec1` before `prec2`.
+- `InvPreconditioner(prec)`: inverts `mul!` and `ldiv!` in a preconditioner
+  definition as a lazy inverse.
+- `LinearAlgera.Diagonal(s::Union{Number,AbstractVector})`: the lazy Diagonal
+  matrix type of Base.LinearAlgebra. Used for efficient construction of a
+  diagonal preconditioner.
+- Other `Base.LinearAlgera` types: all define the full Preconditioner interface.
+- [IncompleteLU.ilu](https://github.com/haampie/IncompleteLU.jl): an implementation
+  of the incomplete LU-factorization preconditioner. This requires `A` as a
+  `SparseMatrixCSC`.

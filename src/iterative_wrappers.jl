@@ -221,6 +221,7 @@ purge_history!(iter, x, b) = nothing
 function purge_history!(iter::IterativeSolvers.GMRESIterable, x, b)
   iter.k = 1
   iter.x  = x
+  fill!(x,false)
   iter.b  = b
 
   iter.residual.current = IterativeSolvers.init!(iter.arnoldi, iter.x, iter.b, iter.Pl, iter.Ax, initially_zero = true)

@@ -40,12 +40,12 @@ like CUDA.
 These overloads tend to work for many array types, such as `CuArrays` for GPU-accelerated
 solving, using the overloads provided by the respective packages. Given that this can be
 customized per-package, details given below describe a subset of important arrays
-(`Matrix`, `SparseMatrixCSC`, `CuMatrix`, etc.) 
+(`Matrix`, `SparseMatrixCSC`, `CuMatrix`, etc.)
 
 - `LUFactorization(pivot=LinearAlgebra.RowMaximum())`: Julia's built in `lu`.
   - On dense matrices this uses the current BLAS implementation of the user's computer
     which by default is OpenBLAS but will use MKL if the user does `using MKL` in their
-    system. 
+    system.
   - On sparse matrices this will use UMFPACK from SuiteSparse. Note that this will not
     cache the symbolic factorization.
   - On CuMatrix it will use a CUDA-accelerated LU from CuSolver.
@@ -53,14 +53,14 @@ customized per-package, details given below describe a subset of important array
 - `QRFactorization(pivot=LinearAlgebra.NoPivot(),blocksize=16)`: Julia's built in `qr`.
   - On dense matrices this uses the current BLAS implementation of the user's computer
     which by default is OpenBLAS but will use MKL if the user does `using MKL` in their
-    system. 
+    system.
   - On sparse matrices this will use SPQR from SuiteSparse
   - On CuMatrix it will use a CUDA-accelerated QR from CuSolver.
   - On BandedMatrix and BlockBandedMatrix it will use a banded QR.
 - `SVDFactorization(full=false,alg=LinearAlgebra.DivideAndConquer())`: Julia's built in `svd`.
   - On dense matrices this uses the current BLAS implementation of the user's computer
     which by default is OpenBLAS but will use MKL if the user does `using MKL` in their
-    system. 
+    system.
 - `GenericFactorization(fact_alg)`: Constructs a linear solver from a generic
   factorization algorithm `fact_alg` which complies with the Base.LinearAlgebra
   factorization API. Quoting from Base:
@@ -118,6 +118,15 @@ Base.@kwdef struct PardisoJL <: SciMLLinearSolveAlgorithm
     dparm::Union{Vector{Tuple{Int,Int}}, Nothing} = nothing
 end
 ```
+
+### CUDA.jl
+
+Note that `CuArrays` are supported by `GenericFactorization` in the "normal" way.
+The following are non-standard GPU factorization routines.
+
+- `GPUOffloadFactorization`: An offloading technique used to GPU-accelerate CPU-based
+  computations. Requires a sufficiently large `A` to overcome the data transfer
+  costs.
 
 ### IterativeSolvers.jl
 

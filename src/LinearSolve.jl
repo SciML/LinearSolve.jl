@@ -44,6 +44,7 @@ function __init__()
     IS_OPENBLAS[] = occursin("openblas", BLAS.get_config().loaded_libs[1].libname)
   end
 
+  @require CUDA="052768ef-5323-5732-b1bb-66c8b64840ba" include("cuda.jl")
   @require Pardiso="46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2" include("pardiso.jl")
 end
 
@@ -52,6 +53,5 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
 export KrylovJL, KrylovJL_CG, KrylovJL_GMRES, KrylovJL_BICGSTAB, KrylovJL_MINRES,
        IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
        IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES
-export DefaultLinSolve
 
 end

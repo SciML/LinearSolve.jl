@@ -43,7 +43,7 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
     # This catches the case where A is a CuMatrix
     # Which does not have LU fully defined
     elseif !(A isa AbstractDiffEqOperator)
-        alg = QRFactorization()
+        alg = QRFactorization(false)
         SciMLBase.solve(cache, alg, args...; kwargs...)
 
     # Not factorizable operator, default to only using A*x
@@ -98,7 +98,7 @@ function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters, abstol, reltol, 
     # This catches the case where A is a CuMatrix
     # Which does not have LU fully defined
     elseif !(A isa AbstractDiffEqOperator)
-        alg = QRFactorization()
+        alg = QRFactorization(false)
         init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
 
     # Not factorizable operator, default to only using A*x

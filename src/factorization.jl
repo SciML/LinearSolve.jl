@@ -129,15 +129,16 @@ end
 struct QRFactorization{P} <: AbstractFactorization
     pivot::P
     blocksize::Int
+    inplace::Bool
 end
 
-function QRFactorization()
+function QRFactorization(inplace = true)
     pivot = @static if VERSION < v"1.7beta"
         Val(false)
     else
         NoPivot()
     end
-    QRFactorization(pivot, 16)
+    QRFactorization(pivot, 16, inplace)
 end
 
 function do_factorization(alg::QRFactorization, A, b, u)
@@ -147,7 +148,11 @@ function do_factorization(alg::QRFactorization, A, b, u)
     if A isa AbstractDiffEqOperator
         A = A.A
     end
-    fact = qr!(A, alg.pivot; blocksize = alg.blocksize)
+    if alg.inplace
+        fact = qr!(A, alg.pivot; blocksize = alg.blocksize)
+    else
+        fact = qr(A) # CUDA.jl does not allow other args!
+    end
     return fact
 end
 

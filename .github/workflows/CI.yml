@@ -1,13 +1,11 @@
 name: CI
 on:
   - push
-  - pull_request
 jobs:
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
         version:
           - '1'
@@ -16,6 +14,8 @@ jobs:
           - ubuntu-latest
         arch:
           - x64
+        group:
+          - Core
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@v1

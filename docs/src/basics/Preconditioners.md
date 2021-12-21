@@ -99,3 +99,6 @@ The following preconditioners match the interface of LinearSolve.jl.
   `SparseMatrixCSC`. Applying `F = lldl(A); F.D .= abs.(F.D)` before usage as a preconditioner
   makes the preconditioner symmetric postive definite and thus is required for Krylov methods which
   are specialized for symmetric linear systems.
+- [RandomizedPreconditioners.NystromPreconditioner](https://github.com/tjdiamandis/RandomizedPreconditioners.jl)
+  A randomized sketching method for positive semidefinite matrices `A`. Builds a preconditioner ``P ≈ A + μ*I``
+  for the system ``(A + μ*I)x = b``

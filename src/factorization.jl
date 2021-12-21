@@ -225,10 +225,6 @@ function init_cacheval(alg::Union{GenericFactorization,GenericFactorization{type
    end
 end
 
-function init_cacheval(alg, A::Union{Hermitian,Symmetric}, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
-    BunchKaufman(A.data, Array(1:size(A,1)), A.uplo, true, false, 0)
-end
-
 # Fallback, tries to make nonsingular and just factorizes
 # Try to never use it.
 function init_cacheval(alg::Union{QRFactorization,SVDFactorization,GenericFactorization}, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
@@ -241,3 +237,4 @@ end
 
 RFLUFactorization() = GenericFactorization(;fact_alg=RecursiveFactorization.lu!)
 init_cacheval(alg::GenericFactorization{typeof(RecursiveFactorization.lu!)}, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose) = ArrayInterface.lu_instance(A)
+init_cacheval(alg::GenericFactorization{typeof(RecursiveFactorization.lu!)}, A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr, maxiters, abstol, reltol, verbose) = ArrayInterface.lu_instance(A)

@@ -5,7 +5,7 @@ function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization; kwargs.
     end
 
     copyto!(cache.u,cache.b)
-    y = ldiv!(cache.cacheval, cache.u)
+    y = ldiv!(cache.u, cache.cacheval, cache.b)
     SciMLBase.build_linear_solution(alg,y,nothing,cache)
 end
 

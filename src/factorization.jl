@@ -197,6 +197,22 @@ function do_factorization(alg::GenericFactorization, A, b, u)
     return fact
 end
 
+init_cacheval(alg::GenericFactorization{typeof(lu)}, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose) = ArrayInterface.lu_instance(A)
+init_cacheval(alg::GenericFactorization{typeof(lu!)}, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose) = ArrayInterface.lu_instance(A)
+
+init_cacheval(alg::GenericFactorization{typeof(lu)}, A::Diagonal, b, u, Pl, Pr, maxiters, abstol, reltol, verbose) = Diagonal(inv.(A.diag))
+init_cacheval(alg::GenericFactorization{typeof(lu)}, A::Tridiagonal, b, u, Pl, Pr, maxiters, abstol, reltol, verbose) = ArrayInterface.lu_instance(A)
+init_cacheval(alg::GenericFactorization{typeof(lu!)}, A::Diagonal, b, u, Pl, Pr, maxiters, abstol, reltol, verbose) = Diagonal(inv.(A.diag))
+init_cacheval(alg::GenericFactorization{typeof(lu!)}, A::Tridiagonal, b, u, Pl, Pr, maxiters, abstol, reltol, verbose) = ArrayInterface.lu_instance(A)
+
+init_cacheval(alg::GenericFactorization, A::Diagonal, b, u, Pl, Pr, maxiters, abstol, reltol, verbose) = Diagonal(inv.(A.diag))
+init_cacheval(alg::GenericFactorization, A::Tridiagonal, b, u, Pl, Pr, maxiters, abstol, reltol, verbose) = ArrayInterface.lu_instance(A)
+function init_cacheval(alg::Union{QRFactorization,SVDFactorization,GenericFactorization}, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+    newA = copy(A)
+    fill!(newA,true)
+    do_factorization(alg, newA, b, u)
+end
+
 ## RFLUFactorization
 
 RFLUFactorization() = GenericFactorization(;fact_alg=RecursiveFactorization.lu!)

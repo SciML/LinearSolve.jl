@@ -1,11 +1,20 @@
+function _ldiv!(x, A, b)
+    # work around https://github.com/JuliaLang/julia/issues/43507
+    if @which(ldiv!(x,A,b)) == which(ldiv!,Tuple{LU{Float64, Matrix{Float64}},Vector{Float64}}) 
+        copyto!(x, b)
+        ldiv!(A, x)
+    else
+        ldiv!(x, A, b)
+    end
+end
+
+
 function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization; kwargs...)
     if cache.isfresh
         fact = do_factorization(alg, cache.A, cache.b, cache.u)
         cache = set_cacheval(cache, fact)
     end
-
-    copyto!(cache.u,cache.b)
-    y = ldiv!(cache.u, cache.cacheval, cache.b)
+    y = _ldiv!(cache.u, cache.cacheval, cache.b)
     SciMLBase.build_linear_solution(alg,y,nothing,cache)
 end
 

@@ -106,7 +106,10 @@ function SciMLBase.solve(cache::LinearCache, alg::KLUFactorization)
             # If we have a cacheval already, run umfpack_symbolic to ensure the symbolic factorization exists
             # This won't recompute if it does.
             KLU.klu_analyze!(cache.cacheval)
-            fact = klu!(cache.cacheval, A)
+            if cache.cacheval._numeric === C_NULL # We MUST have a numeric factorization for reuse, unlike UMFPACK.
+                KLU.klu_factor!(cache.cacheval)
+            end
+            fact = KLU.klu!(cache.cacheval, A)
         else
             fact = do_factorization(alg, A, cache.b, cache.u)
         end

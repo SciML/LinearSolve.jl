@@ -1,11 +1,7 @@
-function _ldiv!(x, A, b)
-    # work around https://github.com/JuliaLang/julia/issues/43507
-    if @which(ldiv!(x,A,b)) == which(ldiv!,Tuple{LU{Float64, Matrix{Float64}},Vector{Float64}}) 
-        copyto!(x, b)
-        ldiv!(A, x)
-    else
-        ldiv!(x, A, b)
-    end
+_ldiv!(x, A, b) = ldiv!(x, A, b)
+function _ldiv!(x::Vector, A::Factorization, b::Vector)
+    copyto!(x, b)
+    ldiv!(A, x)
 end
 
 

@@ -98,6 +98,10 @@ Base.@kwdef struct KLUFactorization <: AbstractFactorization
     reuse_symbolic::Bool = true
 end
 
+function init_cacheval(alg::KLUFactorization, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+    return KLU.KLUFactorization(A) # this takes care of the copy internally.
+end
+
 function do_factorization(::KLUFactorization, A, b, u)
     if A isa AbstractDiffEqOperator
         A = A.A
@@ -119,7 +123,10 @@ function SciMLBase.solve(cache::LinearCache, alg::KLUFactorization)
             # If we have a cacheval already, run umfpack_symbolic to ensure the symbolic factorization exists
             # This won't recompute if it does.
             KLU.klu_analyze!(cache.cacheval)
-            fact = klu!(cache.cacheval, A)
+            if cache.cacheval._numeric === C_NULL # We MUST have a numeric factorization for reuse, unlike UMFPACK.
+                KLU.klu_factor!(cache.cacheval)
+            end
+            fact = KLU.klu!(cache.cacheval, A)
         else
             fact = do_factorization(alg, A, cache.b, cache.u)
         end

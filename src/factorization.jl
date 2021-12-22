@@ -1,11 +1,17 @@
+_ldiv!(x, A, b) = ldiv!(x, A, b)
+function _ldiv!(x::Vector, A::Factorization, b::Vector)
+    # workaround https://github.com/JuliaLang/julia/issues/43507
+    copyto!(x, b)
+    ldiv!(A, x)
+end
+
+
 function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization; kwargs...)
     if cache.isfresh
         fact = do_factorization(alg, cache.A, cache.b, cache.u)
         cache = set_cacheval(cache, fact)
     end
-
-    copyto!(cache.u,cache.b)
-    y = ldiv!(cache.cacheval, cache.u)
+    y = _ldiv!(cache.u, cache.cacheval, cache.b)
     SciMLBase.build_linear_solution(alg,y,nothing,cache)
 end
 

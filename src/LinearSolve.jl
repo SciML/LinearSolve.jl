@@ -39,7 +39,6 @@ include("factorization.jl")
 include("iterative_wrappers.jl")
 include("preconditioners.jl")
 include("default.jl")
-include("alg_utils.jl")
 
 const IS_OPENBLAS = Ref(true)
 isopenblas() = IS_OPENBLAS[]

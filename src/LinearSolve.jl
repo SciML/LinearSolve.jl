@@ -27,11 +27,19 @@ abstract type SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
 abstract type AbstractFactorization <: SciMLLinearSolveAlgorithm end
 abstract type AbstractKrylovSubspaceMethod <: SciMLLinearSolveAlgorithm end
 
+# Traits
+
+needs_concrete_A(alg::AbstractFactorization) = true
+needs_concrete_A(alg::AbstractKrylovSubspaceMethod) = true
+
+# Code
+
 include("common.jl")
 include("factorization.jl")
 include("iterative_wrappers.jl")
 include("preconditioners.jl")
 include("default.jl")
+include("alg_utils.jl")
 
 const IS_OPENBLAS = Ref(true)
 isopenblas() = IS_OPENBLAS[]

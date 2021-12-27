@@ -82,6 +82,8 @@ function SciMLBase.solve(cache::LinearCache, alg::PardisoJL; kwargs...)
     return SciMLBase.build_linear_solution(alg,cache.u,nothing,cache)
 end
 
+needsconcreteA(alg::PardisoJL) = true
+
 # Add finalizer to release memory
 # Pardiso.set_phase!(cache.cacheval, Pardiso.RELEASE_ALL)
 

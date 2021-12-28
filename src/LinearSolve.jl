@@ -30,7 +30,7 @@ abstract type AbstractKrylovSubspaceMethod <: SciMLLinearSolveAlgorithm end
 # Traits
 
 needs_concrete_A(alg::AbstractFactorization) = true
-needs_concrete_A(alg::AbstractKrylovSubspaceMethod) = true
+needs_concrete_A(alg::AbstractKrylovSubspaceMethod) = false
 
 # Code
 

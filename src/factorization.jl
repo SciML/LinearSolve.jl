@@ -162,7 +162,7 @@ function do_factorization(alg::QRFactorization, A, b, u)
         A = A.A
     end
     if alg.inplace
-        fact = qr!(A, alg.pivot; blocksize = alg.blocksize)
+        fact = qr!(A, alg.pivot)
     else
         fact = qr(A) # CUDA.jl does not allow other args!
     end

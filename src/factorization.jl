@@ -38,7 +38,7 @@ function do_factorization(alg::LUFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("LU is not defined for $(typeof(A))")
 
-    if A isa AbstractDiffEqOperator
+    if A isa DiffEqArrayOperator
         A = A.A
     end
     fact = lu!(A, alg.pivot)
@@ -63,7 +63,7 @@ function init_cacheval(alg::UMFPACKFactorization, A, b, u, Pl, Pr, maxiters, abs
 end
 
 function do_factorization(::UMFPACKFactorization, A, b, u)
-    if A isa AbstractDiffEqOperator
+    if A isa DiffEqArrayOperator
         A = A.A
     end
     if A isa SparseMatrixCSC
@@ -75,7 +75,7 @@ end
 
 function SciMLBase.solve(cache::LinearCache, alg::UMFPACKFactorization)
     A = cache.A
-    if A isa AbstractDiffEqOperator
+    if A isa DiffEqArrayOperator
         A = A.A
     end
     if cache.isfresh
@@ -103,7 +103,7 @@ function init_cacheval(alg::KLUFactorization, A, b, u, Pl, Pr, maxiters, abstol,
 end
 
 function do_factorization(::KLUFactorization, A, b, u)
-    if A isa AbstractDiffEqOperator
+    if A isa DiffEqArrayOperator
         A = A.A
     end
     if A isa SparseMatrixCSC
@@ -115,7 +115,7 @@ end
 
 function SciMLBase.solve(cache::LinearCache, alg::KLUFactorization)
     A = cache.A
-    if A isa AbstractDiffEqOperator
+    if A isa DiffEqArrayOperator
         A = A.A
     end
     if cache.isfresh
@@ -158,7 +158,7 @@ function do_factorization(alg::QRFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("QR is not defined for $(typeof(A))")
 
-    if A isa AbstractDiffEqOperator
+    if A isa DiffEqArrayOperator
         A = A.A
     end
     if alg.inplace
@@ -182,7 +182,7 @@ function do_factorization(alg::SVDFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("SVD is not defined for $(typeof(A))")
 
-    if A isa AbstractDiffEqOperator
+    if A isa DiffEqArrayOperator
         A = A.A
     end
 
@@ -203,7 +203,7 @@ function do_factorization(alg::GenericFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("GenericFactorization is not defined for $(typeof(A))")
 
-    if A isa AbstractDiffEqOperator
+    if A isa DiffEqArrayOperator
         A = A.A
     end
     fact = alg.fact_alg(A)

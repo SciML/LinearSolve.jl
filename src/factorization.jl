@@ -41,7 +41,11 @@ function do_factorization(alg::LUFactorization, A, b, u)
     if A isa DiffEqArrayOperator
         A = A.A
     end
-    fact = lu!(A, alg.pivot)
+    if A isa SparseMatrixCSC
+        fact = lu(A, alg.pivot)
+    else
+        fact = lu!(A, alg.pivot)
+    end
     return fact
 end
 

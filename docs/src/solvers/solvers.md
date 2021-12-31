@@ -124,7 +124,7 @@ end
 Note that `CuArrays` are supported by `GenericFactorization` in the "normal" way.
 The following are non-standard GPU factorization routines.
 
-- `GPUOffloadFactorization`: An offloading technique used to GPU-accelerate CPU-based
+- `GPUOffloadFactorization()`: An offloading technique used to GPU-accelerate CPU-based
   computations. Requires a sufficiently large `A` to overcome the data transfer
   costs.
 

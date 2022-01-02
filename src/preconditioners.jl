@@ -4,6 +4,8 @@ struct ComposePreconditioner{Ti,To}
     inner::Ti
     outer::To
 end
+ComposePreconditioner(inner,::Nothing) = inner
+ComposePreconditioner(::Nothing,outer) = outer
 
 Base.eltype(A::ComposePreconditioner) = promote_type(eltype(A.inner), eltype(A.outer))
 

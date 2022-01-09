@@ -5,8 +5,6 @@
 Solves for ``Au=b`` in the problem defined by `prob` using the algorithm
 `alg`. If no algorithm is given, a default algorithm will be chosen.
 
-This page is solely focused on the methods for nonlinear systems.
-
 ## Recommended Methods
 
 The default algorithm `nothing` is good for choosing an algorithm that will work,

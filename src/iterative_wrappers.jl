@@ -208,13 +208,15 @@ function SciMLBase.solve(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
     purge_history!(cache.cacheval, cache.u, cache.b)
 
     cache.verbose && println("Using IterativeSolvers.$(alg.generate_iterator)")
+    i = 0
     for iter in enumerate(cache.cacheval)
+        i += 1
         cache.verbose && println("Iter: $(iter[1]), residual: $(iter[2])")
         # TODO inject callbacks KSP into solve cb!(cache.cacheval)
     end
     cache.verbose && println()
 
-    return SciMLBase.build_linear_solution(alg,cache.u,nothing,cache)
+    return SciMLBase.build_linear_solution(alg,cache.u,nothing,cache; iters = i)
 end
 
 purge_history!(iter, x, b) = nothing

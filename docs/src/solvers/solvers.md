@@ -1,4 +1,4 @@
-# [Linear System Solvers](@id nonlinearsystemsolvers)
+# [Linear System Solvers](@id linearsystemsolvers)
 
 `solve(prob::LinearProlem,alg;kwargs)`
 

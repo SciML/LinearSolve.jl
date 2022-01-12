@@ -6,8 +6,8 @@ Base.@kwdef struct PardisoJL <: SciMLLinearSolveAlgorithm
     dparm::Union{Vector{Tuple{Int,Int}}, Nothing} = nothing
 end
 
-MKLPardisoFactorize(;kwargs...) = PardisoJL(;kwargs...)
-MKLPardisoIterate(;kwargs...) = PardisoJL(;kwargs...)
+MKLPardisoFactorize(;kwargs...) = PardisoJL(;solver_type = 0,kwargs...)
+MKLPardisoIterate(;kwargs...) = PardisoJL(;solver_type = 1,kwargs...)
 needs_concrete_A(alg::PardisoJL) = true
 
 # TODO schur complement functionality

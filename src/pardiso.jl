@@ -57,6 +57,9 @@ function init_cacheval(alg::PardisoJL, A, b, u, Pl, Pr, maxiters, abstol, reltol
         end
     end
 
+    # Make sure to say it's transposed because its CSC not CSR
+    Pardiso.set_iparm!(solver,12, 1)
+
     Pardiso.set_phase!(solver, Pardiso.ANALYSIS)
     Pardiso.pardiso(solver, u, A, b)
 

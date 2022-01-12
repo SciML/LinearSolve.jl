@@ -8,15 +8,13 @@ end
 
 MKLPardisoFactorize(;kwargs...) = PardisoJL(;kwargs...)
 MKLPardisoIterate(;kwargs...) = PardisoJL(;kwargs...)
+needs_concrete_A(alg::PardisoJL) = true
 
 # TODO schur complement functionality
 
 function init_cacheval(alg::PardisoJL, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
     @unpack nprocs, solver_type, matrix_type, iparm, dparm = alg
-
-    if A isa DiffEqArrayOperator
-        A = A.A
-    end
+    A = convert(AbstractMatrix,A)
 
     solver =
     if Pardiso.PARDISO_LOADED[]
@@ -67,22 +65,19 @@ end
 
 function SciMLBase.solve(cache::LinearCache, alg::PardisoJL; kwargs...)
     @unpack A, b, u = cache
-    if A isa DiffEqArrayOperator
-        A = A.A
-    end
+    A = copy(convert(AbstractMatrix,A))
 
-    if cache.isfresh
-        Pardiso.set_phase!(cache.cacheval, Pardiso.NUM_FACT)
-        Pardiso.pardiso(cache.cacheval, cache.u, cache.A, cache.b)
-    end
+    #if cache.isfresh
+    #    Pardiso.set_phase!(cache.cacheval, Pardiso.NUM_FACT)
+    #    Pardiso.pardiso(cache.cacheval, u, A, b)
+    #end
+    #Pardiso.set_phase!(cache.cacheval, Pardiso.SOLVE_ITERATIVE_REFINE)
 
-    Pardiso.set_phase!(cache.cacheval, Pardiso.SOLVE_ITERATIVE_REFINE)
+    Pardiso.set_phase!(cache.cacheval, Pardiso.ANALYSIS_NUM_FACT_SOLVE_REFINE)
     Pardiso.pardiso(cache.cacheval, u, A, b)
 
     return SciMLBase.build_linear_solution(alg,cache.u,nothing,cache)
 end
-
-needsconcreteA(alg::PardisoJL) = true
 
 # Add finalizer to release memory
 # Pardiso.set_phase!(cache.cacheval, Pardiso.RELEASE_ALL)

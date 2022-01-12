@@ -6,17 +6,15 @@ Base.@kwdef struct PardisoJL <: SciMLLinearSolveAlgorithm
     dparm::Union{Vector{Tuple{Int,Int}}, Nothing} = nothing
 end
 
-MKLPardisoFactorize(;kwargs...) = PardisoJL(;kwargs...)
-MKLPardisoIterate(;kwargs...) = PardisoJL(;kwargs...)
+MKLPardisoFactorize(;kwargs...) = PardisoJL(;solver_type = 0,kwargs...)
+MKLPardisoIterate(;kwargs...) = PardisoJL(;solver_type = 1,kwargs...)
+needs_concrete_A(alg::PardisoJL) = true
 
 # TODO schur complement functionality
 
 function init_cacheval(alg::PardisoJL, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
     @unpack nprocs, solver_type, matrix_type, iparm, dparm = alg
-
-    if A isa DiffEqArrayOperator
-        A = A.A
-    end
+    A = convert(AbstractMatrix,A)
 
     solver =
     if Pardiso.PARDISO_LOADED[]
@@ -59,6 +57,9 @@ function init_cacheval(alg::PardisoJL, A, b, u, Pl, Pr, maxiters, abstol, reltol
         end
     end
 
+    # Make sure to say it's transposed because its CSC not CSR
+    Pardiso.set_iparm!(solver,12, 1)
+
     Pardiso.set_phase!(solver, Pardiso.ANALYSIS)
     Pardiso.pardiso(solver, u, A, b)
 
@@ -67,22 +68,17 @@ end
 
 function SciMLBase.solve(cache::LinearCache, alg::PardisoJL; kwargs...)
     @unpack A, b, u = cache
-    if A isa DiffEqArrayOperator
-        A = A.A
-    end
+    A = convert(AbstractMatrix,A)
 
     if cache.isfresh
         Pardiso.set_phase!(cache.cacheval, Pardiso.NUM_FACT)
-        Pardiso.pardiso(cache.cacheval, cache.u, cache.A, cache.b)
+        Pardiso.pardiso(cache.cacheval, u, A, b)
     end
-
     Pardiso.set_phase!(cache.cacheval, Pardiso.SOLVE_ITERATIVE_REFINE)
     Pardiso.pardiso(cache.cacheval, u, A, b)
 
     return SciMLBase.build_linear_solution(alg,cache.u,nothing,cache)
 end
-
-needsconcreteA(alg::PardisoJL) = true
 
 # Add finalizer to release memory
 # Pardiso.set_phase!(cache.cacheval, Pardiso.RELEASE_ALL)

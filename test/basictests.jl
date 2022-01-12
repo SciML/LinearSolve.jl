@@ -1,5 +1,6 @@
 using LinearSolve, LinearAlgebra, SparseArrays
 using Test
+import Random
 
 n = 8
 A = Matrix(I,n,n)
@@ -230,6 +231,43 @@ end
         ldiv!(y, P, x);      @test y ≈ ldiv!(P2, ldiv!(P1, x))
         y .= x; ldiv!(P, x); @test x ≈ ldiv!(P2, ldiv!(P1, y))
     end
+end
+
+@testset "Sparse Precaching" begin
+    n = 4
+    Random.seed!(10)
+    A = sprand(n,n,0.8); A2 = 2.0 .* A
+    b1 = rand(n); b2 = rand(n)
+
+    prob = LinearProblem(copy(A), copy(b1))
+    linsolve = init(prob,UMFPACKFactorization())
+    sol11 = solve(linsolve)
+    linsolve = LinearSolve.set_b(sol11.cache,copy(b2))
+    sol12 = solve(linsolve)
+    linsolve = LinearSolve.set_A(sol12.cache,copy(A2))
+    sol13 = solve(linsolve)
+
+    prob = LinearProblem(copy(A), copy(b1))
+    linsolve = init(prob,KLUFactorization())
+    sol21 = solve(linsolve)
+    linsolve = LinearSolve.set_b(sol21.cache,copy(b2))
+    sol22 = solve(linsolve)
+    linsolve = LinearSolve.set_A(sol22.cache,copy(A2))
+    sol23 = solve(linsolve)
+
+    linsolve = init(prob,MKLPardisoFactorize())
+    sol31 = solve(linsolve)
+    linsolve = LinearSolve.set_b(sol31.cache,copy(b2))
+    sol32 = solve(linsolve)
+    linsolve = LinearSolve.set_A(sol32.cache,copy(A2))
+    sol33 = solve(linsolve)
+
+    @test sol11.u ≈ sol21.u
+    @test sol11.u ≈ sol31.u
+    @test sol12.u ≈ sol22.u
+    @test sol12.u ≈ sol32.u
+    @test sol13.u ≈ sol23.u
+    @test sol13.u ≈ sol33.u
 end
 
 end # testset

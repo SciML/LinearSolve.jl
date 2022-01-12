@@ -68,15 +68,13 @@ end
 
 function SciMLBase.solve(cache::LinearCache, alg::PardisoJL; kwargs...)
     @unpack A, b, u = cache
-    A = copy(convert(AbstractMatrix,A))
+    A = convert(AbstractMatrix,A)
 
-    #if cache.isfresh
-    #    Pardiso.set_phase!(cache.cacheval, Pardiso.NUM_FACT)
-    #    Pardiso.pardiso(cache.cacheval, u, A, b)
-    #end
-    #Pardiso.set_phase!(cache.cacheval, Pardiso.SOLVE_ITERATIVE_REFINE)
-
-    Pardiso.set_phase!(cache.cacheval, Pardiso.ANALYSIS_NUM_FACT_SOLVE_REFINE)
+    if cache.isfresh
+        Pardiso.set_phase!(cache.cacheval, Pardiso.NUM_FACT)
+        Pardiso.pardiso(cache.cacheval, u, A, b)
+    end
+    Pardiso.set_phase!(cache.cacheval, Pardiso.SOLVE_ITERATIVE_REFINE)
     Pardiso.pardiso(cache.cacheval, u, A, b)
 
     return SciMLBase.build_linear_solution(alg,cache.u,nothing,cache)

@@ -19,12 +19,16 @@ makedocs(
         ],
         "Basics" => Any[
             "basics/LinearProblem.md",
+            "basics/common_solver_opts.md",
             "basics/CachingAPI.md",
             "basics/Preconditioners.md",
             "basics/FAQ.md"
         ],
         "Solvers" => Any[
             "solvers/solvers.md"
+        ],
+        "Advanced" => Any[
+            "advanced/developing.md"
         ]
     ]
 )

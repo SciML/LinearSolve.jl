@@ -1,4 +1,4 @@
-# Preconditioners
+# [Preconditioners](@id prec)
 
 Many linear solvers can be accelerated by using what is known as a **preconditioner**,
 an approximation to the matrix inverse action which is cheap to evaluate. These

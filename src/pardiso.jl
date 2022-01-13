@@ -95,7 +95,7 @@ function SciMLBase.solve(cache::LinearCache, alg::PardisoJL; kwargs...)
 
     if cache.isfresh
         Pardiso.set_phase!(cache.cacheval, Pardiso.NUM_FACT)
-        Pardiso.pardiso(cache.cacheval, A, Float64[])
+        Pardiso.pardiso(cache.cacheval, A, eltype(A)[])
     end
 
     Pardiso.set_phase!(cache.cacheval, Pardiso.SOLVE_ITERATIVE_REFINE)

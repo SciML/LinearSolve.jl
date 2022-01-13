@@ -225,9 +225,6 @@ end
         P1 = Diagonal(s1)
         P2 = Diagonal(s2)
 
-        @test LinearSolve.ComposePreconditioner(P1,nothing) === P1
-        @test LinearSolve.ComposePreconditioner(nothing,P1) === P1
-
         P  = LinearSolve.ComposePreconditioner(P1,P2)
 
         # ComposePreconditioner

@@ -60,7 +60,30 @@ function init_cacheval(alg::PardisoJL, A, b, u, Pl, Pr, maxiters, abstol, reltol
     # Make sure to say it's transposed because its CSC not CSR
     Pardiso.set_iparm!(solver,12, 1)
 
+    #=
+    Note: It is recommended to use IPARM(11)=1 (scaling) and IPARM(13)=1 (matchings) for
+    highly indefinite symmetric matrices e.g. from interior point optimizations or saddle point problems.
+    It is also very important to note that the user must provide in the analysis phase (PHASE=11)
+    the numerical values of the matrix A if IPARM(11)=1 (scaling) or PARM(13)=1 or 2 (matchings).
+
+    The numerical values will be incorrect since the analysis is ran once and
+    cached. If these two are not set, then Pardiso.NUM_FACT in the solve must
+    be changed to Pardiso.ANALYSIS_NUM_FACT in the solver loop otherwise instabilities
+    occur in the example https://github.com/SciML/OrdinaryDiffEq.jl/issues/1569
+    =#
+    Pardiso.set_iparm!(solver,11, 0)
+    Pardiso.set_iparm!(solver,13, 0)
+
     Pardiso.set_phase!(solver, Pardiso.ANALYSIS)
+
+    if alg.solver_type == 1
+        # PARDISO uses a numerical factorization A = LU for the first system and
+        # applies these exact factors L and U for the next steps in a
+        # preconditioned Krylov-Subspace iteration. If the iteration does not
+        # converge, the solver will automatically switch back to the numerical factorization.
+        Pardiso.set_iparm!(solver,3,round(Int,abs(log10(reltol)),RoundDown) * 10 + 1)
+    end
+
     Pardiso.pardiso(solver, u, A, b)
 
     return solver
@@ -72,11 +95,11 @@ function SciMLBase.solve(cache::LinearCache, alg::PardisoJL; kwargs...)
 
     if cache.isfresh
         Pardiso.set_phase!(cache.cacheval, Pardiso.NUM_FACT)
-        Pardiso.pardiso(cache.cacheval, u, A, b)
+        Pardiso.pardiso(cache.cacheval, A, eltype(A)[])
     end
+
     Pardiso.set_phase!(cache.cacheval, Pardiso.SOLVE_ITERATIVE_REFINE)
     Pardiso.pardiso(cache.cacheval, u, A, b)
-
     return SciMLBase.build_linear_solution(alg,cache.u,nothing,cache)
 end
 

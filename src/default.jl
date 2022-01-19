@@ -1,5 +1,55 @@
 ## Default algorithm
 
+# Allows A === nothing as a stand-in for dense matrix
+function defaultalg(A,b)
+    if A isa DiffEqArrayOperator
+        A = A.A
+    end
+
+    # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
+    # it makes sense according to the benchmarks, which is dependent on
+    # whether MKL or OpenBLAS is being used
+    if A === nothing || A isa Matrix
+        if (A === nothing || eltype(A) <: Union{Float32,Float64,ComplexF32,ComplexF64}) &&
+                    ArrayInterface.can_setindex(b) && (length(b) <= 100 ||
+                                              (isopenblas() && length(b) <= 500)
+                                             )
+            alg = RFLUFactorization()
+        else
+            alg = LUFactorization()
+        end
+
+    # These few cases ensure the choice is optimal without the
+    # dynamic dispatching of factorize
+    elseif A isa Tridiagonal
+        alg = GenericFactorization(;fact_alg=lu!)
+    elseif A isa SymTridiagonal
+        alg = GenericFactorization(;fact_alg=ldlt!)
+    elseif A isa SparseMatrixCSC
+        alg = UMFPACKFactorization()
+
+    # This catches the cases where a factorization overload could exist
+    # For example, BlockBandedMatrix
+    elseif ArrayInterface.isstructured(A)
+        alg = GenericFactorization()
+
+    # This catches the case where A is a CuMatrix
+    # Which does not have LU fully defined
+    elseif !(A isa AbstractDiffEqOperator)
+        alg = QRFactorization(false)
+
+    # Not factorizable operator, default to only using A*x
+    # IterativeSolvers is faster on CPU but not GPU-compatible
+    elseif cache.u isa Array
+        alg = IterativeSolversJL_GMRES()
+    else
+        alg = KrylovJL_GMRES()
+    end
+    alg
+end
+
+## Other dispatches are to decrease the dispatch cost
+
 function SciMLBase.solve(cache::LinearCache, alg::Nothing,
                          args...; kwargs...)
     @unpack A = cache

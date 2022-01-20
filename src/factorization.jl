@@ -224,6 +224,12 @@ end
 
 ## RFLUFactorization
 
-RFLUFactorization() = GenericFactorization(;fact_alg=RecursiveFactorization.lu!)
+struct RFWrapper{P,T}
+    RFWrapper(::Val{P},::Val{T}) where {P,T} = new{P,T}()
+end
+(::RFWrapper{P,T})(A) where {P,T} = RecursiveFactorization.lu!(A,Val(P),Val(T))
+
+RFLUFactorization(;pivot = Val(true), thread = Val(true)) = GenericFactorization(;fact_alg=RFWrapper(pivot,thread))
+
 init_cacheval(alg::GenericFactorization{typeof(RecursiveFactorization.lu!)}, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose) = ArrayInterface.lu_instance(convert(AbstractMatrix,A))
 init_cacheval(alg::GenericFactorization{typeof(RecursiveFactorization.lu!)}, A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr, maxiters, abstol, reltol, verbose) = ArrayInterface.lu_instance(convert(AbstractMatrix,A))

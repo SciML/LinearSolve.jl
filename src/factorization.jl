@@ -223,9 +223,21 @@ function init_cacheval(alg::Union{QRFactorization,SVDFactorization,GenericFactor
 end
 
 # Ambiguity handling dispatch
-function init_cacheval(alg::Union{QRFactorization,SVDFactorization,GenericFactorization}, A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+function init_cacheval(alg::Union{QRFactorization,SVDFactorization}, A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
     newA = copy(convert(AbstractMatrix,A))
     fill!(newA,true)
+    do_factorization(alg, newA, b, u)
+end
+
+# Cholesky needs the posdef matrix, for GenericFactorization assume structure is needed
+function init_cacheval(alg::Union{GenericFactorization,GenericFactorization{typeof(cholesky)},GenericFactorization{typeof(cholesky!)}}, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+    newA = copy(convert(AbstractMatrix,A))
+    do_factorization(alg, newA, b, u)
+end
+
+# Ambiguity handling dispatch
+function init_cacheval(alg::Union{GenericFactorization,GenericFactorization{typeof(cholesky)},GenericFactorization{typeof(cholesky!)}}, A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+    newA = copy(convert(AbstractMatrix,A))
     do_factorization(alg, newA, b, u)
 end
 

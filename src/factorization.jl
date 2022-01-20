@@ -222,6 +222,13 @@ function init_cacheval(alg::Union{QRFactorization,SVDFactorization,GenericFactor
     do_factorization(alg, newA, b, u)
 end
 
+# Ambiguity handling dispatch
+function init_cacheval(alg::Union{QRFactorization,SVDFactorization,GenericFactorization}, A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+    newA = copy(convert(AbstractMatrix,A))
+    fill!(newA,true)
+    do_factorization(alg, newA, b, u)
+end
+
 ## RFLUFactorization
 
 struct RFWrapper{P,T}

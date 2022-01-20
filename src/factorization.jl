@@ -227,7 +227,7 @@ end
 struct RFWrapper{P,T}
     RFWrapper(::Val{P},::Val{T}) where {P,T} = new{P,T}()
 end
-(::RFWrapper{P,T})(A) where {P,T} = RecursiveFactorization.lu!(A,val(P),val(T))
+(::RFWrapper{P,T})(A) where {P,T} = RecursiveFactorization.lu!(A,Val(P),Val(T))
 
 RFLUFactorization(;pivot = Val(true), thread = Val(true)) = GenericFactorization(;fact_alg=RFWrapper(pivot,thread))
 

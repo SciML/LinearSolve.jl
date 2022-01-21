@@ -9,7 +9,7 @@ function defaultalg(A,b)
     # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
     # it makes sense according to the benchmarks, which is dependent on
     # whether MKL or OpenBLAS is being used
-    if A === nothing || A isa Matrix
+    if (A === nothing && !isgpu(b)) || A isa Matrix
         if (A === nothing || eltype(A) <: Union{Float32,Float64,ComplexF32,ComplexF64}) &&
                     ArrayInterface.can_setindex(b) && (length(b) <= 100 ||
                                               (isopenblas() && length(b) <= 500)
@@ -30,18 +30,15 @@ function defaultalg(A,b)
 
     # This catches the cases where a factorization overload could exist
     # For example, BlockBandedMatrix
-    elseif ArrayInterface.isstructured(A)
+    elseif A !== nothing && ArrayInterface.isstructured(A)
         alg = GenericFactorization()
 
     # This catches the case where A is a CuMatrix
     # Which does not have LU fully defined
-    elseif !(A isa AbstractDiffEqOperator)
+    elseif isgpu(A) || isgpu(b)
         alg = QRFactorization(false)
 
     # Not factorizable operator, default to only using A*x
-    # IterativeSolvers is faster on CPU but not GPU-compatible
-    elseif cache.u isa Array
-        alg = IterativeSolversJL_GMRES()
     else
         alg = KrylovJL_GMRES()
     end
@@ -92,15 +89,12 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
 
     # This catches the case where A is a CuMatrix
     # Which does not have LU fully defined
-    elseif !(A isa AbstractDiffEqOperator)
+    elseif isgpu(A)
         alg = QRFactorization(false)
         SciMLBase.solve(cache, alg, args...; kwargs...)
 
     # Not factorizable operator, default to only using A*x
     # IterativeSolvers is faster on CPU but not GPU-compatible
-    elseif cache.u isa Array
-        alg = IterativeSolversJL_GMRES()
-        SciMLBase.solve(cache, alg, args...; kwargs...)
     else
         alg = KrylovJL_GMRES()
         SciMLBase.solve(cache, alg, args...; kwargs...)
@@ -147,15 +141,12 @@ function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters, abstol, reltol, 
 
     # This catches the case where A is a CuMatrix
     # Which does not have LU fully defined
-    elseif !(A isa AbstractDiffEqOperator)
+    elseif isgpu(A)
         alg = QRFactorization(false)
         init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
 
     # Not factorizable operator, default to only using A*x
     # IterativeSolvers is faster on CPU but not GPU-compatible
-    elseif u isa Array
-        alg = IterativeSolversJL_GMRES()
-        init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
     else
         alg = KrylovJL_GMRES()
         init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)

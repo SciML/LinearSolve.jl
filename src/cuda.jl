@@ -1,3 +1,26 @@
+gpu_or_cpu(x::CUDA.CuArray) = CUDA.CuArray
+gpu_or_cpu(x::Transpose{<:Any,<:CUDA.CuArray}) = CUDA.CuArray
+gpu_or_cpu(x::Adjoint{<:Any,<:CUDA.CuArray}) = CUDA.CuArray
+isgpu(::CUDA.CuArray) = true
+isgpu(::Transpose{<:Any,<:CUDA.CuArray}) = true
+isgpu(::Adjoint{<:Any,<:CUDA.CuArray}) = true
+ifgpufree(x::CUDA.CuArray) = CUDA.unsafe_free!(x)
+ifgpufree(x::Transpose{<:Any,<:CUDA.CuArray}) = CUDA.unsafe_free!(x.parent)
+ifgpufree(x::Adjoint{<:Any,<:CUDA.CuArray}) = CUDA.unsafe_free!(x.parent)
+
+@require Tracker="9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c" begin
+    TrackedArray = Tracker.TrackedArray
+    gpu_or_cpu(x::TrackedArray{<:Any,<:Any,<:CUDA.CuArray}) = CUDA.CuArray
+    gpu_or_cpu(x::Adjoint{<:Any,TrackedArray{<:Any,<:Any,<:CUDA.CuArray}}) = CUDA.CuArray
+    gpu_or_cpu(x::Transpose{<:Any,TrackedArray{<:Any,<:Any,<:CUDA.CuArray}}) = CUDA.CuArray
+    isgpu(::Adjoint{<:Any,TrackedArray{<:Any,<:Any,<:CUDA.CuArray}}) = true
+    isgpu(::TrackedArray{<:Any,<:Any,<:CUDA.CuArray}) = true
+    isgpu(::Transpose{<:Any,TrackedArray{<:Any,<:Any,<:CUDA.CuArray}}) = true
+    ifgpufree(x::TrackedArray{<:Any,<:Any,<:CUDA.CuArray}) = CUDA.unsafe_free!(x.data)
+    ifgpufree(x::Adjoint{<:Any,TrackedArray{<:Any,<:Any,<:CUDA.CuArray}}) = CUDA.unsafe_free!((x.data).parent)
+    ifgpufree(x::Transpose{<:Any,TrackedArray{<:Any,<:Any,<:CUDA.CuArray}}) = CUDA.unsafe_free!((x.data).parent)
+end
+
 struct GPUOffloadFactorization <: AbstractFactorization end
 
 function SciMLBase.solve(cache::LinearCache, alg::GPUOffloadFactorization; kwargs...)

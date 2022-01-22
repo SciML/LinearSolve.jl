@@ -82,14 +82,12 @@ function simplelu_factorize!(lu::LUSolver{T}, pivot=true) where {T}
 end
 
 function simplelu_solve!(lu::LUSolver{T}) where {T}
-    local s::T
-
     @inbounds for i = 1:lu.n
         lu.x[i] = lu.b[lu.perms[i]]
     end
 
     @inbounds for i = 2:lu.n
-        s = 0
+        s = zero(T)
         for j = 1:i-1
             s += lu.A[i,j] * lu.x[j]
         end
@@ -98,7 +96,7 @@ function simplelu_solve!(lu::LUSolver{T}) where {T}
 
     lu.x[lu.n] /= lu.A[lu.n,lu.n]
     @inbounds for i = lu.n-1:-1:1
-        s = 0
+        s = zero(T)
         for j = i+1:lu.n
             s += lu.A[i,j] * lu.x[j]
         end
@@ -106,7 +104,7 @@ function simplelu_solve!(lu::LUSolver{T}) where {T}
         lu.x[i] /= lu.A[i,i]
     end
 
-    lu.b .= lu.x
+    copyto!(lu.b,lu.x)
 
     lu.x
 end

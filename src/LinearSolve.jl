@@ -45,7 +45,7 @@ const IS_OPENBLAS = Ref(true)
 isopenblas() = IS_OPENBLAS[]
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
-       RFLUFactorization, UMFPACKFactorization, KLUFactorization
+       GenericLUFactorization, RFLUFactorization, UMFPACKFactorization, KLUFactorization
 export KrylovJL, KrylovJL_CG, KrylovJL_GMRES, KrylovJL_BICGSTAB, KrylovJL_MINRES,
        IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
        IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES

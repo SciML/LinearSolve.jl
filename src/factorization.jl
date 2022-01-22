@@ -25,6 +25,10 @@ struct LUFactorization{P} <: AbstractFactorization
     pivot::P
 end
 
+struct GenericLUFactorization{P} <: AbstractFactorization
+    pivot::P
+end
+
 function LUFactorization()
     pivot = @static if VERSION < v"1.7beta"
         Val(true)
@@ -32,6 +36,15 @@ function LUFactorization()
         RowMaximum()
     end
     LUFactorization(pivot)
+end
+
+function GenericLUFactorization()
+    pivot = @static if VERSION < v"1.7beta"
+        Val(true)
+    else
+        RowMaximum()
+    end
+    GenericLUFactorization(pivot)
 end
 
 function do_factorization(alg::LUFactorization, A, b, u)
@@ -44,7 +57,13 @@ function do_factorization(alg::LUFactorization, A, b, u)
     return fact
 end
 
-init_cacheval(alg::LUFactorization, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose) = ArrayInterface.lu_instance(convert(AbstractMatrix,A))
+function do_factorization(alg::GenericLUFactorization, A, b, u)
+    A = convert(AbstractMatrix,A)
+    fact = LinearAlgebra.generic_lufact!(A, alg.pivot)
+    return fact
+end
+
+init_cacheval(alg::Union{LUFactorization,GenericLUFactorization}, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose) = ArrayInterface.lu_instance(convert(AbstractMatrix,A))
 
 # This could be a GenericFactorization perhaps?
 Base.@kwdef struct UMFPACKFactorization <: AbstractFactorization

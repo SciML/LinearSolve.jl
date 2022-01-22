@@ -11,10 +11,14 @@ function defaultalg(A,b)
     # whether MKL or OpenBLAS is being used
     if (A === nothing && !isgpu(b)) || A isa Matrix
         if (A === nothing || eltype(A) <: Union{Float32,Float64,ComplexF32,ComplexF64}) &&
-                    ArrayInterface.can_setindex(b) && (length(b) <= 100 ||
-                                              (isopenblas() && length(b) <= 500)
-                                             )
-            alg = RFLUFactorization()
+                    ArrayInterface.can_setindex(b)
+            if length(b) <= 10
+                alg = GenericLUFactorization()
+            elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500))
+                alg = RFLUFactorization()
+            else
+                alg = LUFactorization()
+            end
         else
             alg = LUFactorization()
         end
@@ -58,12 +62,19 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
     # it makes sense according to the benchmarks, which is dependent on
     # whether MKL or OpenBLAS is being used
     if A isa Matrix
-        if eltype(A) <: Union{Float32,Float64,ComplexF32,ComplexF64} &&
-                    ArrayInterface.can_setindex(cache.b) && (size(A,1) <= 100 ||
-                                              (isopenblas() && size(A,1) <= 500)
-                                             )
-            alg = RFLUFactorization()
-            SciMLBase.solve(cache, alg, args...; kwargs...)
+        b = cache.b
+        if (A === nothing || eltype(A) <: Union{Float32,Float64,ComplexF32,ComplexF64}) &&
+                    ArrayInterface.can_setindex(b)
+            if length(b) <= 10
+                alg = GenericLUFactorization()
+                SciMLBase.solve(cache, alg, args...; kwargs...)
+            elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500))
+                alg = RFLUFactorization()
+                SciMLBase.solve(cache, alg, args...; kwargs...)
+            else
+                alg = LUFactorization()
+                SciMLBase.solve(cache, alg, args...; kwargs...)
+            end
         else
             alg = LUFactorization()
             SciMLBase.solve(cache, alg, args...; kwargs...)
@@ -110,12 +121,18 @@ function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters, abstol, reltol, 
     # it makes sense according to the benchmarks, which is dependent on
     # whether MKL or OpenBLAS is being used
     if A isa Matrix
-        if eltype(A) <: Union{Float32,Float64,ComplexF32,ComplexF64} &&
-                    ArrayInterface.can_setindex(b) && (size(A,1) <= 100 ||
-                                              (isopenblas() && size(A,1) <= 500)
-                                             )
-            alg = RFLUFactorization()
-            init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+        if (A === nothing || eltype(A) <: Union{Float32,Float64,ComplexF32,ComplexF64}) &&
+                    ArrayInterface.can_setindex(b)
+            if length(b) <= 10
+                alg = GenericLUFactorization()
+                init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+            elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500))
+                alg = RFLUFactorization()
+                init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+            else
+                alg = LUFactorization()
+                init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+            end
         else
             alg = LUFactorization()
             init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)

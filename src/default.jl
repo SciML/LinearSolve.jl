@@ -62,6 +62,7 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
     # it makes sense according to the benchmarks, which is dependent on
     # whether MKL or OpenBLAS is being used
     if A isa Matrix
+        b = cache.b
         if (A === nothing || eltype(A) <: Union{Float32,Float64,ComplexF32,ComplexF64}) &&
                     ArrayInterface.can_setindex(b)
             if length(b) <= 10

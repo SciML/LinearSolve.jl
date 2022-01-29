@@ -87,7 +87,12 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
                        )
     @unpack A, b, u0, p = prob
 
-    u0 = (u0 !== nothing) ? u0 : zero.(similar(b, size(A, 2)))
+    u0 = if u0 !== nothing
+        u0 
+    else
+        u0 = similar(b, size(A, 2))
+        fill!(u0,false)
+    end
 
     cacheval = init_cacheval(alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, verbose)
     isfresh = true

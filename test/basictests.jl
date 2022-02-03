@@ -208,6 +208,9 @@ end
         mul!(y, Pl, x); @test y ≈ s .* x
         mul!(y, Pr, x); @test y ≈ s .\ x
 
+        y .= x; ldiv!(Pl, x); @test x ≈ s .\ y
+        y .= x; ldiv!(Pr, x); @test x ≈ s .* y
+
         ldiv!(y, Pl, x); @test y ≈ s .\ x
         ldiv!(y, Pr, x); @test y ≈ s .* x
     end

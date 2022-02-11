@@ -237,7 +237,7 @@ end
 # Try to never use it.
 function init_cacheval(alg::Union{QRFactorization,SVDFactorization,GenericFactorization}, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
     newA = copy(convert(AbstractMatrix,A))
-    if newA isa SparseMatrixCSC
+    if newA isa AbstractSparseMatrix
         fill!(nonzeros(newA),true)
     else
         fill!(newA,true)
@@ -248,7 +248,7 @@ end
 # Ambiguity handling dispatch
 function init_cacheval(alg::Union{QRFactorization,SVDFactorization}, A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
     newA = copy(convert(AbstractMatrix,A))
-    if newA isa SparseMatrixCSC
+    if newA isa AbstractSparseMatrix
         fill!(nonzeros(newA),true)
     else
         fill!(newA,true)

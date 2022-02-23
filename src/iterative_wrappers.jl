@@ -234,18 +234,23 @@ end
 
 ## KrylovKit.jl
 
-struct KrylovKitJL{F,I,K} <: AbstractKrylovSubspaceMethod
+struct KrylovKitJL{F,A,I,K} <: AbstractKrylovSubspaceMethod
     KrylovAlg::F
     gmres_restart::I
+    args::A
     kwargs::K
 end
 
-function KrylovKitJL(KrylovAlg = KrylovKit.GMRES, gmres_restart=0, kwargs...)
-    return KrylovJL(KrylovAlg, gmres_restart, kwargs)
+function KrylovKitJL(args...;
+                     KrylovAlg = KrylovKit.GMRES, gmres_restart = 0,
+                     kwargs...)
+    return KrylovJL(KrylovAlg, gmres_restart, args, kwargs)
 end
 
-KrylovKitJL_GMRES(kwargs...) = KrylovKitJL()
-KrylovKitJL_CG(kwargs...) = KrylovKitJL(KrylovKitAlg=KrylovKit.CG, kwargs...)
+KrylovKitJL_CG(args...;kwargs...) =
+    KrylovKitJL(args...; KrylovAlg=KrylovKit.CG, kwargs...)
+KrylovKitJL_GMRES(args...;kwargs...) =
+    KrylovKitJL(args...; KrylovAlg=KrylovKit.GMRES, kwargs...)
 
 function SciMLBase.solve(cache::LinearCache, alg::KrylovKitJL, kwargs...)
 
@@ -253,18 +258,16 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovKitJL, kwargs...)
     rtol      = float(cache.reltol)
     maxiter   = cache.maxiters
     verbosity = cache.verbose ? 1 : 0
-    krylovdim = alg.gmres_restart
+    krylovdim = (alg.gmres_restart == 0) ? min(20, size(A,1)) : alg.gmres_restart
 
     kwargs = (atol=atol, rtol=rtol, maxiter=maxiter, verbosity=verbosity,
               krylovdim = krylovdim, alg.kwargs...)
 
-    x, info = KrylovKit.linsolve(cache.A, cache.b, cache.u, alg.KrylovAlg,
-                                 [a₀::Number = 0, a₁::Number = 1])
+    x, info = KrylovKit.linsolve(cache.A, cache.b, cache.u, alg.KrylovAlg)
+
     copy!(cache.u, x)
     resid = info.normres
     retcode = info.converged == 1 ? :Default : :DidNotConverge
     iters = info.numiter
-
-    return SciMLBase.build_linear_solution(alg,cache.u, resid,cache;
-                                           retcode = retcode, iters = iters)
+    return SciMLBase.build_linear_solution(alg, cache.u, resid, cache; retcode = retcode, iters = iters)
 end

@@ -53,9 +53,17 @@ end
 
 function SciMLBase.solve(cache::LinearCache, alg::Nothing,
                          args...; kwargs...)
-    @unpack A = cache
+    @unpack A, b, u = cache
     if A isa DiffEqArrayOperator
         A = A.A
+    end
+
+    if applicable(ldiv!, A, u)
+        alg = FunctionCall(ldiv!, (A, u))
+        SciMLBase.solve(cache, alg, args...; kwargs...)
+    elseif applicable(ldiv!, u, A, b)
+        alg = FunctionCall(ldiv!, (u, A, b))
+        SciMLBase.solve(cache, alg, args...; kwargs...)
     end
 
     # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when

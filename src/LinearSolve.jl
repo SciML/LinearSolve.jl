@@ -14,7 +14,6 @@ using Requires
 using SuiteSparse
 using KLU
 using DocStringExtensions
-using Tricks:static_hasmethod
 
 # wrap
 import Krylov

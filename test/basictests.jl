@@ -44,6 +44,10 @@ end
     y = solve(prob1)
     @test A1 *  y  ≈ b1
 
+    _prob = LinearProblem(Diagonal(A1), b1; u0=x1)
+    y = solve(_prob)
+    @test A1 *  y  ≈ b1
+
     _prob = LinearProblem(SymTridiagonal(A1), b1; u0=x1)
     y = solve(_prob)
     @test A1 *  y  ≈ b1

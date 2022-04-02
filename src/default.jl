@@ -58,11 +58,11 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
         A = A.A
     end
 
-    if applicable(ldiv!, A, u)
-        alg = FunctionCall(ldiv!, (:A, :u))
+    if applicable(ldiv!, u, A, b)
+        alg = LdivBang3Args()
         SciMLBase.solve(cache, alg, args...; kwargs...)
-    elseif applicable(ldiv!, u, A, b)
-        alg = FunctionCall(ldiv!, (:u, :A, :b))
+    elseif applicable(ldiv!, A, u)
+        alg = LdivBang2Args()
         SciMLBase.solve(cache, alg, args...; kwargs...)
     end
 

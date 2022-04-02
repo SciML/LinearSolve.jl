@@ -7,6 +7,9 @@ struct FunctionCall{F,A} <: SciMLLinearSolveAlgorithm
     end
 end
 
+LdivBang2Args() = FunctionCall(ldiv!, (:A, :u))
+LdivBang3Args() = FunctionCall(ldiv!, (:u, :A, :b))
+
 function (f::FunctionCall)(cache::LinearCache)
     @unpack func!, argsyms = f
     args = [getproperty(cache,argsym) for argsym in argsyms]

@@ -17,7 +17,7 @@ using DocStringExtensions
 
 # wrap
 import Krylov
-import KrylovKit # TODO
+import KrylovKit
 import IterativeSolvers
 
 using Reexport

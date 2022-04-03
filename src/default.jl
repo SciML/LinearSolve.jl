@@ -53,17 +53,9 @@ end
 
 function SciMLBase.solve(cache::LinearCache, alg::Nothing,
                          args...; kwargs...)
-    @unpack A, b, u = cache
+    @unpack A = cache
     if A isa DiffEqArrayOperator
         A = A.A
-    end
-
-    if applicable(ldiv!, u, A, b)
-        alg = LdivBang3Args()
-        SciMLBase.solve(cache, alg, args...; kwargs...)
-    elseif applicable(ldiv!, A, u)
-        alg = LdivBang2Args()
-        SciMLBase.solve(cache, alg, args...; kwargs...)
     end
 
     # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
@@ -123,14 +115,6 @@ end
 function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
     if A isa DiffEqArrayOperator
         A = A.A
-    end
-
-    if applicable(ldiv!, A, u)
-        alg = FunctionCall(ldiv!, (:A, :u))
-        init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
-    elseif applicable(ldiv!, u, A, b)
-        alg = FunctionCall(ldiv!, (:u, :A, :b))
-        init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
     end
 
     # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when

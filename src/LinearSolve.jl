@@ -48,8 +48,11 @@ isopenblas() = IS_OPENBLAS[]
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
-       UMFPACKFactorization, KLUFactorization,
-       FunctionCall
+       UMFPACKFactorization, KLUFactorization
+
+export FunctionCall, LdivBang2Args, LDivBang3Args,
+       ApplyLDivBang2Args, ApplyLDivBang3Args
+
 export KrylovJL, KrylovJL_CG, KrylovJL_GMRES, KrylovJL_BICGSTAB, KrylovJL_MINRES,
        IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
        IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES,

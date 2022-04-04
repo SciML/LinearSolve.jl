@@ -26,11 +26,13 @@ using Reexport
 abstract type SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
 abstract type AbstractFactorization <: SciMLLinearSolveAlgorithm end
 abstract type AbstractKrylovSubspaceMethod <: SciMLLinearSolveAlgorithm end
+abstract type AbstractFunctionCall <: SciMLLinearSolveAlgorithm end
 
 # Traits
 
 needs_concrete_A(alg::AbstractFactorization) = true
 needs_concrete_A(alg::AbstractKrylovSubspaceMethod) = false
+needs_concrete_A(alg::AbstractFunctionCall) = false
 
 # Code
 
@@ -50,8 +52,7 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
        UMFPACKFactorization, KLUFactorization
 
-export FunctionCall, LdivBang2Args, LDivBang3Args,
-       ApplyLDivBang2Args, ApplyLDivBang3Args
+export FunctionCall, ApplyLDivBang, ApplyLDivBang2Args, ApplyLDivBang3Args
 
 export KrylovJL, KrylovJL_CG, KrylovJL_GMRES, KrylovJL_BICGSTAB, KrylovJL_MINRES,
        IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,

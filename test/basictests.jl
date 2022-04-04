@@ -48,6 +48,7 @@ end
 
         for alg in (
                     FunctionCall(LinearAlgebra.ldiv!, (:u, :A, :b)),
+                    ApplyLDivBang(),
                     ApplyLDivBang2Args(),
                     ApplyLDivBang3Args(),
                    )
@@ -85,13 +86,13 @@ end
         for alg in (
                     FunctionCall(LinearAlgebra.ldiv!, (:u, :A, :b)),
                     FunctionCall(my_inv!, (:A, :u, :b)),
+                    ApplyLDivBang(),
                     ApplyLDivBang2Args(),
                     ApplyLDivBang3Args(),
                    )
             test_interface(alg, prob1, prob2)
         end
     end
-
 end
 #=
 

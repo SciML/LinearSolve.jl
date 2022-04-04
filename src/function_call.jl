@@ -1,10 +1,11 @@
-
 """ user passes in inverse function, and arg symbols """
-struct FunctionCall{F,A} <: SciMLLinearSolveAlgorithm
+struct FunctionCall{F,A} <: AbstractFunctionCall
     func!::F
     argnames::A
 
-    function FunctionCall(func!::Function, argnames::Tuple)
+    function FunctionCall(func!::Function=LinearAlgebra.ldiv!,
+                          argnames::Tuple=(:u, :A, :b),
+                         )
 #       @assert hasfield(::LinearCache, argnames)
 #       @assert isdefined
         new{typeof(func!), typeof(argnames)}(func!, argnames)
@@ -27,7 +28,7 @@ end
 ##
 
 """ apply ldiv!(A, u) """
-struct ApplyLDivBang2Args <: SciMLLinearSolveAlgorithm end
+struct ApplyLDivBang2Args <: AbstractFunctionCall end
 function SciMLBase.solve(cache::LinearCache, alg::ApplyLDivBang2Args,
                          args...; kwargs...)
     @unpack A, b, u = cache
@@ -37,10 +38,12 @@ function SciMLBase.solve(cache::LinearCache, alg::ApplyLDivBang2Args,
 end
 
 """ apply ldiv!(u, A, b) """
-struct ApplyLDivBang3Args <: SciMLLinearSolveAlgorithm end
+struct ApplyLDivBang3Args <: AbstractFunctionCall end
 function SciMLBase.solve(cache::LinearCache, alg::ApplyLDivBang3Args,
                          args...; kwargs...)
     @unpack A, b, u = cache
     LinearAlgebra.ldiv!(u, A, b)
     return SciMLBase.build_linear_solution(alg,cache.u,nothing,cache)
 end
+
+ApplyLDivBang() = ApplyLDivBang3Args()

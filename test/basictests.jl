@@ -37,65 +37,6 @@ end
 
 @testset "LinearSolve" begin
 
-@testset "Apply Function" begin
-
-    @testset "Diagonal Type" begin
-        A1 = rand(n) |> Diagonal; b1 = rand(n); x1 = zero(b1)
-        A2 = rand(n) |> Diagonal; b2 = rand(n); x2 = zero(b1)
-                                                  
-        prob1 = LinearProblem(A1, b1; u0=x1)
-        prob2 = LinearProblem(A1, b1; u0=x1)
-
-        for alg in (
-                    FunctionCall(LinearAlgebra.ldiv!, (:u, :A, :b)),
-                    ApplyLDivBang(),
-                    ApplyLDivBang2Args(),
-                    ApplyLDivBang3Args(),
-                   )
-            test_interface(alg, prob1, prob2)
-        end
-    end
-
-    @testset "Custom Type" begin
-
-        struct MyDiag
-            d
-        end
-
-        # overloads
-        (D::MyDiag)(du, u, p, t) = mul!(du, D, u)
-        Base.:*(D::MyDiag, u) = Diagonal(D.d) * u
-
-        Base.copy(D::MyDiag) = copy(D.d) |> MyDiag
-
-        LinearAlgebra.mul!(y, D::MyDiag, x) = mul!(y, Diagonal(D.d), x)
-        LinearAlgebra.ldiv!(y, D::MyDiag, x) = ldiv!(y, Diagonal(D.d), x)
-        LinearAlgebra.ldiv!(D::MyDiag, x) = ldiv!(Diagonal(D.d), x)
-
-        # custom inverse function
-        function my_inv!(D::MyDiag, u, b)
-            @. u = b / D.d 
-        end
-    
-        A1 = rand(n) |> MyDiag; b1 = rand(n); x1 = zero(b1)
-        A2 = rand(n) |> MyDiag; b2 = rand(n); x2 = zero(b1)
-                                                  
-        prob1 = LinearProblem(A1, b1; u0=x1)
-        prob2 = LinearProblem(A1, b1; u0=x1)
-
-        for alg in (
-                    FunctionCall(LinearAlgebra.ldiv!, (:u, :A, :b)),
-                    FunctionCall(my_inv!, (:A, :u, :b)),
-                    ApplyLDivBang(),
-                    ApplyLDivBang2Args(),
-                    ApplyLDivBang3Args(),
-                   )
-            test_interface(alg, prob1, prob2)
-        end
-    end
-end
-#=
-
 @testset "Default Linear Solver" begin
     test_interface(nothing, prob1, prob2)
 
@@ -345,7 +286,37 @@ end
     @test sol13.u ≈ sol23.u
     @test sol13.u ≈ sol33.u
 end
-=#
+
+@testset "Solve Function" begin
+
+    A1 = rand(n) |> Diagonal; b1 = rand(n); x1 = zero(b1)
+    A2 = rand(n) |> Diagonal; b2 = rand(n); x2 = zero(b1)
+                                              
+    function sol_func(A,b,u,p,newA,Pl,Pr,solverdata;verbose=true, kwargs...)
+        if verbose == true
+            println("out-of-place solve")
+        end
+        u = A \ b
+    end
+
+    function sol_func!(A,b,u,p,newA,Pl,Pr,solverdata;verbose=true, kwargs...)
+        if verbose == true
+            println("in-place solve")
+        end
+        ldiv!(u,A,b)
+    end
+
+    prob1 = LinearProblem(A1, b1; u0=x1)
+    prob2 = LinearProblem(A1, b1; u0=x1)
+
+    for alg in (
+                LinearSolveFunction(),
+                LinearSolveFunction(sol_func),
+                LinearSolveFunction(sol_func!),
+               )
+        test_interface(alg, prob1, prob2)
+    end
+end
 
 @testset "Solve Function" begin
 

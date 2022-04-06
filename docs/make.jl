@@ -29,6 +29,7 @@ makedocs(
         ],
         "Advanced" => Any[
             "advanced/developing.md"
+            "advanced/custom.md"
         ]
     ]
 )

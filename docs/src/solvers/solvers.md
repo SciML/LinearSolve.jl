@@ -19,10 +19,12 @@ Pardiso.jl's methods are also known to be very efficient sparse linear solvers.
 
 As sparse matrices get larger, iterative solvers tend to get more efficient than
 factorization methods if a lower tolerance of the solution is required.
+
 IterativeSolvers.jl uses a low-rank Q update in its GMRES so it tends to be
 faster than Krylov.jl for CPU-based arrays, but it's only compatible with
 CPU-based arrays while Krylov.jl is more general and will support accelerators
-like CUDA.
+like CUDA. Krylov.jl works with CPUs and GPUs and tends to be more efficient than other
+Krylov-based methods.
 
 Finally, a user can pass a custom function ofr the linear solve using
 `LinearSolveFunction()` if existing solvers are not optimal for their application.
@@ -160,4 +162,17 @@ KrylovJL(args...; KrylovAlg = Krylov.gmres!,
                   Pl=nothing, Pr=nothing,
                   gmres_restart=0, window=0,
                   kwargs...)
+```
+
+### KrylovKit.jl
+
+- `KrylovKitJL_CG(args...;kwargs...)`: A generic CG implementation
+- `KrylovKitJL_GMRES(args...;kwargs...)`: A generic GMRES implementation
+
+The general algorithm is:
+
+```julia
+function KrylovKitJL(args...;
+                     KrylovAlg = KrylovKit.GMRES, gmres_restart = 0,
+                     kwargs...)
 ```

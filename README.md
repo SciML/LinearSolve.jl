@@ -10,7 +10,6 @@ common interface. LinearSolve.jl makes it easy to define high level algorithms
 which allow for swapping out the linear solver that is used while maintaining
 maximum efficiency.
 
-
 For information on using the package,
 [see the stable documentation](https://linearsolve.sciml.ai/stable/). Use the
 [in-development documentation](https://linearsolve.sciml.ai/dev/) for the version of

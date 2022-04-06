@@ -1,4 +1,4 @@
-module LinearSolve
+module LinearSolve 
 
 using ArrayInterface
 using RecursiveFactorization

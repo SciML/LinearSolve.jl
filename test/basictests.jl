@@ -287,4 +287,35 @@ end
     @test sol13.u ≈ sol33.u
 end
 
+@testset "Solve Function" begin
+
+    A1 = rand(n) |> Diagonal; b1 = rand(n); x1 = zero(b1)
+    A2 = rand(n) |> Diagonal; b2 = rand(n); x2 = zero(b1)
+                                              
+    function sol_func(A,b,u,p,newA,Pl,Pr,solverdata;verbose=true, kwargs...)
+        if verbose == true
+            println("out-of-place solve")
+        end
+        u = A \ b
+    end
+
+    function sol_func!(A,b,u,p,newA,Pl,Pr,solverdata;verbose=true, kwargs...)
+        if verbose == true
+            println("in-place solve")
+        end
+        ldiv!(u,A,b)
+    end
+
+    prob1 = LinearProblem(A1, b1; u0=x1)
+    prob2 = LinearProblem(A1, b1; u0=x1)
+
+    for alg in (
+                LinearSolveFunction(sol_func),
+                LinearSolveFunction(sol_func!),
+               )
+
+        test_interface(alg, prob1, prob2)
+    end
+end
+
 end # testset

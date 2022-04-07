@@ -26,11 +26,13 @@ using Reexport
 abstract type SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
 abstract type AbstractFactorization <: SciMLLinearSolveAlgorithm end
 abstract type AbstractKrylovSubspaceMethod <: SciMLLinearSolveAlgorithm end
+abstract type AbstractSolveFunction <: SciMLLinearSolveAlgorithm end
 
 # Traits
 
 needs_concrete_A(alg::AbstractFactorization) = true
 needs_concrete_A(alg::AbstractKrylovSubspaceMethod) = false
+needs_concrete_A(alg::AbstractSolveFunction) = false
 
 # Code
 
@@ -39,6 +41,7 @@ include("factorization.jl")
 include("simplelu.jl")
 include("iterative_wrappers.jl")
 include("preconditioners.jl")
+include("solve_function.jl")
 include("default.jl")
 include("init.jl")
 
@@ -48,6 +51,9 @@ isopenblas() = IS_OPENBLAS[]
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
        UMFPACKFactorization, KLUFactorization
+
+export LinearSolveFunction
+
 export KrylovJL, KrylovJL_CG, KrylovJL_GMRES, KrylovJL_BICGSTAB, KrylovJL_MINRES,
        IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
        IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES,

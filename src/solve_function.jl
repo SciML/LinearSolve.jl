@@ -1,10 +1,6 @@
 #
-function DEFAULT_LINEAR_SOLVE(A,b,u,p,newA,Pl,Pr,solverdata;kwargs...)
-    solve(LinearProblem(A, b; u0=u); p=p, kwargs...).u
-end
-
-Base.@kwdef struct LinearSolveFunction{F} <: AbstractSolveFunction
-    solve_func::F = DEFAULT_LINEAR_SOLVE
+struct LinearSolveFunction{F} <: AbstractSolveFunction
+    solve_func::F
 end
 
 function SciMLBase.solve(cache::LinearCache, alg::LinearSolveFunction,

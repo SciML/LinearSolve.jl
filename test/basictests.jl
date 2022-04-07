@@ -310,10 +310,10 @@ end
     prob2 = LinearProblem(A1, b1; u0=x1)
 
     for alg in (
-                LinearSolveFunction(),
                 LinearSolveFunction(sol_func),
                 LinearSolveFunction(sol_func!),
                )
+
         test_interface(alg, prob1, prob2)
     end
 end

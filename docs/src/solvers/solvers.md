@@ -26,8 +26,8 @@ CPU-based arrays while Krylov.jl is more general and will support accelerators
 like CUDA. Krylov.jl works with CPUs and GPUs and tends to be more efficient than other
 Krylov-based methods.
 
-Finally, a user can pass a custom function ofr the linear solve using
-`LinearSolveFunction()` if existing solvers are not optimal for their application.
+Finally, a user can pass a custom function for handling the linear solve using
+`LinearSolveFunction()` if existing solvers are not optimally suited for their application.
 The interface is detailed [here](#passing-in-a-custom-linear-solver)
 
 ## Full List of Methods

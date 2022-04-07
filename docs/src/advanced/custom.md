@@ -1,6 +1,6 @@
 # Passing in a Custom Linear Solver
-Julia users are constantly a wide variety of applications in the SciML ecosystem,
-often requiring custom handling. As existing solvers in `LinearSolve.jl` may not
+Julia users are building a wide variety of applications in the SciML ecosystem,
+often requiring problem-specific handling of their linear solves. As existing solvers in `LinearSolve.jl` may not
 be optimally suited for novel applications, it is essential for the linear solve
 interface to be easily extendable by users. To that end, the linear solve algorithm
 `LinearSolveFunction()` accepts a user-defined function for handling the solve. A

@@ -8,7 +8,7 @@ makedocs(
     authors="Chris Rackauckas",
     modules=[LinearSolve],
     clean=true,doctest=false,
-    format = Documenter.HTML(#analytics = "UA-90474609-3",
+    format = Documenter.HTML(analytics = "UA-90474609-3",
                              assets = ["assets/favicon.ico"],
                              canonical="https://linearsolve.sciml.ai/stable/"),
     pages=[

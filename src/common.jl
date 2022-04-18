@@ -8,6 +8,7 @@ struct LinearCache{TA,Tb,Tu,Tp,Talg,Tc,Tl,Tr,Ttol}
     isfresh::Bool # false => cacheval is set wrt A, true => update cacheval wrt A
     Pl::Tl        # store final preconditioner here. not being used rn
     Pr::Tr        # wrappers are using preconditioner in cache.alg for now
+    solve_adjoint::Bool # solve adjoint problem
     abstol::Ttol
     reltol::Ttol
     maxiters::Int
@@ -77,6 +78,7 @@ default_tol(::Type{Any}) = 0
 
 function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorithm,Nothing}, args...;
                         alias_A = false, alias_b = false,
+                        solve_adjoint = false,
                         abstol=default_tol(eltype(prob.A)),
                         reltol=default_tol(eltype(prob.A)),
                         maxiters=length(prob.b),
@@ -92,6 +94,11 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
     else
         u0 = similar(b, size(A, 2))
         fill!(u0,false)
+    end
+
+    # TODO
+    if solve_adjoint === true
+        A = A'
     end
 
     cacheval = init_cacheval(alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, verbose)
@@ -121,6 +128,7 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
         isfresh,
         Pl,
         Pr,
+        solve_adjoint,
         abstol,
         reltol,
         maxiters,

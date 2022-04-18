@@ -6,8 +6,8 @@ struct LinearCache{TA,Tb,Tu,Tp,Talg,Tc,Tl,Tr,Ttol}
     alg::Talg
     cacheval::Tc  # store alg cache here
     isfresh::Bool # false => cacheval is set wrt A, true => update cacheval wrt A
-    Pl::Tl        # store final preconditioner here. not being used rn
-    Pr::Tr        # wrappers are using preconditioner in cache.alg for now
+    Pl::Tl        # preconditioners
+    Pr::Tr
     solve_adjoint::Bool # solve adjoint problem
     abstol::Ttol
     reltol::Ttol

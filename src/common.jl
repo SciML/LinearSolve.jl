@@ -96,9 +96,9 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
         fill!(u0,false)
     end
 
-    # TODO
-    if solve_adjoint === true
-        A = A'
+    if solve_adjoint & !(alg isa Union{AbstractFactorization,
+                                       AbstractSolveFunction})
+       A = A'
     end
 
     cacheval = init_cacheval(alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, verbose)

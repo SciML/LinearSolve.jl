@@ -45,6 +45,8 @@ function do_factorization(alg::GPUOffloadFactorization, A, b, u)
     return fact
 end
 
+if VERSION <= v"1.7.2"
+
 function LinearAlgebra.ldiv!(x::CUDA.CuArray,_qr::CUDA.CUSOLVER.CuQR,b::CUDA.CuArray)
   _x = UpperTriangular(_qr.R) \ (_qr.Q' * reshape(b,length(b),1))
   x .= vec(_x)
@@ -53,5 +55,7 @@ function LinearAlgebra.ldiv!(x::CUDA.CuArray,_qr::CUDA.CUSOLVER.CuQR,b::CUDA.CuA
 end
 # make `\` work
 LinearAlgebra.ldiv!(F::CUDA.CUSOLVER.CuQR, b::CUDA.CuArray) = (x = similar(b); ldiv!(x, F, b); x)
+
+end
 
 export GPUOffloadFactorization

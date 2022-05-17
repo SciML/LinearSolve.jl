@@ -10,7 +10,6 @@ using SparseArrays
 using SciMLBase: AbstractDiffEqOperator, AbstractLinearAlgorithm
 using Setfield
 using UnPack
-using Requires
 using SuiteSparse
 using KLU
 using DocStringExtensions

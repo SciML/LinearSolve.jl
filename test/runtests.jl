@@ -3,11 +3,16 @@ using SafeTestsets
 const LONGER_TESTS = false
 
 const GROUP = get(ENV, "GROUP", "All")
-const is_APPVEYOR = Sys.iswindows() && haskey(ENV,"APPVEYOR")
 
-function activate_downstream_env()
-    Pkg.activate("downstream")
-    Pkg.develop(PackageSpec(path=dirname(@__DIR__)))
+function dev_subpkg(subpkg)
+    subpkg_path = joinpath(dirname(@__DIR__), "lib", subpkg)
+    Pkg.develop(PackageSpec(path=subpkg_path))
+end
+
+function activate_subpkg_env(subpkg)
+    subpkg_path = joinpath(dirname(@__DIR__), "lib", subpkg)
+    Pkg.activate(subpkg_path)
+    Pkg.develop(PackageSpec(path=subpkg_path))
     Pkg.instantiate()
 end
 
@@ -15,7 +20,12 @@ if GROUP == "All" || GROUP == "Core"
   @time @safetestset "Basic Tests" begin include("basictests.jl") end
 end
 
-if !is_APPVEYOR && GROUP == "GPU"
-  activate_downstream_env()
-  @time @safetestset "CUDA" begin include("cuda.jl") end
+if GROUP == "LinearSolveCUDA"
+  dev_subpkg("LinearSolveCUDA")
+  @time @safetestset "CUDA" begin include("../lib/LinearSolveCUDA/test/runtests.jl") end
+end
+
+if GROUP == "LinearSolvePardiso"
+  dev_subpkg("LinearSolvePardiso")
+  @time @safetestset "Pardiso" begin include("../lib/LinearSolvePardiso/test/runtests.jl") end
 end

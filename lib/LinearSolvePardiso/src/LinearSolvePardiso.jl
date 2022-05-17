@@ -1,33 +1,37 @@
-Base.@kwdef struct PardisoJL <: SciMLLinearSolveAlgorithm
-    nprocs::Union{Int, Nothing} = nothing
-    solver_type::Union{Int, Pardiso.Solver, Nothing} = nothing
-    matrix_type::Union{Int, Pardiso.MatrixType, Nothing} = nothing
-    iparm::Union{Vector{Tuple{Int,Int}}, Nothing} = nothing
-    dparm::Union{Vector{Tuple{Int,Int}}, Nothing} = nothing
+module LinearSolvePardiso
+
+using LinearSolve, SciMLBase
+
+Base.@kwdef struct PardisoJL <: SciMLBase.SciMLLinearSolveAlgorithm
+    nprocs::Union{Int,Nothing} = nothing
+    solver_type::Union{Int,Pardiso.Solver,Nothing} = nothing
+    matrix_type::Union{Int,Pardiso.MatrixType,Nothing} = nothing
+    iparm::Union{Vector{Tuple{Int,Int}},Nothing} = nothing
+    dparm::Union{Vector{Tuple{Int,Int}},Nothing} = nothing
 end
 
-MKLPardisoFactorize(;kwargs...) = PardisoJL(;solver_type = 0,kwargs...)
-MKLPardisoIterate(;kwargs...) = PardisoJL(;solver_type = 1,kwargs...)
-needs_concrete_A(alg::PardisoJL) = true
+MKLPardisoFactorize(; kwargs...) = PardisoJL(; solver_type=0, kwargs...)
+MKLPardisoIterate(; kwargs...) = PardisoJL(; solver_type=1, kwargs...)
+LinearSolve.needs_concrete_A(alg::PardisoJL) = true
 
 # TODO schur complement functionality
 
-function init_cacheval(alg::PardisoJL, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+function LinearSolve.init_cacheval(alg::PardisoJL, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
     @unpack nprocs, solver_type, matrix_type, iparm, dparm = alg
-    A = convert(AbstractMatrix,A)
+    A = convert(AbstractMatrix, A)
 
     solver =
-    if Pardiso.PARDISO_LOADED[]
-        solver = Pardiso.PardisoSolver()
-        solver_type !== nothing && Pardiso.set_solver!(solver, solver_type)
+        if Pardiso.PARDISO_LOADED[]
+            solver = Pardiso.PardisoSolver()
+            solver_type !== nothing && Pardiso.set_solver!(solver, solver_type)
 
-        solver
-    else
-        solver = Pardiso.MKLPardisoSolver()
-        nprocs !== nothing && Pardiso.set_nprocs!(solver, nprocs)
+            solver
+        else
+            solver = Pardiso.MKLPardisoSolver()
+            nprocs !== nothing && Pardiso.set_nprocs!(solver, nprocs)
 
-        solver
-    end
+            solver
+        end
 
     Pardiso.pardisoinit(solver) # default initialization
 
@@ -58,7 +62,7 @@ function init_cacheval(alg::PardisoJL, A, b, u, Pl, Pr, maxiters, abstol, reltol
     end
 
     # Make sure to say it's transposed because its CSC not CSR
-    Pardiso.set_iparm!(solver,12, 1)
+    Pardiso.set_iparm!(solver, 12, 1)
 
     #=
     Note: It is recommended to use IPARM(11)=1 (scaling) and IPARM(13)=1 (matchings) for
@@ -71,8 +75,8 @@ function init_cacheval(alg::PardisoJL, A, b, u, Pl, Pr, maxiters, abstol, reltol
     be changed to Pardiso.ANALYSIS_NUM_FACT in the solver loop otherwise instabilities
     occur in the example https://github.com/SciML/OrdinaryDiffEq.jl/issues/1569
     =#
-    Pardiso.set_iparm!(solver,11, 0)
-    Pardiso.set_iparm!(solver,13, 0)
+    Pardiso.set_iparm!(solver, 11, 0)
+    Pardiso.set_iparm!(solver, 13, 0)
 
     Pardiso.set_phase!(solver, Pardiso.ANALYSIS)
 
@@ -81,7 +85,7 @@ function init_cacheval(alg::PardisoJL, A, b, u, Pl, Pr, maxiters, abstol, reltol
         # applies these exact factors L and U for the next steps in a
         # preconditioned Krylov-Subspace iteration. If the iteration does not
         # converge, the solver will automatically switch back to the numerical factorization.
-        Pardiso.set_iparm!(solver,3,round(Int,abs(log10(reltol)),RoundDown) * 10 + 1)
+        Pardiso.set_iparm!(solver, 3, round(Int, abs(log10(reltol)), RoundDown) * 10 + 1)
     end
 
     Pardiso.pardiso(solver, u, A, b)
@@ -91,7 +95,7 @@ end
 
 function SciMLBase.solve(cache::LinearCache, alg::PardisoJL; kwargs...)
     @unpack A, b, u = cache
-    A = convert(AbstractMatrix,A)
+    A = convert(AbstractMatrix, A)
 
     if cache.isfresh
         Pardiso.set_phase!(cache.cacheval, Pardiso.NUM_FACT)
@@ -100,10 +104,12 @@ function SciMLBase.solve(cache::LinearCache, alg::PardisoJL; kwargs...)
 
     Pardiso.set_phase!(cache.cacheval, Pardiso.SOLVE_ITERATIVE_REFINE)
     Pardiso.pardiso(cache.cacheval, u, A, b)
-    return SciMLBase.build_linear_solution(alg,cache.u,nothing,cache)
+    return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
 end
 
 # Add finalizer to release memory
 # Pardiso.set_phase!(cache.cacheval, Pardiso.RELEASE_ALL)
 
 export PardisoJL, MKLPardisoFactorize, MKLPardisoIterate
+
+end

@@ -77,6 +77,12 @@ customized per-package, details given below describe a subset of important array
       factorization does not use pivoting during the numerical factorization and therefore the
       procedure can fail even for invertible matrices.
 
+### LinearSolve.jl
+
+LinearSolve.jl contains some linear solvers built in.
+
+- `SimpleLUFactorization`: a simple LU-factorization implementation without BLAS. Fast for small matrices.
+
 ### SuiteSparse.jl
 
 By default, the SuiteSparse.jl are implemented for efficiency by caching the
@@ -92,8 +98,11 @@ be used in a context where that assumption does not hold, set `reuse_symbolic=fa
 
 ### Pardiso.jl
 
-This package is not loaded by default. Thus in order to use this package you
-must first `using Pardiso`. The following algorithms are pre-specified:
+!!! note
+
+    Using this solver requires adding the package LinearSolvePardiso.jl
+
+The following algorithms are pre-specified:
 
 - `MKLPardisoFactorize(;kwargs...)`: A sparse factorization method.
 - `MKLPardisoIterate(;kwargs...)`: A mixed factorization+iterative method.
@@ -128,7 +137,11 @@ end
 Note that `CuArrays` are supported by `GenericFactorization` in the "normal" way.
 The following are non-standard GPU factorization routines.
 
-- `GPUOffloadFactorization()`: An offloading technique used to GPU-accelerate CPU-based
+!!! note
+
+    Using this solver requires adding the package LinearSolveCUDA.jl
+    
+- `CudaOffloadFactorization()`: An offloading technique used to GPU-accelerate CPU-based
   computations. Requires a sufficiently large `A` to overcome the data transfer
   costs.
 

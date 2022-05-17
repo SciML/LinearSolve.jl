@@ -34,7 +34,7 @@ function test_interface(alg, prob1, prob2)
     return
 end
 
-test_interface(GPUOffloadFactorization(), prob1, prob2)
+test_interface(CudaOffloadFactorization(), prob1, prob2)
 
 A1 = prob1.A; b1 = prob1.b; x1 = prob1.u0
 y = solve(prob1)

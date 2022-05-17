@@ -237,9 +237,8 @@ end
     sol23 = solve(linsolve)
 
     @test sol11.u ≈ sol21.u
-    @test sol11.u ≈ sol31.u
     @test sol12.u ≈ sol22.u
-    @test sol12.u ≈ sol32.u
+    @test sol13.u ≈ sol23.u
 end
 
 @testset "Solve Function" begin

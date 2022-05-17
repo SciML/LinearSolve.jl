@@ -1,6 +1,6 @@
 module LinearSolvePardiso
 
-using LinearSolve, SciMLBase
+using Pardiso, LinearSolve, SciMLBase
 
 Base.@kwdef struct PardisoJL <: SciMLBase.SciMLLinearSolveAlgorithm
     nprocs::Union{Int,Nothing} = nothing

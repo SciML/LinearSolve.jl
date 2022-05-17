@@ -4,10 +4,10 @@ using CUDA, LinearAlgebra, LinearSolve, SciMLBase
 
 struct CudaOffloadFactorization <: LinearSolve.AbstractFactorization end
 
-function SciMLBase.solve(cache::LinearCache, alg::CudaOffloadFactorization; kwargs...)
+function SciMLBase.solve(cache::LinearSolve.LinearCache, alg::CudaOffloadFactorization; kwargs...)
     if cache.isfresh
-        fact = do_factorization(alg, CUDA.CuArray(cache.A), cache.b, cache.u)
-        cache = set_cacheval(cache, fact)
+        fact = LinearSolve.do_factorization(alg, CUDA.CuArray(cache.A), cache.b, cache.u)
+        cache = LinearSolve.set_cacheval(cache, fact)
     end
 
     copyto!(cache.u, cache.b)

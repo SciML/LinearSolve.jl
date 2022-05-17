@@ -236,19 +236,10 @@ end
     linsolve = LinearSolve.set_A(sol22.cache,copy(A2))
     sol23 = solve(linsolve)
 
-    linsolve = init(prob,MKLPardisoFactorize())
-    sol31 = solve(linsolve)
-    linsolve = LinearSolve.set_b(sol31.cache,copy(b2))
-    sol32 = solve(linsolve)
-    linsolve = LinearSolve.set_A(sol32.cache,copy(A2))
-    sol33 = solve(linsolve)
-
     @test sol11.u ≈ sol21.u
     @test sol11.u ≈ sol31.u
     @test sol12.u ≈ sol22.u
     @test sol12.u ≈ sol32.u
-    @test sol13.u ≈ sol23.u
-    @test sol13.u ≈ sol33.u
 end
 
 @testset "Solve Function" begin

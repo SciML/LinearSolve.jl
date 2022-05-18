@@ -16,7 +16,7 @@ function SciMLBase.solve(cache::LinearSolve.LinearCache, alg::CudaOffloadFactori
 end
 
 function LinearSolve.do_factorization(alg::CudaOffloadFactorization, A, b, u)
-    A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
+    A isa Union{AbstractMatrix,SciMLBase.AbstractDiffEqOperator} ||
         error("LU is not defined for $(typeof(A))")
 
     if A isa SciMLBase.AbstractDiffEqOperator

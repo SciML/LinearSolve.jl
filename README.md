@@ -1,4 +1,4 @@
-# LinearSolvers
+# LinearSolve.jl
 
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](http://linearsolve.sciml.ai/stable)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](http://linearsolve.sciml.ai/dev)

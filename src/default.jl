@@ -9,7 +9,7 @@ function defaultalg(A,b)
     # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
     # it makes sense according to the benchmarks, which is dependent on
     # whether MKL or OpenBLAS is being used
-    if (A === nothing && b isa GPUArrays.AbstractGPUArray) || A isa Matrix
+    if (A === nothing && !(b isa GPUArrays.AbstractGPUArray)) || A isa Matrix
         if (A === nothing || eltype(A) <: Union{Float32,Float64,ComplexF32,ComplexF64}) &&
                     ArrayInterface.can_setindex(b)
             if length(b) <= 10

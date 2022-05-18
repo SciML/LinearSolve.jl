@@ -14,6 +14,8 @@ using SuiteSparse
 using KLU
 using DocStringExtensions
 
+import GPUArrays
+
 # wrap
 import Krylov
 import KrylovKit

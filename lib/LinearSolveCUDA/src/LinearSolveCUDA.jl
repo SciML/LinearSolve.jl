@@ -19,7 +19,7 @@ function LinearSolve.do_factorization(alg::CudaOffloadFactorization, A, b, u)
     A isa Union{AbstractMatrix,AbstractDiffEqOperator} ||
         error("LU is not defined for $(typeof(A))")
 
-    if A isa AbstractDiffEqOperator
+    if A isa SciMLBase.AbstractDiffEqOperator
         A = A.A
     end
     fact = qr(CUDA.CuArray(A))

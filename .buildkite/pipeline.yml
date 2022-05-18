@@ -1,5 +1,5 @@
 steps:
-  - label: "GPU"
+  - label: "LinearSolveCUDA"
     plugins:
       - JuliaCI/julia#v1:
           version: "1"
@@ -9,7 +9,7 @@ steps:
       queue: "juliagpu"
       cuda: "*"
     env:
-      GROUP: 'GPU'
+      GROUP: 'LinearSolveCUDA'
       JULIA_PKG_SERVER: "" # it often struggles with our large artifacts
       # SECRET_CODECOV_TOKEN: "..."
     timeout_in_minutes: 30

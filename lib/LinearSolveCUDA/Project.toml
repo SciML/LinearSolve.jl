@@ -1,0 +1,22 @@
+name = "LinearSolveCUDA"
+uuid = "0d26bed2-170e-468a-8415-1cfcbba6e180"
+authors = ["SciML"]
+version = "0.1"
+
+[deps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
+SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
+
+[compat]
+CUDA = "3"
+SciMLBase = "1.25"
+LinearSolve = "1"
+julia = "1.6"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

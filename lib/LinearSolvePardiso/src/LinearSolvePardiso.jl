@@ -2,7 +2,7 @@ module LinearSolvePardiso
 
 using Pardiso, LinearSolve, SciMLBase
 
-Base.@kwdef struct PardisoJL <: SciMLBase.SciMLLinearSolveAlgorithm
+Base.@kwdef struct PardisoJL <: LinearSolve.SciMLLinearSolveAlgorithm
     nprocs::Union{Int,Nothing} = nothing
     solver_type::Union{Int,Pardiso.Solver,Nothing} = nothing
     matrix_type::Union{Int,Pardiso.MatrixType,Nothing} = nothing

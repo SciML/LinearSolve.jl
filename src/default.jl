@@ -9,7 +9,7 @@ function defaultalg(A,b)
     # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
     # it makes sense according to the benchmarks, which is dependent on
     # whether MKL or OpenBLAS is being used
-    if (A === nothing && !isgpu(b)) || A isa Matrix
+    if (A === nothing && b isa AbstractGPUArray) || A isa Matrix
         if (A === nothing || eltype(A) <: Union{Float32,Float64,ComplexF32,ComplexF64}) &&
                     ArrayInterface.can_setindex(b)
             if length(b) <= 10
@@ -39,7 +39,7 @@ function defaultalg(A,b)
 
     # This catches the case where A is a CuMatrix
     # Which does not have LU fully defined
-    elseif isgpu(A) || isgpu(b)
+    elseif A isa AbstractGPUArray || b isa AbstractGPUArray
         alg = QRFactorization(false)
 
     # Not factorizable operator, default to only using A*x
@@ -100,7 +100,7 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
 
     # This catches the case where A is a CuMatrix
     # Which does not have LU fully defined
-    elseif isgpu(A)
+    elseif A isa AbstractGPUArray
         alg = QRFactorization(false)
         SciMLBase.solve(cache, alg, args...; kwargs...)
 
@@ -158,7 +158,7 @@ function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters, abstol, reltol, 
 
     # This catches the case where A is a CuMatrix
     # Which does not have LU fully defined
-    elseif isgpu(A)
+    elseif A isa AbstractGPUArray
         alg = QRFactorization(false)
         init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
 

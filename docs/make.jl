@@ -6,7 +6,7 @@ DocMeta.setdocmeta!(LinearSolve, :DocTestSetup, :(using LinearSolve); recursive=
 makedocs(
     sitename="LinearSolve.jl",
     authors="Chris Rackauckas",
-    modules=[LinearSolve],
+    modules=[LinearSolve,LinearSolve.SciMLBase],
     clean=true,doctest=false,
     format = Documenter.HTML(analytics = "UA-90474609-3",
                              assets = ["assets/favicon.ico"],

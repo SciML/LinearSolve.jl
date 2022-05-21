@@ -8,6 +8,7 @@ b1 = rand(4)
 prob1 = LinearProblem(A1, b1)
 
 lambda = 3
+n = 4
 e = ones(n)
 e2 = ones(n - 1)
 A2 = spdiagm(-1 => im * e2, 0 => lambda * e, 1 => -im * e2)
@@ -29,7 +30,6 @@ for alg in (
     @test_broken A2 * u ≈ b2
 end
 
-n = 4
 Random.seed!(10)
 A = sprand(n, n, 0.8);
 A2 = 2.0 .* A;

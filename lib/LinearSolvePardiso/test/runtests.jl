@@ -13,6 +13,7 @@ e = ones(n)
 e2 = ones(n - 1)
 A2 = spdiagm(-1 => im * e2, 0 => lambda * e, 1 => -im * e2)
 b2 = rand(n) + im * zeros(n)
+cache_kwargs = (; verbose=true, abstol=1e-8, reltol=1e-8, maxiter=30)
 
 prob2 = LinearProblem(A2, b2)
 

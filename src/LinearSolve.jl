@@ -1,6 +1,6 @@
 module LinearSolve
 
-using ArrayInterface
+using ArrayInterfaceCore
 using RecursiveFactorization
 using Base: cache_dependencies, Bool
 import Base: eltype, adjoint, inv

@@ -11,7 +11,7 @@ function defaultalg(A,b)
     # whether MKL or OpenBLAS is being used
     if (A === nothing && !(b isa GPUArrays.AbstractGPUArray)) || A isa Matrix
         if (A === nothing || eltype(A) <: Union{Float32,Float64,ComplexF32,ComplexF64}) &&
-                    ArrayInterface.can_setindex(b)
+                    ArrayInterfaceCore.can_setindex(b)
             if length(b) <= 10
                 alg = GenericLUFactorization()
             elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500))
@@ -34,7 +34,7 @@ function defaultalg(A,b)
 
     # This catches the cases where a factorization overload could exist
     # For example, BlockBandedMatrix
-    elseif A !== nothing && ArrayInterface.isstructured(A)
+    elseif A !== nothing && ArrayInterfaceCore.isstructured(A)
         alg = GenericFactorization()
 
     # This catches the case where A is a CuMatrix
@@ -64,7 +64,7 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
     if A isa Matrix
         b = cache.b
         if (A === nothing || eltype(A) <: Union{Float32,Float64,ComplexF32,ComplexF64}) &&
-                    ArrayInterface.can_setindex(b)
+                    ArrayInterfaceCore.can_setindex(b)
             if length(b) <= 10
                 alg = GenericLUFactorization()
                 SciMLBase.solve(cache, alg, args...; kwargs...)
@@ -94,7 +94,7 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
 
     # This catches the cases where a factorization overload could exist
     # For example, BlockBandedMatrix
-    elseif ArrayInterface.isstructured(A)
+    elseif ArrayInterfaceCore.isstructured(A)
         alg = GenericFactorization()
         SciMLBase.solve(cache, alg, args...; kwargs...)
 
@@ -122,7 +122,7 @@ function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters, abstol, reltol, 
     # whether MKL or OpenBLAS is being used
     if A isa Matrix
         if (A === nothing || eltype(A) <: Union{Float32,Float64,ComplexF32,ComplexF64}) &&
-                    ArrayInterface.can_setindex(b)
+                    ArrayInterfaceCore.can_setindex(b)
             if length(b) <= 10
                 alg = GenericLUFactorization()
                 init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
@@ -152,7 +152,7 @@ function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters, abstol, reltol, 
 
     # This catches the cases where a factorization overload could exist
     # For example, BlockBandedMatrix
-    elseif ArrayInterface.isstructured(A)
+    elseif ArrayInterfaceCore.isstructured(A)
         alg = GenericFactorization()
         init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
 

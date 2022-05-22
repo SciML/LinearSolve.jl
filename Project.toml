@@ -4,7 +4,7 @@ authors = ["SciML"]
 version = "1.16.3"
 
 [deps]
-ArrayInterfaceCore = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
+ArrayInterfaceCore = "30b0a656-2188-435a-8636-2ec0e6a096e2"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 GPUArrays = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7"
 IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"

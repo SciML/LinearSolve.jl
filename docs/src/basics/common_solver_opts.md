@@ -1,4 +1,4 @@
-# Common Solver Options (Keyword Arguments to Solve)
+# Common Solver Options (Keyword Arguments for Solve)
 
 While many algorithms have specific arguments within their constructor,
 the keyword arguments for `solve` are common across all of the algorithms

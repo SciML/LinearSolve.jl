@@ -3,6 +3,8 @@ using Documenter
 
 DocMeta.setdocmeta!(LinearSolve, :DocTestSetup, :(using LinearSolve); recursive=true)
 
+include("pages.jl")
+
 makedocs(
     sitename="LinearSolve.jl",
     authors="Chris Rackauckas",

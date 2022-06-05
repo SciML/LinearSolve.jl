@@ -8,7 +8,19 @@
 Fast implementations of linear solving algorithms in Julia that satisfy the SciML
 common interface. LinearSolve.jl makes it easy to define high level algorithms
 which allow for swapping out the linear solver that is used while maintaining
-maximum efficiency.
+maximum efficiency. Specifically, LinearSolve.jl includes:
+
+- Fast pure Julia LU factorizations which outperform standard BLAS
+- KLU for faster sparse LU factorization on unstructured matrices
+- UMFPACK for faster sparse LU factorization on matrices with some repeated structure
+- MKLPardiso wrappers for handling many sparse matrices faster than SuiteSparse (KLU, UMFPACK) methods
+- GPU-offloading for large dense matrices
+- Wrappers to all of the Krylov implementations (Krylov.jl, IterativeSolvers.jl, KrylovKit.jl) for easy
+  testing of all of them. LinearSolve.jl handles the API differences, especially with the preconditioner
+  definitions
+- A polyalgorithm that smartly chooses between these methods
+- A caching interface which automates caching of symbolic factorizations and numerical factorizations
+  as optimally as possible
 
 For information on using the package,
 [see the stable documentation](https://linearsolve.sciml.ai/stable/). Use the

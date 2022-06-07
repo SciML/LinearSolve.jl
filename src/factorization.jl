@@ -11,7 +11,9 @@ function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization; kwargs.
         fact = do_factorization(alg, cache.A, cache.b, cache.u)
         cache = set_cacheval(cache, fact)
     end
-    y = _ldiv!(cache.u, cache.cacheval, cache.b)
+    fact = cache.solve_adjoint ? cache.cacheval' : cache.cacheval
+
+    y = _ldiv!(cache.u, fact, cache.b)
     SciMLBase.build_linear_solution(alg,y,nothing,cache)
 end
 

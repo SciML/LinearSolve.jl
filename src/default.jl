@@ -2,7 +2,7 @@
 
 # Allows A === nothing as a stand-in for dense matrix
 function defaultalg(A,b)
-    if A isa DiffEqArrayOperator
+    if A isa SciMLOperators.MatirxOperator
         A = A.A
     end
 
@@ -54,7 +54,7 @@ end
 function SciMLBase.solve(cache::LinearCache, alg::Nothing,
                          args...; kwargs...)
     @unpack A = cache
-    if A isa DiffEqArrayOperator
+    if A isa SciMLOperators.MatirxOperator
         A = A.A
     end
 
@@ -113,7 +113,7 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
 end
 
 function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
-    if A isa DiffEqArrayOperator
+    if A isa SciMLOperators.MatirxOperator
         A = A.A
     end
 

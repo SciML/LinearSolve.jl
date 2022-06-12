@@ -1,6 +1,7 @@
 module LinearSolveCUDA
 
 using CUDA, LinearAlgebra, LinearSolve, SciMLBase
+import SciMLOperators
 
 struct CudaOffloadFactorization <: LinearSolve.AbstractFactorization end
 

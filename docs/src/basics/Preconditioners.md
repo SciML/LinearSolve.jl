@@ -10,16 +10,16 @@ preconditioners which works with the wrapped packages.
 
 ### Mathematical Definition
 
-Preconditioners are specified in the keyword arguments of `init` or `solve`. The
-right preconditioner, `Pr` transforms the linear system ``Au = b`` into the
-form:
+Preconditioners are specified in the keyword arguments to `init` or `solve`: `Pl` for left
+and `Pr` for right preconditioner, respectively.
+The right preconditioner, ``P_r`` transforms the linear system ``Au = b`` into the form:
 
 ```math
-AP_r^{-1}(Pu) = AP_r^{-1}y = b
+AP_r^{-1}(P_r u) = AP_r^{-1}y = b
 ```
 
-to add the solving step ``P_r u = y``. The left preconditioner, `Pl`, transforms
-the linear system into the form:
+which is solved for ``y``, and then ``P_r u = y`` is solved for ``u``. The left
+preconditioner, ``P_l``, transforms the linear system into the form:
 
 ```math
 P_l^{-1}(Au - b) = 0

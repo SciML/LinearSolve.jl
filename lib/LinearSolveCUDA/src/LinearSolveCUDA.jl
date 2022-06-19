@@ -1,6 +1,7 @@
 module LinearSolveCUDA
 
 using CUDA, LinearAlgebra, LinearSolve, SciMLBase
+import SciMLOperators
 
 struct CudaOffloadFactorization <: LinearSolve.AbstractFactorization end
 
@@ -16,10 +17,10 @@ function SciMLBase.solve(cache::LinearSolve.LinearCache, alg::CudaOffloadFactori
 end
 
 function LinearSolve.do_factorization(alg::CudaOffloadFactorization, A, b, u)
-    A isa Union{AbstractMatrix,SciMLBase.AbstractDiffEqOperator} ||
+    A isa Union{AbstractMatrix,SciMLOperators.AbstractSciMLOperator } ||
         error("LU is not defined for $(typeof(A))")
 
-    if A isa SciMLBase.AbstractDiffEqOperator
+    if A isa SciMLOperators.AbstractSciMLOperator 
         A = A.A
     end
     fact = qr(CUDA.CuArray(A))

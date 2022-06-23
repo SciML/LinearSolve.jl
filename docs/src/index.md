@@ -22,16 +22,14 @@ Pkg.add("LinearSolve")
 
 ## Contributing
 
-  - Please refer to the
-    [SciML ColPrac: Contributor's Guide on Collaborative Practices for Community Packages](https://github.com/SciML/ColPrac/blob/master/README.md)
-    for guidance on PRs, issues, and other matters relating to contributing to ModelingToolkit.
-
-  - There are a few community forums:
-    
-      + the #diffeq-bridged channel in the [Julia Slack](https://julialang.org/slack/)
-      + [JuliaDiffEq](https://gitter.im/JuliaDiffEq/Lobby) on Gitter
-      + on the [Julia Discourse forums](https://discourse.julialang.org)
-      + see also [SciML Community page](https://sciml.ai/community/)
+- Please refer to the
+  [SciML ColPrac: Contributor's Guide on Collaborative Practices for Community Packages](https://github.com/SciML/ColPrac/blob/master/README.md)
+  for guidance on PRs, issues, and other matters relating to contributing to ModelingToolkit.
+- There are a few community forums:
+    - the #diffeq-bridged channel in the [Julia Slack](https://julialang.org/slack/)
+    - [JuliaDiffEq](https://gitter.im/JuliaDiffEq/Lobby) on Gitter
+    - on the [Julia Discourse forums](https://discourse.julialang.org)
+    - see also [SciML Community page](https://sciml.ai/community/)
 
 ## Roadmap
 

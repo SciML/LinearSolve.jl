@@ -3,8 +3,8 @@
 Developing new or custom linear solvers for the SciML interface can be done in
 one of two ways:
 
- 1. You can either create a completely new set of dispatches for `init` and `solve`.
- 2. You can extend LinearSolve.jl's internal mechanisms.
+1. You can either create a completely new set of dispatches for `init` and `solve`.
+2. You can extend LinearSolve.jl's internal mechanisms.
 
 For developer ease, we highly recommend (2) as that will automatically make the
 caching API work. Thus this is the documentation for how to do that.
@@ -17,17 +17,16 @@ basic machinery. A simplified version is:
 ```julia
 struct MyLUFactorization{P} <: SciMLBase.AbstractLinearAlgorithm end
 
-init_cacheval(alg::MyLUFactorization, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose) =
-    lu!(convert(AbstractMatrix, A))
+init_cacheval(alg::MyLUFactorization, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose) = lu!(convert(AbstractMatrix,A))
 
 function SciMLBase.solve(cache::LinearCache, alg::MyLUFactorization; kwargs...)
     if cache.isfresh
-        A = convert(AbstractMatrix, A)
+        A = convert(AbstractMatrix,A)
         fact = lu!(A)
         cache = set_cacheval(cache, fact)
     end
     y = ldiv!(cache.u, cache.cacheval, cache.b)
-    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    SciMLBase.build_linear_solution(alg,y,nothing,cache)
 end
 ```
 

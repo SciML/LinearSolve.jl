@@ -3,8 +3,9 @@
 pages = [
     "Home" => "index.md",
     "Tutorials" => Any[
-        "tutorials/linear.md"
-        "tutorials/caching_interface.md"
+        "tutorials/linear.md",
+        "tutorials/caching_interface.md",
+        "tutorials/efficient_large_systems.md",
     ],
     "Basics" => Any[
         "basics/LinearProblem.md",

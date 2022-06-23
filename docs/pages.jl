@@ -1,6 +1,6 @@
 # Put in a separate page so it can be used by SciMLDocs.jl
 
-pages=[
+pages = [
     "Home" => "index.md",
     "Tutorials" => Any[
         "tutorials/linear.md"
@@ -11,13 +11,11 @@ pages=[
         "basics/common_solver_opts.md",
         "basics/CachingAPI.md",
         "basics/Preconditioners.md",
-        "basics/FAQ.md"
+        "basics/FAQ.md",
     ],
-    "Solvers" => Any[
-        "solvers/solvers.md"
-    ],
+    "Solvers" => Any["solvers/solvers.md"],
     "Advanced" => Any[
         "advanced/developing.md"
         "advanced/custom.md"
-    ]
+    ],
 ]

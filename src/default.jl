@@ -1,7 +1,7 @@
 ## Default algorithm
 
 # Allows A === nothing as a stand-in for dense matrix
-function defaultalg(A,b)
+function defaultalg(A, b)
     if A isa DiffEqArrayOperator
         A = A.A
     end
@@ -11,7 +11,7 @@ function defaultalg(A,b)
     # whether MKL or OpenBLAS is being used
     if (A === nothing && !(b isa GPUArraysCore.AbstractGPUArray)) || A isa Matrix
         if (A === nothing || eltype(A) <: Union{Float32,Float64,ComplexF32,ComplexF64}) &&
-                    ArrayInterfaceCore.can_setindex(b)
+           ArrayInterfaceCore.can_setindex(b)
             if length(b) <= 10
                 alg = GenericLUFactorization()
             elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500))
@@ -23,26 +23,26 @@ function defaultalg(A,b)
             alg = LUFactorization()
         end
 
-    # These few cases ensure the choice is optimal without the
-    # dynamic dispatching of factorize
+        # These few cases ensure the choice is optimal without the
+        # dynamic dispatching of factorize
     elseif A isa Tridiagonal
-        alg = GenericFactorization(;fact_alg=lu!)
+        alg = GenericFactorization(; fact_alg = lu!)
     elseif A isa SymTridiagonal
-        alg = GenericFactorization(;fact_alg=ldlt!)
+        alg = GenericFactorization(; fact_alg = ldlt!)
     elseif A isa SparseMatrixCSC
         alg = UMFPACKFactorization()
 
-    # This catches the cases where a factorization overload could exist
-    # For example, BlockBandedMatrix
+        # This catches the cases where a factorization overload could exist
+        # For example, BlockBandedMatrix
     elseif A !== nothing && ArrayInterfaceCore.isstructured(A)
         alg = GenericFactorization()
 
-    # This catches the case where A is a CuMatrix
-    # Which does not have LU fully defined
+        # This catches the case where A is a CuMatrix
+        # Which does not have LU fully defined
     elseif A isa GPUArraysCore.AbstractGPUArray || b isa GPUArraysCore.AbstractGPUArray
         alg = QRFactorization(false)
 
-    # Not factorizable operator, default to only using A*x
+        # Not factorizable operator, default to only using A*x
     else
         alg = KrylovJL_GMRES()
     end
@@ -51,8 +51,7 @@ end
 
 ## Other dispatches are to decrease the dispatch cost
 
-function SciMLBase.solve(cache::LinearCache, alg::Nothing,
-                         args...; kwargs...)
+function SciMLBase.solve(cache::LinearCache, alg::Nothing, args...; kwargs...)
     @unpack A = cache
     if A isa DiffEqArrayOperator
         A = A.A
@@ -64,7 +63,7 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
     if A isa Matrix
         b = cache.b
         if (A === nothing || eltype(A) <: Union{Float32,Float64,ComplexF32,ComplexF64}) &&
-                    ArrayInterfaceCore.can_setindex(b)
+           ArrayInterfaceCore.can_setindex(b)
             if length(b) <= 10
                 alg = GenericLUFactorization()
                 SciMLBase.solve(cache, alg, args...; kwargs...)
@@ -80,32 +79,32 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
             SciMLBase.solve(cache, alg, args...; kwargs...)
         end
 
-    # These few cases ensure the choice is optimal without the
-    # dynamic dispatching of factorize
+        # These few cases ensure the choice is optimal without the
+        # dynamic dispatching of factorize
     elseif A isa Tridiagonal
-        alg = GenericFactorization(;fact_alg=lu!)
+        alg = GenericFactorization(; fact_alg = lu!)
         SciMLBase.solve(cache, alg, args...; kwargs...)
     elseif A isa SymTridiagonal
-        alg = GenericFactorization(;fact_alg=ldlt!)
+        alg = GenericFactorization(; fact_alg = ldlt!)
         SciMLBase.solve(cache, alg, args...; kwargs...)
     elseif A isa SparseMatrixCSC
         alg = UMFPACKFactorization()
         SciMLBase.solve(cache, alg, args...; kwargs...)
 
-    # This catches the cases where a factorization overload could exist
-    # For example, BlockBandedMatrix
+        # This catches the cases where a factorization overload could exist
+        # For example, BlockBandedMatrix
     elseif ArrayInterfaceCore.isstructured(A)
         alg = GenericFactorization()
         SciMLBase.solve(cache, alg, args...; kwargs...)
 
-    # This catches the case where A is a CuMatrix
-    # Which does not have LU fully defined
+        # This catches the case where A is a CuMatrix
+        # Which does not have LU fully defined
     elseif A isa GPUArraysCore.AbstractGPUArray
         alg = QRFactorization(false)
         SciMLBase.solve(cache, alg, args...; kwargs...)
 
-    # Not factorizable operator, default to only using A*x
-    # IterativeSolvers is faster on CPU but not GPU-compatible
+        # Not factorizable operator, default to only using A*x
+        # IterativeSolvers is faster on CPU but not GPU-compatible
     else
         alg = KrylovJL_GMRES()
         SciMLBase.solve(cache, alg, args...; kwargs...)
@@ -122,7 +121,7 @@ function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters, abstol, reltol, 
     # whether MKL or OpenBLAS is being used
     if A isa Matrix
         if (A === nothing || eltype(A) <: Union{Float32,Float64,ComplexF32,ComplexF64}) &&
-                    ArrayInterfaceCore.can_setindex(b)
+           ArrayInterfaceCore.can_setindex(b)
             if length(b) <= 10
                 alg = GenericLUFactorization()
                 init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
@@ -138,32 +137,32 @@ function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters, abstol, reltol, 
             init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
         end
 
-    # These few cases ensure the choice is optimal without the
-    # dynamic dispatching of factorize
+        # These few cases ensure the choice is optimal without the
+        # dynamic dispatching of factorize
     elseif A isa Tridiagonal
-        alg = GenericFactorization(;fact_alg=lu!)
+        alg = GenericFactorization(; fact_alg = lu!)
         init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
     elseif A isa SymTridiagonal
-        alg = GenericFactorization(;fact_alg=ldlt!)
+        alg = GenericFactorization(; fact_alg = ldlt!)
         init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
     elseif A isa SparseMatrixCSC
         alg = UMFPACKFactorization()
         init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
 
-    # This catches the cases where a factorization overload could exist
-    # For example, BlockBandedMatrix
+        # This catches the cases where a factorization overload could exist
+        # For example, BlockBandedMatrix
     elseif ArrayInterfaceCore.isstructured(A)
         alg = GenericFactorization()
         init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
 
-    # This catches the case where A is a CuMatrix
-    # Which does not have LU fully defined
+        # This catches the case where A is a CuMatrix
+        # Which does not have LU fully defined
     elseif A isa GPUArraysCore.AbstractGPUArray
         alg = QRFactorization(false)
         init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
 
-    # Not factorizable operator, default to only using A*x
-    # IterativeSolvers is faster on CPU but not GPU-compatible
+        # Not factorizable operator, default to only using A*x
+        # IterativeSolvers is faster on CPU but not GPU-compatible
     else
         alg = KrylovJL_GMRES()
         init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)

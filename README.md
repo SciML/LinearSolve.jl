@@ -1,26 +1,33 @@
 # LinearSolve.jl
 
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](http://linearsolve.sciml.ai/stable)
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](http://linearsolve.sciml.ai/dev)
-[![Build Status](https://github.com/SciML/LinearSolvers.jl/workflows/CI/badge.svg)](https://github.com/SciML/LinearSolvers.jl/actions)
-[![Coverage](https://codecov.io/gh/SciML/LinearSolvers.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/SciML/LinearSolvers.jl)
+[![Join the chat at https://julialang.zulipchat.com #sciml-bridged](https://img.shields.io/static/v1?label=Zulip&message=chat&color=9558b2&labelColor=389826)](https://julialang.zulipchat.com/#narrow/stream/279055-sciml-bridged)
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](http://linearsolve.sciml.ai/stable/)
+[![Global Docs](https://img.shields.io/badge/docs-SciML-blue.svg)](https://docs.sciml.ai/dev/modules/LinearSolve/)
+
+[![codecov](https://codecov.io/gh/SciML/LinearSolve.jl/branch/master/graph/badge.svg?token=FwXaKBNW67)](https://codecov.io/gh/SciML/LinearSolve.jl)
+[![Build Status](https://github.com/SciML/LinearSolve.jl/workflows/CI/badge.svg)](https://github.com/SciML/LinearSolve.jl/actions?query=workflow%3ACI)
+[![Build status](https://badge.buildkite.com/e0ee4d9d914eb44a43c291d78c53047eeff95e7edb7881b6f7.svg)](https://buildkite.com/julialang/linearsolve-dot-jl)
+
+[![ColPrac: Contributor's Guide on Collaborative Practices for Community Packages](https://img.shields.io/badge/ColPrac-Contributor's%20Guide-blueviolet)](https://github.com/SciML/ColPrac)
+[![SciML Code Style](https://img.shields.io/static/v1?label=code%20style&message=SciML&color=9558b2&labelColor=389826)](https://github.com/SciML/SciMLStyle)
+[![Package Downloads](https://shields.io/endpoint?url=https://pkgs.genieframework.com/api/v1/badge/DiffEqSensitivity)](https://pkgs.genieframework.com?packages=LinearSolve)
 
 Fast implementations of linear solving algorithms in Julia that satisfy the SciML
 common interface. LinearSolve.jl makes it easy to define high level algorithms
 which allow for swapping out the linear solver that is used while maintaining
 maximum efficiency. Specifically, LinearSolve.jl includes:
 
-- Fast pure Julia LU factorizations which outperform standard BLAS
-- KLU for faster sparse LU factorization on unstructured matrices
-- UMFPACK for faster sparse LU factorization on matrices with some repeated structure
-- MKLPardiso wrappers for handling many sparse matrices faster than SuiteSparse (KLU, UMFPACK) methods
-- GPU-offloading for large dense matrices
-- Wrappers to all of the Krylov implementations (Krylov.jl, IterativeSolvers.jl, KrylovKit.jl) for easy
-  testing of all of them. LinearSolve.jl handles the API differences, especially with the preconditioner
-  definitions
-- A polyalgorithm that smartly chooses between these methods
-- A caching interface which automates caching of symbolic factorizations and numerical factorizations
-  as optimally as possible
+  - Fast pure Julia LU factorizations which outperform standard BLAS
+  - KLU for faster sparse LU factorization on unstructured matrices
+  - UMFPACK for faster sparse LU factorization on matrices with some repeated structure
+  - MKLPardiso wrappers for handling many sparse matrices faster than SuiteSparse (KLU, UMFPACK) methods
+  - GPU-offloading for large dense matrices
+  - Wrappers to all of the Krylov implementations (Krylov.jl, IterativeSolvers.jl, KrylovKit.jl) for easy
+    testing of all of them. LinearSolve.jl handles the API differences, especially with the preconditioner
+    definitions
+  - A polyalgorithm that smartly chooses between these methods
+  - A caching interface which automates caching of symbolic factorizations and numerical factorizations
+    as optimally as possible
 
 For information on using the package,
 [see the stable documentation](https://linearsolve.sciml.ai/stable/). Use the
@@ -31,8 +38,9 @@ the documentation which contains the unreleased features.
 
 ```julia
 n = 4
-A = rand(n,n)
-b1 = rand(n); b2 = rand(n)
+A = rand(n, n)
+b1 = rand(n);
+b2 = rand(n);
 prob = LinearProblem(A, b1)
 
 linsolve = init(prob)
@@ -47,7 +55,7 @@ sol1.u
   1.8385599677530706
 =#
 
-linsolve = LinearSolve.set_b(linsolve,b2)
+linsolve = LinearSolve.set_b(linsolve, b2)
 sol2 = solve(linsolve)
 
 sol2.u
@@ -59,8 +67,8 @@ sol2.u
  -0.4998342686003478
 =#
 
-linsolve = LinearSolve.set_b(linsolve,b2)
-sol2 = solve(linsolve,IterativeSolversJL_GMRES()) # Switch to GMRES
+linsolve = LinearSolve.set_b(linsolve, b2)
+sol2 = solve(linsolve, IterativeSolversJL_GMRES()) # Switch to GMRES
 sol2.u
 #=
 4-element Vector{Float64}:
@@ -70,8 +78,8 @@ sol2.u
  -0.4998342686003478
 =#
 
-A2 = rand(n,n)
-linsolve = LinearSolve.set_A(linsolve,A2)
+A2 = rand(n, n)
+linsolve = LinearSolve.set_A(linsolve, A2)
 sol3 = solve(linsolve)
 
 sol3.u

@@ -13,11 +13,11 @@ using LinearSolve, LinearAlgebra
 Pl = LinearSolve.InvPreconditioner(Diagonal(weights))
 Pr = Diagonal(weights)
 
-A = rand(n,n)
+A = rand(n, n)
 b = rand(n)
 
-prob = LinearProblem(A,b)
-sol = solve(prob,IterativeSolvers_GMRES(),Pl=Pl,Pr=Pr)
+prob = LinearProblem(A, b)
+sol = solve(prob, IterativeSolvers_GMRES(), Pl = Pl, Pr = Pr)
 ```
 
 If you want to use a "real" preconditioner under the norm `weights`, then one
@@ -26,12 +26,12 @@ of the weights like as follows:
 
 ```julia
 using LinearSolve, LinearAlgebra
-Pl = ComposePreconitioner(LinearSolve.InvPreconditioner(Diagonal(weights),realprec))
+Pl = ComposePreconitioner(LinearSolve.InvPreconditioner(Diagonal(weights), realprec))
 Pr = Diagonal(weights)
 
-A = rand(n,n)
+A = rand(n, n)
 b = rand(n)
 
-prob = LinearProblem(A,b)
-sol = solve(prob,IterativeSolvers_GMRES(),Pl=Pl,Pr=Pr)
+prob = LinearProblem(A, b)
+sol = solve(prob, IterativeSolvers_GMRES(), Pl = Pl, Pr = Pr)
 ```

@@ -1,6 +1,6 @@
 # Tooling Preconditioners
 
-struct ComposePreconditioner{Ti,To}
+struct ComposePreconditioner{Ti, To}
     inner::Ti
     outer::To
 end

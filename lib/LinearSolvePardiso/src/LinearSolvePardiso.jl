@@ -11,38 +11,28 @@ Base.@kwdef struct PardisoJL <: LinearSolve.SciMLLinearSolveAlgorithm
     dparm::Union{Vector{Tuple{Int,Int}},Nothing} = nothing
 end
 
-MKLPardisoFactorize(; kwargs...) = PardisoJL(; solver_type = 0, kwargs...)
-MKLPardisoIterate(; kwargs...) = PardisoJL(; solver_type = 1, kwargs...)
+MKLPardisoFactorize(; kwargs...) = PardisoJL(; solver_type=0, kwargs...)
+MKLPardisoIterate(; kwargs...) = PardisoJL(; solver_type=1, kwargs...)
 LinearSolve.needs_concrete_A(alg::PardisoJL) = true
 
 # TODO schur complement functionality
 
-function LinearSolve.init_cacheval(
-    alg::PardisoJL,
-    A,
-    b,
-    u,
-    Pl,
-    Pr,
-    maxiters,
-    abstol,
-    reltol,
-    verbose,
-)
+function LinearSolve.init_cacheval(alg::PardisoJL, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
     @unpack nprocs, solver_type, matrix_type, iparm, dparm = alg
     A = convert(AbstractMatrix, A)
 
-    solver = if Pardiso.PARDISO_LOADED[]
-        solver = Pardiso.PardisoSolver()
-        solver_type !== nothing && Pardiso.set_solver!(solver, solver_type)
+    solver =
+        if Pardiso.PARDISO_LOADED[]
+            solver = Pardiso.PardisoSolver()
+            solver_type !== nothing && Pardiso.set_solver!(solver, solver_type)
 
-        solver
-    else
-        solver = Pardiso.MKLPardisoSolver()
-        nprocs !== nothing && Pardiso.set_nprocs!(solver, nprocs)
+            solver
+        else
+            solver = Pardiso.MKLPardisoSolver()
+            nprocs !== nothing && Pardiso.set_nprocs!(solver, nprocs)
 
-        solver
-    end
+            solver
+        end
 
     Pardiso.pardisoinit(solver) # default initialization
 

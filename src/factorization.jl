@@ -401,7 +401,7 @@ function init_cacheval(alg::FastQRFactorization{NoPivot}, A, b, u, Pl, Pr,
     return WorkspaceAndFactors(ws, LinearAlgebra.QRCompactWY(LAPACK.geqrt!(ws, A)...))
 end
 
-function init_cacheval(::FastQRFactorization{ColumnNorm}, A, b, u, Pl, Pr,
+function init_cacheval(::FastQRFactorization{LinearAlgebra.ColumnNorm}, A, b, u, Pl, Pr,
                        maxiters, abstol, reltol, verbose)
     ws = QRpWs(A)
     return WorkspaceAndFactors(ws, LinearAlgebra.QRPivoted(LAPACK.geqp3!(ws, A)...))
@@ -417,7 +417,7 @@ function SciMLBase.solve(cache::LinearCache, alg::FastQRFactorization{P}) where 
         if P === NoPivot
             @set! ws_and_fact.factors = LinearAlgebra.QRCompactWY(LAPACK.geqrt!(ws_and_fact.workspace,
                                                                                 A)...)
-        elseif P === ColumnNorm
+        elseif P === LinearAlgebra.ColumnNorm
             @set! ws_and_fact.factors = LinearAlgebra.QRPivoted(LAPACK.geqp3!(ws_and_fact.workspace,
                                                                               A)...)
         else

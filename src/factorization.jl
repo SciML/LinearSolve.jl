@@ -397,30 +397,28 @@ end
 
 @static if VERSION < v"1.7beta"
     function init_cacheval(alg::FastQRFactorization{Val{false}}, A, b, u, Pl, Pr,
-        maxiters, abstol, reltol, verbose)
+                           maxiters, abstol, reltol, verbose)
         ws = QRWYWs(A; blocksize = alg.blocksize)
         return WorkspaceAndFactors(ws, LinearAlgebra.QRCompactWY(LAPACK.geqrt!(ws, A)...))
     end
 
     function init_cacheval(::FastQRFactorization{Val{true}}, A, b, u, Pl, Pr,
-        maxiters, abstol, reltol, verbose)
+                           maxiters, abstol, reltol, verbose)
         ws = QRpWs(A)
         return WorkspaceAndFactors(ws, LinearAlgebra.QRPivoted(LAPACK.geqp3!(ws, A)...))
     end
 else
     function init_cacheval(alg::FastQRFactorization{NoPivot}, A, b, u, Pl, Pr,
-        maxiters, abstol, reltol, verbose)
+                           maxiters, abstol, reltol, verbose)
         ws = QRWYWs(A; blocksize = alg.blocksize)
         return WorkspaceAndFactors(ws, LinearAlgebra.QRCompactWY(LAPACK.geqrt!(ws, A)...))
     end
     function init_cacheval(::FastQRFactorization{ColumnNorm}, A, b, u, Pl, Pr,
-        maxiters, abstol, reltol, verbose)
+                           maxiters, abstol, reltol, verbose)
         ws = QRpWs(A)
         return WorkspaceAndFactors(ws, LinearAlgebra.QRPivoted(LAPACK.geqp3!(ws, A)...))
     end
 end
-
-
 
 function SciMLBase.solve(cache::LinearCache, alg::FastQRFactorization{P}) where {P}
     A = cache.A

@@ -131,7 +131,7 @@ end
         prob2 = LinearProblem(A2, b2; u0 = x2)
         test_interface(LinearSolve.FastLUFactorization(), prob1, prob2)
         test_interface(LinearSolve.FastQRFactorization(), prob1, prob2)
-        
+
         # TODO: Resizing tests. Upstream doesn't currently support it.
         # Need to be absolutely certain we never segfault with incorrect
         # ws sizes.

@@ -12,8 +12,8 @@ using Setfield
 using UnPack
 using SuiteSparse
 using KLU
+using FastLapackInterface
 using DocStringExtensions
-
 import GPUArraysCore
 
 # wrap

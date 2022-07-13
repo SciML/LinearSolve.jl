@@ -347,7 +347,6 @@ function init_cacheval(alg::GenericFactorization{<:RFWrapper},
     ArrayInterfaceCore.lu_instance(convert(AbstractMatrix, A))
 end
 
-
 ## FastLAPACKFactorizations
 
 struct WorkspaceAndFactors{W, F}
@@ -361,7 +360,7 @@ end
 struct FastLUFactorization <: AbstractFactorization end
 
 function init_cacheval(::FastLUFactorization, A, b, u, Pl, Pr,
-    maxiters, abstol, reltol, verbose)
+                       maxiters, abstol, reltol, verbose)
     ws = LUWs(A)
     return WorkspaceAndFactors(ws, LinearAlgebra.LU(LAPACK.getrf!(ws, A)...))
 end
@@ -373,7 +372,8 @@ function SciMLBase.solve(cache::LinearCache, alg::FastLUFactorization)
     if cache.isfresh
         # we will fail here if A is a different *size* than in a previous version of the same cache.
         # it may instead be desirable to resize the workspace.
-        @set! ws_and_fact.factors = LinearAlgebra.LU(LAPACK.getrf!(ws_and_fact.workspace, A)...)
+        @set! ws_and_fact.factors = LinearAlgebra.LU(LAPACK.getrf!(ws_and_fact.workspace,
+                                                                   A)...)
         cache = set_cacheval(cache, ws_and_fact)
     end
     y = ldiv!(cache.u, cache.cacheval.factors, cache.b)
@@ -396,13 +396,13 @@ function FastQRFactorization()
 end
 
 function init_cacheval(alg::FastQRFactorization{NoPivot}, A, b, u, Pl, Pr,
-    maxiters, abstol, reltol, verbose)
+                       maxiters, abstol, reltol, verbose)
     ws = QRWYWs(A; blocksize = alg.blocksize)
     return WorkspaceAndFactors(ws, LinearAlgebra.QRCompactWY(LAPACK.geqrt!(ws, A)...))
 end
 
 function init_cacheval(::FastQRFactorization{ColumnNorm}, A, b, u, Pl, Pr,
-    maxiters, abstol, reltol, verbose)
+                       maxiters, abstol, reltol, verbose)
     ws = QRpWs(A)
     return WorkspaceAndFactors(ws, LinearAlgebra.QRPivoted(LAPACK.geqp3!(ws, A)...))
 end
@@ -415,9 +415,11 @@ function SciMLBase.solve(cache::LinearCache, alg::FastQRFactorization{P}) where 
         # we will fail here if A is a different *size* than in a previous version of the same cache.
         # it may instead be desirable to resize the workspace.
         if P === NoPivot
-            @set! ws_and_fact.factors = LinearAlgebra.QRCompactWY(LAPACK.geqrt!(ws_and_fact.workspace, A)...)
+            @set! ws_and_fact.factors = LinearAlgebra.QRCompactWY(LAPACK.geqrt!(ws_and_fact.workspace,
+                                                                                A)...)
         elseif P === ColumnNorm
-            @set! ws_and_fact.factors = LinearAlgebra.QRPivoted(LAPACK.geqp3!(ws_and_fact.workspace, A)...)
+            @set! ws_and_fact.factors = LinearAlgebra.QRPivoted(LAPACK.geqp3!(ws_and_fact.workspace,
+                                                                              A)...)
         else
             error("No FastLAPACK Factorization defined for $P")
         end

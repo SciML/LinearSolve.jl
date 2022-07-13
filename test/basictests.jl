@@ -119,6 +119,24 @@ end
         @test_throws ArgumentError solve(cache)
     end
 
+    @testset "FastLAPACK Factorizations" begin
+        A1 = A / 1
+        b1 = rand(n)
+        x1 = zero(b)
+        A2 = A / 2
+        b2 = rand(n)
+        x2 = zero(b)
+
+        prob1 = LinearProblem(A1, b1; u0 = x1)
+        prob2 = LinearProblem(A2, b2; u0 = x2)
+        test_interface(LinearSolve.FastLUFactorization(), prob1, prob2)
+        test_interface(LinearSolve.FastQRFactorization(), prob1, prob2)
+
+        # TODO: Resizing tests. Upstream doesn't currently support it.
+        # Need to be absolutely certain we never segfault with incorrect
+        # ws sizes.
+    end
+
     @testset "Concrete Factorizations" begin for alg in (LUFactorization(),
                                                          QRFactorization(),
                                                          SVDFactorization(),

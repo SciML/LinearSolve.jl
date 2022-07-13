@@ -346,3 +346,101 @@ function init_cacheval(alg::GenericFactorization{<:RFWrapper},
                        abstol, reltol, verbose)
     ArrayInterfaceCore.lu_instance(convert(AbstractMatrix, A))
 end
+
+## FastLAPACKFactorizations
+
+struct WorkspaceAndFactors{W, F}
+    workspace::W
+    factors::F
+end
+
+# There's no options like pivot here.
+# But I'm not sure it makes sense as a GenericFactorization
+# since it just uses `LAPACK.getrf!`.
+struct FastLUFactorization <: AbstractFactorization end
+
+function init_cacheval(::FastLUFactorization, A, b, u, Pl, Pr,
+                       maxiters, abstol, reltol, verbose)
+    ws = LUWs(A)
+    return WorkspaceAndFactors(ws, LinearAlgebra.LU(LAPACK.getrf!(ws, A)...))
+end
+
+function SciMLBase.solve(cache::LinearCache, alg::FastLUFactorization)
+    A = cache.A
+    A = convert(AbstractMatrix, A)
+    ws_and_fact = cache.cacheval
+    if cache.isfresh
+        # we will fail here if A is a different *size* than in a previous version of the same cache.
+        # it may instead be desirable to resize the workspace.
+        @set! ws_and_fact.factors = LinearAlgebra.LU(LAPACK.getrf!(ws_and_fact.workspace,
+                                                                   A)...)
+        cache = set_cacheval(cache, ws_and_fact)
+    end
+    y = ldiv!(cache.u, cache.cacheval.factors, cache.b)
+    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+end
+
+struct FastQRFactorization{P} <: AbstractFactorization
+    pivot::P
+    blocksize::Int
+end
+
+function FastQRFactorization()
+    pivot = @static if VERSION < v"1.7beta"
+        Val(false)
+    else
+        NoPivot()
+    end
+    FastQRFactorization(pivot, 36) # is 36 or 16 better here? LinearAlgebra and FastLapackInterface use 36,
+    # but QRFactorization uses 16.
+end
+
+@static if VERSION < v"1.7beta"
+    function init_cacheval(alg::FastQRFactorization{Val{false}}, A, b, u, Pl, Pr,
+                           maxiters, abstol, reltol, verbose)
+        ws = QRWYWs(A; blocksize = alg.blocksize)
+        return WorkspaceAndFactors(ws, LinearAlgebra.QRCompactWY(LAPACK.geqrt!(ws, A)...))
+    end
+
+    function init_cacheval(::FastQRFactorization{Val{true}}, A, b, u, Pl, Pr,
+                           maxiters, abstol, reltol, verbose)
+        ws = QRpWs(A)
+        return WorkspaceAndFactors(ws, LinearAlgebra.QRPivoted(LAPACK.geqp3!(ws, A)...))
+    end
+else
+    function init_cacheval(alg::FastQRFactorization{NoPivot}, A, b, u, Pl, Pr,
+                           maxiters, abstol, reltol, verbose)
+        ws = QRWYWs(A; blocksize = alg.blocksize)
+        return WorkspaceAndFactors(ws, LinearAlgebra.QRCompactWY(LAPACK.geqrt!(ws, A)...))
+    end
+    function init_cacheval(::FastQRFactorization{ColumnNorm}, A, b, u, Pl, Pr,
+                           maxiters, abstol, reltol, verbose)
+        ws = QRpWs(A)
+        return WorkspaceAndFactors(ws, LinearAlgebra.QRPivoted(LAPACK.geqp3!(ws, A)...))
+    end
+end
+
+function SciMLBase.solve(cache::LinearCache, alg::FastQRFactorization{P}) where {P}
+    A = cache.A
+    A = convert(AbstractMatrix, A)
+    ws_and_fact = cache.cacheval
+    if cache.isfresh
+        # we will fail here if A is a different *size* than in a previous version of the same cache.
+        # it may instead be desirable to resize the workspace.
+        nopivot = @static if VERSION < v"1.7beta"
+            Val{false}
+        else
+            NoPivot
+        end
+        if P === nopivot
+            @set! ws_and_fact.factors = LinearAlgebra.QRCompactWY(LAPACK.geqrt!(ws_and_fact.workspace,
+                                                                                A)...)
+        else
+            @set! ws_and_fact.factors = LinearAlgebra.QRPivoted(LAPACK.geqp3!(ws_and_fact.workspace,
+                                                                              A)...)
+        end
+        cache = set_cacheval(cache, ws_and_fact)
+    end
+    y = ldiv!(cache.u, cache.cacheval.factors, cache.b)
+    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+end

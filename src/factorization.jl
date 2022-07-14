@@ -14,7 +14,7 @@ function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization; kwargs.
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
-# Bad fallback: will fail if `A` is just a stand-in
+#RF Bad fallback: will fail if `A` is just a stand-in
 # This should instead just create the factorization type.
 function init_cacheval(alg::AbstractFactorization, A, b, u, Pl, Pr, maxiters, abstol,
                        reltol, verbose)
@@ -328,24 +328,33 @@ end
 
 ## RFLUFactorization
 
-struct RFWrapper{P, T}
-    RFWrapper(::Val{P}, ::Val{T}) where {P, T} = new{P, T}()
+
+struct RFLUFactorization{P, T}
+    RFLUFactorization(::Val{P}, ::Val{T}) where {P, T} = new{P, T}()
 end
-(::RFWrapper{P, T})(A) where {P, T} = RecursiveFactorization.lu!(A, Val(P), Val(T))
 
 function RFLUFactorization(; pivot = Val(true), thread = Val(true))
-    GenericFactorization(; fact_alg = RFWrapper(pivot, thread))
+    RFLUFactorization(pivot, thread)
 end
 
-function init_cacheval(alg::GenericFactorization{<:RFWrapper}, A, b, u, Pl, Pr, maxiters,
+function init_cacheval(alg::RFLUFactorization, A, b, u, Pl, Pr, maxiters,
                        abstol, reltol, verbose)
-    ArrayInterfaceCore.lu_instance(convert(AbstractMatrix, A))
+    ipiv = Vector{BlasInt}(undef, min(size(A)...));
+    ArrayInterfaceCore.lu_instance(convert(AbstractMatrix, A)), ipiv
 end
-function init_cacheval(alg::GenericFactorization{<:RFWrapper},
-                       A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr, maxiters,
-                       abstol, reltol, verbose)
-    ArrayInterfaceCore.lu_instance(convert(AbstractMatrix, A))
+
+function SciMLBase.solve(cache::LinearCache, alg::RFLUFactorization{P,T}) where {P,T}
+    A = cache.A
+    A = convert(AbstractMatrix, A)
+    fact, ipiv = cache.cacheval
+    if cache.isfresh
+        fact = RecursiveFactorization.lu!(A, ipiv, Val(P), Val(T))
+        cache = set_cacheval(cache, (fact, ipiv))
+    end
+    y = ldiv!(cache.u, cache.cacheval[1], cache.b)
+    SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
+
 
 ## FastLAPACKFactorizations
 

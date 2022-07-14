@@ -395,17 +395,32 @@ function FastQRFactorization()
     # but QRFactorization uses 16.
 end
 
-function init_cacheval(alg::FastQRFactorization{NoPivot}, A, b, u, Pl, Pr,
-                       maxiters, abstol, reltol, verbose)
-    ws = QRWYWs(A; blocksize = alg.blocksize)
-    return WorkspaceAndFactors(ws, LinearAlgebra.QRCompactWY(LAPACK.geqrt!(ws, A)...))
+@static if VERSION < v"1.7beta"
+    function init_cacheval(alg::FastQRFactorization{Val{false}}, A, b, u, Pl, Pr,
+        maxiters, abstol, reltol, verbose)
+        ws = QRWYWs(A; blocksize = alg.blocksize)
+        return WorkspaceAndFactors(ws, LinearAlgebra.QRCompactWY(LAPACK.geqrt!(ws, A)...))
+    end
+
+    function init_cacheval(::FastQRFactorization{Val{true}}, A, b, u, Pl, Pr,
+        maxiters, abstol, reltol, verbose)
+        ws = QRpWs(A)
+        return WorkspaceAndFactors(ws, LinearAlgebra.QRPivoted(LAPACK.geqp3!(ws, A)...))
+    end
+else
+    function init_cacheval(alg::FastQRFactorization{NoPivot}, A, b, u, Pl, Pr,
+        maxiters, abstol, reltol, verbose)
+        ws = QRWYWs(A; blocksize = alg.blocksize)
+        return WorkspaceAndFactors(ws, LinearAlgebra.QRCompactWY(LAPACK.geqrt!(ws, A)...))
+    end
+    function init_cacheval(::FastQRFactorization{ColumnNorm}, A, b, u, Pl, Pr,
+        maxiters, abstol, reltol, verbose)
+        ws = QRpWs(A)
+        return WorkspaceAndFactors(ws, LinearAlgebra.QRPivoted(LAPACK.geqp3!(ws, A)...))
+    end
 end
 
-function init_cacheval(::FastQRFactorization{LinearAlgebra.ColumnNorm}, A, b, u, Pl, Pr,
-                       maxiters, abstol, reltol, verbose)
-    ws = QRpWs(A)
-    return WorkspaceAndFactors(ws, LinearAlgebra.QRPivoted(LAPACK.geqp3!(ws, A)...))
-end
+
 
 function SciMLBase.solve(cache::LinearCache, alg::FastQRFactorization{P}) where {P}
     A = cache.A
@@ -414,14 +429,17 @@ function SciMLBase.solve(cache::LinearCache, alg::FastQRFactorization{P}) where 
     if cache.isfresh
         # we will fail here if A is a different *size* than in a previous version of the same cache.
         # it may instead be desirable to resize the workspace.
-        if P === NoPivot
+        nopivot = @static if VERSION < v"1.7beta"
+            Val{false}
+        else
+            NoPivot
+        end
+        if P === nopivot
             @set! ws_and_fact.factors = LinearAlgebra.QRCompactWY(LAPACK.geqrt!(ws_and_fact.workspace,
                                                                                 A)...)
-        elseif P === LinearAlgebra.ColumnNorm
+        else
             @set! ws_and_fact.factors = LinearAlgebra.QRPivoted(LAPACK.geqp3!(ws_and_fact.workspace,
                                                                               A)...)
-        else
-            error("No FastLAPACK Factorization defined for $P")
         end
         cache = set_cacheval(cache, ws_and_fact)
     end

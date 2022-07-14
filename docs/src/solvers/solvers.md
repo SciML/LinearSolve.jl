@@ -13,6 +13,10 @@ more precision is necessary, `QRFactorization()` and `SVDFactorization()` are
 the best choices, with SVD being the slowest but most precise.
 
 For efficiency, `RFLUFactorization` is the fastest for dense LU-factorizations.
+`FastLUFactorization` will be faster than `LUFactorization` which is the Base.LinearAlgebra
+(`\` default) implementation of LU factorization. `SimpleLUFactorization` will be fast
+on very small matrices.
+
 For sparse LU-factorizations, `KLUFactorization` if there is less structure
 to the sparsity pattern and `UMFPACKFactorization` if there is more structure.
 Pardiso.jl's methods are also known to be very efficient sparse linear solvers.
@@ -20,11 +24,8 @@ Pardiso.jl's methods are also known to be very efficient sparse linear solvers.
 As sparse matrices get larger, iterative solvers tend to get more efficient than
 factorization methods if a lower tolerance of the solution is required.
 
-IterativeSolvers.jl uses a low-rank Q update in its GMRES so it tends to be
-faster than Krylov.jl for CPU-based arrays, but it's only compatible with
-CPU-based arrays while Krylov.jl is more general and will support accelerators
-like CUDA. Krylov.jl works with CPUs and GPUs and tends to be more efficient than other
-Krylov-based methods.
+Krylov.jl generally outperforms IterativeSolvers.jl and KrylovKit.jl, and is compatible
+with CPUs and GPUs, and thus is the generally preferred form for Krylov methods.
 
 Finally, a user can pass a custom function for handling the linear solve using
 `LinearSolveFunction()` if existing solvers are not optimally suited for their application.
@@ -83,6 +84,19 @@ LinearSolve.jl contains some linear solvers built in.
 
 - `SimpleLUFactorization`: a simple LU-factorization implementation without BLAS. Fast for small matrices.
 
+### FastLapackInterface.jl
+
+FastLapackInterface.jl is a package that allows for a lower-level interface to the LAPACK
+calls to allow for preallocating workspaces to decrease the overhead of the wrappers.
+LinearSolve.jl provides a wrapper to these routines in a way where an initialized solver
+has a non-allocating LU factorization. In theory, this post-initialized solve should always
+be faster than the Base.LinearAlgebra version.
+
+- `FastLUFactorization` the `FastLapackInterface` version of the LU factorizaiton. Notably,
+  this version does not allow for choice of pivoting method.
+- `FastQRFactorization(pivot=NoPivot(),blocksize=32)`, the `FastLapackInterface` version of
+  the QR factorizaiton.
+
 ### SuiteSparse.jl
 
 By default, the SuiteSparse.jl are implemented for efficiency by caching the
@@ -117,7 +131,7 @@ MKLPardisoIterate(;kwargs...) = PardisoJL(;solve_phase=Pardiso.NUM_FACT_SOLVE_RE
                                            kwargs...)
 ```
 
-The full set of keyword arguments for `PardisoJL` are:                         
+The full set of keyword arguments for `PardisoJL` are:
 
 ```julia
 Base.@kwdef struct PardisoJL <: SciMLLinearSolveAlgorithm
@@ -140,7 +154,7 @@ The following are non-standard GPU factorization routines.
 !!! note
 
     Using this solver requires adding the package LinearSolveCUDA.jl
-    
+
 - `CudaOffloadFactorization()`: An offloading technique used to GPU-accelerate CPU-based
   computations. Requires a sufficiently large `A` to overcome the data transfer
   costs.

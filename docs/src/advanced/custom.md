@@ -6,6 +6,7 @@ interface to be easily extendable by users. To that end, the linear solve algori
 `LinearSolveFunction()` accepts a user-defined function for handling the solve. A
 user can pass in their custom linear solve function, say `my_linsolve`, to
 `LinearSolveFunction()`. A contrived example of solving a linear system with a custom solver is below.
+
 ```julia
 using LinearSolve, LinearAlgebra
 

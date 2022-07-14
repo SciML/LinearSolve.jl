@@ -373,7 +373,7 @@ function init_cacheval(::FastLUFactorization, A, b, u, Pl, Pr,
     return WorkspaceAndFactors(ws, LinearAlgebra.LU(LAPACK.getrf!(ws, A)...))
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::FastLUFactorization)
+function SciMLBase.solve(cache::LinearCache, alg::FastLUFactorization, args...; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     ws_and_fact = cache.cacheval
@@ -428,7 +428,7 @@ else
     end
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::FastQRFactorization{P}) where {P}
+function SciMLBase.solve(cache::LinearCache, alg::FastQRFactorization{P}, args...; kwargs...) where {P}
     A = cache.A
     A = convert(AbstractMatrix, A)
     ws_and_fact = cache.cacheval

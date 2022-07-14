@@ -339,7 +339,7 @@ end
 
 function init_cacheval(alg::RFLUFactorization, A, b, u, Pl, Pr, maxiters,
                        abstol, reltol, verbose)
-    ipiv = Vector{BlasInt}(undef, min(size(A)...));
+    ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...));
     ArrayInterfaceCore.lu_instance(convert(AbstractMatrix, A)), ipiv
 end
 

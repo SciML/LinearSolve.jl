@@ -98,7 +98,7 @@ function do_factorization(::UMFPACKFactorization, A, b, u)
     end
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::UMFPACKFactorization)
+function SciMLBase.solve(cache::LinearCache, alg::UMFPACKFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
@@ -135,7 +135,7 @@ function do_factorization(::KLUFactorization, A, b, u)
     end
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::KLUFactorization)
+function SciMLBase.solve(cache::LinearCache, alg::KLUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
@@ -373,7 +373,7 @@ function init_cacheval(::FastLUFactorization, A, b, u, Pl, Pr,
     return WorkspaceAndFactors(ws, LinearAlgebra.LU(LAPACK.getrf!(ws, A)...))
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::FastLUFactorization, args...; kwargs...)
+function SciMLBase.solve(cache::LinearCache, alg::FastLUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     ws_and_fact = cache.cacheval
@@ -428,7 +428,7 @@ else
     end
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::FastQRFactorization{P}, args...; kwargs...) where {P}
+function SciMLBase.solve(cache::LinearCache, alg::FastQRFactorization{P}; kwargs...) where {P}
     A = cache.A
     A = convert(AbstractMatrix, A)
     ws_and_fact = cache.cacheval

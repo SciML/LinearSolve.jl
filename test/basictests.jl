@@ -33,11 +33,11 @@ function test_interface(alg, prob1, prob2)
     @test A1 * y ≈ b1
 
     cache = LinearSolve.set_A(cache, copy(A2))
-    y = solve(cache)
+    y = solve(cache; cache_kwargs...)
     @test A2 * y ≈ b1
 
     cache = LinearSolve.set_b(cache, b2)
-    y = solve(cache)
+    y = solve(cache; cache_kwargs...)
     @test A2 * y ≈ b2
 
     return

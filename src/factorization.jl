@@ -428,7 +428,8 @@ else
     end
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::FastQRFactorization{P}; kwargs...) where {P}
+function SciMLBase.solve(cache::LinearCache, alg::FastQRFactorization{P};
+                         kwargs...) where {P}
     A = cache.A
     A = convert(AbstractMatrix, A)
     ws_and_fact = cache.cacheval

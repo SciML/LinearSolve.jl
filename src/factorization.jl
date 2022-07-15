@@ -328,7 +328,7 @@ end
 
 ## RFLUFactorization
 
-struct RFLUFactorization{P, T}
+struct RFLUFactorization{P, T} <: AbstractFactorization
     RFLUFactorization(::Val{P}, ::Val{T}) where {P, T} = new{P, T}()
 end
 

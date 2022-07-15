@@ -343,7 +343,7 @@ function init_cacheval(alg::RFLUFactorization, A, b, u, Pl, Pr, maxiters,
     ArrayInterfaceCore.lu_instance(convert(AbstractMatrix, A)), ipiv
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::RFLUFactorization{P,T}) where {P,T}
+function SciMLBase.solve(cache::LinearCache, alg::RFLUFactorization{P,T}; kwargs...) where {P,T}
     A = cache.A
     A = convert(AbstractMatrix, A)
     fact, ipiv = cache.cacheval

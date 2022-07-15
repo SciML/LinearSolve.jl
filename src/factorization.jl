@@ -328,7 +328,6 @@ end
 
 ## RFLUFactorization
 
-
 struct RFLUFactorization{P, T}
     RFLUFactorization(::Val{P}, ::Val{T}) where {P, T} = new{P, T}()
 end
@@ -339,11 +338,12 @@ end
 
 function init_cacheval(alg::RFLUFactorization, A, b, u, Pl, Pr, maxiters,
                        abstol, reltol, verbose)
-    ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...));
+    ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
     ArrayInterfaceCore.lu_instance(convert(AbstractMatrix, A)), ipiv
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::RFLUFactorization{P,T}; kwargs...) where {P,T}
+function SciMLBase.solve(cache::LinearCache, alg::RFLUFactorization{P, T};
+                         kwargs...) where {P, T}
     A = cache.A
     A = convert(AbstractMatrix, A)
     fact, ipiv = cache.cacheval
@@ -354,7 +354,6 @@ function SciMLBase.solve(cache::LinearCache, alg::RFLUFactorization{P,T}; kwargs
     y = ldiv!(cache.u, cache.cacheval[1], cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
-
 
 ## FastLAPACKFactorizations
 

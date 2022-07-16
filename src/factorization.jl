@@ -108,7 +108,7 @@ function SciMLBase.solve(cache::LinearCache, alg::UMFPACKFactorization; kwargs..
             SuiteSparse.UMFPACK.umfpack_symbolic!(cache.cacheval)
             fact = lu!(cache.cacheval, A)
         else
-        fact = do_factorization(alg, A, cache.b, cache.u)
+            fact = do_factorization(alg, A, cache.b, cache.u)
         end
         cache = set_cacheval(cache, fact)
     end

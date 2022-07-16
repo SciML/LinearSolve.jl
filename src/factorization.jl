@@ -102,15 +102,14 @@ function SciMLBase.solve(cache::LinearCache, alg::UMFPACKFactorization; kwargs..
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
-        # Temporarily disable UMFPACK resolves 
-        # if cache.cacheval !== nothing && alg.reuse_symbolic
-        #     # If we have a cacheval already, run umfpack_symbolic to ensure the symbolic factorization exists
-        #     # This won't recompute if it does.
-        #     SuiteSparse.UMFPACK.umfpack_symbolic!(cache.cacheval)
-        #     fact = lu!(cache.cacheval, A)
-        # else
+        if cache.cacheval !== nothing && alg.reuse_symbolic
+            # If we have a cacheval already, run umfpack_symbolic to ensure the symbolic factorization exists
+            # This won't recompute if it does.
+            SuiteSparse.UMFPACK.umfpack_symbolic!(cache.cacheval)
+            fact = lu!(cache.cacheval, A)
+        else
         fact = do_factorization(alg, A, cache.b, cache.u)
-        # end
+        end
         cache = set_cacheval(cache, fact)
     end
 

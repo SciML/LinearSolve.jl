@@ -123,7 +123,7 @@ end
 
 function init_cacheval(alg::KLUFactorization, A, b, u, Pl, Pr, maxiters, abstol, reltol,
                        verbose)
-    return KLU.KLUFactorization(convert(AbstractMatrix, A)) # this takes care of the copy internally.
+    return do_factorization(alg, convert(AbstractMatrix, A), b, u) # this takes care of the copy internally.
 end
 
 function do_factorization(::KLUFactorization, A, b, u)
@@ -139,20 +139,15 @@ function SciMLBase.solve(cache::LinearCache, alg::KLUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
-        if cache.cacheval !== nothing && alg.reuse_symbolic
-            # If we have a cacheval already, run umfpack_symbolic to ensure the symbolic factorization exists
-            # This won't recompute if it does.
-            KLU.klu_analyze!(cache.cacheval)
-            if cache.cacheval._numeric === C_NULL # We MUST have a numeric factorization for reuse, unlike UMFPACK.
-                KLU.klu_factor!(cache.cacheval)
-            end
+        if alg.reuse_symbolic
+            # We should *know* that we have a completed Factorization
+            # from init_cacheval at this point. If we don't this will error
             fact = KLU.klu!(cache.cacheval, A)
         else
             fact = do_factorization(alg, A, cache.b, cache.u)
         end
         cache = set_cacheval(cache, fact)
     end
-
     y = ldiv!(cache.u, cache.cacheval, cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end

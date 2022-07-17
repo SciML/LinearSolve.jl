@@ -78,6 +78,7 @@ end
 function init_cacheval(alg::UMFPACKFactorization, A, b, u, Pl, Pr, maxiters, abstol, reltol,
                        verbose)
     A = convert(AbstractMatrix, A)
+    #=
     zerobased = SparseArrays.getcolptr(A)[1] == 0
     res = SuiteSparse.UMFPACK.UmfpackLU(C_NULL, C_NULL, size(A, 1), size(A, 2),
                                         zerobased ? copy(SparseArrays.getcolptr(A)) :
@@ -86,6 +87,9 @@ function init_cacheval(alg::UMFPACKFactorization, A, b, u, Pl, Pr, maxiters, abs
                                         SuiteSparse.decrement(rowvals(A)),
                                         copy(nonzeros(A)), 0)
     finalizer(SuiteSparse.UMFPACK.umfpack_free_symbolic, res)
+    =#
+    res = lu(A; check = false)
+    @assert res isa SuiteSparse.UMFPACK.UmfpackLU
     res
 end
 

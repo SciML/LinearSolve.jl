@@ -20,6 +20,7 @@ end
 
 if GROUP == "All" || GROUP == "Core"
     @time @safetestset "Basic Tests" begin include("basictests.jl") end
+    @time @safetestset "Zero Initialization Tests" begin include("zeroinittests.jl") end
 end
 
 if GROUP == "LinearSolveCUDA"

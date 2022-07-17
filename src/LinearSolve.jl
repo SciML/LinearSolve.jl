@@ -51,7 +51,7 @@ isopenblas() = IS_OPENBLAS[]
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
-       UMFPACKFactorization, KLUFactorization
+       UMFPACKFactorization, KLUFactorization, FastLUFactorization
 
 export LinearSolveFunction
 

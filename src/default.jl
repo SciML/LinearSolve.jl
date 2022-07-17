@@ -15,7 +15,7 @@ function defaultalg(A, b)
             if length(b) <= 10
                 alg = GenericLUFactorization()
             elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500)) &&
-                    eltype(A) <: Union{Float32, Float64} && Base.Threads.nthreads() > 1
+                   eltype(A) <: Union{Float32, Float64} && Base.Threads.nthreads() > 1
                 alg = RFLUFactorization()
             elseif A === nothing || A isa Matrix
                 alg = FastLUFactorization()
@@ -72,7 +72,7 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
                 alg = GenericLUFactorization()
                 SciMLBase.solve(cache, alg, args...; kwargs...)
             elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500)) &&
-                    eltype(A) <: Union{Float32, Float64} && Base.Threads.nthreads() > 1
+                   eltype(A) <: Union{Float32, Float64} && Base.Threads.nthreads() > 1
                 alg = RFLUFactorization()
                 SciMLBase.solve(cache, alg, args...; kwargs...)
             elseif A isa Matrix
@@ -134,7 +134,7 @@ function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters, abstol, reltol, 
                 alg = GenericLUFactorization()
                 init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
             elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500)) &&
-                    eltype(A) <: Union{Float32, Float64} && Base.Threads.nthreads() > 1
+                   eltype(A) <: Union{Float32, Float64} && Base.Threads.nthreads() > 1
                 alg = RFLUFactorization()
                 init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
             elseif A isa Matrix

@@ -265,7 +265,6 @@ function SciMLBase.solve(cache::LinearCache, alg::UMFPACKFactorization; kwargs..
     if cache.isfresh
         if cache.cacheval !== nothing && alg.reuse_symbolic
             # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
-            println("factorize"); display(A)
             fact = lu!(cache.cacheval, A)
         else
             fact = do_factorization(alg, A, cache.b, cache.u)

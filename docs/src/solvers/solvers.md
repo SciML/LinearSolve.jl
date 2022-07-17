@@ -37,8 +37,9 @@ The interface is detailed [here](#passing-in-a-custom-linear-solver)
 
 - `RFLUFactorization()`: a fast pure Julia LU-factorization implementation
   using RecursiveFactorization.jl. This is by far the fastest LU-factorization
-  implementation, usually outperforming OpenBLAS and MKL, but generally optimized
-  only for Base `Array` with `Float32`, `Float64`, `ComplexF32`, and `ComplexF64`.
+  implementation, usually outperforming OpenBLAS and MKL, but currently optimized
+  only for Base `Array` with `Float32` or `Float64`.  Additional optimization for 
+  complex matrices is in the works.
 
 ### Base.LinearAlgebra
 

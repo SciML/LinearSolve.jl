@@ -70,94 +70,6 @@ function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization}, A, b
     ArrayInterfaceCore.lu_instance(convert(AbstractMatrix, A))
 end
 
-# This could be a GenericFactorization perhaps?
-Base.@kwdef struct UMFPACKFactorization <: AbstractFactorization
-    reuse_symbolic::Bool = true
-end
-
-function init_cacheval(alg::UMFPACKFactorization, A, b, u, Pl, Pr, maxiters, abstol, reltol,
-                       verbose)
-    A = convert(AbstractMatrix, A)
-    zerobased = SparseArrays.getcolptr(A)[1] == 0
-    res = SuiteSparse.UMFPACK.UmfpackLU(C_NULL, C_NULL, size(A, 1), size(A, 2),
-                                        zerobased ? copy(SparseArrays.getcolptr(A)) :
-                                        SuiteSparse.decrement(SparseArrays.getcolptr(A)),
-                                        zerobased ? copy(rowvals(A)) :
-                                        SuiteSparse.decrement(rowvals(A)),
-                                        copy(nonzeros(A)), 0)
-    finalizer(SuiteSparse.UMFPACK.umfpack_free_symbolic, res)
-    res
-end
-
-function do_factorization(::UMFPACKFactorization, A, b, u)
-    A = convert(AbstractMatrix, A)
-    if A isa SparseMatrixCSC
-        return lu(A)
-    else
-        error("Sparse LU is not defined for $(typeof(A))")
-    end
-end
-
-function SciMLBase.solve(cache::LinearCache, alg::UMFPACKFactorization; kwargs...)
-    A = cache.A
-    A = convert(AbstractMatrix, A)
-    if cache.isfresh
-        if cache.cacheval !== nothing && alg.reuse_symbolic
-            # If we have a cacheval already, run umfpack_symbolic to ensure the symbolic factorization exists
-            # This won't recompute if it does.
-            SuiteSparse.UMFPACK.umfpack_symbolic!(cache.cacheval)
-            fact = lu!(cache.cacheval, A)
-        else
-            fact = do_factorization(alg, A, cache.b, cache.u)
-        end
-        cache = set_cacheval(cache, fact)
-    end
-
-    y = ldiv!(cache.u, cache.cacheval, cache.b)
-    SciMLBase.build_linear_solution(alg, y, nothing, cache)
-end
-
-Base.@kwdef struct KLUFactorization <: AbstractFactorization
-    reuse_symbolic::Bool = true
-end
-
-function init_cacheval(alg::KLUFactorization, A, b, u, Pl, Pr, maxiters, abstol, reltol,
-                       verbose)
-    return KLU.KLUFactorization(convert(AbstractMatrix, A)) # this takes care of the copy internally.
-end
-
-function do_factorization(::KLUFactorization, A, b, u)
-    A = convert(AbstractMatrix, A)
-    if A isa SparseMatrixCSC
-        return klu(A)
-    else
-        error("KLU is not defined for $(typeof(A))")
-    end
-end
-
-function SciMLBase.solve(cache::LinearCache, alg::KLUFactorization; kwargs...)
-    A = cache.A
-    A = convert(AbstractMatrix, A)
-    if cache.isfresh
-        if cache.cacheval !== nothing && alg.reuse_symbolic
-            # If we have a cacheval already, run umfpack_symbolic to ensure the symbolic factorization exists
-            # This won't recompute if it does.
-            KLU.klu_analyze!(cache.cacheval)
-            copyto!(cache.cacheval.nzval, A.nzval)
-            if cache.cacheval._numeric === C_NULL # We MUST have a numeric factorization for reuse, unlike UMFPACK.
-                KLU.klu_factor!(cache.cacheval)
-            end
-            fact = KLU.klu!(cache.cacheval, A)
-        else
-            fact = do_factorization(alg, A, cache.b, cache.u)
-        end
-        cache = set_cacheval(cache, fact)
-    end
-
-    y = ldiv!(cache.u, cache.cacheval, cache.b)
-    SciMLBase.build_linear_solution(alg, y, nothing, cache)
-end
-
 ## QRFactorization
 
 struct QRFactorization{P} <: AbstractFactorization
@@ -325,6 +237,75 @@ function init_cacheval(alg::Union{GenericFactorization,
                        abstol, reltol, verbose)
     newA = copy(convert(AbstractMatrix, A))
     do_factorization(alg, newA, b, u)
+end
+
+################################## Factorizations which require solve overloads
+
+Base.@kwdef struct UMFPACKFactorization <: AbstractFactorization
+    reuse_symbolic::Bool = true
+end
+
+function init_cacheval(alg::UMFPACKFactorization, A, b, u, Pl, Pr, maxiters, abstol, reltol,
+                       verbose)
+    A = convert(AbstractMatrix, A)
+    zerobased = SparseArrays.getcolptr(A)[1] == 0
+    res = SuiteSparse.UMFPACK.UmfpackLU(C_NULL, C_NULL, size(A, 1), size(A, 2),
+                                        zerobased ? copy(SparseArrays.getcolptr(A)) :
+                                        SuiteSparse.decrement(SparseArrays.getcolptr(A)),
+                                        zerobased ? copy(rowvals(A)) :
+                                        SuiteSparse.decrement(rowvals(A)),
+                                        copy(nonzeros(A)), 0)
+    finalizer(SuiteSparse.UMFPACK.umfpack_free_symbolic, res)
+    res
+end
+
+function SciMLBase.solve(cache::LinearCache, alg::UMFPACKFactorization; kwargs...)
+    A = cache.A
+    A = convert(AbstractMatrix, A)
+    if cache.isfresh
+        if cache.cacheval !== nothing && alg.reuse_symbolic
+            # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
+            fact = lu!(cache.cacheval, A)
+        else
+            fact = do_factorization(alg, A, cache.b, cache.u)
+        end
+        cache = set_cacheval(cache, fact)
+    end
+
+    y = ldiv!(cache.u, cache.cacheval, cache.b)
+    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+end
+
+Base.@kwdef struct KLUFactorization <: AbstractFactorization
+    reuse_symbolic::Bool = true
+end
+
+function init_cacheval(alg::KLUFactorization, A, b, u, Pl, Pr, maxiters, abstol, reltol,
+                       verbose)
+    return KLU.KLUFactorization(convert(AbstractMatrix, A)) # this takes care of the copy internally.
+end
+
+function SciMLBase.solve(cache::LinearCache, alg::KLUFactorization; kwargs...)
+    A = cache.A
+    A = convert(AbstractMatrix, A)
+    if cache.isfresh
+        if cache.cacheval !== nothing && alg.reuse_symbolic
+            # If we have a cacheval already, run umfpack_symbolic to ensure the symbolic factorization exists
+            # This won't recompute if it does.
+            KLU.klu_analyze!(cache.cacheval)
+            copyto!(cache.cacheval.nzval, A.nzval)
+            if cache.cacheval._numeric === C_NULL # We MUST have a numeric factorization for reuse, unlike UMFPACK.
+                KLU.klu_factor!(cache.cacheval)
+            end
+            fact = KLU.klu!(cache.cacheval, A)
+        else
+            fact = do_factorization(alg, A, cache.b, cache.u)
+        end
+        cache = set_cacheval(cache, fact)
+    end
+
+    y = ldiv!(cache.u, cache.cacheval, cache.b)
+    SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
 ## RFLUFactorization

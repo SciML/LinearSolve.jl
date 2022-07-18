@@ -17,8 +17,8 @@ function defaultalg(A, b)
             elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500)) &&
                    eltype(A) <: Union{Float32, Float64} && Base.Threads.nthreads() > 1
                 alg = RFLUFactorization()
-            #elseif A === nothing || A isa Matrix
-            #    alg = FastLUFactorization()
+                #elseif A === nothing || A isa Matrix
+                #    alg = FastLUFactorization()
             else
                 alg = LUFactorization()
             end
@@ -75,9 +75,9 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
                    eltype(A) <: Union{Float32, Float64} && Base.Threads.nthreads() > 1
                 alg = RFLUFactorization()
                 SciMLBase.solve(cache, alg, args...; kwargs...)
-            #elseif A isa Matrix
-            #    alg = FastLUFactorization()
-            #    SciMLBase.solve(cache, alg, args...; kwargs...)
+                #elseif A isa Matrix
+                #    alg = FastLUFactorization()
+                #    SciMLBase.solve(cache, alg, args...; kwargs...)
             else
                 alg = LUFactorization()
                 SciMLBase.solve(cache, alg, args...; kwargs...)
@@ -137,9 +137,9 @@ function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters, abstol, reltol, 
                    eltype(A) <: Union{Float32, Float64} && Base.Threads.nthreads() > 1
                 alg = RFLUFactorization()
                 init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
-            #elseif A isa Matrix
-            #    alg = FastLUFactorization()
-            #    init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+                #elseif A isa Matrix
+                #    alg = FastLUFactorization()
+                #    init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
             else
                 alg = LUFactorization()
                 init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)

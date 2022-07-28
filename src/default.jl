@@ -107,7 +107,7 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
         else
             alg = UMFPACKFactorization()
             SciMLBase.solve(cache, alg, args...; kwargs...)
-        end      
+        end
 
         # This catches the cases where a factorization overload could exist
         # For example, BlockBandedMatrix

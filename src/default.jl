@@ -33,7 +33,11 @@ function defaultalg(A, b)
     elseif A isa SymTridiagonal
         alg = GenericFactorization(; fact_alg = ldlt!)
     elseif A isa SparseMatrixCSC
-        alg = KLUFactorization()
+        if length(b) <= 10_000
+            alg = KLUFactorization()
+        else
+            alg = UMFPACKFactorization()
+        end
 
         # This catches the cases where a factorization overload could exist
         # For example, BlockBandedMatrix
@@ -96,8 +100,13 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
         alg = GenericFactorization(; fact_alg = ldlt!)
         SciMLBase.solve(cache, alg, args...; kwargs...)
     elseif A isa SparseMatrixCSC
-        alg = KLUFactorization()
-        SciMLBase.solve(cache, alg, args...; kwargs...)
+        if length(b) <= 10_000
+            alg = KLUFactorization()
+            SciMLBase.solve(cache, alg, args...; kwargs...)
+        else
+            alg = UMFPACKFactorization()
+            SciMLBase.solve(cache, alg, args...; kwargs...)
+        end      
 
         # This catches the cases where a factorization overload could exist
         # For example, BlockBandedMatrix
@@ -158,8 +167,13 @@ function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters, abstol, reltol, 
         alg = GenericFactorization(; fact_alg = ldlt!)
         init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
     elseif A isa SparseMatrixCSC
-        alg = KLUFactorization()
-        init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+        if length(b) <= 10_000
+            alg = KLUFactorization()
+            init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+        else
+            alg = UMFPACKFactorization()
+            init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+        end
 
         # This catches the cases where a factorization overload could exist
         # For example, BlockBandedMatrix

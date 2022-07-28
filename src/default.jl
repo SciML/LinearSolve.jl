@@ -100,6 +100,7 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
         alg = GenericFactorization(; fact_alg = ldlt!)
         SciMLBase.solve(cache, alg, args...; kwargs...)
     elseif A isa SparseMatrixCSC
+        b = cache.b
         if length(b) <= 10_000
             alg = KLUFactorization()
             SciMLBase.solve(cache, alg, args...; kwargs...)

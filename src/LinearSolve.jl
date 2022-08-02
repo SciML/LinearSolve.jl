@@ -5,9 +5,9 @@ using RecursiveFactorization
 using Base: cache_dependencies, Bool
 import Base: eltype, adjoint, inv
 using LinearAlgebra
-using IterativeSolvers: Identity
+import IterativeSolvers: Identity # TODO - replace with SciMLOperators.IdentityOperator
 using SparseArrays
-using SciMLBase: AbstractDiffEqOperator, AbstractLinearAlgorithm
+using SciMLOperators
 using Setfield
 using UnPack
 using SuiteSparse

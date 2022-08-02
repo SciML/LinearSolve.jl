@@ -24,6 +24,7 @@ import IterativeSolvers
 using Reexport
 @reexport using SciMLBase
 
+isidentity(A) = A === I
 isidentity(A::UniformScaling) = isone(A.λ)
 isidentity(::IterativeSolvers.Identity) = true
 isidentity(::SciMLOperators.IdentityOperator) = true

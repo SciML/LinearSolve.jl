@@ -2,9 +2,11 @@
 
 # Allows A === nothing as a stand-in for dense matrix
 function defaultalg(A, b)
-    if A isa DiffEqArrayOperator
+    if A isa MatrixOperator
         A = A.A
     end
+
+    # TODO - create case for has_ldiv(A) == true
 
     # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
     # it makes sense according to the benchmarks, which is dependent on
@@ -61,7 +63,7 @@ end
 function SciMLBase.solve(cache::LinearCache, alg::Nothing,
                          args...; kwargs...)
     @unpack A = cache
-    if A isa DiffEqArrayOperator
+    if A isa MatrixOperator
         A = A.A
     end
 
@@ -130,7 +132,7 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
 end
 
 function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
-    if A isa DiffEqArrayOperator
+    if A isa MatrixOperator
         A = A.A
     end
 

@@ -7,7 +7,7 @@ import Base: eltype, adjoint, inv
 using LinearAlgebra
 using SparseArrays
 using SciMLOperators
-using SciMLOperators: IdentityOperator, InvertedOperator
+using SciMLOperators: AbstractSciMLOperator, IdentityOperator, InvertedOperator
 using Setfield
 using UnPack
 using SuiteSparse

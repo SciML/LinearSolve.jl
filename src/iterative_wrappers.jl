@@ -133,6 +133,8 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
     M = cache.Pl
     N = cache.Pr
 
+    # TODO wrap in SciMLOperator and use lazy inverse - Base.inv
+    # look at expected signature in preconditinoers.jl
     M = (M === Identity()) ? I : InvPreconditioner(M)
     N = (N === Identity()) ? I : InvPreconditioner(N)
 

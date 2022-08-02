@@ -1,5 +1,7 @@
 # Tooling Preconditioners
 
+# TODO - clear this out
+
 struct ComposePreconditioner{Ti, To}
     inner::Ti
     outer::To

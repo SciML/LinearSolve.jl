@@ -5,7 +5,6 @@ using RecursiveFactorization
 using Base: cache_dependencies, Bool
 import Base: eltype, adjoint, inv
 using LinearAlgebra
-import IterativeSolvers: Identity # TODO - replace with SciMLOperators.IdentityOperator
 using SparseArrays
 using SciMLOperators
 using Setfield
@@ -23,6 +22,13 @@ import IterativeSolvers
 
 using Reexport
 @reexport using SciMLBase
+
+# TODO - replace instances of these SciMLOperators.IdentityOperator
+const IdentityTypes = (
+                       LinearAlgebra.I,
+                       IterativeSolvers.Identity,
+                       SciMLOperators.IdentityOperator
+                      )
 
 abstract type SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
 abstract type AbstractFactorization <: SciMLLinearSolveAlgorithm end

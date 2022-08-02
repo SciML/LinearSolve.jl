@@ -2,20 +2,20 @@
 # For SciML algorithms already using `defaultalg`, all assume square matrix.
 defaultalg(A, b) = defaultalg(A, b, OperatorAssumptions(Val(true)))
 
-function defaultalg(A::DiffEqArrayOperator, b, assumptions::OperatorAssumptions)
+function defaultalg(A::MatrixOperator, b, assumptions::OperatorAssumptions)
     defaultalg(A.A, b, assumptions)
 end
 
 # Ambiguity handling
-function defaultalg(A::DiffEqArrayOperator, b, assumptions::OperatorAssumptions{nothing})
+function defaultalg(A::MatrixOperator, b, assumptions::OperatorAssumptions{nothing})
     defaultalg(A.A, b, assumptions)
 end
 
-function defaultalg(A::DiffEqArrayOperator, b, assumptions::OperatorAssumptions{false})
+function defaultalg(A::MatrixOperator, b, assumptions::OperatorAssumptions{false})
     defaultalg(A.A, b, assumptions)
 end
 
-function defaultalg(A::DiffEqArrayOperator, b, assumptions::OperatorAssumptions{true})
+function defaultalg(A::MatrixOperator, b, assumptions::OperatorAssumptions{true})
     defaultalg(A.A, b, assumptions)
 end
 
@@ -58,18 +58,18 @@ function defaultalg(A, b::GPUArraysCore.AbstractGPUArray, ::OperatorAssumptions{
     end
 end
 
-function defaultalg(A::SciMLBase.AbstractDiffEqOperator, b,
+function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
                     assumptions::OperatorAssumptions)
     KrylovJL_GMRES()
 end
 
 # Ambiguity handling
-function defaultalg(A::SciMLBase.AbstractDiffEqOperator, b,
+function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
                     assumptions::OperatorAssumptions{Nothing})
     KrylovJL_GMRES()
 end
 
-function defaultalg(A::SciMLBase.AbstractDiffEqOperator, b,
+function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
                     assumptions::OperatorAssumptions{false})
     KrylovJL_LSMR()
 end
@@ -100,6 +100,8 @@ end
 
 # Allows A === nothing as a stand-in for dense matrix
 function defaultalg(A, b, ::OperatorAssumptions{true})
+    # TODO (vedant) - create case for has_ldiv(A) == true
+
     # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
     # it makes sense according to the benchmarks, which is dependent on
     # whether MKL or OpenBLAS is being used

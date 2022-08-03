@@ -14,6 +14,7 @@ SciMLOperators = "c0aeaf25-5076-4817-a8d5-81caf7dfa961"
 CUDA = "3"
 LinearSolve = "1"
 SciMLBase = "1.25"
+SciMLOperators = "0.1.10"
 julia = "1.6"
 
 [extras]

@@ -52,6 +52,10 @@ include("solve_function.jl")
 include("default.jl")
 include("init.jl")
 
+# deprecate preconditioner interface
+@deprecate ComposePreconditioner SciMLOperators.ComposedOperator
+@deprecate InvPreconditioner SciMLOperators.InvertedOperator
+
 const IS_OPENBLAS = Ref(true)
 isopenblas() = IS_OPENBLAS[]
 

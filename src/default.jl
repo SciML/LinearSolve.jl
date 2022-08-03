@@ -6,12 +6,15 @@ function defaultalg(A, b)
         A = A.A
     end
 
-    # TODO - create case for has_ldiv(A) == true
+    if SciMLOperators.has_ldiv(A) # TODO write applyldiv alg
+        #alg = Applyldiv
+    elseif SciMLOperators.has_ldiv!(A)
+        #alg = Applyldiv!
 
     # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
     # it makes sense according to the benchmarks, which is dependent on
     # whether MKL or OpenBLAS is being used
-    if (A === nothing && !(b isa GPUArraysCore.AbstractGPUArray)) || A isa Matrix
+    elseif (A === nothing && !(b isa GPUArraysCore.AbstractGPUArray)) || A isa Matrix
         if (A === nothing || eltype(A) <: Union{Float32, Float64, ComplexF32, ComplexF64}) &&
            ArrayInterfaceCore.can_setindex(b)
             if length(b) <= 10

@@ -106,7 +106,7 @@ function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, re
                  alg.KrylovAlg === Krylov.diom! ||
                  alg.KrylovAlg === Krylov.gmres! ||
                  alg.KrylovAlg === Krylov.fom!)
-        KS(A, b, memory)
+        KS(A, b, memory) # TODO (vedant) add kwarg ldiv=true, and wont need to invert precs
     elseif (alg.KrylovAlg === Krylov.minres! ||
             alg.KrylovAlg === Krylov.symmlq! ||
             alg.KrylovAlg === Krylov.lslq! ||

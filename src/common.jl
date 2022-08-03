@@ -95,8 +95,8 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
                         reltol = default_tol(eltype(prob.A)),
                         maxiters::Int = length(prob.b),
                         verbose::Bool = false,
-                        Pl = Identity(),
-                        Pr = Identity(),
+                        Pl = IdentityOperator{size(prob.A, 1)}(),
+                        Pr = IdentityOperator{size(prob.A, 2)}();
                         assumptions = OperatorAssumptions(),
                         kwargs...)
     @unpack A, b, u0, p = prob

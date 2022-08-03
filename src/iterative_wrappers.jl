@@ -135,8 +135,8 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
 
     # TODO wrap in SciMLOperator and use lazy inverse - Base.inv
     # look at expected signature in preconditinoers.jl
-    M = (M === Identity()) ? I : InvPreconditioner(M)
-    N = (N === Identity()) ? I : InvPreconditioner(N)
+    M = M isa IterativeSolvers.Identity ? IdentityOperator{size(cache.A, 1)}() : InvertedOperator(M)
+    N = N isa IterativeSolvers.Identity ? IdentityOperator{size(cache.A, 2)}() : InvertedOperator(N)
 
     atol = float(cache.abstol)
     rtol = float(cache.reltol)
@@ -219,7 +219,7 @@ function init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, maxiters::Int, 
               alg.kwargs...)
 
     iterable = if alg.generate_iterator === IterativeSolvers.cg_iterator!
-        Pr !== Identity() &&
+        !isidentity(Pr) &&
             @warn "$(alg.generate_iterator) doesn't support right preconditioning"
         alg.generate_iterator(u, A, b, Pl;
                               kwargs...)
@@ -227,7 +227,7 @@ function init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, maxiters::Int, 
         alg.generate_iterator(u, A, b; Pl = Pl, Pr = Pr, restart = restart,
                               kwargs...)
     elseif alg.generate_iterator === IterativeSolvers.bicgstabl_iterator!
-        Pr !== Identity() &&
+        !isidentity(Pr) &&
             @warn "$(alg.generate_iterator) doesn't support right preconditioning"
         alg.generate_iterator(u, A, b, alg.args...; Pl = Pl,
                               abstol = abstol, reltol = reltol,

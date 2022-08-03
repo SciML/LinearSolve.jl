@@ -49,7 +49,7 @@ include("solve_function.jl")
 include("default.jl")
 include("init.jl")
 
-# deprecate preconditioner interface in favor of SciMLOperators
+# deprecate preconditioner interface
 @deprecate ComposePreconditioner SciMLOperators.ComposedOperator
 @deprecate InvPreconditioner SciMLOperators.InvertedOperator
 

@@ -7,6 +7,7 @@ import Base: eltype, adjoint, inv
 using LinearAlgebra
 using SparseArrays
 using SciMLOperators
+using SciMLOperators: IdentityOperator, InvertedOperator
 using Setfield
 using UnPack
 using SuiteSparse
@@ -23,7 +24,6 @@ import IterativeSolvers
 using Reexport
 @reexport using SciMLBase
 
-#TODO - replace instances of these SciMLOperators.IdentityOperator
 function isidentity(A)
     return (A === LinearAlgebra.I) |
            (A isa IterativeSolvers.Identity) |

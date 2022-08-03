@@ -42,7 +42,6 @@ needs_concrete_A(alg::AbstractKrylovSubspaceMethod) = false
 needs_concrete_A(alg::AbstractSolveFunction) = false
 
 # Code
-
 include("common.jl")
 include("factorization.jl")
 include("simplelu.jl")
@@ -51,7 +50,7 @@ include("solve_function.jl")
 include("default.jl")
 include("init.jl")
 
-# deprecate preconditioner interface
+# deprecate preconditioner interface in favor of SciMLOperators
 @deprecate ComposePreconditioner SciMLOperators.ComposedOperator
 @deprecate InvPreconditioner SciMLOperators.InvertedOperator
 

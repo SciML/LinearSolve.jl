@@ -100,11 +100,10 @@ end
 
 # Allows A === nothing as a stand-in for dense matrix
 function defaultalg(A, b, ::OperatorAssumptions{true})
-
     if SciMLOperators.has_ldiv!(A)
-        alg = Applyldiv()
+        alg = ApplyLdiv!()
     elseif SciMLOperators.has_ldiv(A)
-        alg = Applyldiv!()
+        alg = ApplyLdiv()
 
     # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
     # it makes sense according to the benchmarks, which is dependent on

@@ -133,9 +133,9 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
     M = cache.Pl
     N = cache.Pr
 
-    # TODO - Base.inv - literally inverts matrices. bad.
-    M = isidentity(M) ? IdentityOperator{size(cache.A, 1)}() : InvertedOperator(M)
-    N = isidentity(N) ? IdentityOperator{size(cache.A, 2)}() : InvertedOperator(N)
+    # TODO - Base.inv - literally inverts matrices. avoid
+    M = isidentity(M) ? M : InvertedOperator(M)
+    N = isidentity(N) ? N : InvertedOperator(N)
 
     atol = float(cache.abstol)
     rtol = float(cache.reltol)

@@ -27,6 +27,12 @@ factorization methods if a lower tolerance of the solution is required.
 Krylov.jl generally outperforms IterativeSolvers.jl and KrylovKit.jl, and is compatible
 with CPUs and GPUs, and thus is the generally preferred form for Krylov methods.
 
+Many linear system have custom inverses defined. If `Base.\`, or `LinearAlgebra.ldiv!` are
+overloaded for `A`, then the user can choose the algorithms `ApplyLdiv`, or `ApplyLdiv!` to
+use that. Alternatively, `LinearSolve` will automatically use `Base.\` or
+`LinearAlgebra.ldiv!` if `SciMLOperators.has_ldiv(A)` or `SciMLOperators.has_ldiv!(A)`
+evaluates to `true`.
+
 Finally, a user can pass a custom function for handling the linear solve using
 `LinearSolveFunction()` if existing solvers are not optimally suited for their application.
 The interface is detailed [here](#passing-in-a-custom-linear-solver)

@@ -193,39 +193,6 @@ end
         end
     end
 
-    # TODO - remove vector diagonal precondtioner, composeprecond, invprecond0
-    @testset "Preconditioners" begin
-        @testset "Vector Diagonal Preconditioner" begin
-            x = rand(n, n)
-            y = rand(n, n)
-
-            s = rand(n)
-            #Pl, Pr = DiagonalOperator(s), LinearSolve.InvPreconditioner(Diagonal(s))
-            Pl = DiagonalOperator(s)
-            Pr = inv(Pl)
-
-            Pl = cache_operator(Pl, x)
-            Pr = cache_operator(Pr, x)
-
-            mul!(y, Pl, x)
-            @test y ≈ s .* x
-            mul!(y, Pr, x)
-            @test y ≈ s .\ x
-
-            y .= x
-            ldiv!(Pl, x)
-            @test x ≈ s .\ y
-            y .= x
-            ldiv!(Pr, x)
-            @test x ≈ s .* y
-
-            ldiv!(y, Pl, x)
-            @test y ≈ s .\ x
-            ldiv!(y, Pr, x)
-            @test y ≈ s .* x
-        end
-    end
-
     @testset "Sparse Precaching" begin
         n = 4
         Random.seed!(10)

@@ -133,10 +133,9 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
     M = cache.Pl
     N = cache.Pr
 
-    # TODO wrap in SciMLOperator and use lazy inverse - Base.inv
-    # look at expected signature in preconditinoers.jl
-    M = M isa IterativeSolvers.Identity ? IdentityOperator{size(cache.A, 1)}() : InvertedOperator(M)
-    N = N isa IterativeSolvers.Identity ? IdentityOperator{size(cache.A, 2)}() : InvertedOperator(N)
+    # TODO - Base.inv - literally inverts matrices. bad.
+    M = isidentity(M) ? IdentityOperator{size(cache.A, 1)}() : InvertedOperator(M)
+    N = isidentity(N) ? IdentityOperator{size(cache.A, 2)}() : InvertedOperator(N)
 
     atol = float(cache.abstol)
     rtol = float(cache.reltol)

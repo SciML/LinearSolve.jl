@@ -28,5 +28,5 @@ function SciMLBase.solve(cache::LinearCache, alg::DirectLdiv, args...; kwargs...
         copy!(u, v)
     end
 
-    return SciMLBase.build_linear_solution(ApplyLdiv(), cache.u, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
 end

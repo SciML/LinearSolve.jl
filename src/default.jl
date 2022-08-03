@@ -105,7 +105,10 @@ function defaultalg(A, b, ::OperatorAssumptions{true})
     elseif SciMLOperators.has_ldiv(A)
         alg = DirectLdiv(inplace=false)
 
-    # TODO - create case for has_ldiv(A) == true
+    if SciMLOperators.has_ldiv(A) # TODO write applyldiv alg
+        #alg = Applyldiv
+    elseif SciMLOperators.has_ldiv!(A)
+        #alg = Applyldiv!
 
     # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
     # it makes sense according to the benchmarks, which is dependent on

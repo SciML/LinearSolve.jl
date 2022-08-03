@@ -7,9 +7,9 @@ function defaultalg(A, b)
     end
 
     if SciMLOperators.has_ldiv!(A)
-        alg = Applyldiv()
+        alg = ApplyLdiv!()
     elseif SciMLOperators.has_ldiv(A)
-        alg = Applyldiv!()
+        alg = ApplyLdiv()
 
     # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
     # it makes sense according to the benchmarks, which is dependent on
@@ -70,10 +70,17 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
         A = A.A
     end
 
+    if SciMLOperators.has_ldiv!(A)
+        alg = ApplyLdiv!()
+        SciMLBase.solve(cache, alg, args...; kwargs...)
+    elseif SciMLOperators.has_ldiv(A)
+        alg = ApplyLdiv()
+        SciMLBase.solve(cache, alg, args...; kwargs...)
+
     # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
     # it makes sense according to the benchmarks, which is dependent on
     # whether MKL or OpenBLAS is being used
-    if A isa Matrix
+    elseif A isa Matrix
         b = cache.b
         if (A === nothing || eltype(A) <: Union{Float32, Float64, ComplexF32, ComplexF64}) &&
            ArrayInterfaceCore.can_setindex(b)
@@ -139,10 +146,17 @@ function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters, abstol, reltol, 
         A = A.A
     end
 
+    if SciMLOperators.has_ldiv!(A)
+        alg = ApplyLdiv!()
+        init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+    elseif SciMLOperators.has_ldiv(A)
+        alg = ApplyLdiv()
+        init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+
     # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
     # it makes sense according to the benchmarks, which is dependent on
     # whether MKL or OpenBLAS is being used
-    if A isa Matrix
+    elseif A isa Matrix
         if (A === nothing || eltype(A) <: Union{Float32, Float64, ComplexF32, ComplexF64}) &&
            ArrayInterfaceCore.can_setindex(b)
             if length(b) <= 10

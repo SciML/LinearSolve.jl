@@ -14,21 +14,21 @@ function SciMLBase.solve(cache::LinearCache, alg::LinearSolveFunction, args...; 
 end
 
 struct ApplyLdiv <: AbstractSolveFunction end
-function SciMLBase.solve(cache::LinearCache, ::ApplyLdiv, args...; kwargs...)
+function SciMLBase.solve(cache::LinearCache, alg::ApplyLdiv, args...; kwargs...)
     @unpack A, b, u = cache
 
     v = A \ b
     copy!(u, v)
 
-    return SciMLBase.build_linear_solution(ApplyLdiv(), cache.u, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
 end
 
 struct ApplyLdiv! <: AbstractSolveFunction end
-function SciMLBase.solve(cache::LinearCache, ::ApplyLdiv!, args...; kwargs...)
+function SciMLBase.solve(cache::LinearCache, alg::ApplyLdiv!, args...; kwargs...)
     @unpack A, b, u = cache
 
     ldiv!(u, A, b)
 
-    return SciMLBase.build_linear_solution(ApplyLdiv!(), cache.u, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
 end
 

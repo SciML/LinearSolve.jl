@@ -45,7 +45,6 @@ function test_interface(alg, prob1, prob2)
 end
 
 @testset "LinearSolve" begin
-    #=
     @testset "Default Linear Solver" begin
         test_interface(nothing, prob1, prob2)
 
@@ -222,7 +221,6 @@ end
         @test sol13.u ≈ sol23.u
     end
 
-    =#
     @testset "Solve Function" begin
         @testset "LinearSolveFunction" begin
             A1 = rand(n) |> Diagonal
@@ -255,8 +253,6 @@ end
             end
         end
 
-        # TODO - tests for ApplyLdiv, ApplyLdiv! - check polyalg chooses Applylidv!
-        # TODO - tests with SciMLOps. pass in whacky functionoperators
         @testset "ApplyLdiv" begin
             function get_operator(A, u)
                 F = lu(A)
@@ -274,8 +270,11 @@ end
             prob1 = LinearProblem(op1, b1; u0 = x1)
             prob2 = LinearProblem(op2, b2; u0 = x2)
 
+            @test LinearSolve.defaultalg(op1, x1) isa ApplyLdiv
+            @test LinearSolve.defaultalg(op2, x2) isa ApplyLdiv
+
             test_interface(ApplyLdiv(), prob1, prob2)
-            #test_interface(nothing, prob1, prob2)
+            test_interface(nothing, prob1, prob2)
         end
 
         @testset "ApplyLdiv!" begin
@@ -295,8 +294,11 @@ end
             prob1 = LinearProblem(op1, b1; u0 = x1)
             prob2 = LinearProblem(op2, b2; u0 = x2)
 
+            @test LinearSolve.defaultalg(op1, x1) isa ApplyLdiv!
+            @test LinearSolve.defaultalg(op2, x2) isa ApplyLdiv!
+
             test_interface(ApplyLdiv(), prob1, prob2)
-            #test_interface(nothing, prob1, prob2)
+            test_interface(nothing, prob1, prob2)
         end
     end
 

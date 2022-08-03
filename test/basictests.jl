@@ -191,6 +191,7 @@ end
         end
     end
 
+    # TODO - remove vector diagonal precondtioner, composeprecond, invprecond0
     @testset "Preconditioners" begin
         @testset "Vector Diagonal Preconditioner" begin
             s = rand(n)
@@ -215,26 +216,6 @@ end
             @test y ≈ s .\ x
             ldiv!(y, Pr, x)
             @test y ≈ s .* x
-        end
-
-        @testset "ComposePreconditioenr" begin
-            s1 = rand(n)
-            s2 = rand(n)
-
-            x = rand(n, n)
-            y = rand(n, n)
-
-            P1 = Diagonal(s1)
-            P2 = Diagonal(s2)
-
-            P = LinearSolve.ComposePreconditioner(P1, P2)
-
-            # ComposePreconditioner
-            ldiv!(y, P, x)
-            @test y ≈ ldiv!(P2, ldiv!(P1, x))
-            y .= x
-            ldiv!(P, x)
-            @test x ≈ ldiv!(P2, ldiv!(P1, y))
         end
     end
 

@@ -23,12 +23,12 @@ import IterativeSolvers
 using Reexport
 @reexport using SciMLBase
 
-# TODO - replace instances of these SciMLOperators.IdentityOperator
-const IdentityTypes = (
-                       LinearAlgebra.I,
-                       IterativeSolvers.Identity,
-                       SciMLOperators.IdentityOperator
-                      )
+#TODO - replace instances of these SciMLOperators.IdentityOperator
+function isidentity(A)
+    return (A === LinearAlgebra.I) |
+           (A isa IterativeSolvers.Identity) |
+           (A isa SciMLOperators.IdentityOperator)
+end
 
 abstract type SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
 abstract type AbstractFactorization <: SciMLLinearSolveAlgorithm end

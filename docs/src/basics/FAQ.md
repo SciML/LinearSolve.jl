@@ -40,39 +40,40 @@ IterativeSolvers.jl computes the norm after the application of the left precondt
 hack the system via the following formulation:
 
 ```@example FAQPrec
-using LinearSolve, LinearAlgebra
+using LinearSolve, LinearAlgebra, SciMLOperators
 
 n = 2
 A = rand(n,n)
 b = rand(n)
-
 weights = [1e-1, 1]
-Pl = LinearSolve.InvPreconditioner(Diagonal(weights))
-Pr = Diagonal(weights)
 
+Pr = DiagonalOperator(weights)
+Pl = inv(Pr)
 
 prob = LinearProblem(A,b)
 sol = solve(prob,IterativeSolversJL_GMRES(),Pl=Pl,Pr=Pr)
 
 sol.u
 ```
+Here, `Base.inv` is overloaded on `SciMLOperators` to store a lazy inverse so no memory is allocated in forming `Pl = inv(Pr)`.
 
 If you want to use a "real" preconditioner under the norm `weights`, then one
-can use `ComposePreconditioner` to apply the preconditioner after the application
-of the weights like as follows:
+can lazily compose preconditinoers via SciMLOperators to apply the preconditioner
+after the application of the weights as follows:
 
 ```@example FAQ2
-using LinearSolve, LinearAlgebra
+using LinearSolve, LinearAlgebra, SciMLOperators
 
 n = 4
 A = rand(n,n)
 b = rand(n)
-
 weights = rand(n)
-realprec = lu(rand(n,n)) # some random preconditioner
-Pl = LinearSolve.ComposePreconditioner(LinearSolve.InvPreconditioner(Diagonal(weights)),realprec)
-Pr = Diagonal(weights)
+
+realprec = lu(rand(n,n)) # some preconditioner
+Pr = DiagonalOperator(weights)
+Pl = inv(Pr) * realprec
 
 prob = LinearProblem(A,b)
 sol = solve(prob,IterativeSolversJL_GMRES(),Pl=Pl,Pr=Pr)
 ```
+As before, `inv(Pr)` is formed lazily, and `Base.*` is overloaded to lazy composition for `SciMLOperators`.

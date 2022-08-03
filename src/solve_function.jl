@@ -1,5 +1,4 @@
 #
-# TODO replace LinearSolveFunction with FunctionOperator
 struct LinearSolveFunction{F} <: AbstractSolveFunction
     solve_func::F
 end

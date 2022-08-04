@@ -253,7 +253,7 @@ end
             end
         end
 
-        @testset "ApplyLdiv" begin
+        @testset "DirectLdiv(inplace=false)" begin
             function get_operator(A, u)
                 F = lu(A)
                 f(u, p, t)  = (println("using FunctionOperator mul"); A * u)
@@ -270,14 +270,14 @@ end
             prob1 = LinearProblem(op1, b1; u0 = x1)
             prob2 = LinearProblem(op2, b2; u0 = x2)
 
-            @test LinearSolve.defaultalg(op1, x1) isa ApplyLdiv
-            @test LinearSolve.defaultalg(op2, x2) isa ApplyLdiv
+            @test LinearSolve.defaultalg(op1, x1) isa DirectLdiv
+            @test LinearSolve.defaultalg(op2, x2) isa DirectLdiv
 
-            test_interface(ApplyLdiv(), prob1, prob2)
+            test_interface(DirectLdiv(inplace=false), prob1, prob2)
             test_interface(nothing, prob1, prob2)
         end
 
-        @testset "ApplyLdiv!" begin
+        @testset "DirectLdiv(inplace=true)" begin
             function get_operator(A, u)
                 F = lu(A)
                 f(du, u, p, t)  = (println("using FunctionOperator mul!"); mul!(du, A, u))
@@ -294,10 +294,10 @@ end
             prob1 = LinearProblem(op1, b1; u0 = x1)
             prob2 = LinearProblem(op2, b2; u0 = x2)
 
-            @test LinearSolve.defaultalg(op1, x1) isa ApplyLdiv!
-            @test LinearSolve.defaultalg(op2, x2) isa ApplyLdiv!
+            @test LinearSolve.defaultalg(op1, x1) isa DirectLdiv
+            @test LinearSolve.defaultalg(op2, x2) isa DirectLdiv
 
-            test_interface(ApplyLdiv(), prob1, prob2)
+            test_interface(DirectLdiv(), prob1, prob2)
             test_interface(nothing, prob1, prob2)
         end
     end

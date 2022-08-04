@@ -13,22 +13,20 @@ function SciMLBase.solve(cache::LinearCache, alg::LinearSolveFunction, args...; 
     return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
 end
 
-struct ApplyLdiv <: AbstractSolveFunction end
-function SciMLBase.solve(cache::LinearCache, alg::ApplyLdiv, args...; kwargs...)
-    @unpack A, b, u = cache
+Base.@kwdef struct DirectLdiv <: AbstractSolveFunction
+    inplace::Bool = true
+end
 
-    v = A \ b
-    copy!(u, v)
+function SciMLBase.solve(cache::LinearCache, alg::DirectLdiv, args...; kwargs...)
+    @unpack A, b, u = cache
+    @unpack inplace = alg
+
+    if inplace
+        ldiv!(u, A, b)
+    else
+        v = A \ b
+        copy!(u, v)
+    end
 
     return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
 end
-
-struct ApplyLdiv! <: AbstractSolveFunction end
-function SciMLBase.solve(cache::LinearCache, alg::ApplyLdiv!, args...; kwargs...)
-    @unpack A, b, u = cache
-
-    ldiv!(u, A, b)
-
-    return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
-end
-

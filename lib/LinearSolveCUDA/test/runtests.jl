@@ -42,9 +42,6 @@ function test_interface(alg, prob1, prob2)
     return
 end
 
-# TODO - test with SciMLOperators.MatrixOperator
-# TODO - test LinearSolveCUDA on GPU machine
-
 test_interface(CudaOffloadFactorization(), prob1, prob2)
 
 A1 = prob1.A;

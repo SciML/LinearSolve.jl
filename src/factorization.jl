@@ -299,7 +299,9 @@ function SciMLBase.solve(cache::LinearCache, alg::KLUFactorization; kwargs...)
             end
             fact = KLU.klu!(cache.cacheval, A)
         else
-            fact = do_factorization(alg, A, cache.b, cache.u)
+            # New fact each time since the sparsity pattern can change
+            # and thus it needs to reallocate
+            fact = KLU.klu(A)
         end
         cache = set_cacheval(cache, fact)
     end

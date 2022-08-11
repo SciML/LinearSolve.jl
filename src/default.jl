@@ -47,7 +47,11 @@ function defaultalg(A, b)
         # This catches the case where A is a CuMatrix
         # Which does not have LU fully defined
     elseif A isa GPUArraysCore.AbstractGPUArray || b isa GPUArraysCore.AbstractGPUArray
-        alg = LUFactorization()
+        if VERSION >= v"1.8-"
+            alg = LUFactorization()
+        else
+            alg = QRFactorization()
+        end
 
         # Not factorizable operator, default to only using A*x
     else
@@ -118,9 +122,13 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
         # This catches the case where A is a CuMatrix
         # Which does not have LU fully defined
     elseif A isa GPUArraysCore.AbstractGPUArray
-        alg = LUFactorization()
-        SciMLBase.solve(cache, alg, args...; kwargs...)
-
+        if VERSION >= v"1.8-"
+            alg = LUFactorization()
+            SciMLBase.solve(cache, alg, args...; kwargs...)
+        else
+            alg = QRFactorization()
+            SciMLBase.solve(cache, alg, args...; kwargs...)
+        end
         # Not factorizable operator, default to only using A*x
         # IterativeSolvers is faster on CPU but not GPU-compatible
     else
@@ -185,9 +193,13 @@ function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters, abstol, reltol, 
         # This catches the case where A is a CuMatrix
         # Which does not have LU fully defined
     elseif A isa GPUArraysCore.AbstractGPUArray
-        alg = LUFactorization()
-        init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
-
+        if VERSION >= v"1.8-"
+            alg = LUFactorization()
+            init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+        else
+            alg = QRFactorization()
+            init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+        end
         # Not factorizable operator, default to only using A*x
         # IterativeSolvers is faster on CPU but not GPU-compatible
     else

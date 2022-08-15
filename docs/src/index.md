@@ -1,6 +1,6 @@
-# Overview
+# LinearSolve.jl: High-Performance Unified Linear Solvers
 
-LinearSolve.jl is a high-performance unified interface for the linear solving packages of
+LinearSolve.jl is a unified interface for the linear solving packages of
 Julia. It interfaces with other packages of the Julia ecosystem
 to make it easy to test alternative solver packages and pass small types to
 control algorithm swapping. It also interfaces with the

@@ -50,7 +50,7 @@ A = rand(n,n)
 b = rand(n)
 
 prob = LinearProblem(A,b)
-sol = solve(prob,IterativeSolvers_GMRES(),Pl=Pl)
+sol = solve(prob,IterativeSolversJL_GMRES(),Pl=Pl)
 ```
 
 ## Preconditioner Interface

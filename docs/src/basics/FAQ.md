@@ -29,7 +29,7 @@ a few ways:
    can slow down calculations. LinearSolve.jl has proper caches for fully preallocated no-GC workflows.
 3. LinearSolve.jl makes a lot of other optimizations, like factorization reuse and symbolic factorization reuse, automatic.
    Many of these optimizations are not even possible from the high-level APIs of things like Python's major libraries and MATLAB.
-4. LinearSolve.jl has a much more extensive set of sparse matrix solvers, which is why you see a major difference (2x-10x) for sparse 
+4. LinearSolve.jl has a much more extensive set of sparse matrix solvers, which is why you see a major difference (2x-10x) for sparse
    matrices. Which sparse matrix solver between KLU, UMFPACK, Pardiso, etc. is optimal depends a lot on matrix sizes, sparsity patterns,
    and threading overheads. LinearSolve.jl's heuristics handle these kinds of issues.
 
@@ -48,7 +48,7 @@ A = rand(n,n)
 b = rand(n)
 
 prob = LinearProblem(A,b)
-sol = solve(prob,IterativeSolvers_GMRES(),Pl=Pl,Pr=Pr)
+sol = solve(prob,IterativeSolversJL_GMRES(),Pl=Pl,Pr=Pr)
 ```
 
 If you want to use a "real" preconditioner under the norm `weights`, then one
@@ -64,5 +64,5 @@ A = rand(n,n)
 b = rand(n)
 
 prob = LinearProblem(A,b)
-sol = solve(prob,IterativeSolvers_GMRES(),Pl=Pl,Pr=Pr)
+sol = solve(prob,IterativeSolversJL_GMRES(),Pl=Pl,Pr=Pr)
 ```

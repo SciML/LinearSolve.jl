@@ -159,8 +159,8 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
         Krylov.solve!(args...; kwargs...)
     end
 
-    return SciMLBase.build_linear_solution(alg, cache.u, Krylov.Aprod(cache.cacheval),
-                                           cache)
+    return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache;
+                                           iters=Krylov.Aprod(cache.cacheval))
 end
 
 ## IterativeSolvers.jl

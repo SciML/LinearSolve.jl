@@ -137,7 +137,7 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
 
     args = (cache.cacheval, cache.A, cache.b)
     kwargs = (atol = atol, rtol = rtol, itmax = itmax, verbose = verbose,
-              alg.kwargs...)
+              history = true, alg.kwargs...)
 
     if cache.cacheval isa Krylov.CgSolver
         N !== I &&
@@ -159,8 +159,10 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
         Krylov.solve!(args...; kwargs...)
     end
 
-    return SciMLBase.build_linear_solution(alg, cache.u, Krylov.Aprod(cache.cacheval),
-                                           cache)
+    resid = cache.cacheval.stats.residuals |> last
+
+    return SciMLBase.build_linear_solution(alg, cache.u, resid, cache;
+                                           iters = cache.cacheval.stats.niter)
 end
 
 ## IterativeSolvers.jl
@@ -247,7 +249,12 @@ function SciMLBase.solve(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
     end
     cache.verbose && println()
 
-    return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache; iters = i)
+    resid = cache.cacheval.residual
+    if resid isa IterativeSolvers.Residual
+        resid = resid.current
+    end
+
+    return SciMLBase.build_linear_solution(alg, cache.u, resid, cache; iters = i)
 end
 
 purge_history!(iter, x, b) = nothing

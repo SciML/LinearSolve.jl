@@ -65,7 +65,7 @@ end
 
 # Ambiguity handling
 function defaultalg(A::SciMLBase.AbstractDiffEqOperator, b,
-                    assumptions::OperatorAssumptions{nothing})
+                    assumptions::OperatorAssumptions{Nothing})
     KrylovJL_GMRES()
 end
 

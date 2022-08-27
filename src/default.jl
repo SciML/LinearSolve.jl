@@ -46,12 +46,14 @@ function defaultalg(A, b::GPUArraysCore.AbstractGPUArray, ::OperatorAssumptions{
     end
 end
 
-function defaultalg(A::SciMLBase.AbstractDiffEqOperator, b, assumptions::OperatorAssumptions)
+function defaultalg(A::SciMLBase.AbstractDiffEqOperator, b,
+                    assumptions::OperatorAssumptions)
     KrylovJL_GMRES()
 end
 
 # Ambiguity handling
-function defaultalg(A::SciMLBase.AbstractDiffEqOperator, b, assumptions::OperatorAssumptions{nothing})
+function defaultalg(A::SciMLBase.AbstractDiffEqOperator, b,
+                    assumptions::OperatorAssumptions{nothing})
     KrylovJL_GMRES()
 end
 
@@ -78,8 +80,6 @@ function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.Abstract
                     ::OperatorAssumptions{false})
     QRFactorization()
 end
-
-
 
 # Allows A === nothing as a stand-in for dense matrix
 function defaultalg(A, b, ::OperatorAssumptions{true})
@@ -130,6 +130,7 @@ end
 
 function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
-    init_cacheval(default_alg(A, b, assumptions), A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose,
+    init_cacheval(default_alg(A, b, assumptions), A, b, u, Pl, Pr, maxiters, abstol, reltol,
+                  verbose,
                   assumptions)
 end

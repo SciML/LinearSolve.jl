@@ -125,12 +125,12 @@ function SciMLBase.solve(cache::LinearCache, alg::Nothing,
                          args...; assumptions::OperatorAssumptions = OperatorAssumptions(),
                          kwargs...)
     @unpack A, b = cache
-    SciMLBase.solve(cache, default_alg(A, b, assumptions), args...; kwargs...)
+    SciMLBase.solve(cache, defaultalg(A, b, assumptions), args...; kwargs...)
 end
 
 function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
-    init_cacheval(default_alg(A, b, assumptions), A, b, u, Pl, Pr, maxiters, abstol, reltol,
+    init_cacheval(defaultalg(A, b, assumptions), A, b, u, Pl, Pr, maxiters, abstol, reltol,
                   verbose,
                   assumptions)
 end

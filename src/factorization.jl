@@ -16,7 +16,7 @@ end
 
 #RF Bad fallback: will fail if `A` is just a stand-in
 # This should instead just create the factorization type.
-function init_cacheval(alg::AbstractFactorization, A, b, u, Pl, Pr, maxiters, abstol,
+function init_cacheval(alg::AbstractFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
                        reltol, verbose::Bool, assumptions::OperatorAssumptions)
     do_factorization(alg, convert(AbstractMatrix, A), b, u)
 end
@@ -127,22 +127,26 @@ function do_factorization(alg::GenericFactorization, A, b, u)
     return fact
 end
 
-function init_cacheval(alg::GenericFactorization{typeof(lu)}, A, b, u, Pl, Pr, maxiters,
+function init_cacheval(alg::GenericFactorization{typeof(lu)}, A, b, u, Pl, Pr,
+                       maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     ArrayInterfaceCore.lu_instance(convert(AbstractMatrix, A))
 end
-function init_cacheval(alg::GenericFactorization{typeof(lu!)}, A, b, u, Pl, Pr, maxiters,
+function init_cacheval(alg::GenericFactorization{typeof(lu!)}, A, b, u, Pl, Pr,
+                       maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     ArrayInterfaceCore.lu_instance(convert(AbstractMatrix, A))
 end
 
 function init_cacheval(alg::GenericFactorization{typeof(lu)},
-                       A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr, maxiters,
+                       A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
+                       maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     ArrayInterfaceCore.lu_instance(A)
 end
 function init_cacheval(alg::GenericFactorization{typeof(lu!)},
-                       A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr, maxiters,
+                       A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
+                       maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     ArrayInterfaceCore.lu_instance(A)
 end
@@ -167,11 +171,12 @@ function init_cacheval(alg::GenericFactorization{typeof(lu!)}, A::Tridiagonal, b
     ArrayInterfaceCore.lu_instance(A)
 end
 
-function init_cacheval(alg::GenericFactorization, A::Diagonal, b, u, Pl, Pr, maxiters,
+function init_cacheval(alg::GenericFactorization, A::Diagonal, b, u, Pl, Pr, maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     Diagonal(inv.(A.diag))
 end
-function init_cacheval(alg::GenericFactorization, A::Tridiagonal, b, u, Pl, Pr, maxiters,
+function init_cacheval(alg::GenericFactorization, A::Tridiagonal, b, u, Pl, Pr,
+                       maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     ArrayInterfaceCore.lu_instance(A)
 end
@@ -184,14 +189,15 @@ end
 function init_cacheval(alg::Union{GenericFactorization,
                                   GenericFactorization{typeof(bunchkaufman!)},
                                   GenericFactorization{typeof(bunchkaufman)}},
-                       A::Union{Hermitian, Symmetric}, b, u, Pl, Pr, maxiters, abstol,
+                       A::Union{Hermitian, Symmetric}, b, u, Pl, Pr, maxiters::Int, abstol,
                        reltol, verbose::Bool, assumptions::OperatorAssumptions)
     BunchKaufman(A.data, Array(1:size(A, 1)), A.uplo, true, false, 0)
 end
 
 function init_cacheval(alg::Union{GenericFactorization{typeof(bunchkaufman!)},
                                   GenericFactorization{typeof(bunchkaufman)}},
-                       A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr, maxiters,
+                       A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
+                       maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     if eltype(A) <: Complex
         return bunchkaufman!(Hermitian(A))
@@ -216,7 +222,8 @@ end
 
 # Ambiguity handling dispatch
 function init_cacheval(alg::Union{QRFactorization, SVDFactorization},
-                       A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr, maxiters,
+                       A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
+                       maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     newA = copy(convert(AbstractMatrix, A))
     if newA isa AbstractSparseMatrix
@@ -241,7 +248,8 @@ end
 function init_cacheval(alg::Union{GenericFactorization,
                                   GenericFactorization{typeof(cholesky)},
                                   GenericFactorization{typeof(cholesky!)}},
-                       A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr, maxiters,
+                       A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
+                       maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     newA = copy(convert(AbstractMatrix, A))
     do_factorization(alg, newA, b, u)
@@ -330,7 +338,7 @@ function RFLUFactorization(; pivot = Val(true), thread = Val(true))
     RFLUFactorization(pivot, thread)
 end
 
-function init_cacheval(alg::RFLUFactorization, A, b, u, Pl, Pr, maxiters,
+function init_cacheval(alg::RFLUFactorization, A, b, u, Pl, Pr, maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
     ArrayInterfaceCore.lu_instance(convert(AbstractMatrix, A)), ipiv

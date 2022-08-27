@@ -2,6 +2,7 @@ struct OperatorAssumptions{issquare} end
 function OperatorAssumptions(issquare = nothing)
     OperatorAssumptions{_unwrap_val(issquare)}()
 end
+issquare(::OperatorAssumptions{issq}) where {issq} = issq
 
 _unwrap_val(::Val{B}) where {B} = B
 _unwrap_val(B::Nothing) = Nothing
@@ -92,8 +93,8 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
                         alias_A = false, alias_b = false,
                         abstol = default_tol(eltype(prob.A)),
                         reltol = default_tol(eltype(prob.A)),
-                        maxiters = length(prob.b),
-                        verbose = false,
+                        maxiters::Int = length(prob.b),
+                        verbose::Bool = false,
                         Pl = Identity(),
                         Pr = Identity(),
                         assumptions = OperatorAssumptions(),
@@ -125,7 +126,7 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
                         typeof(Pl),
                         typeof(Pr),
                         typeof(reltol),
-                        typeof(assumptions)
+                        issquare(assumptions)
                         }(A,
                           b,
                           u0,

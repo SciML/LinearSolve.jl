@@ -71,7 +71,7 @@ function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.Abstract
 end
 
 # Allows A === nothing as a stand-in for dense matrix
-function defaultalg(A, b, ::Assumptions{true})
+function defaultalg(A, b, ::OperatorAssumptions{true})
     # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
     # it makes sense according to the benchmarks, which is dependent on
     # whether MKL or OpenBLAS is being used
@@ -104,7 +104,7 @@ function defaultalg(A, b, ::Assumptions{true})
     alg
 end
 
-function defaultalg(A, b, ::Val{false})
+function defaultalg(A, b, ::OperatorAssumptions{false})
     QRFactorization()
 end
 

@@ -1,16 +1,26 @@
-defaultalg(A::DiffEqArrayOperator, b, assumptions::OperatorAssumptions) = defaultalg(A.A, b, assumptions)
+function defaultalg(A::DiffEqArrayOperator, b, assumptions::OperatorAssumptions)
+    defaultalg(A.A, b, assumptions)
+end
 
 # Ambiguity handling
-defaultalg(A::DiffEqArrayOperator, b, assumptions::OperatorAssumptions{nothing}) = defaultalg(A.A, b, assumptions)
+function defaultalg(A::DiffEqArrayOperator, b, assumptions::OperatorAssumptions{nothing})
+    defaultalg(A.A, b, assumptions)
+end
 
 function defaultalg(A, b, ::OperatorAssumptions{nothing})
-    issquare = size(A,1) == size(A,2)
+    issquare = size(A, 1) == size(A, 2)
     defaultalg(A, b, OperatorAssumptions(Val(issquare)))
 end
 
-defaultalg(A::Tridiagonal, b, ::OperatorAssumptions{true}) = GenericFactorization(; fact_alg = lu!)
-defaultalg(A::Tridiagonal, b, ::OperatorAssumptions{false}) = GenericFactorization(; fact_alg = qr!)
-defaultalg(A::SymTridiagonal, b, ::OperatorAssumptions{true}) = GenericFactorization(; fact_alg = ldlt!)
+function defaultalg(A::Tridiagonal, b, ::OperatorAssumptions{true})
+    GenericFactorization(; fact_alg = lu!)
+end
+function defaultalg(A::Tridiagonal, b, ::OperatorAssumptions{false})
+    GenericFactorization(; fact_alg = qr!)
+end
+function defaultalg(A::SymTridiagonal, b, ::OperatorAssumptions{true})
+    GenericFactorization(; fact_alg = ldlt!)
+end
 
 function defaultalg(A::SparseMatrixCSC, b, ::OperatorAssumptions{true})
     if length(b) <= 10_000
@@ -37,7 +47,8 @@ function defaultalg(A, b::GPUArraysCore.AbstractGPUArray, ::OperatorAssumptions{
 end
 
 # Handle ambiguity
-function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.AbstractGPUArray, ::OperatorAssumptions{true})
+function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.AbstractGPUArray,
+                    ::OperatorAssumptions{true})
     if VERSION >= v"1.8-"
         LUFactorization()
     else
@@ -54,7 +65,8 @@ function defaultalg(A, b::GPUArraysCore.AbstractGPUArray, ::OperatorAssumptions{
 end
 
 # Handle ambiguity
-function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.AbstractGPUArray, ::OperatorAssumptions{false})
+function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.AbstractGPUArray,
+                    ::OperatorAssumptions{false})
     QRFactorization()
 end
 
@@ -99,11 +111,14 @@ end
 ## Catch high level interface
 
 function SciMLBase.solve(cache::LinearCache, alg::Nothing,
-                         args...; assumptions::OperatorAssumptions = OperatorAssumptions(), kwargs...)
+                         args...; assumptions::OperatorAssumptions = OperatorAssumptions(),
+                         kwargs...)
     @unpack A, b = cache
-    SciMLBase.solve(cache, default_alg(A,b,assumptions), args...; kwargs...)
+    SciMLBase.solve(cache, default_alg(A, b, assumptions), args...; kwargs...)
 end
 
-function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    init_cacheval(default_alg(A,b), A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose, assumptions)
+function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
+                       verbose::Bool, assumptions::OperatorAssumptions)
+    init_cacheval(default_alg(A, b), A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose,
+                  assumptions)
 end

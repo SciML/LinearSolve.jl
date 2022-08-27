@@ -92,7 +92,8 @@ function get_KrylovJL_solver(KrylovAlg)
     return KS
 end
 
-function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
+                       verbose::Bool, assumptions::OperatorAssumptions)
     KS = get_KrylovJL_solver(alg.KrylovAlg)
 
     memory = (alg.gmres_restart == 0) ? min(20, size(A, 1)) : alg.gmres_restart
@@ -203,7 +204,8 @@ function IterativeSolversJL_MINRES(args...; kwargs...)
                        kwargs...)
 end
 
-function init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
+function init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, maxiters::Int, abstol,
+                       reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
     restart = (alg.gmres_restart == 0) ? min(20, size(A, 1)) : alg.gmres_restart
 

@@ -1,3 +1,7 @@
+# Legacy fallback
+# For SciML algorithms already using `defaultalg`, all assume square matrix.
+defaultalg(A, b) = defaultalg(A, b, OperatorAssumptions(Val(true)))
+
 function defaultalg(A::DiffEqArrayOperator, b, assumptions::OperatorAssumptions)
     defaultalg(A.A, b, assumptions)
 end

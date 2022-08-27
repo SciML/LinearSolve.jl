@@ -41,8 +41,9 @@ preconditioned system which first divides by some random numbers and then
 multiplies by the same values. This is commonly used in the case where if, instead
 of random, `s` is an approximation to the eigenvalues of a system.
 
-```julia
+```@example precon
 using LinearSolve, LinearAlgebra
+n = 4
 s = rand(n)
 Pl = Diagonal(s)
 
@@ -51,6 +52,7 @@ b = rand(n)
 
 prob = LinearProblem(A,b)
 sol = solve(prob,IterativeSolversJL_GMRES(),Pl=Pl)
+sol.u
 ```
 
 ## Preconditioner Interface

@@ -8,7 +8,7 @@ of simplicity, this tutorial will only showcase concrete matrices.
 The following defines a matrix and a `LinearProblem` which is subsequently solved
 by the default linear solver.
 
-```julia
+```@example linsys1
 using LinearSolve
 
 A = rand(4,4)
@@ -16,14 +16,6 @@ b = rand(4)
 prob = LinearProblem(A, b)
 sol = solve(prob)
 sol.u
-
-#=
-4-element Vector{Float64}:
-  0.3784870087078603
-  0.07275749718047864
-  0.6612816064734302
- -0.10598367531463938
-=#
 ```
 
 Note that `solve(prob)` is equivalent to `solve(prob,nothing)` where `nothing`
@@ -35,16 +27,9 @@ has some nice methods like GMRES which can be faster in some cases. With
 LinearSolve.jl, there is one interface and changing linear solvers is simply
 the switch of the algorithm choice:
 
-```julia
+```@example linsys1
 sol = solve(prob,IterativeSolversJL_GMRES())
-
-#=
-u: 4-element Vector{Float64}:
-  0.37848700870786
-  0.07275749718047908
-  0.6612816064734302
- -0.10598367531463923
-=#
+sol.u
 ```
 
 Thus a package which uses LinearSolve.jl simply needs to allow the user to

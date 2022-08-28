@@ -7,7 +7,7 @@ interface to be easily extendable by users. To that end, the linear solve algori
 user can pass in their custom linear solve function, say `my_linsolve`, to
 `LinearSolveFunction()`. A contrived example of solving a linear system with a custom solver is below.
 
-```julia
+```@example advanced1
 using LinearSolve, LinearAlgebra
 
 function my_linsolve(A,b,u,p,newA,Pl,Pr,solverdata;verbose=true, kwargs...)
@@ -21,6 +21,7 @@ end
 prob = LinearProblem(Diagonal(rand(4)), rand(4))
 alg  = LinearSolveFunction(my_linsolve)
 sol  = solve(prob, alg)
+sol.u
 ```
 The inputs to the function are as follows:
 - `A`, the linear operator
@@ -36,7 +37,7 @@ The inputs to the function are as follows:
 The function `my_linsolve` must accept the above specified arguments, and return
 the solution, `u`. As memory for `u` is already allocated, the user may choose
 to modify `u` in place as follows:
-```julia
+```@example advanced1
 function my_linsolve!(A,b,u,p,newA,Pl,Pr,solverdata;verbose=true, kwargs...)
     if verbose == true
         println("solving Ax=b")
@@ -47,4 +48,5 @@ end
 
 alg  = LinearSolveFunction(my_linsolve!)
 sol  = solve(prob, alg)
+sol.u
 ```

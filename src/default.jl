@@ -1,11 +1,100 @@
-## Default algorithm
+# Legacy fallback
+# For SciML algorithms already using `defaultalg`, all assume square matrix.
+defaultalg(A, b) = defaultalg(A, b, OperatorAssumptions(Val(true)))
+
+function defaultalg(A::DiffEqArrayOperator, b, assumptions::OperatorAssumptions)
+    defaultalg(A.A, b, assumptions)
+end
+
+# Ambiguity handling
+function defaultalg(A::DiffEqArrayOperator, b, assumptions::OperatorAssumptions{nothing})
+    defaultalg(A.A, b, assumptions)
+end
+
+function defaultalg(A::DiffEqArrayOperator, b, assumptions::OperatorAssumptions{false})
+    defaultalg(A.A, b, assumptions)
+end
+
+function defaultalg(A::DiffEqArrayOperator, b, assumptions::OperatorAssumptions{true})
+    defaultalg(A.A, b, assumptions)
+end
+
+function defaultalg(A, b, ::OperatorAssumptions{Nothing})
+    issquare = size(A, 1) == size(A, 2)
+    defaultalg(A, b, OperatorAssumptions(Val(issquare)))
+end
+
+function defaultalg(A::Tridiagonal, b, ::OperatorAssumptions{true})
+    GenericFactorization(; fact_alg = lu!)
+end
+function defaultalg(A::Tridiagonal, b, ::OperatorAssumptions{false})
+    GenericFactorization(; fact_alg = qr!)
+end
+function defaultalg(A::SymTridiagonal, b, ::OperatorAssumptions{true})
+    GenericFactorization(; fact_alg = ldlt!)
+end
+
+function defaultalg(A::SparseMatrixCSC, b, ::OperatorAssumptions{true})
+    if length(b) <= 10_000
+        KLUFactorization()
+    else
+        UMFPACKFactorization()
+    end
+end
+
+function defaultalg(A::GPUArraysCore.AbstractGPUArray, b, ::OperatorAssumptions{true})
+    if VERSION >= v"1.8-"
+        LUFactorization()
+    else
+        QRFactorization()
+    end
+end
+
+function defaultalg(A, b::GPUArraysCore.AbstractGPUArray, ::OperatorAssumptions{true})
+    if VERSION >= v"1.8-"
+        LUFactorization()
+    else
+        QRFactorization()
+    end
+end
+
+function defaultalg(A::SciMLBase.AbstractDiffEqOperator, b,
+                    assumptions::OperatorAssumptions)
+    KrylovJL_GMRES()
+end
+
+# Ambiguity handling
+function defaultalg(A::SciMLBase.AbstractDiffEqOperator, b,
+                    assumptions::OperatorAssumptions{Nothing})
+    KrylovJL_GMRES()
+end
+
+# Handle ambiguity
+function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.AbstractGPUArray,
+                    ::OperatorAssumptions{true})
+    if VERSION >= v"1.8-"
+        LUFactorization()
+    else
+        QRFactorization()
+    end
+end
+
+function defaultalg(A::GPUArraysCore.AbstractGPUArray, b, ::OperatorAssumptions{false})
+    QRFactorization()
+end
+
+function defaultalg(A, b::GPUArraysCore.AbstractGPUArray, ::OperatorAssumptions{false})
+    QRFactorization()
+end
+
+# Handle ambiguity
+function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.AbstractGPUArray,
+                    ::OperatorAssumptions{false})
+    QRFactorization()
+end
 
 # Allows A === nothing as a stand-in for dense matrix
-function defaultalg(A, b)
-    if A isa DiffEqArrayOperator
-        A = A.A
-    end
-
+function defaultalg(A, b, ::OperatorAssumptions{true})
     # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
     # it makes sense according to the benchmarks, which is dependent on
     # whether MKL or OpenBLAS is being used
@@ -26,32 +115,10 @@ function defaultalg(A, b)
             alg = LUFactorization()
         end
 
-        # These few cases ensure the choice is optimal without the
-        # dynamic dispatching of factorize
-    elseif A isa Tridiagonal
-        alg = GenericFactorization(; fact_alg = lu!)
-    elseif A isa SymTridiagonal
-        alg = GenericFactorization(; fact_alg = ldlt!)
-    elseif A isa SparseMatrixCSC
-        if length(b) <= 10_000
-            alg = KLUFactorization()
-        else
-            alg = UMFPACKFactorization()
-        end
-
         # This catches the cases where a factorization overload could exist
         # For example, BlockBandedMatrix
     elseif A !== nothing && ArrayInterfaceCore.isstructured(A)
         alg = GenericFactorization()
-
-        # This catches the case where A is a CuMatrix
-        # Which does not have LU fully defined
-    elseif A isa GPUArraysCore.AbstractGPUArray || b isa GPUArraysCore.AbstractGPUArray
-        if VERSION >= v"1.8-"
-            alg = LUFactorization()
-        else
-            alg = QRFactorization()
-        end
 
         # Not factorizable operator, default to only using A*x
     else
@@ -60,150 +127,22 @@ function defaultalg(A, b)
     alg
 end
 
-## Other dispatches are to decrease the dispatch cost
-
-function SciMLBase.solve(cache::LinearCache, alg::Nothing,
-                         args...; kwargs...)
-    @unpack A = cache
-    if A isa DiffEqArrayOperator
-        A = A.A
-    end
-
-    # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
-    # it makes sense according to the benchmarks, which is dependent on
-    # whether MKL or OpenBLAS is being used
-    if A isa Matrix
-        b = cache.b
-        if (A === nothing || eltype(A) <: Union{Float32, Float64, ComplexF32, ComplexF64}) &&
-           ArrayInterfaceCore.can_setindex(b)
-            if length(b) <= 10
-                alg = GenericLUFactorization()
-                SciMLBase.solve(cache, alg, args...; kwargs...)
-            elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500)) &&
-                   eltype(A) <: Union{Float32, Float64}
-                alg = RFLUFactorization()
-                SciMLBase.solve(cache, alg, args...; kwargs...)
-                #elseif A isa Matrix
-                #    alg = FastLUFactorization()
-                #    SciMLBase.solve(cache, alg, args...; kwargs...)
-            else
-                alg = LUFactorization()
-                SciMLBase.solve(cache, alg, args...; kwargs...)
-            end
-        else
-            alg = LUFactorization()
-            SciMLBase.solve(cache, alg, args...; kwargs...)
-        end
-
-        # These few cases ensure the choice is optimal without the
-        # dynamic dispatching of factorize
-    elseif A isa Tridiagonal
-        alg = GenericFactorization(; fact_alg = lu!)
-        SciMLBase.solve(cache, alg, args...; kwargs...)
-    elseif A isa SymTridiagonal
-        alg = GenericFactorization(; fact_alg = ldlt!)
-        SciMLBase.solve(cache, alg, args...; kwargs...)
-    elseif A isa SparseMatrixCSC
-        b = cache.b
-        if length(b) <= 10_000
-            alg = KLUFactorization()
-            SciMLBase.solve(cache, alg, args...; kwargs...)
-        else
-            alg = UMFPACKFactorization()
-            SciMLBase.solve(cache, alg, args...; kwargs...)
-        end
-
-        # This catches the cases where a factorization overload could exist
-        # For example, BlockBandedMatrix
-    elseif ArrayInterfaceCore.isstructured(A)
-        alg = GenericFactorization()
-        SciMLBase.solve(cache, alg, args...; kwargs...)
-
-        # This catches the case where A is a CuMatrix
-        # Which does not have LU fully defined
-    elseif A isa GPUArraysCore.AbstractGPUArray
-        if VERSION >= v"1.8-"
-            alg = LUFactorization()
-            SciMLBase.solve(cache, alg, args...; kwargs...)
-        else
-            alg = QRFactorization()
-            SciMLBase.solve(cache, alg, args...; kwargs...)
-        end
-        # Not factorizable operator, default to only using A*x
-        # IterativeSolvers is faster on CPU but not GPU-compatible
-    else
-        alg = KrylovJL_GMRES()
-        SciMLBase.solve(cache, alg, args...; kwargs...)
-    end
+function defaultalg(A, b, ::OperatorAssumptions{false})
+    QRFactorization()
 end
 
-function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
-    if A isa DiffEqArrayOperator
-        A = A.A
-    end
+## Catch high level interface
 
-    # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
-    # it makes sense according to the benchmarks, which is dependent on
-    # whether MKL or OpenBLAS is being used
-    if A isa Matrix
-        if (A === nothing || eltype(A) <: Union{Float32, Float64, ComplexF32, ComplexF64}) &&
-           ArrayInterfaceCore.can_setindex(b)
-            if length(b) <= 10
-                alg = GenericLUFactorization()
-                init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
-            elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500)) &&
-                   eltype(A) <: Union{Float32, Float64}
-                alg = RFLUFactorization()
-                init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
-                #elseif A isa Matrix
-                #    alg = FastLUFactorization()
-                #    init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
-            else
-                alg = LUFactorization()
-                init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
-            end
-        else
-            alg = LUFactorization()
-            init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
-        end
+function SciMLBase.solve(cache::LinearCache, alg::Nothing,
+                         args...; assumptions::OperatorAssumptions = OperatorAssumptions(),
+                         kwargs...)
+    @unpack A, b = cache
+    SciMLBase.solve(cache, defaultalg(A, b, assumptions), args...; kwargs...)
+end
 
-        # These few cases ensure the choice is optimal without the
-        # dynamic dispatching of factorize
-    elseif A isa Tridiagonal
-        alg = GenericFactorization(; fact_alg = lu!)
-        init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
-    elseif A isa SymTridiagonal
-        alg = GenericFactorization(; fact_alg = ldlt!)
-        init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
-    elseif A isa SparseMatrixCSC
-        if length(b) <= 10_000
-            alg = KLUFactorization()
-            init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
-        else
-            alg = UMFPACKFactorization()
-            init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
-        end
-
-        # This catches the cases where a factorization overload could exist
-        # For example, BlockBandedMatrix
-    elseif ArrayInterfaceCore.isstructured(A)
-        alg = GenericFactorization()
-        init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
-
-        # This catches the case where A is a CuMatrix
-        # Which does not have LU fully defined
-    elseif A isa GPUArraysCore.AbstractGPUArray
-        if VERSION >= v"1.8-"
-            alg = LUFactorization()
-            init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
-        else
-            alg = QRFactorization()
-            init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
-        end
-        # Not factorizable operator, default to only using A*x
-        # IterativeSolvers is faster on CPU but not GPU-compatible
-    else
-        alg = KrylovJL_GMRES()
-        init_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
-    end
+function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
+                       verbose::Bool, assumptions::OperatorAssumptions)
+    init_cacheval(defaultalg(A, b, assumptions), A, b, u, Pl, Pr, maxiters, abstol, reltol,
+                  verbose,
+                  assumptions)
 end

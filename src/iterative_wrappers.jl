@@ -92,7 +92,8 @@ function get_KrylovJL_solver(KrylovAlg)
     return KS
 end
 
-function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose)
+function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
+                       verbose::Bool, assumptions::OperatorAssumptions)
     KS = get_KrylovJL_solver(alg.KrylovAlg)
 
     memory = (alg.gmres_restart == 0) ? min(20, size(A, 1)) : alg.gmres_restart
@@ -120,7 +121,8 @@ end
 function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
     if cache.isfresh
         solver = init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr,
-                               cache.maxiters, cache.abstol, cache.reltol, cache.verbose)
+                               cache.maxiters, cache.abstol, cache.reltol, cache.verbose,
+                               cache.assumptions)
         cache = set_cacheval(cache, solver)
     end
 
@@ -202,8 +204,9 @@ function IterativeSolversJL_MINRES(args...; kwargs...)
                        kwargs...)
 end
 
-function init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, maxiters, abstol, reltol,
-                       verbose)
+function init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, maxiters::Int, abstol,
+                       reltol,
+                       verbose::Bool, assumptions::OperatorAssumptions)
     restart = (alg.gmres_restart == 0) ? min(20, size(A, 1)) : alg.gmres_restart
 
     kwargs = (abstol = abstol, reltol = reltol, maxiter = maxiters,
@@ -235,7 +238,8 @@ end
 function SciMLBase.solve(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
     if cache.isfresh || !(typeof(alg) <: IterativeSolvers.GMRESIterable)
         solver = init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr,
-                               cache.maxiters, cache.abstol, cache.reltol, cache.verbose)
+                               cache.maxiters, cache.abstol, cache.reltol, cache.verbose,
+                               cache.assumptions)
         cache = set_cacheval(cache, solver)
     end
     purge_history!(cache.cacheval, cache.u, cache.b)

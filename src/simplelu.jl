@@ -129,7 +129,7 @@ function SciMLBase.solve(cache::LinearCache, alg::SimpleLUFactorization; kwargs.
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
-function init_cacheval(alg::SimpleLUFactorization, A, b, u, Pl, Pr, maxiters, abstol,
-                       reltol, verbose)
+function init_cacheval(alg::SimpleLUFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
+                       reltol, verbose::Bool, assumptions::OperatorAssumptions)
     LUSolver(convert(AbstractMatrix, A))
 end

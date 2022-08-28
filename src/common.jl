@@ -1,4 +1,14 @@
-struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol}
+struct OperatorAssumptions{issquare} end
+function OperatorAssumptions(issquare = nothing)
+    OperatorAssumptions{_unwrap_val(issquare)}()
+end
+issquare(::OperatorAssumptions{issq}) where {issq} = issq
+
+_unwrap_val(::Val{B}) where {B} = B
+_unwrap_val(B::Nothing) = Nothing
+_unwrap_val(B::Bool) = B
+
+struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issquare}
     A::TA
     b::Tb
     u::Tu
@@ -12,6 +22,7 @@ struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol}
     reltol::Ttol
     maxiters::Int
     verbose::Bool
+    assumptions::OperatorAssumptions{issquare}
 end
 
 """
@@ -82,10 +93,11 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
                         alias_A = false, alias_b = false,
                         abstol = default_tol(eltype(prob.A)),
                         reltol = default_tol(eltype(prob.A)),
-                        maxiters = length(prob.b),
-                        verbose = false,
+                        maxiters::Int = length(prob.b),
+                        verbose::Bool = false,
                         Pl = Identity(),
                         Pr = Identity(),
+                        assumptions = OperatorAssumptions(),
                         kwargs...)
     @unpack A, b, u0, p = prob
 
@@ -96,7 +108,8 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
         fill!(u0, false)
     end
 
-    cacheval = init_cacheval(alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, verbose)
+    cacheval = init_cacheval(alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, verbose,
+                             assumptions)
     isfresh = true
     Tc = typeof(cacheval)
 
@@ -112,7 +125,8 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
                         Tc,
                         typeof(Pl),
                         typeof(Pr),
-                        typeof(reltol)
+                        typeof(reltol),
+                        issquare(assumptions)
                         }(A,
                           b,
                           u0,
@@ -125,7 +139,8 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
                           abstol,
                           reltol,
                           maxiters,
-                          verbose)
+                          verbose,
+                          assumptions)
     return cache
 end
 

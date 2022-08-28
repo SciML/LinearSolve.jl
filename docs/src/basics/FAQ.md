@@ -39,17 +39,21 @@ IterativeSolvers.jl computes the norm after the application of the left precondt
 `Pl`. Thus in order to use a vector tolerance `weights`, one can mathematically
 hack the system via the following formulation:
 
-```@example FAQ1
+```@example FAQPrec
 using LinearSolve, LinearAlgebra
-n = 4
-weights = rand(n)
-Pl = LinearSolve.InvPreconditioner(Diagonal(weights))
-Pr = Diagonal(weights)
+
+n = 2
 A = rand(n,n)
 b = rand(n)
 
+weights = [1e-1, 1]
+Pl = LinearSolve.InvPreconditioner(Diagonal(weights))
+Pr = Diagonal(weights)
+
+
 prob = LinearProblem(A,b)
 sol = solve(prob,IterativeSolversJL_GMRES(),Pl=Pl,Pr=Pr)
+
 sol.u
 ```
 
@@ -59,14 +63,15 @@ of the weights like as follows:
 
 ```@example FAQ2
 using LinearSolve, LinearAlgebra
-n = 4
-weights = rand(n)
-realprec = rand(n)
-Pl = LinearSolve.ComposePreconditioner(LinearSolve.InvPreconditioner(Diagonal(weights)),realprec)
-Pr = Diagonal(weights)
 
+n = 4
 A = rand(n,n)
 b = rand(n)
+
+weights = rand(n)
+realprec = lu(rand(n,n)) # some random preconditioner
+Pl = LinearSolve.ComposePreconditioner(LinearSolve.InvPreconditioner(Diagonal(weights)),realprec)
+Pr = Diagonal(weights)
 
 prob = LinearProblem(A,b)
 sol = solve(prob,IterativeSolversJL_GMRES(),Pl=Pl,Pr=Pr)

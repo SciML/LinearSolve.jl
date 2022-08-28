@@ -70,7 +70,7 @@ function defaultalg(A::SciMLBase.AbstractDiffEqOperator, b,
 end
 
 function defaultalg(A::SciMLBase.AbstractDiffEqOperator, b,
-    assumptions::OperatorAssumptions{false})
+                    assumptions::OperatorAssumptions{false})
     KrylovJL_LSMR()
 end
 

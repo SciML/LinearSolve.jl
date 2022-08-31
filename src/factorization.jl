@@ -5,6 +5,11 @@ function _ldiv!(x::Vector, A::Factorization, b::Vector)
     ldiv!(A, x)
 end
 
+# Specialize QR for the non-square case
+function _ldiv!(x::Vector, A::QRFactorization, b::Vector)
+    ldiv!(x, A, b)
+end
+
 function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization; kwargs...)
     if cache.isfresh
         fact = do_factorization(alg, cache.A, cache.b, cache.u)

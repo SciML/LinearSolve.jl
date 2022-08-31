@@ -6,7 +6,7 @@ function _ldiv!(x::Vector, A::Factorization, b::Vector)
 end
 
 # Specialize QR for the non-square case
-function _ldiv!(x::Vector, A::Union{QR, QRCompactWY}, b::Vector)
+function _ldiv!(x::Vector, A::Union{SparseArrays.QR, LinearAlgebra.QRCompactWY}, b::Vector)
     ldiv!(x, A, b)
 end
 

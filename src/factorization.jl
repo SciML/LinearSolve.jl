@@ -95,7 +95,7 @@ end
 
 function do_factorization(alg::QRFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
-    if alg.inplace
+    if alg.inplace && (!(A isa SparseMatrixCSC) || VERSION >= v"1.8-")
         fact = qr!(A, alg.pivot)
     else
         fact = qr(A) # CUDA.jl does not allow other args!

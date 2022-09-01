@@ -24,6 +24,10 @@ function KrylovJL_MINRES(args...; kwargs...)
     KrylovJL(args...; KrylovAlg = Krylov.minres!, kwargs...)
 end
 
+function KrylovJL_LSMR(args...; kwargs...)
+    KrylovJL(args...; KrylovAlg = Krylov.lsmr!, kwargs...)
+end
+
 function get_KrylovJL_solver(KrylovAlg)
     KS = if (KrylovAlg === Krylov.lsmr!)
         Krylov.LsmrSolver

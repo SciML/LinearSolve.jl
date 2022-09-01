@@ -69,6 +69,11 @@ function defaultalg(A::SciMLBase.AbstractDiffEqOperator, b,
     KrylovJL_GMRES()
 end
 
+function defaultalg(A::SciMLBase.AbstractDiffEqOperator, b,
+                    assumptions::OperatorAssumptions{false})
+    KrylovJL_LSMR()
+end
+
 # Handle ambiguity
 function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.AbstractGPUArray,
                     ::OperatorAssumptions{true})

@@ -6,10 +6,11 @@ function _ldiv!(x::Vector, A::Factorization, b::Vector)
 end
 
 # Specialize QR for the non-square case
+# Missing ldiv! definitions: https://github.com/JuliaSparse/SparseArrays.jl/issues/242
 function _ldiv!(x::Vector,
                 A::Union{SparseArrays.QR, LinearAlgebra.QRCompactWY,
                          SuiteSparse.SPQR.QRSparse}, b::Vector)
-    ldiv!(x, A, b)
+    x .= A \ b
 end
 
 function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization; kwargs...)

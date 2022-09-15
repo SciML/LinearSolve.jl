@@ -22,13 +22,13 @@ Note that `solve(prob)` is equivalent to `solve(prob,nothing)` where `nothing`
 denotes the choice of the default linear solver. This is equivalent to the
 Julia built-in `A\b`, where the solution is recovered via `sol.u`. The power
 of this package comes into play when changing the algorithms. For example,
-[IterativeSolvers.jl](https://github.com/JuliaLinearAlgebra/IterativeSolvers.jl)
+[Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl)
 has some nice methods like GMRES which can be faster in some cases. With
 LinearSolve.jl, there is one interface and changing linear solvers is simply
 the switch of the algorithm choice:
 
 ```@example linsys1
-sol = solve(prob,IterativeSolversJL_GMRES())
+sol = solve(prob,KrylovJL_GMRES())
 sol.u
 ```
 

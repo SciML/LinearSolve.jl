@@ -49,6 +49,24 @@ include("init.jl")
 const IS_OPENBLAS = Ref(true)
 isopenblas() = IS_OPENBLAS[]
 
+import SnoopPrecompile
+
+SnoopPrecompile.@precompile_all_calls begin
+    A = rand(4, 4)
+    b = rand(4)
+    prob = LinearProblem(A, b)
+    sol = solve(prob)
+    sol = solve(prob, LUFactorization())
+    sol = solve(prob, RFLUFactorization())
+    sol = solve(prob, KrylovJL_GMRES())
+
+    A = sprand(4, 4, 0.9)
+    prob = LinearProblem(A, b)
+    sol = solve(prob)
+    sol = solve(prob, KLUFactorization())
+    sol = solve(prob, UMFPACKFactorization())
+end
+
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
        UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization

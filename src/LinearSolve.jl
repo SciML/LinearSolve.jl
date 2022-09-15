@@ -52,7 +52,7 @@ isopenblas() = IS_OPENBLAS[]
 import SnoopPrecompile
 
 SnoopPrecompile.@precompile_all_calls begin
-    A = rand(4,4)
+    A = rand(4, 4)
     b = rand(4)
     prob = LinearProblem(A, b)
     sol = solve(prob)
@@ -60,7 +60,7 @@ SnoopPrecompile.@precompile_all_calls begin
     sol = solve(prob, RFLUFactorization())
     sol = solve(prob, KrylovJL_GMRES())
 
-    A = sprand(4,4,0.9)
+    A = sprand(4, 4, 0.9)
     prob = LinearProblem(A, b)
     sol = solve(prob)
     sol = solve(prob, KLUFactorization())

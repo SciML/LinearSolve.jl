@@ -34,9 +34,9 @@ KrylovKit = "0.5"
 RecursiveFactorization = "0.2.8"
 Reexport = "1"
 SciMLBase = "1.32"
+SciMLOperators = "0.1.13"
 Setfield = "0.7, 0.8, 1"
 UnPack = "1"
-SciMLOperators = "0.1.10"
 julia = "1.6"
 
 [extras]

@@ -24,11 +24,9 @@ import IterativeSolvers
 using Reexport
 @reexport using SciMLBase
 
-function isidentity(A)
-    return (A === LinearAlgebra.I) |
-           (A isa IterativeSolvers.Identity) |
-           (A isa SciMLOperators.IdentityOperator)
-end
+isidentity(A::UniformScaling) = isone(A.λ)
+isidentity(::IterativeSolvers.Identity) = true
+isidentity(::SciMLOperators.IdentityOperator) = true
 
 abstract type SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
 abstract type AbstractFactorization <: SciMLLinearSolveAlgorithm end

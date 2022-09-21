@@ -39,7 +39,6 @@ SciMLOperators = "0.1.13"
 Setfield = "0.7, 0.8, 1"
 SnoopPrecompile = "1"
 UnPack = "1"
-SciMLOperators = "0.1.10"
 julia = "1.6"
 
 [extras]

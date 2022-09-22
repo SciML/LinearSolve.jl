@@ -49,7 +49,10 @@ include("default.jl")
 include("init.jl")
 
 # deprecate preconditioner interface in favor of SciMLOperators
+# TODO (vedant): OrdinaryDiffEq dispatches on ComposePreconditioner
+const ComposePreconditioenr = SciMLOperators.ComposedOperator
 @deprecate ComposePreconditioner SciMLOperators.ComposedOperator
+const InvPreconditioner = SciMLOperators.InvertedOperator
 @deprecate InvPreconditioner SciMLOperators.InvertedOperator
 
 const IS_OPENBLAS = Ref(true)

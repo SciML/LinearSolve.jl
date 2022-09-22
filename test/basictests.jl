@@ -260,9 +260,7 @@ end
                 f(u, p, t)  = (println("using FunctionOperator mul"); A * u)
                 fi(u, p, t) = (println("using FunctionOperator div"); F \ u)
 
-                FunctionOperator(f; isinplace=false, T=Float64, size=(n,n),
-                                 input_prototype=u, output_prototype=u,
-                                 op_inverse=fi)
+                FunctionOperator(f, u, u; isinplace=false, op_inverse=fi)
             end
 
             op1 = get_operator(A1, x1*0)
@@ -284,9 +282,7 @@ end
                 f(du, u, p, t)  = (println("using FunctionOperator mul!"); mul!(du, A, u))
                 fi(du, u, p, t) = (println("using FunctionOperator div!"); ldiv!(du, F, u))
 
-                FunctionOperator(f; isinplace=true, T=Float64, size=(n,n),
-                                 input_prototype=u, output_prototype=u,
-                                 op_inverse=fi)
+                FunctionOperator(f, u, u; isinplace=true, op_inverse=fi)
             end
 
             op1 = get_operator(A1, x1*0)

@@ -59,17 +59,6 @@ function defaultalg(A, b::GPUArraysCore.AbstractGPUArray, ::OperatorAssumptions{
 end
 
 function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
-                    assumptions::OperatorAssumptions)
-    KrylovJL_GMRES()
-end
-
-# Ambiguity handling
-function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
-                    assumptions::OperatorAssumptions{Nothing})
-    KrylovJL_GMRES()
-end
-
-function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
                     assumptions::OperatorAssumptions{false})
     KrylovJL_LSMR()
 end

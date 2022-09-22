@@ -104,12 +104,6 @@ function defaultalg(A, b, ::OperatorAssumptions{true})
         alg = DirectLdiv()
     elseif SciMLOperators.has_ldiv(A)
         alg = DirectLdiv(inplace=false)
-
-    if SciMLOperators.has_ldiv!(A)
-        alg = DirectLdiv()
-    elseif SciMLOperators.has_ldiv(A)
-        alg = DirectLdiv(inplace=false)
-
     # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
     # it makes sense according to the benchmarks, which is dependent on
     # whether MKL or OpenBLAS is being used

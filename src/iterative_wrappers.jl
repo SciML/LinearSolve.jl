@@ -134,6 +134,7 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
     N = cache.Pr
 
     # TODO - Base.inv - literally inverts matrices. avoid
+    # TODO (vedant): https://github.com/JuliaSmoothOptimizers/Krylov.jl/issues/612#issuecomment-1227391841
     M = isidentity(M) ? M : InvertedOperator(M)
     N = isidentity(N) ? N : InvertedOperator(N)
 

@@ -110,6 +110,11 @@ end
         test_interface(KLUFactorization(), prob1, prob2)
         test_interface(KLUFactorization(reuse_symbolic = false), prob1, prob2)
 
+        prob1 = LinearProblem(A1, b1; u0 = x1)
+        prob2 = LinearProblem(A2, b2; u0 = x2)
+        test_interface(KLUFactorization(), prob1, prob2)
+        test_interface(KLUFactorization(reuse_symbolic = false), prob1, prob2)
+
         # Test that refactoring wrong throws.
         cache = SciMLBase.init(prob1, KLUFactorization(); cache_kwargs...) # initialize cache
         y = solve(cache)

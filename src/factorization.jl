@@ -308,7 +308,13 @@ end
 function init_cacheval(alg::KLUFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
                        reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
-    return KLU.KLUFactorization(convert(AbstractMatrix, A)) # this takes care of the copy internally.
+    M = if issparse(A)
+        A
+    else
+        @warn "nonsparse operator pased to KLUFactorization(). converting to sparse"
+        sparse(A)
+    end
+    return KLU.KLUFactorization(convert(AbstractMatrix, M)) # this takes care of the copy internally.
 end
 
 function SciMLBase.solve(cache::LinearCache, alg::KLUFactorization; kwargs...)

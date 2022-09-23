@@ -320,6 +320,7 @@ end
 function SciMLBase.solve(cache::LinearCache, alg::KLUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
+    A = issparse(A) ? A : sparse(A)
     if cache.isfresh
         if cache.cacheval !== nothing && alg.reuse_symbolic
             # If we have a cacheval already, run umfpack_symbolic to ensure the symbolic factorization exists

@@ -89,6 +89,7 @@ end
         prob1 = LinearProblem(sparse(A1), b1; u0 = x1)
         prob2 = LinearProblem(sparse(A2), b2; u0 = x2)
         test_interface(UMFPACKFactorization(), prob1, prob2)
+        test_interface(UMFPACKFactorization(reuse_symbolic = false), prob1, prob2)
 
         # Test that refactoring wrong throws.
         cache = SciMLBase.init(prob1, UMFPACKFactorization(); cache_kwargs...) # initialize cache

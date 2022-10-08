@@ -79,15 +79,15 @@ end
     end
 
     @testset "UMFPACK Factorization" begin
-        A1 = A / 1
+        A1 = sparse(A / 1)
         b1 = rand(n)
         x1 = zero(b)
-        A2 = A / 2
+        A2 = sparse(A / 2)
         b2 = rand(n)
         x2 = zero(b)
 
-        prob1 = LinearProblem(sparse(A1), b1; u0 = x1)
-        prob2 = LinearProblem(sparse(A2), b2; u0 = x2)
+        prob1 = LinearProblem(A1, b1; u0 = x1)
+        prob2 = LinearProblem(A2, b2; u0 = x2)
         test_interface(UMFPACKFactorization(), prob1, prob2)
         test_interface(UMFPACKFactorization(reuse_symbolic = false), prob1, prob2)
 
@@ -102,15 +102,15 @@ end
     end
 
     @testset "KLU Factorization" begin
-        A1 = A / 1
+        A1 = sparse(A / 1)
         b1 = rand(n)
         x1 = zero(b)
-        A2 = A / 2
+        A2 = sparse(A / 2)
         b2 = rand(n)
         x2 = zero(b)
 
-        prob1 = LinearProblem(sparse(A1), b1; u0 = x1)
-        prob2 = LinearProblem(sparse(A2), b2; u0 = x2)
+        prob1 = LinearProblem(A1, b1; u0 = x1)
+        prob2 = LinearProblem(A2, b2; u0 = x2)
         test_interface(KLUFactorization(), prob1, prob2)
         test_interface(KLUFactorization(reuse_symbolic = false), prob1, prob2)
 

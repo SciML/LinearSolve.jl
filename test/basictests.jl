@@ -94,7 +94,7 @@ end
         # Test that refactoring is checked and handled.
         cache = SciMLBase.init(prob1, UMFPACKFactorization(); cache_kwargs...) # initialize cache
         y = solve(cache)
-        X = sprand(sprand(n, n, 0.8))
+        X = sprand(n, n, 0.8)
         cache = LinearSolve.set_A(cache, X)
         @test X * solve(cache) ≈ b1
     end
@@ -115,7 +115,7 @@ end
         # Test that refactoring wrong is checked and handled.
         cache = SciMLBase.init(prob1, KLUFactorization(); cache_kwargs...) # initialize cache
         y = solve(cache)
-        X = sprand(sprand(n, n, 0.8))
+        X = sprand(n, n, 0.8)
         cache = LinearSolve.set_A(cache, X)
         @test X * solve(cache) ≈ b1
     end

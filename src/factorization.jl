@@ -291,7 +291,7 @@ function SciMLBase.solve(cache::LinearCache, alg::UMFPACKFactorization; kwargs..
     if cache.isfresh
         if cache.cacheval !== nothing && alg.reuse_symbolic
             # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
-            if alg.check && !(SuiteSparse.decrement(SparseArrays.getcolptr(A)) ==
+            if alg.check_pattern && !(SuiteSparse.decrement(SparseArrays.getcolptr(A)) ==
                  cache.cacheval.colptr &&
                  SuiteSparse.decrement(SparseArrays.getrowval(A)) == cache.cacheval.rowval)
                 fact = lu(A)
@@ -324,7 +324,7 @@ function SciMLBase.solve(cache::LinearCache, alg::KLUFactorization; kwargs...)
     A = convert(AbstractMatrix, A)
     if cache.isfresh
         if cache.cacheval !== nothing && alg.reuse_symbolic
-            if alg.check && !(SuiteSparse.decrement(SparseArrays.getcolptr(A)) ==
+            if alg.check_pattern && !(SuiteSparse.decrement(SparseArrays.getcolptr(A)) ==
                  cache.cacheval.colptr &&
                  SuiteSparse.decrement(SparseArrays.getrowval(A)) == cache.cacheval.rowval)
                 fact = KLU.klu(A)

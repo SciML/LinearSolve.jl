@@ -267,7 +267,7 @@ end
 
 Base.@kwdef struct UMFPACKFactorization <: AbstractFactorization
     reuse_symbolic::Bool = true
-    check::Bool = true # Check factorization re-use
+    check_pattern::Bool = true # Check factorization re-use
 end
 
 function init_cacheval(alg::UMFPACKFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
@@ -310,7 +310,7 @@ end
 
 Base.@kwdef struct KLUFactorization <: AbstractFactorization
     reuse_symbolic::Bool = true
-    check::Bool = true
+    check_pattern::Bool = true
 end
 
 function init_cacheval(alg::KLUFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,

@@ -19,7 +19,7 @@ makedocs(sitename = "LinearSolve.jl",
          ],
          format = Documenter.HTML(analytics = "UA-90474609-3",
                                   assets = ["assets/favicon.ico"],
-                                  canonical = "https://linearsolve.sciml.ai/stable/"),
+                                  canonical = "https://docs.sciml.ai/LinearSolve/stable/"),
          pages = pages)
 
 deploydocs(;

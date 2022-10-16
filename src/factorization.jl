@@ -267,6 +267,7 @@ end
 
 Base.@kwdef struct UMFPACKFactorization <: AbstractFactorization
     reuse_symbolic::Bool = true
+    check_pattern::Bool = true # Check factorization re-use
 end
 
 function init_cacheval(alg::UMFPACKFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
@@ -290,7 +291,13 @@ function SciMLBase.solve(cache::LinearCache, alg::UMFPACKFactorization; kwargs..
     if cache.isfresh
         if cache.cacheval !== nothing && alg.reuse_symbolic
             # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
-            fact = lu!(cache.cacheval, A)
+            if alg.check_pattern && !(SuiteSparse.decrement(SparseArrays.getcolptr(A)) ==
+                 cache.cacheval.colptr &&
+                 SuiteSparse.decrement(SparseArrays.getrowval(A)) == cache.cacheval.rowval)
+                fact = lu(A)
+            else
+                fact = lu!(cache.cacheval, A)
+            end
         else
             fact = lu(A)
         end
@@ -303,6 +310,7 @@ end
 
 Base.@kwdef struct KLUFactorization <: AbstractFactorization
     reuse_symbolic::Bool = true
+    check_pattern::Bool = true
 end
 
 function init_cacheval(alg::KLUFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
@@ -316,14 +324,20 @@ function SciMLBase.solve(cache::LinearCache, alg::KLUFactorization; kwargs...)
     A = convert(AbstractMatrix, A)
     if cache.isfresh
         if cache.cacheval !== nothing && alg.reuse_symbolic
-            # If we have a cacheval already, run umfpack_symbolic to ensure the symbolic factorization exists
-            # This won't recompute if it does.
-            KLU.klu_analyze!(cache.cacheval)
-            copyto!(cache.cacheval.nzval, A.nzval)
-            if cache.cacheval._numeric === C_NULL # We MUST have a numeric factorization for reuse, unlike UMFPACK.
-                KLU.klu_factor!(cache.cacheval)
+            if alg.check_pattern && !(SuiteSparse.decrement(SparseArrays.getcolptr(A)) ==
+                 cache.cacheval.colptr &&
+                 SuiteSparse.decrement(SparseArrays.getrowval(A)) == cache.cacheval.rowval)
+                fact = KLU.klu(A)
+            else
+                # If we have a cacheval already, run umfpack_symbolic to ensure the symbolic factorization exists
+                # This won't recompute if it does.
+                KLU.klu_analyze!(cache.cacheval)
+                copyto!(cache.cacheval.nzval, A.nzval)
+                if cache.cacheval._numeric === C_NULL # We MUST have a numeric factorization for reuse, unlike UMFPACK.
+                    KLU.klu_factor!(cache.cacheval)
+                end
+                fact = KLU.klu!(cache.cacheval, A)
             end
-            fact = KLU.klu!(cache.cacheval, A)
         else
             # New fact each time since the sparsity pattern can change
             # and thus it needs to reallocate

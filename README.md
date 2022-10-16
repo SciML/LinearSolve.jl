@@ -3,7 +3,7 @@
 [![Join the chat at https://julialang.zulipchat.com #sciml-bridged](https://img.shields.io/static/v1?label=Zulip&message=chat&color=9558b2&labelColor=389826)](https://julialang.zulipchat.com/#narrow/stream/279055-sciml-bridged)
 [![Global Docs](https://img.shields.io/badge/docs-SciML-blue.svg)](https://docs.sciml.ai/LinearSolve/stable/)
 
-[![codecov](https://codecov.io/gh/SciML/LinearSolvers.jl/branch/master/graph/badge.svg)](https://app.codecov.io/gh/SciML/LinearSolve.jl)
+[![codecov](https://codecov.io/gh/SciML/LinearSolve.jl/branch/main/graph/badge.svg)](https://app.codecov.io/gh/SciML/LinearSolve.jl)
 [![Build Status](https://github.com/SciML/LinearSolvers.jl/workflows/CI/badge.svg)](https://github.com/SciML/LinearSolvers.jl/actions?query=workflow%3ACI)
 
 [![ColPrac: Contributor's Guide on Collaborative Practices for Community Packages](https://img.shields.io/badge/ColPrac-Contributor's%20Guide-blueviolet)](https://github.com/SciML/ColPrac)

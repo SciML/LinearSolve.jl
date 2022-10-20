@@ -274,14 +274,17 @@ function init_cacheval(alg::UMFPACKFactorization, A, b, u, Pl, Pr, maxiters::Int
                        verbose::Bool, assumptions::OperatorAssumptions)
     A = convert(AbstractMatrix, A)
     zerobased = SparseArrays.getcolptr(A)[1] == 0
-    res = SuiteSparse.UMFPACK.UmfpackLU(C_NULL, C_NULL, size(A, 1), size(A, 2),
-                                        zerobased ? copy(SparseArrays.getcolptr(A)) :
-                                        SuiteSparse.decrement(SparseArrays.getcolptr(A)),
-                                        zerobased ? copy(rowvals(A)) :
-                                        SuiteSparse.decrement(rowvals(A)),
-                                        copy(nonzeros(A)), 0)
-    finalizer(SuiteSparse.UMFPACK.umfpack_free_symbolic, res)
-    res
+    @static if VERSION < v"1.9"
+        return SuiteSparse.UMFPACK.UmfpackLU(C_NULL, C_NULL, size(A, 1), size(A, 2),
+                                            zerobased ? copy(SparseArrays.getcolptr(A)) :
+                                            SuiteSparse.decrement(SparseArrays.getcolptr(A)),
+                                            zerobased ? copy(rowvals(A)) :
+                                            SuiteSparse.decrement(rowvals(A)),
+                                            copy(nonzeros(A)), 0)
+        finalizer(SuiteSparse.UMFPACK.umfpack_free_symbolic, res)
+    else
+        return SuiteSparse.UMFPACK.UmfpackLU(A)
+    end
 end
 
 function SciMLBase.solve(cache::LinearCache, alg::UMFPACKFactorization; kwargs...)

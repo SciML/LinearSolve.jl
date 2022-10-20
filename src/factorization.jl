@@ -274,7 +274,7 @@ function init_cacheval(alg::UMFPACKFactorization, A, b, u, Pl, Pr, maxiters::Int
                        verbose::Bool, assumptions::OperatorAssumptions)
     A = convert(AbstractMatrix, A)
     zerobased = SparseArrays.getcolptr(A)[1] == 0
-    @static if VERSION < v"1.9"
+    @static if VERSION < v"1.9.0-DEV.1622"
         return SuiteSparse.UMFPACK.UmfpackLU(C_NULL, C_NULL, size(A, 1), size(A, 2),
                                              zerobased ? copy(SparseArrays.getcolptr(A)) :
                                              SuiteSparse.decrement(SparseArrays.getcolptr(A)),

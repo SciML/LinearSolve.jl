@@ -40,3 +40,35 @@ Wrappers for every linear solver in the Julia language is on the roadmap. If
 there are any important ones that are missing that you would like to see added,
 please open an issue. The current algorithms should support automatic differentiation.
 Pre-defined preconditioners would be a welcome addition.
+
+## Reproducibility
+```@raw html
+<details><summary>The documentation of this SciML package was build using these direct dependencies</summary>
+```
+```@example
+using Pkg # hide
+Pkg.status() # hide
+```
+```@raw html
+</details>
+```
+```@raw html
+<details><summary>and using this machine and Julia version:</summary>
+```
+```@example
+using InteractiveUtils # hide
+versioninfo() # hide
+```
+```@raw html
+</details>
+```
+```@raw html
+<details><summary>A more complete overview of all dependencies and their versions is also provided:</summary>
+```
+```@example
+using Pkg # hide
+Pkg.status(;mode = PKGMODE_MANIFEST) # hide
+```
+```@raw html
+</details>
+```

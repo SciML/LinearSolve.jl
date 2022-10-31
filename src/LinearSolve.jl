@@ -7,7 +7,9 @@ import Base: eltype, adjoint, inv
 using LinearAlgebra
 using IterativeSolvers: Identity
 using SparseArrays
-using SciMLBase: AbstractDiffEqOperator, AbstractLinearAlgorithm
+using SciMLBase: AbstractLinearAlgorithm
+using SciMLOperators
+using SciMLOperators: AbstractSciMLOperator, IdentityOperator, InvertedOperator
 using Setfield
 using UnPack
 using SuiteSparse
@@ -23,6 +25,11 @@ import IterativeSolvers
 
 using Reexport
 @reexport using SciMLBase
+
+
+const ComposePreconditioner = SciMLOperators.ComposedOperator
+
+@deprecate InvPreconditioner SciMLOperators.InvertedOperator
 
 abstract type SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
 abstract type AbstractFactorization <: SciMLLinearSolveAlgorithm end
@@ -41,7 +48,6 @@ include("common.jl")
 include("factorization.jl")
 include("simplelu.jl")
 include("iterative_wrappers.jl")
-include("preconditioners.jl")
 include("solve_function.jl")
 include("default.jl")
 include("init.jl")

@@ -9,7 +9,7 @@ using IterativeSolvers: Identity
 using SparseArrays
 using SciMLBase: AbstractLinearAlgorithm
 using SciMLOperators
-using SciMLOperators: AbstractSciMLOperator, IdentityOperator, InvertedOperator
+using SciMLOperators: AbstractSciMLOperator
 using Setfield
 using UnPack
 using SuiteSparse

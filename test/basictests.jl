@@ -273,33 +273,82 @@ end
     end
 
     @testset "Solve Function" begin
-        A1 = rand(n) |> Diagonal
-        b1 = rand(n)
-        x1 = zero(b1)
-        A2 = rand(n) |> Diagonal
-        b2 = rand(n)
-        x2 = zero(b1)
+        @testset "LinearSolveFunction" begin
+            A1 = rand(n) |> Diagonal
+            b1 = rand(n)
+            x1 = zero(b1)
+            A2 = rand(n) |> Diagonal
+            b2 = rand(n)
+            x2 = zero(b1)
 
-        function sol_func(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true, kwargs...)
-            if verbose == true
-                println("out-of-place solve")
+            function sol_func(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,
+                              kwargs...)
+                if verbose == true
+                    println("out-of-place solve")
+                end
+                u = A \ b
             end
-            u = A \ b
+
+            function sol_func!(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,
+                               kwargs...)
+                if verbose == true
+                    println("in-place solve")
+                end
+                ldiv!(u, A, b)
+            end
+
+            prob1 = LinearProblem(A1, b1; u0 = x1)
+            prob2 = LinearProblem(A2, b2; u0 = x2)
+
+            for alg in (LinearSolveFunction(sol_func),
+                        LinearSolveFunction(sol_func!))
+                test_interface(alg, prob1, prob2)
+            end
         end
 
-        function sol_func!(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true, kwargs...)
-            if verbose == true
-                println("in-place solve")
+        @testset "DirectLdiv(inplace=false)" begin
+            function get_operator(A, u)
+                F = lu(A)
+                f(u, p, t) = (println("using FunctionOperator mul"); A * u)
+                fi(u, p, t) = (println("using FunctionOperator div"); F \ u)
+
+                FunctionOperator(f, u, u; isinplace = false, op_inverse = fi)
             end
-            ldiv!(u, A, b)
+
+            op1 = get_operator(A1, x1 * 0)
+            op2 = get_operator(A2, x2 * 0)
+
+            prob1 = LinearProblem(op1, b1; u0 = x1)
+            prob2 = LinearProblem(op2, b2; u0 = x2)
+
+            @test LinearSolve.defaultalg(op1, x1) isa DirectLdiv
+            @test LinearSolve.defaultalg(op2, x2) isa DirectLdiv
+
+            test_interface(DirectLdiv(inplace = false), prob1, prob2)
+            test_interface(nothing, prob1, prob2)
         end
 
-        prob1 = LinearProblem(A1, b1; u0 = x1)
-        prob2 = LinearProblem(A1, b1; u0 = x1)
+        @testset "DirectLdiv(inplace=true)" begin
+            function get_operator(A, u)
+                F = lu(A)
+                f(du, u, p, t) = (println("using FunctionOperator mul!"); mul!(du, A, u))
+                fi(du, u, p, t) = (println("using FunctionOperator div!"); ldiv!(du, F, u))
 
-        for alg in (LinearSolveFunction(sol_func),
-                    LinearSolveFunction(sol_func!))
-            test_interface(alg, prob1, prob2)
+                FunctionOperator(f, u, u; isinplace = true, op_inverse = fi)
+            end
+
+            op1 = get_operator(A1, x1 * 0)
+            op2 = get_operator(A2, x2 * 0)
+
+            prob1 = LinearProblem(op1, b1; u0 = x1)
+            prob2 = LinearProblem(op2, b2; u0 = x2)
+
+            @test LinearSolve.defaultalg(op1, x1) isa DirectLdiv
+            @test LinearSolve.defaultalg(op2, x2) isa DirectLdiv
+
+            test_interface(DirectLdiv(), prob1, prob2)
+            test_interface(nothing, prob1, prob2)
         end
     end
+
 end # testset

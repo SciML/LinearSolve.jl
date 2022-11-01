@@ -39,6 +39,13 @@ needs_concrete_A(alg::AbstractFactorization) = true
 needs_concrete_A(alg::AbstractKrylovSubspaceMethod) = false
 needs_concrete_A(alg::AbstractSolveFunction) = false
 
+# Is Identity
+
+isidentity(A) = A === I
+isidentity(A::UniformScaling) = isone(A.λ)
+isidentity(::IterativeSolvers.Identity) = true
+isidentity(::SciMLOperators.IdentityOperator) = true
+
 # Code
 
 include("common.jl")
@@ -75,7 +82,7 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
        UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization
 
-export LinearSolveFunction
+export LinearSolveFunction, DirectLdiv
 
 export KrylovJL, KrylovJL_CG, KrylovJL_GMRES, KrylovJL_BICGSTAB, KrylovJL_MINRES,
        IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,

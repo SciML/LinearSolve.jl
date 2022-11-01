@@ -26,9 +26,6 @@ import IterativeSolvers
 using Reexport
 @reexport using SciMLBase
 
-
-const ComposePreconditioner = SciMLOperators.ComposedOperator
-
 @deprecate InvPreconditioner SciMLOperators.InvertedOperator
 
 abstract type SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
@@ -48,6 +45,7 @@ include("common.jl")
 include("factorization.jl")
 include("simplelu.jl")
 include("iterative_wrappers.jl")
+include("preconditioners.jl")
 include("solve_function.jl")
 include("default.jl")
 include("init.jl")

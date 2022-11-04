@@ -5,7 +5,7 @@ end
 issquare(::OperatorAssumptions{issq}) where {issq} = issq
 
 _unwrap_val(::Val{B}) where {B} = B
-_unwrap_val(B::Nothing) = Nothing
+_unwrap_val(B::Nothing) = nothing
 _unwrap_val(B::Bool) = B
 
 struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issquare}

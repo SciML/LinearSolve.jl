@@ -19,7 +19,7 @@ function defaultalg(A::DiffEqArrayOperator, b, assumptions::OperatorAssumptions{
     defaultalg(A.A, b, assumptions)
 end
 
-function defaultalg(A, b, ::OperatorAssumptions{nothing})
+function defaultalg(A, b, ::OperatorAssumptions{Nothing})
     issquare = size(A, 1) == size(A, 2)
     defaultalg(A, b, OperatorAssumptions(Val(issquare)))
 end
@@ -65,7 +65,7 @@ end
 
 # Ambiguity handling
 function defaultalg(A::SciMLBase.AbstractDiffEqOperator, b,
-                    assumptions::OperatorAssumptions{nothing})
+                    assumptions::OperatorAssumptions{Nothing})
     KrylovJL_GMRES()
 end
 

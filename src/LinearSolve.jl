@@ -23,6 +23,7 @@ import IterativeSolvers
 
 using Reexport
 @reexport using SciMLBase
+using SciMLBase: _unwrap_val
 
 abstract type SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
 abstract type AbstractFactorization <: SciMLLinearSolveAlgorithm end

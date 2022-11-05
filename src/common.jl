@@ -1,12 +1,9 @@
 struct OperatorAssumptions{issquare} end
 function OperatorAssumptions(issquare = nothing)
-    OperatorAssumptions{_unwrap_val(issquare)}()
+    issquare = something(_unwrap_val(issquare), Nothing)
+    OperatorAssumptions{issquare}()
 end
 issquare(::OperatorAssumptions{issq}) where {issq} = issq
-
-_unwrap_val(::Val{B}) where {B} = B
-_unwrap_val(B::Nothing) = Nothing
-_unwrap_val(B::Bool) = B
 
 struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issquare}
     A::TA

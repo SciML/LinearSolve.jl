@@ -1,8 +1,8 @@
 using LinearSolve
 using Documenter
 
-cp("./Manifest.toml", "./src/assets/Manifest.toml", force = true)
-cp("./Project.toml", "./src/assets/Project.toml", force = true)
+cp("./docs/Manifest.toml", "./docs/src/assets/Manifest.toml", force = true)
+cp("./docs/Project.toml", "./docs/src/assets/Project.toml", force = true)
 
 DocMeta.setdocmeta!(LinearSolve, :DocTestSetup, :(using LinearSolve); recursive = true)
 

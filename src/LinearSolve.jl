@@ -61,7 +61,7 @@ SnoopPrecompile.@precompile_all_calls begin
     sol = solve(prob, RFLUFactorization())
     sol = solve(prob, KrylovJL_GMRES())
 
-    A = sprand(4, 4, 0.9)
+    A = sprand(4, 4, 0.3) + I
     prob = LinearProblem(A, b)
     sol = solve(prob)
     sol = solve(prob, KLUFactorization())

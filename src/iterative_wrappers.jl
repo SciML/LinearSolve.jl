@@ -291,11 +291,11 @@ end
 function KrylovKitJL(args...;
                      KrylovAlg = KrylovKit.GMRES, gmres_restart = 0,
                      kwargs...)
-    return KrylovJL(KrylovAlg, gmres_restart, args, kwargs)
+    return KrylovKitJL(KrylovAlg, gmres_restart, args, kwargs)
 end
 
 function KrylovKitJL_CG(args...; kwargs...)
-    KrylovKitJL(args...; KrylovAlg = KrylovKit.CG, kwargs...)
+    KrylovKitJL(args...; KrylovAlg = KrylovKit.CG, kwargs..., isposdef = true)
 end
 function KrylovKitJL_GMRES(args...; kwargs...)
     KrylovKitJL(args...; KrylovAlg = KrylovKit.GMRES, kwargs...)
@@ -306,12 +306,12 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovKitJL, kwargs...)
     rtol = float(cache.reltol)
     maxiter = cache.maxiters
     verbosity = cache.verbose ? 1 : 0
-    krylovdim = (alg.gmres_restart == 0) ? min(20, size(A, 1)) : alg.gmres_restart
+    krylovdim = (alg.gmres_restart == 0) ? min(20, size(cache.A, 1)) : alg.gmres_restart
 
     kwargs = (atol = atol, rtol = rtol, maxiter = maxiter, verbosity = verbosity,
               krylovdim = krylovdim, alg.kwargs...)
 
-    x, info = KrylovKit.linsolve(cache.A, cache.b, cache.u, alg.KrylovAlg)
+    x, info = KrylovKit.linsolve(cache.A, cache.b, cache.u; kwargs...)
 
     copy!(cache.u, x)
     resid = info.normres

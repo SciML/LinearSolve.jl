@@ -193,6 +193,7 @@ end
                     ("CG", KrylovKitJL_CG(kwargs...)),
                     ("GMRES", KrylovKitJL_GMRES(kwargs...)))
             @testset "$(alg[1])" begin test_interface(alg[2], prob1, prob2) end
+			@test alg[2] isa KrylovKitJL
         end
     end
 

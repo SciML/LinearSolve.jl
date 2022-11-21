@@ -297,6 +297,7 @@ end
 function KrylovKitJL_CG(args...; kwargs...)
     KrylovKitJL(args...; KrylovAlg = KrylovKit.CG, kwargs..., isposdef = true)
 end
+
 function KrylovKitJL_GMRES(args...; kwargs...)
     KrylovKitJL(args...; KrylovAlg = KrylovKit.GMRES, kwargs...)
 end

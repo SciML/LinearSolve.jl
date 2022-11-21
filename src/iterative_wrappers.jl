@@ -301,7 +301,7 @@ function KrylovKitJL_GMRES(args...; kwargs...)
     KrylovKitJL(args...; KrylovAlg = KrylovKit.GMRES, kwargs...)
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::KrylovKitJL, kwargs...)
+function SciMLBase.solve(cache::LinearCache, alg::KrylovKitJL; kwargs...)
     atol = float(cache.abstol)
     rtol = float(cache.reltol)
     maxiter = cache.maxiters

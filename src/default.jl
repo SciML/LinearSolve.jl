@@ -71,7 +71,7 @@ end
 
 function defaultalg(A::SciMLBase.AbstractDiffEqOperator, b,
                     assumptions::OperatorAssumptions{false})
-    m,n = size(A)
+    m, n = size(A)
     if m < n
         KrylovJL_CRAIGMR()
     else

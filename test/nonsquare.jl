@@ -22,5 +22,5 @@ res = A \ b
 A = sprand(n, m, 0.5)
 b = rand(n)
 prob = LinearProblem(A, b)
-res = A \ b
+res = Matrix(A) \ b
 @test solve(prob, KrylovJL_CRAIGMR()) ≈ res

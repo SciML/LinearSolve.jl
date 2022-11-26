@@ -316,7 +316,7 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovKitJL; kwargs...)
 
     copy!(cache.u, x)
     resid = info.normres
-    retcode = info.converged == 1 ? :Default : :DidNotConverge
+    retcode = info.converged == 1 ? ReturnCode.Default : ReturnCode.ConvergenceFailure
     iters = info.numiter
     return SciMLBase.build_linear_solution(alg, cache.u, resid, cache; retcode = retcode,
                                            iters = iters)

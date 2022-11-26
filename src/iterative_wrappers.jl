@@ -15,18 +15,28 @@ function KrylovJL(args...; KrylovAlg = Krylov.gmres!,
                     args, kwargs)
 end
 
-KrylovJL_CG(args...; kwargs...) = KrylovJL(args...; KrylovAlg = Krylov.cg!, kwargs...)
-KrylovJL_GMRES(args...; kwargs...) = KrylovJL(args...; KrylovAlg = Krylov.gmres!, kwargs...)
-KrylovJL_FGMRES(args...; kwargs...) = KrylovJL(args...; KrylovAlg = Krylov.fgmres!, kwargs...)
-function KrylovJL_BICGSTAB(args...; kwargs...)
-    KrylovJL(args...; KrylovAlg = Krylov.bicgstab!, kwargs...)
+function KrylovJL_CG(args...; kwargs...)
+    KrylovJL(args...; KrylovAlg = Krylov.cg!, kwargs...)
 end
+
 function KrylovJL_MINRES(args...; kwargs...)
     KrylovJL(args...; KrylovAlg = Krylov.minres!, kwargs...)
 end
 
+function KrylovJL_GMRES(args...; kwargs...)
+    KrylovJL(args...; KrylovAlg = Krylov.gmres!, kwargs...)
+end
+
+function KrylovJL_BICGSTAB(args...; kwargs...)
+    KrylovJL(args...; KrylovAlg = Krylov.bicgstab!, kwargs...)
+end
+
 function KrylovJL_LSMR(args...; kwargs...)
     KrylovJL(args...; KrylovAlg = Krylov.lsmr!, kwargs...)
+end
+
+function KrylovJL_CRAIGMR(args...; kwargs...)
+    KrylovJL(args...; KrylovAlg = Krylov.craigmr!, kwargs...)
 end
 
 function get_KrylovJL_solver(KrylovAlg)

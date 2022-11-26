@@ -74,9 +74,10 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
 
 export LinearSolveFunction
 
-export KrylovJL, KrylovJL_CG, KrylovJL_GMRES, KrylovJL_BICGSTAB, KrylovJL_MINRES,
+export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
+       KrylovJL_BICGSTAB, KrylovJL_LSMR, KrylovJL_CRAIGMR,
        IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
        IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES,
-       KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES, KrylovJL_LSMR
+       KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES
 
 end

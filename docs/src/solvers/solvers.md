@@ -178,10 +178,12 @@ IterativeSolversJL(args...;
 
 ### Krylov.jl
 
-- `KrylovJL_CG(args...;kwargs...)`: A generic CG implementation
-- `KrylovJL_GMRES(args...;kwargs...)`: A generic GMRES implementation
-- `KrylovJL_BICGSTAB(args...;kwargs...)`: A generic BICGSTAB implementation
-- `KrylovJL_MINRES(args...;kwargs...)`: A generic MINRES implementation
+- `KrylovJL_CG(args...;kwargs...)`: A generic CG implementation for Hermitian and positive definite linear systems
+- `KrylovJL_MINRES(args...;kwargs...)`: A generic MINRES implementation for Hermitian linear systems
+- `KrylovJL_GMRES(args...;kwargs...)`: A generic GMRES implementation for square non-Hermitian linear systems
+- `KrylovJL_BICGSTAB(args...;kwargs...)`: A generic BICGSTAB implementation for square non-Hermitian linear systems
+- `KrylovJL_LSMR(args...;kwargs...)`: A generic LSMR implementation for least-squares problems
+- `KrylovJL_CRAIGMR(args...;kwargs...)`: A generic CRAIGMR implementation for least-norm problems
 
 The general algorithm is:
 

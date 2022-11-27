@@ -71,7 +71,12 @@ end
 
 function defaultalg(A::SciMLBase.AbstractDiffEqOperator, b,
                     assumptions::OperatorAssumptions{false})
-    KrylovJL_LSMR()
+    m, n = size(A)
+    if m < n
+        KrylovJL_CRAIGMR()
+    else
+        KrylovJL_LSMR()
+    end
 end
 
 # Handle ambiguity

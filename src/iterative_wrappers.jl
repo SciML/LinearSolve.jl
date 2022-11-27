@@ -15,17 +15,28 @@ function KrylovJL(args...; KrylovAlg = Krylov.gmres!,
                     args, kwargs)
 end
 
-KrylovJL_CG(args...; kwargs...) = KrylovJL(args...; KrylovAlg = Krylov.cg!, kwargs...)
-KrylovJL_GMRES(args...; kwargs...) = KrylovJL(args...; KrylovAlg = Krylov.gmres!, kwargs...)
-function KrylovJL_BICGSTAB(args...; kwargs...)
-    KrylovJL(args...; KrylovAlg = Krylov.bicgstab!, kwargs...)
+function KrylovJL_CG(args...; kwargs...)
+    KrylovJL(args...; KrylovAlg = Krylov.cg!, kwargs...)
 end
+
 function KrylovJL_MINRES(args...; kwargs...)
     KrylovJL(args...; KrylovAlg = Krylov.minres!, kwargs...)
 end
 
+function KrylovJL_GMRES(args...; kwargs...)
+    KrylovJL(args...; KrylovAlg = Krylov.gmres!, kwargs...)
+end
+
+function KrylovJL_BICGSTAB(args...; kwargs...)
+    KrylovJL(args...; KrylovAlg = Krylov.bicgstab!, kwargs...)
+end
+
 function KrylovJL_LSMR(args...; kwargs...)
     KrylovJL(args...; KrylovAlg = Krylov.lsmr!, kwargs...)
+end
+
+function KrylovJL_CRAIGMR(args...; kwargs...)
+    KrylovJL(args...; KrylovAlg = Krylov.craigmr!, kwargs...)
 end
 
 function get_KrylovJL_solver(KrylovAlg)
@@ -89,6 +100,10 @@ function get_KrylovJL_solver(KrylovAlg)
         Krylov.QmrSolver
     elseif (KrylovAlg === Krylov.gmres!)
         Krylov.GmresSolver
+    elseif (KrylovAlg === Krylov.fgmres!)
+        Krylov.FgmresSolver
+    elseif (KrylovAlg === Krylov.gpmr!)
+        Krylov.GpmrSolver
     elseif (KrylovAlg === Krylov.fom!)
         Krylov.FomSolver
     end
@@ -105,6 +120,8 @@ function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, re
     solver = if (alg.KrylovAlg === Krylov.dqgmres! ||
                  alg.KrylovAlg === Krylov.diom! ||
                  alg.KrylovAlg === Krylov.gmres! ||
+                 alg.KrylovAlg === Krylov.fgmres! ||
+                 alg.KrylovAlg === Krylov.gpmr! ||
                  alg.KrylovAlg === Krylov.fom!)
         KS(A, b, memory)
     elseif (alg.KrylovAlg === Krylov.minres! ||

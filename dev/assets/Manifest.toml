@@ -281,9 +281,9 @@ version = "0.4.0"
 
 [[deps.Krylov]]
 deps = ["LinearAlgebra", "Printf", "SparseArrays"]
-git-tree-sha1 = "92256444f81fb094ff5aa742ed10835a621aef75"
+git-tree-sha1 = "dd90aacbfb622f898a97c2a4411ac49101ebab8a"
 uuid = "ba0b0d4f-ebba-5204-a429-3ac8c609bfb7"
-version = "0.8.4"
+version = "0.9.0"
 
 [[deps.KrylovKit]]
 deps = ["ChainRulesCore", "GPUArraysCore", "LinearAlgebra", "Printf"]
@@ -507,9 +507,9 @@ version = "0.6.37"
 
 [[deps.SciMLBase]]
 deps = ["ArrayInterfaceCore", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "Preferences", "RecipesBase", "RecursiveArrayTools", "RuntimeGeneratedFunctions", "StaticArraysCore", "Statistics", "Tables"]
-git-tree-sha1 = "8ee3f9c8f20744e336fd89617de9835cd4a3f6e4"
+git-tree-sha1 = "9e2628b1cc637774d99f4d547e969584de80c5a9"
 uuid = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
-version = "1.74.1"
+version = "1.75.0"
 
 [[deps.Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"

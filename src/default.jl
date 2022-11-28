@@ -57,7 +57,11 @@ function defaultalg(A::GPUArraysCore.AbstractGPUArray, b, ::OperatorAssumptions{
 end
 
 function defaultalg(A, b::GPUArraysCore.AbstractGPUArray, ::OperatorAssumptions{true})
-    KrylovJL_GMRES()
+    if VERSION >= v"1.8-"
+        LUFactorization()
+    else
+        QRFactorization()
+    end
 end
 
 function defaultalg(A::SciMLBase.AbstractDiffEqOperator, b,

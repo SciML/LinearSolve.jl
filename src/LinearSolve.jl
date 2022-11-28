@@ -15,6 +15,7 @@ using KLU
 using FastLapackInterface
 using DocStringExtensions
 import GPUArraysCore
+import Preferences
 
 # wrap
 import Krylov
@@ -38,6 +39,8 @@ needs_concrete_A(alg::AbstractSolveFunction) = false
 
 # Code
 
+const INCLUDE_SPARSE = Preferences.@load_preference("include_sparse", Base.USE_GPL_LIBS)
+
 include("common.jl")
 include("factorization.jl")
 include("simplelu.jl")
@@ -46,6 +49,10 @@ include("preconditioners.jl")
 include("solve_function.jl")
 include("default.jl")
 include("init.jl")
+
+@static if INCLUDE_SPARSE
+    include("factorization_sparse.jl")
+end
 
 const IS_OPENBLAS = Ref(true)
 isopenblas() = IS_OPENBLAS[]
@@ -60,12 +67,17 @@ SnoopPrecompile.@precompile_all_calls begin
     sol = solve(prob, LUFactorization())
     sol = solve(prob, RFLUFactorization())
     sol = solve(prob, KrylovJL_GMRES())
+end
 
-    A = sprand(4, 4, 0.3) + I
-    prob = LinearProblem(A, b)
-    sol = solve(prob)
-    sol = solve(prob, KLUFactorization())
-    sol = solve(prob, UMFPACKFactorization())
+@static if INCLUDE_SPARSE
+    SnoopPrecompile.@precompile_all_calls begin
+        A = sprand(4, 4, 0.3) + I
+        b = rand(4)
+        prob = LinearProblem(A, b)
+        sol = solve(prob)
+        sol = solve(prob, KLUFactorization())
+        sol = solve(prob, UMFPACKFactorization())
+    end
 end
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,

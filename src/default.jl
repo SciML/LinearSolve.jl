@@ -34,11 +34,17 @@ function defaultalg(A::SymTridiagonal, b, ::OperatorAssumptions{true})
     GenericFactorization(; fact_alg = ldlt!)
 end
 
-function defaultalg(A::SparseMatrixCSC, b, ::OperatorAssumptions{true})
-    if length(b) <= 10_000
-        KLUFactorization()
-    else
-        UMFPACKFactorization()
+@static if INCLUDE_SPARSE
+    function defaultalg(A::SparseMatrixCSC, b, ::OperatorAssumptions{true})
+        if length(b) <= 10_000
+            KLUFactorization()
+        else
+            UMFPACKFactorization()
+        end
+    end
+else
+    function defaultalg(A::SparseMatrixCSC, b, ::OperatorAssumptions{true})
+        KrylovJL_GMRES()
     end
 end
 

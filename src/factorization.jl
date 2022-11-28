@@ -5,14 +5,6 @@ function _ldiv!(x::Vector, A::Factorization, b::Vector)
     ldiv!(A, x)
 end
 
-# Specialize QR for the non-square case
-# Missing ldiv! definitions: https://github.com/JuliaSparse/SparseArrays.jl/issues/242
-function _ldiv!(x::Vector,
-                A::Union{SparseArrays.QR, LinearAlgebra.QRCompactWY,
-                         SuiteSparse.SPQR.QRSparse}, b::Vector)
-    x .= A \ b
-end
-
 function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization; kwargs...)
     if cache.isfresh
         fact = do_factorization(alg, cache.A, cache.b, cache.u)

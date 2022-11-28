@@ -39,6 +39,8 @@ needs_concrete_A(alg::AbstractSolveFunction) = false
 
 # Code
 
+const INCLUDE_SPARSE = Preferences.@load_preference("include_sparse", Base.USE_GPL_LIBS)
+
 include("common.jl")
 include("factorization.jl")
 include("simplelu.jl")
@@ -48,7 +50,6 @@ include("solve_function.jl")
 include("default.jl")
 include("init.jl")
 
-const INCLUDE_SPARSE = Preferences.@load_preference("include_sparse", Base.USE_GPL_LIBS)
 @static if INCLUDE_SPARSE
     include("factorization_sparse.jl")
 end

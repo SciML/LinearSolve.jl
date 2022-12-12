@@ -124,6 +124,19 @@ end
         @test X * solve(cache) ≈ b1
     end
 
+    @testset "Sparspak Factorization" begin
+        A1 = sparse(A / 1)
+        b1 = rand(n)
+        x1 = zero(b)
+        A2 = sparse(A / 2)
+        b2 = rand(n)
+        x2 = zero(b)
+
+        prob1 = LinearProblem(A1, b1; u0 = x1)
+        prob2 = LinearProblem(A2, b2; u0 = x2)
+        test_interface(SparspakFactorization(), prob1, prob2)
+    end
+
     @testset "FastLAPACK Factorizations" begin
         A1 = A / 1
         b1 = rand(n)

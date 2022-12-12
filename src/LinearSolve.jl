@@ -12,6 +12,7 @@ using Setfield
 using UnPack
 using SuiteSparse
 using KLU
+using Sparspak
 using FastLapackInterface
 using DocStringExtensions
 import GPUArraysCore
@@ -82,7 +83,8 @@ end
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
-       UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization
+       UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization,
+       SparspakFactorization
 
 export LinearSolveFunction
 

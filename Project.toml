@@ -20,6 +20,7 @@ SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 Setfield = "efcf1570-3423-57d1-acb7-fd33fddbac46"
 SnoopPrecompile = "66db9d55-30c0-4569-8b51-7e840670fc0c"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+Sparspak = "e56a9233-b9d6-4f03-8d0f-1825330902ac"
 SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 

@@ -124,7 +124,7 @@ end
         @test X * solve(cache) ≈ b1
     end
 
-    @testset "UMFPACK Factorization" begin
+    @testset "Sparspak Factorization" begin
         A1 = sparse(A / 1)
         b1 = rand(n)
         x1 = zero(b)

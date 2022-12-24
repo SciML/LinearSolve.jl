@@ -374,6 +374,28 @@ function SciMLBase.solve(cache::LinearCache, alg::RFLUFactorization{P, T};
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
+## DiagonalFactorization
+
+struct DiagonalFactorization <: AbstractFactorization end
+
+function init_cacheval(alg::DiagonalFactorization, A, b, u, Pl, Pr, maxiters::Int,
+                       abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function SciMLBase.solve(cache::LinearCache, alg::DiagonalFactorization;
+                         kwargs...) where {P, T}
+    A = cache.A
+    if cache.u isa Vector && cache.b isa Vector
+        @simd ivdep for i in eachindex(cache.u)
+            cache.u[i] = A.diag[i] \ cache.b[i]
+        end
+    else
+        cache.u .= A.diag .\ cache.b
+    end
+    SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
+end
+
 ## FastLAPACKFactorizations
 
 struct WorkspaceAndFactors{W, F}

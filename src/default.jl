@@ -33,6 +33,15 @@ end
 function defaultalg(A::SymTridiagonal, b, ::OperatorAssumptions{true})
     GenericFactorization(; fact_alg = ldlt!)
 end
+function defaultalg(A::Diagonal, b, ::OperatorAssumptions{true})
+    DiagonalFactorization()
+end
+function defaultalg(A::Diagonal, b, ::OperatorAssumptions{false})
+    DiagonalFactorization()
+end
+function defaultalg(A::Diagonal, b, ::OperatorAssumptions{Nothing})
+    DiagonalFactorization()
+end
 
 @static if INCLUDE_SPARSE
     function defaultalg(A::SparseMatrixCSC, b, ::OperatorAssumptions{true})

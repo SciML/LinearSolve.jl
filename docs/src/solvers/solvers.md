@@ -84,6 +84,7 @@ customized per-package, details given below describe a subset of important array
 LinearSolve.jl contains some linear solvers built in.
 
 - `SimpleLUFactorization`: a simple LU-factorization implementation without BLAS. Fast for small matrices.
+- `DiagonalFactorization`: a special implementation only for solving `Diagonal` matrices fast.
 
 ### FastLapackInterface.jl
 

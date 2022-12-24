@@ -84,7 +84,7 @@ end
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
        UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization,
-       SparspakFactorization
+       SparspakFactorization, DiagonalFactorization
 
 export LinearSolveFunction
 

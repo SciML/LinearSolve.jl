@@ -384,7 +384,7 @@ function init_cacheval(alg::DiagonalFactorization, A, b, u, Pl, Pr, maxiters::In
 end
 
 function SciMLBase.solve(cache::LinearCache, alg::DiagonalFactorization;
-                         kwargs...) where {P, T}
+                         kwargs...)
     A = cache.A
     if cache.u isa Vector && cache.b isa Vector
         @simd ivdep for i in eachindex(cache.u)

@@ -210,6 +210,24 @@ end
         end
     end
 
+    @testset "CHOLMOD" begin
+        # Create a posdef symmetric matrix
+        A = sprand(100, 100, 0.01)
+        A = A + A' + 100 * I
+
+        # rhs
+        b = rand(100)
+
+        # Set the problem
+        prob = LinearProblem(A, b)
+        sol = solve(prob)
+
+        # Enforce symmetry to use Cholesky, since A is symmetric and posdef
+        prob2 = LinearProblem(Symmetric(A), b)
+        sol2 = solve(prob2)
+        @test abs(norm(A * sol2.u .- b) - norm(A * sol.u .- b)) < 1e-12
+    end
+
     @testset "Preconditioners" begin
         @testset "Vector Diagonal Preconditioner" begin
             s = rand(n)

@@ -22,13 +22,13 @@ which is solved for ``y``, and then ``P_r u = y`` is solved for ``u``. The left
 preconditioner, ``P_l``, transforms the linear system into the form:
 
 ```math
-P_l^{-1}(Au - b) = 0
+P_l^{-1}Au = P_l^{-1}b
 ```
 
 A two-sided preconditioned system is of the form:
 
 ```math
-P_l A P_r^{-1} (P_r u) = P_l b
+P_l^{-1}A P_r^{-1} (P_r u) = P_l^{-1}b
 ```
 
 By default, if no preconditioner is given the preconditioner is assumed to be

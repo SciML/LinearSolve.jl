@@ -111,7 +111,14 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
     Tc = typeof(cacheval)
 
     A = alias_A ? A : deepcopy(A)
-    b = alias_b ? b : deepcopy(b)
+    b = if b isa SparseArray && !(A isa Diagonal)
+            Array(b) # the solution to a linear solve will always be dense!
+        elseif alias_b 
+            b 
+        else 
+            deepcopy(b)
+        end
+    end
 
     cache = LinearCache{
                         typeof(A),

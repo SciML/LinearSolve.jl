@@ -154,7 +154,7 @@ end
 
 function defaultalg(A::SparseMatrixCSC, b, ::OperatorAssumptions{true})
     # If GPL libraries are loaded, then use SuiteSparse. Otherwise Sparspak
-    if INCLUDE_SPARSE 
+    if INCLUDE_SPARSE
         if length(b) <= 10000
             alg = KLUFactorization()
         else

@@ -53,7 +53,7 @@ end
     end
 else
     function defaultalg(A::SparseMatrixCSC, b, ::OperatorAssumptions{true})
-        KrylovJL_GMRES()
+        SparspakFactorization()
     end
 end
 

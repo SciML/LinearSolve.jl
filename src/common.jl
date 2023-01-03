@@ -111,7 +111,7 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
     Tc = typeof(cacheval)
 
     A = alias_A ? A : deepcopy(A)
-    b = if b isa SparseArray && !(A isa Diagonal)
+    b = if b isa SparseArrays.AbstractSparseArray && !(A isa Diagonal)
         Array(b) # the solution to a linear solve will always be dense!
     elseif alias_b
         b

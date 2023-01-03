@@ -53,7 +53,7 @@ end
     end
 else
     function defaultalg(A::SparseMatrixCSC, b, ::OperatorAssumptions{true})
-        KrylovJL_GMRES()
+        SparspakFactorization()
     end
 end
 
@@ -148,20 +148,6 @@ function defaultalg(A, b, ::OperatorAssumptions{true})
         # Not factorizable operator, default to only using A*x
     else
         alg = KrylovJL_GMRES()
-    end
-    alg
-end
-
-function defaultalg(A::SparseMatrixCSC, b, ::OperatorAssumptions{true})
-    # If GPL libraries are loaded, then use SuiteSparse. Otherwise Sparspak
-    if INCLUDE_SPARSE
-        if length(b) <= 10000
-            alg = KLUFactorization()
-        else
-            alg = UMFPACKFactorization()
-        end
-    else
-        alg = SparspakFactorization()
     end
     alg
 end

@@ -7,7 +7,7 @@ Solves for ``Au=b`` in the problem defined by `prob` using the algorithm
 
 ## Recommended Methods
 
-The default algorithm `nothing` is good for choosing an algorithm that will work,
+The default algorithm `nothing` is good for picking an algorithm that will work,
 but one may need to change this to receive more performance or precision. If
 more precision is necessary, `QRFactorization()` and `SVDFactorization()` are
 the best choices, with SVD being the slowest but most precise.
@@ -29,7 +29,7 @@ with CPUs and GPUs, and thus is the generally preferred form for Krylov methods.
 
 Finally, a user can pass a custom function for handling the linear solve using
 `LinearSolveFunction()` if existing solvers are not optimally suited for their application.
-The interface is detailed [here](#passing-in-a-custom-linear-solver)
+The interface is detailed [here](#passing-in-a-custom-linear-solver).
 
 ## Full List of Methods
 
@@ -49,29 +49,29 @@ customized per-package, details given below describe a subset of important array
 (`Matrix`, `SparseMatrixCSC`, `CuMatrix`, etc.)
 
 - `LUFactorization(pivot=LinearAlgebra.RowMaximum())`: Julia's built in `lu`.
-  - On dense matrices this uses the current BLAS implementation of the user's computer
+  - On dense matrices, this uses the current BLAS implementation of the user's computer,
     which by default is OpenBLAS but will use MKL if the user does `using MKL` in their
     system.
-  - On sparse matrices this will use UMFPACK from SuiteSparse. Note that this will not
+  - On sparse matrices, this will use UMFPACK from SuiteSparse. Note that this will not
     cache the symbolic factorization.
-  - On CuMatrix it will use a CUDA-accelerated LU from CuSolver.
-  - On BandedMatrix and BlockBandedMatrix it will use a banded LU.
+  - On CuMatrix, it will use a CUDA-accelerated LU from CuSolver.
+  - On BandedMatrix and BlockBandedMatrix, it will use a banded LU.
 - `QRFactorization(pivot=LinearAlgebra.NoPivot(),blocksize=16)`: Julia's built in `qr`.
-  - On dense matrices this uses the current BLAS implementation of the user's computer
+  - On dense matrices, this uses the current BLAS implementation of the user's computer
     which by default is OpenBLAS but will use MKL if the user does `using MKL` in their
     system.
-  - On sparse matrices this will use SPQR from SuiteSparse
-  - On CuMatrix it will use a CUDA-accelerated QR from CuSolver.
-  - On BandedMatrix and BlockBandedMatrix it will use a banded QR.
+  - On sparse matrices, this will use SPQR from SuiteSparse
+  - On CuMatrix, it will use a CUDA-accelerated QR from CuSolver.
+  - On BandedMatrix and BlockBandedMatrix, it will use a banded QR.
 - `SVDFactorization(full=false,alg=LinearAlgebra.DivideAndConquer())`: Julia's built in `svd`.
-  - On dense matrices this uses the current BLAS implementation of the user's computer
+  - On dense matrices, this uses the current BLAS implementation of the user's computer
     which by default is OpenBLAS but will use MKL if the user does `using MKL` in their
     system.
 - `GenericFactorization(fact_alg)`: Constructs a linear solver from a generic
   factorization algorithm `fact_alg` which complies with the Base.LinearAlgebra
   factorization API. Quoting from Base:
     - If `A` is upper or lower triangular (or diagonal), no factorization of `A` is
-      required and the system is solved with either forward or backward substitution.
+      required. The system is then solved with either forward or backward substitution.
       For non-triangular square matrices, an LU factorization is used.
       For rectangular `A` the result is the minimum-norm least squares solution computed by a
       pivoted QR factorization of `A` and a rank estimate of `A` based on the R factor.
@@ -94,23 +94,22 @@ LinearSolve.jl provides a wrapper to these routines in a way where an initialize
 has a non-allocating LU factorization. In theory, this post-initialized solve should always
 be faster than the Base.LinearAlgebra version.
 
-- `FastLUFactorization` the `FastLapackInterface` version of the LU factorizaiton. Notably,
+- `FastLUFactorization` the `FastLapackInterface` version of the LU factorization. Notably,
   this version does not allow for choice of pivoting method.
 - `FastQRFactorization(pivot=NoPivot(),blocksize=32)`, the `FastLapackInterface` version of
-  the QR factorizaiton.
+  the QR factorization.
 
 ### SuiteSparse.jl
 
 By default, the SuiteSparse.jl are implemented for efficiency by caching the
-symbolic factorization. I.e. if `set_A` is used, it is expected that the new
+symbolic factorization. I.e., if `set_A` is used, it is expected that the new
 `A` has the same sparsity pattern as the previous `A`. If this algorithm is to
 be used in a context where that assumption does not hold, set `reuse_symbolic=false`.
 
 - `KLUFactorization(;reuse_symbolic=true)`: A fast sparse LU-factorization which
-  specializes on sparsity patterns with "less structure".
+  specializes on sparsity patterns with “less structure”.
 - `UMFPACKFactorization(;reuse_symbolic=true)`: A fast sparse multithreaded
-  LU-factorization which specializes on sparsity patterns that are more
-  structured.
+  LU-factorization which specializes on sparsity patterns with “more structure”.
 
 ### Pardiso.jl
 
@@ -150,7 +149,7 @@ end
 
 ### CUDA.jl
 
-Note that `CuArrays` are supported by `GenericFactorization` in the "normal" way.
+Note that `CuArrays` are supported by `GenericFactorization` in the “normal” way.
 The following are non-standard GPU factorization routines.
 
 !!! note

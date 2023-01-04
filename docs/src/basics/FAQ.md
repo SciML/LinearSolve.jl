@@ -1,13 +1,11 @@
 # Frequently Asked Questions
 
-Ask more questions.
-
 ## How is LinearSolve.jl compared to just using normal \, i.e. A\b?
 
 Check out [this video from JuliaCon 2022](https://www.youtube.com/watch?v=JWI34_w-yYw) which goes
-into detail on how and why LinearSolve.jl is able to be a more general and efficient interface.
+into detail on how and why LinearSolve.jl can be a more general and efficient interface.
 
-Note that if `\` is good enough for you, great! We still tend to use `\` in the REPL all of the time!
+Note that if `\` is good enough for you, great! We still tend to use `\` in the REPL all the time!
 However, if you're building a package, you may want to consider using LinearSolve.jl for the improved
 efficiency and ability to choose solvers.
 
@@ -27,7 +25,7 @@ a few ways:
    faster (in a platform and matrix-specific way).
 2. Standard approaches to handling linear solves re-allocate the pivoting vector each time. This leads to GC pauses that
    can slow down calculations. LinearSolve.jl has proper caches for fully preallocated no-GC workflows.
-3. LinearSolve.jl makes a lot of other optimizations, like factorization reuse and symbolic factorization reuse, automatic.
+3. LinearSolve.jl makes many other optimizations, like factorization reuse and symbolic factorization reuse, automatic.
    Many of these optimizations are not even possible from the high-level APIs of things like Python's major libraries and MATLAB.
 4. LinearSolve.jl has a much more extensive set of sparse matrix solvers, which is why you see a major difference (2x-10x) for sparse
    matrices. Which sparse matrix solver between KLU, UMFPACK, Pardiso, etc. is optimal depends a lot on matrix sizes, sparsity patterns,
@@ -35,8 +33,8 @@ a few ways:
 
 ## How do I use IterativeSolvers solvers with a weighted tolerance vector?
 
-IterativeSolvers.jl computes the norm after the application of the left precondtioner
-`Pl`. Thus in order to use a vector tolerance `weights`, one can mathematically
+IterativeSolvers.jl computes the norm after the application of the left preconditioner
+`Pl`. Thus, in order to use a vector tolerance `weights`, one can mathematically
 hack the system via the following formulation:
 
 ```@example FAQPrec
@@ -57,7 +55,7 @@ sol = solve(prob,IterativeSolversJL_GMRES(),Pl=Pl,Pr=Pr)
 sol.u
 ```
 
-If you want to use a "real" preconditioner under the norm `weights`, then one
+If you want to use a “real” preconditioner under the norm `weights`, then one
 can use `ComposePreconditioner` to apply the preconditioner after the application
 of the weights like as follows:
 

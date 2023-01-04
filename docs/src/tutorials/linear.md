@@ -32,6 +32,6 @@ sol = solve(prob,KrylovJL_GMRES())
 sol.u
 ```
 
-Thus a package which uses LinearSolve.jl simply needs to allow the user to
+Thus, a package which uses LinearSolve.jl simply needs to allow the user to
 pass in an algorithm struct and all wrapped linear solvers are immediately
 available as tweaks to the general algorithm.

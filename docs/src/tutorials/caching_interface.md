@@ -1,6 +1,6 @@
 # Linear Solve with Caching Interface
 
-In many cases one may want to cache information that is reused between different
+Often, one may want to cache information that is reused between different
 linear solves. For example, if one is going to perform:
 
 ```julia
@@ -52,9 +52,9 @@ sol3.u
 
 The factorization occurs on the first solve, and it stores the factorization in
 the cache. You can retrieve this cache via `sol.cache`, which is the same object
-as the `init` but updated to know not to re-solve the factorization.
+as the `init`, but updated to know not to re-solve the factorization.
 
 The advantage of course with using LinearSolve.jl in this form is that it is
 efficient while being agnostic to the linear solver. One can easily swap in
-iterative solvers, sparse solvers, etc. and it will do all of the tricks like
-caching symbolic factorizations if the sparsity pattern is unchanged.
+iterative solvers, sparse solvers, etc. and it will do all the tricks like
+caching the symbolic factorization if the sparsity pattern is unchanged.

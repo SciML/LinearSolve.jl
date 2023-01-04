@@ -31,7 +31,7 @@ A two-sided preconditioned system is of the form:
 P_l^{-1}A P_r^{-1} (P_r u) = P_l^{-1}b
 ```
 
-By default, if no preconditioner is given the preconditioner is assumed to be
+By default, if no preconditioner is given, the preconditioner is assumed to be
 the identity ``I``.
 
 ### Using Preconditioners
@@ -99,8 +99,8 @@ The following preconditioners match the interface of LinearSolve.jl.
 - [LimitedLDLFactorizations.lldl](https://github.com/JuliaSmoothOptimizers/LimitedLDLFactorizations.jl):
   A limited-memory LDLᵀ factorization for symmetric matrices. Requires `A` as a
   `SparseMatrixCSC`. Applying `F = lldl(A); F.D .= abs.(F.D)` before usage as a preconditioner
-  makes the preconditioner symmetric postive definite and thus is required for Krylov methods which
+  makes the preconditioner symmetric positive definite and thus is required for Krylov methods which
   are specialized for symmetric linear systems.
 - [RandomizedPreconditioners.NystromPreconditioner](https://github.com/tjdiamandis/RandomizedPreconditioners.jl)
   A randomized sketching method for positive semidefinite matrices `A`. Builds a preconditioner ``P ≈ A + μ*I``
-  for the system ``(A + μ*I)x = b``
+  for the system ``(A + μ*I)x = b``.

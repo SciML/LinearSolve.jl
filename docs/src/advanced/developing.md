@@ -7,7 +7,7 @@ one of two ways:
 2. You can extend LinearSolve.jl's internal mechanisms.
 
 For developer ease, we highly recommend (2) as that will automatically make the
-caching API work. Thus this is the documentation for how to do that.
+caching API work. Thus, this is the documentation for how to do that.
 
 ## Developing New Linear Solvers with LinearSolve.jl Primitives
 
@@ -43,18 +43,18 @@ is what is called at `init` time to create the first `cacheval`. Note that this
 should match the type of the cache later used in `solve` as many algorithms, like
 those in OrdinaryDiffEq.jl, expect type-groundedness in the linear solver definitions.
 While there are cheaper ways to obtain this type for LU factorizations (specifically,
-`ArrayInterfaceCore.lu_instance(A)`), for a demonstration this just performs an
+`ArrayInterfaceCore.lu_instance(A)`), for a demonstration, this just performs an
 LU-factorization to get an `LU{T, Matrix{T}}` which it puts into the `cacheval`
-so its typed for future use.
+so it is typed for future use.
 
 After the `init_cacheval`, the only thing left to do is to define
 `SciMLBase.solve(cache::LinearCache, alg::MyLUFactorization)`. Many algorithms
-may use a lazy matrix-free representation of the operator `A`. Thus if the
+may use a lazy matrix-free representation of the operator `A`. Thus, if the
 algorithm requires a concrete matrix, like LU-factorization does, the algorithm
 should `convert(AbstractMatrix,cache.A)`. The flag `cache.isfresh` states whether
 `A` has changed since the last `solve`. Since we only need to factorize when
 `A` is new, the factorization part of the algorithm is done in a `if cache.isfresh`.
-`cache = set_cacheval(cache, fact)` puts the new factorization into the cache
+`cache = set_cacheval(cache, fact)` puts the new factorization into the cache,
 so it's updated for future solves. Then `y = ldiv!(cache.u, cache.cacheval, cache.b)`
 performs the solve and a linear solution is returned via
 `SciMLBase.build_linear_solution(alg,y,nothing,cache)`.

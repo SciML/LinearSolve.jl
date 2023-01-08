@@ -67,7 +67,7 @@ customized per-package, details given below describe a subset of important array
   - On dense matrices, this uses the current BLAS implementation of the user's computer
     which by default is OpenBLAS but will use MKL if the user does `using MKL` in their
     system.
-- `GenericFactorization(fact_alg)`: Constructs a linear solver from a generic
+- `GenericFactorization(;fact_alg=LinearAlgebra.factorize())`: Constructs a linear solver from a generic
   factorization algorithm `fact_alg` which complies with the Base.LinearAlgebra
   factorization API. Quoting from Base:
     - If `A` is upper or lower triangular (or diagonal), no factorization of `A` is

@@ -78,6 +78,7 @@ end
         sol = solve(prob)
         sol = solve(prob, KLUFactorization())
         sol = solve(prob, UMFPACKFactorization())
+        sol = solve(prob, SparspakFactorization())
     end
 end
 

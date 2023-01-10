@@ -21,6 +21,12 @@ For sparse LU-factorizations, `KLUFactorization` if there is less structure
 to the sparsity pattern and `UMFPACKFactorization` if there is more structure.
 Pardiso.jl's methods are also known to be very efficient sparse linear solvers.
 
+While these sparse factorizations are based on implementations in other languages, 
+and therefore constrained to standard number types (`Float64`,  `Float32` and
+their complex counterparts),  `SparspakFactorization` is able to handle general 
+number types, e.g. defined by `ForwardDiff.jl`, `MultiFloats.jl`, 
+or `IntervalArithmetics.jl`. 
+
 As sparse matrices get larger, iterative solvers tend to get more efficient than
 factorization methods if a lower tolerance of the solution is required.
 
@@ -146,6 +152,20 @@ Base.@kwdef struct PardisoJL <: SciMLLinearSolveAlgorithm
     dparm::Union{Vector{Tuple{Int,Int}}, Nothing} = nothing
 end
 ```
+
+### Sparspak.jl
+This is the translation of the well-known sparse matrix software Sparspak 
+(Waterloo Sparse Matrix Package), solving
+large sparse systems of linear algebraic equations. Sparspak is composed of the
+subroutines from the book "Computer Solution of Large Sparse Positive Definite
+Systems" by Alan George and Joseph Liu. Originally written in Fortran 77, later
+rewritten in Fortran 90. Here is the software translated into Julia.
+The Julia rewrite is released  under the MIT license with an express permission 
+from the authors of the Fortran package. The package uses mutiple 
+dispatch to route around standard BLAS routines in the case e.g. of arbitrary-precision 
+floating point numbers or ForwardDiff.Dual.
+This e.g. allows for Automatic Differentiation (AD) of a sparse-matrix solve.
+
 
 ### CUDA.jl
 

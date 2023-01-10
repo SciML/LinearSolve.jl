@@ -503,30 +503,28 @@ end
 
 ## SparspakFactorization is here since it's MIT licensed, not GPL
 
-struct SparspakFactorization <: AbstractFactorization end
+Base.@kwdef struct SparspakFactorization <: AbstractFactorization
+    reuse_symbolic::Bool = true
+end
 
 function init_cacheval(::SparspakFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
                        reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
     A = convert(AbstractMatrix, A)
-    p = Sparspak.Problem.Problem(size(A)...)
-    Sparspak.Problem.insparse!(p, A)
-    Sparspak.Problem.infullrhs!(p, b)
-    s = Sparspak.SparseSolver.SparseSolver(p)
-    return s
+    return sparspaklu(A, factorize=false)
 end
 
 function SciMLBase.solve(cache::LinearCache, alg::SparspakFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
-        p = Sparspak.Problem.Problem(size(A)...)
-        Sparspak.Problem.insparse!(p, A)
-        Sparspak.Problem.infullrhs!(p, cache.b)
-        s = Sparspak.SparseSolver.SparseSolver(p)
-        cache = set_cacheval(cache, s)
+        if cache.cacheval !== nothing && alg.reuse_symbolic
+            fact = sparspaklu!(cache.cacheval, A)
+        else
+            fact = sparspaklu(A)
+        end
+        cache = set_cacheval(cache, fact)
     end
-    Sparspak.SparseSolver.solve!(cache.cacheval)
-    copyto!(cache.u, cache.cacheval.p.x)
-    SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
+    y = ldiv!(cache.u, cache.cacheval, cache.b)
+    SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end

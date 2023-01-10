@@ -511,7 +511,7 @@ function init_cacheval(::SparspakFactorization, A, b, u, Pl, Pr, maxiters::Int, 
                        reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
     A = convert(AbstractMatrix, A)
-    return sparspaklu(A)
+    return sparspaklu(A, factorize=false)
 end
 
 function SciMLBase.solve(cache::LinearCache, alg::SparspakFactorization; kwargs...)

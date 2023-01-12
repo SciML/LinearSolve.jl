@@ -4,6 +4,8 @@ const LONGER_TESTS = false
 
 const GROUP = get(ENV, "GROUP", "All")
 
+const HAS_EXTENSIONS = isdefined(Base, :get_extension)
+
 function dev_subpkg(subpkg)
     subpkg_path = joinpath(dirname(@__DIR__), "lib", subpkg)
     Pkg.develop(PackageSpec(path = subpkg_path))
@@ -33,4 +35,8 @@ end
 if GROUP == "LinearSolvePardiso"
     dev_subpkg("LinearSolvePardiso")
     @time @safetestset "Pardiso" begin include("../lib/LinearSolvePardiso/test/runtests.jl") end
+end
+
+if (GROUP == "All" || GROUP == "LinearSolveHYPRE") && HAS_EXTENSIONS
+    @time @safetestset "LinearSolveHYPRE" begin include("hypretests.jl") end
 end

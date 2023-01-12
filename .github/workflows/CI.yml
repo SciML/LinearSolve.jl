@@ -18,6 +18,9 @@ jobs:
         version:
           - '1'
           - '1.6'
+        include:
+          - version: '^1.9.0-0'
+            group: 'LinearSolveHYPRE'
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@v1
@@ -39,7 +42,7 @@ jobs:
           GROUP: ${{ matrix.group }}
       - uses: julia-actions/julia-processcoverage@v1
         with:
-          directories: src,lib/LinearSolveCUDA/src,lib/LinearSolvePardiso/src
+          directories: src,lib/LinearSolveCUDA/src,lib/LinearSolvePardiso/src,ext
       - uses: codecov/codecov-action@v3
         with:
           files: lcov.info

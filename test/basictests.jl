@@ -2,7 +2,7 @@ using LinearSolve, LinearAlgebra, SparseArrays, MultiFloats, ForwardDiff
 using Test
 import Random
 
-const Dual64=ForwardDiff.Dual{Nothing,Float64,1}
+const Dual64 = ForwardDiff.Dual{Nothing, Float64, 1}
 
 n = 8
 A = Matrix(I, n, n)
@@ -141,11 +141,11 @@ end
 
     @testset "Sparspak Factorization (Float64x1)" begin
         A1 = sparse(A / 1) .|> Float64x1
-        b1 = rand(n)  .|> Float64x1
-        x1 = zero(b)   .|> Float64x1
-        A2 = sparse(A / 2)  .|> Float64x1
-        b2 = rand(n)  .|> Float64x1
-        x2 = zero(b)  .|> Float64x1
+        b1 = rand(n) .|> Float64x1
+        x1 = zero(b) .|> Float64x1
+        A2 = sparse(A / 2) .|> Float64x1
+        b2 = rand(n) .|> Float64x1
+        x2 = zero(b) .|> Float64x1
 
         prob1 = LinearProblem(A1, b1; u0 = x1)
         prob2 = LinearProblem(A2, b2; u0 = x2)
@@ -154,11 +154,11 @@ end
 
     @testset "Sparspak Factorization (Float64x2)" begin
         A1 = sparse(A / 1) .|> Float64x2
-        b1 = rand(n)  .|> Float64x2
-        x1 = zero(b)   .|> Float64x2
-        A2 = sparse(A / 2)  .|> Float64x2
-        b2 = rand(n)  .|> Float64x2
-        x2 = zero(b)  .|> Float64x2
+        b1 = rand(n) .|> Float64x2
+        x1 = zero(b) .|> Float64x2
+        A2 = sparse(A / 2) .|> Float64x2
+        b2 = rand(n) .|> Float64x2
+        x2 = zero(b) .|> Float64x2
 
         prob1 = LinearProblem(A1, b1; u0 = x1)
         prob2 = LinearProblem(A2, b2; u0 = x2)
@@ -167,18 +167,17 @@ end
 
     @testset "Sparspak Factorization (Dual64)" begin
         A1 = sparse(A / 1) .|> Dual64
-        b1 = rand(n)  .|> Dual64
-        x1 = zero(b)   .|> Dual64
-        A2 = sparse(A / 2)  .|> Dual64
-        b2 = rand(n)  .|> Dual64
-        x2 = zero(b)  .|> Dual64
+        b1 = rand(n) .|> Dual64
+        x1 = zero(b) .|> Dual64
+        A2 = sparse(A / 2) .|> Dual64
+        b2 = rand(n) .|> Dual64
+        x2 = zero(b) .|> Dual64
 
         prob1 = LinearProblem(A1, b1; u0 = x1)
         prob2 = LinearProblem(A2, b2; u0 = x2)
         test_interface(SparspakFactorization(), prob1, prob2)
     end
 
-    
     @testset "FastLAPACK Factorizations" begin
         A1 = A / 1
         b1 = rand(n)

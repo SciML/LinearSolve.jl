@@ -43,17 +43,19 @@ function defaultalg(A::Diagonal, b, ::OperatorAssumptions{Nothing})
     DiagonalFactorization()
 end
 
+function defaultalg(A::SparseMatrixCSC{Tv, Ti}, b,
+                    ::OperatorAssumptions{true}) where {Tv, Ti}
+    SparspakFactorization()
+end
+
 @static if INCLUDE_SPARSE
-    function defaultalg(A::SparseMatrixCSC, b, ::OperatorAssumptions{true})
+    function defaultalg(A::SparseMatrixCSC{<:Union{Float64,ComplexF64}, Ti}, b,
+                        ::OperatorAssumptions{true}) where {Ti}
         if length(b) <= 10_000
             KLUFactorization()
         else
             UMFPACKFactorization()
         end
-    end
-else
-    function defaultalg(A::SparseMatrixCSC, b, ::OperatorAssumptions{true})
-        SparspakFactorization()
     end
 end
 

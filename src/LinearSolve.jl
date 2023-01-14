@@ -75,11 +75,17 @@ end
         A = sprand(4, 4, 0.3) + I
         b = rand(4)
         prob = LinearProblem(A, b)
-        sol = solve(prob)
         sol = solve(prob, KLUFactorization())
         sol = solve(prob, UMFPACKFactorization())
-        sol = solve(prob, SparspakFactorization())
     end
+end
+
+SnoopPrecompile.@precompile_all_calls begin
+    A = sprand(4, 4, 0.3) + I
+    b = rand(4)
+    prob = LinearProblem(A, b)
+    sol = solve(prob)
+    sol = solve(prob, SparspakFactorization())
 end
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,

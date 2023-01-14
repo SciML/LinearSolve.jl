@@ -19,6 +19,7 @@ maximum efficiency. Specifically, LinearSolve.jl includes:
 - KLU for faster sparse LU factorization on unstructured matrices
 - UMFPACK for faster sparse LU factorization on matrices with some repeated structure
 - MKLPardiso wrappers for handling many sparse matrices faster than SuiteSparse (KLU, UMFPACK) methods
+- Sparspak.jl for sparse LU factorization in pure Julia for generic number types and for non-GPL distributions
 - GPU-offloading for large dense matrices
 - Wrappers to all of the Krylov implementations (Krylov.jl, IterativeSolvers.jl, KrylovKit.jl) for easy
   testing of all of them. LinearSolve.jl handles the API differences, especially with the preconditioner

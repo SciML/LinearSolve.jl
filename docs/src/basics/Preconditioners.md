@@ -104,3 +104,5 @@ The following preconditioners match the interface of LinearSolve.jl.
 - [RandomizedPreconditioners.NystromPreconditioner](https://github.com/tjdiamandis/RandomizedPreconditioners.jl)
   A randomized sketching method for positive semidefinite matrices `A`. Builds a preconditioner ``P ≈ A + μ*I``
   for the system ``(A + μ*I)x = b``.
+- [HYPRE.jl](https://github.com/fredrikekre/HYPRE.jl) A set of solvers with 
+  preconditioners which supports distributed computing via MPI.

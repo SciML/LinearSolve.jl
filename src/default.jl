@@ -49,15 +49,13 @@ function defaultalg(A::SparseMatrixCSC{Tv, Ti}, b,
 end
 
 @static if INCLUDE_SPARSE
-    for Tv in (:Float64, :ComplexF64)
-        @eval begin function defaultalg(A::SparseMatrixCSC{$Tv, Ti}, b,
-                                        ::OperatorAssumptions{true}) where {Ti}
-            if length(b) <= 10_000
-                KLUFactorization()
-            else
-                UMFPACKFactorization()
-            end
-        end end
+    function defaultalg(A::SparseMatrixCSC{<:Union{Float64,ComplexF64}, Ti}, b,
+                        ::OperatorAssumptions{true}) where {Ti}
+        if length(b) <= 10_000
+            KLUFactorization()
+        else
+            UMFPACKFactorization()
+        end
     end
 end
 

@@ -226,3 +226,50 @@ function KrylovKitJL(args...;
                      KrylovAlg = KrylovKit.GMRES, gmres_restart = 0,
                      kwargs...)
 ```
+
+### HYPRE.jl
+
+!!! note
+    Using HYPRE solvers requires Julia version 1.9 or higher, and that the package HYPRE.jl
+    is installed.
+
+[HYPRE.jl](https://github.com/fredrikekre/HYPRE.jl) is an interface to
+[`hypre`](https://computing.llnl.gov/projects/hypre-scalable-linear-solvers-multigrid-methods)
+and provide iterative solvers and preconditioners for sparse linear systems. It is mainly
+developed for large multi-process distributed problems (using MPI), but can also be used for
+single-process problems with Julias standard sparse matrices.
+
+The algorithm is defined as:
+
+```julia
+alg = HYPREAlgorithm(X)
+```
+
+where `X` is one of the following supported solvers:
+
+ - `HYPRE.BiCGSTAB`
+ - `HYPRE.BoomerAMG`
+ - `HYPRE.FlexGMRES`
+ - `HYPRE.GMRES`
+ - `HYPRE.Hybrid`
+ - `HYPRE.ILU`
+ - `HYPRE.ParaSails` (as preconditioner only)
+ - `HYPRE.PCG`
+
+Some of the solvers above can also be used as preconditioners by passing via the `Pl`
+keyword argument.
+
+For example, to use `HYPRE.PCG` as the solver, with `HYPRE.BoomerAMG` as the preconditioner,
+the algorithm should be defined as follows:
+
+```julia
+A, b = setup_system(...)
+prob = LinearProblem(A, b)
+alg = HYPREAlgorithm(HYPRE.PCG)
+prec = HYPRE.BoomerAMG
+sol = solve(prob, alg; Pl = prec)
+```
+
+If you need more fine-grained control over the solver/preconditioner options you can
+alternatively pass an already created solver to `HYPREAlgorithm` (and to the `Pl` keyword
+argument). See HYPRE.jl docs for how to set up solvers with specific options.

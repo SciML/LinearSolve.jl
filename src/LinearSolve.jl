@@ -50,6 +50,7 @@ include("preconditioners.jl")
 include("solve_function.jl")
 include("default.jl")
 include("init.jl")
+include("HYPRE.jl")
 
 @static if INCLUDE_SPARSE
     include("factorization_sparse.jl")
@@ -100,5 +101,7 @@ export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
        IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
        IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES,
        KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES
+
+export HYPREAlgorithm
 
 end

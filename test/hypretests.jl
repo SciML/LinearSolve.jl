@@ -4,6 +4,7 @@ using HYPRE.LibHYPRE: HYPRE_BigInt, HYPRE_Complex, HYPRE_IJMatrixGetValues,
 using LinearAlgebra
 using LinearSolve
 using MPI
+using Random: MersenneTwister
 using SparseArrays
 using Test
 
@@ -33,13 +34,14 @@ end
 to_array(x) = x
 
 function generate_probs(alg)
+    rng = MersenneTwister(1234)
     n = 100
     if alg.solver isa HYPRE.BoomerAMG || alg.solver === HYPRE.BoomerAMG
         # BoomerAMG needs a "nice" matrix so construct a simple FEM-like matrix.
         # Ironically this matrix doesn't play nice with the other solvers...
         I, J, V = Int[], Int[], Float64[]
         for i in 1:99
-            k = (1 + rand()) * [1.0 -1.0; -1.0 1.0]
+            k = (1 + rand(rng)) * [1.0 -1.0; -1.0 1.0]
             append!(V, k)
             append!(I, [i, i + 1, i, i + 1]) # rows
             append!(J, [i, i, i + 1, i + 1]) # cols
@@ -52,17 +54,17 @@ function generate_probs(alg)
         A[1, 1] = 2
         A[end, end] = 2
     else
-        A = sprand(n, n, 0.01) + 3 * LinearAlgebra.I
+        A = sprand(rng, n, n, 0.01) + 3 * LinearAlgebra.I
         A = A'A
     end
     A1 = A / 1
     @test isposdef(A1)
-    b1 = rand(n)
+    b1 = rand(rng, n)
     x1 = zero(b1)
     prob1 = LinearProblem(A1, b1; u0 = x1)
     A2 = A / 2
     @test isposdef(A2)
-    b2 = rand(n)
+    b2 = rand(rng, n)
     prob2 = LinearProblem(A2, b2)
     # HYPREArrays
     prob3 = LinearProblem(HYPREMatrix(A1), HYPREVector(b1); u0 = HYPREVector(x1))
@@ -85,6 +87,8 @@ function test_interface(alg; kw...)
         # Solve prob directly (without cache)
         y = solve(prob, alg; cache_kwargs..., Pl = HYPRE.BoomerAMG)
         @test A * to_array(y.u)≈b atol=atol rtol=rtol
+        @test y.iters > 0
+        @test y.resid < rtol
 
         # Solve with cache
         cache = SciMLBase.init(prob, alg; cache_kwargs...)

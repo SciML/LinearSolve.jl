@@ -39,11 +39,15 @@ function getAb(scaling)
     return A, b
 end
 
+const TOL = LinearSolve.default_tol(HYPRE.LibHYPRE.HYPRE_Complex)
+
 # Solve without initial guess (GMRES)
 A, b = getAb(1.0)
 alg = HYPREAlgorithm(HYPRE.GMRES)
 prob = LinearProblem(A, b)
 sol = solve(prob, alg)
+@test sol.resid < TOL
+@test sol.iters > 0
 copy!(local_sol, sol.u)
 @test local_sol ≈ ilower:iupper
 
@@ -52,6 +56,8 @@ A, b = getAb(2.0)
 alg = HYPREAlgorithm(HYPRE.PCG)
 prob = LinearProblem(A, b; u0 = zero(b))
 sol = solve(prob, alg)
+@test sol.resid < TOL
+@test sol.iters > 0
 copy!(local_sol, sol.u)
 @test local_sol ≈ 2 * (ilower:iupper)
 
@@ -61,6 +67,8 @@ alg = HYPREAlgorithm(HYPRE.BiCGSTAB)
 prob = LinearProblem(A, b)
 cache = init(prob, alg)
 sol = solve(cache)
+@test sol.resid < TOL
+@test sol.iters > 0
 copy!(local_sol, sol.u)
 @test local_sol ≈ 3 * (ilower:iupper)
 
@@ -68,5 +76,7 @@ copy!(local_sol, sol.u)
 _, b = getAb(4.0)
 cache = LinearSolve.set_b(sol.cache, b)
 sol = solve(cache)
+@test sol.resid < TOL
+@test sol.iters > 0
 copy!(local_sol, sol.u)
 @test local_sol ≈ 4 * (ilower:iupper)

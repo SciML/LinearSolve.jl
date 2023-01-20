@@ -86,7 +86,7 @@ SnoopPrecompile.@precompile_all_calls begin
     b = rand(4)
     prob = LinearProblem(A, b)
     sol = solve(prob)
-    sol = solve(prob, SparspakFactorization())
+    #sol = solve(prob, SparspakFactorization())
 end
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,

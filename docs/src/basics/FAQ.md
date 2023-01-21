@@ -14,22 +14,22 @@ efficiency and ability to choose solvers.
 This is addressed in the [JuliaCon 2022 video](https://youtu.be/JWI34_w-yYw?t=182). This happens in
 a few ways:
 
-1. The Fortran/C code that NumPy/SciPy uses is actually slow. It's [OpenBLAS](https://github.com/xianyi/OpenBLAS),
-   a library developed in part by the Julia Lab back in 2012 as a fast open source BLAS implementation. Many
-   open source environments now use this build, including many R distributions. However, the Julia Lab has greatly
-   improved its ability to generate optimized SIMD in platform-specific ways. This, and improved multithreading support
-   (OpenBLAS's multithreading is rather slow), has led to pure Julia-based BLAS implementations which the lab now
-   works on. This includes [RecursiveFactorization.jl](https://github.com/JuliaLinearAlgebra/RecursiveFactorization.jl)
-   which generally outperforms OpenBLAS by 2x-10x depending on the platform. It even outperforms MKL for small matrices
-   (<100). LinearSolve.jl uses RecursiveFactorization.jl by default sometimes, but switches to BLAS when it would be
-   faster (in a platform and matrix-specific way).
-2. Standard approaches to handling linear solves re-allocate the pivoting vector each time. This leads to GC pauses that
-   can slow down calculations. LinearSolve.jl has proper caches for fully preallocated no-GC workflows.
-3. LinearSolve.jl makes many other optimizations, like factorization reuse and symbolic factorization reuse, automatic.
-   Many of these optimizations are not even possible from the high-level APIs of things like Python's major libraries and MATLAB.
-4. LinearSolve.jl has a much more extensive set of sparse matrix solvers, which is why you see a major difference (2x-10x) for sparse
-   matrices. Which sparse matrix solver between KLU, UMFPACK, Pardiso, etc. is optimal depends a lot on matrix sizes, sparsity patterns,
-   and threading overheads. LinearSolve.jl's heuristics handle these kinds of issues.
+ 1. The Fortran/C code that NumPy/SciPy uses is actually slow. It's [OpenBLAS](https://github.com/xianyi/OpenBLAS),
+    a library developed in part by the Julia Lab back in 2012 as a fast open source BLAS implementation. Many
+    open source environments now use this build, including many R distributions. However, the Julia Lab has greatly
+    improved its ability to generate optimized SIMD in platform-specific ways. This, and improved multithreading support
+    (OpenBLAS's multithreading is rather slow), has led to pure Julia-based BLAS implementations which the lab now
+    works on. This includes [RecursiveFactorization.jl](https://github.com/JuliaLinearAlgebra/RecursiveFactorization.jl)
+    which generally outperforms OpenBLAS by 2x-10x depending on the platform. It even outperforms MKL for small matrices
+    (<100). LinearSolve.jl uses RecursiveFactorization.jl by default sometimes, but switches to BLAS when it would be
+    faster (in a platform and matrix-specific way).
+ 2. Standard approaches to handling linear solves re-allocate the pivoting vector each time. This leads to GC pauses that
+    can slow down calculations. LinearSolve.jl has proper caches for fully preallocated no-GC workflows.
+ 3. LinearSolve.jl makes many other optimizations, like factorization reuse and symbolic factorization reuse, automatic.
+    Many of these optimizations are not even possible from the high-level APIs of things like Python's major libraries and MATLAB.
+ 4. LinearSolve.jl has a much more extensive set of sparse matrix solvers, which is why you see a major difference (2x-10x) for sparse
+    matrices. Which sparse matrix solver between KLU, UMFPACK, Pardiso, etc. is optimal depends a lot on matrix sizes, sparsity patterns,
+    and threading overheads. LinearSolve.jl's heuristics handle these kinds of issues.
 
 ## How do I use IterativeSolvers solvers with a weighted tolerance vector?
 
@@ -41,16 +41,15 @@ hack the system via the following formulation:
 using LinearSolve, LinearAlgebra
 
 n = 2
-A = rand(n,n)
+A = rand(n, n)
 b = rand(n)
 
 weights = [1e-1, 1]
 Pl = LinearSolve.InvPreconditioner(Diagonal(weights))
 Pr = Diagonal(weights)
 
-
-prob = LinearProblem(A,b)
-sol = solve(prob,IterativeSolversJL_GMRES(),Pl=Pl,Pr=Pr)
+prob = LinearProblem(A, b)
+sol = solve(prob, IterativeSolversJL_GMRES(), Pl = Pl, Pr = Pr)
 
 sol.u
 ```
@@ -63,14 +62,15 @@ of the weights like as follows:
 using LinearSolve, LinearAlgebra
 
 n = 4
-A = rand(n,n)
+A = rand(n, n)
 b = rand(n)
 
 weights = rand(n)
-realprec = lu(rand(n,n)) # some random preconditioner
-Pl = LinearSolve.ComposePreconditioner(LinearSolve.InvPreconditioner(Diagonal(weights)),realprec)
+realprec = lu(rand(n, n)) # some random preconditioner
+Pl = LinearSolve.ComposePreconditioner(LinearSolve.InvPreconditioner(Diagonal(weights)),
+                                       realprec)
 Pr = Diagonal(weights)
 
-prob = LinearProblem(A,b)
-sol = solve(prob,IterativeSolversJL_GMRES(),Pl=Pl,Pr=Pr)
+prob = LinearProblem(A, b)
+sol = solve(prob, IterativeSolversJL_GMRES(), Pl = Pl, Pr = Pr)
 ```

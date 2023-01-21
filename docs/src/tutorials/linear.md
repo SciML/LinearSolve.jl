@@ -11,7 +11,7 @@ by the default linear solver.
 ```@example linsys1
 using LinearSolve
 
-A = rand(4,4)
+A = rand(4, 4)
 b = rand(4)
 prob = LinearProblem(A, b)
 sol = solve(prob)
@@ -28,7 +28,7 @@ LinearSolve.jl, there is one interface and changing linear solvers is simply
 the switch of the algorithm choice:
 
 ```@example linsys1
-sol = solve(prob,KrylovJL_GMRES())
+sol = solve(prob, KrylovJL_GMRES())
 sol.u
 ```
 

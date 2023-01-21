@@ -4,16 +4,16 @@ Often, one may want to cache information that is reused between different
 linear solves. For example, if one is going to perform:
 
 ```julia
-A\b1
-A\b2
+A \ b1
+A \ b2
 ```
 
 then it would be more efficient to LU-factorize one time and reuse the factorization:
 
 ```julia
 lu!(A)
-A\b1
-A\b2
+A \ b1
+A \ b2
 ```
 
 LinearSolve.jl's caching interface automates this process to use the most efficient
@@ -24,8 +24,9 @@ you simply `init` a cache, `solve`, replace `b`, and solve again. This looks lik
 using LinearSolve
 
 n = 4
-A = rand(n,n)
-b1 = rand(n); b2 = rand(n)
+A = rand(n, n)
+b1 = rand(n);
+b2 = rand(n);
 prob = LinearProblem(A, b1)
 
 linsolve = init(prob)
@@ -33,8 +34,9 @@ sol1 = solve(linsolve)
 
 sol1.u
 ```
+
 ```@example linsys2
-linsolve = LinearSolve.set_b(sol1.cache,b2)
+linsolve = LinearSolve.set_b(sol1.cache, b2)
 sol2 = solve(linsolve)
 
 sol2.u
@@ -43,8 +45,8 @@ sol2.u
 Then refactorization will occur when a new `A` is given:
 
 ```@example linsys2
-A2 = rand(n,n)
-linsolve = LinearSolve.set_A(sol2.cache,A2)
+A2 = rand(n, n)
+linsolve = LinearSolve.set_A(sol2.cache, A2)
 sol3 = solve(linsolve)
 
 sol3.u

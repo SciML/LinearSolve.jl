@@ -222,7 +222,7 @@ KrylovJL(args...; KrylovAlg = Krylov.gmres!,
 The general algorithm is:
 
 ```julia
-function KrylovKitJL(args...;
+KrylovKitJL(args...;
                      KrylovAlg = KrylovKit.GMRES, gmres_restart = 0,
                      kwargs...)
 ```

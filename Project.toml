@@ -46,7 +46,7 @@ Reexport = "1"
 SciMLBase = "1.68"
 Setfield = "0.7, 0.8, 1"
 SnoopPrecompile = "1"
-Sparspak = "0.3.4"
+Sparspak = "0.3.6"
 UnPack = "1"
 julia = "1.6"
 

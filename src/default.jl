@@ -131,7 +131,8 @@ function defaultalg(A, b, ::OperatorAssumptions{true})
             if length(b) <= 10
                 alg = GenericLUFactorization()
             elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500)) &&
-                   eltype(A) <: Union{Float32, Float64}
+                   (A === nothing ? eltype(b) <: Union{Float32, Float64} :
+                    eltype(A) <: Union{Float32, Float64})
                 alg = RFLUFactorization()
                 #elseif A === nothing || A isa Matrix
                 #    alg = FastLUFactorization()

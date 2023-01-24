@@ -3,8 +3,8 @@ using Test
 import Random
 
 const Dual64 = ForwardDiff.Dual{Nothing, Float64, 1}
-Base.:^(x::MultiFloat{T, N}, y::Int) where {T,N} = MultiFloat{T, N}(BigFloat(x)^y)
-Base.:^(x::MultiFloat{T, N}, y::Float64) where {T,N} = MultiFloat{T, N}(BigFloat(x)^y)
+Base.:^(x::MultiFloat{T, N}, y::Int) where {T, N} = MultiFloat{T, N}(BigFloat(x)^y)
+Base.:^(x::MultiFloat{T, N}, y::Float64) where {T, N} = MultiFloat{T, N}(BigFloat(x)^y)
 
 n = 8
 A = Matrix(I, n, n)
@@ -21,7 +21,7 @@ prob2 = LinearProblem(A2, b2; u0 = x2)
 
 cache_kwargs = (; verbose = true, abstol = 1e-8, reltol = 1e-8, maxiter = 30)
 
-function test_interface(alg, prob1, prob2; T=Float64)
+function test_interface(alg, prob1, prob2; T = Float64)
     A1 = prob1.A .|> T
     b1 = prob1.b .|> T
     x1 = prob1.u0 .|> T
@@ -31,7 +31,7 @@ function test_interface(alg, prob1, prob2; T=Float64)
 
     myprob1 = LinearProblem(A1, b1; u0 = x1)
     myprob2 = LinearProblem(A2, b2; u0 = x2)
-    
+
     y = solve(myprob1, alg; cache_kwargs...)
     @test A1 * y ≈ b1
 
@@ -154,7 +154,7 @@ end
 
         prob1 = LinearProblem(A1, b1; u0 = x1)
         prob2 = LinearProblem(A2, b2; u0 = x2)
-        test_interface(SparspakFactorization(), prob1, prob2; T=Float64x1)
+        test_interface(SparspakFactorization(), prob1, prob2; T = Float64x1)
     end
 
     @testset "Sparspak Factorization (Float64x2)" begin
@@ -167,7 +167,7 @@ end
 
         prob1 = LinearProblem(A1, b1; u0 = x1)
         prob2 = LinearProblem(A2, b2; u0 = x2)
-        test_interface(SparspakFactorization(), prob1, prob2; T=Float64x2)
+        test_interface(SparspakFactorization(), prob1, prob2; T = Float64x2)
     end
 
     @testset "Sparspak Factorization (Dual64)" begin
@@ -180,9 +180,9 @@ end
 
         prob1 = LinearProblem(A1, b1; u0 = x1)
         prob2 = LinearProblem(A2, b2; u0 = x2)
-        test_interface(SparspakFactorization(), prob1, prob2; T=Dual64)
+        test_interface(SparspakFactorization(), prob1, prob2; T = Dual64)
     end
-   
+
     @testset "FastLAPACK Factorizations" begin
         A1 = A / 1
         b1 = rand(n)
@@ -232,9 +232,9 @@ end
                     ("MINRES", KrylovJL_MINRES(kwargs...)))
             @testset "$(alg[1])" begin
                 test_interface(alg[2], prob1, prob2)
-                test_interface(alg[2], prob1, prob2; T=Float64x1)
-                test_interface(alg[2], prob1, prob2; T=Float64x2)
-                # test_interface(alg[2], prob1, prob2; T=Dual64)
+                test_interface(alg[2], prob1, prob2; T = Float64x1)
+                test_interface(alg[2], prob1, prob2; T = Float64x2)
+                test_interface(alg[2], prob1, prob2; T = Dual64)
                 # https://github.com/JuliaSmoothOptimizers/Krylov.jl/issues/646
                 # ForwardDiff.Dual is a Real, not an AbstractFloat
             end
@@ -251,10 +251,10 @@ end
                     )
             @testset "$(alg[1])" begin
                 test_interface(alg[2], prob1, prob2)
-                test_interface(alg[2], prob1, prob2; T=Float64x1)
-                test_interface(alg[2], prob1, prob2; T=Float64x2)
-                # test_interface(alg[2], prob1, prob2; T=Dual64)
-                # https://github.com/JuliaLang/julia/blob/master/stdlib/LinearAlgebra/src/givens.jl#L77
+                test_interface(alg[2], prob1, prob2; T = Float64x1)
+                test_interface(alg[2], prob1, prob2; T = Float64x2)
+                test_interface(alg[2], prob1, prob2; T = Dual64)
+                # https://github.com/JuliaLang/julia/issues/41753
                 # ForwardDiff.Dual is a Real, not an AbstractFloat
             end
         end
@@ -267,9 +267,9 @@ end
                     ("GMRES", KrylovKitJL_GMRES(kwargs...)))
             @testset "$(alg[1])" begin
                 test_interface(alg[2], prob1, prob2)
-                test_interface(alg[2], prob1, prob2; T=Float64x1)
-                test_interface(alg[2], prob1, prob2; T=Float64x2)
-                test_interface(alg[2], prob1, prob2; T=Dual64)
+                test_interface(alg[2], prob1, prob2; T = Float64x1)
+                test_interface(alg[2], prob1, prob2; T = Float64x2)
+                test_interface(alg[2], prob1, prob2; T = Dual64)
             end
             @test alg[2] isa KrylovKitJL
         end

@@ -1,5 +1,8 @@
 module LinearSolve
-
+if isdefined(Base, :Experimental) &&
+   isdefined(Base.Experimental, Symbol("@max_methods"))
+    @eval Base.Experimental.@max_methods 1
+end
 using ArrayInterfaceCore
 using RecursiveFactorization
 using Base: cache_dependencies, Bool

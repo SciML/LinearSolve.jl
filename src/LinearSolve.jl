@@ -20,6 +20,7 @@ using FastLapackInterface
 using DocStringExtensions
 import GPUArraysCore
 import Preferences
+import SciMLOperators: issquare
 
 # wrap
 import Krylov

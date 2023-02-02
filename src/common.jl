@@ -1,11 +1,11 @@
-struct OperatorAssumptions{issquare} end
+struct OperatorAssumptions{issq} end
 function OperatorAssumptions(issquare = nothing)
-    issquare = something(_unwrap_val(issquare), Nothing)
-    OperatorAssumptions{issquare}()
+    issq = something(_unwrap_val(issquare), Nothing)
+    OperatorAssumptions{issq}()
 end
 issquare(::OperatorAssumptions{issq}) where {issq} = issq
 
-struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issquare}
+struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq}
     A::TA
     b::Tb
     u::Tu
@@ -19,7 +19,7 @@ struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issquare}
     reltol::Ttol
     maxiters::Int
     verbose::Bool
-    assumptions::OperatorAssumptions{issquare}
+    assumptions::OperatorAssumptions{issq}
 end
 
 """

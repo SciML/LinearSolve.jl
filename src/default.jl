@@ -20,8 +20,9 @@ function defaultalg(A::DiffEqArrayOperator, b, assumptions::OperatorAssumptions{
 end
 
 function defaultalg(A, b, ::OperatorAssumptions{Nothing})
-    issquare = size(A, 1) == size(A, 2)
-    defaultalg(A, b, OperatorAssumptions(Val(issquare)))
+    #issquare = size(A, 1) == size(A, 2)
+    issq = issquare(A)
+    defaultalg(A, b, OperatorAssumptions(Val(issq)))
 end
 
 function defaultalg(A::Tridiagonal, b, ::OperatorAssumptions{true})

@@ -150,8 +150,9 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
     M = cache.Pl
     N = cache.Pr
 
-    M = (M === Identity()) ? I : InvPreconditioner(M)
-    N = (N === Identity()) ? I : InvPreconditioner(N)
+    # use no-op preconditioner for Krylov.jl (LinearAlgebra.I) when M/N is identity
+    M = _isidentity_struct(M) ? I : InvPreconditioner(M)
+    N = _isidentity_struct(M) ? I : InvPreconditioner(N)
 
     atol = float(cache.abstol)
     rtol = float(cache.reltol)
@@ -234,7 +235,7 @@ function init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, maxiters::Int, 
               alg.kwargs...)
 
     iterable = if alg.generate_iterator === IterativeSolvers.cg_iterator!
-        Pr !== Identity() &&
+        ! _isidentity_struct(Pr) &&
             @warn "$(alg.generate_iterator) doesn't support right preconditioning"
         alg.generate_iterator(u, A, b, Pl;
                               kwargs...)
@@ -242,7 +243,7 @@ function init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, maxiters::Int, 
         alg.generate_iterator(u, A, b; Pl = Pl, Pr = Pr, restart = restart,
                               kwargs...)
     elseif alg.generate_iterator === IterativeSolvers.bicgstabl_iterator!
-        Pr !== Identity() &&
+        ! _isidentity_struct(Pr) &&
             @warn "$(alg.generate_iterator) doesn't support right preconditioning"
         alg.generate_iterator(u, A, b, alg.args...; Pl = Pl,
                               abstol = abstol, reltol = reltol,

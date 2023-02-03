@@ -26,6 +26,7 @@ if GROUP == "All" || GROUP == "Core"
     @time @safetestset "Non-Square Tests" begin include("nonsquare.jl") end
     @time @safetestset "SparseVector b Tests" begin include("sparse_vector.jl") end
     @time @safetestset "Default Alg Tests" begin include("default_algs.jl") end
+    @time @safetestset "Traits" begin include("traits.jl") end
 end
 
 if GROUP == "LinearSolveCUDA"

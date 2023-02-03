@@ -42,6 +42,14 @@ needs_concrete_A(alg::AbstractFactorization) = true
 needs_concrete_A(alg::AbstractKrylovSubspaceMethod) = false
 needs_concrete_A(alg::AbstractSolveFunction) = false
 
+# Util
+_isidentity_struct(A) = false
+_isidentity_struct(λ::Number) = isone(λ)
+_isidentity_struct(A::UniformScaling) = isone(A.λ)
+_isidentity_struct(::IterativeSolvers.Identity) = true
+_isidentity_struct(::SciMLBase.IdentityOperator) = true
+_isidentity_struct(::SciMLBase.DiffEqIdentity) = true
+
 # Code
 
 const INCLUDE_SPARSE = Preferences.@load_preference("include_sparse", Base.USE_GPL_LIBS)

@@ -10,7 +10,9 @@ import Base: eltype, adjoint, inv
 using LinearAlgebra
 using IterativeSolvers: Identity
 using SparseArrays
-using SciMLBase: AbstractSciMLOperator, AbstractLinearAlgorithm
+using SciMLBase: AbstractLinearAlgorithm, DiffEqIdentity
+using SciMLOperators: AbstractSciMLOperator, IdentityOperator,
+                      InvertedOperator, ComposedOperator
 using Setfield
 using UnPack
 using SuiteSparse

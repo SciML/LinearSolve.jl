@@ -271,11 +271,17 @@ end
 
     @testset "Preconditioners" begin
         @testset "Vector Diagonal Preconditioner" begin
-            s = rand(n)
-            Pl, Pr = Diagonal(s), LinearSolve.InvPreconditioner(Diagonal(s))
+            using SciMLOperators
 
             x = rand(n, n)
             y = rand(n, n)
+
+            s = rand(n)
+            Pl = Diagonal(s)
+            Pr = Diagonal(s)
+            Pr = LinearSolve.InvertedOperator(MatrixOperator(Pr))
+            Pr = cache_operator(Pr, x)
+            #@test Pr == (@test_deprecated LinearSolve.InvPreconditioner(Diagonal(s)))
 
             mul!(y, Pl, x)
             @test y ≈ s .* x

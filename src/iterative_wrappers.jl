@@ -151,8 +151,8 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
     N = cache.Pr
 
     # use no-op preconditioner for Krylov.jl (LinearAlgebra.I) when M/N is identity
-    M = _isidentity_struct(M) ? I : InvPreconditioner(M)
-    N = _isidentity_struct(M) ? I : InvPreconditioner(N)
+    M = _isidentity_struct(M) ? I : InvertedOperator(M)
+    N = _isidentity_struct(M) ? I : InvertedOperator(N)
 
     atol = float(cache.abstol)
     rtol = float(cache.reltol)

@@ -20,7 +20,6 @@ function defaultalg(A::Union{DiffEqArrayOperator,MatrixOperator}, b, assumptions
 end
 
 function defaultalg(A, b, ::OperatorAssumptions{Nothing})
-    #issquare = size(A, 1) == size(A, 2)
     issq = issquare(A)
     defaultalg(A, b, OperatorAssumptions(Val(issq)))
 end

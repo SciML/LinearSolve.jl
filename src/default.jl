@@ -33,6 +33,12 @@ end
 function defaultalg(A::SymTridiagonal, b, ::OperatorAssumptions{true})
     GenericFactorization(; fact_alg = ldlt!)
 end
+function defaultalg(A::Bidiagonal, b, ::OperatorAssumptions{true})
+    DirectLdiv!()
+end
+function defaultalg(A::Factorization, b, ::OperatorAssumptions{true})
+    DirectLdiv!()
+end
 function defaultalg(A::Diagonal, b, ::OperatorAssumptions{true})
     DiagonalFactorization()
 end

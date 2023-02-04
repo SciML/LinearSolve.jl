@@ -381,6 +381,8 @@ struct DiagonalFactorization <: AbstractFactorization end
 
 function init_cacheval(alg::DiagonalFactorization, A, b, u, Pl, Pr, maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    # TODO - DiagonalFactorization should preinvert, and mul!
+    #Diagonal(inv.(A.diag))
     nothing
 end
 

@@ -36,6 +36,7 @@ end
 function defaultalg(A::Diagonal, b, ::OperatorAssumptions{true})
     DiagonalFactorization()
 end
+# TODO - Diagonal matrices are always square
 function defaultalg(A::Diagonal, b, ::OperatorAssumptions{false})
     DiagonalFactorization()
 end
@@ -76,13 +77,21 @@ function defaultalg(A, b::GPUArraysCore.AbstractGPUArray, ::OperatorAssumptions{
 end
 
 function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
-                    assumptions::OperatorAssumptions)
+                    assumptions::OperatorAssumptions{true})
+    if has_ldiv!(A)
+        return DirectLdiv!()
+    end
+
     KrylovJL_GMRES()
 end
 
 # Ambiguity handling
 function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
                     assumptions::OperatorAssumptions{Nothing})
+    if has_ldiv!(A)
+        return DirectLdiv!()
+    end
+
     KrylovJL_GMRES()
 end
 

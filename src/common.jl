@@ -25,6 +25,7 @@ end
 """
 $(SIGNATURES)
 """
+# TODO - this should modify OperatorAssumption??
 function set_A(cache::LinearCache, A)
     @set! cache.A = A
     @set! cache.isfresh = true
@@ -94,7 +95,7 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
                         verbose::Bool = false,
                         Pl = IdentityOperator{size(prob.A, 1)}(),
                         Pr = IdentityOperator{size(prob.A, 2)}(),
-                        assumptions = OperatorAssumptions(),
+                        assumptions = OperatorAssumptions(issquare(prob.A)),
                         kwargs...)
     @unpack A, b, u0, p = prob
 

@@ -108,7 +108,7 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization,
        SparspakFactorization, DiagonalFactorization
 
-export LinearSolveFunction
+export LinearSolveFunction, DirectLdiv!
 
 export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
        KrylovJL_BICGSTAB, KrylovJL_LSMR, KrylovJL_CRAIGMR,

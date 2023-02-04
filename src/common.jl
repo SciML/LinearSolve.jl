@@ -1,4 +1,7 @@
 struct OperatorAssumptions{issq} end
+# TODO - in defaultalg selection, OperatorAssumptions{nothing} behaves
+#        exactly like OperatorAssumptions{true}. So let's remove the option to
+#        put in nothing.
 function OperatorAssumptions(issquare = nothing)
     issq = something(_unwrap_val(issquare), Nothing)
     OperatorAssumptions{issq}()

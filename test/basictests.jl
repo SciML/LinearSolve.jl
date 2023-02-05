@@ -349,10 +349,10 @@ end
     end
 
     @testset "Solve Function" begin
-        A1 = rand(n) |> Diagonal
+        A1 = rand(n) |> Diagonal |> Array
         b1 = rand(n)
         x1 = zero(b1)
-        A2 = rand(n) |> Diagonal
+        A2 = rand(n) |> Diagonal |> Array
         b2 = rand(n)
         x2 = zero(b1)
 

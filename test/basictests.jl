@@ -349,10 +349,10 @@ end
     end
 
     @testset "Solve Function" begin
-        A1 = rand(n) |> Diagonal |> Array
+        A1 = rand(n) |> Diagonal
         b1 = rand(n)
         x1 = zero(b1)
-        A2 = rand(n) |> Diagonal |> Array
+        A2 = rand(n) |> Diagonal
         b2 = rand(n)
         x2 = zero(b1)
 
@@ -384,7 +384,7 @@ end
 
         @testset "DirectLdiv!" begin
             function get_operator(A, u)
-                F = lu(A)
+                F = lu(Array(A))
 
                 function f(du, u, p, t)
                     println("using FunctionOperator mul!")

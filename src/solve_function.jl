@@ -13,3 +13,12 @@ function SciMLBase.solve(cache::LinearCache, alg::LinearSolveFunction,
 
     return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
 end
+
+struct DirectLdiv! <: AbstractSolveFunction end
+
+function SciMLBase.solve(cache::LinearCache, alg::DirectLdiv!, args...; kwargs...)
+    @unpack A, b, u = cache
+    ldiv!(u, A, b)
+
+    return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
+end

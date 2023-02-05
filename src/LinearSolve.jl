@@ -6,11 +6,12 @@ end
 using ArrayInterfaceCore
 using RecursiveFactorization
 using Base: cache_dependencies, Bool
-import Base: eltype, adjoint, inv
 using LinearAlgebra
 using IterativeSolvers: Identity
 using SparseArrays
-using SciMLBase: AbstractDiffEqOperator, AbstractLinearAlgorithm
+using SciMLBase: AbstractLinearAlgorithm
+using SciMLOperators
+using SciMLOperators: AbstractSciMLOperator, IdentityOperator
 using Setfield
 using UnPack
 using SuiteSparse
@@ -40,6 +41,15 @@ abstract type AbstractSolveFunction <: SciMLLinearSolveAlgorithm end
 needs_concrete_A(alg::AbstractFactorization) = true
 needs_concrete_A(alg::AbstractKrylovSubspaceMethod) = false
 needs_concrete_A(alg::AbstractSolveFunction) = false
+
+# Util
+
+_isidentity_struct(A) = false
+_isidentity_struct(λ::Number) = isone(λ)
+_isidentity_struct(A::UniformScaling) = isone(A.λ)
+_isidentity_struct(::IterativeSolvers.Identity) = true
+_isidentity_struct(::SciMLOperators.IdentityOperator) = true
+_isidentity_struct(::SciMLBase.DiffEqIdentity) = true
 
 # Code
 
@@ -97,7 +107,7 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization,
        SparspakFactorization, DiagonalFactorization
 
-export LinearSolveFunction
+export LinearSolveFunction, DirectLdiv!
 
 export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
        KrylovJL_BICGSTAB, KrylovJL_LSMR, KrylovJL_CRAIGMR,

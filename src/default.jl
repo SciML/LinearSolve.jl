@@ -2,26 +2,30 @@
 # For SciML algorithms already using `defaultalg`, all assume square matrix.
 defaultalg(A, b) = defaultalg(A, b, OperatorAssumptions(Val(true)))
 
-function defaultalg(A::DiffEqArrayOperator, b, assumptions::OperatorAssumptions)
+function defaultalg(A::Union{DiffEqArrayOperator, MatrixOperator}, b,
+                    assumptions::OperatorAssumptions)
     defaultalg(A.A, b, assumptions)
 end
 
 # Ambiguity handling
-function defaultalg(A::DiffEqArrayOperator, b, assumptions::OperatorAssumptions{nothing})
+function defaultalg(A::Union{DiffEqArrayOperator, MatrixOperator}, b,
+                    assumptions::OperatorAssumptions{nothing})
     defaultalg(A.A, b, assumptions)
 end
 
-function defaultalg(A::DiffEqArrayOperator, b, assumptions::OperatorAssumptions{false})
+function defaultalg(A::Union{DiffEqArrayOperator, MatrixOperator}, b,
+                    assumptions::OperatorAssumptions{false})
     defaultalg(A.A, b, assumptions)
 end
 
-function defaultalg(A::DiffEqArrayOperator, b, assumptions::OperatorAssumptions{true})
+function defaultalg(A::Union{DiffEqArrayOperator, MatrixOperator}, b,
+                    assumptions::OperatorAssumptions{true})
     defaultalg(A.A, b, assumptions)
 end
 
 function defaultalg(A, b, ::OperatorAssumptions{Nothing})
-    issquare = size(A, 1) == size(A, 2)
-    defaultalg(A, b, OperatorAssumptions(Val(issquare)))
+    issq = issquare(A)
+    defaultalg(A, b, OperatorAssumptions(Val(issq)))
 end
 
 function defaultalg(A::Tridiagonal, b, ::OperatorAssumptions{true})
@@ -33,10 +37,13 @@ end
 function defaultalg(A::SymTridiagonal, b, ::OperatorAssumptions{true})
     GenericFactorization(; fact_alg = ldlt!)
 end
-function defaultalg(A::Diagonal, b, ::OperatorAssumptions{true})
-    DiagonalFactorization()
+function defaultalg(A::Bidiagonal, b, ::OperatorAssumptions{true})
+    DirectLdiv!()
 end
-function defaultalg(A::Diagonal, b, ::OperatorAssumptions{false})
+function defaultalg(A::Factorization, b, ::OperatorAssumptions{true})
+    DirectLdiv!()
+end
+function defaultalg(A::Diagonal, b, ::OperatorAssumptions{true})
     DiagonalFactorization()
 end
 function defaultalg(A::Diagonal, b, ::OperatorAssumptions{Nothing})
@@ -75,18 +82,26 @@ function defaultalg(A, b::GPUArraysCore.AbstractGPUArray, ::OperatorAssumptions{
     end
 end
 
-function defaultalg(A::SciMLBase.AbstractDiffEqOperator, b,
-                    assumptions::OperatorAssumptions)
+function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
+                    assumptions::OperatorAssumptions{true})
+    if has_ldiv!(A)
+        return DirectLdiv!()
+    end
+
     KrylovJL_GMRES()
 end
 
 # Ambiguity handling
-function defaultalg(A::SciMLBase.AbstractDiffEqOperator, b,
+function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
                     assumptions::OperatorAssumptions{Nothing})
+    if has_ldiv!(A)
+        return DirectLdiv!()
+    end
+
     KrylovJL_GMRES()
 end
 
-function defaultalg(A::SciMLBase.AbstractDiffEqOperator, b,
+function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
                     assumptions::OperatorAssumptions{false})
     m, n = size(A)
     if m < n

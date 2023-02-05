@@ -1,4 +1,5 @@
 using LinearSolve, LinearAlgebra, SparseArrays, MultiFloats, ForwardDiff
+using SciMLOperators
 using Test
 import Random
 
@@ -27,20 +28,20 @@ function test_interface(alg, prob1, prob2)
     b2 = prob2.b
     x2 = prob2.u0
 
-    y = solve(prob1, alg; cache_kwargs...)
-    @test A1 * y ≈ b1
+    sol = solve(prob1, alg; cache_kwargs...)
+    @test A1 * sol.u ≈ b1
 
     cache = SciMLBase.init(prob1, alg; cache_kwargs...) # initialize cache
-    y = solve(cache)
-    @test A1 * y ≈ b1
+    sol = solve(cache)
+    @test A1 * sol.u ≈ b1
 
-    cache = LinearSolve.set_A(cache, copy(A2))
-    y = solve(cache; cache_kwargs...)
-    @test A2 * y ≈ b1
+    cache = LinearSolve.set_A(cache, deepcopy(A2))
+    sol = solve(cache; cache_kwargs...)
+    @test A2 * sol.u ≈ b1
 
     cache = LinearSolve.set_b(cache, b2)
-    y = solve(cache; cache_kwargs...)
-    @test A2 * y ≈ b2
+    sol = solve(cache; cache_kwargs...)
+    @test A2 * sol.u ≈ b2
 
     return
 end
@@ -271,11 +272,13 @@ end
 
     @testset "Preconditioners" begin
         @testset "Vector Diagonal Preconditioner" begin
-            s = rand(n)
-            Pl, Pr = Diagonal(s), LinearSolve.InvPreconditioner(Diagonal(s))
-
             x = rand(n, n)
             y = rand(n, n)
+
+            s = rand(n)
+            Pl = Diagonal(s) |> MatrixOperator
+            Pr = Diagonal(s) |> MatrixOperator |> inv
+            Pr = cache_operator(Pr, x)
 
             mul!(y, Pl, x)
             @test y ≈ s .* x
@@ -353,26 +356,58 @@ end
         b2 = rand(n)
         x2 = zero(b1)
 
-        function sol_func(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true, kwargs...)
-            if verbose == true
-                println("out-of-place solve")
+        @testset "LinearSolveFunction" begin
+            function sol_func(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,
+                              kwargs...)
+                if verbose == true
+                    println("out-of-place solve")
+                end
+                u = A \ b
             end
-            u = A \ b
+
+            function sol_func!(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,
+                               kwargs...)
+                if verbose == true
+                    println("in-place solve")
+                end
+                ldiv!(u, A, b)
+            end
+
+            prob1 = LinearProblem(A1, b1; u0 = x1)
+            prob2 = LinearProblem(A1, b1; u0 = x1)
+
+            for alg in (LinearSolveFunction(sol_func),
+                        LinearSolveFunction(sol_func!))
+                test_interface(alg, prob1, prob2)
+            end
         end
 
-        function sol_func!(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true, kwargs...)
-            if verbose == true
-                println("in-place solve")
+        @testset "DirectLdiv!" begin
+            function get_operator(A, u)
+                function f(du, u, p, t)
+                    println("using FunctionOperator mul!")
+                    mul!(du, A, u)
+                end
+
+                function fi(du, u, p, t)
+                    println("using FunctionOperator ldiv!")
+                    ldiv!(du, A, u)
+                end
+
+                FunctionOperator(f, u, u; isinplace = true, op_inverse = fi)
             end
-            ldiv!(u, A, b)
-        end
 
-        prob1 = LinearProblem(A1, b1; u0 = x1)
-        prob2 = LinearProblem(A1, b1; u0 = x1)
+            op1 = get_operator(A1, x1 * 0)
+            op2 = get_operator(A2, x2 * 0)
 
-        for alg in (LinearSolveFunction(sol_func),
-                    LinearSolveFunction(sol_func!))
-            test_interface(alg, prob1, prob2)
+            prob1 = LinearProblem(op1, b1; u0 = x1)
+            prob2 = LinearProblem(op2, b2; u0 = x2)
+
+            @test LinearSolve.defaultalg(op1, x1) isa DirectLdiv!
+            @test LinearSolve.defaultalg(op2, x2) isa DirectLdiv!
+
+            test_interface(DirectLdiv!(), prob1, prob2)
+            test_interface(nothing, prob1, prob2)
         end
     end
 end # testset

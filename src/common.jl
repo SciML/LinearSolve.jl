@@ -3,7 +3,7 @@ function OperatorAssumptions(issquare = nothing)
     issq = something(_unwrap_val(issquare), Nothing)
     OperatorAssumptions{issq}()
 end
-SciMLOperators.issquare(::OperatorAssumptions{issq}) where {issq} = issq
+__issquare(::OperatorAssumptions{issq}) where {issq} = issq
 
 struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq}
     A::TA
@@ -94,7 +94,7 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
                         verbose::Bool = false,
                         Pl = IdentityOperator{size(prob.A, 1)}(),
                         Pr = IdentityOperator{size(prob.A, 2)}(),
-                        assumptions = OperatorAssumptions(issquare(prob.A)),
+                        assumptions = OperatorAssumptions(Val(issquare(prob.A))),
                         kwargs...)
     @unpack A, b, u0, p = prob
 
@@ -129,7 +129,7 @@ function SciMLBase.init(prob::LinearProblem, alg::Union{SciMLLinearSolveAlgorith
                         typeof(Pl),
                         typeof(Pr),
                         typeof(reltol),
-                        issquare(assumptions)
+                        __issquare(assumptions)
                         }(A,
                           b,
                           u0,

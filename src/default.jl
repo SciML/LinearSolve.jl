@@ -42,10 +42,6 @@ end
 function defaultalg(A::Diagonal, b, ::OperatorAssumptions{true})
     DiagonalFactorization()
 end
-# TODO - Diagonal matrices are always square
-function defaultalg(A::Diagonal, b, ::OperatorAssumptions{false})
-    DiagonalFactorization()
-end
 function defaultalg(A::Diagonal, b, ::OperatorAssumptions{Nothing})
     DiagonalFactorization()
 end

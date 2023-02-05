@@ -384,8 +384,6 @@ end
 
         @testset "DirectLdiv!" begin
             function get_operator(A, u)
-                F = lu(Array(A))
-
                 function f(du, u, p, t)
                     println("using FunctionOperator mul!")
                     mul!(du, A, u)
@@ -393,7 +391,7 @@ end
 
                 function fi(du, u, p, t)
                     println("using FunctionOperator ldiv!")
-                    ldiv!(du, F, u)
+                    ldiv!(du, A, u)
                 end
 
                 FunctionOperator(f, u, u; isinplace = true, op_inverse = fi)

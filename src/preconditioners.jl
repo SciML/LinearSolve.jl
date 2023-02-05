@@ -1,11 +1,4 @@
 # Tooling Preconditioners
-#
-# TODO - update Preconditioner docs
-# TODO - replace ComposePreconditoner with ComposedOperator after
-#        ComposePreconditioner is deprecated in OrdinaryDiffEq
-
-#const ComposePreconditioner = ComposedOperator
-#@deprecate ComposePreconditioner ComposedOperator
 
 struct ComposePreconditioner{Ti, To}
     inner::Ti
@@ -27,6 +20,3 @@ function LinearAlgebra.ldiv!(y, A::ComposePreconditioner, x)
     ldiv!(y, inner, x)
     ldiv!(outer, y)
 end
-
-#const InvPreconditioner = InvertedOperator
-#@deprecate InvPreconditioner InvertedOperator

@@ -6,13 +6,11 @@ end
 using ArrayInterfaceCore
 using RecursiveFactorization
 using Base: cache_dependencies, Bool
-import Base: eltype, adjoint, inv
 using LinearAlgebra
-using IterativeSolvers: Identity
 using SparseArrays
-using SciMLBase: AbstractLinearAlgorithm, DiffEqIdentity
-using SciMLOperators: AbstractSciMLOperator, IdentityOperator,
-                      InvertedOperator, ComposedOperator
+using SciMLBase: AbstractLinearAlgorithm
+using SciMLOperators
+using SciMLOperators: AbstractSciMLOperator, IdentityOperator
 using Setfield
 using UnPack
 using SuiteSparse
@@ -22,7 +20,6 @@ using FastLapackInterface
 using DocStringExtensions
 import GPUArraysCore
 import Preferences
-import SciMLOperators: issquare
 
 # wrap
 import Krylov
@@ -45,11 +42,12 @@ needs_concrete_A(alg::AbstractKrylovSubspaceMethod) = false
 needs_concrete_A(alg::AbstractSolveFunction) = false
 
 # Util
+
 _isidentity_struct(A) = false
 _isidentity_struct(λ::Number) = isone(λ)
 _isidentity_struct(A::UniformScaling) = isone(A.λ)
 _isidentity_struct(::IterativeSolvers.Identity) = true
-_isidentity_struct(::SciMLBase.IdentityOperator) = true
+_isidentity_struct(::SciMLOperators.IdentityOperator) = true
 _isidentity_struct(::SciMLBase.DiffEqIdentity) = true
 
 # Code

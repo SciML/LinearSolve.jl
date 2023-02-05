@@ -1,4 +1,5 @@
 using LinearSolve, LinearAlgebra, SparseArrays, MultiFloats, ForwardDiff
+using SciMLOperators
 using Test
 import Random
 
@@ -271,17 +272,14 @@ end
 
     @testset "Preconditioners" begin
         @testset "Vector Diagonal Preconditioner" begin
-            using SciMLOperators
 
             x = rand(n, n)
             y = rand(n, n)
 
             s = rand(n)
-            Pl = Diagonal(s)
-            Pr = Diagonal(s)
-            Pr = LinearSolve.InvertedOperator(MatrixOperator(Pr))
+            Pl = Diagonal(s) |> MatrixOperator
+            Pr = Diagonal(s) |> MatrixOperator |> inv
             Pr = cache_operator(Pr, x)
-            #@test Pr == (@test_deprecated LinearSolve.InvPreconditioner(Diagonal(s)))
 
             mul!(y, Pl, x)
             @test y ≈ s .* x

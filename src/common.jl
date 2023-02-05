@@ -1,12 +1,9 @@
 struct OperatorAssumptions{issq} end
-# TODO - in defaultalg selection, OperatorAssumptions{nothing} behaves
-#        exactly like OperatorAssumptions{true}. So let's remove the option to
-#        put in nothing.
 function OperatorAssumptions(issquare = nothing)
     issq = something(_unwrap_val(issquare), Nothing)
     OperatorAssumptions{issq}()
 end
-issquare(::OperatorAssumptions{issq}) where {issq} = issq
+SciMLOperators.issquare(::OperatorAssumptions{issq}) where {issq} = issq
 
 struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq}
     A::TA
@@ -28,7 +25,6 @@ end
 """
 $(SIGNATURES)
 """
-# TODO - this should modify OperatorAssumption??
 function set_A(cache::LinearCache, A)
     @set! cache.A = A
     @set! cache.isfresh = true

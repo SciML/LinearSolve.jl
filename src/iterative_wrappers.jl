@@ -153,8 +153,10 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
     M = (M === Identity()) ? I : InvPreconditioner(M)
     N = (N === Identity()) ? I : InvPreconditioner(N)
 
-    atol = float(cache.abstol)
-    rtol = float(cache.reltol)
+    Ta = eltype(cache.A)
+
+    atol = Ta(float(cache.abstol))
+    rtol = Ta(float(cache.reltol))
     itmax = cache.maxiters
     verbose = cache.verbose ? 1 : 0
 

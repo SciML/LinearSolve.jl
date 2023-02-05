@@ -3,6 +3,8 @@ using Test
 import Random
 
 const Dual64 = ForwardDiff.Dual{Nothing, Float64, 1}
+Base.:^(x::MultiFloat{T, N}, y::Int) where {T, N} = MultiFloat{T, N}(BigFloat(x)^y)
+Base.:^(x::MultiFloat{T, N}, y::Float64) where {T, N} = MultiFloat{T, N}(BigFloat(x)^y)
 
 n = 8
 A = Matrix(I, n, n)
@@ -19,18 +21,21 @@ prob2 = LinearProblem(A2, b2; u0 = x2)
 
 cache_kwargs = (; verbose = true, abstol = 1e-8, reltol = 1e-8, maxiter = 30)
 
-function test_interface(alg, prob1, prob2)
-    A1 = prob1.A
-    b1 = prob1.b
-    x1 = prob1.u0
-    A2 = prob2.A
-    b2 = prob2.b
-    x2 = prob2.u0
+function test_interface(alg, prob1, prob2; T = Float64)
+    A1 = prob1.A .|> T
+    b1 = prob1.b .|> T
+    x1 = prob1.u0 .|> T
+    A2 = prob2.A .|> T
+    b2 = prob2.b .|> T
+    x2 = prob2.u0 .|> T
 
-    y = solve(prob1, alg; cache_kwargs...)
+    myprob1 = LinearProblem(A1, b1; u0 = x1)
+    myprob2 = LinearProblem(A2, b2; u0 = x2)
+
+    y = solve(myprob1, alg; cache_kwargs...)
     @test A1 * y ≈ b1
 
-    cache = SciMLBase.init(prob1, alg; cache_kwargs...) # initialize cache
+    cache = SciMLBase.init(myprob1, alg; cache_kwargs...) # initialize cache
     y = solve(cache)
     @test A1 * y ≈ b1
 
@@ -140,42 +145,42 @@ end
     end
 
     @testset "Sparspak Factorization (Float64x1)" begin
-        A1 = sparse(A / 1) .|> Float64x1
-        b1 = rand(n) .|> Float64x1
-        x1 = zero(b) .|> Float64x1
-        A2 = sparse(A / 2) .|> Float64x1
-        b2 = rand(n) .|> Float64x1
-        x2 = zero(b) .|> Float64x1
+        A1 = sparse(A / 1)
+        b1 = rand(n)
+        x1 = zero(b)
+        A2 = sparse(A / 2)
+        b2 = rand(n)
+        x2 = zero(b)
 
         prob1 = LinearProblem(A1, b1; u0 = x1)
         prob2 = LinearProblem(A2, b2; u0 = x2)
-        test_interface(SparspakFactorization(), prob1, prob2)
+        test_interface(SparspakFactorization(), prob1, prob2; T = Float64x1)
     end
 
     @testset "Sparspak Factorization (Float64x2)" begin
-        A1 = sparse(A / 1) .|> Float64x2
-        b1 = rand(n) .|> Float64x2
-        x1 = zero(b) .|> Float64x2
-        A2 = sparse(A / 2) .|> Float64x2
-        b2 = rand(n) .|> Float64x2
-        x2 = zero(b) .|> Float64x2
+        A1 = sparse(A / 1)
+        b1 = rand(n)
+        x1 = zero(b)
+        A2 = sparse(A / 2)
+        b2 = rand(n)
+        x2 = zero(b)
 
         prob1 = LinearProblem(A1, b1; u0 = x1)
         prob2 = LinearProblem(A2, b2; u0 = x2)
-        test_interface(SparspakFactorization(), prob1, prob2)
+        test_interface(SparspakFactorization(), prob1, prob2; T = Float64x2)
     end
 
     @testset "Sparspak Factorization (Dual64)" begin
-        A1 = sparse(A / 1) .|> Dual64
-        b1 = rand(n) .|> Dual64
-        x1 = zero(b) .|> Dual64
-        A2 = sparse(A / 2) .|> Dual64
-        b2 = rand(n) .|> Dual64
-        x2 = zero(b) .|> Dual64
+        A1 = sparse(A / 1)
+        b1 = rand(n)
+        x1 = zero(b)
+        A2 = sparse(A / 2)
+        b2 = rand(n)
+        x2 = zero(b)
 
         prob1 = LinearProblem(A1, b1; u0 = x1)
         prob2 = LinearProblem(A2, b2; u0 = x2)
-        test_interface(SparspakFactorization(), prob1, prob2)
+        test_interface(SparspakFactorization(), prob1, prob2; T = Dual64)
     end
 
     @testset "FastLAPACK Factorizations" begin
@@ -225,7 +230,14 @@ end
                     ("GMRES", KrylovJL_GMRES(kwargs...)),
                     #           ("BICGSTAB",KrylovJL_BICGSTAB(kwargs...)),
                     ("MINRES", KrylovJL_MINRES(kwargs...)))
-            @testset "$(alg[1])" begin test_interface(alg[2], prob1, prob2) end
+            @testset "$(alg[1])" begin
+                test_interface(alg[2], prob1, prob2)
+                test_interface(alg[2], prob1, prob2; T = Float64x1)
+                test_interface(alg[2], prob1, prob2; T = Float64x2)
+                test_interface(alg[2], prob1, prob2; T = Dual64)
+                # https://github.com/JuliaSmoothOptimizers/Krylov.jl/issues/646
+                # ForwardDiff.Dual is a Real, not an AbstractFloat
+            end
         end
     end
 
@@ -237,7 +249,14 @@ end
                     #           ("BICGSTAB",IterativeSolversJL_BICGSTAB(kwargs...)),
                     #            ("MINRES",IterativeSolversJL_MINRES(kwargs...)),
                     )
-            @testset "$(alg[1])" begin test_interface(alg[2], prob1, prob2) end
+            @testset "$(alg[1])" begin
+                test_interface(alg[2], prob1, prob2)
+                test_interface(alg[2], prob1, prob2; T = Float64x1)
+                test_interface(alg[2], prob1, prob2; T = Float64x2)
+                test_interface(alg[2], prob1, prob2; T = Dual64)
+                # https://github.com/JuliaLang/julia/issues/41753
+                # ForwardDiff.Dual is a Real, not an AbstractFloat
+            end
         end
     end
 
@@ -246,7 +265,12 @@ end
         for alg in (("Default", KrylovKitJL(kwargs...)),
                     ("CG", KrylovKitJL_CG(kwargs...)),
                     ("GMRES", KrylovKitJL_GMRES(kwargs...)))
-            @testset "$(alg[1])" begin test_interface(alg[2], prob1, prob2) end
+            @testset "$(alg[1])" begin
+                test_interface(alg[2], prob1, prob2)
+                test_interface(alg[2], prob1, prob2; T = Float64x1)
+                test_interface(alg[2], prob1, prob2; T = Float64x2)
+                test_interface(alg[2], prob1, prob2; T = Dual64)
+            end
             @test alg[2] isa KrylovKitJL
         end
     end

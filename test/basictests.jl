@@ -272,7 +272,6 @@ end
 
     @testset "Preconditioners" begin
         @testset "Vector Diagonal Preconditioner" begin
-
             x = rand(n, n)
             y = rand(n, n)
 
@@ -358,14 +357,16 @@ end
         x2 = zero(b1)
 
         @testset "LinearSolveFunction" begin
-            function sol_func(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true, kwargs...)
+            function sol_func(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,
+                              kwargs...)
                 if verbose == true
                     println("out-of-place solve")
                 end
                 u = A \ b
             end
 
-            function sol_func!(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true, kwargs...)
+            function sol_func!(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,
+                               kwargs...)
                 if verbose == true
                     println("in-place solve")
                 end
@@ -395,11 +396,11 @@ end
                     ldiv!(du, F, u)
                 end
 
-                FunctionOperator(f, u, u; isinplace=true, op_inverse=fi)
+                FunctionOperator(f, u, u; isinplace = true, op_inverse = fi)
             end
 
-            op1 = get_operator(A1, x1*0)
-            op2 = get_operator(A2, x2*0)
+            op1 = get_operator(A1, x1 * 0)
+            op2 = get_operator(A2, x2 * 0)
 
             prob1 = LinearProblem(op1, b1; u0 = x1)
             prob2 = LinearProblem(op2, b2; u0 = x2)

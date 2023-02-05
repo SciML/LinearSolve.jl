@@ -20,3 +20,12 @@ function LinearAlgebra.ldiv!(y, A::ComposePreconditioner, x)
     ldiv!(y, inner, x)
     ldiv!(outer, y)
 end
+
+struct InvPreconditioner{T}
+    P::T
+end
+
+Base.eltype(A::InvPreconditioner) = Base.eltype(A.P)
+LinearAlgebra.ldiv!(A::InvPreconditioner, x) = mul!(x, A.P, x)
+LinearAlgebra.ldiv!(y, A::InvPreconditioner, x) = mul!(y, A.P, x)
+LinearAlgebra.mul!(y, A::InvPreconditioner, x) = ldiv!(y, A.P, x)

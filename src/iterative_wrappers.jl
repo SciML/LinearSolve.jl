@@ -152,7 +152,7 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
 
     # use no-op preconditioner for Krylov.jl (LinearAlgebra.I) when M/N is identity
     M = _isidentity_struct(M) ? I : M
-    N = _isidentity_struct(M) ? I : N
+    N = _isidentity_struct(N) ? I : N
 
     atol = float(cache.abstol)
     rtol = float(cache.reltol)

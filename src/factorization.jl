@@ -316,6 +316,7 @@ end
 function init_cacheval(alg::KLUFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
                        reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
+    A = convert(AbstractMatrix, A)
     return KLU.KLUFactorization(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                                                 nonzeros(A)))
 end
@@ -519,6 +520,7 @@ end
 function init_cacheval(::SparspakFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
                        reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
+    A = convert(AbstractMatrix, A)
     return sparspaklu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
                       factorize = false)
 end

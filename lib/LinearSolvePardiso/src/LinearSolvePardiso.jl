@@ -1,14 +1,17 @@
 module LinearSolvePardiso
 
 using Pardiso, LinearSolve, SciMLBase
+using SparseArrays
+using SparseArrays: nonzeros, rowvals, getcolptr
+
 using UnPack
 
 Base.@kwdef struct PardisoJL <: LinearSolve.SciMLLinearSolveAlgorithm
-    nprocs::Union{Int, Nothing} = nothing
-    solver_type::Union{Int, Pardiso.Solver, Nothing} = nothing
-    matrix_type::Union{Int, Pardiso.MatrixType, Nothing} = nothing
-    iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing
-    dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing
+    nprocs::Union{Int,Nothing} = nothing
+    solver_type::Union{Int,Pardiso.Solver,Nothing} = nothing
+    matrix_type::Union{Int,Pardiso.MatrixType,Nothing} = nothing
+    iparm::Union{Vector{Tuple{Int,Int}},Nothing} = nothing
+    dparm::Union{Vector{Tuple{Int,Int}},Nothing} = nothing
 end
 
 MKLPardisoFactorize(; kwargs...) = PardisoJL(; solver_type = 0, kwargs...)
@@ -17,9 +20,19 @@ LinearSolve.needs_concrete_A(alg::PardisoJL) = true
 
 # TODO schur complement functionality
 
-function LinearSolve.init_cacheval(alg::PardisoJL, A, b, u, Pl, Pr, maxiters::Int, abstol,
-                                   reltol, verbose::Bool,
-                                   assumptions::LinearSolve.OperatorAssumptions)
+function LinearSolve.init_cacheval(
+    alg::PardisoJL,
+    A,
+    b,
+    u,
+    Pl,
+    Pr,
+    maxiters::Int,
+    abstol,
+    reltol,
+    verbose::Bool,
+    assumptions::LinearSolve.OperatorAssumptions,
+)
     @unpack nprocs, solver_type, matrix_type, iparm, dparm = alg
     A = convert(AbstractMatrix, A)
 
@@ -90,7 +103,12 @@ function LinearSolve.init_cacheval(alg::PardisoJL, A, b, u, Pl, Pr, maxiters::In
         Pardiso.set_iparm!(solver, 3, round(Int, abs(log10(reltol)), RoundDown) * 10 + 1)
     end
 
-    Pardiso.pardiso(solver, u, SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A), b)
+    Pardiso.pardiso(
+        solver,
+        u,
+        SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
+        b,
+    )
 
     return solver
 end

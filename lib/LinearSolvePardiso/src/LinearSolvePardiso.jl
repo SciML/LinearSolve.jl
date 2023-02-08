@@ -90,7 +90,7 @@ function LinearSolve.init_cacheval(alg::PardisoJL, A, b, u, Pl, Pr, maxiters::In
         Pardiso.set_iparm!(solver, 3, round(Int, abs(log10(reltol)), RoundDown) * 10 + 1)
     end
 
-    Pardiso.pardiso(solver, u, A, b)
+    Pardiso.pardiso(solver, u, SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A), b)
 
     return solver
 end

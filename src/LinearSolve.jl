@@ -9,6 +9,7 @@ using Base: cache_dependencies, Bool
 using LinearAlgebra
 using IterativeSolvers: Identity
 using SparseArrays
+using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
 using SciMLBase: AbstractLinearAlgorithm
 using SciMLOperators
 using SciMLOperators: AbstractSciMLOperator, IdentityOperator

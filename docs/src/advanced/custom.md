@@ -1,4 +1,4 @@
-# Passing in a Custom Linear Solver
+# [Passing in a Custom Linear Solver](@id custom)
 
 Julia users are building a wide variety of applications in the SciML ecosystem,
 often requiring problem-specific handling of their linear solves. As existing solvers in `LinearSolve.jl` may not

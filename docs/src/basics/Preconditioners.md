@@ -80,7 +80,7 @@ The following preconditioners match the interface of LinearSolve.jl.
   - [IncompleteLU.ilu](https://github.com/haampie/IncompleteLU.jl): an implementation
     of the incomplete LU-factorization preconditioner. This requires `A` as a
     `SparseMatrixCSC`.
-  - [Preconditioners.CholeskyPreconditioner(A, i)](https://github.com/mohamed82008/Preconditioners.jl):
+  - [Preconditioners.CholeskyPreconditioner(A, i)](https://github.com/JuliaLinearAlgebra/Preconditioners.jl):
     An incomplete Cholesky preconditioner with cut-off level `i`. Requires `A` as
     a `AbstractMatrix` and positive semi-definite.
   - [AlgebraicMultiGrid](https://github.com/JuliaLinearAlgebra/AlgebraicMultigrid.jl):

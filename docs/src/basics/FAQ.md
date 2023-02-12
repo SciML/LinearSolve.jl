@@ -11,7 +11,7 @@ efficiency and ability to choose solvers.
 
 ## Python's NumPy/SciPy just calls fast Fortran/C code, why would LinearSolve.jl be any better?
 
-This is addressed in the [JuliaCon 2022 video](https://youtu.be/JWI34_w-yYw?t=182). This happens in
+This is addressed in the [JuliaCon 2022 video](https://www.youtube.com/watch?v=JWI34_w-yYw&t=182s). This happens in
 a few ways:
 
  1. The Fortran/C code that NumPy/SciPy uses is actually slow. It's [OpenBLAS](https://github.com/xianyi/OpenBLAS),

@@ -35,7 +35,7 @@ with CPUs and GPUs, and thus is the generally preferred form for Krylov methods.
 
 Finally, a user can pass a custom function for handling the linear solve using
 `LinearSolveFunction()` if existing solvers are not optimally suited for their application.
-The interface is detailed [here](#passing-in-a-custom-linear-solver).
+The interface is detailed [here](@ref custom).
 
 ## Full List of Methods
 

@@ -11,7 +11,7 @@ include("pages.jl")
 makedocs(sitename = "LinearSolve.jl",
          authors = "Chris Rackauckas",
          modules = [LinearSolve, LinearSolve.SciMLBase],
-         clean = true, doctest = false,
+         clean = true, doctest = false, linkcheck = true,
          strict = [
              :doctest,
              :linkcheck,

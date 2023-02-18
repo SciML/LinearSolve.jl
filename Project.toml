@@ -4,7 +4,7 @@ authors = ["SciML"]
 version = "1.35.0"
 
 [deps]
-ArrayInterfaceCore = "30b0a656-2188-435a-8636-2ec0e6a096e2"
+ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 FastLapackInterface = "29a986be-02c6-4525-aec4-84b980013641"
 GPUArraysCore = "46192b85-c4d5-4398-a991-12ede77f4527"
@@ -32,7 +32,7 @@ HYPRE = "b5ffcf37-a2bd-41ab-a3da-4bd9bc8ad771"
 LinearSolveHYPRE = "HYPRE"
 
 [compat]
-ArrayInterfaceCore = "0.1.1"
+ArrayInterface = "7"
 DocStringExtensions = "0.8, 0.9"
 FastLapackInterface = "1"
 GPUArraysCore = "0.1"

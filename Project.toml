@@ -32,7 +32,7 @@ HYPRE = "b5ffcf37-a2bd-41ab-a3da-4bd9bc8ad771"
 LinearSolveHYPRE = "HYPRE"
 
 [compat]
-ArrayInterface = "7"
+ArrayInterface = "6, 7"
 DocStringExtensions = "0.8, 0.9"
 FastLapackInterface = "1"
 GPUArraysCore = "0.1"

@@ -46,7 +46,7 @@ is what is called at `init` time to create the first `cacheval`. Note that this
 should match the type of the cache later used in `solve` as many algorithms, like
 those in OrdinaryDiffEq.jl, expect type-groundedness in the linear solver definitions.
 While there are cheaper ways to obtain this type for LU factorizations (specifically,
-`ArrayInterfaceCore.lu_instance(A)`), for a demonstration, this just performs an
+`ArrayInterface.lu_instance(A)`), for a demonstration, this just performs an
 LU-factorization to get an `LU{T, Matrix{T}}` which it puts into the `cacheval`
 so it is typed for future use.
 

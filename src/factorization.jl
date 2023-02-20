@@ -69,7 +69,7 @@ end
 function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization}, A, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
-    ArrayInterfaceCore.lu_instance(convert(AbstractMatrix, A))
+    ArrayInterface.lu_instance(convert(AbstractMatrix, A))
 end
 
 ## QRFactorization
@@ -131,25 +131,25 @@ end
 function init_cacheval(alg::GenericFactorization{typeof(lu)}, A, b, u, Pl, Pr,
                        maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ArrayInterfaceCore.lu_instance(convert(AbstractMatrix, A))
+    ArrayInterface.lu_instance(convert(AbstractMatrix, A))
 end
 function init_cacheval(alg::GenericFactorization{typeof(lu!)}, A, b, u, Pl, Pr,
                        maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ArrayInterfaceCore.lu_instance(convert(AbstractMatrix, A))
+    ArrayInterface.lu_instance(convert(AbstractMatrix, A))
 end
 
 function init_cacheval(alg::GenericFactorization{typeof(lu)},
                        A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
                        maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ArrayInterfaceCore.lu_instance(A)
+    ArrayInterface.lu_instance(A)
 end
 function init_cacheval(alg::GenericFactorization{typeof(lu!)},
                        A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
                        maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ArrayInterfaceCore.lu_instance(A)
+    ArrayInterface.lu_instance(A)
 end
 function init_cacheval(alg::GenericFactorization{typeof(lu)}, A::Diagonal, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
@@ -159,7 +159,7 @@ end
 function init_cacheval(alg::GenericFactorization{typeof(lu)}, A::Tridiagonal, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
-    ArrayInterfaceCore.lu_instance(A)
+    ArrayInterface.lu_instance(A)
 end
 function init_cacheval(alg::GenericFactorization{typeof(lu!)}, A::Diagonal, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
@@ -169,7 +169,7 @@ end
 function init_cacheval(alg::GenericFactorization{typeof(lu!)}, A::Tridiagonal, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
-    ArrayInterfaceCore.lu_instance(A)
+    ArrayInterface.lu_instance(A)
 end
 
 function init_cacheval(alg::GenericFactorization, A::Diagonal, b, u, Pl, Pr, maxiters::Int,
@@ -179,7 +179,7 @@ end
 function init_cacheval(alg::GenericFactorization, A::Tridiagonal, b, u, Pl, Pr,
                        maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ArrayInterfaceCore.lu_instance(A)
+    ArrayInterface.lu_instance(A)
 end
 function init_cacheval(alg::GenericFactorization, A::SymTridiagonal{T, V}, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
@@ -369,7 +369,7 @@ end
 function init_cacheval(alg::RFLUFactorization, A, b, u, Pl, Pr, maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
-    ArrayInterfaceCore.lu_instance(convert(AbstractMatrix, A)), ipiv
+    ArrayInterface.lu_instance(convert(AbstractMatrix, A)), ipiv
 end
 
 function SciMLBase.solve(cache::LinearCache, alg::RFLUFactorization{P, T};

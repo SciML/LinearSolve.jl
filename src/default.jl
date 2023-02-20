@@ -142,7 +142,7 @@ function defaultalg(A, b, ::OperatorAssumptions{true})
     # whether MKL or OpenBLAS is being used
     if (A === nothing && !(b isa GPUArraysCore.AbstractGPUArray)) || A isa Matrix
         if (A === nothing || eltype(A) <: Union{Float32, Float64, ComplexF32, ComplexF64}) &&
-           ArrayInterfaceCore.can_setindex(b)
+           ArrayInterface.can_setindex(b)
             if length(b) <= 10
                 alg = GenericLUFactorization()
             elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500)) &&
@@ -160,7 +160,7 @@ function defaultalg(A, b, ::OperatorAssumptions{true})
 
         # This catches the cases where a factorization overload could exist
         # For example, BlockBandedMatrix
-    elseif A !== nothing && ArrayInterfaceCore.isstructured(A)
+    elseif A !== nothing && ArrayInterface.isstructured(A)
         alg = GenericFactorization()
 
         # Not factorizable operator, default to only using A*x

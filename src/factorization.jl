@@ -52,8 +52,8 @@ end
 
 function do_factorization(alg::LUFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
-    if A isa SparseMatrixCSC
-        return lu(A)
+    if A isa AbstractSparseMatrixCSC
+        return lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)))
     else
         fact = lu!(A, alg.pivot)
     end
@@ -277,7 +277,8 @@ function init_cacheval(alg::UMFPACKFactorization, A, b, u, Pl, Pr, maxiters::Int
                                              copy(nonzeros(A)), 0)
         finalizer(SuiteSparse.UMFPACK.umfpack_free_symbolic, res)
     else
-        return SuiteSparse.UMFPACK.UmfpackLU(A)
+        return SuiteSparse.UMFPACK.UmfpackLU(SparseMatrixCSC(size(A)..., getcolptr(A),
+                                                             rowvals(A), nonzeros(A)))
     end
 end
 
@@ -290,12 +291,15 @@ function SciMLBase.solve(cache::LinearCache, alg::UMFPACKFactorization; kwargs..
             if alg.check_pattern && !(SuiteSparse.decrement(SparseArrays.getcolptr(A)) ==
                  cache.cacheval.colptr &&
                  SuiteSparse.decrement(SparseArrays.getrowval(A)) == cache.cacheval.rowval)
-                fact = lu(A)
+                fact = lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
+                                          nonzeros(A)))
             else
-                fact = lu!(cache.cacheval, A)
+                fact = lu!(cache.cacheval,
+                           SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
+                                           nonzeros(A)))
             end
         else
-            fact = lu(A)
+            fact = lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)))
         end
         cache = set_cacheval(cache, fact)
     end
@@ -312,7 +316,9 @@ end
 function init_cacheval(alg::KLUFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
                        reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
-    return KLU.KLUFactorization(convert(AbstractMatrix, A)) # this takes care of the copy internally.
+    A = convert(AbstractMatrix, A)
+    return KLU.KLUFactorization(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
+                                                nonzeros(A)))
 end
 
 function SciMLBase.solve(cache::LinearCache, alg::KLUFactorization; kwargs...)
@@ -323,21 +329,25 @@ function SciMLBase.solve(cache::LinearCache, alg::KLUFactorization; kwargs...)
             if alg.check_pattern && !(SuiteSparse.decrement(SparseArrays.getcolptr(A)) ==
                  cache.cacheval.colptr &&
                  SuiteSparse.decrement(SparseArrays.getrowval(A)) == cache.cacheval.rowval)
-                fact = KLU.klu(A)
+                fact = KLU.klu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
+                                               nonzeros(A)))
             else
                 # If we have a cacheval already, run umfpack_symbolic to ensure the symbolic factorization exists
                 # This won't recompute if it does.
                 KLU.klu_analyze!(cache.cacheval)
-                copyto!(cache.cacheval.nzval, A.nzval)
+                copyto!(cache.cacheval.nzval, nonzeros(A))
                 if cache.cacheval._numeric === C_NULL # We MUST have a numeric factorization for reuse, unlike UMFPACK.
                     KLU.klu_factor!(cache.cacheval)
                 end
-                fact = KLU.klu!(cache.cacheval, A)
+                fact = KLU.klu!(cache.cacheval,
+                                SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
+                                                nonzeros(A)))
             end
         else
             # New fact each time since the sparsity pattern can change
             # and thus it needs to reallocate
-            fact = KLU.klu(A)
+            fact = KLU.klu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
+                                           nonzeros(A)))
         end
         cache = set_cacheval(cache, fact)
     end
@@ -511,17 +521,20 @@ function init_cacheval(::SparspakFactorization, A, b, u, Pl, Pr, maxiters::Int, 
                        reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
     A = convert(AbstractMatrix, A)
-    return sparspaklu(A, factorize = false)
+    return sparspaklu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
+                      factorize = false)
 end
 
 function SciMLBase.solve(cache::LinearCache, alg::SparspakFactorization; kwargs...)
     A = cache.A
-    A = convert(AbstractMatrix, A)
     if cache.isfresh
         if cache.cacheval !== nothing && alg.reuse_symbolic
-            fact = sparspaklu!(cache.cacheval, A)
+            fact = sparspaklu!(cache.cacheval,
+                               SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
+                                               nonzeros(A)))
         else
-            fact = sparspaklu(A)
+            fact = sparspaklu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
+                                              nonzeros(A)))
         end
         cache = set_cacheval(cache, fact)
     end

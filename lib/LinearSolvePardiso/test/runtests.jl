@@ -17,9 +17,7 @@ cache_kwargs = (; verbose = true, abstol = 1e-8, reltol = 1e-8, maxiter = 30)
 
 prob2 = LinearProblem(A2, b2)
 
-for alg in (PardisoJL(),
-            MKLPardisoFactorize(),
-            MKLPardisoIterate())
+for alg in (PardisoJL(), MKLPardisoFactorize(), MKLPardisoIterate())
     u = solve(prob1, alg; cache_kwargs...).u
     @test A1 * u ≈ b1
 

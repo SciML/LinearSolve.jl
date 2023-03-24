@@ -200,9 +200,10 @@ function SciMLBase.solve(cache::LinearCache, alg::HYPREAlgorithm, args...; kwarg
     resid = HYPRE.GetFinalRelativeResidualNorm(hcache.solver)
     iters = Int(HYPRE.GetNumIterations(hcache.solver))
     retc = SciMLBase.ReturnCode.Default # TODO: Fetch from solver
+    stats = nothing
 
     ret = SciMLBase.LinearSolution{T, N, typeof(cache.u), typeof(resid), typeof(alg),
-                                   typeof(cache)}(cache.u, resid, alg, retc, iters, cache)
+                                   typeof(cache), typeof(stats)}(cache.u, resid, alg, retc, iters, cache, stats)
 
     return ret
 end

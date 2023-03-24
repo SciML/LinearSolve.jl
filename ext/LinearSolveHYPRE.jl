@@ -201,7 +201,7 @@ function SciMLBase.solve(cache::LinearCache, alg::HYPREAlgorithm, args...; kwarg
     iters = Int(HYPRE.GetNumIterations(hcache.solver))
     retc = SciMLBase.ReturnCode.Default # TODO: Fetch from solver
 
-    ret = build_linear_solution(alg, cache.u, resid, cache; iters)
+    ret = SciMLBase.build_linear_solution(alg, cache.u, resid, cache; iters)
     return ret
 end
 

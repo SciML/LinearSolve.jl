@@ -331,8 +331,7 @@ function init_cacheval(alg::Union{GenericFactorization{typeof(cholesky)},
 end
 
 # Ambiguity handling dispatch
-function init_cacheval(alg::Union{GenericFactorization,
-                                  GenericFactorization{typeof(cholesky)},
+function init_cacheval(alg::Union{GenericFactorization{typeof(cholesky)},
                                   GenericFactorization{typeof(cholesky!)}},
                        A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
                        maxiters::Int,

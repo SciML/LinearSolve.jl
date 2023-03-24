@@ -309,23 +309,9 @@ end
 
 # Fallback, tries to make nonsingular and just factorizes
 # Try to never use it.
-function init_cacheval(alg::Union{QRFactorization, SVDFactorization, GenericFactorization},
+function init_cacheval(alg::GenericFactorization,
                        A, b, u, Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
-    newA = copy(convert(AbstractMatrix, A))
-    if newA isa AbstractSparseMatrix
-        fill!(nonzeros(newA), true)
-    else
-        fill!(newA, true)
-    end
-    do_factorization(alg, newA, b, u)
-end
-
-# Ambiguity handling dispatch
-function init_cacheval(alg::Union{QRFactorization, SVDFactorization},
-                       A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
-                       maxiters::Int,
-                       abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     newA = copy(convert(AbstractMatrix, A))
     if newA isa AbstractSparseMatrix
         fill!(nonzeros(newA), true)

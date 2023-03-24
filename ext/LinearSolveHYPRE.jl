@@ -198,11 +198,12 @@ function SciMLBase.solve(cache::LinearCache, alg::HYPREAlgorithm, args...; kwarg
     T = cache.u isa HYPREVector ? HYPRE_Complex : eltype(cache.u) # eltype(u)
     N = 1 # length((size(u)...,))
     resid = HYPRE.GetFinalRelativeResidualNorm(hcache.solver)
-    iters = HYPRE.GetNumIterations(hcache.solver)
+    iters = Int(HYPRE.GetNumIterations(hcache.solver))
     retc = SciMLBase.ReturnCode.Default # TODO: Fetch from solver
+    stats = nothing
 
     ret = SciMLBase.LinearSolution{T, N, typeof(cache.u), typeof(resid), typeof(alg),
-                                   typeof(cache)}(cache.u, resid, alg, retc, iters, cache)
+                                   typeof(cache), typeof(stats)}(cache.u, resid, alg, retc, iters, cache, stats)
 
     return ret
 end

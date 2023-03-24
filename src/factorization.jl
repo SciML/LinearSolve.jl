@@ -99,6 +99,12 @@ function do_factorization(alg::QRFactorization, A, b, u)
     return fact
 end
 
+function init_cacheval(alg::QRFactorization, A, b, u, Pl, Pr,
+    maxiters::Int, abstol, reltol, verbose::Bool,
+    assumptions::OperatorAssumptions)
+    ArrayInterface.qr_instance(convert(AbstractMatrix, A))
+end
+
 ## SVDFactorization
 
 struct SVDFactorization{A} <: AbstractFactorization
@@ -112,6 +118,12 @@ function do_factorization(alg::SVDFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
     fact = svd!(A; full = alg.full, alg = alg.alg)
     return fact
+end
+
+function init_cacheval(alg::SVDFactorization, A, b, u, Pl, Pr,
+    maxiters::Int, abstol, reltol, verbose::Bool,
+    assumptions::OperatorAssumptions)
+    ArrayInterface.svd_instance(convert(AbstractMatrix, A))
 end
 
 ## GenericFactorization
@@ -172,6 +184,94 @@ function init_cacheval(alg::GenericFactorization{typeof(lu!)}, A::Tridiagonal, b
     ArrayInterface.lu_instance(A)
 end
 
+function init_cacheval(alg::GenericFactorization{typeof(qr)}, A, b, u, Pl, Pr,
+                       maxiters::Int,
+                       abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    ArrayInterface.qr_instance(convert(AbstractMatrix, A))
+end
+function init_cacheval(alg::GenericFactorization{typeof(qr!)}, A, b, u, Pl, Pr,
+                       maxiters::Int,
+                       abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    ArrayInterface.qr_instance(convert(AbstractMatrix, A))
+end
+
+function init_cacheval(alg::GenericFactorization{typeof(qr)},
+                       A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
+                       maxiters::Int,
+                       abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    ArrayInterface.qr_instance(A)
+end
+function init_cacheval(alg::GenericFactorization{typeof(qr!)},
+                       A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
+                       maxiters::Int,
+                       abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    ArrayInterface.qr_instance(A)
+end
+function init_cacheval(alg::GenericFactorization{typeof(qr)}, A::Diagonal, b, u, Pl, Pr,
+                       maxiters::Int, abstol, reltol, verbose::Bool,
+                       assumptions::OperatorAssumptions)
+    Diagonal(inv.(A.diag))
+end
+function init_cacheval(alg::GenericFactorization{typeof(qr)}, A::Tridiagonal, b, u, Pl, Pr,
+                       maxiters::Int, abstol, reltol, verbose::Bool,
+                       assumptions::OperatorAssumptions)
+    ArrayInterface.qr_instance(A)
+end
+function init_cacheval(alg::GenericFactorization{typeof(qr!)}, A::Diagonal, b, u, Pl, Pr,
+                       maxiters::Int, abstol, reltol, verbose::Bool,
+                       assumptions::OperatorAssumptions)
+    Diagonal(inv.(A.diag))
+end
+function init_cacheval(alg::GenericFactorization{typeof(qr!)}, A::Tridiagonal, b, u, Pl, Pr,
+                       maxiters::Int, abstol, reltol, verbose::Bool,
+                       assumptions::OperatorAssumptions)
+    ArrayInterface.qr_instance(A)
+end
+
+function init_cacheval(alg::GenericFactorization{typeof(svd)}, A, b, u, Pl, Pr,
+                       maxiters::Int,
+                       abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    ArrayInterface.svd_instance(convert(AbstractMatrix, A))
+end
+function init_cacheval(alg::GenericFactorization{typeof(svd!)}, A, b, u, Pl, Pr,
+                       maxiters::Int,
+                       abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    ArrayInterface.svd_instance(convert(AbstractMatrix, A))
+end
+
+function init_cacheval(alg::GenericFactorization{typeof(svd)},
+                       A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
+                       maxiters::Int,
+                       abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    ArrayInterface.svd_instance(A)
+end
+function init_cacheval(alg::GenericFactorization{typeof(svd!)},
+                       A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
+                       maxiters::Int,
+                       abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    ArrayInterface.svd_instance(A)
+end
+function init_cacheval(alg::GenericFactorization{typeof(svd)}, A::Diagonal, b, u, Pl, Pr,
+                       maxiters::Int, abstol, reltol, verbose::Bool,
+                       assumptions::OperatorAssumptions)
+    Diagonal(inv.(A.diag))
+end
+function init_cacheval(alg::GenericFactorization{typeof(svd)}, A::Tridiagonal, b, u, Pl, Pr,
+                       maxiters::Int, abstol, reltol, verbose::Bool,
+                       assumptions::OperatorAssumptions)
+    ArrayInterface.svd_instance(A)
+end
+function init_cacheval(alg::GenericFactorization{typeof(svd!)}, A::Diagonal, b, u, Pl, Pr,
+                       maxiters::Int, abstol, reltol, verbose::Bool,
+                       assumptions::OperatorAssumptions)
+    Diagonal(inv.(A.diag))
+end
+function init_cacheval(alg::GenericFactorization{typeof(svd!)}, A::Tridiagonal, b, u, Pl, Pr,
+                       maxiters::Int, abstol, reltol, verbose::Bool,
+                       assumptions::OperatorAssumptions)
+    ArrayInterface.svd_instance(A)
+end
+
 function init_cacheval(alg::GenericFactorization, A::Diagonal, b, u, Pl, Pr, maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     Diagonal(inv.(A.diag))
@@ -209,23 +309,9 @@ end
 
 # Fallback, tries to make nonsingular and just factorizes
 # Try to never use it.
-function init_cacheval(alg::Union{QRFactorization, SVDFactorization, GenericFactorization},
+function init_cacheval(alg::GenericFactorization,
                        A, b, u, Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
-    newA = copy(convert(AbstractMatrix, A))
-    if newA isa AbstractSparseMatrix
-        fill!(nonzeros(newA), true)
-    else
-        fill!(newA, true)
-    end
-    do_factorization(alg, newA, b, u)
-end
-
-# Ambiguity handling dispatch
-function init_cacheval(alg::Union{QRFactorization, SVDFactorization},
-                       A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
-                       maxiters::Int,
-                       abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     newA = copy(convert(AbstractMatrix, A))
     if newA isa AbstractSparseMatrix
         fill!(nonzeros(newA), true)

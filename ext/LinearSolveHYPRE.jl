@@ -203,7 +203,8 @@ function SciMLBase.solve(cache::LinearCache, alg::HYPREAlgorithm, args...; kwarg
     stats = nothing
 
     ret = SciMLBase.LinearSolution{T, N, typeof(cache.u), typeof(resid), typeof(alg),
-                                   typeof(cache), typeof(stats)}(cache.u, resid, alg, retc, iters, cache, stats)
+                                   typeof(cache), typeof(stats)}(cache.u, resid, alg, retc,
+                                                                 iters, cache, stats)
 
     return ret
 end

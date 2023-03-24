@@ -100,8 +100,8 @@ function do_factorization(alg::QRFactorization, A, b, u)
 end
 
 function init_cacheval(alg::QRFactorization, A, b, u, Pl, Pr,
-    maxiters::Int, abstol, reltol, verbose::Bool,
-    assumptions::OperatorAssumptions)
+                       maxiters::Int, abstol, reltol, verbose::Bool,
+                       assumptions::OperatorAssumptions)
     ArrayInterface.qr_instance(convert(AbstractMatrix, A))
 end
 
@@ -121,8 +121,8 @@ function do_factorization(alg::SVDFactorization, A, b, u)
 end
 
 function init_cacheval(alg::SVDFactorization, A, b, u, Pl, Pr,
-    maxiters::Int, abstol, reltol, verbose::Bool,
-    assumptions::OperatorAssumptions)
+                       maxiters::Int, abstol, reltol, verbose::Bool,
+                       assumptions::OperatorAssumptions)
     ArrayInterface.svd_instance(convert(AbstractMatrix, A))
 end
 
@@ -266,7 +266,8 @@ function init_cacheval(alg::GenericFactorization{typeof(svd!)}, A::Diagonal, b, 
                        assumptions::OperatorAssumptions)
     Diagonal(inv.(A.diag))
 end
-function init_cacheval(alg::GenericFactorization{typeof(svd!)}, A::Tridiagonal, b, u, Pl, Pr,
+function init_cacheval(alg::GenericFactorization{typeof(svd!)}, A::Tridiagonal, b, u, Pl,
+                       Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
     ArrayInterface.svd_instance(A)

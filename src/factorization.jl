@@ -99,7 +99,7 @@ function do_factorization(alg::QRFactorization, A, b, u)
     return fact
 end
 
-function init_cacheval(alg:QRFactorization, A, b, u, Pl, Pr,
+function init_cacheval(alg::QRFactorization, A, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
     ArrayInterface.qr_instance(convert(AbstractMatrix, A))
@@ -120,7 +120,7 @@ function do_factorization(alg::SVDFactorization, A, b, u)
     return fact
 end
 
-function init_cacheval(alg:SVDFactorization, A, b, u, Pl, Pr,
+function init_cacheval(alg::SVDFactorization, A, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
     ArrayInterface.svd_instance(convert(AbstractMatrix, A))

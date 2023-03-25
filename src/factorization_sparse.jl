@@ -6,3 +6,10 @@ function _ldiv!(x::Vector,
                          SuiteSparse.CHOLMOD.Factor}, b::Vector)
     x .= A \ b
 end
+
+function _ldiv!(x::AbstractVector,
+    A::Union{SparseArrays.QR, LinearAlgebra.QRCompactWY,
+             SuiteSparse.SPQR.QRSparse,
+             SuiteSparse.CHOLMOD.Factor}, b::AbstractVector)
+    x .= A \ b
+end

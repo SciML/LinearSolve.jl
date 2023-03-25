@@ -54,7 +54,7 @@ end
 Sets the operator `A` assumptions used as part of the default algorithm
 """
 struct OperatorAssumptions{issq,condition} end
-function OperatorAssumptions(issquare = nothing; condition::OperatorCondition.T = IllConditioned)
+function OperatorAssumptions(issquare = nothing; condition::OperatorCondition.T = OperatorCondition.IllConditioned)
     issq = something(_unwrap_val(issquare), Nothing)
     condition = _unwrap_val(condition)
     OperatorAssumptions{issq,condition}()

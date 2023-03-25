@@ -20,6 +20,7 @@ using KLU
 using Sparspak
 using FastLapackInterface
 using DocStringExtensions
+using EnumX
 import GPUArraysCore
 import Preferences
 

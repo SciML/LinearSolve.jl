@@ -6,7 +6,7 @@ using LinearSolve, LinearAlgebra, SparseArrays, Test
       DiagonalFactorization
 
 @test LinearSolve.defaultalg(nothing, zeros(5),
-                             LinearSolve.OperatorAssumptions{false}()) isa QRFactorization
+                             LinearSolve.OperatorAssumptions(false)) isa QRFactorization
 
 @test LinearSolve.defaultalg(sprand(1000, 1000, 0.01), zeros(1000)) isa KLUFactorization
 @test LinearSolve.defaultalg(sprand(11000, 11000, 0.001), zeros(11000)) isa

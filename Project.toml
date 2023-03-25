@@ -6,6 +6,7 @@ version = "1.40.0"
 [deps]
 ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
+EnumX = "4e289a0a-7415-4d19-859d-a7e5c4648b56"
 FastLapackInterface = "29a986be-02c6-4525-aec4-84b980013641"
 GPUArraysCore = "46192b85-c4d5-4398-a991-12ede77f4527"
 IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"

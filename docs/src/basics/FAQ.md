@@ -9,6 +9,18 @@ Note that if `\` is good enough for you, great! We still tend to use `\` in the 
 However, if you're building a package, you may want to consider using LinearSolve.jl for the improved
 efficiency and ability to choose solvers.
 
+## I'm seeing some dynamic dispatches in the default algorithm choice, how do I reduce that?
+
+Make sure you set the `OperatorAssumptions` to get the full performance, especially the `issquare` choice
+as otherwise that will need to be determined at runtime.
+
+## I found a faster algorithm that can be used than what LinearSolve.jl chose?
+
+What assumptions are made as part of your method? If your method only works on well-conditioned operators, then
+make sure you set the `WellConditioned` assumption in the `assumptions`. See the 
+[OperatorAssumptions page for more details](@ref assumptions). If using the right assumptions does not improve
+the performance to the expected state, please open an issue and we will improve the default algorithm.
+
 ## Python's NumPy/SciPy just calls fast Fortran/C code, why would LinearSolve.jl be any better?
 
 This is addressed in the [JuliaCon 2022 video](https://www.youtube.com/watch?v=JWI34_w-yYw&t=182s). This happens in

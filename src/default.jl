@@ -66,7 +66,7 @@ end
     end
 end
 
-function defaultalg(A::GPUArraysCore.AbstractGPUArray, b, ::OperatorAssumptions{true})
+function defaultalg(A::GPUArraysCore.AbstractGPUArray, b, assump::OperatorAssumptions{true})
     if VERSION >= v"1.8-"
         LUFactorization()
     else
@@ -74,12 +74,20 @@ function defaultalg(A::GPUArraysCore.AbstractGPUArray, b, ::OperatorAssumptions{
     end
 end
 
-function defaultalg(A, b::GPUArraysCore.AbstractGPUArray, ::OperatorAssumptions{true})
+function defaultalg(A::GPUArraysCore.AbstractGPUArray, b, assump::OperatorAssumptions{true,OperatorCondition.IllConditioned})
+    QRFactorization()
+end
+
+function defaultalg(A, b::GPUArraysCore.AbstractGPUArray, assump::OperatorAssumptions{true})
     if VERSION >= v"1.8-"
         LUFactorization()
     else
         QRFactorization()
     end
+end
+
+function defaultalg(A, b::GPUArraysCore.AbstractGPUArray, assump::OperatorAssumptions{true,OperatorCondition.IllConditioned})
+    QRFactorization()
 end
 
 function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
@@ -121,6 +129,11 @@ function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.Abstract
     end
 end
 
+function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.AbstractGPUArray,
+                    ::OperatorAssumptions{true,OperatorCondition.IllConditioned})
+    QRFactorization()
+end
+
 function defaultalg(A::GPUArraysCore.AbstractGPUArray, b, ::OperatorAssumptions{false})
     QRFactorization()
 end
@@ -136,13 +149,13 @@ function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.Abstract
 end
 
 # Allows A === nothing as a stand-in for dense matrix
-function defaultalg(A, b, ::OperatorAssumptions{true})
+function defaultalg(A, b, assump::OperatorAssumptions{true})
     # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
     # it makes sense according to the benchmarks, which is dependent on
     # whether MKL or OpenBLAS is being used
     if (A === nothing && !(b isa GPUArraysCore.AbstractGPUArray)) || A isa Matrix
         if (A === nothing || eltype(A) <: Union{Float32, Float64, ComplexF32, ComplexF64}) &&
-           ArrayInterface.can_setindex(b)
+           ArrayInterface.can_setindex(b) && __conditioning(assump) === OperatorCondition.IllConditioned
             if length(b) <= 10
                 alg = GenericLUFactorization()
             elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500)) &&
@@ -154,6 +167,10 @@ function defaultalg(A, b, ::OperatorAssumptions{true})
             else
                 alg = LUFactorization()
             end
+        elseif __conditioning(assump) === OperatorCondition.VeryIllConditioned
+            alg = QRFactorization()
+        elseif __conditioning(assump) === OperatorCondition.SuperIllConditioned
+            alg = SVDFactorization(false, LinearAlgebra.QRIteration())
         else
             alg = LUFactorization()
         end
@@ -170,8 +187,16 @@ function defaultalg(A, b, ::OperatorAssumptions{true})
     alg
 end
 
-function defaultalg(A, b, ::OperatorAssumptions{false})
+function defaultalg(A, b, ::OperatorAssumptions{false,OperatorCondition.IllConditioned})
     QRFactorization()
+end
+
+function defaultalg(A, b, ::OperatorAssumptions{false,OperatorCondition.VeryIllConditioned})
+    QRFactorization()
+end
+
+function defaultalg(A, b, ::OperatorAssumptions{false,OperatorCondition.SuperIllConditioned})
+    SVDFactorization(false, LinearAlgebra.QRIteration())
 end
 
 ## Catch high level interface

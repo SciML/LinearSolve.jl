@@ -472,6 +472,43 @@ function SciMLBase.solve(cache::LinearCache, alg::RFLUFactorization{P, T};
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
+## NormalCholeskyFactorization
+
+struct NormalCholeskyFactorization <: AbstractFactorization
+    pivot::P
+    perm::Bool
+end
+
+function NormalCholeskyFactorization(; pivot = nothing, perm = nothing)
+    if pivot === nothing
+        @static if VERSION < v"1.7beta"
+            Val(true)
+        else
+            RowMaximum()
+        end
+    end
+    NormalCholeskyFactorization(pivot, perm)
+end
+
+function init_cacheval(alg::NormalCholeskyFactorization, A, b, u, Pl, Pr,
+                       maxiters::Int, abstol, reltol, verbose::Bool,
+                       assumptions::OperatorAssumptions)
+    ArrayInterface.cholesky_instance(convert(AbstractMatrix, A), alg.pivot)
+end
+
+function SciMLBase.solve(cache::LinearCache, alg::NormalCholeskyFactorization;
+                         kwargs...)
+    A = cache.A
+    A = convert(AbstractMatrix, A)
+    fact, ipiv = cache.cacheval
+    if cache.isfresh
+        fact = cholesky(Symmetric((A)' * A), alg.pivot)
+        cache = set_cacheval(cache, fact)
+    end
+    y = ldiv!(cache.u, cache.cacheval, A' * cache.b)
+    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+end
+
 ## DiagonalFactorization
 
 struct DiagonalFactorization <: AbstractFactorization end

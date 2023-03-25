@@ -155,17 +155,52 @@ function defaultalg(A, b, assump::OperatorAssumptions{true})
     # whether MKL or OpenBLAS is being used
     if (A === nothing && !(b isa GPUArraysCore.AbstractGPUArray)) || A isa Matrix
         if (A === nothing || eltype(A) <: Union{Float32, Float64, ComplexF32, ComplexF64}) &&
-           ArrayInterface.can_setindex(b) && __conditioning(assump) === OperatorCondition.IllConditioned
+           ArrayInterface.can_setindex(b) && (__conditioning(assump) === OperatorCondition.IllConditioned ||
+           __conditioning(assump) === OperatorCondition.WellConditioned)
+
             if length(b) <= 10
-                alg = GenericLUFactorization()
+                pivot = @static if VERSION < v"1.7beta"
+                    if __conditioning(assump) === OperatorCondition.IllConditioned
+                        Val(true)
+                    else
+                        Val(false)
+                    end
+                    else
+                        if __conditioning(assump) === OperatorCondition.IllConditioned
+                            RowMaximum()
+                        else
+                            RowNonZero()
+                        end
+                    end
+                end
+                alg = GenericLUFactorization(pivot)
             elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500)) &&
                    (A === nothing ? eltype(b) <: Union{Float32, Float64} :
                     eltype(A) <: Union{Float32, Float64})
-                alg = RFLUFactorization()
+                pivot =  if __conditioning(assump) === OperatorCondition.IllConditioned
+                    Val(true)
+                else
+                    Val(false)
+                end
+                alg = RFLUFactorization(;pivot = pivot)
                 #elseif A === nothing || A isa Matrix
                 #    alg = FastLUFactorization()
             else
-                alg = LUFactorization()
+                pivot = @static if VERSION < v"1.7beta"
+                    if __conditioning(assump) === OperatorCondition.IllConditioned
+                        Val(true)
+                    else
+                        Val(false)
+                    end
+                    else
+                        if __conditioning(assump) === OperatorCondition.IllConditioned
+                            RowMaximum()
+                        else
+                            RowNonZero()
+                        end
+                    end
+                end
+                alg = LUFactorization(pivot)
             end
         elseif __conditioning(assump) === OperatorCondition.VeryIllConditioned
             alg = QRFactorization()

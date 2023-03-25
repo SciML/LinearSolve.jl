@@ -155,7 +155,7 @@ function defaultalg(A, b, assump::OperatorAssumptions{true})
     # whether MKL or OpenBLAS is being used
     if (A === nothing && !(b isa GPUArraysCore.AbstractGPUArray)) || A isa Matrix
         if (A === nothing || eltype(A) <: Union{Float32, Float64, ComplexF32, ComplexF64}) &&
-           ArrayInterface.can_setindex(b) && __conditioning(assump) != OperatorCondition.IllConditioned
+           ArrayInterface.can_setindex(b) && __conditioning(assump) === OperatorCondition.IllConditioned
             if length(b) <= 10
                 alg = GenericLUFactorization()
             elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500)) &&

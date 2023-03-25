@@ -24,3 +24,9 @@ b = rand(n)
 prob = LinearProblem(A, b)
 res = Matrix(A) \ b
 @test solve(prob, KrylovJL_CRAIGMR()) ≈ res
+
+A = sprandn(1000, 100, 0.1)
+b = randn(1001)
+prob = LinearProblem(A, view(b, 1:1000))
+linsolve = init(prob, QRFactorization())
+solve(linsolve)

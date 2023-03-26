@@ -106,6 +106,7 @@ end
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
+       NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
        UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization,
        SparspakFactorization, DiagonalFactorization
 
@@ -118,5 +119,7 @@ export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
        KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES
 
 export HYPREAlgorithm
+
+export OperatorAssumptions, OperatorCondition
 
 end

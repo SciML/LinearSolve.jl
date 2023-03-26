@@ -220,6 +220,10 @@ function defaultalg(A, b, assump::OperatorAssumptions{true})
     alg
 end
 
+function defaultalg(A, b, ::OperatorAssumptions{false,OperatorCondition.WellConditioned})
+    NormalCholeskyFactorization()
+end
+
 function defaultalg(A, b, ::OperatorAssumptions{false,OperatorCondition.IllConditioned})
     QRFactorization()
 end
@@ -233,6 +237,14 @@ function defaultalg(A, b, ::OperatorAssumptions{false,OperatorCondition.SuperIll
 end
 
 ## Catch high level interface
+
+function SciMLBase.init(prob::LinearProblem, alg::Nothing,
+                        args...;
+                        assumptions = OperatorAssumptions(Val(issquare(prob.A))),
+                        kwargs...)
+    alg = defaultalg(prob.A, prob.b, assumptions)
+    SciMLBase.init(prob, alg, args...; assumptions, kwargs...)
+end
 
 function SciMLBase.solve(cache::LinearCache, alg::Nothing,
                          args...; assumptions::OperatorAssumptions = OperatorAssumptions(),

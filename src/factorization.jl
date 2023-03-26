@@ -6,22 +6,6 @@ function _ldiv!(x::Vector, A::Factorization, b::Vector)
     ldiv!(A, x)
 end
 
-@static if VERSION >= v"1.9-"
-    function _ldiv!(x::AbstractVector, A::SparseArrays.SPQR.QRSparse, b::AbstractVector)
-        x .= A \ b
-    end
-    function _ldiv!(x::Vector, A::SparseArrays.SPQR.QRSparse, b::Vector)
-        x .= A \ b
-    end
-else
-    function _ldiv!(x::AbstractVector, A::SuiteSparse.SPQR.QRSparse, b::AbstractVector)
-        x .= A \ b
-    end
-    function _ldiv!(x::Vector, A::SuiteSparse.SPQR.QRSparse, b::Vector)
-        x .= A \ b
-    end
-end
-
 function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization; kwargs...)
     if cache.isfresh
         fact = do_factorization(alg, cache.A, cache.b, cache.u)

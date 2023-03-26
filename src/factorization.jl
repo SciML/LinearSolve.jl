@@ -323,7 +323,8 @@ function init_cacheval(alg::GenericFactorization,
 end
 
 # Cholesky needs the posdef matrix, for GenericFactorization assume structure is needed
-function init_cacheval(alg::Union{GenericFactorization{typeof(cholesky)},
+function init_cacheval(alg::Union{GenericFactorization,
+                                  GenericFactorization{typeof(cholesky)},
                                   GenericFactorization{typeof(cholesky!)}}, A, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)

@@ -4,7 +4,8 @@ using HYPRE.LibHYPRE: HYPRE_Complex
 using HYPRE: HYPRE, HYPREMatrix, HYPRESolver, HYPREVector
 using IterativeSolvers: Identity
 using LinearSolve: HYPREAlgorithm, LinearCache, LinearProblem, LinearSolve,
-                   OperatorAssumptions, default_tol, init_cacheval, __issquare, set_cacheval
+                   OperatorAssumptions, default_tol, init_cacheval, __issquare,
+                   __conditioning, set_cacheval
 using SciMLBase: LinearProblem, SciMLBase
 using UnPack: @unpack
 using Setfield: @set!
@@ -82,7 +83,8 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
 
     cache = LinearCache{
                         typeof(A), typeof(b), typeof(u0), typeof(p), typeof(alg), Tc,
-                        typeof(Pl), typeof(Pr), typeof(reltol), __issquare(assumptions)
+                        typeof(Pl), typeof(Pr), typeof(reltol), __issquare(assumptions),
+                        __conditioning(assumptions)
                         }(A, b, u0, p, alg, cacheval, isfresh, Pl, Pr, abstol, reltol,
                           maxiters,
                           verbose, assumptions)

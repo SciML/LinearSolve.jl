@@ -472,6 +472,84 @@ function SciMLBase.solve(cache::LinearCache, alg::RFLUFactorization{P, T};
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
+## NormalCholeskyFactorization
+
+struct NormalCholeskyFactorization{P} <: AbstractFactorization
+    pivot::P
+end
+
+function NormalCholeskyFactorization(; pivot = nothing)
+    if pivot === nothing
+        pivot = @static if VERSION < v"1.7beta"
+            Val(true)
+        else
+            RowMaximum()
+        end
+    end
+    NormalCholeskyFactorization(pivot)
+end
+
+default_alias_A(::NormalCholeskyFactorization, ::Any, ::Any) = true
+default_alias_b(::NormalCholeskyFactorization, ::Any, ::Any) = true
+
+function init_cacheval(alg::NormalCholeskyFactorization, A, b, u, Pl, Pr,
+                       maxiters::Int, abstol, reltol, verbose::Bool,
+                       assumptions::OperatorAssumptions)
+    ArrayInterface.cholesky_instance(convert(AbstractMatrix, A), alg.pivot)
+end
+
+function SciMLBase.solve(cache::LinearCache, alg::NormalCholeskyFactorization;
+                         kwargs...)
+    A = cache.A
+    A = convert(AbstractMatrix, A)
+    if cache.isfresh
+        if A isa SparseMatrixCSC
+            fact = cholesky(Symmetric((A)' * A))
+        else
+            fact = cholesky(Symmetric((A)' * A), alg.pivot)
+        end
+        cache = set_cacheval(cache, fact)
+    end
+    if A isa SparseMatrixCSC
+        cache.u .= cache.cacheval \ (A' * cache.b)
+        y = cache.u
+    else
+        y = ldiv!(cache.u, cache.cacheval, A' * cache.b)
+    end
+    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+end
+
+## NormalBunchKaufmanFactorization
+
+struct NormalBunchKaufmanFactorization <: AbstractFactorization
+    rook::Bool
+end
+
+function NormalBunchKaufmanFactorization(; rook = false)
+    NormalBunchKaufmanFactorization(rook)
+end
+
+default_alias_A(::NormalBunchKaufmanFactorization, ::Any, ::Any) = true
+default_alias_b(::NormalBunchKaufmanFactorization, ::Any, ::Any) = true
+
+function init_cacheval(alg::NormalBunchKaufmanFactorization, A, b, u, Pl, Pr,
+                       maxiters::Int, abstol, reltol, verbose::Bool,
+                       assumptions::OperatorAssumptions)
+    ArrayInterface.bunchkaufman_instance(convert(AbstractMatrix, A))
+end
+
+function SciMLBase.solve(cache::LinearCache, alg::NormalBunchKaufmanFactorization;
+                         kwargs...)
+    A = cache.A
+    A = convert(AbstractMatrix, A)
+    if cache.isfresh
+        fact = bunchkaufman(Symmetric((A)' * A), alg.rook)
+        cache = set_cacheval(cache, fact)
+    end
+    y = ldiv!(cache.u, cache.cacheval, A' * cache.b)
+    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+end
+
 ## DiagonalFactorization
 
 struct DiagonalFactorization <: AbstractFactorization end

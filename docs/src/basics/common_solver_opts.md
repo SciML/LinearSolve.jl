@@ -16,6 +16,7 @@ The following are the options these algorithms take, along with their defaults.
   - `verbose`: Whether to print extra information. Defaults to `false`.
   - `assumptions`: Sets the assumptions of the operator in order to effect the default
     choice algorithm. See the [Operator Assumptions page for more details](@ref assumptions).
+
 ## Iterative Solver Controls
 
 Error controls are not used by all algorithms. Specifically, direct solves always

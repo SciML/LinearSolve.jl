@@ -17,7 +17,7 @@ as otherwise that will need to be determined at runtime.
 ## I found a faster algorithm that can be used than what LinearSolve.jl chose?
 
 What assumptions are made as part of your method? If your method only works on well-conditioned operators, then
-make sure you set the `WellConditioned` assumption in the `assumptions`. See the 
+make sure you set the `WellConditioned` assumption in the `assumptions`. See the
 [OperatorAssumptions page for more details](@ref assumptions). If using the right assumptions does not improve
 the performance to the expected state, please open an issue and we will improve the default algorithm.
 

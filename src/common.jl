@@ -53,15 +53,15 @@ end
 
 Sets the operator `A` assumptions used as part of the default algorithm
 """
-struct OperatorAssumptions{issq,condition} end
-function OperatorAssumptions(issquare = nothing; condition::OperatorCondition.T = OperatorCondition.IllConditioned)
+struct OperatorAssumptions{issq, condition} end
+function OperatorAssumptions(issquare = nothing;
+                             condition::OperatorCondition.T = OperatorCondition.IllConditioned)
     issq = something(_unwrap_val(issquare), Nothing)
     condition = _unwrap_val(condition)
-    OperatorAssumptions{issq,condition}()
+    OperatorAssumptions{issq, condition}()
 end
-__issquare(::OperatorAssumptions{issq,condition}) where {issq,condition} = issq
-__conditioning(::OperatorAssumptions{issq,condition}) where {issq,condition} = condition
-
+__issquare(::OperatorAssumptions{issq, condition}) where {issq, condition} = issq
+__conditioning(::OperatorAssumptions{issq, condition}) where {issq, condition} = condition
 
 struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, condition}
     A::TA
@@ -77,7 +77,7 @@ struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, condition}
     reltol::Ttol
     maxiters::Int
     verbose::Bool
-    assumptions::OperatorAssumptions{issq,condition}
+    assumptions::OperatorAssumptions{issq, condition}
 end
 
 """
@@ -143,12 +143,13 @@ default_tol(::Type{<:Rational}) = 0
 default_tol(::Type{<:Integer}) = 0
 default_tol(::Type{Any}) = 0
 
-default_alias_A(::Any,::Any,::Any) = false
-default_alias_b(::Any,::Any,::Any) = false
+default_alias_A(::Any, ::Any, ::Any) = false
+default_alias_b(::Any, ::Any, ::Any) = false
 
 function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
                         args...;
-                        alias_A = default_alias_A(alg, prob.A, prob.b), alias_b = default_alias_b(alg, prob.A, prob.b),
+                        alias_A = default_alias_A(alg, prob.A, prob.b),
+                        alias_b = default_alias_b(alg, prob.A, prob.b),
                         abstol = default_tol(eltype(prob.A)),
                         reltol = default_tol(eltype(prob.A)),
                         maxiters::Int = length(prob.b),

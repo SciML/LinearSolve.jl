@@ -37,11 +37,15 @@ b = randn(1000)
 solve(LinearProblem(A, b)).u;
 solve(LinearProblem(A, b), (LinearSolve.NormalCholeskyFactorization())).u;
 solve(LinearProblem(A, b), (LinearSolve.NormalBunchKaufmanFactorization())).u;
-solve(LinearProblem(A, b), assumptions = (OperatorAssumptions(false; condition = OperatorCondition.WellConditioned))).u;
+solve(LinearProblem(A, b),
+      assumptions = (OperatorAssumptions(false;
+                                         condition = OperatorCondition.WellConditioned))).u;
 
 A = sprandn(5000, 100, 0.1)
 b = randn(5000)
 @test isapprox(solve(LinearProblem(A, b)).u, ldlt(A' * A) \ (A' * b))
 solve(LinearProblem(A, b)).u;
 solve(LinearProblem(A, b), (LinearSolve.NormalCholeskyFactorization())).u;
-solve(LinearProblem(A, b), assumptions = (OperatorAssumptions(false; condition = OperatorCondition.WellConditioned))).u;
+solve(LinearProblem(A, b),
+      assumptions = (OperatorAssumptions(false;
+                                         condition = OperatorCondition.WellConditioned))).u;

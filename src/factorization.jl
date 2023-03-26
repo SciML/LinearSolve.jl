@@ -489,8 +489,8 @@ function NormalCholeskyFactorization(; pivot = nothing)
     NormalCholeskyFactorization(pivot)
 end
 
-default_alias_A(::NormalCholeskyFactorization,::Any,::Any) = true
-default_alias_b(::NormalCholeskyFactorization,::Any,::Any) = true
+default_alias_A(::NormalCholeskyFactorization, ::Any, ::Any) = true
+default_alias_b(::NormalCholeskyFactorization, ::Any, ::Any) = true
 
 function init_cacheval(alg::NormalCholeskyFactorization, A, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
@@ -529,8 +529,8 @@ function NormalBunchKaufmanFactorization(; rook = false)
     NormalBunchKaufmanFactorization(rook)
 end
 
-default_alias_A(::NormalBunchKaufmanFactorization,::Any,::Any) = true
-default_alias_b(::NormalBunchKaufmanFactorization,::Any,::Any) = true
+default_alias_A(::NormalBunchKaufmanFactorization, ::Any, ::Any) = true
+default_alias_b(::NormalBunchKaufmanFactorization, ::Any, ::Any) = true
 
 function init_cacheval(alg::NormalBunchKaufmanFactorization, A, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,

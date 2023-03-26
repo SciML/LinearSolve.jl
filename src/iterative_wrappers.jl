@@ -15,8 +15,8 @@ function KrylovJL(args...; KrylovAlg = Krylov.gmres!,
                     args, kwargs)
 end
 
-default_alias_A(::KrylovJL,::Any,::Any) = true
-default_alias_b(::KrylovJL,::Any,::Any) = true
+default_alias_A(::KrylovJL, ::Any, ::Any) = true
+default_alias_b(::KrylovJL, ::Any, ::Any) = true
 
 function KrylovJL_CG(args...; kwargs...)
     KrylovJL(args...; KrylovAlg = Krylov.cg!, kwargs...)
@@ -208,8 +208,8 @@ function IterativeSolversJL(args...;
                               args, kwargs)
 end
 
-default_alias_A(::IterativeSolversJL,::Any,::Any) = true
-default_alias_b(::IterativeSolversJL,::Any,::Any) = true
+default_alias_A(::IterativeSolversJL, ::Any, ::Any) = true
+default_alias_b(::IterativeSolversJL, ::Any, ::Any) = true
 
 function IterativeSolversJL_CG(args...; kwargs...)
     IterativeSolversJL(args...;
@@ -318,8 +318,8 @@ function KrylovKitJL(args...;
     return KrylovKitJL(KrylovAlg, gmres_restart, args, kwargs)
 end
 
-default_alias_A(::KrylovKitJL,::Any,::Any) = true
-default_alias_b(::KrylovKitJL,::Any,::Any) = true
+default_alias_A(::KrylovKitJL, ::Any, ::Any) = true
+default_alias_b(::KrylovKitJL, ::Any, ::Any) = true
 
 function KrylovKitJL_CG(args...; kwargs...)
     KrylovKitJL(args...; KrylovAlg = KrylovKit.CG, kwargs..., isposdef = true)

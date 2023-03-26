@@ -172,7 +172,6 @@ function defaultalg(A, b, assump::OperatorAssumptions{true})
                             RowNonZero()
                         end
                     end
-                end
                 alg = GenericLUFactorization(pivot)
             elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500)) &&
                    (A === nothing ? eltype(b) <: Union{Float32, Float64} :

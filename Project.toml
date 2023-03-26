@@ -26,15 +26,10 @@ Sparspak = "e56a9233-b9d6-4f03-8d0f-1825330902ac"
 SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 
-[weakdeps]
-HYPRE = "b5ffcf37-a2bd-41ab-a3da-4bd9bc8ad771"
-
-[extensions]
-LinearSolveHYPRE = "HYPRE"
-
 [compat]
 ArrayInterface = "7.3"
 DocStringExtensions = "0.8, 0.9"
+EnumX = "1"
 FastLapackInterface = "1"
 GPUArraysCore = "0.1"
 HYPRE = "1.4.0"
@@ -53,6 +48,9 @@ Sparspak = "0.3.6"
 UnPack = "1"
 julia = "1.6"
 
+[extensions]
+LinearSolveHYPRE = "HYPRE"
+
 [extras]
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 HYPRE = "b5ffcf37-a2bd-41ab-a3da-4bd9bc8ad771"
@@ -65,3 +63,6 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Test", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI"]
+
+[weakdeps]
+HYPRE = "b5ffcf37-a2bd-41ab-a3da-4bd9bc8ad771"

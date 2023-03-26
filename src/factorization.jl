@@ -474,7 +474,7 @@ end
 
 ## NormalCholeskyFactorization
 
-struct NormalCholeskyFactorization <: AbstractFactorization
+struct NormalCholeskyFactorization{P} <: AbstractFactorization
     pivot::P
     perm::Bool
 end

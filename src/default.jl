@@ -198,7 +198,6 @@ function defaultalg(A, b, assump::OperatorAssumptions{true})
                             RowNonZero()
                         end
                     end
-                end
                 alg = LUFactorization(pivot)
             end
         elseif __conditioning(assump) === OperatorCondition.VeryIllConditioned

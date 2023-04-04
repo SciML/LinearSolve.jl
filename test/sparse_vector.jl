@@ -37,7 +37,7 @@ n = length(x0)
 hess_mat = sparse(rowval, colval, hess_sparse(x0), n, n)
 grad_vec = sparsevec(gradinds, grad_sparse(x0), n)
 
-# # Converting grad_vec to dense succeds in solving
+# # Converting grad_vec to dense succeeds in solving
 prob = LinearProblem(hess_mat, grad_vec)
 linsolve = init(prob)
 @test solve(linsolve).u ≈ hess_mat \ Array(grad_vec)

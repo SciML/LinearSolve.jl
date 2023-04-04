@@ -39,6 +39,7 @@ function test_interface(alg, prob1, prob2)
     sol = solve(cache; cache_kwargs...)
     @test A2 * sol.u ≈ b1
 
+    cache = LinearSolve.set_A(cache, deepcopy(A2))
     cache = LinearSolve.set_b(cache, b2)
     sol = solve(cache; cache_kwargs...)
     @test A2 * sol.u ≈ b2
@@ -207,8 +208,8 @@ end
     @testset "Generic Factorizations" begin for fact_alg in (lu, lu!,
                                                              qr, qr!,
                                                              cholesky,
-                                                             #cholesky!,
-                                                             #                ldlt, ldlt!,
+                                                             cholesky!,
+                                                             #ldlt, ldlt!,
                                                              bunchkaufman, bunchkaufman!,
                                                              lq, lq!,
                                                              svd, svd!,

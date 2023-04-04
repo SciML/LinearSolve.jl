@@ -310,21 +310,20 @@ end
 
 # Fallback, tries to make nonsingular and just factorizes
 # Try to never use it.
-function init_cacheval(alg::GenericFactorization,
-                       A, b, u, Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool,
-                       assumptions::OperatorAssumptions)
-    newA = copy(convert(AbstractMatrix, A))
-    if newA isa AbstractSparseMatrix
-        fill!(nonzeros(newA), true)
-    else
-        fill!(newA, true)
-    end
-    do_factorization(alg, newA, b, u)
-end
+# function init_cacheval(alg::GenericFactorization,
+#                        A, b, u, Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool,
+#                        assumptions::OperatorAssumptions)
+#     newA = copy(convert(AbstractMatrix, A))
+#     if newA isa AbstractSparseMatrix
+#         fill!(nonzeros(newA), true)
+#     else
+#         fill!(newA, true)
+#     end
+#     do_factorization(alg, newA, b, u)
+# end
 
 # Cholesky needs the posdef matrix, for GenericFactorization assume structure is needed
-function init_cacheval(alg::Union{GenericFactorization,
-                                  GenericFactorization{typeof(cholesky)},
+function init_cacheval(alg::Union{GenericFactorization, GenericFactorization{typeof(cholesky)},
                                   GenericFactorization{typeof(cholesky!)}}, A, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
@@ -333,15 +332,15 @@ function init_cacheval(alg::Union{GenericFactorization,
 end
 
 # Ambiguity handling dispatch
-function init_cacheval(alg::Union{GenericFactorization,
-                                  GenericFactorization{typeof(cholesky)},
-                                  GenericFactorization{typeof(cholesky!)}},
-                       A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
-                       maxiters::Int,
-                       abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    newA = copy(convert(AbstractMatrix, A))
-    do_factorization(alg, newA, b, u)
-end
+# Since code not different than above, let's keep the general one above.
+# function init_cacheval(alg::Union{GenericFactorization, GenericFactorization{typeof(cholesky)},
+#                                   GenericFactorization{typeof(cholesky!)}},
+#                        A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
+#                        maxiters::Int,
+#                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+#     newA = copy(convert(AbstractMatrix, A))
+#     do_factorization(alg, newA, b, u)
+# end
 
 ################################## Factorizations which require solve overloads
 

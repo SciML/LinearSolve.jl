@@ -1,6 +1,6 @@
 # [Linear System Solvers](@id linearsystemsolvers)
 
-`solve(prob::LinearProlem,alg;kwargs)`
+`solve(prob::LinearProblem,alg;kwargs)`
 
 Solves for ``Au=b`` in the problem defined by `prob` using the algorithm
 `alg`. If no algorithm is given, a default algorithm will be chosen.
@@ -171,7 +171,7 @@ subroutines from the book "Computer Solution of Large Sparse Positive Definite
 Systems" by Alan George and Joseph Liu. Originally written in Fortran 77, later
 rewritten in Fortran 90. Here is the software translated into Julia.
 The Julia rewrite is released  under the MIT license with an express permission
-from the authors of the Fortran package. The package uses mutiple
+from the authors of the Fortran package. The package uses multiple
 dispatch to route around standard BLAS routines in the case e.g. of arbitrary-precision
 floating point numbers or ForwardDiff.Dual.
 This e.g. allows for Automatic Differentiation (AD) of a sparse-matrix solve.

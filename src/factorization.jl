@@ -332,15 +332,6 @@ function init_cacheval(alg::Union{GenericFactorization, GenericFactorization{typ
 end
 
 # Ambiguity handling dispatch
-# Since code not different than above, let's keep the general one above.
-# function init_cacheval(alg::Union{GenericFactorization, GenericFactorization{typeof(cholesky)},
-#                                   GenericFactorization{typeof(cholesky!)}},
-#                        A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
-#                        maxiters::Int,
-#                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-#     newA = copy(convert(AbstractMatrix, A))
-#     do_factorization(alg, newA, b, u)
-# end
 
 ################################## Factorizations which require solve overloads
 

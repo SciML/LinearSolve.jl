@@ -310,17 +310,6 @@ end
 
 # Fallback, tries to make nonsingular and just factorizes
 # Try to never use it.
-# function init_cacheval(alg::GenericFactorization,
-#                        A, b, u, Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool,
-#                        assumptions::OperatorAssumptions)
-#     newA = copy(convert(AbstractMatrix, A))
-#     if newA isa AbstractSparseMatrix
-#         fill!(nonzeros(newA), true)
-#     else
-#         fill!(newA, true)
-#     end
-#     do_factorization(alg, newA, b, u)
-# end
 
 # Cholesky needs the posdef matrix, for GenericFactorization assume structure is needed
 function init_cacheval(alg::Union{GenericFactorization, GenericFactorization{typeof(cholesky)},

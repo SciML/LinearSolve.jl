@@ -18,8 +18,6 @@ function activate_subpkg_env(subpkg)
     Pkg.instantiate()
 end
 
-@show GROUP, GROUP == "LinearSolvePardiso"
-
 if GROUP == "All" || GROUP == "Core"
     @time @safetestset "Basic Tests" begin include("basictests.jl") end
     @time @safetestset "Zero Initialization Tests" begin include("zeroinittests.jl") end

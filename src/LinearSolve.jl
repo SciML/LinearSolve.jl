@@ -74,9 +74,9 @@ end
 const IS_OPENBLAS = Ref(true)
 isopenblas() = IS_OPENBLAS[]
 
-import SnoopPrecompile
+import PrecompileTools
 
-SnoopPrecompile.@precompile_all_calls begin
+PrecompileTools.@compile_workload begin
     A = rand(4, 4)
     b = rand(4)
     prob = LinearProblem(A, b)
@@ -87,7 +87,7 @@ SnoopPrecompile.@precompile_all_calls begin
 end
 
 @static if INCLUDE_SPARSE
-    SnoopPrecompile.@precompile_all_calls begin
+    PrecompileTools.@compile_workload begin
         A = sprand(4, 4, 0.3) + I
         b = rand(4)
         prob = LinearProblem(A, b)
@@ -96,7 +96,7 @@ end
     end
 end
 
-SnoopPrecompile.@precompile_all_calls begin
+PrecompileTools.@compile_workload begin
     A = sprand(4, 4, 0.3) + I
     b = rand(4)
     prob = LinearProblem(A, b)

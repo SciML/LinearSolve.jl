@@ -176,6 +176,8 @@ dispatch to route around standard BLAS routines in the case e.g. of arbitrary-pr
 floating point numbers or ForwardDiff.Dual.
 This e.g. allows for Automatic Differentiation (AD) of a sparse-matrix solve.
 
+- `SparspakFactorization()`: A Julia-native sparse linear solver.
+
 ### CUDA.jl
 
 Note that `CuArrays` are supported by `GenericFactorization` in the “normal” way.

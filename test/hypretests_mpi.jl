@@ -74,7 +74,7 @@ copy!(local_sol, sol.u)
 
 # Solve after updated b
 _, b = getAb(4.0)
-cache = LinearSolve.set_b(sol.cache, b)
+cache.b = b
 sol = solve(cache)
 @test sol.resid < TOL
 @test sol.iters > 0

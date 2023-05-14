@@ -34,13 +34,12 @@ function test_interface(alg, prob1, prob2)
     cache = SciMLBase.init(prob1, alg; cache_kwargs...) # initialize cache
     sol = solve(cache)
     @test A1 * sol.u ≈ b1
-
-    cache = LinearSolve.set_A(cache, deepcopy(A2))
+    cache.A = deepcopy(A2)
     sol = solve(cache; cache_kwargs...)
     @test A2 * sol.u ≈ b1
 
-    cache = LinearSolve.set_A(cache, A2)
-    cache = LinearSolve.set_b(cache, b2)
+    cache.A = A2
+    cache.b = b2
     sol = solve(cache; cache_kwargs...)
     @test A2 * sol.u ≈ b2
 
@@ -98,10 +97,10 @@ end
         # Test that refactoring is checked and handled.
         cache = SciMLBase.init(prob1, UMFPACKFactorization(); cache_kwargs...) # initialize cache
         y = solve(cache)
-        cache = LinearSolve.set_A(cache, A2)
+        cache.A = A2
         @test A2 * solve(cache) ≈ b1
         X = sprand(n, n, 0.8)
-        cache = LinearSolve.set_A(cache, X)
+        cache.A = X
         @test X * solve(cache) ≈ b1
     end
 
@@ -121,10 +120,10 @@ end
         # Test that refactoring wrong is checked and handled.
         cache = SciMLBase.init(prob1, KLUFactorization(); cache_kwargs...) # initialize cache
         y = solve(cache)
-        cache = LinearSolve.set_A(cache, A2)
+        cache.A = A2
         @test A2 * solve(cache) ≈ b1
         X = sprand(n, n, 0.8)
-        cache = LinearSolve.set_A(cache, X)
+        cache.A = X
         @test X * solve(cache) ≈ b1
     end
 
@@ -331,17 +330,17 @@ end
         prob = LinearProblem(copy(A), copy(b1))
         linsolve = init(prob, UMFPACKFactorization())
         sol11 = solve(linsolve)
-        linsolve = LinearSolve.set_b(sol11.cache, copy(b2))
+        linsolve.b = copy(b2)
         sol12 = solve(linsolve)
-        linsolve = LinearSolve.set_A(sol12.cache, copy(A2))
+        linsolve.A = copy(A2)
         sol13 = solve(linsolve)
 
         prob = LinearProblem(copy(A), copy(b1))
         linsolve = init(prob, KLUFactorization())
         sol21 = solve(linsolve)
-        linsolve = LinearSolve.set_b(sol21.cache, copy(b2))
+        linsolve.b = copy(b2)
         sol22 = solve(linsolve)
-        linsolve = LinearSolve.set_A(sol22.cache, copy(A2))
+        linsolve.A = copy(A2)
         sol23 = solve(linsolve)
 
         @test sol11.u ≈ sol21.u
@@ -363,7 +362,7 @@ end
                 if verbose == true
                     println("out-of-place solve")
                 end
-                u = A \ b
+                u .= A \ b
             end
 
             function sol_func!(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,

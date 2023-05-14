@@ -5,7 +5,7 @@ using HYPRE: HYPRE, HYPREMatrix, HYPRESolver, HYPREVector
 using IterativeSolvers: Identity
 using LinearSolve: HYPREAlgorithm, LinearCache, LinearProblem, LinearSolve,
                    OperatorAssumptions, default_tol, init_cacheval, __issquare,
-                   __conditioning, set_cacheval
+                   __conditioning
 using SciMLBase: LinearProblem, SciMLBase
 using UnPack: @unpack
 using Setfield: @set!
@@ -28,21 +28,22 @@ end
 
 # Overload set_(A|b|u) in order to keep track of "isfresh" for all of them
 const LinearCacheHYPRE = LinearCache{<:Any, <:Any, <:Any, <:Any, <:Any, HYPRECache}
-function LinearSolve.set_A(cache::LinearCacheHYPRE, A)
-    @set! cache.A = A
-    cache.cacheval.isfresh_A = true
-    @set! cache.isfresh = true
-    return cache
-end
-function LinearSolve.set_b(cache::LinearCacheHYPRE, b)
-    @set! cache.b = b
-    cache.cacheval.isfresh_b = true
-    return cache
-end
-function LinearSolve.set_u(cache::LinearCacheHYPRE, u)
-    @set! cache.u = u
-    cache.cacheval.isfresh_u = true
-    return cache
+
+function Base.setproperty!(cache::LinearCacheHYPRE, name::Symbol, x)
+    if name === :A
+        cache.cacheval.isfresh_A = true
+        setfield!(cache, :isfresh, true)
+        return setfield!(cache, name, x isa HYPREMatrix ? x : HYPREMatrix(x))
+    elseif name == :b
+        cache.cacheval.isfresh_b = true
+        setfield!(cache, :isfresh, true)
+        return setfield!(cache, name, x isa HYPREVector ? x : HYPREVector(x))
+    elseif name == :u
+        cache.cacheval.isfresh_u = true
+        setfield!(cache, :isfresh, true)
+        return setfield!(cache, name, x isa HYPREVector ? x : HYPREVector(x))
+    end
+    setfield!(cache, name, x)
 end
 
 # Note:
@@ -69,6 +70,10 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
                         assumptions = OperatorAssumptions(),
                         kwargs...)
     @unpack A, b, u0, p = prob
+
+    A = A isa HYPREMatrix ? A : HYPREMatrix(A)
+    b = b isa HYPREVector ? b : HYPREVector(b)
+    u0 = u0 isa HYPREVector ? u0 : (u0 === nothing ? nothing : HYPREVector(u0))
 
     # Create solution vector/initial guess
     if u0 === nothing
@@ -183,7 +188,8 @@ function SciMLBase.solve(cache::LinearCache, alg::HYPREAlgorithm, args...; kwarg
     end
 
     # Done with cache updates; set it
-    cache = set_cacheval(cache, hcache)
+    cache.cacheval = hcache
+    cache.isfresh = false
 
     # Solve!
     HYPRE.solve!(hcache.solver, hcache.u, hcache.A, hcache.b)

@@ -147,7 +147,8 @@ function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
         solver = init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr,
                                cache.maxiters, cache.abstol, cache.reltol, cache.verbose,
                                cache.assumptions)
-        cache = set_cacheval(cache, solver)
+        cache.cacheval = solver
+        cache.isfresh = false
     end
 
     M = cache.Pl
@@ -268,7 +269,8 @@ function SciMLBase.solve(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
         solver = init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr,
                                cache.maxiters, cache.abstol, cache.reltol, cache.verbose,
                                cache.assumptions)
-        cache = set_cacheval(cache, solver)
+        cache.cacheval = solver
+        cache.isfresh = false
     end
     purge_history!(cache.cacheval, cache.u, cache.b)
 

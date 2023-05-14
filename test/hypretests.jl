@@ -101,7 +101,7 @@ function test_interface(alg; kw...)
         @test A * to_array(y.u)≈b atol=atol rtol=rtol
 
         # Update A
-        cache = LinearSolve.set_A(cache, A)
+        cache.A = A
         @test cache.isfresh == cache.cacheval.isfresh_A == true
         @test cache.cacheval.isfresh_b == cache.cacheval.isfresh_u == false
         y = solve(cache; cache_kwargs...)
@@ -115,7 +115,7 @@ function test_interface(alg; kw...)
         if b isa HYPREVector
             b2 = HYPREVector(b2)
         end
-        cache = LinearSolve.set_b(cache, b2)
+        cache.b = b2
         @test cache.cacheval.isfresh_b
         @test cache.cacheval.isfresh_A == cache.cacheval.isfresh_u == false
         y = solve(cache; cache_kwargs...)

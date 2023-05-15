@@ -605,12 +605,10 @@ struct FastQRFactorization{P} <: AbstractFactorization
 end
 
 function FastQRFactorization()
-    pivot = @static if VERSION < v"1.7beta"
-        Val(false)
-    else
-        NoPivot()
+    if VERSION < v"1.9"
+        error("FastQRFactorization is only supported on v1.9+")
     end
-    FastQRFactorization(pivot, 36) # is 36 or 16 better here? LinearAlgebra and FastLapackInterface use 36,
+    FastQRFactorization(NoPivot, 36) # is 36 or 16 better here? LinearAlgebra and FastLapackInterface use 36,
     # but QRFactorization uses 16.
 end
 

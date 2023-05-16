@@ -176,6 +176,6 @@ function SciMLBase.solve(prob::LinearProblem,
     solve(init(prob, alg, args...; kwargs...))
 end
 
-function SciMLBase.solve(cache::LinearCache, args...; kwargs...)
-    solve(cache, cache.alg, args...; kwargs...)
+function SciMLBase.solve!(cache::LinearCache, args...; kwargs...)
+    solve!(cache, cache.alg, args...; kwargs...)
 end

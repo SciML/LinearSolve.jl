@@ -29,7 +29,7 @@ A = sprandn(1000, 100, 0.1)
 b = randn(1001)
 prob = LinearProblem(A, view(b, 1:1000))
 linsolve = init(prob, QRFactorization())
-solve(linsolve)
+solve!(linsolve)
 
 A = randn(1000, 100)
 b = randn(1000)

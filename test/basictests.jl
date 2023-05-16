@@ -331,19 +331,19 @@ end
 
         prob = LinearProblem(copy(A), copy(b1))
         linsolve = init(prob, UMFPACKFactorization())
-        sol11 = solve(linsolve)
+        sol11 = solve!(linsolve)
         linsolve.b = copy(b2)
-        sol12 = solve(linsolve)
+        sol12 = solve!(linsolve)
         linsolve.A = copy(A2)
-        sol13 = solve(linsolve)
+        sol13 = solve!(linsolve)
 
         prob = LinearProblem(copy(A), copy(b1))
         linsolve = init(prob, KLUFactorization())
-        sol21 = solve(linsolve)
+        sol21 = solve!(linsolve)
         linsolve.b = copy(b2)
-        sol22 = solve(linsolve)
+        sol22 = solve!(linsolve)
         linsolve.A = copy(A2)
-        sol23 = solve(linsolve)
+        sol23 = solve!(linsolve)
 
         @test sol11.u ≈ sol21.u
         @test sol12.u ≈ sol22.u

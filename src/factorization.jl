@@ -6,7 +6,7 @@ function _ldiv!(x::Vector, A::Factorization, b::Vector)
     ldiv!(A, x)
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization; kwargs...)
+function SciMLBase.solve!(cache::LinearCache, alg::AbstractFactorization; kwargs...)
     if cache.isfresh
         fact = do_factorization(alg, cache.A, cache.b, cache.u)
         cache.cacheval = fact
@@ -330,7 +330,7 @@ end
 
 # Ambiguity handling dispatch
 
-################################## Factorizations which require solve overloads
+################################## Factorizations which require solve! overloads
 
 Base.@kwdef struct UMFPACKFactorization <: AbstractFactorization
     reuse_symbolic::Bool = true
@@ -356,7 +356,7 @@ function init_cacheval(alg::UMFPACKFactorization, A, b, u, Pl, Pr, maxiters::Int
     end
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::UMFPACKFactorization; kwargs...)
+function SciMLBase.solve!(cache::LinearCache, alg::UMFPACKFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
@@ -396,7 +396,7 @@ function init_cacheval(alg::KLUFactorization, A, b, u, Pl, Pr, maxiters::Int, ab
                                                 nonzeros(A)))
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::KLUFactorization; kwargs...)
+function SciMLBase.solve!(cache::LinearCache, alg::KLUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
@@ -448,7 +448,7 @@ function init_cacheval(alg::RFLUFactorization, A, b, u, Pl, Pr, maxiters::Int,
     ArrayInterface.lu_instance(convert(AbstractMatrix, A)), ipiv
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::RFLUFactorization{P, T};
+function SciMLBase.solve!(cache::LinearCache, alg::RFLUFactorization{P, T};
                          kwargs...) where {P, T}
     A = cache.A
     A = convert(AbstractMatrix, A)
@@ -488,7 +488,7 @@ function init_cacheval(alg::NormalCholeskyFactorization, A, b, u, Pl, Pr,
     ArrayInterface.cholesky_instance(convert(AbstractMatrix, A), alg.pivot)
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::NormalCholeskyFactorization;
+function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization;
                          kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
@@ -529,7 +529,7 @@ function init_cacheval(alg::NormalBunchKaufmanFactorization, A, b, u, Pl, Pr,
     ArrayInterface.bunchkaufman_instance(convert(AbstractMatrix, A))
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::NormalBunchKaufmanFactorization;
+function SciMLBase.solve!(cache::LinearCache, alg::NormalBunchKaufmanFactorization;
                          kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
@@ -551,7 +551,7 @@ function init_cacheval(alg::DiagonalFactorization, A, b, u, Pl, Pr, maxiters::In
     nothing
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::DiagonalFactorization;
+function SciMLBase.solve!(cache::LinearCache, alg::DiagonalFactorization;
                          kwargs...)
     A = cache.A
     if cache.u isa Vector && cache.b isa Vector
@@ -583,7 +583,7 @@ function init_cacheval(::FastLUFactorization, A, b, u, Pl, Pr,
     return WorkspaceAndFactors(ws, ArrayInterface.lu_instance(convert(AbstractMatrix, A)))
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::FastLUFactorization; kwargs...)
+function SciMLBase.solve!(cache::LinearCache, alg::FastLUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     ws_and_fact = cache.cacheval
@@ -643,7 +643,7 @@ else
     end
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::FastQRFactorization{P};
+function SciMLBase.solve!(cache::LinearCache, alg::FastQRFactorization{P};
                          kwargs...) where {P}
     A = cache.A
     A = convert(AbstractMatrix, A)
@@ -684,7 +684,7 @@ function init_cacheval(::SparspakFactorization, A, b, u, Pl, Pr, maxiters::Int, 
                       factorize = false)
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::SparspakFactorization; kwargs...)
+function SciMLBase.solve!(cache::LinearCache, alg::SparspakFactorization; kwargs...)
     A = cache.A
     if cache.isfresh
         if cache.cacheval !== nothing && alg.reuse_symbolic

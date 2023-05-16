@@ -250,7 +250,7 @@ function SciMLBase.init(prob::LinearProblem, alg::Nothing,
     SciMLBase.init(prob, alg, args...; assumptions, kwargs...)
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::Nothing,
+function SciMLBase.solve!(cache::LinearCache, alg::Nothing,
                          args...; assumptions::OperatorAssumptions = OperatorAssumptions(),
                          kwargs...)
     @unpack A, b = cache

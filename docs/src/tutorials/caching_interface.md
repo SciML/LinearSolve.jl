@@ -35,7 +35,7 @@ sol1 = solve(linsolve)
 
 ```@example linsys2
 linsolve.b = b2
-sol2 = solve(linsolve)
+sol2 = solve!(linsolve)
 
 sol2.u
 ```
@@ -45,7 +45,7 @@ Then refactorization will occur when a new `A` is given:
 ```@example linsys2
 A2 = rand(n, n)
 linsolve.A = A2
-sol3 = solve(linsolve)
+sol3 = solve!(linsolve)
 
 sol3.u
 ```

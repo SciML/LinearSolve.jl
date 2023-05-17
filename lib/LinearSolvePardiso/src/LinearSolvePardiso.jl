@@ -1,5 +1,7 @@
 module LinearSolvePardiso
 
+@warn "LinearSolvePardiso.jl is deprecated and made into an extension package in LinearSolve 2.0. Instead, simply `using Pardiso`. Please see the documentation for more details."
+
 using Pardiso, LinearSolve, SciMLBase
 using SparseArrays
 using SparseArrays: nonzeros, rowvals, getcolptr

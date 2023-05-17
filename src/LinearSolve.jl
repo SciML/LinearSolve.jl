@@ -65,7 +65,7 @@ include("preconditioners.jl")
 include("solve_function.jl")
 include("default.jl")
 include("init.jl")
-include("HYPRE.jl")
+include("extension_algs.jl")
 include("deprecated.jl")
 
 @static if INCLUDE_SPARSE

@@ -55,4 +55,11 @@ function set_cacheval(cache::LinearCache, alg_cache)
     end
 end
 
-@deprecate SciMLBase.solve(cache::LinearCache, args...; kwargs...) SciMLBase.solve!(cache::LinearCache, args...; kwargs...) false
+if VERSION >= v"1.7"
+    @deprecate SciMLBase.solve(cache::LinearCache, args...; kwargs...) SciMLBase.solve!(cache::LinearCache, args...; kwargs...) false
+else
+    function SciMLBase.solve(cache::LinearCache, args...; kwargs...) 
+        @warn "SciMLBase.solve(cache::LinearCache, args...; kwargs...) is deprecated for SciMLBase.solve!(cache::LinearCache, args...; kwargs...) to follow the CommonSolve.jl interface."
+        SciMLBase.solve!(cache::LinearCache, args...; kwargs...)
+    end
+end

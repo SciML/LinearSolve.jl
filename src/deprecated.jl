@@ -55,7 +55,7 @@ function set_cacheval(cache::LinearCache, alg_cache)
     end
 end
 
-if VERSION >= v"1.7"
+@static if VERSION >= v"1.7"
     @deprecate SciMLBase.solve(cache::LinearCache, args...; kwargs...) SciMLBase.solve!(cache::LinearCache, args...; kwargs...) false
 else
     function SciMLBase.solve(cache::LinearCache, args...; kwargs...) 

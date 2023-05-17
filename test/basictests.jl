@@ -32,15 +32,15 @@ function test_interface(alg, prob1, prob2)
     @test A1 * sol.u ≈ b1
 
     cache = SciMLBase.init(prob1, alg; cache_kwargs...) # initialize cache
-    sol = solve(cache)
+    sol = solve!(cache)
     @test A1 * sol.u ≈ b1
     cache.A = deepcopy(A2)
-    sol = solve(cache; cache_kwargs...)
+    sol = solve!(cache; cache_kwargs...)
     @test A2 * sol.u ≈ b1
 
     cache.A = A2
     cache.b = b2
-    sol = solve(cache; cache_kwargs...)
+    sol = solve!(cache; cache_kwargs...)
     @test A2 * sol.u ≈ b2
 
     return
@@ -96,12 +96,12 @@ end
 
         # Test that refactoring is checked and handled.
         cache = SciMLBase.init(prob1, UMFPACKFactorization(); cache_kwargs...) # initialize cache
-        y = solve(cache)
+        y = solve!(cache)
         cache.A = A2
-        @test A2 * solve(cache) ≈ b1
+        @test A2 * solve!(cache) ≈ b1
         X = sprand(n, n, 0.8)
         cache.A = X
-        @test X * solve(cache) ≈ b1
+        @test X * solve!(cache) ≈ b1
     end
 
     @testset "KLU Factorization" begin
@@ -119,12 +119,12 @@ end
 
         # Test that refactoring wrong is checked and handled.
         cache = SciMLBase.init(prob1, KLUFactorization(); cache_kwargs...) # initialize cache
-        y = solve(cache)
+        y = solve!(cache)
         cache.A = A2
-        @test A2 * solve(cache) ≈ b1
+        @test A2 * solve!(cache) ≈ b1
         X = sprand(n, n, 0.8)
         cache.A = X
-        @test X * solve(cache) ≈ b1
+        @test X * solve!(cache) ≈ b1
     end
 
     @testset "Sparspak Factorization (Float64)" begin

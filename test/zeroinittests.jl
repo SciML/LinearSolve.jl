@@ -14,10 +14,10 @@ function test_nonzero_init(alg = nothing)
 
     cache = init(linprob, alg)
     cache.A = Anz
-    sol = solve(cache; cache_kwargs...)
+    sol = solve!(cache; cache_kwargs...)
     @test sol.u == b
     cache.A = C
-    sol = solve(cache; cache_kwargs...)
+    sol = solve!(cache; cache_kwargs...)
     @test sol.u ≈ b
 end
 

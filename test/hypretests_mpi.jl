@@ -45,7 +45,7 @@ const TOL = LinearSolve.default_tol(HYPRE.LibHYPRE.HYPRE_Complex)
 A, b = getAb(1.0)
 alg = HYPREAlgorithm(HYPRE.GMRES)
 prob = LinearProblem(A, b)
-sol = solve(prob, alg)
+sol = solve!(prob, alg)
 @test sol.resid < TOL
 @test sol.iters > 0
 copy!(local_sol, sol.u)
@@ -55,7 +55,7 @@ copy!(local_sol, sol.u)
 A, b = getAb(2.0)
 alg = HYPREAlgorithm(HYPRE.PCG)
 prob = LinearProblem(A, b; u0 = zero(b))
-sol = solve(prob, alg)
+sol = solve!(prob, alg)
 @test sol.resid < TOL
 @test sol.iters > 0
 copy!(local_sol, sol.u)
@@ -66,7 +66,7 @@ A, b = getAb(3.0)
 alg = HYPREAlgorithm(HYPRE.BiCGSTAB)
 prob = LinearProblem(A, b)
 cache = init(prob, alg)
-sol = solve(cache)
+sol = solve!(cache)
 @test sol.resid < TOL
 @test sol.iters > 0
 copy!(local_sol, sol.u)
@@ -75,7 +75,7 @@ copy!(local_sol, sol.u)
 # Solve after updated b
 _, b = getAb(4.0)
 cache.b = b
-sol = solve(cache)
+sol = solve!(cache)
 @test sol.resid < TOL
 @test sol.iters > 0
 copy!(local_sol, sol.u)

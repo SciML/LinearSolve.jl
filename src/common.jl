@@ -167,13 +167,13 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
 end
 
 function SciMLBase.solve(prob::LinearProblem, args...; kwargs...)
-    solve(init(prob, nothing, args...; kwargs...))
+    solve!(init(prob, nothing, args...; kwargs...))
 end
 
 function SciMLBase.solve(prob::LinearProblem,
                          alg::Union{SciMLLinearSolveAlgorithm, Nothing},
                          args...; kwargs...)
-    solve(init(prob, alg, args...; kwargs...))
+    solve!(init(prob, alg, args...; kwargs...))
 end
 
 function SciMLBase.solve!(cache::LinearCache, args...; kwargs...)

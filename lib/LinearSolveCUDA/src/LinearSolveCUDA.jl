@@ -6,7 +6,7 @@ using SciMLBase: AbstractSciMLOperator
 struct CudaOffloadFactorization <: LinearSolve.AbstractFactorization end
 
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadFactorization;
-                         kwargs...)
+                          kwargs...)
     if cache.isfresh
         fact = LinearSolve.do_factorization(alg, CUDA.CuArray(cache.A), cache.b, cache.u)
         cache = LinearSolve.set_cacheval(cache, fact)

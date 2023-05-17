@@ -320,10 +320,11 @@ function init_cacheval(alg::Union{GenericFactorization{typeof(cholesky)},
     do_factorization(alg, newA, b, u)
 end
 
-function init_cacheval(alg::Union{GenericFactorization}, A::Union{Hermitian{T, <:SparseMatrixCSC},
-                       Symmetric{T, <:SparseMatrixCSC}}, b, u, Pl, Pr,
+function init_cacheval(alg::Union{GenericFactorization},
+                       A::Union{Hermitian{T, <:SparseMatrixCSC},
+                                Symmetric{T, <:SparseMatrixCSC}}, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
-                       assumptions::OperatorAssumptions) where T
+                       assumptions::OperatorAssumptions) where {T}
     newA = copy(convert(AbstractMatrix, A))
     do_factorization(alg, newA, b, u)
 end
@@ -449,7 +450,7 @@ function init_cacheval(alg::RFLUFactorization, A, b, u, Pl, Pr, maxiters::Int,
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::RFLUFactorization{P, T};
-                         kwargs...) where {P, T}
+                          kwargs...) where {P, T}
     A = cache.A
     A = convert(AbstractMatrix, A)
     fact, ipiv = cache.cacheval
@@ -489,7 +490,7 @@ function init_cacheval(alg::NormalCholeskyFactorization, A, b, u, Pl, Pr,
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization;
-                         kwargs...)
+                          kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
@@ -530,7 +531,7 @@ function init_cacheval(alg::NormalBunchKaufmanFactorization, A, b, u, Pl, Pr,
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::NormalBunchKaufmanFactorization;
-                         kwargs...)
+                          kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
@@ -552,7 +553,7 @@ function init_cacheval(alg::DiagonalFactorization, A, b, u, Pl, Pr, maxiters::In
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::DiagonalFactorization;
-                         kwargs...)
+                          kwargs...)
     A = cache.A
     if cache.u isa Vector && cache.b isa Vector
         @simd ivdep for i in eachindex(cache.u)
@@ -610,7 +611,7 @@ function FastQRFactorization()
     else
         FastQRFactorization(NoPivot(), 36)
     end
-     # is 36 or 16 better here? LinearAlgebra and FastLapackInterface use 36,
+    # is 36 or 16 better here? LinearAlgebra and FastLapackInterface use 36,
     # but QRFactorization uses 16.
 end
 
@@ -619,32 +620,36 @@ end
                            maxiters::Int, abstol, reltol, verbose::Bool,
                            assumptions::OperatorAssumptions)
         ws = QRWYWs(A; blocksize = alg.blocksize)
-        return WorkspaceAndFactors(ws, ArrayInterface.qr_instance(convert(AbstractMatrix, A)))
+        return WorkspaceAndFactors(ws,
+                                   ArrayInterface.qr_instance(convert(AbstractMatrix, A)))
     end
 
     function init_cacheval(::FastQRFactorization{Val{true}}, A, b, u, Pl, Pr,
                            maxiters::Int, abstol, reltol, verbose::Bool,
                            assumptions::OperatorAssumptions)
         ws = QRpWs(A)
-        return WorkspaceAndFactors(ws, ArrayInterface.qr_instance(convert(AbstractMatrix, A)))
+        return WorkspaceAndFactors(ws,
+                                   ArrayInterface.qr_instance(convert(AbstractMatrix, A)))
     end
 else
     function init_cacheval(alg::FastQRFactorization{NoPivot}, A, b, u, Pl, Pr,
                            maxiters::Int, abstol, reltol, verbose::Bool,
                            assumptions::OperatorAssumptions)
         ws = QRWYWs(A; blocksize = alg.blocksize)
-        return WorkspaceAndFactors(ws, ArrayInterface.qr_instance(convert(AbstractMatrix, A)))
+        return WorkspaceAndFactors(ws,
+                                   ArrayInterface.qr_instance(convert(AbstractMatrix, A)))
     end
     function init_cacheval(::FastQRFactorization{ColumnNorm}, A, b, u, Pl, Pr,
                            maxiters::Int, abstol, reltol, verbose::Bool,
                            assumptions::OperatorAssumptions)
         ws = QRpWs(A)
-        return WorkspaceAndFactors(ws, ArrayInterface.qr_instance(convert(AbstractMatrix, A)))
+        return WorkspaceAndFactors(ws,
+                                   ArrayInterface.qr_instance(convert(AbstractMatrix, A)))
     end
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::FastQRFactorization{P};
-                         kwargs...) where {P}
+                          kwargs...) where {P}
     A = cache.A
     A = convert(AbstractMatrix, A)
     ws_and_fact = cache.cacheval

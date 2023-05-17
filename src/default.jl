@@ -251,8 +251,8 @@ function SciMLBase.init(prob::LinearProblem, alg::Nothing,
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::Nothing,
-                         args...; assumptions::OperatorAssumptions = OperatorAssumptions(),
-                         kwargs...)
+                          args...; assumptions::OperatorAssumptions = OperatorAssumptions(),
+                          kwargs...)
     @unpack A, b = cache
     SciMLBase.solve!(cache, defaultalg(A, b, assumptions), args...; kwargs...)
 end

@@ -1,11 +1,7 @@
 module LinearSolveCUDAExt
 
-@warn "LinearSolveCUDA.jl is deprecated and made into an extension package in LinearSolve 2.0. Instead, simply `using CUDA`. Please see the documentation for more details."
-
 using CUDA, LinearAlgebra, LinearSolve, SciMLBase
 using SciMLBase: AbstractSciMLOperator
-
-struct CudaOffloadFactorization <: LinearSolve.AbstractFactorization end
 
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadFactorization;
                           kwargs...)
@@ -31,7 +27,5 @@ function LinearSolve.do_factorization(alg::CudaOffloadFactorization, A, b, u)
     fact = qr(CUDA.CuArray(A))
     return fact
 end
-
-export CudaOffloadFactorization
 
 end

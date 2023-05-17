@@ -120,6 +120,8 @@ export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
        KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES
 
 export HYPREAlgorithm
+export CudaOffloadFactorization
+export MKLPardisoFactorize, MKLPardisoIterate
 
 export OperatorAssumptions, OperatorCondition
 

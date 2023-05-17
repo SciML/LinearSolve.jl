@@ -30,7 +30,7 @@ b2 = rand(n);
 prob = LinearProblem(A, b1)
 
 linsolve = init(prob)
-sol1 = solve(linsolve)
+sol1 = solve!(linsolve)
 ```
 
 ```@example linsys2

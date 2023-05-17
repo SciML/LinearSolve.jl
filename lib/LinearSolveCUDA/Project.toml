@@ -1,7 +1,7 @@
 name = "LinearSolveCUDA"
 uuid = "0d26bed2-170e-468a-8415-1cfcbba6e180"
 authors = ["SciML"]
-version = "0.1"
+version = "0.1.1"
 
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"

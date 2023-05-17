@@ -1,4 +1,4 @@
-using LinearSolve, LinearSolvePardiso, SparseArrays, Random
+using LinearSolve, Pardiso, SparseArrays, Random
 
 A1 = sparse([1.0 0 -2 3
              0 5 1 2

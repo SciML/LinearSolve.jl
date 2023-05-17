@@ -6,18 +6,6 @@ const GROUP = get(ENV, "GROUP", "All")
 
 const HAS_EXTENSIONS = isdefined(Base, :get_extension)
 
-function dev_subpkg(subpkg)
-    subpkg_path = joinpath(dirname(@__DIR__), "lib", subpkg)
-    Pkg.develop(PackageSpec(path = subpkg_path))
-end
-
-function activate_subpkg_env(subpkg)
-    subpkg_path = joinpath(dirname(@__DIR__), "lib", subpkg)
-    Pkg.activate(subpkg_path)
-    Pkg.develop(PackageSpec(path = subpkg_path))
-    Pkg.instantiate()
-end
-
 if GROUP == "All" || GROUP == "Core"
     @time @safetestset "Basic Tests" begin include("basictests.jl") end
     @time @safetestset "Re-solve" begin include("resolve.jl") end

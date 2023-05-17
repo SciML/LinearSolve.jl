@@ -1,4 +1,4 @@
-module LinearSolvePardiso
+module LinearSolvePardisoExt
 
 @warn "LinearSolvePardiso.jl is deprecated and made into an extension package in LinearSolve 2.0. Instead, simply `using Pardiso`. Please see the documentation for more details."
 

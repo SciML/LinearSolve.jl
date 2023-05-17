@@ -25,7 +25,7 @@ jobs:
         run: julia --project=docs/ --code-coverage=user docs/make.jl
       - uses: julia-actions/julia-processcoverage@v1
         with:
-          directories: src,lib/LinearSolveCUDA/src,lib/LinearSolvePardiso/src
+          directories: src
       - uses: codecov/codecov-action@v3
         with:
           files: lcov.info

@@ -1,0 +1,5 @@
+[deps]
+LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
+Pardiso = "46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"

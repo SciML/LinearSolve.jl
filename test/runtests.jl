@@ -29,13 +29,17 @@ if GROUP == "All" || GROUP == "Core"
 end
 
 if GROUP == "LinearSolveCUDA"
-    dev_subpkg("LinearSolveCUDA")
-    @time @safetestset "CUDA" begin include("../lib/LinearSolveCUDA/test/runtests.jl") end
+    Pkg.activate("gpu")
+    Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
+    Pkg.instantiate()
+    @time @safetestset "CUDA" begin include("gpu/cuda.jl") end
 end
 
 if GROUP == "LinearSolvePardiso"
-    dev_subpkg("LinearSolvePardiso")
-    @time @safetestset "Pardiso" begin include("../lib/LinearSolvePardiso/test/runtests.jl") end
+    Pkg.activate("pardiso")
+    Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
+    Pkg.instantiate()
+    @time @safetestset "Pardiso" begin include("pardiso/pardiso.jl") end
 end
 
 if (GROUP == "All" || GROUP == "LinearSolveHYPRE") && HAS_EXTENSIONS

@@ -49,7 +49,9 @@ UnPack = "1"
 julia = "1.6"
 
 [extensions]
-LinearSolveHYPRE = "HYPRE"
+LinearSolveCUDAExt = "CUDA"
+LinearSolveHYPREExt = "HYPRE"
+LinearSolvePardisoExt = "Pardiso"
 
 [extras]
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
@@ -66,4 +68,6 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 test = ["Test", "InteractiveUtils", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI"]
 
 [weakdeps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 HYPRE = "b5ffcf37-a2bd-41ab-a3da-4bd9bc8ad771"
+Pardiso = "46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2"

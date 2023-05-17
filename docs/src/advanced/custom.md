@@ -11,7 +11,7 @@ user can pass in their custom linear solve function, say `my_linsolve`, to
 ```@example advanced1
 using LinearSolve, LinearAlgebra
 
-function my_linsolve!(u, A, b, p, newA, Pl, Pr, solverdata; verbose = true, kwargs...)
+function my_linsolve(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true, kwargs...)
     if verbose == true
         println("solving Ax=b")
     end

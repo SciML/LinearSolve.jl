@@ -30,14 +30,12 @@ b2 = rand(n);
 prob = LinearProblem(A, b1)
 
 linsolve = init(prob)
-sol1 = solve(linsolve)
-
-sol1.u
+sol1 = solve!(linsolve)
 ```
 
 ```@example linsys2
-linsolve = LinearSolve.set_b(sol1.cache, b2)
-sol2 = solve(linsolve)
+linsolve.b = b2
+sol2 = solve!(linsolve)
 
 sol2.u
 ```
@@ -46,8 +44,8 @@ Then refactorization will occur when a new `A` is given:
 
 ```@example linsys2
 A2 = rand(n, n)
-linsolve = LinearSolve.set_A(sol2.cache, A2)
-sol3 = solve(linsolve)
+linsolve.A = A2
+sol3 = solve!(linsolve)
 
 sol3.u
 ```

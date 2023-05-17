@@ -13,11 +13,11 @@ function test_nonzero_init(alg = nothing)
     linprob = LinearProblem(A, b)
 
     cache = init(linprob, alg)
-    cache = LinearSolve.set_A(cache, Anz)
-    sol = solve(cache; cache_kwargs...)
+    cache.A = Anz
+    sol = solve!(cache; cache_kwargs...)
     @test sol.u == b
-    cache = LinearSolve.set_A(cache, C)
-    sol = solve(cache; cache_kwargs...)
+    cache.A = C
+    sol = solve!(cache; cache_kwargs...)
     @test sol.u ≈ b
 end
 

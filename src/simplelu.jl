@@ -118,13 +118,17 @@ struct SimpleLUFactorization <: AbstractFactorization
     SimpleLUFactorization(pivot = true) = new(pivot)
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::SimpleLUFactorization; kwargs...)
+default_alias_A(::SimpleLUFactorization, ::Any, ::Any) = true
+default_alias_b(::SimpleLUFactorization, ::Any, ::Any) = true
+
+function SciMLBase.solve!(cache::LinearCache, alg::SimpleLUFactorization; kwargs...)
     if cache.isfresh
-        cache.cacheval.A = cache.A
+        cache.cacheval.A .= cache.A
         simplelu_factorize!(cache.cacheval, alg.pivot)
+        cache.isfresh = false
     end
-    cache.cacheval.b = cache.b
-    cache.cacheval.x = cache.u
+    cache.cacheval.b .= cache.b
+    cache.cacheval.x .= cache.u
     y = simplelu_solve!(cache.cacheval)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end

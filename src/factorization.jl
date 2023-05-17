@@ -6,10 +6,11 @@ function _ldiv!(x::Vector, A::Factorization, b::Vector)
     ldiv!(A, x)
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::AbstractFactorization; kwargs...)
+function SciMLBase.solve!(cache::LinearCache, alg::AbstractFactorization; kwargs...)
     if cache.isfresh
         fact = do_factorization(alg, cache.A, cache.b, cache.u)
-        cache = set_cacheval(cache, fact)
+        cache.cacheval = fact
+        cache.isfresh = false
     end
     y = _ldiv!(cache.u, cache.cacheval, cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
@@ -288,8 +289,7 @@ function init_cacheval(alg::GenericFactorization, A::SymTridiagonal{T, V}, b, u,
     LinearAlgebra.LDLt{T, SymTridiagonal{T, V}}(A)
 end
 
-function init_cacheval(alg::Union{GenericFactorization,
-                                  GenericFactorization{typeof(bunchkaufman!)},
+function init_cacheval(alg::Union{GenericFactorization{typeof(bunchkaufman!)},
                                   GenericFactorization{typeof(bunchkaufman)}},
                        A::Union{Hermitian, Symmetric}, b, u, Pl, Pr, maxiters::Int, abstol,
                        reltol, verbose::Bool, assumptions::OperatorAssumptions)
@@ -312,8 +312,7 @@ end
 # Try to never use it.
 
 # Cholesky needs the posdef matrix, for GenericFactorization assume structure is needed
-function init_cacheval(alg::Union{GenericFactorization,
-                                  GenericFactorization{typeof(cholesky)},
+function init_cacheval(alg::Union{GenericFactorization{typeof(cholesky)},
                                   GenericFactorization{typeof(cholesky!)}}, A, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
@@ -321,9 +320,18 @@ function init_cacheval(alg::Union{GenericFactorization,
     do_factorization(alg, newA, b, u)
 end
 
+function init_cacheval(alg::Union{GenericFactorization},
+                       A::Union{Hermitian{T, <:SparseMatrixCSC},
+                                Symmetric{T, <:SparseMatrixCSC}}, b, u, Pl, Pr,
+                       maxiters::Int, abstol, reltol, verbose::Bool,
+                       assumptions::OperatorAssumptions) where {T}
+    newA = copy(convert(AbstractMatrix, A))
+    do_factorization(alg, newA, b, u)
+end
+
 # Ambiguity handling dispatch
 
-################################## Factorizations which require solve overloads
+################################## Factorizations which require solve! overloads
 
 Base.@kwdef struct UMFPACKFactorization <: AbstractFactorization
     reuse_symbolic::Bool = true
@@ -349,7 +357,7 @@ function init_cacheval(alg::UMFPACKFactorization, A, b, u, Pl, Pr, maxiters::Int
     end
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::UMFPACKFactorization; kwargs...)
+function SciMLBase.solve!(cache::LinearCache, alg::UMFPACKFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
@@ -368,7 +376,8 @@ function SciMLBase.solve(cache::LinearCache, alg::UMFPACKFactorization; kwargs..
         else
             fact = lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)))
         end
-        cache = set_cacheval(cache, fact)
+        cache.cacheval = fact
+        cache.isfresh = false
     end
 
     y = ldiv!(cache.u, cache.cacheval, cache.b)
@@ -388,7 +397,7 @@ function init_cacheval(alg::KLUFactorization, A, b, u, Pl, Pr, maxiters::Int, ab
                                                 nonzeros(A)))
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::KLUFactorization; kwargs...)
+function SciMLBase.solve!(cache::LinearCache, alg::KLUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
@@ -416,7 +425,8 @@ function SciMLBase.solve(cache::LinearCache, alg::KLUFactorization; kwargs...)
             fact = KLU.klu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                                            nonzeros(A)))
         end
-        cache = set_cacheval(cache, fact)
+        cache.cacheval = fact
+        cache.isfresh = false
     end
 
     y = ldiv!(cache.u, cache.cacheval, cache.b)
@@ -439,14 +449,15 @@ function init_cacheval(alg::RFLUFactorization, A, b, u, Pl, Pr, maxiters::Int,
     ArrayInterface.lu_instance(convert(AbstractMatrix, A)), ipiv
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::RFLUFactorization{P, T};
-                         kwargs...) where {P, T}
+function SciMLBase.solve!(cache::LinearCache, alg::RFLUFactorization{P, T};
+                          kwargs...) where {P, T}
     A = cache.A
     A = convert(AbstractMatrix, A)
     fact, ipiv = cache.cacheval
     if cache.isfresh
         fact = RecursiveFactorization.lu!(A, ipiv, Val(P), Val(T))
-        cache = set_cacheval(cache, (fact, ipiv))
+        cache.cacheval = (fact, ipiv)
+        cache.isfresh = false
     end
     y = ldiv!(cache.u, cache.cacheval[1], cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
@@ -478,8 +489,8 @@ function init_cacheval(alg::NormalCholeskyFactorization, A, b, u, Pl, Pr,
     ArrayInterface.cholesky_instance(convert(AbstractMatrix, A), alg.pivot)
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::NormalCholeskyFactorization;
-                         kwargs...)
+function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization;
+                          kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
@@ -488,7 +499,8 @@ function SciMLBase.solve(cache::LinearCache, alg::NormalCholeskyFactorization;
         else
             fact = cholesky(Symmetric((A)' * A), alg.pivot)
         end
-        cache = set_cacheval(cache, fact)
+        cache.cacheval = fact
+        cache.isfresh = false
     end
     if A isa SparseMatrixCSC
         cache.u .= cache.cacheval \ (A' * cache.b)
@@ -518,13 +530,14 @@ function init_cacheval(alg::NormalBunchKaufmanFactorization, A, b, u, Pl, Pr,
     ArrayInterface.bunchkaufman_instance(convert(AbstractMatrix, A))
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::NormalBunchKaufmanFactorization;
-                         kwargs...)
+function SciMLBase.solve!(cache::LinearCache, alg::NormalBunchKaufmanFactorization;
+                          kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
         fact = bunchkaufman(Symmetric((A)' * A), alg.rook)
-        cache = set_cacheval(cache, fact)
+        cache.cacheval = fact
+        cache.isfresh = false
     end
     y = ldiv!(cache.u, cache.cacheval, A' * cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
@@ -539,8 +552,8 @@ function init_cacheval(alg::DiagonalFactorization, A, b, u, Pl, Pr, maxiters::In
     nothing
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::DiagonalFactorization;
-                         kwargs...)
+function SciMLBase.solve!(cache::LinearCache, alg::DiagonalFactorization;
+                          kwargs...)
     A = cache.A
     if cache.u isa Vector && cache.b isa Vector
         @simd ivdep for i in eachindex(cache.u)
@@ -568,10 +581,10 @@ function init_cacheval(::FastLUFactorization, A, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
     ws = LUWs(A)
-    return WorkspaceAndFactors(ws, LinearAlgebra.LU(LAPACK.getrf!(ws, A)...))
+    return WorkspaceAndFactors(ws, ArrayInterface.lu_instance(convert(AbstractMatrix, A)))
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::FastLUFactorization; kwargs...)
+function SciMLBase.solve!(cache::LinearCache, alg::FastLUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     ws_and_fact = cache.cacheval
@@ -580,7 +593,8 @@ function SciMLBase.solve(cache::LinearCache, alg::FastLUFactorization; kwargs...
         # it may instead be desirable to resize the workspace.
         @set! ws_and_fact.factors = LinearAlgebra.LU(LAPACK.getrf!(ws_and_fact.workspace,
                                                                    A)...)
-        cache = set_cacheval(cache, ws_and_fact)
+        cache.cacheval = ws_and_fact
+        cache.isfresh = false
     end
     y = ldiv!(cache.u, cache.cacheval.factors, cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
@@ -592,12 +606,12 @@ struct FastQRFactorization{P} <: AbstractFactorization
 end
 
 function FastQRFactorization()
-    pivot = @static if VERSION < v"1.7beta"
-        Val(false)
+    if VERSION < v"1.7beta"
+        FastQRFactorization(Val(false), 36)
     else
-        NoPivot()
+        FastQRFactorization(NoPivot(), 36)
     end
-    FastQRFactorization(pivot, 36) # is 36 or 16 better here? LinearAlgebra and FastLapackInterface use 36,
+    # is 36 or 16 better here? LinearAlgebra and FastLapackInterface use 36,
     # but QRFactorization uses 16.
 end
 
@@ -606,32 +620,36 @@ end
                            maxiters::Int, abstol, reltol, verbose::Bool,
                            assumptions::OperatorAssumptions)
         ws = QRWYWs(A; blocksize = alg.blocksize)
-        return WorkspaceAndFactors(ws, LinearAlgebra.QRCompactWY(LAPACK.geqrt!(ws, A)...))
+        return WorkspaceAndFactors(ws,
+                                   ArrayInterface.qr_instance(convert(AbstractMatrix, A)))
     end
 
     function init_cacheval(::FastQRFactorization{Val{true}}, A, b, u, Pl, Pr,
                            maxiters::Int, abstol, reltol, verbose::Bool,
                            assumptions::OperatorAssumptions)
         ws = QRpWs(A)
-        return WorkspaceAndFactors(ws, LinearAlgebra.QRPivoted(LAPACK.geqp3!(ws, A)...))
+        return WorkspaceAndFactors(ws,
+                                   ArrayInterface.qr_instance(convert(AbstractMatrix, A)))
     end
 else
     function init_cacheval(alg::FastQRFactorization{NoPivot}, A, b, u, Pl, Pr,
                            maxiters::Int, abstol, reltol, verbose::Bool,
                            assumptions::OperatorAssumptions)
         ws = QRWYWs(A; blocksize = alg.blocksize)
-        return WorkspaceAndFactors(ws, LinearAlgebra.QRCompactWY(LAPACK.geqrt!(ws, A)...))
+        return WorkspaceAndFactors(ws,
+                                   ArrayInterface.qr_instance(convert(AbstractMatrix, A)))
     end
     function init_cacheval(::FastQRFactorization{ColumnNorm}, A, b, u, Pl, Pr,
                            maxiters::Int, abstol, reltol, verbose::Bool,
                            assumptions::OperatorAssumptions)
         ws = QRpWs(A)
-        return WorkspaceAndFactors(ws, LinearAlgebra.QRPivoted(LAPACK.geqp3!(ws, A)...))
+        return WorkspaceAndFactors(ws,
+                                   ArrayInterface.qr_instance(convert(AbstractMatrix, A)))
     end
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::FastQRFactorization{P};
-                         kwargs...) where {P}
+function SciMLBase.solve!(cache::LinearCache, alg::FastQRFactorization{P};
+                          kwargs...) where {P}
     A = cache.A
     A = convert(AbstractMatrix, A)
     ws_and_fact = cache.cacheval
@@ -650,7 +668,8 @@ function SciMLBase.solve(cache::LinearCache, alg::FastQRFactorization{P};
             @set! ws_and_fact.factors = LinearAlgebra.QRPivoted(LAPACK.geqp3!(ws_and_fact.workspace,
                                                                               A)...)
         end
-        cache = set_cacheval(cache, ws_and_fact)
+        cache.cacheval = ws_and_fact
+        cache.isfresh = false
     end
     y = ldiv!(cache.u, cache.cacheval.factors, cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
@@ -670,7 +689,7 @@ function init_cacheval(::SparspakFactorization, A, b, u, Pl, Pr, maxiters::Int, 
                       factorize = false)
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::SparspakFactorization; kwargs...)
+function SciMLBase.solve!(cache::LinearCache, alg::SparspakFactorization; kwargs...)
     A = cache.A
     if cache.isfresh
         if cache.cacheval !== nothing && alg.reuse_symbolic
@@ -681,7 +700,8 @@ function SciMLBase.solve(cache::LinearCache, alg::SparspakFactorization; kwargs.
             fact = sparspaklu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                                               nonzeros(A)))
         end
-        cache = set_cacheval(cache, fact)
+        cache.cacheval = fact
+        cache.isfresh = false
     end
     y = ldiv!(cache.u, cache.cacheval, cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)

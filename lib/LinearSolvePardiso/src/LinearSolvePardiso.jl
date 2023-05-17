@@ -84,7 +84,7 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
     the numerical values of the matrix A if IPARM(11)=1 (scaling) or PARM(13)=1 or 2 (matchings).
 
     The numerical values will be incorrect since the analysis is ran once and
-    cached. If these two are not set, then Pardiso.NUM_FACT in the solve must
+    cached. If these two are not set, then Pardiso.NUM_FACT in the solve! must
     be changed to Pardiso.ANALYSIS_NUM_FACT in the solver loop otherwise instabilities
     occur in the example https://github.com/SciML/OrdinaryDiffEq.jl/issues/1569
     =#
@@ -109,13 +109,14 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
     return solver
 end
 
-function SciMLBase.solve(cache::LinearSolve.LinearCache, alg::PardisoJL; kwargs...)
+function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::PardisoJL; kwargs...)
     @unpack A, b, u = cache
     A = convert(AbstractMatrix, A)
 
     if cache.isfresh
         Pardiso.set_phase!(cache.cacheval, Pardiso.NUM_FACT)
         Pardiso.pardiso(cache.cacheval, A, eltype(A)[])
+        cache.isfresh = false
     end
 
     Pardiso.set_phase!(cache.cacheval, Pardiso.SOLVE_ITERATIVE_REFINE)

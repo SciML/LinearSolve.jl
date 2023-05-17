@@ -63,7 +63,7 @@ end
 __issquare(::OperatorAssumptions{issq, condition}) where {issq, condition} = issq
 __conditioning(::OperatorAssumptions{issq, condition}) where {issq, condition} = condition
 
-struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, condition}
+mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, condition}
     A::TA
     b::Tb
     u::Tu
@@ -80,55 +80,11 @@ struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, condition}
     assumptions::OperatorAssumptions{issq, condition}
 end
 
-"""
-$(SIGNATURES)
-"""
-function set_A(cache::LinearCache, A)
-    @set! cache.A = A
-    @set! cache.isfresh = true
-    return cache
-end
-
-"""
-$(SIGNATURES)
-"""
-function set_b(cache::LinearCache, b)
-    @set! cache.b = b
-    return cache
-end
-
-"""
-$(SIGNATURES)
-"""
-function set_u(cache::LinearCache, u)
-    @set! cache.u = u
-    return cache
-end
-
-"""
-$(SIGNATURES)
-"""
-function set_p(cache::LinearCache, p)
-    @set! cache.p = p
-    #   @set! cache.isfresh = true
-    return cache
-end
-
-"""
-$(SIGNATURES)
-"""
-function set_prec(cache, Pl, Pr)
-    @set! cache.Pl = Pl
-    @set! cache.Pr = Pr
-    return cache
-end
-
-function set_cacheval(cache::LinearCache, alg_cache)
-    if cache.isfresh
-        @set! cache.cacheval = alg_cache
-        @set! cache.isfresh = false
+function Base.setproperty!(cache::LinearCache, name::Symbol, x)
+    if name === :A
+        setfield!(cache, :isfresh, true)
     end
-    return cache
+    setfield!(cache, name, x)
 end
 
 init_cacheval(alg::SciMLLinearSolveAlgorithm, args...) = nothing
@@ -211,15 +167,15 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
 end
 
 function SciMLBase.solve(prob::LinearProblem, args...; kwargs...)
-    solve(init(prob, nothing, args...; kwargs...))
+    solve!(init(prob, nothing, args...; kwargs...))
 end
 
 function SciMLBase.solve(prob::LinearProblem,
                          alg::Union{SciMLLinearSolveAlgorithm, Nothing},
                          args...; kwargs...)
-    solve(init(prob, alg, args...; kwargs...))
+    solve!(init(prob, alg, args...; kwargs...))
 end
 
-function SciMLBase.solve(cache::LinearCache, args...; kwargs...)
-    solve(cache, cache.alg, args...; kwargs...)
+function SciMLBase.solve!(cache::LinearCache, args...; kwargs...)
+    solve!(cache, cache.alg, args...; kwargs...)
 end

@@ -32,16 +32,15 @@ function test_interface(alg, prob1, prob2)
     @test A1 * sol.u ≈ b1
 
     cache = SciMLBase.init(prob1, alg; cache_kwargs...) # initialize cache
-    sol = solve(cache)
+    sol = solve!(cache)
     @test A1 * sol.u ≈ b1
-
-    cache = LinearSolve.set_A(cache, deepcopy(A2))
-    sol = solve(cache; cache_kwargs...)
+    cache.A = deepcopy(A2)
+    sol = solve!(cache; cache_kwargs...)
     @test A2 * sol.u ≈ b1
 
-    cache = LinearSolve.set_A(cache, A2)
-    cache = LinearSolve.set_b(cache, b2)
-    sol = solve(cache; cache_kwargs...)
+    cache.A = A2
+    cache.b = b2
+    sol = solve!(cache; cache_kwargs...)
     @test A2 * sol.u ≈ b2
 
     return
@@ -97,12 +96,12 @@ end
 
         # Test that refactoring is checked and handled.
         cache = SciMLBase.init(prob1, UMFPACKFactorization(); cache_kwargs...) # initialize cache
-        y = solve(cache)
-        cache = LinearSolve.set_A(cache, A2)
-        @test A2 * solve(cache) ≈ b1
+        y = solve!(cache)
+        cache.A = A2
+        @test A2 * solve!(cache) ≈ b1
         X = sprand(n, n, 0.8)
-        cache = LinearSolve.set_A(cache, X)
-        @test X * solve(cache) ≈ b1
+        cache.A = X
+        @test X * solve!(cache) ≈ b1
     end
 
     @testset "KLU Factorization" begin
@@ -120,12 +119,12 @@ end
 
         # Test that refactoring wrong is checked and handled.
         cache = SciMLBase.init(prob1, KLUFactorization(); cache_kwargs...) # initialize cache
-        y = solve(cache)
-        cache = LinearSolve.set_A(cache, A2)
-        @test A2 * solve(cache) ≈ b1
+        y = solve!(cache)
+        cache.A = A2
+        @test A2 * solve!(cache) ≈ b1
         X = sprand(n, n, 0.8)
-        cache = LinearSolve.set_A(cache, X)
-        @test X * solve(cache) ≈ b1
+        cache.A = X
+        @test X * solve!(cache) ≈ b1
     end
 
     @testset "Sparspak Factorization (Float64)" begin
@@ -180,22 +179,24 @@ end
         test_interface(SparspakFactorization(), prob1, prob2)
     end
 
-    @testset "FastLAPACK Factorizations" begin
-        A1 = A / 1
-        b1 = rand(n)
-        x1 = zero(b)
-        A2 = A / 2
-        b2 = rand(n)
-        x2 = zero(b)
+    if VERSION >= v"1.9"
+        @testset "FastLAPACK Factorizations" begin
+            A1 = A / 1
+            b1 = rand(n)
+            x1 = zero(b)
+            A2 = A / 2
+            b2 = rand(n)
+            x2 = zero(b)
 
-        prob1 = LinearProblem(A1, b1; u0 = x1)
-        prob2 = LinearProblem(A2, b2; u0 = x2)
-        test_interface(LinearSolve.FastLUFactorization(), prob1, prob2)
-        test_interface(LinearSolve.FastQRFactorization(), prob1, prob2)
+            prob1 = LinearProblem(A1, b1; u0 = x1)
+            prob2 = LinearProblem(A2, b2; u0 = x2)
+            test_interface(LinearSolve.FastLUFactorization(), prob1, prob2)
+            test_interface(LinearSolve.FastQRFactorization(), prob1, prob2)
 
-        # TODO: Resizing tests. Upstream doesn't currently support it.
-        # Need to be absolutely certain we never segfault with incorrect
-        # ws sizes.
+            # TODO: Resizing tests. Upstream doesn't currently support it.
+            # Need to be absolutely certain we never segfault with incorrect
+            # ws sizes.
+        end
     end
 
     @testset "Concrete Factorizations" begin for alg in (LUFactorization(),
@@ -330,19 +331,19 @@ end
 
         prob = LinearProblem(copy(A), copy(b1))
         linsolve = init(prob, UMFPACKFactorization())
-        sol11 = solve(linsolve)
-        linsolve = LinearSolve.set_b(sol11.cache, copy(b2))
-        sol12 = solve(linsolve)
-        linsolve = LinearSolve.set_A(sol12.cache, copy(A2))
-        sol13 = solve(linsolve)
+        sol11 = solve!(linsolve)
+        linsolve.b = copy(b2)
+        sol12 = solve!(linsolve)
+        linsolve.A = copy(A2)
+        sol13 = solve!(linsolve)
 
         prob = LinearProblem(copy(A), copy(b1))
         linsolve = init(prob, KLUFactorization())
-        sol21 = solve(linsolve)
-        linsolve = LinearSolve.set_b(sol21.cache, copy(b2))
-        sol22 = solve(linsolve)
-        linsolve = LinearSolve.set_A(sol22.cache, copy(A2))
-        sol23 = solve(linsolve)
+        sol21 = solve!(linsolve)
+        linsolve.b = copy(b2)
+        sol22 = solve!(linsolve)
+        linsolve.A = copy(A2)
+        sol23 = solve!(linsolve)
 
         @test sol11.u ≈ sol21.u
         @test sol12.u ≈ sol22.u
@@ -363,7 +364,7 @@ end
                 if verbose == true
                     println("out-of-place solve")
                 end
-                u = A \ b
+                u .= A \ b
             end
 
             function sol_func!(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,

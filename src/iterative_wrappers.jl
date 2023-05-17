@@ -142,12 +142,13 @@ function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, re
     return solver
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::KrylovJL; kwargs...)
+function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     if cache.isfresh
         solver = init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr,
                                cache.maxiters, cache.abstol, cache.reltol, cache.verbose,
                                cache.assumptions)
-        cache = set_cacheval(cache, solver)
+        cache.cacheval = solver
+        cache.isfresh = false
     end
 
     M = cache.Pl
@@ -263,12 +264,13 @@ function init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, maxiters::Int, 
     return iterable
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
+function SciMLBase.solve!(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
     if cache.isfresh || !(typeof(alg) <: IterativeSolvers.GMRESIterable)
         solver = init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr,
                                cache.maxiters, cache.abstol, cache.reltol, cache.verbose,
                                cache.assumptions)
-        cache = set_cacheval(cache, solver)
+        cache.cacheval = solver
+        cache.isfresh = false
     end
     purge_history!(cache.cacheval, cache.u, cache.b)
 
@@ -277,7 +279,7 @@ function SciMLBase.solve(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
     for iter in enumerate(cache.cacheval)
         i += 1
         cache.verbose && println("Iter: $(iter[1]), residual: $(iter[2])")
-        # TODO inject callbacks KSP into solve cb!(cache.cacheval)
+        # TODO inject callbacks KSP into solve! cb!(cache.cacheval)
     end
     cache.verbose && println()
 
@@ -329,7 +331,7 @@ function KrylovKitJL_GMRES(args...; kwargs...)
     KrylovKitJL(args...; KrylovAlg = KrylovKit.GMRES, kwargs...)
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::KrylovKitJL; kwargs...)
+function SciMLBase.solve!(cache::LinearCache, alg::KrylovKitJL; kwargs...)
     atol = float(cache.abstol)
     rtol = float(cache.reltol)
     maxiter = cache.maxiters

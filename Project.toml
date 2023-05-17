@@ -54,6 +54,7 @@ LinearSolveHYPRE = "HYPRE"
 [extras]
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 HYPRE = "b5ffcf37-a2bd-41ab-a3da-4bd9bc8ad771"
+InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
 MultiFloats = "bdf0d083-296b-4888-a5b6-7498122e68a5"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
@@ -62,7 +63,7 @@ SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI"]
+test = ["Test", "InteractiveUtils", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI"]
 
 [weakdeps]
 HYPRE = "b5ffcf37-a2bd-41ab-a3da-4bd9bc8ad771"

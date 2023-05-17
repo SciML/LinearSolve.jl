@@ -27,9 +27,9 @@ sol.u
 
 The inputs to the function are as follows:
 
+  - `u`, the solution initialized as `zero(b)`,
   - `A`, the linear operator
   - `b`, the right-hand-side
-  - `u`, the solution initialized as `zero(b)`,
   - `p`, a set of parameters
   - `newA`, a `Bool` which is `true` if `A` has been modified since last solve
   - `Pl`, left-preconditioner
@@ -37,7 +37,7 @@ The inputs to the function are as follows:
   - `solverdata`, solver cache set to `nothing` if solver hasn't been initialized
   - `kwargs`, standard SciML keyword arguments such as `verbose`, `maxiters`, `abstol`, `reltol`
 
-The function `my_linsolve` must accept the above specified arguments, and return
+The function `my_linsolve` must accept the above specified arguments and modify the, and return
 the solution, `u`. As memory for `u` is already allocated, the user may choose
 to modify `u` in place as follows:
 

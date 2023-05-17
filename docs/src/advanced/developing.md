@@ -22,7 +22,7 @@ function init_cacheval(alg::MyLUFactorization, A, b, u, Pl, Pr, maxiters, abstol
     lu!(convert(AbstractMatrix, A))
 end
 
-function SciMLBase.solve(cache::LinearCache, alg::MyLUFactorization; kwargs...)
+function SciMLBase.solve!(cache::LinearCache, alg::MyLUFactorization; kwargs...)
     if cache.isfresh
         A = convert(AbstractMatrix, A)
         fact = lu!(A)

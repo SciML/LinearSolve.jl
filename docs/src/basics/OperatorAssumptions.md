@@ -8,8 +8,8 @@ OperatorCondition
 ## Condition Number Specifications
 
 ```@docs
-IllConditioned
-VeryIllConditioned
-SuperIllConditioned
-WellConditioned
+OperatorCondition.IllConditioned
+OperatorCondition.VeryIllConditioned
+OperatorCondition.SuperIllConditioned
+OperatorCondition.WellConditioned
 ```

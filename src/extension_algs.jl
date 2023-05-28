@@ -45,9 +45,11 @@ struct PardisoJL{T1,T2} <: LinearSolve.SciMLLinearSolveAlgorithm
         if ext === nothing
             error("PardisoJL requires that Pardiso is loaded, i.e. `using Pardiso`")
         else
-            @assert typeof(solver_type) <: Union{Int, Nothing, ext.Pardiso.Solver}
-            @assert typeof(matrix_type) <: Union{Int, Nothing, ext.Pardiso.MatrixType}
-            return new{}(nprocs, solver_type, matrix_type, iparm, dparm)
+            T1 = typeof(solver_type)
+            T2 = typeof(matrix_type)
+            @assert T1 <: Union{Int, Nothing, ext.Pardiso.Solver}
+            @assert T2 <: Union{Int, Nothing, ext.Pardiso.MatrixType}
+            return new{T1, T2}(nprocs, solver_type, matrix_type, iparm, dparm)
         end
     end
 end

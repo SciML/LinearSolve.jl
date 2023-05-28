@@ -55,7 +55,7 @@ copy!(local_sol, sol.u)
 A, b = getAb(2.0)
 alg = HYPREAlgorithm(HYPRE.PCG)
 prob = LinearProblem(A, b; u0 = zero(b))
-sol = solve!(prob, alg)
+sol = solve(prob, alg)
 @test sol.resid < TOL
 @test sol.iters > 0
 copy!(local_sol, sol.u)

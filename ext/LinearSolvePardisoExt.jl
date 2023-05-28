@@ -6,14 +6,6 @@ using SparseArrays: nonzeros, rowvals, getcolptr
 
 using UnPack
 
-Base.@kwdef struct PardisoJL <: LinearSolve.SciMLLinearSolveAlgorithm
-    nprocs::Union{Int, Nothing} = nothing
-    solver_type::Union{Int, Pardiso.Solver, Nothing} = nothing
-    matrix_type::Union{Int, Pardiso.MatrixType, Nothing} = nothing
-    iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing
-    dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing
-end
-
 LinearSolve.needs_concrete_A(alg::PardisoJL) = true
 
 # TODO schur complement functionality

@@ -3,6 +3,7 @@ module LinearSolvePardisoExt
 using Pardiso, LinearSolve, SciMLBase
 using SparseArrays
 using SparseArrays: nonzeros, rowvals, getcolptr
+using LinearSolve: PardisoJL
 
 using UnPack
 

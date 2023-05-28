@@ -158,7 +158,7 @@ function create_solver(alg::HYPREAlgorithm, cache::LinearCache)
 end
 
 # TODO: How are args... and kwargs... supposed to be used here?
-function SciMLBase.solve!(cache::LinearCache, alg::HYPREAlgorithm; kwargs...)
+function SciMLBase.solve!(cache::LinearCache, alg::HYPREAlgorithm, args...; kwargs...)
     # It is possible to reach here without HYPRE.Init() being called if HYPRE structures are
     # only to be created here internally (i.e. when cache.A::SparseMatrixCSC and not a
     # ::HYPREMatrix created externally by the user). Be nice to the user and call it :)

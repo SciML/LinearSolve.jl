@@ -19,7 +19,7 @@ jobs:
           - '1'
           - '1.6'
         include:
-          - version: '^1.9.0-0'
+          - version: '1'
             group: 'LinearSolveHYPRE'
     steps:
       - uses: actions/checkout@v3

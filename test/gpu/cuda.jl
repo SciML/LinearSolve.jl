@@ -1,4 +1,4 @@
-using LinearSolve, LinearSolveCUDA, LinearAlgebra, SparseArrays
+using LinearSolve, CUDA, LinearAlgebra, SparseArrays
 using Test
 
 n = 8

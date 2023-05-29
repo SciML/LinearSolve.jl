@@ -1,23 +1,12 @@
-module LinearSolvePardiso
-
-@warn "LinearSolvePardiso.jl is deprecated and made into an extension package in LinearSolve 2.0. Instead, simply `using Pardiso`. Please see the documentation for more details."
+module LinearSolvePardisoExt
 
 using Pardiso, LinearSolve, SciMLBase
 using SparseArrays
 using SparseArrays: nonzeros, rowvals, getcolptr
+using LinearSolve: PardisoJL
 
 using UnPack
 
-Base.@kwdef struct PardisoJL <: LinearSolve.SciMLLinearSolveAlgorithm
-    nprocs::Union{Int, Nothing} = nothing
-    solver_type::Union{Int, Pardiso.Solver, Nothing} = nothing
-    matrix_type::Union{Int, Pardiso.MatrixType, Nothing} = nothing
-    iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing
-    dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing
-end
-
-MKLPardisoFactorize(; kwargs...) = PardisoJL(; solver_type = 0, kwargs...)
-MKLPardisoIterate(; kwargs...) = PardisoJL(; solver_type = 1, kwargs...)
 LinearSolve.needs_concrete_A(alg::PardisoJL) = true
 
 # TODO schur complement functionality
@@ -128,7 +117,5 @@ end
 
 # Add finalizer to release memory
 # Pardiso.set_phase!(cache.cacheval, Pardiso.RELEASE_ALL)
-
-export PardisoJL, MKLPardisoFactorize, MKLPardisoIterate
 
 end

@@ -126,7 +126,7 @@ be used in a context where that assumption does not hold, set `reuse_symbolic=fa
 
 !!! note
     
-    Using this solver requires adding the package LinearSolvePardiso.jl
+    Using this solver requires adding the package Pardiso.jl, i.e. `using Pardiso`
 
 The following algorithms are pre-specified:
 
@@ -185,7 +185,7 @@ The following are non-standard GPU factorization routines.
 
 !!! note
     
-    Using this solver requires adding the package LinearSolveCUDA.jl
+    Using this solver requires adding the package CUDA.jl, i.e. `using CUDA`
 
   - `CudaOffloadFactorization()`: An offloading technique used to GPU-accelerate CPU-based
     computations. Requires a sufficiently large `A` to overcome the data transfer

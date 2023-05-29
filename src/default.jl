@@ -178,12 +178,7 @@ function defaultalg(A, b, assump::OperatorAssumptions{true})
             elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500)) &&
                    (A === nothing ? eltype(b) <: Union{Float32, Float64} :
                     eltype(A) <: Union{Float32, Float64})
-                pivot = if __conditioning(assump) === OperatorCondition.IllConditioned
-                    Val(true)
-                else
-                    Val(false)
-                end
-                alg = RFLUFactorization(; pivot = pivot)
+                alg = RFLUFactorization()
                 #elseif A === nothing || A isa Matrix
                 #    alg = FastLUFactorization()
             else

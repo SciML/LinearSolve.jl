@@ -89,7 +89,9 @@ customized per-package, details given below describe a subset of important array
         When `A` is sparse, a similar polyalgorithm is used. For indefinite matrices, the `LDLt`
         factorization does not use pivoting during the numerical factorization and therefore the
         procedure can fail even for invertible matrices.
-
+  - CholeskyFactorization
+  - BunchKaufmanFactorization
+  - CHOLMODFactorization
 ### LinearSolve.jl
 
 LinearSolve.jl contains some linear solvers built in.

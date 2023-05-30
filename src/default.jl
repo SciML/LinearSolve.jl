@@ -11,14 +11,18 @@ EnumX.@enumx DefaultAlgorithmChoice begin
     RowMaximumGenericLUFactorization
     RFLUFactorization
     LDLtFactorization
+    BunchKaufmanFactorization
+    CHOLMODFactorization
     SVDFactorization
+    CholeskyFactorization
+    NormalCholeskyFactorization
 end
 
 struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm
     alg::DefaultAlgorithmChoice.T
 end
 
-mutable struct DefaultLinearSolverInit{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13}
+mutable struct DefaultLinearSolverInit{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15,T16,T17}
     LUFactorization::T1
     QRFactorization::T2
     DiagonalFactorization::T3
@@ -31,7 +35,11 @@ mutable struct DefaultLinearSolverInit{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T1
     RowMaximumGenericLUFactorization::T10
     RFLUFactorization::T11
     LDLtFactorization::T12
-    SVDFactorization::T13
+    BunchKaufmanFactorization::T13
+    CHOLMODFactorization::T14
+    SVDFactorization::T15
+    CholeskyFactorization::T16
+    NormalCholeskyFactorization::T17
 end
 
 # Legacy fallback
@@ -48,7 +56,7 @@ function defaultalg(A, b, assump::OperatorAssumptions{Nothing})
     DefaultLinearSolver(defaultalg(A, b, OperatorAssumptions(issq, assump.condition)))
 end
 
-function defaultalg(A::Tridiagonal, b, assump::OperatorAssumptions{true})
+function defaultalg(A::Tridiagonal, b, assump::OperatorAssumptions)
     if assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.LUFactorization)
     else
@@ -69,8 +77,20 @@ function defaultalg(A::Diagonal, b, ::OperatorAssumptions)
     DefaultLinearSolver(DefaultAlgorithmChoice.DiagonalFactorization)
 end
 
+function defaultalg(A::Hermitian, b, ::OperatorAssumptions)
+    DefaultLinearSolver(DefaultAlgorithmChoice.CholeskyFactorization)
+end
+
+function defaultalg(A::Symmetric{<:Number,<:Array}, b, ::OperatorAssumptions)
+    DefaultLinearSolver(DefaultAlgorithmChoice.BunchKaufmanFactorization)
+end
+
+function defaultalg(A::Symmetric{<:Number,<:SparseMatrixCSC}, b, ::OperatorAssumptions)
+    DefaultLinearSolver(DefaultAlgorithmChoice.CHOLMODFactorization)
+end
+
 function defaultalg(A::AbstractSparseMatrixCSC{Tv, Ti}, b,
-                    assump::OperatorAssumptions{true}) where {Tv, Ti}
+                    assump::OperatorAssumptions) where {Tv, Ti}
     if assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.SparspakFactorization)
     else
@@ -80,7 +100,7 @@ end
 
 @static if INCLUDE_SPARSE
     function defaultalg(A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
-                        assump::OperatorAssumptions{true}) where {Ti}
+                        assump::OperatorAssumptions) where {Ti}
         if assump.issq
             if length(b) <= 10_000
                 DefaultLinearSolver(DefaultAlgorithmChoice.KLUFactorization)
@@ -88,7 +108,7 @@ end
                 DefaultLinearSolver(DefaultAlgorithmChoice.UMFPACKFactorization)
             end
         else
-            error("Non-square sparse factorization case not handled")
+            DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
         end
     end
 end
@@ -149,11 +169,11 @@ end
 
 # Allows A === nothing as a stand-in for dense matrix
 function defaultalg(A, b, assump::OperatorAssumptions)
-    if assump.issq
+    alg = if assump.issq
         # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
         # it makes sense according to the benchmarks, which is dependent on
         # whether MKL or OpenBLAS is being used
-        alg = if (A === nothing && !(b isa GPUArraysCore.AbstractGPUArray)) || A isa Matrix
+        if (A === nothing && !(b isa GPUArraysCore.AbstractGPUArray)) || A isa Matrix
             if (A === nothing || eltype(A) <: Union{Float32, Float64, ComplexF32, ComplexF64}) &&
             ArrayInterface.can_setindex(b) &&
             (__conditioning(assump) === OperatorCondition.IllConditioned ||
@@ -188,7 +208,7 @@ function defaultalg(A, b, assump::OperatorAssumptions)
             # This catches the cases where a factorization overload could exist
             # For example, BlockBandedMatrix
         elseif A !== nothing && ArrayInterface.isstructured(A)
-            DefaultAlgorithmChoice.GenericFactorization
+            error("Special factorization not handled in current default algorithm")
 
             # Not factorizable operator, default to only using A*x
         else
@@ -202,6 +222,8 @@ function defaultalg(A, b, assump::OperatorAssumptions)
         DefaultAlgorithmChoice.QRFactorization
     elseif assump.condition === OperatorCondition.SuperIllConditioned
         DefaultAlgorithmChoice.SVDFactorization
+    else
+        error("Special factorization not handled in current default algorithm")
     end
     DefaultLinearSolver(alg)
 end
@@ -233,6 +255,14 @@ function algchoice_to_alg(alg::Symbol)
         GenericLUFactorization()
     elseif alg === :RFLUFactorization
         RFLUFactorization()
+    elseif alg === :BunchKaufmanFactorization
+        BunchKaufmanFactorization()
+    elseif alg === :CHOLMODFactorization
+        CHOLMODFactorization()
+    elseif alg === :CholeskyFactorization
+        CholeskyFactorization()
+    elseif alg === :NormalCholeskyFactorization
+        NormalCholeskyFactorization()
     else
         error("Algorithm choice symbol $alg not allowed in the default")
     end
@@ -316,7 +346,7 @@ end
     end
 end
 
-defaultalg_symbol(::Type{T}) where T = Symbol(SciMLBase.parameterless_type(T))
+defaultalg_symbol(::Type{T}) where T = Symbol(split(string(SciMLBase.parameterless_type(T)), ".")[end])
 defaultalg_symbol(::Type{<:GenericLUFactorization{LinearAlgebra.RowMaximum}}) = :RowMaximumGenericLUFactorization
 defaultalg_symbol(::Type{<:GenericFactorization{typeof(ldlt!)}}) = :LDLtFactorization
 

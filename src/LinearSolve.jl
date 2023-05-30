@@ -111,7 +111,8 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
        NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
        UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization,
-       SparspakFactorization, DiagonalFactorization
+       SparspakFactorization, DiagonalFactorization, CholeskyFactorization,
+       BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization
 
 export LinearSolveFunction, DirectLdiv!
 

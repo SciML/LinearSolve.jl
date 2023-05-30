@@ -405,8 +405,8 @@ end
             prob1 = LinearProblem(op1, b1; u0 = x1)
             prob2 = LinearProblem(op2, b2; u0 = x2)
 
-            @test LinearSolve.defaultalg(op1, x1) isa DirectLdiv!
-            @test LinearSolve.defaultalg(op2, x2) isa DirectLdiv!
+            @test LinearSolve.defaultalg(op1, x1).alg === LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
+            @test LinearSolve.defaultalg(op2, x2).alg === LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
 
             test_interface(DirectLdiv!(), prob1, prob2)
             test_interface(nothing, prob1, prob2)

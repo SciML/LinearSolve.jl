@@ -75,6 +75,14 @@ function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization}, A, b
     ArrayInterface.lu_instance(convert(AbstractMatrix, A))
 end
 
+const PREALLOCATED_LU = ArrayInterface.lu_instance(rand(1,1))
+
+function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization}, A::Matrix{Float64}, b, u, Pl, Pr,
+    maxiters::Int, abstol, reltol, verbose::Bool,
+    assumptions::OperatorAssumptions)
+    PREALLOCATED_LU
+end
+
 ## QRFactorization
 
 struct QRFactorization{P} <: AbstractFactorization
@@ -106,6 +114,14 @@ function init_cacheval(alg::QRFactorization, A, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
     ArrayInterface.qr_instance(convert(AbstractMatrix, A))
+end
+
+const PREALLOCATED_QR = ArrayInterface.qr_instance(rand(1,1))
+
+function init_cacheval(alg::QRFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
+    maxiters::Int, abstol, reltol, verbose::Bool,
+    assumptions::OperatorAssumptions)
+    PREALLOCATED_QR
 end
 
 ## LDLtFactorization
@@ -160,6 +176,14 @@ function init_cacheval(alg::SVDFactorization, A, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
     ArrayInterface.svd_instance(convert(AbstractMatrix, A))
+end
+
+const PREALLOCATED_SVD = ArrayInterface.svd_instance(rand(1,1))
+
+function init_cacheval(alg::SVDFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
+    maxiters::Int, abstol, reltol, verbose::Bool,
+    assumptions::OperatorAssumptions)
+    PREALLOCATED_SVD
 end
 
 ## GenericFactorization
@@ -536,6 +560,17 @@ function init_cacheval(alg::RFLUFactorization, A, b, u, Pl, Pr, maxiters::Int,
     ArrayInterface.lu_instance(convert(AbstractMatrix, A)), ipiv
 end
 
+function init_cacheval(alg::RFLUFactorization, A::Matrix{Float64}, b, u, Pl, Pr, maxiters::Int,
+                       abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
+    PREALLOCATED_LU, ipiv
+end
+
+function init_cacheval(alg::RFLUFactorization, A::AbstractSparseArray, b, u, Pl, Pr, maxiters::Int,
+    abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing,nothing
+end
+
 function SciMLBase.solve!(cache::LinearCache, alg::RFLUFactorization{P, T};
                           kwargs...) where {P, T}
     A = cache.A
@@ -770,7 +805,7 @@ end
 
 const PREALLOCATED_SPARSEPAK = sparspaklu(SparseMatrixCSC(0,0, [1], Int64[], Float64[]), factorize = false)
 
-function init_cacheval(alg::KLUFactorization, A::Union{Matrix,Nothing}, b, u, Pl, Pr, 
+function init_cacheval(alg::SparspakFactorization, A::Union{Matrix,Nothing}, b, u, Pl, Pr, 
     maxiters::Int, abstol, reltol,
     verbose::Bool, assumptions::OperatorAssumptions)
     nothing

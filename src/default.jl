@@ -267,9 +267,25 @@ cache.cacheval = NamedTuple(LUFactorization = cache of LUFactorization, ...)
 """
 @generated function init_cacheval(alg::DefaultLinearSolver, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
                        verbose::Bool, assump::OperatorAssumptions)
-    caches = [:(init_cacheval($(algchoice_to_alg(alg)), A, b, u, Pl, Pr, maxiters, abstol, reltol,
-                verbose,
-                assump)) for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))]
+    caches = map(first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))) do alg
+        if alg === :KrylovJL_GMRES
+            quote
+                if A isa Matrix || A isa SparseMatrixCSC
+                    nothing
+                else
+                    init_cacheval($(algchoice_to_alg(alg)), A, b, u, Pl, Pr, maxiters, abstol, reltol,
+                            verbose,
+                            assump)
+                end
+            end
+        else
+            quote
+                init_cacheval($(algchoice_to_alg(alg)), A, b, u, Pl, Pr, maxiters, abstol, reltol,
+                        verbose,
+                        assump)
+            end
+        end
+    end
     Expr(:call,:DefaultLinearSolverInit, caches...)
 end
 

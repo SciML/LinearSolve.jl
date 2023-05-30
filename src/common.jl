@@ -53,17 +53,19 @@ end
 
 Sets the operator `A` assumptions used as part of the default algorithm
 """
-struct OperatorAssumptions{issq, condition} end
+struct OperatorAssumptions{T}
+    issq::T
+    condition::OperatorCondition.T
+end
+
 function OperatorAssumptions(issquare = nothing;
                              condition::OperatorCondition.T = OperatorCondition.IllConditioned)
-    issq = something(_unwrap_val(issquare), Nothing)
-    condition = _unwrap_val(condition)
-    OperatorAssumptions{issq, condition}()
+    OperatorAssumptions{typeof(issquare)}(issquare, condition)
 end
-__issquare(::OperatorAssumptions{issq, condition}) where {issq, condition} = issq
-__conditioning(::OperatorAssumptions{issq, condition}) where {issq, condition} = condition
+__issquare(assump::OperatorAssumptions) = assump.issq
+__conditioning(assump::OperatorAssumptions) = assump.condition
 
-mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, condition}
+mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq}
     A::TA
     b::Tb
     u::Tu
@@ -77,7 +79,7 @@ mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, conditi
     reltol::Ttol
     maxiters::Int
     verbose::Bool
-    assumptions::OperatorAssumptions{issq, condition}
+    assumptions::OperatorAssumptions{issq}
 end
 
 function Base.setproperty!(cache::LinearCache, name::Symbol, x)
@@ -150,8 +152,7 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
                         typeof(Pl),
                         typeof(Pr),
                         typeof(reltol),
-                        __issquare(assumptions),
-                        __conditioning(assumptions)
+                        typeof(assumptions.issq),
                         }(A,
                           b,
                           u0,

@@ -83,6 +83,9 @@ end
 function Base.setproperty!(cache::LinearCache, name::Symbol, x)
     if name === :A
         setfield!(cache, :isfresh, true)
+    elseif name === :cacheval && cache.alg isa DefaultLinearSolver
+        @assert cache.cacheval isa DefaultLinearSolverInit
+        return setfield!(cache.cacheval, Symbol(cache.alg.alg), x)
     end
     setfield!(cache, name, x)
 end

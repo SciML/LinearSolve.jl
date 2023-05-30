@@ -1,7 +1,3 @@
-struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm
-    alg::DefaultAlgorithmChoice
-end
-
 EnumX.@enumx DefaultAlgorithmChoice begin
     LUFactorization
     QRFactorization
@@ -14,9 +10,28 @@ EnumX.@enumx DefaultAlgorithmChoice begin
     GenericLUFactorization
     RowMaximumGenericLUFactorization
     RFLUFactorization
-    PivotedRFLUFactorization
     LDLtFactorization
     SVDFactorization
+end
+
+struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm
+    alg::DefaultAlgorithmChoice.T
+end
+
+mutable struct DefaultLinearSolverInit{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13}
+    LUFactorization::T1
+    QRFactorization::T2
+    DiagonalFactorization::T3
+    DirectLdiv!::T4
+    SparspakFactorization::T5
+    KLUFactorization::T6
+    UMFPACKFactorization::T7
+    KrylovJL_GMRES::T8
+    GenericLUFactorization::T9
+    RowMaximumGenericLUFactorization::T10
+    RFLUFactorization::T11
+    LDLtFactorization::T12
+    SVDFactorization::T13
 end
 
 # Legacy fallback
@@ -50,95 +65,95 @@ function defaultalg(A, b, ::OperatorAssumptions{Nothing})
 end
 
 function defaultalg(A::Tridiagonal, b, ::OperatorAssumptions{true})
-    DefaultAlgorithmChoice.LUFactorization
+    DefaultLinearSolver(DefaultAlgorithmChoice.LUFactorization)
 end
 function defaultalg(A::Tridiagonal, b, ::OperatorAssumptions{false})
-    DefaultAlgorithmChoice.QRFactorization
+    DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
 end
 function defaultalg(A::SymTridiagonal, b, ::OperatorAssumptions{true})
-    DefaultAlgorithmChoice.LDLtFactorization
+    DefaultLinearSolver(DefaultAlgorithmChoice.LDLtFactorization)
 end
 function defaultalg(A::Bidiagonal, b, ::OperatorAssumptions{true})
-    DefaultAlgorithmChoice.DirectLdiv!
+    DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
 end
 function defaultalg(A::Factorization, b, ::OperatorAssumptions{true})
-    DefaultAlgorithmChoice.DirectLdiv!
+    DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
 end
 function defaultalg(A::Diagonal, b, ::OperatorAssumptions{true})
-    DefaultAlgorithmChoice.DiagonalFactorization
+    DefaultLinearSolver(DefaultAlgorithmChoice.DiagonalFactorization)
 end
 function defaultalg(A::Diagonal, b, ::OperatorAssumptions{Nothing})
-    DefaultAlgorithmChoice.DiagonalFactorization
+    DefaultLinearSolver(DefaultAlgorithmChoice.DiagonalFactorization)
 end
 
 function defaultalg(A::AbstractSparseMatrixCSC{Tv, Ti}, b,
                     ::OperatorAssumptions{true}) where {Tv, Ti}
-    DefaultAlgorithmChoice.SparspakFactorization
+                    DefaultLinearSolver(DefaultAlgorithmChoice.SparspakFactorization)
 end
 
 @static if INCLUDE_SPARSE
     function defaultalg(A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
                         ::OperatorAssumptions{true}) where {Ti}
         if length(b) <= 10_000
-            DefaultAlgorithmChoice.KLUFactorization
+            DefaultLinearSolver(DefaultAlgorithmChoice.KLUFactorization)
         else
-            DefaultAlgorithmChoice.UMFPACKFactorization
+            DefaultLinearSolver(DefaultAlgorithmChoice.UMFPACKFactorization)
         end
     end
 end
 
 function defaultalg(A::GPUArraysCore.AbstractGPUArray, b, assump::OperatorAssumptions{true})
     if VERSION >= v"1.8-"
-        DefaultAlgorithmChoice.LUFactorization
+        DefaultLinearSolver(DefaultAlgorithmChoice.LUFactorization)
     else
-        DefaultAlgorithmChoice.QRFactorization
+        DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
     end
 end
 
 function defaultalg(A::GPUArraysCore.AbstractGPUArray, b,
                     assump::OperatorAssumptions{true, OperatorCondition.IllConditioned})
-    DefaultAlgorithmChoice.QRFactorization
+                    DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
 end
 
 function defaultalg(A, b::GPUArraysCore.AbstractGPUArray, assump::OperatorAssumptions{true})
     if VERSION >= v"1.8-"
-        DefaultAlgorithmChoice.LUFactorization
+        DefaultLinearSolver(DefaultAlgorithmChoice.LUFactorization)
     else
-        DefaultAlgorithmChoice.QRFactorization
+        DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
     end
 end
 
 function defaultalg(A, b::GPUArraysCore.AbstractGPUArray,
                     assump::OperatorAssumptions{true, OperatorCondition.IllConditioned})
-    DefaultAlgorithmChoice.QRFactorization
+                    DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
 end
 
 function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
                     assumptions::OperatorAssumptions{true})
     if has_ldiv!(A)
-        return DefaultAlgorithmChoice.DirectLdiv!
+        return DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
     end
 
-    DefaultAlgorithmChoice.KrylovJL_GMRES
+    DefaultLinearSolver( DefaultAlgorithmChoice.KrylovJL_GMRES)
 end
 
 # Ambiguity handling
 function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
                     assumptions::OperatorAssumptions{Nothing})
     if has_ldiv!(A)
-        return DefaultAlgorithmChoice.DirectLdiv!
+        return DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
     end
 
-    DefaultAlgorithmChoice.KrylovJL_GMRES
+    DefaultLinearSolver(DefaultAlgorithmChoice.KrylovJL_GMRES)
 end
 
 function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
                     assumptions::OperatorAssumptions{false})
     m, n = size(A)
     if m < n
-        DefaultAlgorithmChoice.KrylovJL_CRAIGMR
+        DefaultLinearSolver(DefaultAlgorithmChoice.KrylovJL_CRAIGMR)
     else
-        DefaultAlgorithmChoice.KrylovJL_LSMR
+        DefaultLinearSolver(DefaultAlgorithmChoice.KrylovJL_LSMR)
     end
 end
 
@@ -146,29 +161,29 @@ end
 function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.AbstractGPUArray,
                     ::OperatorAssumptions{true})
     if VERSION >= v"1.8-"
-        DefaultAlgorithmChoice.LUFactorization
+       DefaultLinearSolver( DefaultAlgorithmChoice.LUFactorization)
     else
-        DefaultAlgorithmChoice.QRFactorization
+        DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
     end
 end
 
 function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.AbstractGPUArray,
                     ::OperatorAssumptions{true, OperatorCondition.IllConditioned})
-    DefaultAlgorithmChoice.QRFactorization
+                    DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
 end
 
 function defaultalg(A::GPUArraysCore.AbstractGPUArray, b, ::OperatorAssumptions{false})
-    DefaultAlgorithmChoice.QRFactorization
+    DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
 end
 
 function defaultalg(A, b::GPUArraysCore.AbstractGPUArray, ::OperatorAssumptions{false})
-    DefaultAlgorithmChoice.QRFactorization
+    DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
 end
 
 # Handle ambiguity
 function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.AbstractGPUArray,
                     ::OperatorAssumptions{false})
-    DefaultAlgorithmChoice.QRFactorization
+                    DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
 end
 
 # Allows A === nothing as a stand-in for dense matrix
@@ -217,25 +232,58 @@ function defaultalg(A, b, assump::OperatorAssumptions{true})
     else
         alg = DefaultAlgorithmChoice.KrylovJL_GMRES
     end
-    alg
+    DefaultLinearSolver(alg)
 end
 
 function defaultalg(A, b, ::OperatorAssumptions{false, OperatorCondition.WellConditioned})
-    DefaultAlgorithmChoice.NormalCholeskyFactorization
+    DefaultLinearSolver(DefaultAlgorithmChoice.NormalCholeskyFactorization)
 end
 
 function defaultalg(A, b, ::OperatorAssumptions{false, OperatorCondition.IllConditioned})
-    DefaultAlgorithmChoice.QRFactorization
+    DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
 end
 
 function defaultalg(A, b,
                     ::OperatorAssumptions{false, OperatorCondition.VeryIllConditioned})
-    DefaultAlgorithmChoice.QRFactorization
+                    DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
 end
 
 function defaultalg(A, b,
                     ::OperatorAssumptions{false, OperatorCondition.SuperIllConditioned})
-    DefaultAlgorithmChoice.SVDFactorization
+                    DefaultLinearSolver(DefaultAlgorithmChoice.SVDFactorization)
+end
+
+function algchoice_to_alg(alg::Symbol)
+    if alg === :SVDFactorization
+        SVDFactorization(false, LinearAlgebra.QRIteration())
+    elseif alg === :RowMaximumGenericLUFactorization
+        GenericLUFactorization(RowMaximum())
+    elseif alg === :LDLtFactorization
+        GenericFactorization()
+        #GenericFactorization(; fact_alg = ldlt!)
+    elseif alg === :LUFactorization
+        LUFactorization()
+    elseif alg === :QRFactorization
+        QRFactorization()
+    elseif alg === :DiagonalFactorization
+        DiagonalFactorization()
+    elseif alg === :DirectLdiv!
+        DirectLdiv!()
+    elseif alg === :SparspakFactorization
+        SparspakFactorization()
+    elseif alg === :KLUFactorization
+        KLUFactorization()
+    elseif alg === :UMFPACKFactorization
+        UMFPACKFactorization()
+    elseif alg === :KrylovJL_GMRES
+        KrylovJL_GMRES()
+    elseif alg === :GenericLUFactorization
+        GenericLUFactorization()
+    elseif alg === :RFLUFactorization
+        RFLUFactorization()
+    else
+        error("Algorithm choice symbol $alg not allowed in the default")
+    end
 end
 
 ## Catch high level interface
@@ -267,40 +315,43 @@ cache.cacheval = NamedTuple(LUFactorization = cache of LUFactorization, ...)
 """
 @generated function init_cacheval(alg::DefaultLinearSolver, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
-    caches = [$alg = :(init_cacheval($alg(), A, b, u, Pl, Pr, maxiters, abstol, reltol,
+    caches = [:(init_cacheval($(algchoice_to_alg(alg)), A, b, u, Pl, Pr, maxiters, abstol, reltol,
                 verbose,
                 assumptions)) for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))]
-    quote
-        return NamedTuple($caches...)
-    end
+    Expr(:call,:DefaultLinearSolverInit, caches...)
 end
 
 """
-if cache.alg.alg === DefaultAlgorithmChoice.LUFactorization
-    cache.cacheval[LUFactorization]
+if algsym === :LUFactorization
+    cache.cacheval.LUFactorization = ...
 else
     ...
 end
 """
-@generated function get_cacheval(cache::LinearCache)
+@generated function get_cacheval(cache::LinearCache, algsym::Symbol)
     ex = :()
     for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))
-        ex = if expr === :()
-            Expr(:elseif, :(cache.alg.alg === $alg),:(cache.cacheval[$alg]))
+        ex = if ex === :()
+            Expr(:elseif, :(algsym === $(Meta.quot(alg))),:(getfield(cache.cacheval,$(Meta.quot(alg)))))
         else
-            Expr(:elseif, :(cache.alg.alg === $alg),:(cache.cacheval[$alg]),ex)
+            Expr(:elseif, :(algsym === $(Meta.quot(alg))),:(getfield(cache.cacheval, $(Meta.quot(alg)))),ex)
         end
     end
     ex = Expr(:if,ex.args...)
 
     quote
-        if cache.alg === DefaultLinearSolver
+        @show algsym
+        if cache.alg isa DefaultLinearSolver
             $ex
         else
             cache.cacheval
         end
     end
 end
+
+defaultalg_symbol(::Type{T}) where T = Symbol(SciMLBase.parameterless_type(T))
+defaultalg_symbol(::Type{<:GenericLUFactorization{LinearAlgebra.RowMaximum}}) = :RowMaximumGenericLUFactorization
+defaultalg_symbol(::Type{<:GenericFactorization{typeof(ldlt!)}}) = :LDLtFactorization
 
 """
 if alg.alg === DefaultAlgorithmChoice.LUFactorization
@@ -309,17 +360,22 @@ else
     ...
 end
 """
-function SciMLBase.solve!(cache::LinearCache, alg::DefaultLinearSolver,
+@generated function SciMLBase.solve!(cache::LinearCache, alg::DefaultLinearSolver,
                           args...; assumptions::OperatorAssumptions = OperatorAssumptions(),
                           kwargs...)
     ex = :()
     for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))
-        ex = if expr === :()
-            Expr(:elseif, :(alg.alg === $alg),:(SciMLBase.solve!(cache, $alg(), args...; kwargs...)))
+        newex = quote
+            sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
+            SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
+                               retcode = sol.retcode,
+                               iters = sol.iters, stats = sol.stats)
+        end
+        ex = if ex === :()
+            Expr(:elseif, :(Symbol(alg.alg) === $(Meta.quot(alg))), newex)
         else
-            Expr(:elseif, :(alg.alg === $alg),:(SciMLBase.solve!(cache, $alg(), args...; kwargs...)),ex)
+            Expr(:elseif, :(Symbol(alg.alg) === $(Meta.quot(alg))), newex,ex)
         end
     end
     ex = Expr(:if,ex.args...)          
-    
 end

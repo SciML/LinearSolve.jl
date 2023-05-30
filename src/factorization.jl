@@ -6,14 +6,16 @@ function _ldiv!(x::Vector, A::Factorization, b::Vector)
     ldiv!(A, x)
 end
 
-function SciMLBase.solve!(cache::LinearCache, alg::AbstractFactorization; kwargs...)
-    if cache.isfresh
-        fact = do_factorization(alg, cache.A, cache.b, cache.u)
-        cache.cacheval = fact
-        cache.isfresh = false
+@generated function SciMLBase.solve!(cache::LinearCache, alg::AbstractFactorization; kwargs...)
+    quote
+        if cache.isfresh
+            fact = do_factorization(alg, cache.A, cache.b, cache.u)
+            cache.cacheval = fact
+            cache.isfresh = false
+        end
+        y = _ldiv!(cache.u, get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))), cache.b)
+        SciMLBase.build_linear_solution(alg, y, nothing, cache)
     end
-    y = _ldiv!(cache.u, cache.cacheval, cache.b)
-    SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
 #RF Bad fallback: will fail if `A` is just a stand-in
@@ -342,18 +344,32 @@ function init_cacheval(alg::UMFPACKFactorization, A, b, u, Pl, Pr, maxiters::Int
                        reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
     A = convert(AbstractMatrix, A)
-    zerobased = SparseArrays.getcolptr(A)[1] == 0
-    @static if VERSION < v"1.9.0-DEV.1622"
-        return SuiteSparse.UMFPACK.UmfpackLU(C_NULL, C_NULL, size(A, 1), size(A, 2),
-                                             zerobased ? copy(SparseArrays.getcolptr(A)) :
-                                             SuiteSparse.decrement(SparseArrays.getcolptr(A)),
-                                             zerobased ? copy(rowvals(A)) :
-                                             SuiteSparse.decrement(rowvals(A)),
-                                             copy(nonzeros(A)), 0)
-        finalizer(SuiteSparse.UMFPACK.umfpack_free_symbolic, res)
+
+    if typeof(A) <: SparseArrays.AbstractSparseArray
+        zerobased = SparseArrays.getcolptr(A)[1] == 0
+        @static if VERSION < v"1.9.0-DEV.1622"
+            res = SuiteSparse.UMFPACK.UmfpackLU(C_NULL, C_NULL, size(A, 1), size(A, 2),
+                                                 zerobased ? copy(SparseArrays.getcolptr(A)) :
+                                                 SuiteSparse.decrement(SparseArrays.getcolptr(A)),
+                                                 zerobased ? copy(rowvals(A)) :
+                                                 SuiteSparse.decrement(rowvals(A)),
+                                                 copy(nonzeros(A)), 0)
+            finalizer(SuiteSparse.UMFPACK.umfpack_free_symbolic, res)
+            return res
+        else
+            return SuiteSparse.UMFPACK.UmfpackLU(SparseMatrixCSC(size(A)..., getcolptr(A),
+                                                                 rowvals(A), nonzeros(A)))
+        end
+
     else
-        return SuiteSparse.UMFPACK.UmfpackLU(SparseMatrixCSC(size(A)..., getcolptr(A),
-                                                             rowvals(A), nonzeros(A)))
+        @static if VERSION < v"1.9.0-DEV.1622"
+            res = SuiteSparse.UMFPACK.UmfpackLU(C_NULL, C_NULL, 0, 0,
+                                                 [0], Int64[], eltype(A)[], 0)
+            finalizer(SuiteSparse.UMFPACK.umfpack_free_symbolic, res)
+            return res
+        else
+            return SuiteSparse.UMFPACK.UmfpackLU(SparseMatrixCSC(0,0, [1], Int64[], eltype(A)[]))
+        end
     end
 end
 
@@ -369,7 +385,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::UMFPACKFactorization; kwargs.
                 fact = lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                                           nonzeros(A)))
             else
-                fact = lu!(cache.cacheval,
+                fact = lu!(get_cacheval(cache, :UMFPACKFactorization),
                            SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                                            nonzeros(A)))
             end
@@ -380,7 +396,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::UMFPACKFactorization; kwargs.
         cache.isfresh = false
     end
 
-    y = ldiv!(cache.u, cache.cacheval, cache.b)
+    y = ldiv!(cache.u, get_cacheval(cache, :UMFPACKFactorization), cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
@@ -393,8 +409,12 @@ function init_cacheval(alg::KLUFactorization, A, b, u, Pl, Pr, maxiters::Int, ab
                        reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
     A = convert(AbstractMatrix, A)
-    return KLU.KLUFactorization(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                                                nonzeros(A)))
+    if typeof(A) <: SparseArrays.AbstractSparseArray
+        return KLU.KLUFactorization(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
+        nonzeros(A)))
+    else
+        return KLU.KLUFactorization(SparseMatrixCSC(0,0, [1], Int64[], eltype(A)[]))
+    end
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::KLUFactorization; kwargs...)
@@ -415,7 +435,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KLUFactorization; kwargs...)
                 if cache.cacheval._numeric === C_NULL # We MUST have a numeric factorization for reuse, unlike UMFPACK.
                     KLU.klu_factor!(cache.cacheval)
                 end
-                fact = KLU.klu!(cache.cacheval,
+                fact = KLU.klu!(get_cacheval(cache, :KLUFactorization),
                                 SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                                                 nonzeros(A)))
             end
@@ -429,7 +449,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KLUFactorization; kwargs...)
         cache.isfresh = false
     end
 
-    y = ldiv!(cache.u, cache.cacheval, cache.b)
+    y = ldiv!(cache.u, get_cacheval(cache, :KLUFactorization), cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
@@ -506,7 +526,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization;
         cache.u .= cache.cacheval \ (A' * cache.b)
         y = cache.u
     else
-        y = ldiv!(cache.u, cache.cacheval, A' * cache.b)
+        y = ldiv!(cache.u, get_cacheval(cache, :NormalCholeskyFactorization), A' * cache.b)
     end
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
@@ -539,7 +559,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::NormalBunchKaufmanFactorizati
         cache.cacheval = fact
         cache.isfresh = false
     end
-    y = ldiv!(cache.u, cache.cacheval, A' * cache.b)
+    y = ldiv!(cache.u, get_cacheval(cache, :NormalBunchKaufmanFactorization), A' * cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
@@ -685,15 +705,20 @@ function init_cacheval(::SparspakFactorization, A, b, u, Pl, Pr, maxiters::Int, 
                        reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
     A = convert(AbstractMatrix, A)
-    return sparspaklu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
-                      factorize = false)
+    if typeof(A) <: SparseArrays.AbstractSparseArray
+        return sparspaklu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
+        factorize = false)
+    else
+        return sparspaklu(SparseMatrixCSC(0,0, [1], Int64[], eltype(A)[]),
+        factorize = false)
+    end
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::SparspakFactorization; kwargs...)
     A = cache.A
     if cache.isfresh
         if cache.cacheval !== nothing && alg.reuse_symbolic
-            fact = sparspaklu!(cache.cacheval,
+            fact = sparspaklu!(get_cacheval(cache, :SparspakFactorization),
                                SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                                                nonzeros(A)))
         else
@@ -703,6 +728,6 @@ function SciMLBase.solve!(cache::LinearCache, alg::SparspakFactorization; kwargs
         cache.cacheval = fact
         cache.isfresh = false
     end
-    y = ldiv!(cache.u, cache.cacheval, cache.b)
+    y = ldiv!(cache.u, get_cacheval(cache, :SparspakFactorization), cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end

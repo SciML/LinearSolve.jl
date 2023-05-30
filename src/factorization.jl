@@ -129,6 +129,12 @@ function do_factorization(alg::LDLtFactorization, A, b, u)
     return fact
 end
 
+function init_cacheval(alg::LDLtFactorization, A::Union{Nothing,Matrix}, b, u, Pl, Pr, 
+    maxiters::Int, abstol, reltol,
+    verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
 function init_cacheval(alg::LDLtFactorization, A, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
@@ -367,6 +373,26 @@ Base.@kwdef struct UMFPACKFactorization <: AbstractFactorization
     check_pattern::Bool = true # Check factorization re-use
 end
 
+@static if VERSION < v"1.9.0-DEV.1622"
+    const PREALLOCATED_UMFPACK = SuiteSparse.UMFPACK.UmfpackLU(C_NULL, C_NULL, 0, 0,
+                                         [0], Int64[], Float64[], 0)
+    finalizer(SuiteSparse.UMFPACK.umfpack_free_symbolic, PREALLOCATED_UMFPACK)
+else
+    const PREALLOCATED_UMFPACK = SuiteSparse.UMFPACK.UmfpackLU(SparseMatrixCSC(0,0, [1], Int64[], Float64[]))
+end
+
+function init_cacheval(alg::UMFPACKFactorization, A::Union{Nothing,Matrix}, b, u, Pl, Pr, 
+    maxiters::Int, abstol, reltol,
+    verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function init_cacheval(alg::UMFPACKFactorization, A::SparseMatrixCSC{Float64,Int}, b, u, Pl, Pr, 
+    maxiters::Int, abstol, reltol,
+    verbose::Bool, assumptions::OperatorAssumptions)
+    PREALLOCATED_UMFPACK
+end
+
 function init_cacheval(alg::UMFPACKFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
                        reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
@@ -404,7 +430,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::UMFPACKFactorization; kwargs.
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
-        if cache.cacheval !== nothing && alg.reuse_symbolic
+        if alg.reuse_symbolic
             # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
             if alg.check_pattern && !(SuiteSparse.decrement(SparseArrays.getcolptr(A)) ==
                  cache.cacheval.colptr &&
@@ -430,6 +456,20 @@ end
 Base.@kwdef struct KLUFactorization <: AbstractFactorization
     reuse_symbolic::Bool = true
     check_pattern::Bool = true
+end
+
+const PREALLOCATED_KLU = KLU.KLUFactorization(SparseMatrixCSC(0,0, [1], Int64[], Float64[]))
+
+function init_cacheval(alg::KLUFactorization, A::Union{Matrix,Nothing}, b, u, Pl, Pr, 
+    maxiters::Int, abstol, reltol,
+    verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function init_cacheval(alg::KLUFactorization, A::SparseMatrixCSC{Float64,Int}, b, u, Pl, Pr, 
+                       maxiters::Int, abstol, reltol,
+                       verbose::Bool, assumptions::OperatorAssumptions)
+    PREALLOCATED_KLU
 end
 
 function init_cacheval(alg::KLUFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
@@ -726,6 +766,20 @@ end
 
 Base.@kwdef struct SparspakFactorization <: AbstractFactorization
     reuse_symbolic::Bool = true
+end
+
+const PREALLOCATED_SPARSEPAK = sparspaklu(SparseMatrixCSC(0,0, [1], Int64[], Float64[]), factorize = false)
+
+function init_cacheval(alg::KLUFactorization, A::Union{Matrix,Nothing}, b, u, Pl, Pr, 
+    maxiters::Int, abstol, reltol,
+    verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function init_cacheval(::SparspakFactorization, A::SparseMatrixCSC{Float64, Int}, b, u, Pl, Pr, maxiters::Int, abstol,
+    reltol,
+    verbose::Bool, assumptions::OperatorAssumptions)
+    PREALLOCATED_SPARSEPAK
 end
 
 function init_cacheval(::SparspakFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,

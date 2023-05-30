@@ -121,11 +121,20 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
                         kwargs...)
     @unpack A, b, u0, p = prob
 
-    A = alias_A ? A : deepcopy(A)
+    A = if alias_A 
+        A 
+    elseif A isa Array || A isa SparseMatrixCSC
+        copy(A)
+    else
+        deepcopy(A)
+    end
+
     b = if b isa SparseArrays.AbstractSparseArray && !(A isa Diagonal)
         Array(b) # the solution to a linear solve will always be dense!
     elseif alias_b
         b
+    elseif b isa Array || b isa SparseMatrixCSC
+        copy(b)
     else
         deepcopy(b)
     end

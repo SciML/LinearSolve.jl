@@ -18,7 +18,7 @@ struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm
     alg::DefaultAlgorithmChoice.T
 end
 
-mutable struct DefaultLinearSolverInit{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11}
+mutable struct DefaultLinearSolverInit{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13}
     LUFactorization::T1
     QRFactorization::T2
     DiagonalFactorization::T3
@@ -27,11 +27,11 @@ mutable struct DefaultLinearSolverInit{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11}
     KLUFactorization::T6
     UMFPACKFactorization::T7
     KrylovJL_GMRES::T8
-    GenericLUFactorization::Any
-    RowMaximumGenericLUFactorization::T9
-    RFLUFactorization::T10
-    LDLtFactorization::Any
-    SVDFactorization::T11
+    GenericLUFactorization::T9
+    RowMaximumGenericLUFactorization::T10
+    RFLUFactorization::T11
+    LDLtFactorization::T12
+    SVDFactorization::T13
 end
 
 # Legacy fallback
@@ -212,8 +212,7 @@ function algchoice_to_alg(alg::Symbol)
     elseif alg === :RowMaximumGenericLUFactorization
         GenericLUFactorization(RowMaximum())
     elseif alg === :LDLtFactorization
-        GenericFactorization()
-        #GenericFactorization(; fact_alg = ldlt!)
+        LDLtFactorization()
     elseif alg === :LUFactorization
         LUFactorization()
     elseif alg === :QRFactorization
@@ -284,7 +283,7 @@ end
 @generated function get_cacheval(cache::LinearCache, algsym::Symbol)
     ex = :()
     for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))
-        ex = if ex === :()
+        ex = if ex == :()
             Expr(:elseif, :(algsym === $(Meta.quot(alg))),:(getfield(cache.cacheval,$(Meta.quot(alg)))))
         else
             Expr(:elseif, :(algsym === $(Meta.quot(alg))),:(getfield(cache.cacheval, $(Meta.quot(alg)))),ex)
@@ -323,11 +322,11 @@ end
                                retcode = sol.retcode,
                                iters = sol.iters, stats = sol.stats)
         end
-        ex = if ex === :()
-            Expr(:elseif, :(Symbol(alg.alg) === $(Meta.quot(alg))), newex)
+        ex = if ex == :()
+            Expr(:elseif, :(Symbol(alg.alg) === $(Meta.quot(alg))), newex, :(error("Algorithm Choice not Allowed")))
         else
             Expr(:elseif, :(Symbol(alg.alg) === $(Meta.quot(alg))), newex,ex)
         end
     end
-    ex = Expr(:if,ex.args...)          
+    ex = Expr(:if,ex.args...)
 end

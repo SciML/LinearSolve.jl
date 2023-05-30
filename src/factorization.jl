@@ -108,6 +108,33 @@ function init_cacheval(alg::QRFactorization, A, b, u, Pl, Pr,
     ArrayInterface.qr_instance(convert(AbstractMatrix, A))
 end
 
+## LDLtFactorization
+
+struct LDLtFactorization{T} <: AbstractFactorization
+    shift::Float64
+    perm::T
+end
+
+function LDLtFactorization(shift = 0.0, perm = nothing)
+    LDLtFactorization(shift, perm)
+end
+
+function do_factorization(alg::LDLtFactorization, A, b, u)
+    A = convert(AbstractMatrix, A)
+    if !(A isa SparseMatrixCSC)
+        fact = ldlt!(A)
+    else
+        fact = ldlt!(A, shift = alg.shift, perm = alg.perm)
+    end
+    return fact
+end
+
+function init_cacheval(alg::LDLtFactorization, A, b, u, Pl, Pr,
+                       maxiters::Int, abstol, reltol, verbose::Bool,
+                       assumptions::OperatorAssumptions)
+    ArrayInterface.ldlt_instance(convert(AbstractMatrix, A))
+end
+
 ## SVDFactorization
 
 struct SVDFactorization{A} <: AbstractFactorization
@@ -381,7 +408,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::UMFPACKFactorization; kwargs.
             # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
             if alg.check_pattern && !(SuiteSparse.decrement(SparseArrays.getcolptr(A)) ==
                  cache.cacheval.colptr &&
-                 SuiteSparse.decrement(SparseArrays.getrowval(A)) == cache.cacheval.rowval)
+                 SuiteSparse.decrement(SparseArrays.getrowval(A)) == get_cacheval(cache,:UMFPACKFactorization).rowval)
                 fact = lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                                           nonzeros(A)))
             else
@@ -424,7 +451,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KLUFactorization; kwargs...)
         if cache.cacheval !== nothing && alg.reuse_symbolic
             if alg.check_pattern && !(SuiteSparse.decrement(SparseArrays.getcolptr(A)) ==
                  cache.cacheval.colptr &&
-                 SuiteSparse.decrement(SparseArrays.getrowval(A)) == cache.cacheval.rowval)
+                 SuiteSparse.decrement(SparseArrays.getrowval(A)) == get_cacheval(cache,:KLUFactorization).rowval)
                 fact = KLU.klu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                                                nonzeros(A)))
             else
@@ -473,7 +500,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::RFLUFactorization{P, T};
                           kwargs...) where {P, T}
     A = cache.A
     A = convert(AbstractMatrix, A)
-    fact, ipiv = cache.cacheval
+    fact, ipiv = get_cacheval(cache,:RFLUFactorization)
     if cache.isfresh
         fact = RecursiveFactorization.lu!(A, ipiv, Val(P), Val(T))
         cache.cacheval = (fact, ipiv)
@@ -523,7 +550,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization;
         cache.isfresh = false
     end
     if A isa SparseMatrixCSC
-        cache.u .= cache.cacheval \ (A' * cache.b)
+        cache.u .= get_cacheval(cache,:NormalCholeskyFactorization) \ (A' * cache.b)
         y = cache.u
     else
         y = ldiv!(cache.u, get_cacheval(cache, :NormalCholeskyFactorization), A' * cache.b)
@@ -607,7 +634,7 @@ end
 function SciMLBase.solve!(cache::LinearCache, alg::FastLUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
-    ws_and_fact = cache.cacheval
+    ws_and_fact = get_cacheval(cache,:FastLUFactorization)
     if cache.isfresh
         # we will fail here if A is a different *size* than in a previous version of the same cache.
         # it may instead be desirable to resize the workspace.
@@ -672,7 +699,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::FastQRFactorization{P};
                           kwargs...) where {P}
     A = cache.A
     A = convert(AbstractMatrix, A)
-    ws_and_fact = cache.cacheval
+    ws_and_fact = get_cacheval(cache, :FastQRFactorization)
     if cache.isfresh
         # we will fail here if A is a different *size* than in a previous version of the same cache.
         # it may instead be desirable to resize the workspace.

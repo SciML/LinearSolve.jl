@@ -22,7 +22,8 @@ struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm
     alg::DefaultAlgorithmChoice.T
 end
 
-mutable struct DefaultLinearSolverInit{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15,T16,T17}
+mutable struct DefaultLinearSolverInit{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12,
+                                       T13, T14, T15, T16, T17}
     LUFactorization::T1
     QRFactorization::T2
     DiagonalFactorization::T3
@@ -81,11 +82,11 @@ function defaultalg(A::Hermitian, b, ::OperatorAssumptions)
     DefaultLinearSolver(DefaultAlgorithmChoice.CholeskyFactorization)
 end
 
-function defaultalg(A::Symmetric{<:Number,<:Array}, b, ::OperatorAssumptions)
+function defaultalg(A::Symmetric{<:Number, <:Array}, b, ::OperatorAssumptions)
     DefaultLinearSolver(DefaultAlgorithmChoice.BunchKaufmanFactorization)
 end
 
-function defaultalg(A::Symmetric{<:Number,<:SparseMatrixCSC}, b, ::OperatorAssumptions)
+function defaultalg(A::Symmetric{<:Number, <:SparseMatrixCSC}, b, ::OperatorAssumptions)
     DefaultLinearSolver(DefaultAlgorithmChoice.CHOLMODFactorization)
 end
 
@@ -122,7 +123,7 @@ function defaultalg(A::GPUArraysCore.AbstractGPUArray, b, assump::OperatorAssump
         else
             DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
         end
-    end 
+    end
 end
 
 # A === nothing case
@@ -135,11 +136,12 @@ function defaultalg(A, b::GPUArraysCore.AbstractGPUArray, assump::OperatorAssump
         else
             DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
         end
-    end 
+    end
 end
 
 # Ambiguity handling
-function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.AbstractGPUArray, assump::OperatorAssumptions)
+function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.AbstractGPUArray,
+                    assump::OperatorAssumptions)
     if assump.condition === OperatorConodition.IllConditioned || !assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
     else
@@ -148,7 +150,7 @@ function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.Abstract
         else
             DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
         end
-    end 
+    end
 end
 
 function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
@@ -163,7 +165,7 @@ function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
             DefaultLinearSolver(DefaultAlgorithmChoice.KrylovJL_LSMR)
         end
     else
-        DefaultLinearSolver( DefaultAlgorithmChoice.KrylovJL_GMRES)
+        DefaultLinearSolver(DefaultAlgorithmChoice.KrylovJL_GMRES)
     end
 end
 
@@ -174,18 +176,19 @@ function defaultalg(A, b, assump::OperatorAssumptions)
         # it makes sense according to the benchmarks, which is dependent on
         # whether MKL or OpenBLAS is being used
         if (A === nothing && !(b isa GPUArraysCore.AbstractGPUArray)) || A isa Matrix
-            if (A === nothing || eltype(A) <: Union{Float32, Float64, ComplexF32, ComplexF64}) &&
-            ArrayInterface.can_setindex(b) &&
-            (__conditioning(assump) === OperatorCondition.IllConditioned ||
+            if (A === nothing ||
+                eltype(A) <: Union{Float32, Float64, ComplexF32, ComplexF64}) &&
+               ArrayInterface.can_setindex(b) &&
+               (__conditioning(assump) === OperatorCondition.IllConditioned ||
                 __conditioning(assump) === OperatorCondition.WellConditioned)
                 if length(b) <= 10
                     if __conditioning(assump) === OperatorCondition.IllConditioned
                         DefaultAlgorithmChoice.RowMaximumGenericLUFactorization
                     else
                         DefaultAlgorithmChoice.GenericLUFactorization
-                    end          
+                    end
                 elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500)) &&
-                    (A === nothing ? eltype(b) <: Union{Float32, Float64} :
+                       (A === nothing ? eltype(b) <: Union{Float32, Float64} :
                         eltype(A) <: Union{Float32, Float64})
                     DefaultAlgorithmChoice.RFLUFactorization
                     #elseif A === nothing || A isa Matrix
@@ -295,28 +298,31 @@ end
 """
 cache.cacheval = NamedTuple(LUFactorization = cache of LUFactorization, ...)
 """
-@generated function init_cacheval(alg::DefaultLinearSolver, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
-                       verbose::Bool, assump::OperatorAssumptions)
+@generated function init_cacheval(alg::DefaultLinearSolver, A, b, u, Pl, Pr, maxiters::Int,
+                                  abstol, reltol,
+                                  verbose::Bool, assump::OperatorAssumptions)
     caches = map(first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))) do alg
         if alg === :KrylovJL_GMRES
             quote
                 if A isa Matrix || A isa SparseMatrixCSC
                     nothing
                 else
-                    init_cacheval($(algchoice_to_alg(alg)), A, b, u, Pl, Pr, maxiters, abstol, reltol,
-                            verbose,
-                            assump)
+                    init_cacheval($(algchoice_to_alg(alg)), A, b, u, Pl, Pr, maxiters,
+                                  abstol, reltol,
+                                  verbose,
+                                  assump)
                 end
             end
         else
             quote
-                init_cacheval($(algchoice_to_alg(alg)), A, b, u, Pl, Pr, maxiters, abstol, reltol,
-                        verbose,
-                        assump)
+                init_cacheval($(algchoice_to_alg(alg)), A, b, u, Pl, Pr, maxiters, abstol,
+                              reltol,
+                              verbose,
+                              assump)
             end
         end
     end
-    Expr(:call,:DefaultLinearSolverInit, caches...)
+    Expr(:call, :DefaultLinearSolverInit, caches...)
 end
 
 """
@@ -330,12 +336,14 @@ end
     ex = :()
     for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))
         ex = if ex == :()
-            Expr(:elseif, :(algsym === $(Meta.quot(alg))),:(getfield(cache.cacheval,$(Meta.quot(alg)))))
+            Expr(:elseif, :(algsym === $(Meta.quot(alg))),
+                 :(getfield(cache.cacheval, $(Meta.quot(alg)))))
         else
-            Expr(:elseif, :(algsym === $(Meta.quot(alg))),:(getfield(cache.cacheval, $(Meta.quot(alg)))),ex)
+            Expr(:elseif, :(algsym === $(Meta.quot(alg))),
+                 :(getfield(cache.cacheval, $(Meta.quot(alg)))), ex)
         end
     end
-    ex = Expr(:if,ex.args...)
+    ex = Expr(:if, ex.args...)
 
     quote
         if cache.alg isa DefaultLinearSolver
@@ -346,8 +354,12 @@ end
     end
 end
 
-defaultalg_symbol(::Type{T}) where T = Symbol(split(string(SciMLBase.parameterless_type(T)), ".")[end])
-defaultalg_symbol(::Type{<:GenericLUFactorization{LinearAlgebra.RowMaximum}}) = :RowMaximumGenericLUFactorization
+function defaultalg_symbol(::Type{T}) where {T}
+    Symbol(split(string(SciMLBase.parameterless_type(T)), ".")[end])
+end
+function defaultalg_symbol(::Type{<:GenericLUFactorization{LinearAlgebra.RowMaximum}})
+    :RowMaximumGenericLUFactorization
+end
 defaultalg_symbol(::Type{<:GenericFactorization{typeof(ldlt!)}}) = :LDLtFactorization
 
 """
@@ -358,21 +370,23 @@ else
 end
 """
 @generated function SciMLBase.solve!(cache::LinearCache, alg::DefaultLinearSolver,
-                          args...; assump::OperatorAssumptions = OperatorAssumptions(),
-                          kwargs...)
+                                     args...;
+                                     assump::OperatorAssumptions = OperatorAssumptions(),
+                                     kwargs...)
     ex = :()
     for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))
         newex = quote
             sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
             SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
-                               retcode = sol.retcode,
-                               iters = sol.iters, stats = sol.stats)
+                                            retcode = sol.retcode,
+                                            iters = sol.iters, stats = sol.stats)
         end
         ex = if ex == :()
-            Expr(:elseif, :(Symbol(alg.alg) === $(Meta.quot(alg))), newex, :(error("Algorithm Choice not Allowed")))
+            Expr(:elseif, :(Symbol(alg.alg) === $(Meta.quot(alg))), newex,
+                 :(error("Algorithm Choice not Allowed")))
         else
-            Expr(:elseif, :(Symbol(alg.alg) === $(Meta.quot(alg))), newex,ex)
+            Expr(:elseif, :(Symbol(alg.alg) === $(Meta.quot(alg))), newex, ex)
         end
     end
-    ex = Expr(:if,ex.args...)
+    ex = Expr(:if, ex.args...)
 end

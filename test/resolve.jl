@@ -8,8 +8,8 @@ for alg in subtypes(LinearSolve.AbstractFactorization)
             (A = sparse(A))
         A = A' * A
         @show A
-        alg in [CHOLMODFactorization] && (A = sparse(Symmetric(A,:L)))
-        alg in [BunchKaufmanFactorization] && (A = Symmetric(A,:L))
+        alg in [CHOLMODFactorization] && (A = sparse(Symmetric(A, :L)))
+        alg in [BunchKaufmanFactorization] && (A = Symmetric(A, :L))
         alg in [LDLtFactorization] && (A = SymTridiagonal(A))
         b = [1.0, 2.0]
         prob = LinearProblem(A, b)
@@ -22,8 +22,8 @@ for alg in subtypes(LinearSolve.AbstractFactorization)
         alg in [KLUFactorization, UMFPACKFactorization, SparspakFactorization] &&
             (A = sparse(A))
         A = A' * A
-        alg in [CHOLMODFactorization] && (A = sparse(Symmetric(A,:L)))
-        alg in [BunchKaufmanFactorization] && (A = Symmetric(A,:L))
+        alg in [CHOLMODFactorization] && (A = sparse(Symmetric(A, :L)))
+        alg in [BunchKaufmanFactorization] && (A = Symmetric(A, :L))
         alg in [LDLtFactorization] && (A = SymTridiagonal(A))
         linsolve.A = A
         @test linsolve.isfresh
@@ -64,4 +64,3 @@ A = Symmetric([1.0 2.0
                2.0 1.0])
 b = [1.0, 2.0]
 @test solve!(linsolve).u ≈ [1.0, 0.0]
-

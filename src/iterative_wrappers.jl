@@ -121,13 +121,13 @@ function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, re
 
     if zeroinit
         solver = if (alg.KrylovAlg === Krylov.dqgmres! ||
-                    alg.KrylovAlg === Krylov.diom! ||
-                    alg.KrylovAlg === Krylov.gmres! ||
-                    alg.KrylovAlg === Krylov.fgmres! ||
-                    alg.KrylovAlg === Krylov.gpmr! ||
-                    alg.KrylovAlg === Krylov.fom!)
+                     alg.KrylovAlg === Krylov.diom! ||
+                     alg.KrylovAlg === Krylov.gmres! ||
+                     alg.KrylovAlg === Krylov.fgmres! ||
+                     alg.KrylovAlg === Krylov.gpmr! ||
+                     alg.KrylovAlg === Krylov.fom!)
             if A isa SparseMatrixCSC
-                KS(SparseMatrixCSC(0,0, [1], Int64[], eltype(A)[]), eltype(b)[], 1)
+                KS(SparseMatrixCSC(0, 0, [1], Int64[], eltype(A)[]), eltype(b)[], 1)
             elseif A isa Matrix
                 KS(Matrix{eltype(A)}(undef, 0, 0), eltype(b)[], 1)
             else
@@ -135,7 +135,7 @@ function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, re
             end
         else
             if A isa SparseMatrixCSC
-                KS(SparseMatrixCSC(0,0, [1], Int64[], eltype(A)[]), eltype(b)[])
+                KS(SparseMatrixCSC(0, 0, [1], Int64[], eltype(A)[]), eltype(b)[])
             elseif A isa Matrix
                 KS(Matrix{eltype(A)}(undef, 0, 0), eltype(b)[])
             else
@@ -161,7 +161,7 @@ function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, re
         else
             KS(A, b)
         end
-    end    
+    end
 
     solver.x = u
 

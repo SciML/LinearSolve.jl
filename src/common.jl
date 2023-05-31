@@ -121,8 +121,8 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
                         kwargs...)
     @unpack A, b, u0, p = prob
 
-    A = if alias_A 
-        A 
+    A = if alias_A
+        A
     elseif A isa Array || A isa SparseMatrixCSC
         copy(A)
     else
@@ -161,7 +161,7 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
                         typeof(Pl),
                         typeof(Pr),
                         typeof(reltol),
-                        typeof(assumptions.issq),
+                        typeof(assumptions.issq)
                         }(A,
                           b,
                           u0,

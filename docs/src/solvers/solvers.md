@@ -92,6 +92,7 @@ customized per-package, details given below describe a subset of important array
   - CholeskyFactorization
   - BunchKaufmanFactorization
   - CHOLMODFactorization
+
 ### LinearSolve.jl
 
 LinearSolve.jl contains some linear solvers built in.

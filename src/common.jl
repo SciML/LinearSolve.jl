@@ -107,6 +107,10 @@ default_tol(::Type{Any}) = 0
 default_alias_A(::Any, ::Any, ::Any) = false
 default_alias_b(::Any, ::Any, ::Any) = false
 
+# Non-destructive algorithms default to true
+default_alias_A(::AbstractKrylovSubspaceMethod, ::Any, ::Any) = true
+default_alias_b(::AbstractKrylovSubspaceMethod, ::Any, ::Any) = true
+
 function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
                         args...;
                         alias_A = default_alias_A(alg, prob.A, prob.b),

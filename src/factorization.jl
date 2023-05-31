@@ -744,6 +744,7 @@ end
 
 function init_cacheval(alg::RFLUFactorization, A, b, u, Pl, Pr, maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    @show size(A), length(b)
     ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
     ArrayInterface.lu_instance(convert(AbstractMatrix, A)), ipiv
 end

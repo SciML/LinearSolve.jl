@@ -751,7 +751,7 @@ end
 function init_cacheval(alg::RFLUFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
                        maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ipiv = Vector{LinearAlgebra.BlasInt}(undef, 0)
+    ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
     PREALLOCATED_LU, ipiv
 end
 

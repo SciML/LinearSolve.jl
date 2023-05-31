@@ -20,6 +20,8 @@ using Sparspak
 using FastLapackInterface
 using DocStringExtensions
 using EnumX
+using Requires
+
 import GPUArraysCore
 import Preferences
 

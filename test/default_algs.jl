@@ -18,10 +18,10 @@ using LinearSolve, LinearAlgebra, SparseArrays, Test
       LinearSolve.DefaultAlgorithmChoice.UMFPACKFactorization
 
 @static if VERSION >= v"v1.7-"
-      # Test inference 
-      A = rand(4, 4)
-      b = rand(4)
-      prob = LinearProblem(A, b)
-      @inferred solve(prob)
-      @inferred init(prob, nothing)
+    # Test inference 
+    A = rand(4, 4)
+    b = rand(4)
+    prob = LinearProblem(A, b)
+    @inferred solve(prob)
+    @inferred init(prob, nothing)
 end

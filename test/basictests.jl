@@ -254,7 +254,6 @@ end
         end
     end
 
-
     if VERSION > v"1.7-"
         @testset "CHOLMOD" begin
             # Create a posdef symmetric matrix

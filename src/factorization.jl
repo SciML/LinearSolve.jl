@@ -104,9 +104,9 @@ end
 
 @static if VERSION < v"1.7-"
     function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization},
-        A::Union{Diagonal,SymTridiagonal}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
+                           A::Union{Diagonal, SymTridiagonal}, b, u, Pl, Pr,
+                           maxiters::Int, abstol, reltol, verbose::Bool,
+                           assumptions::OperatorAssumptions)
         nothing
     end
 end
@@ -160,9 +160,9 @@ end
 
 @static if VERSION < v"1.7-"
     function init_cacheval(alg::QRFactorization,
-        A::Union{Diagonal,SymTridiagonal,Tridiagonal}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
+                           A::Union{Diagonal, SymTridiagonal, Tridiagonal}, b, u, Pl, Pr,
+                           maxiters::Int, abstol, reltol, verbose::Bool,
+                           assumptions::OperatorAssumptions)
         nothing
     end
 end
@@ -232,9 +232,10 @@ function init_cacheval(alg::CholeskyFactorization, A::AbstractSciMLOperator, b, 
 end
 
 @static if VERSION < v"1.7beta"
-    function init_cacheval(alg::CholeskyFactorization, A::Union{SymTridiagonal,Tridiagonal}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
+    function init_cacheval(alg::CholeskyFactorization,
+                           A::Union{SymTridiagonal, Tridiagonal}, b, u, Pl, Pr,
+                           maxiters::Int, abstol, reltol, verbose::Bool,
+                           assumptions::OperatorAssumptions)
         nothing
     end
 end
@@ -309,9 +310,9 @@ end
 
 @static if VERSION < v"1.7-"
     function init_cacheval(alg::SVDFactorization,
-        A::Union{Diagonal,SymTridiagonal,Tridiagonal}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
+                           A::Union{Diagonal, SymTridiagonal, Tridiagonal}, b, u, Pl, Pr,
+                           maxiters::Int, abstol, reltol, verbose::Bool,
+                           assumptions::OperatorAssumptions)
         nothing
     end
 end
@@ -787,7 +788,7 @@ function init_cacheval(alg::RFLUFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
                        maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     ipiv = Vector{LinearAlgebra.BlasInt}(undef, 0)
-    PREALLOCATED_LU, ipiv    
+    PREALLOCATED_LU, ipiv
 end
 
 function init_cacheval(alg::RFLUFactorization,
@@ -799,9 +800,9 @@ end
 
 @static if VERSION < v"1.7-"
     function init_cacheval(alg::RFLUFactorization,
-                            A::Union{Diagonal,SymTridiagonal,Tridiagonal}, b, u, Pl, Pr,
-                            maxiters::Int,
-                            abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+                           A::Union{Diagonal, SymTridiagonal, Tridiagonal}, b, u, Pl, Pr,
+                           maxiters::Int,
+                           abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
         nothing, nothing
     end
 end
@@ -875,9 +876,9 @@ end
 
 @static if VERSION < v"1.7-"
     function init_cacheval(alg::NormalCholeskyFactorization,
-        A::Union{Tridiagonal, SymTridiagonal}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
+                           A::Union{Tridiagonal, SymTridiagonal}, b, u, Pl, Pr,
+                           maxiters::Int, abstol, reltol, verbose::Bool,
+                           assumptions::OperatorAssumptions)
         nothing
     end
 end

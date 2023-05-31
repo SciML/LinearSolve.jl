@@ -8,7 +8,6 @@ EnumX.@enumx DefaultAlgorithmChoice begin
     UMFPACKFactorization
     KrylovJL_GMRES
     GenericLUFactorization
-    RowMaximumGenericLUFactorization
     RFLUFactorization
     LDLtFactorization
     BunchKaufmanFactorization
@@ -23,7 +22,7 @@ struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm
 end
 
 mutable struct DefaultLinearSolverInit{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12,
-                                       T13, T14, T15, T16, T17}
+                                       T13, T14, T15, T16}
     LUFactorization::T1
     QRFactorization::T2
     DiagonalFactorization::T3
@@ -33,14 +32,13 @@ mutable struct DefaultLinearSolverInit{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, 
     UMFPACKFactorization::T7
     KrylovJL_GMRES::T8
     GenericLUFactorization::T9
-    RowMaximumGenericLUFactorization::T10
-    RFLUFactorization::T11
-    LDLtFactorization::T12
-    BunchKaufmanFactorization::T13
-    CHOLMODFactorization::T14
-    SVDFactorization::T15
-    CholeskyFactorization::T16
-    NormalCholeskyFactorization::T17
+    RFLUFactorization::T10
+    LDLtFactorization::T11
+    BunchKaufmanFactorization::T12
+    CHOLMODFactorization::T13
+    SVDFactorization::T14
+    CholeskyFactorization::T15
+    NormalCholeskyFactorization::T16
 end
 
 # Legacy fallback
@@ -182,11 +180,7 @@ function defaultalg(A, b, assump::OperatorAssumptions)
                (__conditioning(assump) === OperatorCondition.IllConditioned ||
                 __conditioning(assump) === OperatorCondition.WellConditioned)
                 if length(b) <= 10
-                    if __conditioning(assump) === OperatorCondition.IllConditioned
-                        DefaultAlgorithmChoice.RowMaximumGenericLUFactorization
-                    else
-                        DefaultAlgorithmChoice.GenericLUFactorization
-                    end
+                    DefaultAlgorithmChoice.GenericLUFactorization
                 elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500)) &&
                        (A === nothing ? eltype(b) <: Union{Float32, Float64} :
                         eltype(A) <: Union{Float32, Float64})
@@ -194,11 +188,7 @@ function defaultalg(A, b, assump::OperatorAssumptions)
                     #elseif A === nothing || A isa Matrix
                     #    alg = FastLUFactorization()
                 else
-                    if __conditioning(assump) === OperatorCondition.IllConditioned
-                        DefaultAlgorithmChoice.RowMaximumGenericLUFactorization
-                    else
-                        DefaultAlgorithmChoice.GenericLUFactorization
-                    end
+                    DefaultAlgorithmChoice.GenericLUFactorization
                 end
             elseif __conditioning(assump) === OperatorCondition.VeryIllConditioned
                 DefaultAlgorithmChoice.QRFactorization
@@ -234,12 +224,6 @@ end
 function algchoice_to_alg(alg::Symbol)
     if alg === :SVDFactorization
         SVDFactorization(false, LinearAlgebra.QRIteration())
-    elseif alg === :RowMaximumGenericLUFactorization
-        @static if VERSION < v"1.7beta"
-            GenericLUFactorization(Val(true))
-        else
-            GenericLUFactorization(RowMaximum())
-        end
     elseif alg === :LDLtFactorization
         LDLtFactorization()
     elseif alg === :LUFactorization
@@ -360,16 +344,6 @@ end
 
 function defaultalg_symbol(::Type{T}) where {T}
     Symbol(split(string(SciMLBase.parameterless_type(T)), ".")[end])
-end
-
-@static if VERSION < v"1.7beta"
-    function defaultalg_symbol(::Type{<:GenericLUFactorization{false}})
-        :RowMaximumGenericLUFactorization
-    end
-else
-    function defaultalg_symbol(::Type{<:GenericLUFactorization{LinearAlgebra.RowMaximum}})
-        :RowMaximumGenericLUFactorization
-    end
 end
 defaultalg_symbol(::Type{<:GenericFactorization{typeof(ldlt!)}}) = :LDLtFactorization
 

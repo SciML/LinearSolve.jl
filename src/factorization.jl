@@ -102,6 +102,15 @@ function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization},
     nothing
 end
 
+@static if VERSION < v"1.7-"
+    function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization},
+        A::Union{Diagonal,SymTridiagonal}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+        nothing
+    end
+end
+
 ## QRFactorization
 
 struct QRFactorization{P} <: AbstractFactorization
@@ -147,6 +156,15 @@ function init_cacheval(alg::QRFactorization, A::AbstractSciMLOperator, b, u, Pl,
                        maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
     nothing
+end
+
+@static if VERSION < v"1.7-"
+    function init_cacheval(alg::QRFactorization,
+        A::Union{Diagonal,SymTridiagonal,Tridiagonal}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+        nothing
+    end
 end
 
 ## CholeskyFactorization
@@ -211,6 +229,14 @@ function init_cacheval(alg::CholeskyFactorization, A::AbstractSciMLOperator, b, 
                        maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
     nothing
+end
+
+@static if VERSION < v"1.7beta"
+    function init_cacheval(alg::CholeskyFactorization, A::Union{SymTridiagonal,Tridiagonal}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+        nothing
+    end
 end
 
 ## LDLtFactorization
@@ -279,6 +305,15 @@ function init_cacheval(alg::SVDFactorization, A, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
     nothing
+end
+
+@static if VERSION < v"1.7-"
+    function init_cacheval(alg::SVDFactorization,
+        A::Union{Diagonal,SymTridiagonal,Tridiagonal}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+        nothing
+    end
 end
 
 ## BunchKaufmanFactorization
@@ -744,9 +779,15 @@ end
 
 function init_cacheval(alg::RFLUFactorization, A, b, u, Pl, Pr, maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    @show size(A), length(b)
     ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
     ArrayInterface.lu_instance(convert(AbstractMatrix, A)), ipiv
+end
+
+function init_cacheval(alg::RFLUFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
+                       maxiters::Int,
+                       abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    ipiv = Vector{LinearAlgebra.BlasInt}(undef, 0)
+    PREALLOCATED_LU, ipiv    
 end
 
 function init_cacheval(alg::RFLUFactorization,
@@ -756,12 +797,24 @@ function init_cacheval(alg::RFLUFactorization,
     nothing, nothing
 end
 
+@static if VERSION < v"1.7-"
+    function init_cacheval(alg::RFLUFactorization,
+                            A::Union{Diagonal,SymTridiagonal,Tridiagonal}, b, u, Pl, Pr,
+                            maxiters::Int,
+                            abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+        nothing, nothing
+    end
+end
+
 function SciMLBase.solve!(cache::LinearCache, alg::RFLUFactorization{P, T};
                           kwargs...) where {P, T}
     A = cache.A
     A = convert(AbstractMatrix, A)
     fact, ipiv = get_cacheval(cache, :RFLUFactorization)
     if cache.isfresh
+        if length(ipiv) != min(size(A)...)
+            ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
+        end
         fact = RecursiveFactorization.lu!(A, ipiv, Val(P), Val(T))
         cache.cacheval = (fact, ipiv)
         cache.isfresh = false
@@ -818,6 +871,15 @@ function init_cacheval(alg::NormalCholeskyFactorization,
                        maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
     nothing
+end
+
+@static if VERSION < v"1.7-"
+    function init_cacheval(alg::NormalCholeskyFactorization,
+        A::Union{Tridiagonal, SymTridiagonal}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+        nothing
+    end
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization;

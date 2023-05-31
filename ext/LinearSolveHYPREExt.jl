@@ -1,8 +1,8 @@
 module LinearSolveHYPREExt
 
+using LinearAlgebra
 using HYPRE.LibHYPRE: HYPRE_Complex
 using HYPRE: HYPRE, HYPREMatrix, HYPRESolver, HYPREVector
-using IterativeSolvers: Identity
 using LinearSolve: HYPREAlgorithm, LinearCache, LinearProblem, LinearSolve,
                    OperatorAssumptions, default_tol, init_cacheval, __issquare,
                    __conditioning
@@ -65,8 +65,8 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
                         # TODO: Implement length() for HYPREVector in HYPRE.jl?
                         maxiters::Int = prob.b isa HYPREVector ? 1000 : length(prob.b),
                         verbose::Bool = false,
-                        Pl = Identity(),
-                        Pr = Identity(),
+                        Pl = LinearAlgebra.I,
+                        Pr = LinearAlgebra.I,
                         assumptions = OperatorAssumptions(),
                         kwargs...)
     @unpack A, b, u0, p = prob
@@ -127,10 +127,10 @@ function create_solver(alg::HYPREAlgorithm, cache::LinearCache)
 
     # Preconditioner (uses Pl even though it might not be a *left* preconditioner just *a*
     # preconditioner)
-    if !(cache.Pl isa Identity)
+    if !(cache.Pl isa LinearAlgebra.UniformScaling)
         precond = if cache.Pl isa HYPRESolver
             cache.Pl
-        elseif cache.Pl <: HYPRESolver
+        elseif cache.Pl isa DataType && cache.Pl <: HYPRESolver
             create_solver(cache.Pl, comm)
         else
             throw(ArgumentError("unknown HYPRE preconditioner $(cache.Pl)"))

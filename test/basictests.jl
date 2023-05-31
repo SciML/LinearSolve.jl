@@ -1,5 +1,6 @@
 using LinearSolve, LinearAlgebra, SparseArrays, MultiFloats, ForwardDiff
 using SciMLOperators
+using IterativeSolvers, KrylovKit
 using Test
 import Random
 
@@ -232,15 +233,17 @@ end
         end
     end
 
-    @testset "IterativeSolversJL" begin
-        kwargs = (; gmres_restart = 5)
-        for alg in (("Default", IterativeSolversJL(kwargs...)),
-                    ("CG", IterativeSolversJL_CG(kwargs...)),
-                    ("GMRES", IterativeSolversJL_GMRES(kwargs...))
-                    #           ("BICGSTAB",IterativeSolversJL_BICGSTAB(kwargs...)),
-                    #            ("MINRES",IterativeSolversJL_MINRES(kwargs...)),
-                    )
-            @testset "$(alg[1])" begin test_interface(alg[2], prob1, prob2) end
+    if VERSION >= v"1.9-"
+        @testset "IterativeSolversJL" begin
+            kwargs = (; gmres_restart = 5)
+            for alg in (("Default", IterativeSolversJL(kwargs...)),
+                        ("CG", IterativeSolversJL_CG(kwargs...)),
+                        ("GMRES", IterativeSolversJL_GMRES(kwargs...))
+                        #           ("BICGSTAB",IterativeSolversJL_BICGSTAB(kwargs...)),
+                        #            ("MINRES",IterativeSolversJL_MINRES(kwargs...)),
+                        )
+                @testset "$(alg[1])" begin test_interface(alg[2], prob1, prob2) end
+            end
         end
     end
 

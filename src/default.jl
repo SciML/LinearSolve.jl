@@ -235,7 +235,11 @@ function algchoice_to_alg(alg::Symbol)
     if alg === :SVDFactorization
         SVDFactorization(false, LinearAlgebra.QRIteration())
     elseif alg === :RowMaximumGenericLUFactorization
-        GenericLUFactorization(RowMaximum())
+        @static if VERSION < v"1.7beta"
+            GenericLUFactorization(Val(true))
+        else
+            GenericLUFactorization(RowMaximum())
+        end
     elseif alg === :LDLtFactorization
         LDLtFactorization()
     elseif alg === :LUFactorization

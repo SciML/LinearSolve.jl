@@ -51,7 +51,7 @@ A = rand(n, n)
 b = rand(n)
 
 prob = LinearProblem(A, b)
-sol = solve(prob, IterativeSolversJL_GMRES(), Pl = Pl)
+sol = solve(prob, KrylovJL_GMRES(), Pl = Pl)
 sol.u
 ```
 

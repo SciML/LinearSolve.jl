@@ -61,7 +61,7 @@ Pl = LinearSolve.InvPreconditioner(Diagonal(weights))
 Pr = Diagonal(weights)
 
 prob = LinearProblem(A, b)
-sol = solve(prob, IterativeSolversJL_GMRES(), Pl = Pl, Pr = Pr)
+sol = solve(prob, KrylovJL_GMRES(), Pl = Pl, Pr = Pr)
 
 sol.u
 ```
@@ -84,5 +84,5 @@ Pl = LinearSolve.ComposePreconditioner(LinearSolve.InvPreconditioner(Diagonal(we
 Pr = Diagonal(weights)
 
 prob = LinearProblem(A, b)
-sol = solve(prob, IterativeSolversJL_GMRES(), Pl = Pl, Pr = Pr)
+sol = solve(prob, KrylovJL_GMRES(), Pl = Pl, Pr = Pr)
 ```

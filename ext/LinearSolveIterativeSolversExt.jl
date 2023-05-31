@@ -4,17 +4,17 @@ using LinearSolve, LinearAlgebra
 using LinearSolve: LinearCache
 import LinearSolve: IterativeSolversJL
 
-if isdefined(Base, :get_extension) 
+if isdefined(Base, :get_extension)
     using IterativeSolvers
-else 
+else
     using ..IterativeSolvers
 end
 
 function LinearSolve.IterativeSolversJL(args...;
-    generate_iterator = IterativeSolvers.gmres_iterable!,
-    gmres_restart = 0, kwargs...)
+                                        generate_iterator = IterativeSolvers.gmres_iterable!,
+                                        gmres_restart = 0, kwargs...)
     return IterativeSolversJL(generate_iterator, gmres_restart,
-        args, kwargs)
+                              args, kwargs)
 end
 
 function LinearSolve.IterativeSolversJL_CG(args...; kwargs...)
@@ -42,9 +42,10 @@ LinearSolve._isidentity_struct(::IterativeSolvers.Identity) = true
 LinearSolve.default_alias_A(::IterativeSolversJL, ::Any, ::Any) = true
 LinearSolve.default_alias_b(::IterativeSolversJL, ::Any, ::Any) = true
 
-function LinearSolve.init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, maxiters::Int, abstol,
-                       reltol,
-                       verbose::Bool, assumptions::OperatorAssumptions)
+function LinearSolve.init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, maxiters::Int,
+                                   abstol,
+                                   reltol,
+                                   verbose::Bool, assumptions::OperatorAssumptions)
     restart = (alg.gmres_restart == 0) ? min(20, size(A, 1)) : alg.gmres_restart
 
     kwargs = (abstol = abstol, reltol = reltol, maxiter = maxiters,
@@ -75,9 +76,11 @@ end
 
 function SciMLBase.solve!(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
     if cache.isfresh || !(typeof(alg) <: IterativeSolvers.GMRESIterable)
-        solver = LinearSolve.init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr,
-                               cache.maxiters, cache.abstol, cache.reltol, cache.verbose,
-                               cache.assumptions)
+        solver = LinearSolve.init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl,
+                                           cache.Pr,
+                                           cache.maxiters, cache.abstol, cache.reltol,
+                                           cache.verbose,
+                                           cache.assumptions)
         cache.cacheval = solver
         cache.isfresh = false
     end

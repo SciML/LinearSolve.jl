@@ -748,15 +748,6 @@ function init_cacheval(alg::RFLUFactorization, A, b, u, Pl, Pr, maxiters::Int,
     ArrayInterface.lu_instance(convert(AbstractMatrix, A)), ipiv
 end
 
-@static if VERSION >= v"1.7-"
-    function init_cacheval(alg::RFLUFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
-                        maxiters::Int,
-                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-        ipiv = Vector{LinearAlgebra.BlasInt}(undef, 0)
-        PREALLOCATED_LU, ipiv    
-    end
-end
-
 function init_cacheval(alg::RFLUFactorization,
                        A::Union{AbstractSparseArray, AbstractSciMLOperator}, b, u, Pl, Pr,
                        maxiters::Int,

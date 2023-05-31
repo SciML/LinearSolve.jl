@@ -114,27 +114,53 @@ function get_KrylovJL_solver(KrylovAlg)
     return KS
 end
 
+# zeroinit allows for init_cacheval to start by initing with A (0,0)
 function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
-                       verbose::Bool, assumptions::OperatorAssumptions)
+                       verbose::Bool, assumptions::OperatorAssumptions; zeroinit = true)
     KS = get_KrylovJL_solver(alg.KrylovAlg)
 
-    memory = (alg.gmres_restart == 0) ? min(20, size(A, 1)) : alg.gmres_restart
-
-    solver = if (alg.KrylovAlg === Krylov.dqgmres! ||
-                 alg.KrylovAlg === Krylov.diom! ||
-                 alg.KrylovAlg === Krylov.gmres! ||
-                 alg.KrylovAlg === Krylov.fgmres! ||
-                 alg.KrylovAlg === Krylov.gpmr! ||
-                 alg.KrylovAlg === Krylov.fom!)
-        KS(A, b, memory)
-    elseif (alg.KrylovAlg === Krylov.minres! ||
-            alg.KrylovAlg === Krylov.symmlq! ||
-            alg.KrylovAlg === Krylov.lslq! ||
-            alg.KrylovAlg === Krylov.lsqr! ||
-            alg.KrylovAlg === Krylov.lsmr!)
-        (alg.window != 0) ? KS(A, b; window = alg.window) : KS(A, b)
+    if zeroinit
+        solver = if (alg.KrylovAlg === Krylov.dqgmres! ||
+                     alg.KrylovAlg === Krylov.diom! ||
+                     alg.KrylovAlg === Krylov.gmres! ||
+                     alg.KrylovAlg === Krylov.fgmres! ||
+                     alg.KrylovAlg === Krylov.gpmr! ||
+                     alg.KrylovAlg === Krylov.fom!)
+            if A isa SparseMatrixCSC
+                KS(SparseMatrixCSC(0, 0, [1], Int64[], eltype(A)[]), eltype(b)[], 1)
+            elseif A isa Matrix
+                KS(Matrix{eltype(A)}(undef, 0, 0), eltype(b)[], 1)
+            else
+                KS(A, b, 1)
+            end
+        else
+            if A isa SparseMatrixCSC
+                KS(SparseMatrixCSC(0, 0, [1], Int64[], eltype(A)[]), eltype(b)[])
+            elseif A isa Matrix
+                KS(Matrix{eltype(A)}(undef, 0, 0), eltype(b)[])
+            else
+                KS(A, b)
+            end
+        end
     else
-        KS(A, b)
+        memory = (alg.gmres_restart == 0) ? min(20, size(A, 1)) : alg.gmres_restart
+
+        solver = if (alg.KrylovAlg === Krylov.dqgmres! ||
+                     alg.KrylovAlg === Krylov.diom! ||
+                     alg.KrylovAlg === Krylov.gmres! ||
+                     alg.KrylovAlg === Krylov.fgmres! ||
+                     alg.KrylovAlg === Krylov.gpmr! ||
+                     alg.KrylovAlg === Krylov.fom!)
+            KS(A, b, memory)
+        elseif (alg.KrylovAlg === Krylov.minres! ||
+                alg.KrylovAlg === Krylov.symmlq! ||
+                alg.KrylovAlg === Krylov.lslq! ||
+                alg.KrylovAlg === Krylov.lsqr! ||
+                alg.KrylovAlg === Krylov.lsmr!)
+            (alg.window != 0) ? KS(A, b; window = alg.window) : KS(A, b)
+        else
+            KS(A, b)
+        end
     end
 
     solver.x = u
@@ -146,7 +172,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     if cache.isfresh
         solver = init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr,
                                cache.maxiters, cache.abstol, cache.reltol, cache.verbose,
-                               cache.assumptions)
+                               cache.assumptions, zeroinit = false)
         cache.cacheval = solver
         cache.isfresh = false
     end

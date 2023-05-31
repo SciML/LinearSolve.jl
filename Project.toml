@@ -27,7 +27,7 @@ SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 
 [compat]
-ArrayInterface = "7.3"
+ArrayInterface = "7.4.7"
 DocStringExtensions = "0.8, 0.9"
 EnumX = "1"
 FastLapackInterface = "1"

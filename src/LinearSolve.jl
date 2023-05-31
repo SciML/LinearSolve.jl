@@ -77,6 +77,7 @@ isopenblas() = IS_OPENBLAS[]
 
 import PrecompileTools
 
+#=
 PrecompileTools.@compile_workload begin
     A = rand(4, 4)
     b = rand(4)
@@ -104,12 +105,14 @@ PrecompileTools.@compile_workload begin
     sol = solve(prob) # in case sparspak is used as default
     sol = solve(prob, SparspakFactorization())
 end
+=#
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
        NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
        UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization,
-       SparspakFactorization, DiagonalFactorization
+       SparspakFactorization, DiagonalFactorization, CholeskyFactorization,
+       BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization
 
 export LinearSolveFunction, DirectLdiv!
 

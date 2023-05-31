@@ -254,22 +254,24 @@ end
         end
     end
 
-    @testset "CHOLMOD" begin
-        # Create a posdef symmetric matrix
-        A = sprand(100, 100, 0.01)
-        A = A + A' + 100 * I
+    if VERSION > v"1.7-"
+        @testset "CHOLMOD" begin
+            # Create a posdef symmetric matrix
+            A = sprand(100, 100, 0.01)
+            A = A + A' + 100 * I
 
-        # rhs
-        b = rand(100)
+            # rhs
+            b = rand(100)
 
-        # Set the problem
-        prob = LinearProblem(A, b)
-        sol = solve(prob)
+            # Set the problem
+            prob = LinearProblem(A, b)
+            sol = solve(prob)
 
-        # Enforce symmetry to use Cholesky, since A is symmetric and posdef
-        prob2 = LinearProblem(Symmetric(A), b)
-        sol2 = solve(prob2)
-        @test abs(norm(A * sol2.u .- b) - norm(A * sol.u .- b)) < 1e-12
+            # Enforce symmetry to use Cholesky, since A is symmetric and posdef
+            prob2 = LinearProblem(Symmetric(A), b)
+            sol2 = solve(prob2)
+            @test abs(norm(A * sol2.u .- b) - norm(A * sol.u .- b)) < 1e-12
+        end
     end
 
     @testset "Preconditioners" begin
@@ -405,8 +407,10 @@ end
             prob1 = LinearProblem(op1, b1; u0 = x1)
             prob2 = LinearProblem(op2, b2; u0 = x2)
 
-            @test LinearSolve.defaultalg(op1, x1) isa DirectLdiv!
-            @test LinearSolve.defaultalg(op2, x2) isa DirectLdiv!
+            @test LinearSolve.defaultalg(op1, x1).alg ===
+                  LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
+            @test LinearSolve.defaultalg(op2, x2).alg ===
+                  LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
 
             test_interface(DirectLdiv!(), prob1, prob2)
             test_interface(nothing, prob1, prob2)

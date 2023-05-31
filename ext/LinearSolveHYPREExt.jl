@@ -88,8 +88,8 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
 
     cache = LinearCache{
                         typeof(A), typeof(b), typeof(u0), typeof(p), typeof(alg), Tc,
-                        typeof(Pl), typeof(Pr), typeof(reltol), __issquare(assumptions),
-                        __conditioning(assumptions)
+                        typeof(Pl), typeof(Pr), typeof(reltol),
+                        typeof(__issquare(assumptions))
                         }(A, b, u0, p, alg, cacheval, isfresh, Pl, Pr, abstol, reltol,
                           maxiters,
                           verbose, assumptions)

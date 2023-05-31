@@ -1,8 +1,14 @@
 module LinearSolveIterativeSolversExt
 
-using LinearSolve, IterativeSolvers, LinearAlgebra
+using LinearSolve, LinearAlgebra
 using LinearSolve: LinearCache
 import LinearSolve: IterativeSolversJL
+
+if isdefined(Base, :get_extension) 
+    using IterativeSolvers
+else 
+    using ..IterativeSolvers
+end
 
 function LinearSolve.IterativeSolversJL(args...;
     generate_iterator = IterativeSolvers.gmres_iterable!,

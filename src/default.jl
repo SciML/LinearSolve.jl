@@ -357,8 +357,15 @@ end
 function defaultalg_symbol(::Type{T}) where {T}
     Symbol(split(string(SciMLBase.parameterless_type(T)), ".")[end])
 end
-function defaultalg_symbol(::Type{<:GenericLUFactorization{LinearAlgebra.RowMaximum}})
-    :RowMaximumGenericLUFactorization
+
+@static if VERSION < v"1.7beta"
+    function defaultalg_symbol(::Type{<:GenericLUFactorization{false}})
+        :RowMaximumGenericLUFactorization
+    end
+else
+    function defaultalg_symbol(::Type{<:GenericLUFactorization{LinearAlgebra.RowMaximum}})
+        :RowMaximumGenericLUFactorization
+    end
 end
 defaultalg_symbol(::Type{<:GenericFactorization{typeof(ldlt!)}}) = :LDLtFactorization
 

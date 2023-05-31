@@ -66,3 +66,25 @@ else
         dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing
     end
 end
+
+struct KrylovKitJL{F, A, I, K} <: LinearSolve.AbstractKrylovSubspaceMethod
+    KrylovAlg::F
+    gmres_restart::I
+    args::A
+    kwargs::K
+end
+
+function KrylovKitJL_CG end
+function KrylovKitJL_GMRES end
+
+struct IterativeSolversJL{F, I, A, K} <: LinearSolve.AbstractKrylovSubspaceMethod
+    generate_iterator::F
+    gmres_restart::I
+    args::A
+    kwargs::K
+end
+
+function IterativeSolversJL_CG end
+function IterativeSolversJL_GMRES end
+function IterativeSolversJL_BICGSTAB end
+function IterativeSolversJL_MINRES end

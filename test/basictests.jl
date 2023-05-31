@@ -1,5 +1,6 @@
 using LinearSolve, LinearAlgebra, SparseArrays, MultiFloats, ForwardDiff
 using SciMLOperators
+using IterativeSolvers, KrylovKit
 using Test
 import Random
 

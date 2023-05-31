@@ -7,7 +7,6 @@ using ArrayInterface
 using RecursiveFactorization
 using Base: cache_dependencies, Bool
 using LinearAlgebra
-using IterativeSolvers: Identity
 using SparseArrays
 using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
 using SciMLBase: AbstractLinearAlgorithm
@@ -26,8 +25,6 @@ import Preferences
 
 # wrap
 import Krylov
-import KrylovKit
-import IterativeSolvers
 
 using Reexport
 @reexport using SciMLBase
@@ -49,7 +46,6 @@ needs_concrete_A(alg::AbstractSolveFunction) = false
 _isidentity_struct(A) = false
 _isidentity_struct(λ::Number) = isone(λ)
 _isidentity_struct(A::UniformScaling) = isone(A.λ)
-_isidentity_struct(::IterativeSolvers.Identity) = true
 _isidentity_struct(::SciMLOperators.IdentityOperator) = true
 _isidentity_struct(::SciMLBase.DiffEqIdentity) = true
 

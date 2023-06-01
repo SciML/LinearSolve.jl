@@ -1128,11 +1128,6 @@ end
 
 ## FastLAPACKFactorizations
 
-struct WorkspaceAndFactors{W, F}
-    workspace::W
-    factors::F
-end
-
 # There's no options like pivot here.
 # But I'm not sure it makes sense as a GenericFactorization
 # since it just uses `LAPACK.getrf!`.
@@ -1147,8 +1142,9 @@ struct FastLUFactorization <: AbstractFactorization end
 function init_cacheval(::FastLUFactorization, A, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
+    A = convert(AbstractMatrix, A)
     ws = LUWs(A)
-    return WorkspaceAndFactors(ws, ArrayInterface.lu_instance(convert(AbstractMatrix, A)))
+    return (ws, ArrayInterface.lu_instance(A))
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::FastLUFactorization; kwargs...)
@@ -1158,12 +1154,11 @@ function SciMLBase.solve!(cache::LinearCache, alg::FastLUFactorization; kwargs..
     if cache.isfresh
         # we will fail here if A is a different *size* than in a previous version of the same cache.
         # it may instead be desirable to resize the workspace.
-        @set! ws_and_fact.factors = LinearAlgebra.LU(LAPACK.getrf!(ws_and_fact.workspace,
-                                                                   A)...)
-        cache.cacheval = ws_and_fact
+        factors = LinearAlgebra.LU(LAPACK.getrf!(ws_and_fact[1], A)...)
+        cache.cacheval = (ws_and_fact[1], factors)
         cache.isfresh = false
     end
-    y = ldiv!(cache.u, cache.cacheval.factors, cache.b)
+    y = ldiv!(cache.u, cache.cacheval[2], cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 

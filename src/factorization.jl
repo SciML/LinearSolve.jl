@@ -38,10 +38,40 @@ end
 
 ## LU Factorizations
 
+"""
+`LUFactorization(pivot=LinearAlgebra.RowMaximum())`
+
+Julia's built in `lu`. Equivalent to calling `lu!(A)`
+    
+      * On dense matrices, this uses the current BLAS implementation of the user's computer,
+        which by default is OpenBLAS but will use MKL if the user does `using MKL` in their
+        system.
+      * On sparse matrices, this will use UMFPACK from SuiteSparse. Note that this will not
+        cache the symbolic factorization.
+      * On CuMatrix, it will use a CUDA-accelerated LU from CuSolver.
+      * On BandedMatrix and BlockBandedMatrix, it will use a banded LU.
+
+## Positional Arguments
+
+* pivot: The choice of pivoting. Defaults to `LinearAlgebra.RowMaximum()`. The other choice is
+  `LinearAlgebra.NoPivot()`.
+"""
 struct LUFactorization{P} <: AbstractFactorization
     pivot::P
 end
 
+"""
+`GenericLUFactorization(pivot=LinearAlgebra.RowMaximum())`
+
+Julia's built in generic LU factorization. Equivalent to calling LinearAlgebra.generic_lufact!.
+Supports arbitrary number types but does not achieve as good scaling as BLAS-based LU implementations.
+Has low overhead and is good for small matrices.
+
+## Positional Arguments
+
+* pivot: The choice of pivoting. Defaults to `LinearAlgebra.RowMaximum()`. The other choice is
+  `LinearAlgebra.NoPivot()`.
+"""
 struct GenericLUFactorization{P} <: AbstractFactorization
     pivot::P
 end
@@ -113,6 +143,18 @@ end
 
 ## QRFactorization
 
+"""
+`QRFactorization(pivot=LinearAlgebra.NoPivot(),blocksize=16)`
+
+Julia's built in `qr`. Equivalent to calling `qr!(A)`.
+    
+      * On dense matrices, this uses the current BLAS implementation of the user's computer
+        which by default is OpenBLAS but will use MKL if the user does `using MKL` in their
+        system.
+      * On sparse matrices, this will use SPQR from SuiteSparse
+      * On CuMatrix, it will use a CUDA-accelerated QR from CuSolver.
+      * On BandedMatrix and BlockBandedMatrix, it will use a banded QR.
+"""
 struct QRFactorization{P} <: AbstractFactorization
     pivot::P
     blocksize::Int
@@ -169,6 +211,18 @@ end
 
 ## CholeskyFactorization
 
+"""
+`CholeskyFactorization(; pivot = nothing, tol = 0.0, shift = 0.0, perm = nothing)`
+
+Julia's built in `cholesky`. Equivalent to calling `cholesky!(A)`.
+
+## Keyword Arguments
+
+* pivot: defaluts to NoPivot, can also be RowMaximum.
+* tol: the tol argument in CHOLMOD. Only used for sparse matrices.
+* shift: the shift argument in CHOLMOD. Only used for sparse matrices.
+* perm: the perm argument in CHOLMOD. Only used for sparse matrices.
+"""
 struct CholeskyFactorization{P, P2} <: AbstractFactorization
     pivot::P
     tol::Int
@@ -275,6 +329,15 @@ end
 
 ## SVDFactorization
 
+"""
+`SVDFactorization(full=false,alg=LinearAlgebra.DivideAndConquer())`
+
+Julia's built in `svd`. Equivalent to `svd!(A)`.
+    
+      * On dense matrices, this uses the current BLAS implementation of the user's computer
+        which by default is OpenBLAS but will use MKL if the user does `using MKL` in their
+        system.
+"""
 struct SVDFactorization{A} <: AbstractFactorization
     full::Bool
     alg::A
@@ -319,6 +382,16 @@ end
 
 ## BunchKaufmanFactorization
 
+"""
+`BunchKaufmanFactorization(; rook = false)`
+
+Julia's built in `bunchkaufman`. Equivalent to calling `bunchkaufman(A)`.
+Only for Symmetric matrices.
+
+## Keyword Arguments
+
+* rook: whether to perform rook pivoting. Defaults to false.
+"""
 Base.@kwdef struct BunchKaufmanFactorization <: AbstractFactorization
     rook::Bool = false
 end
@@ -353,6 +426,25 @@ end
 
 ## GenericFactorization
 
+"""
+`GenericFactorization(;fact_alg=LinearAlgebra.factorize)`: Constructs a linear solver from a generic
+    factorization algorithm `fact_alg` which complies with the Base.LinearAlgebra
+    factorization API. Quoting from Base:
+    
+      * If `A` is upper or lower triangular (or diagonal), no factorization of `A` is
+        required. The system is then solved with either forward or backward substitution.
+        For non-triangular square matrices, an LU factorization is used.
+        For rectangular `A` the result is the minimum-norm least squares solution computed by a
+        pivoted QR factorization of `A` and a rank estimate of `A` based on the R factor.
+        When `A` is sparse, a similar polyalgorithm is used. For indefinite matrices, the `LDLt`
+        factorization does not use pivoting during the numerical factorization and therefore the
+        procedure can fail even for invertible matrices.
+
+## Keyword Arguments
+
+* fact_alg: the factorization algorithm to use. Defaults to `LinearAlgebra.factorize`, but can be
+  swapped to choices like `lu`, `qr`
+"""
 struct GenericFactorization{F} <: AbstractFactorization
     fact_alg::F
 end
@@ -557,6 +649,19 @@ end
 
 ################################## Factorizations which require solve! overloads
 
+"""
+`UMFPACKFactorization(;reuse_symbolic=true, check_pattern=true)`
+
+A fast sparse multithreaded LU-factorization which specializes on sparsity 
+patterns with “more structure”.
+
+!!! note
+
+    By default, the SuiteSparse.jl are implemented for efficiency by caching the
+    symbolic factorization. I.e., if `set_A` is used, it is expected that the new
+    `A` has the same sparsity pattern as the previous `A`. If this algorithm is to
+    be used in a context where that assumption does not hold, set `reuse_symbolic=false`.
+"""
 Base.@kwdef struct UMFPACKFactorization <: AbstractFactorization
     reuse_symbolic::Bool = true
     check_pattern::Bool = true # Check factorization re-use
@@ -649,6 +754,18 @@ function SciMLBase.solve!(cache::LinearCache, alg::UMFPACKFactorization; kwargs.
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
+"""
+`KLUFactorization(;reuse_symbolic=true, check_pattern=true)`
+
+A fast sparse LU-factorization which specializes on sparsity patterns with “less structure”.
+
+!!! note
+
+    By default, the SuiteSparse.jl are implemented for efficiency by caching the
+    symbolic factorization. I.e., if `set_A` is used, it is expected that the new
+    `A` has the same sparsity pattern as the previous `A`. If this algorithm is to
+    be used in a context where that assumption does not hold, set `reuse_symbolic=false`.
+"""
 Base.@kwdef struct KLUFactorization <: AbstractFactorization
     reuse_symbolic::Bool = true
     check_pattern::Bool = true
@@ -723,6 +840,20 @@ end
 
 ## CHOLMODFactorization
 
+"""
+`CHOLMODFactorization(; shift = 0.0, perm = nothing)`
+
+A wrapper of CHOLMOD's polyalgorithm, mixing Cholesky factorization and ldlt.
+Tries cholesky for performance and retries ldlt if conditioning causes Cholesky
+to fail.
+
+Only supports sparse matrices.
+
+## Keyword Arguments
+
+* shift: the shift argument in CHOLMOD. 
+* perm: the perm argument in CHOLMOD
+"""
 Base.@kwdef struct CHOLMODFactorization{T} <: AbstractFactorization
     shift::Float64 = 0.0
     perm::T = nothing
@@ -770,6 +901,15 @@ end
 
 ## RFLUFactorization
 
+"""
+`RFLUFactorization()` 
+
+A fast pure Julia LU-factorization implementation
+using RecursiveFactorization.jl. This is by far the fastest LU-factorization
+implementation, usually outperforming OpenBLAS and MKL for smaller matrices
+(<500x500), but currently optimized only for Base `Array` with `Float32` or `Float64`.  
+Additional optimization for complex matrices is in the works.
+"""
 struct RFLUFactorization{P, T} <: AbstractFactorization
     RFLUFactorization(::Val{P}, ::Val{T}) where {P, T} = new{P, T}()
 end
@@ -826,6 +966,17 @@ end
 
 ## NormalCholeskyFactorization
 
+"""
+`NormalCholeskyFactorization(pivot = RowMaximum())`
+
+A fast factorization which uses a Cholesky factorization on A * A'. Can be much
+faster than LU factorization, but is not as numerically stable and thus should only
+be applied to well-conditioned matrices.
+
+## Positional Arguments
+
+* pivot: Defaults to RowMaximum(), but can be NoPivot()
+"""
 struct NormalCholeskyFactorization{P} <: AbstractFactorization
     pivot::P
 end
@@ -833,9 +984,9 @@ end
 function NormalCholeskyFactorization(; pivot = nothing)
     if pivot === nothing
         pivot = @static if VERSION < v"1.7beta"
-            Val(true)
+            Val(false)
         else
-            RowMaximum()
+            NoPivot()
         end
     end
     NormalCholeskyFactorization(pivot)
@@ -907,6 +1058,17 @@ end
 
 ## NormalBunchKaufmanFactorization
 
+"""
+`NormalBunchKaufmanFactorization(rook = false)`
+
+A fast factorization which uses a BunchKaufman factorization on A * A'. Can be much
+faster than LU factorization, but is not as numerically stable and thus should only
+be applied to well-conditioned matrices.
+
+## Positional Arguments
+
+* rook: whether to perform rook pivoting. Defaults to false.
+"""
 struct NormalBunchKaufmanFactorization <: AbstractFactorization
     rook::Bool
 end
@@ -939,6 +1101,11 @@ end
 
 ## DiagonalFactorization
 
+"""
+`DiagonalFactorization()`
+
+A special implementation only for solving `Diagonal` matrices fast.
+"""
 struct DiagonalFactorization <: AbstractFactorization end
 
 function init_cacheval(alg::DiagonalFactorization, A, b, u, Pl, Pr, maxiters::Int,
@@ -969,6 +1136,12 @@ end
 # There's no options like pivot here.
 # But I'm not sure it makes sense as a GenericFactorization
 # since it just uses `LAPACK.getrf!`.
+"""
+`FastLUFactorization()` 
+
+The FastLapackInterface.jl version of the LU factorization. Notably,
+this version does not allow for choice of pivoting method.
+"""
 struct FastLUFactorization <: AbstractFactorization end
 
 function init_cacheval(::FastLUFactorization, A, b, u, Pl, Pr,
@@ -994,6 +1167,11 @@ function SciMLBase.solve!(cache::LinearCache, alg::FastLUFactorization; kwargs..
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
+"""
+`FastQRFactorization()` 
+
+The FastLapackInterface.jl version of the QR factorization.
+"""
 struct FastQRFactorization{P} <: AbstractFactorization
     pivot::P
     blocksize::Int
@@ -1071,6 +1249,22 @@ end
 
 ## SparspakFactorization is here since it's MIT licensed, not GPL
 
+"""
+`SparspakFactorization(reuse_symbolic = true)`
+
+This is the translation of the well-known sparse matrix software Sparspak
+(Waterloo Sparse Matrix Package), solving
+large sparse systems of linear algebraic equations. Sparspak is composed of the
+subroutines from the book "Computer Solution of Large Sparse Positive Definite
+Systems" by Alan George and Joseph Liu. Originally written in Fortran 77, later
+rewritten in Fortran 90. Here is the software translated into Julia.
+
+The Julia rewrite is released  under the MIT license with an express permission
+from the authors of the Fortran package. The package uses multiple
+dispatch to route around standard BLAS routines in the case e.g. of arbitrary-precision
+floating point numbers or ForwardDiff.Dual.
+This e.g. allows for Automatic Differentiation (AD) of a sparse-matrix solve.
+"""
 Base.@kwdef struct SparspakFactorization <: AbstractFactorization
     reuse_symbolic::Bool = true
 end

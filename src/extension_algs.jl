@@ -133,7 +133,6 @@ default handling process. This should not be required by most users.
 MKLPardisoIterate(; kwargs...) = PardisoJL(; solver_type = 1, kwargs...)
 
 @static if VERSION >= v"1.9-"
-
     """
     ```julia
     PardisoJL(; nprocs::Union{Int, Nothing} = nothing,
@@ -146,7 +145,7 @@ MKLPardisoIterate(; kwargs...) = PardisoJL(; solver_type = 1, kwargs...)
     A generic method using MKL Pardiso. Specifying `solver_type` is required.
 
     !!! note
-    
+
         Using this solver requires adding the package Pardiso.jl, i.e. `using Pardiso`
 
     ## Keyword Arguments

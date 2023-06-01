@@ -7,12 +7,14 @@ The following are the options these algorithms take, along with their defaults.
 
 ## General Controls
 
-  - `alias_A`: Whether to alias the matrix `A` or use a copy by default. When true,
+  - `alias_A::Bool`: Whether to alias the matrix `A` or use a copy by default. When `true`,
     algorithms like LU-factorization can be faster by reusing the memory via `lu!`,
-    but care must be taken as the original input will be modified. Default is `false`.
-  - `alias_b`: Whether to alias the matrix `b` or use a copy by default. When true,
+    but care must be taken as the original input will be modified. Default is `true` if the
+    algorithm is known not to modify `A`, otherwise is `false`.
+  - `alias_b::Bool`: Whether to alias the matrix `b` or use a copy by default. When `true`,
     algorithms can write and change `b` upon usage. Care must be taken as the
-    original input will be modified. Default is `false`.
+    original input will be modified. Default is `true` if the algorithm is known not to
+    modify `b`, otherwise `false`.
   - `verbose`: Whether to print extra information. Defaults to `false`.
   - `assumptions`: Sets the assumptions of the operator in order to effect the default
     choice algorithm. See the [Operator Assumptions page for more details](@ref assumptions).

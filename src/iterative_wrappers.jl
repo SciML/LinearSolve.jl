@@ -1,5 +1,15 @@
 ## Krylov.jl
 
+"""
+```julia
+KrylovJL(args...; KrylovAlg = Krylov.gmres!,
+         Pl = nothing, Pr = nothing,
+         gmres_restart = 0, window = 0,
+         kwargs...)
+```
+
+A generic wrapper over the Krylov.jl krylov-subspace iterative solvers.
+"""
 struct KrylovJL{F, I, A, K} <: AbstractKrylovSubspaceMethod
     KrylovAlg::F
     gmres_restart::I
@@ -18,26 +28,68 @@ end
 default_alias_A(::KrylovJL, ::Any, ::Any) = true
 default_alias_b(::KrylovJL, ::Any, ::Any) = true
 
+"""
+```julia
+KrylovJL_CG(args...;  kwargs...)
+```
+
+A generic CG implementation for Hermitian and positive definite linear systems
+"""
 function KrylovJL_CG(args...; kwargs...)
     KrylovJL(args...; KrylovAlg = Krylov.cg!, kwargs...)
 end
 
+"""
+```julia
+KrylovJL_MINRES(args...;  kwargs...)
+```
+
+A generic MINRES implementation for Hermitian linear systems
+"""
 function KrylovJL_MINRES(args...; kwargs...)
     KrylovJL(args...; KrylovAlg = Krylov.minres!, kwargs...)
 end
 
+"""
+```julia
+KrylovJL_GMRES(args...;  gmres_restart = 0, window = 0, kwargs...)
+```
+
+A generic GMRES implementation for square non-Hermitian linear systems
+"""
 function KrylovJL_GMRES(args...; kwargs...)
     KrylovJL(args...; KrylovAlg = Krylov.gmres!, kwargs...)
 end
 
+"""
+```julia
+KrylovJL_BICGSTAB(args...;  kwargs...)
+```
+
+A generic BICGSTAB implementation for square non-Hermitian linear systems
+"""
 function KrylovJL_BICGSTAB(args...; kwargs...)
     KrylovJL(args...; KrylovAlg = Krylov.bicgstab!, kwargs...)
 end
 
+"""
+```julia
+KrylovJL_LSMR(args...;  kwargs...)
+```
+
+A generic LSMR implementation for least-squares problems
+"""
 function KrylovJL_LSMR(args...; kwargs...)
     KrylovJL(args...; KrylovAlg = Krylov.lsmr!, kwargs...)
 end
 
+"""
+```julia
+KrylovJL_CRAIGMR(args...;  kwargs...)
+```
+
+A generic CRAIGMR implementation for least-norm problems
+"""
 function KrylovJL_CRAIGMR(args...; kwargs...)
     KrylovJL(args...; KrylovAlg = Krylov.craigmr!, kwargs...)
 end

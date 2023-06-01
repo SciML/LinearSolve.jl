@@ -6,29 +6,6 @@ function _ldiv!(x::Vector, A::Factorization, b::Vector)
     ldiv!(A, x)
 end
 
-@generated function SciMLBase.solve!(cache::LinearCache, alg::AbstractFactorization;
-                                     kwargs...)
-    quote
-        if cache.isfresh
-            fact = do_factorization(alg, cache.A, cache.b, cache.u)
-            cache.cacheval = fact
-            cache.isfresh = false
-        end
-        y = _ldiv!(cache.u, get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
-                   cache.b)
-
-        #=
-        retcode = if LinearAlgebra.issuccess(fact)
-            SciMLBase.ReturnCode.Success
-        else
-            SciMLBase.ReturnCode.Failure
-        end
-        SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = retcode)
-        =#
-        SciMLBase.build_linear_solution(alg, y, nothing, cache)
-    end
-end
-
 #RF Bad fallback: will fail if `A` is just a stand-in
 # This should instead just create the factorization type.
 function init_cacheval(alg::AbstractFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,

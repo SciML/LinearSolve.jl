@@ -11,5 +11,5 @@ pages = ["index.md",
     "Solvers" => Any["solvers/solvers.md"],
     "Advanced" => Any["advanced/developing.md"
                       "advanced/custom.md"],
-    "Release Notes" => "release_notes.md"
+    "Release Notes" => "release_notes.md",
 ]

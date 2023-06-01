@@ -66,6 +66,29 @@ include("init.jl")
 include("extension_algs.jl")
 include("deprecated.jl")
 
+@generated function SciMLBase.solve!(cache::LinearCache, alg::AbstractFactorization;
+                                     kwargs...)
+    quote
+        if cache.isfresh
+            fact = do_factorization(alg, cache.A, cache.b, cache.u)
+            cache.cacheval = fact
+            cache.isfresh = false
+        end
+        y = _ldiv!(cache.u, get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
+                   cache.b)
+
+        #=
+        retcode = if LinearAlgebra.issuccess(fact)
+            SciMLBase.ReturnCode.Success
+        else
+            SciMLBase.ReturnCode.Failure
+        end
+        SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = retcode)
+        =#
+        SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    end
+end
+
 @static if INCLUDE_SPARSE
     include("factorization_sparse.jl")
 end
@@ -82,7 +105,6 @@ isopenblas() = IS_OPENBLAS[]
 
 import PrecompileTools
 
-#=
 PrecompileTools.@compile_workload begin
     A = rand(4, 4)
     b = rand(4)
@@ -110,7 +132,6 @@ PrecompileTools.@compile_workload begin
     sol = solve(prob) # in case sparspak is used as default
     sol = solve(prob, SparspakFactorization())
 end
-=#
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,

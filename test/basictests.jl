@@ -200,27 +200,33 @@ end
         end
     end
 
-    @testset "Concrete Factorizations" begin for alg in (LUFactorization(),
-                                                         QRFactorization(),
-                                                         SVDFactorization(),
-                                                         RFLUFactorization())
-        @testset "$alg" begin test_interface(alg, prob1, prob2) end
-    end end
-
-    @testset "Generic Factorizations" begin for fact_alg in (lu, lu!,
-                                                             qr, qr!,
-                                                             cholesky,
-                                                             #cholesky!,
-                                                             #ldlt, ldlt!,
-                                                             bunchkaufman, bunchkaufman!,
-                                                             lq, lq!,
-                                                             svd, svd!,
-                                                             LinearAlgebra.factorize)
-        @testset "fact_alg = $fact_alg" begin
-            alg = GenericFactorization(fact_alg = fact_alg)
-            test_interface(alg, prob1, prob2)
+    @testset "Concrete Factorizations" begin
+        for alg in (LUFactorization(),
+                    QRFactorization(),
+                    SVDFactorization(),
+                    RFLUFactorization())
+            @testset "$alg" begin
+                test_interface(alg, prob1, prob2)
+            end
         end
-    end end
+    end
+
+    @testset "Generic Factorizations" begin
+        for fact_alg in (lu, lu!,
+                         qr, qr!,
+                         cholesky,
+                         #cholesky!,
+                         #ldlt, ldlt!,
+                         bunchkaufman, bunchkaufman!,
+                         lq, lq!,
+                         svd, svd!,
+                         LinearAlgebra.factorize)
+            @testset "fact_alg = $fact_alg" begin
+                alg = GenericFactorization(fact_alg = fact_alg)
+                test_interface(alg, prob1, prob2)
+            end
+        end
+    end
 
     @testset "KrylovJL" begin
         kwargs = (; gmres_restart = 5)
@@ -229,7 +235,9 @@ end
                     ("GMRES", KrylovJL_GMRES(kwargs...)),
                     #           ("BICGSTAB",KrylovJL_BICGSTAB(kwargs...)),
                     ("MINRES", KrylovJL_MINRES(kwargs...)))
-            @testset "$(alg[1])" begin test_interface(alg[2], prob1, prob2) end
+            @testset "$(alg[1])" begin
+                test_interface(alg[2], prob1, prob2)
+            end
         end
     end
 
@@ -242,7 +250,9 @@ end
                         #           ("BICGSTAB",IterativeSolversJL_BICGSTAB(kwargs...)),
                         #            ("MINRES",IterativeSolversJL_MINRES(kwargs...)),
                         )
-                @testset "$(alg[1])" begin test_interface(alg[2], prob1, prob2) end
+                @testset "$(alg[1])" begin
+                    test_interface(alg[2], prob1, prob2)
+                end
             end
         end
     end
@@ -252,7 +262,9 @@ end
         for alg in (("Default", KrylovKitJL(kwargs...)),
                     ("CG", KrylovKitJL_CG(kwargs...)),
                     ("GMRES", KrylovKitJL_GMRES(kwargs...)))
-            @testset "$(alg[1])" begin test_interface(alg[2], prob1, prob2) end
+            @testset "$(alg[1])" begin
+                test_interface(alg[2], prob1, prob2)
+            end
             @test alg[2] isa KrylovKitJL
         end
     end

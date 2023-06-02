@@ -121,7 +121,7 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
                         verbose::Bool = false,
                         Pl = IdentityOperator(size(prob.A)[1]),
                         Pr = IdentityOperator(size(prob.A)[2]),
-                        assumptions = OperatorAssumptions(Val(issquare(prob.A))),
+                        assumptions = OperatorAssumptions(issquare(prob.A)),
                         kwargs...)
     @unpack A, b, u0, p = prob
 

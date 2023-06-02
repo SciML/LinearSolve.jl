@@ -1,26 +1,3 @@
-EnumX.@enumx DefaultAlgorithmChoice begin
-    LUFactorization
-    QRFactorization
-    DiagonalFactorization
-    DirectLdiv!
-    SparspakFactorization
-    KLUFactorization
-    UMFPACKFactorization
-    KrylovJL_GMRES
-    GenericLUFactorization
-    RFLUFactorization
-    LDLtFactorization
-    BunchKaufmanFactorization
-    CHOLMODFactorization
-    SVDFactorization
-    CholeskyFactorization
-    NormalCholeskyFactorization
-end
-
-struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm
-    alg::DefaultAlgorithmChoice.T
-end
-
 mutable struct DefaultLinearSolverInit{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12,
                                        T13, T14, T15, T16}
     LUFactorization::T1
@@ -311,35 +288,6 @@ cache.cacheval = NamedTuple(LUFactorization = cache of LUFactorization, ...)
         end
     end
     Expr(:call, :DefaultLinearSolverInit, caches...)
-end
-
-"""
-if algsym === :LUFactorization
-    cache.cacheval.LUFactorization = ...
-else
-    ...
-end
-"""
-@generated function get_cacheval(cache::LinearCache, algsym::Symbol)
-    ex = :()
-    for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))
-        ex = if ex == :()
-            Expr(:elseif, :(algsym === $(Meta.quot(alg))),
-                 :(getfield(cache.cacheval, $(Meta.quot(alg)))))
-        else
-            Expr(:elseif, :(algsym === $(Meta.quot(alg))),
-                 :(getfield(cache.cacheval, $(Meta.quot(alg)))), ex)
-        end
-    end
-    ex = Expr(:if, ex.args...)
-
-    quote
-        if cache.alg isa DefaultLinearSolver
-            $ex
-        else
-            cache.cacheval
-        end
-    end
 end
 
 function defaultalg_symbol(::Type{T}) where {T}

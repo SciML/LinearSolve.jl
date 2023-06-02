@@ -1,3 +1,13 @@
+macro get_cacheval(cache, algsym)
+    quote
+        if $(esc(cache)).alg isa DefaultLinearSolver
+            getfield($(esc(cache)).cacheval, $algsym)
+        else
+            $(esc(cache)).cacheval
+        end
+    end
+end
+
 _ldiv!(x, A, b) = ldiv!(x, A, b)
 
 function _ldiv!(x::Vector, A::Factorization, b::Vector)
@@ -712,11 +722,11 @@ function SciMLBase.solve!(cache::LinearCache, alg::UMFPACKFactorization; kwargs.
             if alg.check_pattern && !(SuiteSparse.decrement(SparseArrays.getcolptr(A)) ==
                  cache.cacheval.colptr &&
                  SuiteSparse.decrement(SparseArrays.getrowval(A)) ==
-                 get_cacheval(cache, :UMFPACKFactorization).rowval)
+                 @get_cacheval(cache, :UMFPACKFactorization).rowval)
                 fact = lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                                           nonzeros(A)))
             else
-                fact = lu!(get_cacheval(cache, :UMFPACKFactorization),
+                fact = lu!(@get_cacheval(cache, :UMFPACKFactorization),
                            SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                                            nonzeros(A)))
             end
@@ -727,7 +737,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::UMFPACKFactorization; kwargs.
         cache.isfresh = false
     end
 
-    y = ldiv!(cache.u, get_cacheval(cache, :UMFPACKFactorization), cache.b)
+    y = ldiv!(cache.u, @get_cacheval(cache, :UMFPACKFactorization), cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
@@ -782,7 +792,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KLUFactorization; kwargs...)
     A = convert(AbstractMatrix, A)
 
     if cache.isfresh
-        cacheval = get_cacheval(cache, :KLUFactorization)
+        cacheval = @get_cacheval(cache, :KLUFactorization)
         if cacheval !== nothing && alg.reuse_symbolic
             if alg.check_pattern && !(SuiteSparse.decrement(SparseArrays.getcolptr(A)) ==
                  cacheval.colptr &&
@@ -811,7 +821,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KLUFactorization; kwargs...)
         cache.isfresh = false
     end
 
-    y = ldiv!(cache.u, get_cacheval(cache, :KLUFactorization), cache.b)
+    y = ldiv!(cache.u, @get_cacheval(cache, :KLUFactorization), cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
@@ -863,7 +873,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::CHOLMODFactorization; kwargs.
     A = convert(AbstractMatrix, A)
 
     if cache.isfresh
-        cacheval = get_cacheval(cache, :CHOLMODFactorization)
+        cacheval = @get_cacheval(cache, :CHOLMODFactorization)
         fact = cholesky(A; check = false)
         if !LinearAlgebra.issuccess(fact)
             ldlt!(fact, A; check = false)
@@ -872,7 +882,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::CHOLMODFactorization; kwargs.
         cache.isfresh = false
     end
 
-    cache.u .= get_cacheval(cache, :CHOLMODFactorization) \ cache.b
+    cache.u .= @get_cacheval(cache, :CHOLMODFactorization) \ cache.b
     SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
 end
 
@@ -928,7 +938,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::RFLUFactorization{P, T};
                           kwargs...) where {P, T}
     A = cache.A
     A = convert(AbstractMatrix, A)
-    fact, ipiv = get_cacheval(cache, :RFLUFactorization)
+    fact, ipiv = @get_cacheval(cache, :RFLUFactorization)
     if cache.isfresh
         if length(ipiv) != min(size(A)...)
             ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
@@ -937,7 +947,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::RFLUFactorization{P, T};
         cache.cacheval = (fact, ipiv)
         cache.isfresh = false
     end
-    y = ldiv!(cache.u, get_cacheval(cache, :RFLUFactorization)[1], cache.b)
+    y = ldiv!(cache.u, @get_cacheval(cache, :RFLUFactorization)[1], cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
@@ -1025,10 +1035,10 @@ function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization;
         cache.isfresh = false
     end
     if A isa SparseMatrixCSC
-        cache.u .= get_cacheval(cache, :NormalCholeskyFactorization) \ (A' * cache.b)
+        cache.u .= @get_cacheval(cache, :NormalCholeskyFactorization) \ (A' * cache.b)
         y = cache.u
     else
-        y = ldiv!(cache.u, get_cacheval(cache, :NormalCholeskyFactorization), A' * cache.b)
+        y = ldiv!(cache.u, @get_cacheval(cache, :NormalCholeskyFactorization), A' * cache.b)
     end
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
@@ -1072,7 +1082,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::NormalBunchKaufmanFactorizati
         cache.cacheval = fact
         cache.isfresh = false
     end
-    y = ldiv!(cache.u, get_cacheval(cache, :NormalBunchKaufmanFactorization), A' * cache.b)
+    y = ldiv!(cache.u, @get_cacheval(cache, :NormalBunchKaufmanFactorization), A' * cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
@@ -1131,7 +1141,7 @@ end
 function SciMLBase.solve!(cache::LinearCache, alg::FastLUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
-    ws_and_fact = get_cacheval(cache, :FastLUFactorization)
+    ws_and_fact = @get_cacheval(cache, :FastLUFactorization)
     if cache.isfresh
         # we will fail here if A is a different *size* than in a previous version of the same cache.
         # it may instead be desirable to resize the workspace.
@@ -1201,7 +1211,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::FastQRFactorization{P};
                           kwargs...) where {P}
     A = cache.A
     A = convert(AbstractMatrix, A)
-    ws_and_fact = get_cacheval(cache, :FastQRFactorization)
+    ws_and_fact = @get_cacheval(cache, :FastQRFactorization)
     if cache.isfresh
         # we will fail here if A is a different *size* than in a previous version of the same cache.
         # it may instead be desirable to resize the workspace.
@@ -1281,7 +1291,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::SparspakFactorization; kwargs
     A = cache.A
     if cache.isfresh
         if cache.cacheval !== nothing && alg.reuse_symbolic
-            fact = sparspaklu!(get_cacheval(cache, :SparspakFactorization),
+            fact = sparspaklu!(@get_cacheval(cache, :SparspakFactorization),
                                SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                                                nonzeros(A)))
         else
@@ -1291,6 +1301,6 @@ function SciMLBase.solve!(cache::LinearCache, alg::SparspakFactorization; kwargs
         cache.cacheval = fact
         cache.isfresh = false
     end
-    y = ldiv!(cache.u, get_cacheval(cache, :SparspakFactorization), cache.b)
+    y = ldiv!(cache.u, @get_cacheval(cache, :SparspakFactorization), cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end

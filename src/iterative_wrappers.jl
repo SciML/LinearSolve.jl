@@ -161,6 +161,8 @@ function get_KrylovJL_solver(KrylovAlg)
         Krylov.GpmrSolver
     elseif (KrylovAlg === Krylov.fom!)
         Krylov.FomSolver
+    else
+        error("Invalid Krylov method detected")
     end
 
     return KS
@@ -241,7 +243,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     itmax = cache.maxiters
     verbose = cache.verbose ? 1 : 0
 
-    args = (cache.cacheval, cache.A, cache.b)
+    args = (@get_cacheval(cache, :KrylovJL_GMRES), cache.A, cache.b)
     kwargs = (atol = atol, rtol = rtol, itmax = itmax, verbose = verbose,
               ldiv = true, history = true, alg.kwargs...)
 

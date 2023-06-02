@@ -25,12 +25,12 @@ defaultalg(A, b) = defaultalg(A, b, OperatorAssumptions(true))
 
 function defaultalg(A::Union{DiffEqArrayOperator, MatrixOperator}, b,
                     assump::OperatorAssumptions)
-    DefaultLinearSolver(defaultalg(A.A, b, assump))
+    defaultalg(A.A, b, assump)
 end
 
 function defaultalg(A, b, assump::OperatorAssumptions{Nothing})
     issq = issquare(A)
-    DefaultLinearSolver(defaultalg(A, b, OperatorAssumptions(issq, assump.condition)))
+    defaultalg(A, b, OperatorAssumptions(issq, assump.condition))
 end
 
 function defaultalg(A::Tridiagonal, b, assump::OperatorAssumptions)

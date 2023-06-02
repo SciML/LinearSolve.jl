@@ -403,7 +403,7 @@ end
         end
 
         @testset "DirectLdiv!" begin
-            function get_operator(A, u)
+            function get_operator(A, u; add_inverse = true)
                 function f(du, u, p, t)
                     println("using FunctionOperator mul!")
                     mul!(du, A, u)
@@ -414,22 +414,35 @@ end
                     ldiv!(du, A, u)
                 end
 
-                FunctionOperator(f, u, u; isinplace = true, op_inverse = fi)
+                if add_inverse
+                    FunctionOperator(f, u, u; isinplace = true, op_inverse = fi)
+                else
+                    FunctionOperator(f, u, u; isinplace = true)
+                end
             end
 
             op1 = get_operator(A1, x1 * 0)
             op2 = get_operator(A2, x2 * 0)
+            op3 = get_operator(A1, x1 * 0; add_inverse = false)
+            op4 = get_operator(A2, x2 * 0; add_inverse = false)
 
             prob1 = LinearProblem(op1, b1; u0 = x1)
             prob2 = LinearProblem(op2, b2; u0 = x2)
+            prob3 = LinearProblem(op1, b1; u0 = x1)
+            prob4 = LinearProblem(op2, b2; u0 = x2)
 
             @test LinearSolve.defaultalg(op1, x1).alg ===
                   LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
             @test LinearSolve.defaultalg(op2, x2).alg ===
                   LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
-
+            @test LinearSolve.defaultalg(op3, x1).alg ===
+                  LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
+            @test LinearSolve.defaultalg(op4, x2).alg ===
+                  LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
             test_interface(DirectLdiv!(), prob1, prob2)
             test_interface(nothing, prob1, prob2)
+            test_interface(KrylovJL_GMRES(), prob3, prob4)
+            test_interface(nothing, prob3, prob4)
         end
     end
 end # testset

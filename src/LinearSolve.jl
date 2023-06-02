@@ -55,6 +55,29 @@ _isidentity_struct(::SciMLBase.DiffEqIdentity) = true
 
 const INCLUDE_SPARSE = Preferences.@load_preference("include_sparse", Base.USE_GPL_LIBS)
 
+EnumX.@enumx DefaultAlgorithmChoice begin
+    LUFactorization
+    QRFactorization
+    DiagonalFactorization
+    DirectLdiv!
+    SparspakFactorization
+    KLUFactorization
+    UMFPACKFactorization
+    KrylovJL_GMRES
+    GenericLUFactorization
+    RFLUFactorization
+    LDLtFactorization
+    BunchKaufmanFactorization
+    CHOLMODFactorization
+    SVDFactorization
+    CholeskyFactorization
+    NormalCholeskyFactorization
+end
+
+struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm
+    alg::DefaultAlgorithmChoice.T
+end
+
 include("common.jl")
 include("factorization.jl")
 include("simplelu.jl")
@@ -74,7 +97,7 @@ include("deprecated.jl")
             cache.cacheval = fact
             cache.isfresh = false
         end
-        y = _ldiv!(cache.u, get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
+        y = _ldiv!(cache.u, @get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
                    cache.b)
 
         #=

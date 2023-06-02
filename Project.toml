@@ -1,7 +1,7 @@
 name = "LinearSolve"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 authors = ["SciML"]
-version = "2.1.0"
+version = "2.1.1"
 
 [deps]
 ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
@@ -60,6 +60,7 @@ ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 HYPRE = "b5ffcf37-a2bd-41ab-a3da-4bd9bc8ad771"
 IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
+JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
 KrylovKit = "0b1a1467-8014-51b9-945f-bf0ae24f4b77"
 MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
 MultiFloats = "bdf0d083-296b-4888-a5b6-7498122e68a5"
@@ -69,7 +70,7 @@ SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "IterativeSolvers", "InteractiveUtils", "KrylovKit", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI"]
+test = ["Test", "IterativeSolvers", "InteractiveUtils", "JET", "KrylovKit", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI"]
 
 [weakdeps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"

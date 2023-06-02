@@ -1,4 +1,4 @@
-using LinearSolve, LinearAlgebra, SparseArrays, Test
+using LinearSolve, LinearAlgebra, SparseArrays, Test, JET
 @test LinearSolve.defaultalg(nothing, zeros(3)).alg ===
       LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
 @test LinearSolve.defaultalg(nothing, zeros(50)).alg ===
@@ -22,6 +22,19 @@ using LinearSolve, LinearAlgebra, SparseArrays, Test
     A = rand(4, 4)
     b = rand(4)
     prob = LinearProblem(A, b)
+    JET.@test_opt init(prob, nothing)
+    JET.@test_opt solve(prob, LUFactorization())
+    JET.@test_opt solve(prob, GenericLUFactorization())
+    JET.@test_opt solve(prob, QRFactorization())
+    JET.@test_opt solve(prob, DiagonalFactorization())
+    #JET.@test_opt solve(prob, SVDFactorization())
+    #JET.@test_opt solve(prob, KrylovJL_GMRES())
+
+    prob = LinearProblem(sparse(A), b)
+    #JET.@test_opt solve(prob, UMFPACKFactorization())
+    #JET.@test_opt solve(prob, KLUFactorization())
+    #JET.@test_opt solve(prob, SparspakFactorization())
+    #JET.@test_opt solve(prob)
     @inferred solve(prob)
     @inferred init(prob, nothing)
 end

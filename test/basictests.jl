@@ -204,7 +204,8 @@ end
         for alg in (LUFactorization(),
                     QRFactorization(),
                     SVDFactorization(),
-                    RFLUFactorization())
+                    RFLUFactorization(),
+                    LinearSolve.defaultalg(prob1.A, prob1.b))
             @testset "$alg" begin
                 test_interface(alg, prob1, prob2)
             end

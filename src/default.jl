@@ -140,7 +140,7 @@ end
 # Ambiguity handling
 function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.AbstractGPUArray,
                     assump::OperatorAssumptions)
-    if assump.condition === OperatorConodition.IllConditioned || !assump.issq
+    if assump.condition === OperatorCondition.IllConditioned || !assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
     else
         @static if VERSION >= v"1.8-"

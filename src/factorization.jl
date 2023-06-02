@@ -83,7 +83,7 @@ end
 
 function do_factorization(alg::GenericLUFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
-    fact = LinearAlgebra.generic_lufact!(A, alg.pivot)
+    fact = LinearAlgebra.generic_lufact!(A, alg.pivot, check = false)
     return fact
 end
 

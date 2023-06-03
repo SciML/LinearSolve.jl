@@ -267,7 +267,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
         Krylov.solve!(args...; kwargs...)
     end
 
-    resid = cache.cacheval.stats.residuals |> last
+    resid = @get_cacheval(cache, :KrylovJL_GMRES).stats.residuals |> last
 
     return SciMLBase.build_linear_solution(alg, cache.u, resid, cache;
                                            iters = cache.cacheval.stats.niter)

@@ -103,16 +103,10 @@ function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization}, A, b
     ArrayInterface.lu_instance(convert(AbstractMatrix, A))
 end
 
-function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization}, A::MatrixOperator, b, u, Pl, Pr,
-    maxiters::Int, abstol, reltol, verbose::Bool,
-    assumptions::OperatorAssumptions)
-    ArrayInterface.lu_instance(convert(AbstractMatrix, A))
-end
-
 const PREALLOCATED_LU = ArrayInterface.lu_instance(rand(1, 1))
 
 function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization},
-                       A::Union{Matrix{Float64},MatrixOperator{Float64, Matrix{Float64}}}, b, u, Pl, Pr,
+                       A::Matrix{Float64}, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
     PREALLOCATED_LU
@@ -181,7 +175,7 @@ end
 
 const PREALLOCATED_QR = ArrayInterface.qr_instance(rand(1, 1))
 
-function init_cacheval(alg::QRFactorization, A::Union{Matrix{Float64}, MatrixOperator{Float64, Matrix{Float64}}}, b, u, Pl, Pr,
+function init_cacheval(alg::QRFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
     PREALLOCATED_QR
@@ -260,7 +254,7 @@ end
 
 const PREALLOCATED_CHOLESKY = ArrayInterface.cholesky_instance(rand(1, 1), cholpivot)
 
-function init_cacheval(alg::CholeskyFactorization, A::Union{Matrix{Float64}, MatrixOperator{Float64, Matrix{Float64}}}, b, u, Pl, Pr,
+function init_cacheval(alg::CholeskyFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
     PREALLOCATED_CHOLESKY
@@ -352,7 +346,7 @@ end
 
 const PREALLOCATED_SVD = ArrayInterface.svd_instance(rand(1, 1))
 
-function init_cacheval(alg::SVDFactorization, A::Union{Matrix{Float64}, MatrixOperator{Float64, Matrix{Float64}}}, b, u, Pl, Pr,
+function init_cacheval(alg::SVDFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
     PREALLOCATED_SVD
@@ -677,7 +671,7 @@ function init_cacheval(alg::UMFPACKFactorization,
     nothing
 end
 
-function init_cacheval(alg::UMFPACKFactorization, A::Union{SparseMatrixCSC{Float64, Int}, MatrixOperator{Float64, Matrix{Float64}}}, b, u,
+function init_cacheval(alg::UMFPACKFactorization, A::SparseMatrixCSC{Float64, Int}, b, u,
                        Pl, Pr,
                        maxiters::Int, abstol, reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
@@ -774,7 +768,7 @@ function init_cacheval(alg::KLUFactorization,
     nothing
 end
 
-function init_cacheval(alg::KLUFactorization, A::Union{SparseMatrixCSC{Float64, Int}, MatrixOperator{Float64, Matrix{Float64}}}, b, u, Pl,
+function init_cacheval(alg::KLUFactorization, A::SparseMatrixCSC{Float64, Int}, b, u, Pl,
                        Pr,
                        maxiters::Int, abstol, reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
@@ -810,7 +804,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KLUFactorization; kwargs...)
                 # This won't recompute if it does.
                 KLU.klu_analyze!(cacheval)
                 copyto!(cacheval.nzval, nonzeros(A))
-                if cache.cacheval._numeric === C_NULL # We MUST have a numeric factorization for reuse, unlike UMFPACK.
+                if cacheval._numeric === C_NULL # We MUST have a numeric factorization for reuse, unlike UMFPACK.
                     KLU.klu_factor!(cacheval)
                 end
                 fact = KLU.klu!(cacheval,
@@ -861,7 +855,7 @@ function init_cacheval(alg::CHOLMODFactorization,
     nothing
 end
 
-function init_cacheval(alg::CHOLMODFactorization, A::Union{SparseMatrixCSC{Float64, Int}, MatrixOperator{Float64, Matrix{Float64}}}, b, u,
+function init_cacheval(alg::CHOLMODFactorization, A::SparseMatrixCSC{Float64, Int}, b, u,
                        Pl, Pr,
                        maxiters::Int, abstol, reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
@@ -917,13 +911,7 @@ function init_cacheval(alg::RFLUFactorization, A, b, u, Pl, Pr, maxiters::Int,
     ArrayInterface.lu_instance(convert(AbstractMatrix, A)), ipiv
 end
 
-function init_cacheval(alg::RFLUFactorization, A::MatrixOperator, b, u, Pl, Pr, maxiters::Int,
-                       abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
-    ArrayInterface.lu_instance(convert(AbstractMatrix, A)), ipiv
-end
-
-function init_cacheval(alg::RFLUFactorization, A::Union{Matrix{Float64}, MatrixOperator{Float64, Matrix{Float64}}}, b, u, Pl, Pr,
+function init_cacheval(alg::RFLUFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
                        maxiters::Int,
                        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     ipiv = Vector{LinearAlgebra.BlasInt}(undef, 0)
@@ -1278,7 +1266,7 @@ function init_cacheval(alg::SparspakFactorization,
     nothing
 end
 
-function init_cacheval(::SparspakFactorization, A::Union{SparseMatrixCSC{Float64, Int}, MatrixOperator{Float64, Matrix{Float64}}}, b, u, Pl,
+function init_cacheval(::SparspakFactorization, A::SparseMatrixCSC{Float64, Int}, b, u, Pl,
                        Pr, maxiters::Int, abstol,
                        reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
@@ -1315,4 +1303,14 @@ function SciMLBase.solve!(cache::LinearCache, alg::SparspakFactorization; kwargs
     end
     y = ldiv!(cache.u, @get_cacheval(cache, :SparspakFactorization), cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
+end
+
+for alg in InteractiveUtils.subtypes(AbstractFactorization)
+    @eval function init_cacheval(alg::$alg, A::MatrixOperator, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+        init_cacheval(alg, A.A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+    end
 end

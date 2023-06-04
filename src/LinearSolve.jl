@@ -21,6 +21,7 @@ using FastLapackInterface
 using DocStringExtensions
 using EnumX
 using Requires
+import InteractiveUtils
 
 import GPUArraysCore
 import Preferences

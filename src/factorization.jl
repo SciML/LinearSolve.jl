@@ -699,7 +699,8 @@ function init_cacheval(alg::UMFPACKFactorization, A, b, u, Pl, Pr, maxiters::Int
             return SuiteSparse.UMFPACK.UmfpackLU(SparseMatrixCSC(size(A)..., getcolptr(A),
                                                                  rowvals(A), nonzeros(A)))
         end
-
+    elseif !(eltype(A) <: Union{Float32,Float64}) || !(eltype(b) <: Union{Float32,Float64})
+        return nothing # Cannot use Umfpack
     else
         @static if VERSION < v"1.9.0-DEV.1622"
             res = SuiteSparse.UMFPACK.UmfpackLU(C_NULL, C_NULL, 0, 0,
@@ -782,6 +783,8 @@ function init_cacheval(alg::KLUFactorization, A, b, u, Pl, Pr, maxiters::Int, ab
     if typeof(A) <: SparseArrays.AbstractSparseArray
         return KLU.KLUFactorization(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                                                     nonzeros(A)))
+    elseif !(eltype(A) <: Union{Float32,Float64}) || !(eltype(b) <: Union{Float32,Float64})
+        return nothing # Cannot use KLU
     else
         return KLU.KLUFactorization(SparseMatrixCSC(0, 0, [1], Int64[], eltype(A)[]))
     end
@@ -1102,7 +1105,7 @@ end
 
 function SciMLBase.solve!(cache::LinearCache, alg::DiagonalFactorization;
                           kwargs...)
-    A = cache.A
+    A = convert(AbstractMatrix, cache.A)
     if cache.u isa Vector && cache.b isa Vector
         @simd ivdep for i in eachindex(cache.u)
             cache.u[i] = A.diag[i] \ cache.b[i]

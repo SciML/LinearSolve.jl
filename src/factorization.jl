@@ -672,7 +672,7 @@ else
 end
 
 function init_cacheval(alg::UMFPACKFactorization,
-                       A::Union{Nothing, Matrix, AbstractSciMLOperator}, b, u, Pl, Pr,
+                       A, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
     nothing
@@ -685,39 +685,24 @@ function init_cacheval(alg::UMFPACKFactorization, A::SparseMatrixCSC{Float64, In
     PREALLOCATED_UMFPACK
 end
 
-function init_cacheval(alg::UMFPACKFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
+function init_cacheval(alg::UMFPACKFactorization, A::AbstractSparseArray, b, u, Pl, Pr, maxiters::Int, abstol,
                        reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
     A = convert(AbstractMatrix, A)
-
-    if typeof(A) <: SparseArrays.AbstractSparseArray
-        zerobased = SparseArrays.getcolptr(A)[1] == 0
-        @static if VERSION < v"1.9.0-DEV.1622"
-            res = SuiteSparse.UMFPACK.UmfpackLU(C_NULL, C_NULL, size(A, 1), size(A, 2),
-                                                zerobased ?
-                                                copy(SparseArrays.getcolptr(A)) :
-                                                SuiteSparse.decrement(SparseArrays.getcolptr(A)),
-                                                zerobased ? copy(rowvals(A)) :
-                                                SuiteSparse.decrement(rowvals(A)),
-                                                copy(nonzeros(A)), 0)
-            finalizer(SuiteSparse.UMFPACK.umfpack_free_symbolic, res)
-            return res
-        else
-            return SuiteSparse.UMFPACK.UmfpackLU(SparseMatrixCSC(size(A)..., getcolptr(A),
-                                                                 rowvals(A), nonzeros(A)))
-        end
-    elseif !(eltype(A) <: Union{Float32,Float64}) || !(eltype(b) <: Union{Float32,Float64})
-        return nothing # Cannot use Umfpack
+    zerobased = SparseArrays.getcolptr(A)[1] == 0
+    @static if VERSION < v"1.9.0-DEV.1622"
+        res = SuiteSparse.UMFPACK.UmfpackLU(C_NULL, C_NULL, size(A, 1), size(A, 2),
+                                            zerobased ?
+                                            copy(SparseArrays.getcolptr(A)) :
+                                            SuiteSparse.decrement(SparseArrays.getcolptr(A)),
+                                            zerobased ? copy(rowvals(A)) :
+                                            SuiteSparse.decrement(rowvals(A)),
+                                            copy(nonzeros(A)), 0)
+        finalizer(SuiteSparse.UMFPACK.umfpack_free_symbolic, res)
+        return res
     else
-        @static if VERSION < v"1.9.0-DEV.1622"
-            res = SuiteSparse.UMFPACK.UmfpackLU(C_NULL, C_NULL, 0, 0,
-                                                [0], Int64[], eltype(A)[], 0)
-            finalizer(SuiteSparse.UMFPACK.umfpack_free_symbolic, res)
-            return res
-        else
-            return SuiteSparse.UMFPACK.UmfpackLU(SparseMatrixCSC(0, 0, [1], Int64[],
-                                                                 eltype(A)[]))
-        end
+        return SuiteSparse.UMFPACK.UmfpackLU(SparseMatrixCSC(size(A)..., getcolptr(A),
+                                                            rowvals(A), nonzeros(A)))
     end
 end
 
@@ -770,7 +755,7 @@ const PREALLOCATED_KLU = KLU.KLUFactorization(SparseMatrixCSC(0, 0, [1], Int64[]
                                                               Float64[]))
 
 function init_cacheval(alg::KLUFactorization,
-                       A::Union{Matrix, Nothing, AbstractSciMLOperator}, b, u, Pl, Pr,
+                       A, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
     nothing
@@ -783,18 +768,12 @@ function init_cacheval(alg::KLUFactorization, A::SparseMatrixCSC{Float64, Int}, 
     PREALLOCATED_KLU
 end
 
-function init_cacheval(alg::KLUFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
+function init_cacheval(alg::KLUFactorization, A::AbstractSparseArray, b, u, Pl, Pr, maxiters::Int, abstol,
                        reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
     A = convert(AbstractMatrix, A)
-    if typeof(A) <: SparseArrays.AbstractSparseArray
-        return KLU.KLUFactorization(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                                                    nonzeros(A)))
-    elseif !(eltype(A) <: Union{Float32,Float64}) || !(eltype(b) <: Union{Float32,Float64})
-        return nothing # Cannot use KLU
-    else
-        return KLU.KLUFactorization(SparseMatrixCSC(0, 0, [1], Int64[], eltype(A)[]))
-    end
+    return KLU.KLUFactorization(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
+                                            nonzeros(A)))
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::KLUFactorization; kwargs...)
@@ -859,23 +838,17 @@ end
 const PREALLOCATED_CHOLMOD = cholesky(SparseMatrixCSC(0, 0, [1], Int64[], Float64[]))
 
 function init_cacheval(alg::CHOLMODFactorization,
-                       A::Union{Matrix, Nothing, AbstractSciMLOperator}, b, u, Pl, Pr,
+                       A, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
     nothing
 end
 
-function init_cacheval(alg::CHOLMODFactorization, A::SparseMatrixCSC{Float64, Int}, b, u,
+function init_cacheval(alg::CHOLMODFactorization, A, b, u,
                        Pl, Pr,
                        maxiters::Int, abstol, reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
     PREALLOCATED_CHOLMOD
-end
-
-function init_cacheval(alg::CHOLMODFactorization, A::SparseMatrixCSC{Float32, Int}, b, u, Pl, Pr, maxiters::Int, abstol,
-                       reltol,
-                       verbose::Bool, assumptions::OperatorAssumptions)
-    cholesky(SparseMatrixCSC(0, 0, [1], Int64[], eltype(A)[]))
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::CHOLMODFactorization; kwargs...)

@@ -279,6 +279,13 @@ end
                            assumptions::OperatorAssumptions)
         nothing
     end
+
+    function init_cacheval(alg::CholeskyFactorization,
+                           A::Adjoint{<:Array}, b, u, Pl, Pr,
+                           maxiters::Int, abstol, reltol, verbose::Bool,
+                           assumptions::OperatorAssumptions)
+        nothing
+    end
 end
 
 ## LDLtFactorization
@@ -865,7 +872,7 @@ function init_cacheval(alg::CHOLMODFactorization, A::SparseMatrixCSC{Float64, In
     PREALLOCATED_CHOLMOD
 end
 
-function init_cacheval(alg::CHOLMODFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
+function init_cacheval(alg::CHOLMODFactorization, A::SparseMatrixCSC{Float32, Int}, b, u, Pl, Pr, maxiters::Int, abstol,
                        reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)
     cholesky(SparseMatrixCSC(0, 0, [1], Int64[], eltype(A)[]))

@@ -104,7 +104,7 @@ end
 
 # A === nothing case
 function defaultalg(A, b::GPUArraysCore.AbstractGPUArray, assump::OperatorAssumptions)
-    if assump.condition === OperatorConodition.IllConditioned || !assump.issq
+    if assump.condition === OperatorCondition.IllConditioned || !assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
     else
         @static if VERSION >= v"1.8-"

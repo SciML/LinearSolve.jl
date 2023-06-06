@@ -844,7 +844,7 @@ function init_cacheval(alg::CHOLMODFactorization,
     nothing
 end
 
-function init_cacheval(alg::CHOLMODFactorization, A, b, u,
+function init_cacheval(alg::CHOLMODFactorization, A::SparseMatrixCSC{Float64, Int}, b, u,
                        Pl, Pr,
                        maxiters::Int, abstol, reltol,
                        verbose::Bool, assumptions::OperatorAssumptions)

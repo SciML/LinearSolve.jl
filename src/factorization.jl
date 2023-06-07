@@ -838,10 +838,10 @@ function init_cacheval(alg::CHOLMODFactorization,
     nothing
 end
 
-function init_cacheval(alg::CHOLMODFactorization, A::SparseMatrixCSC{Float64, Int}, b, u,
+function init_cacheval(alg::CHOLMODFactorization, A::Union{SparseMatrixCSC{T, Int},  Symmetric{T, SparseMatrixCSC{T, Int}}}, b, u,
                        Pl, Pr,
                        maxiters::Int, abstol, reltol,
-                       verbose::Bool, assumptions::OperatorAssumptions)
+                       verbose::Bool, assumptions::OperatorAssumptions) where {T <: Union{Float32,Float64}}
     PREALLOCATED_CHOLMOD
 end
 

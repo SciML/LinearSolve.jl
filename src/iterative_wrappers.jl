@@ -19,10 +19,10 @@ struct KrylovJL{F, I, A, K} <: AbstractKrylovSubspaceMethod
 end
 
 function KrylovJL(args...; KrylovAlg = Krylov.gmres!,
-                  gmres_restart = 0, window = 0,
-                  kwargs...)
+    gmres_restart = 0, window = 0,
+    kwargs...)
     return KrylovJL(KrylovAlg, gmres_restart, window,
-                    args, kwargs)
+        args, kwargs)
 end
 
 default_alias_A(::KrylovJL, ::Any, ::Any) = true
@@ -170,7 +170,7 @@ end
 
 # zeroinit allows for init_cacheval to start by initing with A (0,0)
 function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
-                       verbose::Bool, assumptions::OperatorAssumptions; zeroinit = true)
+    verbose::Bool, assumptions::OperatorAssumptions; zeroinit = true)
     KS = get_KrylovJL_solver(alg.KrylovAlg)
 
     if zeroinit
@@ -225,8 +225,8 @@ end
 function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     if cache.isfresh
         solver = init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr,
-                               cache.maxiters, cache.abstol, cache.reltol, cache.verbose,
-                               cache.assumptions, zeroinit = false)
+            cache.maxiters, cache.abstol, cache.reltol, cache.verbose,
+            cache.assumptions, zeroinit = false)
         cache.cacheval = solver
         cache.isfresh = false
     end
@@ -245,24 +245,24 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
 
     args = (@get_cacheval(cache, :KrylovJL_GMRES), cache.A, cache.b)
     kwargs = (atol = atol, rtol = rtol, itmax = itmax, verbose = verbose,
-              ldiv = true, history = true, alg.kwargs...)
+        ldiv = true, history = true, alg.kwargs...)
 
     if cache.cacheval isa Krylov.CgSolver
         N !== I &&
             @warn "$(alg.KrylovAlg) doesn't support right preconditioning."
         Krylov.solve!(args...; M = M,
-                      kwargs...)
+            kwargs...)
     elseif cache.cacheval isa Krylov.GmresSolver
         Krylov.solve!(args...; M = M, N = N,
-                      kwargs...)
+            kwargs...)
     elseif cache.cacheval isa Krylov.BicgstabSolver
         Krylov.solve!(args...; M = M, N = N,
-                      kwargs...)
+            kwargs...)
     elseif cache.cacheval isa Krylov.MinresSolver
         N !== I &&
             @warn "$(alg.KrylovAlg) doesn't support right preconditioning."
         Krylov.solve!(args...; M = M,
-                      kwargs...)
+            kwargs...)
     else
         Krylov.solve!(args...; kwargs...)
     end
@@ -271,5 +271,5 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     resid = stats.residuals |> last
 
     return SciMLBase.build_linear_solution(alg, cache.u, resid, cache;
-                                           iters = stats.niter)
+        iters = stats.niter)
 end

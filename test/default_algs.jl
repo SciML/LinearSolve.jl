@@ -9,7 +9,7 @@ using LinearSolve, LinearAlgebra, SparseArrays, Test, JET
       LinearSolve.DefaultAlgorithmChoice.DiagonalFactorization
 
 @test LinearSolve.defaultalg(nothing, zeros(5),
-                             LinearSolve.OperatorAssumptions(false)).alg ===
+    LinearSolve.OperatorAssumptions(false)).alg ===
       LinearSolve.DefaultAlgorithmChoice.QRFactorization
 
 @test LinearSolve.defaultalg(sprand(1000, 1000, 0.01), zeros(1000)).alg ===

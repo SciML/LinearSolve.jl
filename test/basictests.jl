@@ -202,10 +202,10 @@ end
 
     @testset "Concrete Factorizations" begin
         for alg in (LUFactorization(),
-                    QRFactorization(),
-                    SVDFactorization(),
-                    RFLUFactorization(),
-                    LinearSolve.defaultalg(prob1.A, prob1.b))
+            QRFactorization(),
+            SVDFactorization(),
+            RFLUFactorization(),
+            LinearSolve.defaultalg(prob1.A, prob1.b))
             @testset "$alg" begin
                 test_interface(alg, prob1, prob2)
             end
@@ -214,14 +214,14 @@ end
 
     @testset "Generic Factorizations" begin
         for fact_alg in (lu, lu!,
-                         qr, qr!,
-                         cholesky,
-                         #cholesky!,
-                         #ldlt, ldlt!,
-                         bunchkaufman, bunchkaufman!,
-                         lq, lq!,
-                         svd, svd!,
-                         LinearAlgebra.factorize)
+            qr, qr!,
+            cholesky,
+            #cholesky!,
+            #ldlt, ldlt!,
+            bunchkaufman, bunchkaufman!,
+            lq, lq!,
+            svd, svd!,
+            LinearAlgebra.factorize)
             @testset "fact_alg = $fact_alg" begin
                 alg = GenericFactorization(fact_alg = fact_alg)
                 test_interface(alg, prob1, prob2)
@@ -232,10 +232,10 @@ end
     @testset "KrylovJL" begin
         kwargs = (; gmres_restart = 5)
         for alg in (("Default", KrylovJL(kwargs...)),
-                    ("CG", KrylovJL_CG(kwargs...)),
-                    ("GMRES", KrylovJL_GMRES(kwargs...)),
-                    #           ("BICGSTAB",KrylovJL_BICGSTAB(kwargs...)),
-                    ("MINRES", KrylovJL_MINRES(kwargs...)))
+            ("CG", KrylovJL_CG(kwargs...)),
+            ("GMRES", KrylovJL_GMRES(kwargs...)),
+            #           ("BICGSTAB",KrylovJL_BICGSTAB(kwargs...)),
+            ("MINRES", KrylovJL_MINRES(kwargs...)))
             @testset "$(alg[1])" begin
                 test_interface(alg[2], prob1, prob2)
             end
@@ -246,11 +246,11 @@ end
         @testset "IterativeSolversJL" begin
             kwargs = (; gmres_restart = 5)
             for alg in (("Default", IterativeSolversJL(kwargs...)),
-                        ("CG", IterativeSolversJL_CG(kwargs...)),
-                        ("GMRES", IterativeSolversJL_GMRES(kwargs...))
-                        #           ("BICGSTAB",IterativeSolversJL_BICGSTAB(kwargs...)),
-                        #            ("MINRES",IterativeSolversJL_MINRES(kwargs...)),
-                        )
+                ("CG", IterativeSolversJL_CG(kwargs...)),
+                ("GMRES", IterativeSolversJL_GMRES(kwargs...))
+                #           ("BICGSTAB",IterativeSolversJL_BICGSTAB(kwargs...)),
+                #            ("MINRES",IterativeSolversJL_MINRES(kwargs...)),
+            )
                 @testset "$(alg[1])" begin
                     test_interface(alg[2], prob1, prob2)
                 end
@@ -261,8 +261,8 @@ end
     @testset "KrylovKit" begin
         kwargs = (; gmres_restart = 5)
         for alg in (("Default", KrylovKitJL(kwargs...)),
-                    ("CG", KrylovKitJL_CG(kwargs...)),
-                    ("GMRES", KrylovKitJL_GMRES(kwargs...)))
+            ("CG", KrylovKitJL_CG(kwargs...)),
+            ("GMRES", KrylovKitJL_GMRES(kwargs...)))
             @testset "$(alg[1])" begin
                 test_interface(alg[2], prob1, prob2)
             end
@@ -378,7 +378,7 @@ end
 
         @testset "LinearSolveFunction" begin
             function sol_func(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,
-                              kwargs...)
+                kwargs...)
                 if verbose == true
                     println("out-of-place solve")
                 end
@@ -386,7 +386,7 @@ end
             end
 
             function sol_func!(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,
-                               kwargs...)
+                kwargs...)
                 if verbose == true
                     println("in-place solve")
                 end
@@ -397,7 +397,7 @@ end
             prob2 = LinearProblem(A1, b1; u0 = x1)
 
             for alg in (LinearSolveFunction(sol_func),
-                        LinearSolveFunction(sol_func!))
+                LinearSolveFunction(sol_func!))
                 test_interface(alg, prob1, prob2)
             end
         end

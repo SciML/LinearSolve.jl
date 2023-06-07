@@ -81,8 +81,8 @@ end
 
 @static if VERSION >= v"1.9" # qualified names only supported in Julia 1.9
     @deprecate SciMLBase.solve(cache::LinearCache, args...; kwargs...) SciMLBase.solve!(cache::LinearCache,
-                                                                                        args...;
-                                                                                        kwargs...) false
+        args...;
+        kwargs...) false
 else
     function SciMLBase.solve(cache::LinearCache, args...; kwargs...)
         @warn "SciMLBase.solve(cache::LinearCache, args...; kwargs...) is deprecated for SciMLBase.solve!(cache::LinearCache, args...; kwargs...) to follow the CommonSolve.jl interface."

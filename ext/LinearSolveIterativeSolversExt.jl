@@ -11,31 +11,31 @@ else
 end
 
 function LinearSolve.IterativeSolversJL(args...;
-                                        generate_iterator = IterativeSolvers.gmres_iterable!,
-                                        gmres_restart = 0, kwargs...)
+    generate_iterator = IterativeSolvers.gmres_iterable!,
+    gmres_restart = 0, kwargs...)
     return IterativeSolversJL(generate_iterator, gmres_restart,
-                              args, kwargs)
+        args, kwargs)
 end
 
 function LinearSolve.IterativeSolversJL_CG(args...; kwargs...)
     IterativeSolversJL(args...;
-                       generate_iterator = IterativeSolvers.cg_iterator!,
-                       kwargs...)
+        generate_iterator = IterativeSolvers.cg_iterator!,
+        kwargs...)
 end
 function LinearSolve.IterativeSolversJL_GMRES(args...; kwargs...)
     IterativeSolversJL(args...;
-                       generate_iterator = IterativeSolvers.gmres_iterable!,
-                       kwargs...)
+        generate_iterator = IterativeSolvers.gmres_iterable!,
+        kwargs...)
 end
 function LinearSolve.IterativeSolversJL_BICGSTAB(args...; kwargs...)
     IterativeSolversJL(args...;
-                       generate_iterator = IterativeSolvers.bicgstabl_iterator!,
-                       kwargs...)
+        generate_iterator = IterativeSolvers.bicgstabl_iterator!,
+        kwargs...)
 end
 function LinearSolve.IterativeSolversJL_MINRES(args...; kwargs...)
     IterativeSolversJL(args...;
-                       generate_iterator = IterativeSolvers.minres_iterable!,
-                       kwargs...)
+        generate_iterator = IterativeSolvers.minres_iterable!,
+        kwargs...)
 end
 
 LinearSolve._isidentity_struct(::IterativeSolvers.Identity) = true
@@ -43,33 +43,33 @@ LinearSolve.default_alias_A(::IterativeSolversJL, ::Any, ::Any) = true
 LinearSolve.default_alias_b(::IterativeSolversJL, ::Any, ::Any) = true
 
 function LinearSolve.init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, maxiters::Int,
-                                   abstol,
-                                   reltol,
-                                   verbose::Bool, assumptions::OperatorAssumptions)
+    abstol,
+    reltol,
+    verbose::Bool, assumptions::OperatorAssumptions)
     restart = (alg.gmres_restart == 0) ? min(20, size(A, 1)) : alg.gmres_restart
 
     kwargs = (abstol = abstol, reltol = reltol, maxiter = maxiters,
-              alg.kwargs...)
+        alg.kwargs...)
 
     iterable = if alg.generate_iterator === IterativeSolvers.cg_iterator!
         !LinearSolve._isidentity_struct(Pr) &&
             @warn "$(alg.generate_iterator) doesn't support right preconditioning"
         alg.generate_iterator(u, A, b, Pl;
-                              kwargs...)
+            kwargs...)
     elseif alg.generate_iterator === IterativeSolvers.gmres_iterable!
         alg.generate_iterator(u, A, b; Pl = Pl, Pr = Pr, restart = restart,
-                              kwargs...)
+            kwargs...)
     elseif alg.generate_iterator === IterativeSolvers.bicgstabl_iterator!
         !!LinearSolve._isidentity_struct(Pr) &&
             @warn "$(alg.generate_iterator) doesn't support right preconditioning"
         alg.generate_iterator(u, A, b, alg.args...; Pl = Pl,
-                              abstol = abstol, reltol = reltol,
-                              max_mv_products = maxiters * 2,
-                              alg.kwargs...)
+            abstol = abstol, reltol = reltol,
+            max_mv_products = maxiters * 2,
+            alg.kwargs...)
     else # minres, qmr
         alg.generate_iterator(u, A, b, alg.args...;
-                              abstol = abstol, reltol = reltol, maxiter = maxiters,
-                              alg.kwargs...)
+            abstol = abstol, reltol = reltol, maxiter = maxiters,
+            alg.kwargs...)
     end
     return iterable
 end
@@ -77,10 +77,10 @@ end
 function SciMLBase.solve!(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
     if cache.isfresh || !(typeof(alg) <: IterativeSolvers.GMRESIterable)
         solver = LinearSolve.init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl,
-                                           cache.Pr,
-                                           cache.maxiters, cache.abstol, cache.reltol,
-                                           cache.verbose,
-                                           cache.assumptions)
+            cache.Pr,
+            cache.maxiters, cache.abstol, cache.reltol,
+            cache.verbose,
+            cache.assumptions)
         cache.cacheval = solver
         cache.isfresh = false
     end
@@ -111,7 +111,7 @@ function purge_history!(iter::IterativeSolvers.GMRESIterable, x, b)
     iter.b = b
 
     iter.residual.current = IterativeSolvers.init!(iter.arnoldi, iter.x, iter.b, iter.Pl,
-                                                   iter.Ax, initially_zero = true)
+        iter.Ax, initially_zero = true)
     IterativeSolvers.init_residual!(iter.residual, iter.residual.current)
     iter.β = iter.residual.current
     nothing

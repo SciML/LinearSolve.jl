@@ -260,13 +260,7 @@ function init_cacheval(alg::CholeskyFactorization, A::Matrix{Float64}, b, u, Pl,
     PREALLOCATED_CHOLESKY
 end
 
-function init_cacheval(alg::CholeskyFactorization, A::Diagonal, b, u, Pl, Pr,
-                       maxiters::Int, abstol, reltol, verbose::Bool,
-                       assumptions::OperatorAssumptions)
-    nothing
-end
-
-function init_cacheval(alg::CholeskyFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
+function init_cacheval(alg::CholeskyFactorization, A::Union{Diagonal,AbstractSciMLOperator}, b, u, Pl, Pr,
                        maxiters::Int, abstol, reltol, verbose::Bool,
                        assumptions::OperatorAssumptions)
     nothing
@@ -281,7 +275,7 @@ end
     end
 
     function init_cacheval(alg::CholeskyFactorization,
-                           A::Adjoint{<:Array}, b, u, Pl, Pr,
+                           A::Adjoint{<:Number, <:Array}, b, u, Pl, Pr,
                            maxiters::Int, abstol, reltol, verbose::Bool,
                            assumptions::OperatorAssumptions)
         nothing

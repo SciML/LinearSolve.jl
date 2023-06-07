@@ -91,7 +91,7 @@ include("extension_algs.jl")
 include("deprecated.jl")
 
 @generated function SciMLBase.solve!(cache::LinearCache, alg::AbstractFactorization;
-                                     kwargs...)
+    kwargs...)
     quote
         if cache.isfresh
             fact = do_factorization(alg, cache.A, cache.b, cache.u)
@@ -99,7 +99,7 @@ include("deprecated.jl")
             cache.isfresh = false
         end
         y = _ldiv!(cache.u, @get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
-                   cache.b)
+            cache.b)
 
         #=
         retcode = if LinearAlgebra.issuccess(fact)
@@ -162,19 +162,19 @@ PrecompileTools.@compile_workload begin
 end
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
-       GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
-       NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
-       UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization,
-       SparspakFactorization, DiagonalFactorization, CholeskyFactorization,
-       BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization
+    GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
+    NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
+    UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization,
+    SparspakFactorization, DiagonalFactorization, CholeskyFactorization,
+    BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization
 
 export LinearSolveFunction, DirectLdiv!
 
 export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
-       KrylovJL_BICGSTAB, KrylovJL_LSMR, KrylovJL_CRAIGMR,
-       IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
-       IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES,
-       KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES
+    KrylovJL_BICGSTAB, KrylovJL_LSMR, KrylovJL_CRAIGMR,
+    IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
+    IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES,
+    KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES
 
 export HYPREAlgorithm
 export CudaOffloadFactorization

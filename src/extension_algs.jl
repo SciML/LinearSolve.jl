@@ -163,10 +163,10 @@ MKLPardisoIterate(; kwargs...) = PardisoJL(; solver_type = 1, kwargs...)
         dparm::Union{Vector{Tuple{Int, Int}}, Nothing}
 
         function PardisoJL(; nprocs::Union{Int, Nothing} = nothing,
-                           solver_type = nothing,
-                           matrix_type = nothing,
-                           iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
-                           dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
+            solver_type = nothing,
+            matrix_type = nothing,
+            iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
+            dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
             ext = Base.get_extension(@__MODULE__, :LinearSolvePardisoExt)
             if ext === nothing
                 error("PardisoJL requires that Pardiso is loaded, i.e. `using Pardiso`")

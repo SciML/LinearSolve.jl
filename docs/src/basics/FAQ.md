@@ -80,7 +80,7 @@ b = rand(n)
 weights = rand(n)
 realprec = lu(rand(n, n)) # some random preconditioner
 Pl = LinearSolve.ComposePreconditioner(LinearSolve.InvPreconditioner(Diagonal(weights)),
-                                       realprec)
+    realprec)
 Pr = Diagonal(weights)
 
 prob = LinearProblem(A, b)

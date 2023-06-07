@@ -12,16 +12,16 @@ LinearSolve.needs_concrete_A(alg::PardisoJL) = true
 # TODO schur complement functionality
 
 function LinearSolve.init_cacheval(alg::PardisoJL,
-                                   A,
-                                   b,
-                                   u,
-                                   Pl,
-                                   Pr,
-                                   maxiters::Int,
-                                   abstol,
-                                   reltol,
-                                   verbose::Bool,
-                                   assumptions::LinearSolve.OperatorAssumptions)
+    A,
+    b,
+    u,
+    Pl,
+    Pr,
+    maxiters::Int,
+    abstol,
+    reltol,
+    verbose::Bool,
+    assumptions::LinearSolve.OperatorAssumptions)
     @unpack nprocs, solver_type, matrix_type, iparm, dparm = alg
     A = convert(AbstractMatrix, A)
 
@@ -93,9 +93,9 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
     end
 
     Pardiso.pardiso(solver,
-                    u,
-                    SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
-                    b)
+        u,
+        SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
+        b)
 
     return solver
 end

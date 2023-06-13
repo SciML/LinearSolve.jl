@@ -84,7 +84,8 @@ end
 function do_factorization(alg::LUFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
     if A isa AbstractSparseMatrixCSC
-        return lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)), check=false)
+        return lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
+            check = false)
     else
         fact = lu!(A, alg.pivot, check = false)
     end
@@ -707,16 +708,17 @@ function SciMLBase.solve!(cache::LinearCache, alg::UMFPACKFactorization; kwargs.
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
+        cacheval = @get_cacheval(cache, :UMFPACKFactorization)
         if alg.reuse_symbolic
             # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
             if alg.check_pattern && !(SuiteSparse.decrement(SparseArrays.getcolptr(A)) ==
-                 cache.cacheval.colptr &&
+                 cacheval.colptr &&
                  SuiteSparse.decrement(SparseArrays.getrowval(A)) ==
-                 @get_cacheval(cache, :UMFPACKFactorization).rowval)
+                 cacheval.rowval)
                 fact = lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                     nonzeros(A)))
             else
-                fact = lu!(@get_cacheval(cache, :UMFPACKFactorization),
+                fact = lu!(cacheval,
                     SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                         nonzeros(A)))
             end

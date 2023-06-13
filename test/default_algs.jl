@@ -1,10 +1,19 @@
 using LinearSolve, LinearAlgebra, SparseArrays, Test, JET
 @test LinearSolve.defaultalg(nothing, zeros(3)).alg ===
       LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
+prob = LinearProblem(rand(3, 3), rand(3))
+solve(prob)
+
 @test LinearSolve.defaultalg(nothing, zeros(50)).alg ===
       LinearSolve.DefaultAlgorithmChoice.RFLUFactorization
+prob = LinearProblem(rand(50, 50), rand(50))
+solve(prob)
+
 @test LinearSolve.defaultalg(nothing, zeros(600)).alg ===
       LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
+prob = LinearProblem(rand(600, 600), rand(600))
+solve(prob)
+
 @test LinearSolve.defaultalg(LinearAlgebra.Diagonal(zeros(5)), zeros(5)).alg ===
       LinearSolve.DefaultAlgorithmChoice.DiagonalFactorization
 
@@ -12,10 +21,15 @@ using LinearSolve, LinearAlgebra, SparseArrays, Test, JET
     LinearSolve.OperatorAssumptions(false)).alg ===
       LinearSolve.DefaultAlgorithmChoice.QRFactorization
 
-@test LinearSolve.defaultalg(sprand(1000, 1000, 0.01), zeros(1000)).alg ===
+@test LinearSolve.defaultalg(sprand(1000, 1000, 0.5), zeros(1000)).alg ===
       LinearSolve.DefaultAlgorithmChoice.KLUFactorization
+prob = LinearProblem(sprand(1000, 1000, 0.5), zeros(1000))
+solve(prob)
+
 @test LinearSolve.defaultalg(sprand(11000, 11000, 0.001), zeros(11000)).alg ===
       LinearSolve.DefaultAlgorithmChoice.UMFPACKFactorization
+prob = LinearProblem(sprand(11000, 11000, 0.5), zeros(11000))
+solve(prob)
 
 @static if VERSION >= v"v1.7-"
     # Test inference 

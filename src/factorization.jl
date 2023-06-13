@@ -84,7 +84,8 @@ end
 function do_factorization(alg::LUFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
     if A isa AbstractSparseMatrixCSC
-        return lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)), check=false)
+        return lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
+            check = false)
     else
         fact = lu!(A, alg.pivot, check = false)
     end

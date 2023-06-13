@@ -21,14 +21,14 @@ solve(prob)
     LinearSolve.OperatorAssumptions(false)).alg ===
       LinearSolve.DefaultAlgorithmChoice.QRFactorization
 
-@test LinearSolve.defaultalg(sprand(1000, 1000, 0.01), zeros(1000)).alg ===
+@test LinearSolve.defaultalg(sprand(1000, 1000, 0.5), zeros(1000)).alg ===
       LinearSolve.DefaultAlgorithmChoice.KLUFactorization
-prob = LinearProblem(sprand(1000, 1000, 0.01), zeros(1000))
+prob = LinearProblem(sprand(1000, 1000, 0.5), zeros(1000))
 solve(prob)
 
 @test LinearSolve.defaultalg(sprand(11000, 11000, 0.001), zeros(11000)).alg ===
       LinearSolve.DefaultAlgorithmChoice.UMFPACKFactorization
-prob = LinearProblem(sprand(11000, 11000, 0.001), zeros(11000))
+prob = LinearProblem(sprand(11000, 11000, 0.5), zeros(11000))
 solve(prob)
 
 

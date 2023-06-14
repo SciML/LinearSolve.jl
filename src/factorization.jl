@@ -660,11 +660,11 @@ end
 
 @static if VERSION < v"1.9.0-DEV.1622"
     const PREALLOCATED_UMFPACK = SuiteSparse.UMFPACK.UmfpackLU(C_NULL, C_NULL, 0, 0,
-        [0], Int64[], Float64[], 0)
+        [0], Int[], Float64[], 0)
     finalizer(SuiteSparse.UMFPACK.umfpack_free_symbolic, PREALLOCATED_UMFPACK)
 else
     const PREALLOCATED_UMFPACK = SuiteSparse.UMFPACK.UmfpackLU(SparseMatrixCSC(0, 0, [1],
-        Int64[],
+        Int[],
         Float64[]))
 end
 
@@ -750,7 +750,7 @@ Base.@kwdef struct KLUFactorization <: AbstractFactorization
     check_pattern::Bool = true
 end
 
-const PREALLOCATED_KLU = KLU.KLUFactorization(SparseMatrixCSC(0, 0, [1], Int64[],
+const PREALLOCATED_KLU = KLU.KLUFactorization(SparseMatrixCSC(0, 0, [1], Int[],
     Float64[]))
 
 function init_cacheval(alg::KLUFactorization,
@@ -835,7 +835,7 @@ Base.@kwdef struct CHOLMODFactorization{T} <: AbstractFactorization
     perm::T = nothing
 end
 
-const PREALLOCATED_CHOLMOD = cholesky(SparseMatrixCSC(0, 0, [1], Int64[], Float64[]))
+const PREALLOCATED_CHOLMOD = cholesky(SparseMatrixCSC(0, 0, [1], Int[], Float64[]))
 
 function init_cacheval(alg::CHOLMODFactorization,
     A, b, u, Pl, Pr,
@@ -1240,7 +1240,7 @@ Base.@kwdef struct SparspakFactorization <: AbstractFactorization
     reuse_symbolic::Bool = true
 end
 
-const PREALLOCATED_SPARSEPAK = sparspaklu(SparseMatrixCSC(0, 0, [1], Int64[], Float64[]),
+const PREALLOCATED_SPARSEPAK = sparspaklu(SparseMatrixCSC(0, 0, [1], Int[], Float64[]),
     factorize = false)
 
 function init_cacheval(alg::SparspakFactorization,
@@ -1266,7 +1266,7 @@ function init_cacheval(::SparspakFactorization, A, b, u, Pl, Pr, maxiters::Int, 
                 nonzeros(A)),
             factorize = false)
     else
-        return sparspaklu(SparseMatrixCSC(0, 0, [1], Int64[], eltype(A)[]),
+        return sparspaklu(SparseMatrixCSC(0, 0, [1], Int[], eltype(A)[]),
             factorize = false)
     end
 end

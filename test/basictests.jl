@@ -260,19 +260,21 @@ end
         end
     end
 
-    @testset "KrylovKit" begin
-        kwargs = (; gmres_restart = 5)
-        for alg in (("Default", KrylovKitJL(kwargs...)),
-            ("CG", KrylovKitJL_CG(kwargs...)),
-            ("GMRES", KrylovKitJL_GMRES(kwargs...)))
-            @testset "$(alg[1])" begin
-                test_interface(alg[2], prob1, prob2)
+    if VERSION > v"1.9-"
+        @testset "KrylovKit" begin
+            kwargs = (; gmres_restart = 5)
+            for alg in (("Default", KrylovKitJL(kwargs...)),
+                ("CG", KrylovKitJL_CG(kwargs...)),
+                ("GMRES", KrylovKitJL_GMRES(kwargs...)))
+                @testset "$(alg[1])" begin
+                    test_interface(alg[2], prob1, prob2)
+                end
+                @test alg[2] isa KrylovKitJL
             end
-            @test alg[2] isa KrylovKitJL
         end
     end
 
-    if VERSION > v"1.7-"
+    if VERSION > v"1.9-"
         @testset "CHOLMOD" begin
             # Create a posdef symmetric matrix
             A = sprand(100, 100, 0.01)

@@ -988,7 +988,7 @@ end
 
 function NormalCholeskyFactorization(; pivot = nothing)
     if pivot === nothing
-        pivot = @static if VERSION < v"1.7beta"
+        pivot = @static if VERSION < v"1.8beta"
             Val(false)
         else
             NoPivot()
@@ -1000,7 +1000,7 @@ end
 default_alias_A(::NormalCholeskyFactorization, ::Any, ::Any) = true
 default_alias_b(::NormalCholeskyFactorization, ::Any, ::Any) = true
 
-@static if VERSION < v"1.7beta"
+@static if VERSION < v"1.8beta"
     normcholpivot = Val(false)
 else
     normcholpivot = NoPivot()

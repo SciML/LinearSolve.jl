@@ -51,7 +51,7 @@ end
     @testset "Default Linear Solver" begin
         test_interface(nothing, prob1, prob2)
 
-        A1 = prob1.A
+        A1 = prob1.A * prob1.A'
         b1 = prob1.b
         x1 = prob1.u0
         y = solve(prob1)

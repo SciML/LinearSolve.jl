@@ -59,7 +59,7 @@ struct OperatorAssumptions{T}
 end
 
 function OperatorAssumptions(issquare = nothing;
-                             condition::OperatorCondition.T = OperatorCondition.IllConditioned)
+    condition::OperatorCondition.T = OperatorCondition.IllConditioned)
     OperatorAssumptions{typeof(issquare)}(issquare, condition)
 end
 __issquare(assump::OperatorAssumptions) = assump.issq
@@ -112,17 +112,17 @@ default_alias_A(::AbstractKrylovSubspaceMethod, ::Any, ::Any) = true
 default_alias_b(::AbstractKrylovSubspaceMethod, ::Any, ::Any) = true
 
 function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
-                        args...;
-                        alias_A = default_alias_A(alg, prob.A, prob.b),
-                        alias_b = default_alias_b(alg, prob.A, prob.b),
-                        abstol = default_tol(eltype(prob.A)),
-                        reltol = default_tol(eltype(prob.A)),
-                        maxiters::Int = length(prob.b),
-                        verbose::Bool = false,
-                        Pl = IdentityOperator(size(prob.A)[1]),
-                        Pr = IdentityOperator(size(prob.A)[2]),
-                        assumptions = OperatorAssumptions(Val(issquare(prob.A))),
-                        kwargs...)
+    args...;
+    alias_A = default_alias_A(alg, prob.A, prob.b),
+    alias_b = default_alias_b(alg, prob.A, prob.b),
+    abstol = default_tol(eltype(prob.A)),
+    reltol = default_tol(eltype(prob.A)),
+    maxiters::Int = length(prob.b),
+    verbose::Bool = false,
+    Pl = IdentityOperator(size(prob.A)[1]),
+    Pr = IdentityOperator(size(prob.A)[2]),
+    assumptions = OperatorAssumptions(issquare(prob.A)),
+    kwargs...)
     @unpack A, b, u0, p = prob
 
     A = if alias_A
@@ -151,35 +151,35 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     end
 
     cacheval = init_cacheval(alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, verbose,
-                             assumptions)
+        assumptions)
     isfresh = true
     Tc = typeof(cacheval)
 
     cache = LinearCache{
-                        typeof(A),
-                        typeof(b),
-                        typeof(u0),
-                        typeof(p),
-                        typeof(alg),
-                        Tc,
-                        typeof(Pl),
-                        typeof(Pr),
-                        typeof(reltol),
-                        typeof(assumptions.issq)
-                        }(A,
-                          b,
-                          u0,
-                          p,
-                          alg,
-                          cacheval,
-                          isfresh,
-                          Pl,
-                          Pr,
-                          abstol,
-                          reltol,
-                          maxiters,
-                          verbose,
-                          assumptions)
+        typeof(A),
+        typeof(b),
+        typeof(u0),
+        typeof(p),
+        typeof(alg),
+        Tc,
+        typeof(Pl),
+        typeof(Pr),
+        typeof(reltol),
+        typeof(assumptions.issq),
+    }(A,
+        b,
+        u0,
+        p,
+        alg,
+        cacheval,
+        isfresh,
+        Pl,
+        Pr,
+        abstol,
+        reltol,
+        maxiters,
+        verbose,
+        assumptions)
     return cache
 end
 
@@ -188,8 +188,8 @@ function SciMLBase.solve(prob::LinearProblem, args...; kwargs...)
 end
 
 function SciMLBase.solve(prob::LinearProblem,
-                         alg::Union{SciMLLinearSolveAlgorithm, Nothing},
-                         args...; kwargs...)
+    alg::Union{SciMLLinearSolveAlgorithm, Nothing},
+    args...; kwargs...)
     solve!(init(prob, alg, args...; kwargs...))
 end
 

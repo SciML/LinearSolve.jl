@@ -120,7 +120,7 @@ KrylovJL
 ```@docs
 MKLPardisoFactorize
 MKLPardisoIterate
-PardisoJL
+LinearSolve.PardisoJL
 ```
 
 ### CUDA.jl

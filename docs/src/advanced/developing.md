@@ -18,7 +18,7 @@ basic machinery. A simplified version is:
 struct MyLUFactorization{P} <: SciMLBase.AbstractLinearAlgorithm end
 
 function init_cacheval(alg::MyLUFactorization, A, b, u, Pl, Pr, maxiters, abstol, reltol,
-                       verbose)
+    verbose)
     lu!(convert(AbstractMatrix, A))
 end
 

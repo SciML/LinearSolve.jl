@@ -38,8 +38,8 @@ solve(LinearProblem(A, b)).u;
 solve(LinearProblem(A, b), (LinearSolve.NormalCholeskyFactorization())).u;
 solve(LinearProblem(A, b), (LinearSolve.NormalBunchKaufmanFactorization())).u;
 solve(LinearProblem(A, b),
-      assumptions = (OperatorAssumptions(false;
-                                         condition = OperatorCondition.WellConditioned))).u;
+    assumptions = (OperatorAssumptions(false;
+        condition = OperatorCondition.WellConditioned))).u;
 
 A = sprandn(5000, 100, 0.1)
 b = randn(5000)
@@ -47,5 +47,5 @@ b = randn(5000)
 solve(LinearProblem(A, b)).u;
 solve(LinearProblem(A, b), (LinearSolve.NormalCholeskyFactorization())).u;
 solve(LinearProblem(A, b),
-      assumptions = (OperatorAssumptions(false;
-                                         condition = OperatorCondition.WellConditioned))).u;
+    assumptions = (OperatorAssumptions(false;
+        condition = OperatorCondition.WellConditioned))).u;

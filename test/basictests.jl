@@ -200,36 +200,45 @@ end
         end
     end
 
-    @testset "Concrete Factorizations" begin for alg in (LUFactorization(),
-                                                         QRFactorization(),
-                                                         SVDFactorization(),
-                                                         RFLUFactorization())
-        @testset "$alg" begin test_interface(alg, prob1, prob2) end
-    end end
-
-    @testset "Generic Factorizations" begin for fact_alg in (lu, lu!,
-                                                             qr, qr!,
-                                                             cholesky,
-                                                             #cholesky!,
-                                                             #ldlt, ldlt!,
-                                                             bunchkaufman, bunchkaufman!,
-                                                             lq, lq!,
-                                                             svd, svd!,
-                                                             LinearAlgebra.factorize)
-        @testset "fact_alg = $fact_alg" begin
-            alg = GenericFactorization(fact_alg = fact_alg)
-            test_interface(alg, prob1, prob2)
+    @testset "Concrete Factorizations" begin
+        for alg in (LUFactorization(),
+            QRFactorization(),
+            SVDFactorization(),
+            RFLUFactorization(),
+            LinearSolve.defaultalg(prob1.A, prob1.b))
+            @testset "$alg" begin
+                test_interface(alg, prob1, prob2)
+            end
         end
-    end end
+    end
+
+    @testset "Generic Factorizations" begin
+        for fact_alg in (lu, lu!,
+            qr, qr!,
+            cholesky,
+            #cholesky!,
+            #ldlt, ldlt!,
+            bunchkaufman, bunchkaufman!,
+            lq, lq!,
+            svd, svd!,
+            LinearAlgebra.factorize)
+            @testset "fact_alg = $fact_alg" begin
+                alg = GenericFactorization(fact_alg = fact_alg)
+                test_interface(alg, prob1, prob2)
+            end
+        end
+    end
 
     @testset "KrylovJL" begin
         kwargs = (; gmres_restart = 5)
         for alg in (("Default", KrylovJL(kwargs...)),
-                    ("CG", KrylovJL_CG(kwargs...)),
-                    ("GMRES", KrylovJL_GMRES(kwargs...)),
-                    #           ("BICGSTAB",KrylovJL_BICGSTAB(kwargs...)),
-                    ("MINRES", KrylovJL_MINRES(kwargs...)))
-            @testset "$(alg[1])" begin test_interface(alg[2], prob1, prob2) end
+            ("CG", KrylovJL_CG(kwargs...)),
+            ("GMRES", KrylovJL_GMRES(kwargs...)),
+            #           ("BICGSTAB",KrylovJL_BICGSTAB(kwargs...)),
+            ("MINRES", KrylovJL_MINRES(kwargs...)))
+            @testset "$(alg[1])" begin
+                test_interface(alg[2], prob1, prob2)
+            end
         end
     end
 
@@ -237,12 +246,14 @@ end
         @testset "IterativeSolversJL" begin
             kwargs = (; gmres_restart = 5)
             for alg in (("Default", IterativeSolversJL(kwargs...)),
-                        ("CG", IterativeSolversJL_CG(kwargs...)),
-                        ("GMRES", IterativeSolversJL_GMRES(kwargs...))
-                        #           ("BICGSTAB",IterativeSolversJL_BICGSTAB(kwargs...)),
-                        #            ("MINRES",IterativeSolversJL_MINRES(kwargs...)),
-                        )
-                @testset "$(alg[1])" begin test_interface(alg[2], prob1, prob2) end
+                ("CG", IterativeSolversJL_CG(kwargs...)),
+                ("GMRES", IterativeSolversJL_GMRES(kwargs...))
+                #           ("BICGSTAB",IterativeSolversJL_BICGSTAB(kwargs...)),
+                #            ("MINRES",IterativeSolversJL_MINRES(kwargs...)),
+            )
+                @testset "$(alg[1])" begin
+                    test_interface(alg[2], prob1, prob2)
+                end
             end
         end
     end
@@ -250,9 +261,11 @@ end
     @testset "KrylovKit" begin
         kwargs = (; gmres_restart = 5)
         for alg in (("Default", KrylovKitJL(kwargs...)),
-                    ("CG", KrylovKitJL_CG(kwargs...)),
-                    ("GMRES", KrylovKitJL_GMRES(kwargs...)))
-            @testset "$(alg[1])" begin test_interface(alg[2], prob1, prob2) end
+            ("CG", KrylovKitJL_CG(kwargs...)),
+            ("GMRES", KrylovKitJL_GMRES(kwargs...)))
+            @testset "$(alg[1])" begin
+                test_interface(alg[2], prob1, prob2)
+            end
             @test alg[2] isa KrylovKitJL
         end
     end
@@ -365,7 +378,7 @@ end
 
         @testset "LinearSolveFunction" begin
             function sol_func(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,
-                              kwargs...)
+                kwargs...)
                 if verbose == true
                     println("out-of-place solve")
                 end
@@ -373,7 +386,7 @@ end
             end
 
             function sol_func!(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,
-                               kwargs...)
+                kwargs...)
                 if verbose == true
                     println("in-place solve")
                 end
@@ -384,13 +397,13 @@ end
             prob2 = LinearProblem(A1, b1; u0 = x1)
 
             for alg in (LinearSolveFunction(sol_func),
-                        LinearSolveFunction(sol_func!))
+                LinearSolveFunction(sol_func!))
                 test_interface(alg, prob1, prob2)
             end
         end
 
         @testset "DirectLdiv!" begin
-            function get_operator(A, u)
+            function get_operator(A, u; add_inverse = true)
                 function f(du, u, p, t)
                     println("using FunctionOperator mul!")
                     mul!(du, A, u)
@@ -401,22 +414,35 @@ end
                     ldiv!(du, A, u)
                 end
 
-                FunctionOperator(f, u, u; isinplace = true, op_inverse = fi)
+                if add_inverse
+                    FunctionOperator(f, u, u; isinplace = true, op_inverse = fi)
+                else
+                    FunctionOperator(f, u, u; isinplace = true)
+                end
             end
 
             op1 = get_operator(A1, x1 * 0)
             op2 = get_operator(A2, x2 * 0)
+            op3 = get_operator(A1, x1 * 0; add_inverse = false)
+            op4 = get_operator(A2, x2 * 0; add_inverse = false)
 
             prob1 = LinearProblem(op1, b1; u0 = x1)
             prob2 = LinearProblem(op2, b2; u0 = x2)
+            prob3 = LinearProblem(op1, b1; u0 = x1)
+            prob4 = LinearProblem(op2, b2; u0 = x2)
 
             @test LinearSolve.defaultalg(op1, x1).alg ===
                   LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
             @test LinearSolve.defaultalg(op2, x2).alg ===
                   LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
-
+            @test LinearSolve.defaultalg(op3, x1).alg ===
+                  LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
+            @test LinearSolve.defaultalg(op4, x2).alg ===
+                  LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
             test_interface(DirectLdiv!(), prob1, prob2)
             test_interface(nothing, prob1, prob2)
+            test_interface(KrylovJL_GMRES(), prob3, prob4)
+            test_interface(nothing, prob3, prob4)
         end
     end
 end # testset

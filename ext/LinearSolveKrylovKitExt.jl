@@ -4,8 +4,8 @@ using LinearSolve, KrylovKit, LinearAlgebra
 using LinearSolve: LinearCache
 
 function LinearSolve.KrylovKitJL(args...;
-                                 KrylovAlg = KrylovKit.GMRES, gmres_restart = 0,
-                                 kwargs...)
+    KrylovAlg = KrylovKit.GMRES, gmres_restart = 0,
+    kwargs...)
     return KrylovKitJL(KrylovAlg, gmres_restart, args, kwargs)
 end
 
@@ -28,7 +28,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovKitJL; kwargs...)
     krylovdim = (alg.gmres_restart == 0) ? min(20, size(cache.A, 1)) : alg.gmres_restart
 
     kwargs = (atol = atol, rtol = rtol, maxiter = maxiter, verbosity = verbosity,
-              krylovdim = krylovdim, alg.kwargs...)
+        krylovdim = krylovdim, alg.kwargs...)
 
     x, info = KrylovKit.linsolve(cache.A, cache.b, cache.u; kwargs...)
 
@@ -37,7 +37,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovKitJL; kwargs...)
     retcode = info.converged == 1 ? ReturnCode.Default : ReturnCode.ConvergenceFailure
     iters = info.numiter
     return SciMLBase.build_linear_solution(alg, cache.u, resid, cache; retcode = retcode,
-                                           iters = iters)
+        iters = iters)
 end
 
 end

@@ -21,6 +21,7 @@ using FastLapackInterface
 using DocStringExtensions
 using EnumX
 using Requires
+import InteractiveUtils
 
 import GPUArraysCore
 import Preferences
@@ -55,6 +56,29 @@ _isidentity_struct(::SciMLBase.DiffEqIdentity) = true
 
 const INCLUDE_SPARSE = Preferences.@load_preference("include_sparse", Base.USE_GPL_LIBS)
 
+EnumX.@enumx DefaultAlgorithmChoice begin
+    LUFactorization
+    QRFactorization
+    DiagonalFactorization
+    DirectLdiv!
+    SparspakFactorization
+    KLUFactorization
+    UMFPACKFactorization
+    KrylovJL_GMRES
+    GenericLUFactorization
+    RFLUFactorization
+    LDLtFactorization
+    BunchKaufmanFactorization
+    CHOLMODFactorization
+    SVDFactorization
+    CholeskyFactorization
+    NormalCholeskyFactorization
+end
+
+struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm
+    alg::DefaultAlgorithmChoice.T
+end
+
 include("common.jl")
 include("factorization.jl")
 include("simplelu.jl")
@@ -66,14 +90,41 @@ include("init.jl")
 include("extension_algs.jl")
 include("deprecated.jl")
 
+@generated function SciMLBase.solve!(cache::LinearCache, alg::AbstractFactorization;
+    kwargs...)
+    quote
+        if cache.isfresh
+            fact = do_factorization(alg, cache.A, cache.b, cache.u)
+            cache.cacheval = fact
+            cache.isfresh = false
+        end
+        y = _ldiv!(cache.u, @get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
+            cache.b)
+
+        #=
+        retcode = if LinearAlgebra.issuccess(fact)
+            SciMLBase.ReturnCode.Success
+        else
+            SciMLBase.ReturnCode.Failure
+        end
+        SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = retcode)
+        =#
+        SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    end
+end
+
 @static if INCLUDE_SPARSE
     include("factorization_sparse.jl")
 end
 
 @static if !isdefined(Base, :get_extension)
     function __init__()
-        @require IterativeSolvers="b77e0a4c-d291-57a0-90e8-8db25a27a240" begin include("../ext/LinearSolveIterativeSolversExt.jl") end
-        @require KrylovKit="0b1a1467-8014-51b9-945f-bf0ae24f4b77" begin include("../ext/LinearSolveKrylovKitExt.jl") end
+        @require IterativeSolvers="b77e0a4c-d291-57a0-90e8-8db25a27a240" begin
+            include("../ext/LinearSolveIterativeSolversExt.jl")
+        end
+        @require KrylovKit="0b1a1467-8014-51b9-945f-bf0ae24f4b77" begin
+            include("../ext/LinearSolveKrylovKitExt.jl")
+        end
     end
 end
 
@@ -82,7 +133,6 @@ isopenblas() = IS_OPENBLAS[]
 
 import PrecompileTools
 
-#=
 PrecompileTools.@compile_workload begin
     A = rand(4, 4)
     b = rand(4)
@@ -110,22 +160,21 @@ PrecompileTools.@compile_workload begin
     sol = solve(prob) # in case sparspak is used as default
     sol = solve(prob, SparspakFactorization())
 end
-=#
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
-       GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
-       NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
-       UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization,
-       SparspakFactorization, DiagonalFactorization, CholeskyFactorization,
-       BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization
+    GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
+    NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
+    UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization,
+    SparspakFactorization, DiagonalFactorization, CholeskyFactorization,
+    BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization
 
 export LinearSolveFunction, DirectLdiv!
 
 export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
-       KrylovJL_BICGSTAB, KrylovJL_LSMR, KrylovJL_CRAIGMR,
-       IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
-       IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES,
-       KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES
+    KrylovJL_BICGSTAB, KrylovJL_LSMR, KrylovJL_CRAIGMR,
+    IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
+    IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES,
+    KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES
 
 export HYPREAlgorithm
 export CudaOffloadFactorization

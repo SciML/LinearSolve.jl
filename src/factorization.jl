@@ -220,7 +220,7 @@ end
 
 function CholeskyFactorization(; pivot = nothing, tol = 0.0, shift = 0.0, perm = nothing)
     if pivot === nothing
-        pivot = @static if VERSION < v"1.7beta"
+        pivot = @static if VERSION < v"1.8beta"
             Val(false)
         else
             NoPivot()
@@ -261,7 +261,7 @@ function init_cacheval(alg::CholeskyFactorization, A, b, u, Pl, Pr,
     ArrayInterface.cholesky_instance(convert(AbstractMatrix, A), alg.pivot)
 end
 
-@static if VERSION < v"1.7beta"
+@static if VERSION < v"1.8beta"
     cholpivot = Val(false)
 else
     cholpivot = NoPivot()

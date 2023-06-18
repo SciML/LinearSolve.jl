@@ -233,11 +233,11 @@ end
     function do_factorization(alg::CholeskyFactorization, A, b, u)
         A = convert(AbstractMatrix, A)
         if A isa SparseMatrixCSC
-            fact = cholesky!(A; shift = alg.shift, perm = alg.perm)
+            fact = cholesky!(A; shift = alg.shift, check = false, perm = alg.perm)
         elseif alg.pivot === Val(false) || alg.pivot === NoPivot()
-            fact = cholesky!(A, alg.pivot)
+            fact = cholesky!(A, alg.pivot; check = false)
         else
-            fact = cholesky!(A, alg.pivot; tol = alg.tol)
+            fact = cholesky!(A, alg.pivot; tol = alg.tol, check = false)
         end
         return fact
     end
@@ -245,11 +245,11 @@ else
     function do_factorization(alg::CholeskyFactorization, A, b, u)
         A = convert(AbstractMatrix, A)
         if A isa SparseMatrixCSC
-            fact = cholesky!(A; shift = alg.shift, check = false, perm = alg.perm)
+            fact = cholesky!(A; shift = alg.shift, perm = alg.perm)
         elseif alg.pivot === Val(false) || alg.pivot === NoPivot()
-            fact = cholesky!(A, alg.pivot; check = false)
+            fact = cholesky!(A, alg.pivot)
         else
-            fact = cholesky!(A, alg.pivot; tol = alg.tol, check = false)
+            fact = cholesky!(A, alg.pivot; tol = alg.tol)
         end
         return fact
     end
@@ -873,9 +873,9 @@ end
 
         if cache.isfresh
             cacheval = @get_cacheval(cache, :CHOLMODFactorization)
-            fact = cholesky(A)
+            fact = cholesky(A; check = false)
             if !LinearAlgebra.issuccess(fact)
-                ldlt!(fact, A)
+                ldlt!(fact, A; check = false)
             end
             cache.cacheval = fact
             cache.isfresh = false
@@ -891,9 +891,9 @@ else
 
         if cache.isfresh
             cacheval = @get_cacheval(cache, :CHOLMODFactorization)
-            fact = cholesky(A; check = false)
+            fact = cholesky(A)
             if !LinearAlgebra.issuccess(fact)
-                ldlt!(fact, A; check = false)
+                ldlt!(fact, A)
             end
             cache.cacheval = fact
             cache.isfresh = false
@@ -1047,9 +1047,9 @@ end
         A = convert(AbstractMatrix, A)
         if cache.isfresh
             if A isa SparseMatrixCSC
-                fact = cholesky(Symmetric((A)' * A, :L))
+                fact = cholesky(Symmetric((A)' * A, :L); check=false)
             else
-                fact = cholesky(Symmetric((A)' * A, :L), alg.pivot)
+                fact = cholesky(Symmetric((A)' * A, :L), alg.pivot; check = false)
             end
             cache.cacheval = fact
             cache.isfresh = false
@@ -1069,9 +1069,9 @@ else
         A = convert(AbstractMatrix, A)
         if cache.isfresh
             if A isa SparseMatrixCSC
-                fact = cholesky(Symmetric((A)' * A, :L); check=false)
+                fact = cholesky(Symmetric((A)' * A, :L))
             else
-                fact = cholesky(Symmetric((A)' * A, :L), alg.pivot; check = false)
+                fact = cholesky(Symmetric((A)' * A, :L), alg.pivot)
             end
             cache.cacheval = fact
             cache.isfresh = false

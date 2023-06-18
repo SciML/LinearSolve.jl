@@ -1000,7 +1000,7 @@ end
 default_alias_A(::NormalCholeskyFactorization, ::Any, ::Any) = true
 default_alias_b(::NormalCholeskyFactorization, ::Any, ::Any) = true
 
-@static if VERSION < v"1.7beta"
+@static if VERSION < v"1.9beta"
     normcholpivot = Val(false)
 else
     normcholpivot = NoPivot()

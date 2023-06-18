@@ -156,7 +156,7 @@ end
 PrecompileTools.@compile_workload begin
     A = sprand(4, 4, 0.3) + I
     b = rand(4)
-    prob = LinearProblem(A, b)
+    prob = LinearProblem(A * A', b)
     sol = solve(prob) # in case sparspak is used as default
     sol = solve(prob, SparspakFactorization())
 end

@@ -270,6 +270,18 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     stats = @get_cacheval(cache, :KrylovJL_GMRES).stats
     resid = stats.residuals |> last
 
+    retcode = if !stats.solved
+        if stats.status == "maximum number of iterations exceeded"
+            ReturnCode.MaxIters
+        elseif stats.status == "solution good enough given atol and rtol"
+            ReturnCode.ConvergenceFailure
+        else
+            ReturnCode.Failure
+        end
+    else
+        ReturnCode.Success
+    end
+
     return SciMLBase.build_linear_solution(alg, cache.u, resid, cache;
         iters = stats.niter)
 end

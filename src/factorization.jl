@@ -1039,7 +1039,6 @@ end
     end
 end
 
-
 @static if VERSION > v"1.8-"
     function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization;
         kwargs...)
@@ -1047,7 +1046,7 @@ end
         A = convert(AbstractMatrix, A)
         if cache.isfresh
             if A isa SparseMatrixCSC
-                fact = cholesky(Symmetric((A)' * A, :L); check=false)
+                fact = cholesky(Symmetric((A)' * A, :L); check = false)
             else
                 fact = cholesky(Symmetric((A)' * A, :L), alg.pivot; check = false)
             end
@@ -1058,7 +1057,9 @@ end
             cache.u .= @get_cacheval(cache, :NormalCholeskyFactorization) \ (A' * cache.b)
             y = cache.u
         else
-            y = ldiv!(cache.u, @get_cacheval(cache, :NormalCholeskyFactorization), A' * cache.b)
+            y = ldiv!(cache.u,
+                @get_cacheval(cache, :NormalCholeskyFactorization),
+                A' * cache.b)
         end
         SciMLBase.build_linear_solution(alg, y, nothing, cache)
     end
@@ -1080,7 +1081,9 @@ else
             cache.u .= @get_cacheval(cache, :NormalCholeskyFactorization) \ (A' * cache.b)
             y = cache.u
         else
-            y = ldiv!(cache.u, @get_cacheval(cache, :NormalCholeskyFactorization), A' * cache.b)
+            y = ldiv!(cache.u,
+                @get_cacheval(cache, :NormalCholeskyFactorization),
+                A' * cache.b)
         end
         SciMLBase.build_linear_solution(alg, y, nothing, cache)
     end

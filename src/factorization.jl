@@ -176,10 +176,18 @@ end
 
 const PREALLOCATED_QR = ArrayInterface.qr_instance(rand(1, 1))
 
-function init_cacheval(alg::QRFactorization{NoPivot}, A::Matrix{Float64}, b, u, Pl, Pr,
-    maxiters::Int, abstol, reltol, verbose::Bool,
-    assumptions::OperatorAssumptions)
-    PREALLOCATED_QR
+@static if VERSION < v"1.7beta"
+    function init_cacheval(alg::QRFactorization{Val{false}}, A::Matrix{Float64}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+        PREALLOCATED_QR
+    end
+else
+    function init_cacheval(alg::QRFactorization{NoPivot}, A::Matrix{Float64}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+        PREALLOCATED_QR
+    end
 end
 
 function init_cacheval(alg::QRFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,

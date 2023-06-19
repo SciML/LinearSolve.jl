@@ -188,7 +188,7 @@ function init_cacheval(alg::QRFactorization, A::AbstractSciMLOperator, b, u, Pl,
     nothing
 end
 
-@static if VERSION < v"1.7-"
+@static if VERSION < v"1.9-"
     function init_cacheval(alg::QRFactorization,
         A::Union{Diagonal, SymTridiagonal, Tridiagonal}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
@@ -282,7 +282,7 @@ function init_cacheval(alg::CholeskyFactorization,
     nothing
 end
 
-@static if VERSION < v"1.7beta"
+@static if VERSION < v"1.9beta"
     function init_cacheval(alg::CholeskyFactorization,
         A::Union{SymTridiagonal, Tridiagonal}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
@@ -375,7 +375,7 @@ function init_cacheval(alg::SVDFactorization, A, b, u, Pl, Pr,
     nothing
 end
 
-@static if VERSION < v"1.7-"
+@static if VERSION < v"1.9-"
     function init_cacheval(alg::SVDFactorization,
         A::Union{Diagonal, SymTridiagonal, Tridiagonal}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,

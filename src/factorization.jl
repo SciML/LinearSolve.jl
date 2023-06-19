@@ -1030,7 +1030,7 @@ function init_cacheval(alg::NormalCholeskyFactorization,
     nothing
 end
 
-@static if VERSION < v"1.7-"
+@static if VERSION < v"1.9-"
     function init_cacheval(alg::NormalCholeskyFactorization,
         A::Union{Tridiagonal, SymTridiagonal, Adjoint}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,

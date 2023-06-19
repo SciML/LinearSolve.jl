@@ -177,7 +177,8 @@ end
 const PREALLOCATED_QR = ArrayInterface.qr_instance(rand(1, 1))
 
 @static if VERSION < v"1.7beta"
-    function init_cacheval(alg::QRFactorization{Val{false}}, A::Matrix{Float64}, b, u, Pl, Pr,
+    function init_cacheval(alg::QRFactorization{Val{false}}, A::Matrix{Float64}, b, u, Pl,
+        Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
         PREALLOCATED_QR

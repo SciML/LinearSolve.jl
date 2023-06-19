@@ -171,12 +171,12 @@ end
 function init_cacheval(alg::QRFactorization, A, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
-    ArrayInterface.qr_instance(convert(AbstractMatrix, A))
+    ArrayInterface.qr_instance(convert(AbstractMatrix, A), alg.pivot)
 end
 
 const PREALLOCATED_QR = ArrayInterface.qr_instance(rand(1, 1))
 
-function init_cacheval(alg::QRFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
+function init_cacheval(alg::QRFactorization{NoPivot}, A::Matrix{Float64}, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
     PREALLOCATED_QR

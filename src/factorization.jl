@@ -943,7 +943,7 @@ function init_cacheval(alg::RFLUFactorization,
     nothing, nothing
 end
 
-@static if VERSION < v"1.7-"
+@static if VERSION < v"1.9-"
     function init_cacheval(alg::RFLUFactorization,
         A::Union{Diagonal, SymTridiagonal, Tridiagonal}, b, u, Pl, Pr,
         maxiters::Int,

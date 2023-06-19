@@ -120,7 +120,7 @@ function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization},
     nothing
 end
 
-@static if VERSION < v"1.7-"
+@static if VERSION < v"1.9-"
     function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization},
         A::Union{Diagonal, SymTridiagonal}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,

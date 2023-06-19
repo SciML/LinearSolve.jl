@@ -120,7 +120,7 @@ function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization},
     nothing
 end
 
-@static if VERSION < v"1.7-"
+@static if VERSION < v"1.9-"
     function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization},
         A::Union{Diagonal, SymTridiagonal}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
@@ -188,7 +188,7 @@ function init_cacheval(alg::QRFactorization, A::AbstractSciMLOperator, b, u, Pl,
     nothing
 end
 
-@static if VERSION < v"1.7-"
+@static if VERSION < v"1.9-"
     function init_cacheval(alg::QRFactorization,
         A::Union{Diagonal, SymTridiagonal, Tridiagonal}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
@@ -220,7 +220,7 @@ end
 
 function CholeskyFactorization(; pivot = nothing, tol = 0.0, shift = 0.0, perm = nothing)
     if pivot === nothing
-        pivot = @static if VERSION < v"1.7beta"
+        pivot = @static if VERSION < v"1.8beta"
             Val(false)
         else
             NoPivot()
@@ -229,16 +229,30 @@ function CholeskyFactorization(; pivot = nothing, tol = 0.0, shift = 0.0, perm =
     CholeskyFactorization(pivot, 16, shift, perm)
 end
 
-function do_factorization(alg::CholeskyFactorization, A, b, u)
-    A = convert(AbstractMatrix, A)
-    if A isa SparseMatrixCSC
-        fact = cholesky!(A; shift = alg.shift, check = false, perm = alg.perm)
-    elseif alg.pivot === Val(false) || alg.pivot === NoPivot()
-        fact = cholesky!(A, alg.pivot; check = false)
-    else
-        fact = cholesky!(A, alg.pivot; tol = alg.tol, check = false)
+@static if VERSION > v"1.8-"
+    function do_factorization(alg::CholeskyFactorization, A, b, u)
+        A = convert(AbstractMatrix, A)
+        if A isa SparseMatrixCSC
+            fact = cholesky!(A; shift = alg.shift, check = false, perm = alg.perm)
+        elseif alg.pivot === Val(false) || alg.pivot === NoPivot()
+            fact = cholesky!(A, alg.pivot; check = false)
+        else
+            fact = cholesky!(A, alg.pivot; tol = alg.tol, check = false)
+        end
+        return fact
     end
-    return fact
+else
+    function do_factorization(alg::CholeskyFactorization, A, b, u)
+        A = convert(AbstractMatrix, A)
+        if A isa SparseMatrixCSC
+            fact = cholesky!(A; shift = alg.shift, perm = alg.perm)
+        elseif alg.pivot === Val(false) || alg.pivot === NoPivot()
+            fact = cholesky!(A, alg.pivot)
+        else
+            fact = cholesky!(A, alg.pivot; tol = alg.tol)
+        end
+        return fact
+    end
 end
 
 function init_cacheval(alg::CholeskyFactorization, A, b, u, Pl, Pr,
@@ -247,7 +261,7 @@ function init_cacheval(alg::CholeskyFactorization, A, b, u, Pl, Pr,
     ArrayInterface.cholesky_instance(convert(AbstractMatrix, A), alg.pivot)
 end
 
-@static if VERSION < v"1.7beta"
+@static if VERSION < v"1.8beta"
     cholpivot = Val(false)
 else
     cholpivot = NoPivot()
@@ -268,7 +282,7 @@ function init_cacheval(alg::CholeskyFactorization,
     nothing
 end
 
-@static if VERSION < v"1.7beta"
+@static if VERSION < v"1.9beta"
     function init_cacheval(alg::CholeskyFactorization,
         A::Union{SymTridiagonal, Tridiagonal}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
@@ -361,7 +375,7 @@ function init_cacheval(alg::SVDFactorization, A, b, u, Pl, Pr,
     nothing
 end
 
-@static if VERSION < v"1.7-"
+@static if VERSION < v"1.9-"
     function init_cacheval(alg::SVDFactorization,
         A::Union{Diagonal, SymTridiagonal, Tridiagonal}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
@@ -852,22 +866,42 @@ function init_cacheval(alg::CHOLMODFactorization,
     PREALLOCATED_CHOLMOD
 end
 
-function SciMLBase.solve!(cache::LinearCache, alg::CHOLMODFactorization; kwargs...)
-    A = cache.A
-    A = convert(AbstractMatrix, A)
+@static if VERSION > v"1.8-"
+    function SciMLBase.solve!(cache::LinearCache, alg::CHOLMODFactorization; kwargs...)
+        A = cache.A
+        A = convert(AbstractMatrix, A)
 
-    if cache.isfresh
-        cacheval = @get_cacheval(cache, :CHOLMODFactorization)
-        fact = cholesky(A; check = false)
-        if !LinearAlgebra.issuccess(fact)
-            ldlt!(fact, A; check = false)
+        if cache.isfresh
+            cacheval = @get_cacheval(cache, :CHOLMODFactorization)
+            fact = cholesky(A; check = false)
+            if !LinearAlgebra.issuccess(fact)
+                ldlt!(fact, A; check = false)
+            end
+            cache.cacheval = fact
+            cache.isfresh = false
         end
-        cache.cacheval = fact
-        cache.isfresh = false
-    end
 
-    cache.u .= @get_cacheval(cache, :CHOLMODFactorization) \ cache.b
-    SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
+        cache.u .= @get_cacheval(cache, :CHOLMODFactorization) \ cache.b
+        SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
+    end
+else
+    function SciMLBase.solve!(cache::LinearCache, alg::CHOLMODFactorization; kwargs...)
+        A = cache.A
+        A = convert(AbstractMatrix, A)
+
+        if cache.isfresh
+            cacheval = @get_cacheval(cache, :CHOLMODFactorization)
+            fact = cholesky(A)
+            if !LinearAlgebra.issuccess(fact)
+                ldlt!(fact, A)
+            end
+            cache.cacheval = fact
+            cache.isfresh = false
+        end
+
+        cache.u .= @get_cacheval(cache, :CHOLMODFactorization) \ cache.b
+        SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
+    end
 end
 
 ## RFLUFactorization
@@ -909,7 +943,7 @@ function init_cacheval(alg::RFLUFactorization,
     nothing, nothing
 end
 
-@static if VERSION < v"1.7-"
+@static if VERSION < v"1.9-"
     function init_cacheval(alg::RFLUFactorization,
         A::Union{Diagonal, SymTridiagonal, Tridiagonal}, b, u, Pl, Pr,
         maxiters::Int,
@@ -954,7 +988,7 @@ end
 
 function NormalCholeskyFactorization(; pivot = nothing)
     if pivot === nothing
-        pivot = @static if VERSION < v"1.7beta"
+        pivot = @static if VERSION < v"1.8beta"
             Val(false)
         else
             NoPivot()
@@ -966,7 +1000,7 @@ end
 default_alias_A(::NormalCholeskyFactorization, ::Any, ::Any) = true
 default_alias_b(::NormalCholeskyFactorization, ::Any, ::Any) = true
 
-@static if VERSION < v"1.7beta"
+@static if VERSION < v"1.8beta"
     normcholpivot = Val(false)
 else
     normcholpivot = NoPivot()
@@ -996,7 +1030,7 @@ function init_cacheval(alg::NormalCholeskyFactorization,
     nothing
 end
 
-@static if VERSION < v"1.7-"
+@static if VERSION < v"1.9-"
     function init_cacheval(alg::NormalCholeskyFactorization,
         A::Union{Tridiagonal, SymTridiagonal, Adjoint}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
@@ -1005,26 +1039,54 @@ end
     end
 end
 
-function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization;
-    kwargs...)
-    A = cache.A
-    A = convert(AbstractMatrix, A)
-    if cache.isfresh
-        if A isa SparseMatrixCSC
-            fact = cholesky(Symmetric((A)' * A, :L))
-        else
-            fact = cholesky(Symmetric((A)' * A, :L), alg.pivot)
+@static if VERSION > v"1.8-"
+    function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization;
+        kwargs...)
+        A = cache.A
+        A = convert(AbstractMatrix, A)
+        if cache.isfresh
+            if A isa SparseMatrixCSC
+                fact = cholesky(Symmetric((A)' * A, :L); check = false)
+            else
+                fact = cholesky(Symmetric((A)' * A, :L), alg.pivot; check = false)
+            end
+            cache.cacheval = fact
+            cache.isfresh = false
         end
-        cache.cacheval = fact
-        cache.isfresh = false
+        if A isa SparseMatrixCSC
+            cache.u .= @get_cacheval(cache, :NormalCholeskyFactorization) \ (A' * cache.b)
+            y = cache.u
+        else
+            y = ldiv!(cache.u,
+                @get_cacheval(cache, :NormalCholeskyFactorization),
+                A' * cache.b)
+        end
+        SciMLBase.build_linear_solution(alg, y, nothing, cache)
     end
-    if A isa SparseMatrixCSC
-        cache.u .= @get_cacheval(cache, :NormalCholeskyFactorization) \ (A' * cache.b)
-        y = cache.u
-    else
-        y = ldiv!(cache.u, @get_cacheval(cache, :NormalCholeskyFactorization), A' * cache.b)
+else
+    function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization;
+        kwargs...)
+        A = cache.A
+        A = convert(AbstractMatrix, A)
+        if cache.isfresh
+            if A isa SparseMatrixCSC
+                fact = cholesky(Symmetric((A)' * A, :L))
+            else
+                fact = cholesky(Symmetric((A)' * A, :L), alg.pivot)
+            end
+            cache.cacheval = fact
+            cache.isfresh = false
+        end
+        if A isa SparseMatrixCSC
+            cache.u .= @get_cacheval(cache, :NormalCholeskyFactorization) \ (A' * cache.b)
+            y = cache.u
+        else
+            y = ldiv!(cache.u,
+                @get_cacheval(cache, :NormalCholeskyFactorization),
+                A' * cache.b)
+        end
+        SciMLBase.build_linear_solution(alg, y, nothing, cache)
     end
-    SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
 ## NormalBunchKaufmanFactorization

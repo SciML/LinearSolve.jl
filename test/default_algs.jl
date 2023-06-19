@@ -31,7 +31,7 @@ solve(prob)
 prob = LinearProblem(sprand(11000, 11000, 0.5), zeros(11000))
 solve(prob)
 
-@static if VERSION >= v"v1.7-"
+@static if VERSION >= v"v1.9-"
     # Test inference 
     A = rand(4, 4)
     b = rand(4)

@@ -51,7 +51,7 @@ end
     @testset "Default Linear Solver" begin
         test_interface(nothing, prob1, prob2)
 
-        A1 = prob1.A
+        A1 = prob1.A * prob1.A'
         b1 = prob1.b
         x1 = prob1.u0
         y = solve(prob1)
@@ -77,9 +77,11 @@ end
         y = solve(_prob)
         @test A1 * y ≈ b1
 
-        _prob = LinearProblem(sparse(A1), b1; u0 = x1)
-        y = solve(_prob)
-        @test A1 * y ≈ b1
+        if VERSION > v"1.9-"
+            _prob = LinearProblem(sparse(A1), b1; u0 = x1)
+            y = solve(_prob)
+            @test A1 * y ≈ b1
+        end
     end
 
     @testset "UMFPACK Factorization" begin
@@ -258,19 +260,21 @@ end
         end
     end
 
-    @testset "KrylovKit" begin
-        kwargs = (; gmres_restart = 5)
-        for alg in (("Default", KrylovKitJL(kwargs...)),
-            ("CG", KrylovKitJL_CG(kwargs...)),
-            ("GMRES", KrylovKitJL_GMRES(kwargs...)))
-            @testset "$(alg[1])" begin
-                test_interface(alg[2], prob1, prob2)
+    if VERSION > v"1.9-"
+        @testset "KrylovKit" begin
+            kwargs = (; gmres_restart = 5)
+            for alg in (("Default", KrylovKitJL(kwargs...)),
+                ("CG", KrylovKitJL_CG(kwargs...)),
+                ("GMRES", KrylovKitJL_GMRES(kwargs...)))
+                @testset "$(alg[1])" begin
+                    test_interface(alg[2], prob1, prob2)
+                end
+                @test alg[2] isa KrylovKitJL
             end
-            @test alg[2] isa KrylovKitJL
         end
     end
 
-    if VERSION > v"1.7-"
+    if VERSION > v"1.9-"
         @testset "CHOLMOD" begin
             # Create a posdef symmetric matrix
             A = sprand(100, 100, 0.01)

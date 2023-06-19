@@ -53,14 +53,16 @@ A = Symmetric([1.0 2.0
 linsolve.A = A
 @test solve!(linsolve).u ≈ [1.0, 0.0]
 
-A = Symmetric([1.0 2.0
-    2.0 1.0])
+A = [1.0 2.0
+    2.0 1.0]
+A = Symmetric(A * A')
 b = [1.0, 2.0]
 prob = LinearProblem(A, b)
 linsolve = init(prob, CholeskyFactorization(), alias_A = false, alias_b = false)
-@test solve!(linsolve).u ≈ [1.0, 0.0]
-@test solve!(linsolve).u ≈ [1.0, 0.0]
-A = Symmetric([1.0 2.0
-    2.0 1.0])
+@test solve!(linsolve).u ≈ [-1 / 3, 2 / 3]
+@test solve!(linsolve).u ≈ [-1 / 3, 2 / 3]
+A = [1.0 2.0
+    2.0 1.0]
+A = Symmetric(A * A')
 b = [1.0, 2.0]
-@test solve!(linsolve).u ≈ [1.0, 0.0]
+@test solve!(linsolve).u ≈ [-1 / 3, 2 / 3]

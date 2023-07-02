@@ -50,7 +50,6 @@ _isidentity_struct(A) = false
 _isidentity_struct(λ::Number) = isone(λ)
 _isidentity_struct(A::UniformScaling) = isone(A.λ)
 _isidentity_struct(::SciMLOperators.IdentityOperator) = true
-_isidentity_struct(::SciMLBase.DiffEqIdentity) = true
 
 # Code
 

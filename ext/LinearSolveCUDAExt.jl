@@ -20,7 +20,7 @@ function LinearSolve.do_factorization(alg::CudaOffloadFactorization, A, b, u)
     A isa Union{AbstractMatrix, AbstractSciMLOperator} ||
         error("LU is not defined for $(typeof(A))")
 
-    if A isa Union{MatrixOperator, DiffEqArrayOperator}
+    if A isa MatrixOperator
         A = A.A
     end
 

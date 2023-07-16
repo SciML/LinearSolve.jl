@@ -79,7 +79,9 @@ end
     function defaultalg(A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
         assump::OperatorAssumptions) where {Ti}
         if assump.issq
-            if length(b) <= 10_000
+            @show length(b) <= 10_000
+            @show length(nonzeros(A)) / length(A)
+            if length(b) <= 10_000 && length(nonzeros(A)) / length(A) < 2e-4
                 DefaultLinearSolver(DefaultAlgorithmChoice.KLUFactorization)
             else
                 DefaultLinearSolver(DefaultAlgorithmChoice.UMFPACKFactorization)

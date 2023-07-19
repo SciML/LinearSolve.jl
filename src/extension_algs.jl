@@ -93,6 +93,7 @@ MKLPardisoFactorize(; nprocs::Union{Int, Nothing} = nothing,
                     matrix_type = nothing,
                     iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
                     dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
+```
 
 A sparse factorization method using MKL Pardiso.
 

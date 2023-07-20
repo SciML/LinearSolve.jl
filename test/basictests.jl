@@ -408,20 +408,29 @@ end
 
         @testset "DirectLdiv!" begin
             function get_operator(A, u; add_inverse = true)
+                
+                function f(u, p, t)
+                    println("using FunctionOperator OOP mul")
+                    A * u
+                end
                 function f(du, u, p, t)
-                    println("using FunctionOperator mul!")
+                    println("using FunctionOperator IIP mul")
                     mul!(du, A, u)
                 end
 
                 function fi(du, u, p, t)
-                    println("using FunctionOperator ldiv!")
+                    println("using FunctionOperator OOP div")
+                    A \ u
+                end
+                function fi(du, u, p, t)
+                    println("using FunctionOperator IIP div")
                     ldiv!(du, A, u)
                 end
 
                 if add_inverse
-                    FunctionOperator(f, u, u; isinplace = true, op_inverse = fi)
+                    FunctionOperator(f, u; op_inverse = fi)
                 else
-                    FunctionOperator(f, u, u; isinplace = true)
+                    FunctionOperator(f, u)
                 end
             end
 

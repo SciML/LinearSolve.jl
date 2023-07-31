@@ -283,8 +283,9 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     end
 
     # Copy the solution to the allocated output vector
-    if cache.u !== cache.cacheval.x
-        cache.u .= cache.cacheval.x
+    cacheval = @get_cacheval(cache, :KrylovJL_GMRES)
+    if cache.u !== cacheval.x
+        cache.u .= cacheval.x
     end
 
     return SciMLBase.build_linear_solution(alg, cache.u, resid, cache;

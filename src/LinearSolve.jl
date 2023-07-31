@@ -181,6 +181,7 @@ export HYPREAlgorithm
 export CudaOffloadFactorization
 export MKLPardisoFactorize, MKLPardisoIterate
 export PardisoJL
+export MKLLUFactorization
 
 export OperatorAssumptions, OperatorCondition
 

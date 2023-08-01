@@ -337,3 +337,13 @@ A wrapper over the IterativeSolvers.jl MINRES.
 
 """
 function IterativeSolversJL_MINRES end
+
+"""
+```julia
+MKLLUFactorization()
+```
+
+A wrapper over Intel's Math Kernel Library (MKL). Direct calls to MKL in a way that pre-allocates workspace
+to avoid allocations and does not require libblastrampoline.
+"""
+struct MKLLUFactorization <: AbstractFactorization end

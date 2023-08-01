@@ -111,6 +111,16 @@ KrylovJL_CRAIGMR
 KrylovJL
 ```
 
+### MKL.jl
+
+!!! note
+    
+    Using this solver requires adding the package MKL_jll.jl, i.e. `using MKL_jll`
+
+```@docs
+MKLLUFactorization
+```
+
 ### Pardiso.jl
 
 !!! note

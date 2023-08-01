@@ -2,7 +2,8 @@ module LinearSolveMKLExt
 
 using MKL_jll
 using LinearAlgebra: BlasInt, LU
-using LinearAlgebra.LAPACK: require_one_based_indexing, chkfinite, chkstride1, chkargsok
+using LinearAlgebra.LAPACK: require_one_based_indexing, chkfinite, chkstride1, 
+                            @blasfunc, chkargsok
 using LinearAlgebra
 const usemkl = MKL_jll.is_available()
 
@@ -15,12 +16,7 @@ function getrf!(A::AbstractMatrix{<:Float64}; ipiv = similar(A, BlasInt, min(siz
     chkstride1(A)
     m, n = size(A)
     lda  = max(1,stride(A, 2))
-
-    if isempty(ipiv)
-        ipiv = similar(A, BlasInt, min(size(A,1),size(A,2)))
-    end
-
-    ccall((:dgetrf_, MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(dgetrf_), MKL_jll.libmkl_rt), Cvoid,
             (Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
             m, n, A, lda, ipiv, info)

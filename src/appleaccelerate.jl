@@ -30,7 +30,7 @@ function aa_getrf!(A::AbstractMatrix{<:Float64}; ipiv = similar(A, BlasInt, min(
     chkstride1(A)
     m, n = size(A)
     lda  = max(1,stride(A, 2))
-    ccall(("dgemm\$NEWLAPACK\$ILP64", libacc), Cvoid,
+    ccall(("dgetrf\$NEWLAPACK\$ILP64", libacc), Cvoid,
             (Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
             m, n, A, lda, ipiv, info)

@@ -16,6 +16,9 @@ function getrf!(A::AbstractMatrix{<:Float64}; ipiv = similar(A, BlasInt, min(siz
     chkstride1(A)
     m, n = size(A)
     lda  = max(1,stride(A, 2))
+    if isempty(ipiv)
+        ipiv = similar(A, BlasInt, min(size(A,1),size(A,2)))
+    end
     ccall((@blasfunc(dgetrf_), MKL_jll.libmkl_rt), Cvoid,
             (Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
@@ -39,7 +42,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
     A = convert(AbstractMatrix, A)
     if cache.isfresh
         cacheval = @get_cacheval(cache, :MKLLUFactorization)
-        fact = LU(getrf!(A)...; ipiv = fact.ipiv)
+        fact = LU(getrf!(A; ipiv = cacheval.ipiv)...)
         cache.cacheval = fact
         cache.isfresh = false
     end

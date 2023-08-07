@@ -190,6 +190,7 @@ export CudaOffloadFactorization
 export MKLPardisoFactorize, MKLPardisoIterate
 export PardisoJL
 export MKLLUFactorization
+export AppleAccelerateLUFactorization
 
 export OperatorAssumptions, OperatorCondition
 

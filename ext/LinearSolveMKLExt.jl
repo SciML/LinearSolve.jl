@@ -24,7 +24,7 @@ function getrf!(A::AbstractMatrix{<:Float64}; ipiv = similar(A, BlasInt, min(siz
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
             m, n, A, lda, ipiv, info)
     chkargsok(info[])
-    A, ipiv, info[] #Error code is stored in LU factorization type
+    A, ipiv, info[], info #Error code is stored in LU factorization type
 end
 
 default_alias_A(::MKLLUFactorization, ::Any, ::Any) = false
@@ -33,7 +33,7 @@ default_alias_b(::MKLLUFactorization, ::Any, ::Any) = false
 function LinearSolve.init_cacheval(alg::MKLLUFactorization, A, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
-    ArrayInterface.lu_instance(convert(AbstractMatrix, A))
+    ArrayInterface.lu_instance(convert(AbstractMatrix, A)), Ref{BlasInt}()
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
@@ -42,11 +42,12 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
     A = convert(AbstractMatrix, A)
     if cache.isfresh
         cacheval = @get_cacheval(cache, :MKLLUFactorization)
-        fact = LU(getrf!(A; ipiv = cacheval.ipiv)...)
+        res = getrf!(A; ipiv = cacheval[1].ipiv, info = cacheval[2])
+        fact = LU(res[1:3]...), res[4]
         cache.cacheval = fact
         cache.isfresh = false
     end
-    y = ldiv!(cache.u, @get_cacheval(cache, :MKLLUFactorization), cache.b)
+    y = ldiv!(cache.u, @get_cacheval(cache, :MKLLUFactorization)[1], cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 

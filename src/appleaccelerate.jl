@@ -11,7 +11,7 @@ to avoid allocations and does not require libblastrampoline.
 """
 struct AppleAccelerateLUFactorization <: AbstractFactorization end
 
-function is_new_accelerate_available()
+function appleaccelerate_isavailable()
     libacc_hdl = dlopen_e(libacc)
     if libacc_hdl == C_NULL
         return false

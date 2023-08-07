@@ -39,7 +39,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
     A = convert(AbstractMatrix, A)
     if cache.isfresh
         cacheval = @get_cacheval(cache, :MKLLUFactorization)
-        fact = LU(getrf!(A)...)
+        fact = LU(getrf!(A)...; ipiv = fact.ipiv)
         cache.cacheval = fact
         cache.isfresh = false
     end

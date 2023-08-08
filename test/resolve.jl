@@ -2,7 +2,9 @@ using LinearSolve, LinearAlgebra, SparseArrays, InteractiveUtils, Test
 
 for alg in subtypes(LinearSolve.AbstractFactorization)
     @show alg
-    if !(alg in [DiagonalFactorization, CudaOffloadFactorization])
+    if !(alg in [DiagonalFactorization, CudaOffloadFactorization, AppleAccelerateLUFactorization]) &&
+        (!(alg == AppleAccelerateLUFactorization) || LinearSolve.appleaccelerate_isavailable())
+
         A = [1.0 2.0; 3.0 4.0]
         alg in [KLUFactorization, UMFPACKFactorization, SparspakFactorization] &&
             (A = sparse(A))

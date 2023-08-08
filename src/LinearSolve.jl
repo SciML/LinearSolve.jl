@@ -23,6 +23,10 @@ using EnumX
 using Requires
 import InteractiveUtils
 
+using LinearAlgebra: BlasInt, LU
+using LinearAlgebra.LAPACK: require_one_based_indexing, chkfinite, chkstride1, 
+                            @blasfunc, chkargsok
+
 import GPUArraysCore
 import Preferences
 
@@ -87,6 +91,7 @@ include("solve_function.jl")
 include("default.jl")
 include("init.jl")
 include("extension_algs.jl")
+include("appleaccelerate.jl")
 include("deprecated.jl")
 
 @generated function SciMLBase.solve!(cache::LinearCache, alg::AbstractFactorization;
@@ -185,6 +190,7 @@ export CudaOffloadFactorization
 export MKLPardisoFactorize, MKLPardisoIterate
 export PardisoJL
 export MKLLUFactorization
+export AppleAccelerateLUFactorization
 
 export OperatorAssumptions, OperatorCondition
 

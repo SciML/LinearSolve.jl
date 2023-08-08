@@ -213,6 +213,9 @@ end
                 test_interface(alg, prob1, prob2)
             end
         end
+        if LinearSolve.appleaccelerate_isavailable()
+            test_interface(AppleAccelerateLUFactorization(), prob1, prob2)
+        end
     end
 
     @testset "Generic Factorizations" begin

@@ -177,6 +177,7 @@ export MKLPardisoFactorize, MKLPardisoIterate
 export PardisoJL
 export MKLLUFactorization
 export AppleAccelerateLUFactorization
+export MetalLUFactorization
 
 export OperatorAssumptions, OperatorCondition
 

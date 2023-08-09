@@ -348,3 +348,13 @@ A wrapper over Intel's Math Kernel Library (MKL). Direct calls to MKL in a way t
 to avoid allocations and does not require libblastrampoline.
 """
 struct MKLLUFactorization <: AbstractFactorization end
+
+"""
+```julia
+MetalLUFactorization()
+```
+
+A wrapper over Apple's Metal GPU library. Direct calls to Metal in a way that pre-allocates workspace
+to avoid allocations and automatically offloads to the GPU.
+"""
+struct MetalLUFactorization <: AbstractFactorization end

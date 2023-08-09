@@ -21,7 +21,7 @@ end
 algs = [MKLLUFactorization(), CUDAOffloadFactorization()]
 res = [Float32[] for i in 1:length(algs)]
 
-ns = 200:400:20000
+ns = 200:400:10000
 for i in 1:length(ns)
     n = ns[i]
     @info "$n × $n"

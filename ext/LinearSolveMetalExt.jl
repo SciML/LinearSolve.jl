@@ -11,7 +11,7 @@ default_alias_b(::MetalLUFactorization, ::Any, ::Any) = false
 function LinearSolve.init_cacheval(alg::MetalLUFactorization, A, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
-    ArrayInterface.lu_instance(convert(AbstractMatrix, MtlArray(A)))
+    ArrayInterface.lu_instance(convert(AbstractMatrix, A))
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::MetalLUFactorization;
@@ -21,10 +21,10 @@ function SciMLBase.solve!(cache::LinearCache, alg::MetalLUFactorization;
     if cache.isfresh
         cacheval = @get_cacheval(cache, :MetalLUFactorization)
         res = lu(MtlArray(A))
-        cache.cacheval = fact
+        cache.cacheval = LU(Array(res.factors), Array{Int}(res.ipiv), res.info)
         cache.isfresh = false
     end
-    y = Array(ldiv!(MtlArray(cache.u), @get_cacheval(cache, :MetalLUFactorization), MtlArray(cache.b)))
+    y = ldiv!(cache.u, @get_cacheval(cache, :MetalLUFactorization), cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 

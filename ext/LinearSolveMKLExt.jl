@@ -110,11 +110,11 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
     m, n = size(A, 1), size(A, 2)
     if m > n
         Bc = copy(cache.b)
-        getrs!('T', A.factors, A.ipiv, Bc; info)
+        getrs!('N', A.factors, A.ipiv, Bc; info)
         return copyto!(cache.u, 1, Bc, 1, n)
     else
         copyto!(cache.u, cache.b)
-        getrs!('T', A.factors, A.ipiv, cache.u; info)
+        getrs!('N', A.factors, A.ipiv, cache.u; info)
     end
 
     SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)

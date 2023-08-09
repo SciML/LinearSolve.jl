@@ -104,7 +104,11 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
         cache.cacheval = fact
         cache.isfresh = false
     end
-    
+
+    y = ldiv!(cache.u, @get_cacheval(cache, :MKLLUFactorization)[1], cache.b)
+    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+
+    #=
     A, info = @get_cacheval(cache, :MKLLUFactorization)
     LinearAlgebra.require_one_based_indexing(cache.u, cache.b)
     m, n = size(A, 1), size(A, 2)
@@ -118,6 +122,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
     end
 
     SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
+    =#
 end
 
 end

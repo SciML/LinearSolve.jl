@@ -7,15 +7,37 @@ Solves for ``Au=b`` in the problem defined by `prob` using the algorithm
 
 ## Recommended Methods
 
+### Dense Matrices
+
 The default algorithm `nothing` is good for picking an algorithm that will work,
 but one may need to change this to receive more performance or precision. If
 more precision is necessary, `QRFactorization()` and `SVDFactorization()` are
 the best choices, with SVD being the slowest but most precise.
 
-For efficiency, `RFLUFactorization` is the fastest for dense LU-factorizations.
-`FastLUFactorization` will be faster than `LUFactorization` which is the Base.LinearAlgebra
-(`\` default) implementation of LU factorization. `SimpleLUFactorization` will be fast
-on very small matrices.
+For efficiency, `RFLUFactorization` is the fastest for dense LU-factorizations until around 
+150x150 matrices, though this can be dependent on the exact details of the hardware. After this
+point, `MKLLUFactorization` is usually faster on most hardware. Note that on Mac computers
+that `AppleAccelerateLUFactorization` is generally always the fastest. `LUFactorization` will
+use your base system BLAS which can be fast or slow depending on the hardware configuration. 
+`SimpleLUFactorization` will be fast only on very small matrices but can cut down on compile times.
+
+For very large dense factorizations, offloading to the GPU can be preferred. Metal.jl can be used
+on Mac hardware to offload, and has a cutoff point of being faster at around size 20,000 x 20,000 
+matrices (and only supports Float32). `CudaOffloadFactorization` can be more efficient at a
+much smaller cutoff, possibly around size 1,000 x 1,000 matrices, though this is highly dependent
+on the chosen GPU hardware. `CudaOffloadFactorization` requires a CUDA-compatible NVIDIA GPU.
+CUDA offload supports Float64 but most consumer GPU hardware will be much faster on Float32
+(many are >32x faster for Float32 operations than Float64 operations) and thus for most hardware
+this is only recommended for Float32 matrices.
+
+!!! note
+
+    Performance details for dense LU-factorizations can be highly dependent on the hardware configuration. 
+    For details see [this issue](https://github.com/SciML/LinearSolve.jl/issues/357). 
+    If one is looking to best optimize their system, we suggest running the performance
+    tuning benchmark.
+
+### Sparse Matrices
 
 For sparse LU-factorizations, `KLUFactorization` if there is less structure
 to the sparsity pattern and `UMFPACKFactorization` if there is more structure.
@@ -31,11 +53,24 @@ As sparse matrices get larger, iterative solvers tend to get more efficient than
 factorization methods if a lower tolerance of the solution is required.
 
 Krylov.jl generally outperforms IterativeSolvers.jl and KrylovKit.jl, and is compatible
-with CPUs and GPUs, and thus is the generally preferred form for Krylov methods.
+with CPUs and GPUs, and thus is the generally preferred form for Krylov methods. The
+choice of Krylov method should be the one most constrained to the type of operator one
+has, for example if positive definite then `Krylov_CG()`, but if no good properties then
+use `Krylov_GMRES()`.
 
 Finally, a user can pass a custom function for handling the linear solve using
 `LinearSolveFunction()` if existing solvers are not optimally suited for their application.
 The interface is detailed [here](@ref custom).
+
+### Lazy SciMLOperators
+
+If the linear operator is given as a lazy non-concrete operator, such as a `FunctionOperator`,
+then using a Krylov method is preferred in order to not concretize the matrix. 
+Krylov.jl generally outperforms IterativeSolvers.jl and KrylovKit.jl, and is compatible
+with CPUs and GPUs, and thus is the generally preferred form for Krylov methods. The
+choice of Krylov method should be the one most constrained to the type of operator one
+has, for example if positive definite then `Krylov_CG()`, but if no good properties then
+use `Krylov_GMRES()`.
 
 ## Full List of Methods
 
@@ -119,6 +154,26 @@ KrylovJL
 
 ```@docs
 MKLLUFactorization
+```
+
+### AppleAccelerate.jl
+
+!!! note
+    
+    Using this solver requires a Mac with Apple Accelerate. This should come standard in most "modern" Mac computers.
+
+```@docs
+AppleAccelerateLUFactorization
+```
+
+### Metal.jl
+
+!!! note
+    
+    Using this solver requires adding the package Metal.jl, i.e. `using Metal`. This package is only compatible with Mac M-Series computers with a Metal-compatible GPU.
+
+```@docs
+MetalLUFactorization
 ```
 
 ### Pardiso.jl

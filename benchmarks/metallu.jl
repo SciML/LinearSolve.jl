@@ -21,7 +21,7 @@ end
 algs = [AppleAccelerateLUFactorization(), MetalLUFactorization()]
 res = [Float32[] for i in 1:length(algs)]
 
-ns = 200:400:20000
+ns = 200:600:15000
 for i in 1:length(ns)
     n = ns[i]
     @info "$n × $n"
@@ -32,6 +32,7 @@ for i in 1:length(ns)
     
     for j in 1:length(algs)
         bt = @belapsed solve(prob, $(algs[j])).u setup=(prob = LinearProblem(copy(A), copy(b); u0 = copy(u0), alias_A=true, alias_b=true))
+        GC.gc()
         push!(res[j], luflop(n) / bt / 1e9)
     end
 end

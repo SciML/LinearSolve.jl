@@ -18,7 +18,7 @@ function luflop(m, n = m; innerflop = 2)
     end
 end
 
-algs = [MKLLUFactorization(), CUDAOffloadFactorization()]
+algs = [MKLLUFactorization(), CudaOffloadFactorization()]
 res = [Float32[] for i in 1:length(algs)]
 
 ns = 200:400:10000

@@ -24,7 +24,7 @@ using Requires
 import InteractiveUtils
 
 using LinearAlgebra: BlasInt, LU
-using LinearAlgebra.LAPACK: require_one_based_indexing, chkfinite, chkstride1, 
+using LinearAlgebra.LAPACK: require_one_based_indexing, chkfinite, chkstride1,
                             @blasfunc, chkargsok
 
 import GPUArraysCore
@@ -85,6 +85,7 @@ end
 include("common.jl")
 include("factorization.jl")
 include("simplelu.jl")
+include("simplegmres.jl")
 include("iterative_wrappers.jl")
 include("preconditioners.jl")
 include("solve_function.jl")
@@ -170,6 +171,8 @@ export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
     IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
     IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES,
     KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES
+
+export SimpleGMRES
 
 export HYPREAlgorithm
 export CudaOffloadFactorization

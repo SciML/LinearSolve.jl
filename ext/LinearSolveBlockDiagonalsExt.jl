@@ -18,7 +18,7 @@ function LinearSolve.init_cacheval(alg::SimpleGMRES{false}, A::BlockDiagonal, b,
     end
     # Can't help but perform dynamic dispatch here
     return LinearSolve._init_cacheval(Val(uniform_blocks), alg, A, b, u, Pl, Pr, maxiters,
-        abstol, reltol, verbose, assumptions; zeroinit)
+        abstol, reltol, verbose, assumptions; zeroinit, blocksize = usize)
 end
 
 end

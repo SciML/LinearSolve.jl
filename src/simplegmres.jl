@@ -19,6 +19,15 @@ specialized dispatches.
 !!! warning
 
     Most users should be using the `KrylovJL_GMRES` solver instead of this implementation.
+
+!!! tip
+
+    We can automatically detect if the matrix is a Block Diagonal Matrix with Uniformly
+    Sized Square Blocks. If this is the case, then we can use a specialized dispatch.
+    However, on most modern systems performing a single matrix-vector multiplication is
+    faster than performing multiple smaller matrix-vector multiplications (as in the case
+    of Block Diagonal Matrix). We recommend making the matrix dense (if size permits) and
+    specifying the `blocksize` argument.
 """
 struct SimpleGMRES{UBD} <: AbstractKrylovSubspaceMethod
     restart::Int

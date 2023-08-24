@@ -46,7 +46,6 @@ LinearSolveIterativeSolversExt = "IterativeSolvers"
 LinearSolveKrylovKitExt = "KrylovKit"
 LinearSolveMKLExt = "MKL_jll"
 LinearSolveMetalExt = "Metal"
-LinearSolveNNlibExt = "NNlib"
 LinearSolvePardisoExt = "Pardiso"
 
 [compat]

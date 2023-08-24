@@ -29,6 +29,7 @@ using LinearAlgebra.LAPACK: require_one_based_indexing, chkfinite, chkstride1,
 
 import GPUArraysCore
 import Preferences
+import ConcreteStructs: @concrete
 
 # wrap
 import Krylov

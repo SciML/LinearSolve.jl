@@ -54,14 +54,14 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
 
     # pass in vector of tuples like [(iparm::Int, key::Int) ...]
     if iparm !== nothing
-        for i in length(iparm)
-            Pardiso.set_iparm!(solver, iparm[i]...)
+        for i in iparm
+            Pardiso.set_iparm!(solver, i...)
         end
     end
 
     if dparm !== nothing
-        for i in length(dparm)
-            Pardiso.set_dparm!(solver, dparm[i]...)
+        for d in dparm
+            Pardiso.set_dparm!(solver, d...)
         end
     end
 

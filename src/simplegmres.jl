@@ -502,7 +502,7 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
             mul!(w, A, p)                         # w ← ANvₖ
             PlisI || ldiv!(q, Pl, w)                 # q ← MANvₖ
             for i in 1:inner_iter
-                R[nr + i] .= vec(sum(__batch(V[i]) .* __batch(q); dims = 1)) # hᵢₖ = (vᵢ)ᴴq
+                sum!(R[nr + i]', __batch(V[i]) .* __batch(q))
                 q .-= vec(R[nr + i]' .* __batch(V[i])) # q ← q - hᵢₖvᵢ
             end
 

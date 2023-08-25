@@ -369,7 +369,7 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
     cache.warm_start = false
 
     return SciMLBase.build_linear_solution(lincache.alg, x, rNorm, lincache;
-        retcode = status)
+        retcode = status, iters = iter)
 end
 
 function _init_cacheval(::Val{true}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiters::Int,
@@ -595,5 +595,5 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
     warm_start && !restart && axpy!(one(T), Δx, x)
 
     return SciMLBase.build_linear_solution(lincache.alg, x, rNorm, lincache;
-        retcode = status)
+        retcode = status, iters = iter)
 end

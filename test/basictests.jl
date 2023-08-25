@@ -235,6 +235,10 @@ end
         end
     end
 
+    @testset "Simple GMRES: restart = $restart" for restart in (true, false)
+        test_interface(SimpleGMRES(; restart), prob1, prob2)
+    end
+
     @testset "KrylovJL" begin
         kwargs = (; gmres_restart = 5)
         for alg in (("Default", KrylovJL(kwargs...)),
@@ -412,7 +416,7 @@ end
 
         @testset "DirectLdiv!" begin
             function get_operator(A, u; add_inverse = true)
-                
+
                 function f(u, p, t)
                     println("using FunctionOperator OOP mul")
                     A * u
@@ -470,3 +474,28 @@ lp = LinearProblem(A, b; u0 = view(u0, :));
 truesol = solve(lp, LUFactorization())
 krylovsol = solve(lp, KrylovJL_GMRES())
 @test truesol ≈ krylovsol
+
+# Block Diagonals
+using BlockDiagonals
+
+@testset "Block Diagonal Specialization" begin
+    A = BlockDiagonal([rand(2, 2) for _ in 1:3])
+    b = rand(size(A, 1))
+
+    if VERSION > v"1.9-"
+        x1 = zero(b)
+        x2 = zero(b)
+        prob1 = LinearProblem(A, b, x1)
+        prob2 = LinearProblem(A, b, x2)
+        test_interface(SimpleGMRES(), prob1, prob2)
+    end
+
+    x1 = zero(b)
+    x2 = zero(b)
+    prob1 = LinearProblem(Array(A), b, x1)
+    prob2 = LinearProblem(Array(A), b, x2)
+
+    test_interface(SimpleGMRES(; blocksize=2), prob1, prob2)
+
+    @test solve(prob1, SimpleGMRES(; blocksize=2)).u ≈ solve(prob2, SimpleGMRES()).u
+end

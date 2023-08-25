@@ -169,6 +169,7 @@ function _init_cacheval(::Val{false}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiter
     q = PlisI ? similar(u, 0) : similar(u, n)
     p = PrisI ? similar(u, 0) : similar(u, n)
     x = u
+    x .= zero(T)
 
     w = similar(u, n)
     V = [similar(u) for _ in 1:memory]
@@ -398,6 +399,7 @@ function _init_cacheval(::Val{true}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiters
     q = PlisI ? similar(u, 0) : similar(u, n)
     p = PrisI ? similar(u, 0) : similar(u, n)
     x = u
+    x .= zero(T)
 
     w = similar(u, n)
     V = [similar(u) for _ in 1:memory]

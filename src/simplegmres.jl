@@ -1,5 +1,6 @@
 """
-    SimpleGMRES(; restart::Int = 20, blocksize::Int = 0)
+    SimpleGMRES(; restart::Bool = true, blocksize::Int = 0, warm_start::Bool = false,
+        memory::Int = 20)
 
 A simple GMRES implementation for square non-Hermitian linear systems.
 
@@ -69,6 +70,39 @@ end
     R
     β
     warm_start::Bool
+end
+
+"""
+    (c, s, ρ) = _sym_givens(a, b)
+
+Numerically stable symmetric Givens reflection.
+Given `a` and `b` reals, return `(c, s, ρ)` such that
+
+    [ c  s ] [ a ] = [ ρ ]
+    [ s -c ] [ b ] = [ 0 ].
+"""
+function _sym_givens(a::T, b::T) where {T <: AbstractFloat}
+    # This has taken from Krylov.jl
+    if b == 0
+        c = ifelse(a == 0, one(T), sign(a)) # In Julia, sign(0) = 0.
+        s = zero(T)
+        ρ = abs(a)
+    elseif a == 0
+        c = zero(T)
+        s = sign(b)
+        ρ = abs(b)
+    elseif abs(b) > abs(a)
+        t = a / b
+        s = sign(b) / sqrt(one(T) + t * t)
+        c = s * t
+        ρ = b / s  # Computationally better than ρ = a / c since |c| ≤ |s|.
+    else
+        t = b / a
+        c = sign(a) / sqrt(one(T) + t * t)
+        s = c * t
+        ρ = a / c  # Computationally better than ρ = b / s since |s| ≤ |c|
+    end
+    return (c, s, ρ)
 end
 
 _no_preconditioner(::Nothing) = true
@@ -162,7 +196,7 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
     xr = restart ? Δx : x
 
     if β == 0
-        return SciMLBase.build_linear_solution(nothing, x, r₀, nothing;
+        return SciMLBase.build_linear_solution(lincache.alg, x, r₀, lincache;
             retcode = ReturnCode.Success)
     end
 
@@ -251,7 +285,7 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
             # Compute and apply current Givens reflection Ωₖ.
             # [cₖ  sₖ] [ r̄ₖ.ₖ ] = [rₖ.ₖ]
             # [s̄ₖ -cₖ] [hₖ₊₁.ₖ]   [ 0  ]
-            (c[inner_iter], s[inner_iter], R[nr + inner_iter]) = Krylov.sym_givens(R[nr + inner_iter],
+            (c[inner_iter], s[inner_iter], R[nr + inner_iter]) = _sym_givens(R[nr + inner_iter],
                 Hbis)
 
             # Update zₖ = (Qₖ)ᴴβe₁
@@ -402,7 +436,7 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
     xr = restart ? Δx : x
 
     if β == 0
-        return SciMLBase.build_linear_solution(nothing, x, r₀, nothing;
+        return SciMLBase.build_linear_solution(lincache.alg, x, r₀, lincache;
             retcode = ReturnCode.Success)
     end
 
@@ -484,7 +518,7 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
             # [cₖ  sₖ] [ r̄ₖ.ₖ ] = [rₖ.ₖ]
             # [s̄ₖ -cₖ] [hₖ₊₁.ₖ]   [ 0  ]
             # FIXME: Write inplace kernel
-            __res = Krylov.sym_givens.(R[nr + inner_iter], Hbis)
+            __res = _sym_givens.(R[nr + inner_iter], Hbis)
             foreach(1:bsize) do i
                 c[inner_iter][i] = __res[i][1]
                 s[inner_iter][i] = __res[i][2]

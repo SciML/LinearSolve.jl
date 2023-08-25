@@ -56,6 +56,11 @@ _isidentity_struct(λ::Number) = isone(λ)
 _isidentity_struct(A::UniformScaling) = isone(A.λ)
 _isidentity_struct(::SciMLOperators.IdentityOperator) = true
 
+# Dispatch Friendly way to check if an extension is loaded
+__is_extension_loaded(::Val) = false
+
+function _fast_sym_givens! end
+
 # Code
 
 const INCLUDE_SPARSE = Preferences.@load_preference("include_sparse", Base.USE_GPL_LIBS)

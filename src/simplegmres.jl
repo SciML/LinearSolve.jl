@@ -105,6 +105,19 @@ function _sym_givens(a::T, b::T) where {T <: AbstractFloat}
     return (c, s, ρ)
 end
 
+function _sym_givens!(c, s, R, nr::Int, inner_iter::Int, bsize::Int, Hbis)
+    if __is_extension_loaded(Val(:KernelAbstractions))
+        return _fast_sym_givens!(c, s, R, nr, inner_iter, bsize, Hbis)
+    end
+    __res = _sym_givens.(R[nr + inner_iter], Hbis)
+    GPUArraysCore.@allowscalar foreach(1:bsize) do i
+        c[inner_iter][i] = __res[i][1]
+        s[inner_iter][i] = __res[i][2]
+        R[nr + inner_iter][i] = __res[i][3]
+    end
+    return c, s, R
+end
+
 _no_preconditioner(::Nothing) = true
 _no_preconditioner(::IdentityOperator) = true
 _no_preconditioner(::UniformScaling) = true
@@ -221,15 +234,7 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
     while !(solved || tired || breakdown)
         # Initialize workspace.
         nr = 0  # Number of coefficients stored in Rₖ.
-        #=  TODO: Check that not zeroing out doesn't lead to incorrect results.
-        foreach(V) do v
-            v .= zero(T)  # Orthogonal basis of Kₖ(MAN, Mr₀).
-        end
-        s .= zero(T)  # Givens sines used for the factorization QₖRₖ = Hₖ₊₁.ₖ.
-        c .= zero(T)  # Givens cosines used for the factorization QₖRₖ = Hₖ₊₁.ₖ.
-        R .= zero(T)  # Upper triangular matrix Rₖ.
-        z .= zero(T)  # Right-hand of the least squares problem min ‖Hₖ₊₁.ₖyₖ - βe₁‖₂.
-        =#
+        # TODO: Check that not zeroing out doesn't lead to incorrect results.
 
         if restart
             xr .= zero(T)  # xr === Δx when restart is set to true
@@ -517,13 +522,7 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
             # Compute and apply current Givens reflection Ωₖ.
             # [cₖ  sₖ] [ r̄ₖ.ₖ ] = [rₖ.ₖ]
             # [s̄ₖ -cₖ] [hₖ₊₁.ₖ]   [ 0  ]
-            # FIXME: Write inplace kernel
-            __res = _sym_givens.(R[nr + inner_iter], Hbis)
-            foreach(1:bsize) do i
-                c[inner_iter][i] = __res[i][1]
-                s[inner_iter][i] = __res[i][2]
-                R[nr + inner_iter][i] = __res[i][3]
-            end
+            _sym_givens!(c, s, R, nr, inner_iter, bsize, Hbis)
 
             # Update zₖ = (Qₖ)ᴴβe₁
             ζₖ₊₁ = conj.(s[inner_iter]) .* z[inner_iter]
@@ -567,15 +566,8 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
                 pos = pos - j + 1            # position of rᵢ.ⱼ₋₁
             end
             # Rₖ can be singular if the system is inconsistent
-            # FIXME: Write with broadcasting
-            GPUArraysCore.@allowscalar foreach(1:bsize) do B
-                if abs(R[pos][B]) ≤ btol
-                    y[i][B] = zero(T)
-                    inconsistent = true
-                else
-                    y[i][B] /= R[pos][B]
-                end
-            end
+            y[i] .= ifelse.(abs.(R[pos]) .≤ btol, zero(T), y[i] ./ R[pos])  # yᵢ ← yᵢ / rᵢᵢ
+            inconsistent = any(abs.(R[pos]) .≤ btol)
         end
 
         # Form xₖ = NVₖyₖ

@@ -3,35 +3,42 @@ if isdefined(Base, :Experimental) &&
    isdefined(Base.Experimental, Symbol("@max_methods"))
     @eval Base.Experimental.@max_methods 1
 end
-using ArrayInterface
-using RecursiveFactorization
-using Base: cache_dependencies, Bool
-using LinearAlgebra
-using SparseArrays
-using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
-using SciMLBase: AbstractLinearAlgorithm
-using SciMLOperators
-using SciMLOperators: AbstractSciMLOperator, IdentityOperator
-using Setfield
-using UnPack
-using SuiteSparse
-using KLU
-using Sparspak
-using FastLapackInterface
-using DocStringExtensions
-using EnumX
-using Requires
-import InteractiveUtils
 
-using LinearAlgebra: BlasInt, LU
-using LinearAlgebra.LAPACK: require_one_based_indexing, chkfinite, chkstride1, 
-                            @blasfunc, chkargsok
+import PrecompileTools
 
-import GPUArraysCore
-import Preferences
+PrecompileTools.@recompile_invalidations begin
+    using ArrayInterface
+    using RecursiveFactorization
+    using Base: cache_dependencies, Bool
+    using LinearAlgebra
+    using SparseArrays
+    using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
+    using SciMLBase: AbstractLinearAlgorithm
+    using SciMLOperators
+    using SciMLOperators: AbstractSciMLOperator, IdentityOperator
+    using Setfield
+    using UnPack
+    using SuiteSparse
+    using KLU
+    using Sparspak
+    using FastLapackInterface
+    using DocStringExtensions
+    using EnumX
+    using Requires
+    import InteractiveUtils
 
-# wrap
-import Krylov
+    using LinearAlgebra: BlasInt, LU
+    using LinearAlgebra.LAPACK: require_one_based_indexing, chkfinite, chkstride1, 
+                                @blasfunc, chkargsok
+
+    import GPUArraysCore
+    import Preferences
+
+    # wrap
+    import Krylov
+    
+    using SciMLBase
+end
 
 using Reexport
 @reexport using SciMLBase
@@ -123,8 +130,6 @@ end
 
 const IS_OPENBLAS = Ref(true)
 isopenblas() = IS_OPENBLAS[]
-
-import PrecompileTools
 
 PrecompileTools.@compile_workload begin
     A = rand(4, 4)

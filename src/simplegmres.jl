@@ -235,7 +235,6 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
     while !(solved || tired || breakdown)
         # Initialize workspace.
         nr = 0  # Number of coefficients stored in Rₖ.
-        # TODO: Check that not zeroing out doesn't lead to incorrect results.
 
         if restart
             xr .= zero(T)  # xr === Δx when restart is set to true

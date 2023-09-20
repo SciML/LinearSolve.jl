@@ -53,6 +53,7 @@ LinearSolvePardisoExt = "Pardiso"
 [compat]
 ArrayInterface = "7.4.11"
 BlockDiagonals = "0.1"
+ConcreteStructs = "0.2"
 DocStringExtensions = "0.8, 0.9"
 EnumX = "1"
 FastLapackInterface = "1, 2"

@@ -42,10 +42,32 @@ function test_interface(alg, prob1, prob2)
     return
 end
 
-test_interface(CudaOffloadFactorization(), prob1, prob2)
+@testset "CudaOffloadFactorization" begin
+    test_interface(CudaOffloadFactorization(), prob1, prob2)
+end
+
+@testset "Simple GMRES: restart = $restart" for restart in (true, false)
+    test_interface(SimpleGMRES(; restart), prob1, prob2)
+end
 
 A1 = prob1.A;
 b1 = prob1.b;
 x1 = prob1.u0;
 y = solve(prob1)
 @test A1 * y ≈ b1
+
+using BlockDiagonals
+
+@testset "Block Diagonal Specialization" begin
+    A = BlockDiagonal([rand(2, 2) for _ in 1:3]) |> cu
+    b = rand(size(A, 1)) |> cu
+
+    x1 = zero(b)
+    x2 = zero(b)
+    prob1 = LinearProblem(A, b, x1)
+    prob2 = LinearProblem(A, b, x2)
+
+    test_interface(SimpleGMRES(; blocksize=2), prob1, prob2)
+
+    @test solve(prob1, SimpleGMRES(; blocksize=2)).u ≈ solve(prob2, SimpleGMRES()).u
+end

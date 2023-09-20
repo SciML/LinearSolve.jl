@@ -72,6 +72,14 @@ choice of Krylov method should be the one most constrained to the type of operat
 has, for example if positive definite then `Krylov_CG()`, but if no good properties then
 use `Krylov_GMRES()`.
 
+!!! tip
+
+    If your materialized operator is a uniform block diagonal matrix, then you can use
+    `SimpleGMRES(; blocksize = <known block size>)` to further improve performance.
+    This often shows up in Neural Networks where the Jacobian wrt the Inputs (almost always)
+    is a Uniform Block Diagonal matrix of Block Size = size of the input divided by the 
+    batch size.
+
 ## Full List of Methods
 
 ### RecursiveFactorization.jl
@@ -106,6 +114,7 @@ LinearSolve.jl contains some linear solvers built in for specailized cases.
 ```@docs
 SimpleLUFactorization
 DiagonalFactorization
+SimpleGMRES
 ```
 
 ### FastLapackInterface.jl

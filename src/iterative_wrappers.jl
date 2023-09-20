@@ -253,7 +253,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
         Krylov.solve!(args...; M = M,
             kwargs...)
     elseif cache.cacheval isa Krylov.GmresSolver
-        Krylov.solve!(args...; M = M, N = N,
+        Krylov.solve!(args...; M = M, N = N, restart = alg.gmres_restart > 0,
             kwargs...)
     elseif cache.cacheval isa Krylov.BicgstabSolver
         Krylov.solve!(args...; M = M, N = N,

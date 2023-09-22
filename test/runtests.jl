@@ -8,7 +8,7 @@ const HAS_EXTENSIONS = isdefined(Base, :get_extension)
 
 if GROUP == "All" || GROUP == "Core"
     @time @safetestset "Basic Tests" include("basictests.jl")
-    @time @safetestset "Re-solve" include("resolve.jl")
+    VERSION >= v"1.9" && @time @safetestset "Re-solve" include("resolve.jl")
     @time @safetestset "Zero Initialization Tests" include("zeroinittests.jl")
     @time @safetestset "Non-Square Tests" include("nonsquare.jl")
     @time @safetestset "SparseVector b Tests" include("sparse_vector.jl")

@@ -202,7 +202,7 @@ end
         end
     end
 
-    test_algs = if VERISON >= v"1.9"
+    test_algs = if VERSION >= v"1.9"
         (LUFactorization(),
             QRFactorization(),
             SVDFactorization(),

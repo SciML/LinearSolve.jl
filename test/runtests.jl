@@ -13,6 +13,7 @@ if GROUP == "All" || GROUP == "Core"
     @time @safetestset "Non-Square Tests" include("nonsquare.jl")
     @time @safetestset "SparseVector b Tests" include("sparse_vector.jl")
     @time @safetestset "Default Alg Tests" include("default_algs.jl")
+    VERSION >= v"1.9" && @time @safetestset "Enzyme Derivative Rules" include("enzyme.jl")
     @time @safetestset "Traits" include("traits.jl")
 end
 

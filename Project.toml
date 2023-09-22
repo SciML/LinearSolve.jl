@@ -1,7 +1,7 @@
 name = "LinearSolve"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 authors = ["SciML"]
-version = "2.6.0"
+version = "2.7.0"
 
 [deps]
 ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
@@ -69,7 +69,7 @@ Preferences = "1"
 RecursiveFactorization = "0.2.8"
 Reexport = "1"
 Requires = "1"
-SciMLBase = "1.82"
+SciMLBase = "2"
 SciMLOperators = "0.2, 0.3"
 Setfield = "0.7, 0.8, 1"
 Sparspak = "0.3.6"

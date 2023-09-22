@@ -202,13 +202,23 @@ end
         end
     end
 
-    @testset "Concrete Factorizations" begin
-        for alg in (LUFactorization(),
+    test_algs = if VERISON >= v"1.9"
+        (LUFactorization(),
             QRFactorization(),
             SVDFactorization(),
             RFLUFactorization(),
             MKLLUFactorization(),
             LinearSolve.defaultalg(prob1.A, prob1.b))
+    else
+        (LUFactorization(),
+            QRFactorization(),
+            SVDFactorization(),
+            RFLUFactorization(),
+            LinearSolve.defaultalg(prob1.A, prob1.b))
+    end
+
+    @testset "Concrete Factorizations" begin
+        for alg in test_algs
             @testset "$alg" begin
                 test_interface(alg, prob1, prob2)
             end

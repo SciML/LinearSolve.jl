@@ -60,7 +60,11 @@ end
 #   dA −= z y^T  
 #   dB += z, where  z = inv(A^T) dy
 function EnzymeCore.EnzymeRules.augmented_primal(config, func::Const{typeof(LinearSolve.solve!)}, ::Type{RT}, linsolve::EnzymeCore.Annotation{LP}; kwargs...) where {RT, LP <: LinearSolve.LinearCache}
+    @assert linsolve.val.isfresh
+    A_cache = copy(linsolve.val.A)
+
     res = func.val(linsolve.val; kwargs...)
+
     dres = if EnzymeRules.width(config) == 1
         deepcopy(res)
     else
@@ -81,7 +85,7 @@ function EnzymeCore.EnzymeRules.augmented_primal(config, func::Const{typeof(Line
         (dr.u for dr in dres)
     end
 
-    cache = (copy(linsolve.val.A), res, resvals)
+    cache = (A_cache, res, resvals)
     return EnzymeCore.EnzymeRules.AugmentedReturn(res, dres, cache)
 end
 

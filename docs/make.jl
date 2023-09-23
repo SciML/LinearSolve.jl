@@ -12,14 +12,7 @@ makedocs(sitename = "LinearSolve.jl",
     authors = "Chris Rackauckas",
     modules = [LinearSolve, LinearSolve.SciMLBase],
     clean = true, doctest = false, linkcheck = true,
-    strict = [
-        :doctest,
-        :linkcheck,
-        :parse_error,
-        :example_block,
-        # Other available options are
-        # :autodocs_block, :cross_references, :docs_block, :eval_block, :example_block, :footnote, :meta_block, :missing_docs, :setup_block
-    ],
+    warnonly = [:docs_block, :missing_docs],
     format = Documenter.HTML(assets = ["assets/favicon.ico"],
         canonical = "https://docs.sciml.ai/LinearSolve/stable/"),
     pages = pages)

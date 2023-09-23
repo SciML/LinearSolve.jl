@@ -4,7 +4,7 @@ using LinearSolve, BlockDiagonals
 
 function LinearSolve.init_cacheval(alg::SimpleGMRES{false}, A::BlockDiagonal, b, args...;
     kwargs...)
-    @assert ndims(A) == 2 "ndims(A) == $(ndims(A)). `A` must have ndims == 2."
+    @assert ndims(A)==2 "ndims(A) == $(ndims(A)). `A` must have ndims == 2."
     # We need to perform this check even when `zeroinit == true`, since the type of the
     # cache is dependent on whether we are able to use the specialized dispatch.
     bsizes = blocksizes(A)

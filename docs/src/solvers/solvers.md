@@ -14,15 +14,15 @@ but one may need to change this to receive more performance or precision. If
 more precision is necessary, `QRFactorization()` and `SVDFactorization()` are
 the best choices, with SVD being the slowest but most precise.
 
-For efficiency, `RFLUFactorization` is the fastest for dense LU-factorizations until around 
+For efficiency, `RFLUFactorization` is the fastest for dense LU-factorizations until around
 150x150 matrices, though this can be dependent on the exact details of the hardware. After this
 point, `MKLLUFactorization` is usually faster on most hardware. Note that on Mac computers
 that `AppleAccelerateLUFactorization` is generally always the fastest. `LUFactorization` will
-use your base system BLAS which can be fast or slow depending on the hardware configuration. 
+use your base system BLAS which can be fast or slow depending on the hardware configuration.
 `SimpleLUFactorization` will be fast only on very small matrices but can cut down on compile times.
 
 For very large dense factorizations, offloading to the GPU can be preferred. Metal.jl can be used
-on Mac hardware to offload, and has a cutoff point of being faster at around size 20,000 x 20,000 
+on Mac hardware to offload, and has a cutoff point of being faster at around size 20,000 x 20,000
 matrices (and only supports Float32). `CudaOffloadFactorization` can be more efficient at a
 much smaller cutoff, possibly around size 1,000 x 1,000 matrices, though this is highly dependent
 on the chosen GPU hardware. `CudaOffloadFactorization` requires a CUDA-compatible NVIDIA GPU.
@@ -31,9 +31,9 @@ CUDA offload supports Float64 but most consumer GPU hardware will be much faster
 this is only recommended for Float32 matrices.
 
 !!! note
-
-    Performance details for dense LU-factorizations can be highly dependent on the hardware configuration. 
-    For details see [this issue](https://github.com/SciML/LinearSolve.jl/issues/357). 
+    
+    Performance details for dense LU-factorizations can be highly dependent on the hardware configuration.
+    For details see [this issue](https://github.com/SciML/LinearSolve.jl/issues/357).
     If one is looking to best optimize their system, we suggest running the performance
     tuning benchmark.
 
@@ -65,7 +65,7 @@ The interface is detailed [here](@ref custom).
 ### Lazy SciMLOperators
 
 If the linear operator is given as a lazy non-concrete operator, such as a `FunctionOperator`,
-then using a Krylov method is preferred in order to not concretize the matrix. 
+then using a Krylov method is preferred in order to not concretize the matrix.
 Krylov.jl generally outperforms IterativeSolvers.jl and KrylovKit.jl, and is compatible
 with CPUs and GPUs, and thus is the generally preferred form for Krylov methods. The
 choice of Krylov method should be the one most constrained to the type of operator one
@@ -73,11 +73,11 @@ has, for example if positive definite then `Krylov_CG()`, but if no good propert
 use `Krylov_GMRES()`.
 
 !!! tip
-
+    
     If your materialized operator is a uniform block diagonal matrix, then you can use
     `SimpleGMRES(; blocksize = <known block size>)` to further improve performance.
     This often shows up in Neural Networks where the Jacobian wrt the Inputs (almost always)
-    is a Uniform Block Diagonal matrix of Block Size = size of the input divided by the 
+    is a Uniform Block Diagonal matrix of Block Size = size of the input divided by the
     batch size.
 
 ## Full List of Methods

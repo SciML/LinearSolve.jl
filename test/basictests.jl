@@ -426,7 +426,6 @@ end
 
         @testset "DirectLdiv!" begin
             function get_operator(A, u; add_inverse = true)
-
                 function f(u, p, t)
                     println("using FunctionOperator OOP mul")
                     A * u
@@ -479,7 +478,9 @@ end
 end # testset
 
 # https://github.com/SciML/LinearSolve.jl/issues/347
-A = rand(4, 4); b = rand(4); u0 = zeros(4);
+A = rand(4, 4);
+b = rand(4);
+u0 = zeros(4);
 lp = LinearProblem(A, b; u0 = view(u0, :));
 truesol = solve(lp, LUFactorization())
 krylovsol = solve(lp, KrylovJL_GMRES())
@@ -505,7 +506,7 @@ using BlockDiagonals
     prob1 = LinearProblem(Array(A), b, x1)
     prob2 = LinearProblem(Array(A), b, x2)
 
-    test_interface(SimpleGMRES(; blocksize=2), prob1, prob2)
+    test_interface(SimpleGMRES(; blocksize = 2), prob1, prob2)
 
-    @test solve(prob1, SimpleGMRES(; blocksize=2)).u ≈ solve(prob2, SimpleGMRES()).u
+    @test solve(prob1, SimpleGMRES(; blocksize = 2)).u ≈ solve(prob2, SimpleGMRES()).u
 end

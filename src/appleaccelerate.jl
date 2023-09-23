@@ -2,7 +2,7 @@ using LinearAlgebra
 using Libdl
 
 # For now, only use BLAS from Accelerate (that is to say, vecLib)
-global const libacc = "/System/Library/Frameworks/Accelerate.framework/Accelerate"
+const global libacc = "/System/Library/Frameworks/Accelerate.framework/Accelerate"
 
 """
 ```julia
@@ -26,43 +26,53 @@ function appleaccelerate_isavailable()
     return true
 end
 
-function aa_getrf!(A::AbstractMatrix{<:Float64}; ipiv = similar(A, Cint, min(size(A,1),size(A,2))), info = Ref{Cint}(), check = false)
+function aa_getrf!(A::AbstractMatrix{<:Float64};
+    ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
+    info = Ref{Cint}(),
+    check = false)
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
     m, n = size(A)
-    lda  = max(1,stride(A, 2))
+    lda = max(1, stride(A, 2))
     if isempty(ipiv)
-        ipiv = similar(A, Cint, min(size(A,1),size(A,2)))
+        ipiv = similar(A, Cint, min(size(A, 1), size(A, 2)))
     end
 
     ccall(("dgetrf_", libacc), Cvoid,
-            (Ref{Cint}, Ref{Cint}, Ptr{Float64},
+        (Ref{Cint}, Ref{Cint}, Ptr{Float64},
             Ref{Cint}, Ptr{Cint}, Ptr{Cint}),
-            m, n, A, lda, ipiv, info)
+        m, n, A, lda, ipiv, info)
     info[] < 0 && throw(ArgumentError("Invalid arguments sent to LAPACK dgetrf_"))
     A, ipiv, BlasInt(info[]), info #Error code is stored in LU factorization type
 end
 
-function aa_getrf!(A::AbstractMatrix{<:Float32}; ipiv = similar(A, Cint, min(size(A,1),size(A,2))), info = Ref{Cint}(), check = false)
+function aa_getrf!(A::AbstractMatrix{<:Float32};
+    ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
+    info = Ref{Cint}(),
+    check = false)
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
     m, n = size(A)
-    lda  = max(1,stride(A, 2))
+    lda = max(1, stride(A, 2))
     if isempty(ipiv)
-        ipiv = similar(A, Cint, min(size(A,1),size(A,2)))
+        ipiv = similar(A, Cint, min(size(A, 1), size(A, 2)))
     end
 
     ccall(("sgetrf_", libacc), Cvoid,
-            (Ref{Cint}, Ref{Cint}, Ptr{Float32},
+        (Ref{Cint}, Ref{Cint}, Ptr{Float32},
             Ref{Cint}, Ptr{Cint}, Ptr{Cint}),
-            m, n, A, lda, ipiv, info)
+        m, n, A, lda, ipiv, info)
     info[] < 0 && throw(ArgumentError("Invalid arguments sent to LAPACK dgetrf_"))
     A, ipiv, BlasInt(info[]), info #Error code is stored in LU factorization type
 end
 
-function aa_getrs!(trans::AbstractChar, A::AbstractMatrix{<:Float64}, ipiv::AbstractVector{Cint}, B::AbstractVecOrMat{<:Float64}; info = Ref{Cint}())
+function aa_getrs!(trans::AbstractChar,
+    A::AbstractMatrix{<:Float64},
+    ipiv::AbstractVector{Cint},
+    B::AbstractVecOrMat{<:Float64};
+    info = Ref{Cint}())
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -75,14 +85,19 @@ function aa_getrs!(trans::AbstractChar, A::AbstractMatrix{<:Float64}, ipiv::Abst
     end
     nrhs = size(B, 2)
     ccall(("dgetrs_", libacc), Cvoid,
-          (Ref{UInt8}, Ref{Cint}, Ref{Cint}, Ptr{Float64}, Ref{Cint},
-           Ptr{Cint}, Ptr{Float64}, Ref{Cint}, Ptr{Cint}, Clong),
-          trans, n, size(B,2), A, max(1,stride(A,2)), ipiv, B, max(1,stride(B,2)), info, 1)
+        (Ref{UInt8}, Ref{Cint}, Ref{Cint}, Ptr{Float64}, Ref{Cint},
+            Ptr{Cint}, Ptr{Float64}, Ref{Cint}, Ptr{Cint}, Clong),
+        trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
+        1)
     LinearAlgebra.LAPACK.chklapackerror(BlasInt(info[]))
     B
 end
 
-function aa_getrs!(trans::AbstractChar, A::AbstractMatrix{<:Float32}, ipiv::AbstractVector{Cint}, B::AbstractVecOrMat{<:Float32}; info = Ref{Cint}())
+function aa_getrs!(trans::AbstractChar,
+    A::AbstractMatrix{<:Float32},
+    ipiv::AbstractVector{Cint},
+    B::AbstractVecOrMat{<:Float32};
+    info = Ref{Cint}())
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -95,9 +110,10 @@ function aa_getrs!(trans::AbstractChar, A::AbstractMatrix{<:Float32}, ipiv::Abst
     end
     nrhs = size(B, 2)
     ccall(("sgetrs_", libacc), Cvoid,
-          (Ref{UInt8}, Ref{Cint}, Ref{Cint}, Ptr{Float32}, Ref{Cint},
-           Ptr{Cint}, Ptr{Float32}, Ref{Cint}, Ptr{Cint}, Clong),
-          trans, n, size(B,2), A, max(1,stride(A,2)), ipiv, B, max(1,stride(B,2)), info, 1)
+        (Ref{UInt8}, Ref{Cint}, Ref{Cint}, Ptr{Float32}, Ref{Cint},
+            Ptr{Cint}, Ptr{Float32}, Ref{Cint}, Ptr{Cint}, Clong),
+        trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
+        1)
     LinearAlgebra.LAPACK.chklapackerror(BlasInt(info[]))
     B
 end
@@ -109,7 +125,7 @@ function LinearSolve.init_cacheval(alg::AppleAccelerateLUFactorization, A, b, u,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
     luinst = ArrayInterface.lu_instance(convert(AbstractMatrix, A))
-    LU(luinst.factors,similar(A, Cint, 0), luinst.info), Ref{Cint}()
+    LU(luinst.factors, similar(A, Cint, 0), luinst.info), Ref{Cint}()
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::AppleAccelerateLUFactorization;

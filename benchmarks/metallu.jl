@@ -28,10 +28,14 @@ for i in 1:length(ns)
     rng = MersenneTwister(123)
     global A = rand(rng, Float32, n, n)
     global b = rand(rng, Float32, n)
-    global u0= rand(rng, Float32, n)
-    
+    global u0 = rand(rng, Float32, n)
+
     for j in 1:length(algs)
-        bt = @belapsed solve(prob, $(algs[j])).u setup=(prob = LinearProblem(copy(A), copy(b); u0 = copy(u0), alias_A=true, alias_b=true))
+        bt = @belapsed solve(prob, $(algs[j])).u setup=(prob = LinearProblem(copy(A),
+            copy(b);
+            u0 = copy(u0),
+            alias_A = true,
+            alias_b = true))
         GC.gc()
         push!(res[j], luflop(n) / bt / 1e9)
     end
@@ -42,7 +46,13 @@ __parameterless_type(T) = Base.typename(T).wrapper
 parameterless_type(x) = __parameterless_type(typeof(x))
 parameterless_type(::Type{T}) where {T} = __parameterless_type(T)
 
-p = plot(ns, res[1]; ylabel = "GFLOPs", xlabel = "N", title = "GFLOPs for NxN LU Factorization", label = string(Symbol(parameterless_type(algs[1]))), legend=:outertopright)
+p = plot(ns,
+    res[1];
+    ylabel = "GFLOPs",
+    xlabel = "N",
+    title = "GFLOPs for NxN LU Factorization",
+    label = string(Symbol(parameterless_type(algs[1]))),
+    legend = :outertopright)
 for i in 2:length(res)
     plot!(p, ns, res[i]; label = string(Symbol(parameterless_type(algs[i]))))
 end

@@ -67,7 +67,7 @@ using BlockDiagonals
     prob1 = LinearProblem(A, b, x1)
     prob2 = LinearProblem(A, b, x2)
 
-    test_interface(SimpleGMRES(; blocksize=2), prob1, prob2)
+    test_interface(SimpleGMRES(; blocksize = 2), prob1, prob2)
 
-    @test solve(prob1, SimpleGMRES(; blocksize=2)).u ≈ solve(prob2, SimpleGMRES()).u
+    @test solve(prob1, SimpleGMRES(; blocksize = 2)).u ≈ solve(prob2, SimpleGMRES()).u
 end

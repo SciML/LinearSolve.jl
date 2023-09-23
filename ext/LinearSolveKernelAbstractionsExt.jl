@@ -9,7 +9,7 @@ using GPUArraysCore
 function LinearSolve._fast_sym_givens!(c, s, R, nr::Int, inner_iter::Int, bsize::Int, Hbis)
     backend = get_backend(Hbis)
     kernel! = __fast_sym_givens_kernel!(backend)
-    kernel!(c[inner_iter], s[inner_iter], R[nr + inner_iter], Hbis; ndrange=bsize)
+    kernel!(c[inner_iter], s[inner_iter], R[nr + inner_iter], Hbis; ndrange = bsize)
     return c, s, R
 end
 

@@ -28,8 +28,9 @@ PrecompileTools.@recompile_invalidations begin
     import InteractiveUtils
 
     using LinearAlgebra: BlasInt, LU
-    using LinearAlgebra.LAPACK: require_one_based_indexing, chkfinite, chkstride1,
-                                @blasfunc, chkargsok
+    using LinearAlgebra.LAPACK: require_one_based_indexing,
+        chkfinite, chkstride1,
+        @blasfunc, chkargsok
 
     import GPUArraysCore
     import Preferences

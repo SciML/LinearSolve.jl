@@ -15,5 +15,8 @@ function __init__()
         @require MKL_jll="856f044c-d86e-5d09-b602-aeab76dc8ba7" begin
             include("../ext/LinearSolveMKLExt.jl")
         end
+        @require Enzyme="7da242da-08ed-463a-9acd-ee780be4f1d9" begin
+            include("../ext/LinearSolveEnzymeExt.jl")
+        end
     end
 end

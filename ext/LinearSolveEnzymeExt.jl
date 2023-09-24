@@ -1,6 +1,7 @@
 module LinearSolveEnzymeExt
 
 using LinearSolve
+using LinearSolve.LinearAlgebra
 isdefined(Base, :get_extension) ? (import Enzyme) : (import ..Enzyme)
 
 
@@ -60,9 +61,6 @@ end
 #   dA −= z y^T  
 #   dB += z, where  z = inv(A^T) dy
 function EnzymeCore.EnzymeRules.augmented_primal(config, func::Const{typeof(LinearSolve.solve!)}, ::Type{RT}, linsolve::EnzymeCore.Annotation{LP}; kwargs...) where {RT, LP <: LinearSolve.LinearCache}
-    @assert linsolve.val.isfresh
-    A_cache = copy(linsolve.val.A)
-
     res = func.val(linsolve.val; kwargs...)
 
     dres = if EnzymeRules.width(config) == 1
@@ -85,12 +83,12 @@ function EnzymeCore.EnzymeRules.augmented_primal(config, func::Const{typeof(Line
         (dr.u for dr in dres)
     end
 
-    cache = (A_cache, res, resvals)
+    cache = (res, resvals, linsolve.val)
     return EnzymeCore.EnzymeRules.AugmentedReturn(res, dres, cache)
 end
 
 function EnzymeCore.EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.solve!)}, ::Type{RT}, cache, linsolve::EnzymeCore.Annotation{LP}; kwargs...) where {RT, LP <: LinearSolve.LinearCache}
-    A, y, dys = cache
+    y, dys, _linsolve = cache
 
     @assert !(typeof(linsolve) <: Const)
     @assert !(typeof(linsolve) <: Active)
@@ -112,11 +110,21 @@ function EnzymeCore.EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.s
     end
 
     for (dA, db, dy) in zip(dAs, dbs, dys)
-        invprob = LinearSolve.LinearProblem(transpose(A), dy)
-        z = solve(invprob;
-            abstol = linsolve.val.abstol,
-            reltol = linsolve.val.reltol,
-            verbose = linsolve.val.verbose) 
+        z = if linsolve.cacheval isa Factorization
+            linsolve.cacheval' \ dy
+        elseif linsolve.cacheval isa Tuple && linsolve.cacheval[1] isa Factorization
+            linsolve.cacheval[1]' \ dy
+        elseif linsolve.alg isa AbstractKrylovSubspaceMethod
+            # Doesn't modify `A`, so it's safe to just reuse it
+            invprob = LinearSolve.LinearProblem(transpose(linsolve.A), dy)
+            solve(invprob;
+                abstol = linsolve.val.abstol,
+                reltol = linsolve.val.reltol,
+                verbose = linsolve.val.verbose,
+                isfresh = freshbefore)
+        else
+            error("Algorithm $(linsolve.alg) is currently not supported by Enzyme rules on LinearSolve.jl. Please open an issue on LinearSolve.jl detailing which algorithm is missing the adjoint handling")
+        end 
 
         dA .-= z * transpose(y)
         db .+= z

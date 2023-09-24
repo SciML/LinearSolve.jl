@@ -29,6 +29,7 @@ function EnzymeCore.EnzymeRules.augmented_primal(config, func::Const{typeof(Line
     else
         (dval.b for dval in dres)
     end
+
     return EnzymeCore.EnzymeRules.AugmentedReturn(res, dres, (d_A, d_b))
 end
 
@@ -89,20 +90,6 @@ function EnzymeCore.EnzymeRules.augmented_primal(config, func::Const{typeof(Line
         (dr.u for dr in dres)
     end
 
-    cache = (res, resvals, deepcopy(linsolve.val))
-    return EnzymeCore.EnzymeRules.AugmentedReturn(res, dres, cache)
-end
-
-function EnzymeCore.EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.solve!)}, ::Type{RT}, cache, linsolve::EnzymeCore.Annotation{LP}; kwargs...) where {RT, LP <: LinearSolve.LinearCache}
-    y, dys, _linsolve = cache
-
-    @assert !(typeof(linsolve) <: Const)
-    @assert !(typeof(linsolve) <: Active)
-
-    if EnzymeRules.width(config) == 1
-        dys = (dys,)
-    end
-
     dAs = if EnzymeRules.width(config) == 1
         (linsolve.dval.A,)
     else
@@ -113,6 +100,20 @@ function EnzymeCore.EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.s
         (linsolve.dval.b,)
     else
         (dval.b for dval in linsolve.dval)
+    end
+
+    cache = (res, resvals, deepcopy(linsolve.val), dAs, dbs)
+    return EnzymeCore.EnzymeRules.AugmentedReturn(res, dres, cache)
+end
+
+function EnzymeCore.EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.solve!)}, ::Type{RT}, cache, linsolve::EnzymeCore.Annotation{LP}; kwargs...) where {RT, LP <: LinearSolve.LinearCache}
+    y, dys, _linsolve, dAs, dbs = cache
+
+    @assert !(typeof(linsolve) <: Const)
+    @assert !(typeof(linsolve) <: Active)
+
+    if EnzymeRules.width(config) == 1
+        dys = (dys,)
     end
 
     for (dA, db, dy) in zip(dAs, dbs, dys)

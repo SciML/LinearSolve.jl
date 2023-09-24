@@ -14,7 +14,10 @@ function EnzymeCore.EnzymeRules.augmented_primal(config, func::Const{typeof(Line
     dres = if EnzymeRules.width(config) == 1
         func.val(prob.dval, alg.val; kwargs...)
     else
-        (func.val(dval, alg.val; kwargs...) for dval in prob.dval)
+        ntuple(Val(EnzymeRules.width(config))) do i
+            Base.@_inline_meta
+            func.val(prob.dval[i], alg.val; kwargs...)
+        end
     end
     d_A = if EnzymeRules.width(config) == 1
         dres.A
@@ -66,7 +69,10 @@ function EnzymeCore.EnzymeRules.augmented_primal(config, func::Const{typeof(Line
     dres = if EnzymeRules.width(config) == 1
         deepcopy(res)
     else
-        (deepcopy(res) for dval in linsolve.dval)
+        ntuple(Val(EnzymeRules.width(config))) do i
+            Base.@_inline_meta
+            deepcopy(res)
+        end
     end
 
     if EnzymeRules.width(config) == 1

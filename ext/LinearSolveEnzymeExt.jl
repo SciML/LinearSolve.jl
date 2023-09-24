@@ -114,17 +114,16 @@ function EnzymeCore.EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.s
         z = if _linsolve.cacheval isa Factorization
             _linsolve.cacheval' \ dy
         elseif linsolve.cacheval isa Tuple && linsolve.cacheval[1] isa Factorization
-            linsolve.cacheval[1]' \ dy
+            _linsolve.cacheval[1]' \ dy
         elseif linsolve.alg isa AbstractKrylovSubspaceMethod
             # Doesn't modify `A`, so it's safe to just reuse it
-            invprob = LinearSolve.LinearProblem(transpose(linsolve.A), dy)
+            invprob = LinearSolve.LinearProblem(transpose(_linsolve.A), dy)
             solve(invprob;
-                abstol = linsolve.val.abstol,
-                reltol = linsolve.val.reltol,
-                verbose = linsolve.val.verbose,
-                isfresh = freshbefore)
+                abstol = _linsolve.val.abstol,
+                reltol = _linsolve.val.reltol,
+                verbose = _linsolve.val.verbose)
         else
-            error("Algorithm $(linsolve.alg) is currently not supported by Enzyme rules on LinearSolve.jl. Please open an issue on LinearSolve.jl detailing which algorithm is missing the adjoint handling")
+            error("Algorithm $(_linsolve.alg) is currently not supported by Enzyme rules on LinearSolve.jl. Please open an issue on LinearSolve.jl detailing which algorithm is missing the adjoint handling")
         end 
 
         dA .-= z * transpose(y)

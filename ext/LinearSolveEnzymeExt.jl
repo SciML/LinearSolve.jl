@@ -83,13 +83,12 @@ function EnzymeCore.EnzymeRules.augmented_primal(config, func::Const{typeof(Line
         (dr.u for dr in dres)
     end
 
-    cache = (res, resvals)
+    cache = (res, resvals, deepcopy(linsolve.val))
     return EnzymeCore.EnzymeRules.AugmentedReturn(res, dres, cache)
 end
 
 function EnzymeCore.EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.solve!)}, ::Type{RT}, cache, linsolve::EnzymeCore.Annotation{LP}; kwargs...) where {RT, LP <: LinearSolve.LinearCache}
-    y, dys = cache
-    _linsolve = linsolve.val
+    y, dys, _linsolve = cache
 
     @assert !(typeof(linsolve) <: Const)
     @assert !(typeof(linsolve) <: Active)
@@ -113,9 +112,9 @@ function EnzymeCore.EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.s
     for (dA, db, dy) in zip(dAs, dbs, dys)
         z = if _linsolve.cacheval isa Factorization
             _linsolve.cacheval' \ dy
-        elseif linsolve.cacheval isa Tuple && linsolve.cacheval[1] isa Factorization
+        elseif _linsolve.cacheval isa Tuple && _linsolve.cacheval[1] isa Factorization
             _linsolve.cacheval[1]' \ dy
-        elseif linsolve.alg isa AbstractKrylovSubspaceMethod
+        elseif _linsolve.alg isa AbstractKrylovSubspaceMethod
             # Doesn't modify `A`, so it's safe to just reuse it
             invprob = LinearSolve.LinearProblem(transpose(_linsolve.A), dy)
             solve(invprob;

@@ -129,7 +129,7 @@ function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.Abstract
     end
 end
 
-function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
+function _defaultalg_scimlops(A::SciMLBase.AbstractSciMLOperator, b,
     assump::OperatorAssumptions)
     if has_ldiv!(A)
         return DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
@@ -144,6 +144,9 @@ function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
         DefaultLinearSolver(DefaultAlgorithmChoice.KrylovJL_GMRES)
     end
 end
+
+defaultalg(A::SciMLBase.AbstractSciMLOperator, b, assump::OperatorAssumptions) = _defaultalg_scimlops(A, b, assump)
+defaultalg(A::SciMLBase.AbstractSciMLOperator, b::GPUArraysCore.AbstractGPUArray, assump::OperatorAssumptions) = _defaultalg_scimlops(A, b, assump)
 
 # Allows A === nothing as a stand-in for dense matrix
 function defaultalg(A, b, assump::OperatorAssumptions)

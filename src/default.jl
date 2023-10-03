@@ -158,10 +158,10 @@ function defaultalg(A, b, assump::OperatorAssumptions)
                ArrayInterface.can_setindex(b) &&
                (__conditioning(assump) === OperatorCondition.IllConditioned ||
                 __conditioning(assump) === OperatorCondition.WellConditioned)
-                if appleaccelerate_isavailable()
-                    DefaultAlgorithmChoice.AppleAccelerateLUFactorization
-                elseif length(b) <= 10
+                if length(b) <= 10
                     DefaultAlgorithmChoice.GenericLUFactorization
+                elseif appleaccelerate_isavailable()
+                    DefaultAlgorithmChoice.AppleAccelerateLUFactorization
                 elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500)) &&
                        (A === nothing ? eltype(b) <: Union{Float32, Float64} :
                         eltype(A) <: Union{Float32, Float64})

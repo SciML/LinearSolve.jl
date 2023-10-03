@@ -40,11 +40,15 @@ PrecompileTools.@recompile_invalidations begin
     import Krylov
 
     using SciMLBase
+
+    using MKL_jll
 end
 
 using Reexport
 @reexport using SciMLBase
 using SciMLBase: _unwrap_val
+
+const usemkl = MKL_jll.is_available()
 
 abstract type SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
 abstract type AbstractFactorization <: SciMLLinearSolveAlgorithm end

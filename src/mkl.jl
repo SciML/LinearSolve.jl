@@ -1,16 +1,3 @@
-module LinearSolveMKLExt
-
-using MKL_jll
-using LinearAlgebra: BlasInt, LU
-using LinearAlgebra.LAPACK: require_one_based_indexing,
-    chkfinite, chkstride1,
-    @blasfunc, chkargsok
-using LinearAlgebra
-const usemkl = MKL_jll.is_available()
-
-using LinearSolve
-using LinearSolve: ArrayInterface, MKLLUFactorization, @get_cacheval, LinearCache, SciMLBase
-
 function getrf!(A::AbstractMatrix{<:Float64};
     ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
     info = Ref{BlasInt}(),
@@ -140,6 +127,4 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
 
     SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
     =#
-end
-
 end

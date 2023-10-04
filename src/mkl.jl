@@ -1,3 +1,13 @@
+"""
+```julia
+MKLLUFactorization()
+```
+
+A wrapper over Intel's Math Kernel Library (MKL). Direct calls to MKL in a way that pre-allocates workspace
+to avoid allocations and does not require libblastrampoline.
+"""
+struct MKLLUFactorization <: AbstractFactorization end
+
 function getrf!(A::AbstractMatrix{<:Float64};
     ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
     info = Ref{BlasInt}(),
@@ -91,7 +101,7 @@ end
 default_alias_A(::MKLLUFactorization, ::Any, ::Any) = false
 default_alias_b(::MKLLUFactorization, ::Any, ::Any) = false
 
-function LinearSolve.init_cacheval(alg::MKLLUFactorization, A, b, u, Pl, Pr,
+function init_cacheval(alg::MKLLUFactorization, A, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
     ArrayInterface.lu_instance(convert(AbstractMatrix, A)), Ref{BlasInt}()

@@ -95,6 +95,7 @@ EnumX.@enumx DefaultAlgorithmChoice begin
     CholeskyFactorization
     NormalCholeskyFactorization
     AppleAccelerateLUFactorization
+    MKLLUFactorization
 end
 
 struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm
@@ -104,6 +105,7 @@ end
 include("common.jl")
 include("factorization.jl")
 include("appleaccelerate.jl")
+include("mkl.jl")
 include("simplelu.jl")
 include("simplegmres.jl")
 include("iterative_wrappers.jl")

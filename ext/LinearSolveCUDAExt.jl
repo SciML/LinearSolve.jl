@@ -6,7 +6,7 @@ using SciMLBase: AbstractSciMLOperator
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadFactorization;
     kwargs...)
     if cache.isfresh
-        fact = lu(CUDA.CuArray(cache.A))
+        fact = qr(CUDA.CuArray(cache.A))
         cache.cacheval = fact
         cache.isfresh = false
     end

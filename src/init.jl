@@ -12,9 +12,6 @@ function __init__()
         @require KrylovKit="0b1a1467-8014-51b9-945f-bf0ae24f4b77" begin
             include("../ext/LinearSolveKrylovKitExt.jl")
         end
-        @require MKL_jll="856f044c-d86e-5d09-b602-aeab76dc8ba7" begin
-            include("../ext/LinearSolveMKLExt.jl")
-        end
         @require Enzyme="7da242da-08ed-463a-9acd-ee780be4f1d9" begin
             include("../ext/LinearSolveEnzymeExt.jl")
         end

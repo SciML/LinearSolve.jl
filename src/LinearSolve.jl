@@ -90,6 +90,7 @@ EnumX.@enumx DefaultAlgorithmChoice begin
     SVDFactorization
     CholeskyFactorization
     NormalCholeskyFactorization
+    AppleAccelerateLUFactorization
 end
 
 struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm
@@ -98,6 +99,7 @@ end
 
 include("common.jl")
 include("factorization.jl")
+include("appleaccelerate.jl")
 include("simplelu.jl")
 include("simplegmres.jl")
 include("iterative_wrappers.jl")
@@ -106,7 +108,6 @@ include("solve_function.jl")
 include("default.jl")
 include("init.jl")
 include("extension_algs.jl")
-include("appleaccelerate.jl")
 include("deprecated.jl")
 
 @generated function SciMLBase.solve!(cache::LinearCache, alg::AbstractFactorization;

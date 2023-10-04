@@ -38,7 +38,6 @@ function aa_getrf!(A::AbstractMatrix{<:Float64};
     if isempty(ipiv)
         ipiv = similar(A, Cint, min(size(A, 1), size(A, 2)))
     end
-
     ccall(("dgetrf_", libacc), Cvoid,
         (Ref{Cint}, Ref{Cint}, Ptr{Float64},
             Ref{Cint}, Ptr{Cint}, Ptr{Cint}),
@@ -121,11 +120,18 @@ end
 default_alias_A(::AppleAccelerateLUFactorization, ::Any, ::Any) = false
 default_alias_b(::AppleAccelerateLUFactorization, ::Any, ::Any) = false
 
+const PREALLOCATED_APPLE_LU = @static if VERSION >= v"1.8" 
+    A = rand(0, 0)
+    luinst = ArrayInterface.lu_instance(A)
+    LU(luinst.factors, similar(A, Cint, 0), luinst.info), Ref{Cint}()
+else
+    nothing
+end
+
 function LinearSolve.init_cacheval(alg::AppleAccelerateLUFactorization, A, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
-    luinst = ArrayInterface.lu_instance(convert(AbstractMatrix, A))
-    LU(luinst.factors, similar(A, Cint, 0), luinst.info), Ref{Cint}()
+    PREALLOCATED_APPLE_LU
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::AppleAccelerateLUFactorization;

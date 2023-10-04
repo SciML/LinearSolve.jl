@@ -1,6 +1,6 @@
 needs_concrete_A(alg::DefaultLinearSolver) = true
 mutable struct DefaultLinearSolverInit{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12,
-    T13, T14, T15, T16}
+    T13, T14, T15, T16, T17}
     LUFactorization::T1
     QRFactorization::T2
     DiagonalFactorization::T3
@@ -17,6 +17,7 @@ mutable struct DefaultLinearSolverInit{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, 
     SVDFactorization::T14
     CholeskyFactorization::T15
     NormalCholeskyFactorization::T16
+    AppleAccelerateLUFactorization::T17
 end
 
 # Legacy fallback
@@ -159,6 +160,8 @@ function defaultalg(A, b, assump::OperatorAssumptions)
                 __conditioning(assump) === OperatorCondition.WellConditioned)
                 if length(b) <= 10
                     DefaultAlgorithmChoice.GenericLUFactorization
+                elseif VERSION >= v"1.8" && appleaccelerate_isavailable()
+                    DefaultAlgorithmChoice.AppleAccelerateLUFactorization
                 elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500)) &&
                        (A === nothing ? eltype(b) <: Union{Float32, Float64} :
                         eltype(A) <: Union{Float32, Float64})
@@ -232,6 +235,8 @@ function algchoice_to_alg(alg::Symbol)
         CholeskyFactorization()
     elseif alg === :NormalCholeskyFactorization
         NormalCholeskyFactorization()
+    elseif alg === :AppleAccelerateLUFactorization
+        AppleAccelerateLUFactorization()
     else
         error("Algorithm choice symbol $alg not allowed in the default")
     end

@@ -14,7 +14,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadFactor
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
-function init_cacheval(alg::CudaOffloadFactorization, A, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(alg::CudaOffloadFactorization, A, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
     ArrayInterface.lu_instance(CUDA.CuArray(A))

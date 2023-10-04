@@ -1,6 +1,8 @@
 module LinearSolveCUDAExt
 
-using CUDA, LinearAlgebra, LinearSolve, SciMLBase
+using CUDA
+using LinearSolve
+using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase, LinearSolve.ArrayInterface
 using SciMLBase: AbstractSciMLOperator
 
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadFactorization;

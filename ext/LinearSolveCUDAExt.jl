@@ -7,7 +7,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadFactor
     kwargs...)
     if cache.isfresh
         fact = LinearSolve.do_factorization(alg, CUDA.CuArray(cache.A), cache.b, cache.u)
-        cache = LinearSolve.set_cacheval(cache, fact)
+        cache.cacheval = fact
         cache.isfresh = false
     end
 
@@ -24,7 +24,7 @@ function LinearSolve.do_factorization(alg::CudaOffloadFactorization, A, b, u)
         A = A.A
     end
 
-    fact = qr(CUDA.CuArray(A))
+    fact = lu(CUDA.CuArray(A))
     return fact
 end
 

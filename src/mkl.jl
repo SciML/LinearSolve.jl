@@ -101,10 +101,15 @@ end
 default_alias_A(::MKLLUFactorization, ::Any, ::Any) = false
 default_alias_b(::MKLLUFactorization, ::Any, ::Any) = false
 
+const PREALLOCATED_MKL_LU = begin
+    A = rand(0, 0)
+    luinst = ArrayInterface.lu_instance(A), Ref{BlasInt}()
+end
+
 function init_cacheval(alg::MKLLUFactorization, A, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
-    ArrayInterface.lu_instance(convert(AbstractMatrix, A)), Ref{BlasInt}()
+    PREALLOCATED_MKL_LU
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;

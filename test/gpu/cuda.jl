@@ -35,7 +35,7 @@ function test_interface(alg, prob1, prob2)
     solve!(cache)
     @test A2 * cache.u ≈ b1
 
-    cache.b = b2
+    cache.b = copy(b2)
     solve!(cache)
     @test A2 * cache.u ≈ b2
 

@@ -120,10 +120,12 @@ end
 default_alias_A(::AppleAccelerateLUFactorization, ::Any, ::Any) = false
 default_alias_b(::AppleAccelerateLUFactorization, ::Any, ::Any) = false
 
-const PREALLOCATED_APPLE_LU = begin
+const PREALLOCATED_APPLE_LU = @static if VERSION >= v"1.8" 
     A = rand(0, 0)
     luinst = ArrayInterface.lu_instance(A)
     LU(luinst.factors, similar(A, Cint, 0), luinst.info), Ref{Cint}()
+else
+    nothing
 end
 
 function LinearSolve.init_cacheval(alg::AppleAccelerateLUFactorization, A, b, u, Pl, Pr,

@@ -1,6 +1,6 @@
 needs_concrete_A(alg::DefaultLinearSolver) = true
 mutable struct DefaultLinearSolverInit{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12,
-    T13, T14, T15, T16, T17}
+    T13, T14, T15, T16, T17, T18}
     LUFactorization::T1
     QRFactorization::T2
     DiagonalFactorization::T3
@@ -18,6 +18,7 @@ mutable struct DefaultLinearSolverInit{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, 
     CholeskyFactorization::T15
     NormalCholeskyFactorization::T16
     AppleAccelerateLUFactorization::T17
+    MKLLUFactorization::T18
 end
 
 # Legacy fallback
@@ -162,19 +163,24 @@ function defaultalg(A, b, assump::OperatorAssumptions)
                     DefaultAlgorithmChoice.GenericLUFactorization
                 elseif VERSION >= v"1.8" && appleaccelerate_isavailable()
                     DefaultAlgorithmChoice.AppleAccelerateLUFactorization
-                elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500)) &&
+                elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500) || 
+                       (usemkl && length(b) <= 200)) &&
                        (A === nothing ? eltype(b) <: Union{Float32, Float64} :
                         eltype(A) <: Union{Float32, Float64})
                     DefaultAlgorithmChoice.RFLUFactorization
                     #elseif A === nothing || A isa Matrix
                     #    alg = FastLUFactorization()
+                elseif usemkl
+                    DefaultAlgorithmChoice.MKLLUFactorization
                 else
-                    DefaultAlgorithmChoice.GenericLUFactorization
+                    DefaultAlgorithmChoice.LUFactorization
                 end
             elseif __conditioning(assump) === OperatorCondition.VeryIllConditioned
                 DefaultAlgorithmChoice.QRFactorization
             elseif __conditioning(assump) === OperatorCondition.SuperIllConditioned
                 DefaultAlgorithmChoice.SVDFactorization
+            elseif usemkl
+                DefaultAlgorithmChoice.MKLLUFactorization
             else
                 DefaultAlgorithmChoice.LUFactorization
             end
@@ -209,6 +215,8 @@ function algchoice_to_alg(alg::Symbol)
         LDLtFactorization()
     elseif alg === :LUFactorization
         LUFactorization()
+    elseif alg === :MKLLUFactorization
+        MKLLUFactorization()
     elseif alg === :QRFactorization
         QRFactorization()
     elseif alg === :DiagonalFactorization

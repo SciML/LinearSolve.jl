@@ -9,8 +9,14 @@ solve(prob)
 prob = LinearProblem(rand(50, 50), rand(50))
 solve(prob)
 
-@test LinearSolve.defaultalg(nothing, zeros(600)).alg ===
-      LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
+if LinearSolve.usemkl
+      @test LinearSolve.defaultalg(nothing, zeros(600)).alg ===
+      LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization
+else
+      @test LinearSolve.defaultalg(nothing, zeros(600)).alg ===
+      LinearSolve.DefaultAlgorithmChoice.LUFactorization
+end
+
 prob = LinearProblem(rand(600, 600), rand(600))
 solve(prob)
 

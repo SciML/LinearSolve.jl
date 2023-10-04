@@ -1,15 +1,12 @@
-module LinearSolveMKLExt
+"""
+```julia
+MKLLUFactorization()
+```
 
-using MKL_jll
-using LinearAlgebra: BlasInt, LU
-using LinearAlgebra.LAPACK: require_one_based_indexing,
-    chkfinite, chkstride1,
-    @blasfunc, chkargsok
-using LinearAlgebra
-const usemkl = MKL_jll.is_available()
-
-using LinearSolve
-using LinearSolve: ArrayInterface, MKLLUFactorization, @get_cacheval, LinearCache, SciMLBase
+A wrapper over Intel's Math Kernel Library (MKL). Direct calls to MKL in a way that pre-allocates workspace
+to avoid allocations and does not require libblastrampoline.
+"""
+struct MKLLUFactorization <: AbstractFactorization end
 
 function getrf!(A::AbstractMatrix{<:Float64};
     ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
@@ -104,10 +101,15 @@ end
 default_alias_A(::MKLLUFactorization, ::Any, ::Any) = false
 default_alias_b(::MKLLUFactorization, ::Any, ::Any) = false
 
-function LinearSolve.init_cacheval(alg::MKLLUFactorization, A, b, u, Pl, Pr,
+const PREALLOCATED_MKL_LU = begin
+    A = rand(0, 0)
+    luinst = ArrayInterface.lu_instance(A), Ref{BlasInt}()
+end
+
+function init_cacheval(alg::MKLLUFactorization, A, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
-    ArrayInterface.lu_instance(convert(AbstractMatrix, A)), Ref{BlasInt}()
+    PREALLOCATED_MKL_LU
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
@@ -140,6 +142,4 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
 
     SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
     =#
-end
-
 end

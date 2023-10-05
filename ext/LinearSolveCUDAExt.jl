@@ -13,6 +13,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadFactor
         cache.isfresh = false
     end
     y = Array(ldiv!(CUDA.CuArray(cache.u), cache.cacheval, CUDA.CuArray(cache.b)))
+    cache.u .= y
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 

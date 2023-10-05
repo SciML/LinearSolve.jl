@@ -19,7 +19,7 @@ end
 function LinearSolve.init_cacheval(alg::CudaOffloadFactorization, A, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
-    ArrayInterface.qr_instance(CUDA.CuArray(A))
+    qr(CUDA.CuArray(A))
 end
 
 end

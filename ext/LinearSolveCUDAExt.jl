@@ -1,31 +1,26 @@
 module LinearSolveCUDAExt
 
-using CUDA, LinearAlgebra, LinearSolve, SciMLBase
+using CUDA
+using LinearSolve
+using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase, LinearSolve.ArrayInterface
 using SciMLBase: AbstractSciMLOperator
 
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadFactorization;
     kwargs...)
     if cache.isfresh
-        fact = LinearSolve.do_factorization(alg, CUDA.CuArray(cache.A), cache.b, cache.u)
-        cache = LinearSolve.set_cacheval(cache, fact)
+        fact = qr(CUDA.CuArray(cache.A))
+        cache.cacheval = fact
         cache.isfresh = false
     end
-
-    copyto!(cache.u, cache.b)
-    y = Array(ldiv!(cache.cacheval, CUDA.CuArray(cache.u)))
+    y = Array(ldiv!(CUDA.CuArray(cache.u), cache.cacheval, CUDA.CuArray(cache.b)))
+    cache.u .= y
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
-function LinearSolve.do_factorization(alg::CudaOffloadFactorization, A, b, u)
-    A isa Union{AbstractMatrix, AbstractSciMLOperator} ||
-        error("LU is not defined for $(typeof(A))")
-
-    if A isa Union{MatrixOperator, DiffEqArrayOperator}
-        A = A.A
-    end
-
-    fact = qr(CUDA.CuArray(A))
-    return fact
+function LinearSolve.init_cacheval(alg::CudaOffloadFactorization, A, b, u, Pl, Pr,
+    maxiters::Int, abstol, reltol, verbose::Bool,
+    assumptions::OperatorAssumptions)
+    qr(CUDA.CuArray(A))
 end
 
 end

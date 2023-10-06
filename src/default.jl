@@ -170,7 +170,7 @@ function defaultalg(A, b, assump::OperatorAssumptions)
                     DefaultAlgorithmChoice.RFLUFactorization
                     #elseif A === nothing || A isa Matrix
                     #    alg = FastLUFactorization()
-                elseif usemkl
+                elseif usemkl && eltype(A) <: Union{Float64, Float32}
                     DefaultAlgorithmChoice.MKLLUFactorization
                 else
                     DefaultAlgorithmChoice.LUFactorization
@@ -179,7 +179,7 @@ function defaultalg(A, b, assump::OperatorAssumptions)
                 DefaultAlgorithmChoice.QRFactorization
             elseif __conditioning(assump) === OperatorCondition.SuperIllConditioned
                 DefaultAlgorithmChoice.SVDFactorization
-            elseif usemkl
+            elseif usemkl && eltype(A) <: Union{Float64, Float32}
                 DefaultAlgorithmChoice.MKLLUFactorization
             else
                 DefaultAlgorithmChoice.LUFactorization

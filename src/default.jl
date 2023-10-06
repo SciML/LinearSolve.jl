@@ -179,7 +179,7 @@ function defaultalg(A, b, assump::OperatorAssumptions)
                 DefaultAlgorithmChoice.QRFactorization
             elseif __conditioning(assump) === OperatorCondition.SuperIllConditioned
                 DefaultAlgorithmChoice.SVDFactorization
-            elseif usemkl && eltype(A) <: Float64
+            elseif usemkl && eltype(A) <: Union{Float64, Float32}
                 DefaultAlgorithmChoice.MKLLUFactorization
             else
                 DefaultAlgorithmChoice.LUFactorization

@@ -2,7 +2,7 @@ using SparseArrays
 using LinearSolve
 using LinearAlgebra
 
-# Constructing sparse array 
+# Constructing sparse array
 function hess_sparse(x::Vector{T}) where {T}
     return [
         -sin(x[1] + x[2]) + 1,
@@ -37,7 +37,12 @@ n = length(x0)
 hess_mat = sparse(rowval, colval, hess_sparse(x0), n, n)
 grad_vec = sparsevec(gradinds, grad_sparse(x0), n)
 
-# # Converting grad_vec to dense succeeds in solving
+# Converting grad_vec to dense succeeds in solving
 prob = LinearProblem(hess_mat, grad_vec)
-linsolve = init(prob)
+linsolve = init(prob);
 @test solve!(linsolve).u ≈ hess_mat \ Array(grad_vec)
+
+H = hess_mat' * hess_mat
+prob = LinearProblem(H, hess_mat' * grad_vec)
+linsolve = init(prob, CholeskyFactorization())
+@test solve!(linsolve).u ≈ H \ Array(hess_mat' * grad_vec)

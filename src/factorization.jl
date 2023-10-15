@@ -242,8 +242,6 @@ end
     function do_factorization(alg::CholeskyFactorization, A, b, u)
         A = convert(AbstractMatrix, A)
         if A isa SparseMatrixCSC
-            # fact = cholesky!(A; shift = alg.shift, check = false, perm = alg.perm)
-            # fact = @time cholesky!(A; check = false)
             fact = cholesky(A; shift = alg.shift, check = false, perm = alg.perm)
         elseif alg.pivot === Val(false) || alg.pivot === NoPivot()
             fact = cholesky!(A, alg.pivot; check = false)
@@ -270,7 +268,6 @@ function init_cacheval(alg::CholeskyFactorization, A, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
     ArrayInterface.cholesky_instance(convert(AbstractMatrix, A), alg.pivot)
-    # cholesky!(similar(A, 1, 1); check=false)
 end
 
 @static if VERSION < v"1.8beta"

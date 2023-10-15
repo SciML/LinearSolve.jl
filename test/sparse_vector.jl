@@ -45,4 +45,4 @@ linsolve = init(prob);
 H = hess_mat' * hess_mat
 prob = LinearProblem(H, hess_mat' * grad_vec)
 linsolve = init(prob, CholeskyFactorization())
-@test solve!(linsolve).u ≈ H \ Array(hess_mat' * grad_vec)
+VERSION >= v"1.8" && @test solve!(linsolve).u ≈ H \ Array(hess_mat' * grad_vec)

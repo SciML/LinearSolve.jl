@@ -29,7 +29,7 @@ end
 `LUFactorization(pivot=LinearAlgebra.RowMaximum())`
 
 Julia's built in `lu`. Equivalent to calling `lu!(A)`
-    
+
 * On dense matrices, this uses the current BLAS implementation of the user's computer,
 which by default is OpenBLAS but will use MKL if the user does `using MKL` in their
 system.
@@ -135,7 +135,7 @@ end
 `QRFactorization(pivot=LinearAlgebra.NoPivot(),blocksize=16)`
 
 Julia's built in `qr`. Equivalent to calling `qr!(A)`.
-    
+
 * On dense matrices, this uses the current BLAS implementation of the user's computer
 which by default is OpenBLAS but will use MKL if the user does `using MKL` in their
 system.
@@ -242,7 +242,9 @@ end
     function do_factorization(alg::CholeskyFactorization, A, b, u)
         A = convert(AbstractMatrix, A)
         if A isa SparseMatrixCSC
-            fact = cholesky!(A; shift = alg.shift, check = false, perm = alg.perm)
+            # fact = cholesky!(A; shift = alg.shift, check = false, perm = alg.perm)
+            # fact = @time cholesky!(A; check = false)
+            fact = cholesky(A; shift = alg.shift, check = false, perm = alg.perm)
         elseif alg.pivot === Val(false) || alg.pivot === NoPivot()
             fact = cholesky!(A, alg.pivot; check = false)
         else
@@ -268,6 +270,7 @@ function init_cacheval(alg::CholeskyFactorization, A, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
     ArrayInterface.cholesky_instance(convert(AbstractMatrix, A), alg.pivot)
+    # cholesky!(similar(A, 1, 1); check=false)
 end
 
 @static if VERSION < v"1.8beta"
@@ -346,7 +349,7 @@ end
 `SVDFactorization(full=false,alg=LinearAlgebra.DivideAndConquer())`
 
 Julia's built in `svd`. Equivalent to `svd!(A)`.
-    
+
 * On dense matrices, this uses the current BLAS implementation of the user's computer
 which by default is OpenBLAS but will use MKL if the user does `using MKL` in their
 system.
@@ -444,7 +447,7 @@ end
 `GenericFactorization(;fact_alg=LinearAlgebra.factorize)`: Constructs a linear solver from a generic
     factorization algorithm `fact_alg` which complies with the Base.LinearAlgebra
     factorization API. Quoting from Base:
-    
+
       * If `A` is upper or lower triangular (or diagonal), no factorization of `A` is
         required. The system is then solved with either forward or backward substitution.
         For non-triangular square matrices, an LU factorization is used.
@@ -666,7 +669,7 @@ end
 """
 `UMFPACKFactorization(;reuse_symbolic=true, check_pattern=true)`
 
-A fast sparse multithreaded LU-factorization which specializes on sparsity 
+A fast sparse multithreaded LU-factorization which specializes on sparsity
 patterns with “more structure”.
 
 !!! note
@@ -850,7 +853,7 @@ Only supports sparse matrices.
 
 ## Keyword Arguments
 
-* shift: the shift argument in CHOLMOD. 
+* shift: the shift argument in CHOLMOD.
 * perm: the perm argument in CHOLMOD
 """
 Base.@kwdef struct CHOLMODFactorization{T} <: AbstractFactorization
@@ -916,12 +919,12 @@ end
 ## RFLUFactorization
 
 """
-`RFLUFactorization()` 
+`RFLUFactorization()`
 
 A fast pure Julia LU-factorization implementation
 using RecursiveFactorization.jl. This is by far the fastest LU-factorization
 implementation, usually outperforming OpenBLAS and MKL for smaller matrices
-(<500x500), but currently optimized only for Base `Array` with `Float32` or `Float64`.  
+(<500x500), but currently optimized only for Base `Array` with `Float32` or `Float64`.
 Additional optimization for complex matrices is in the works.
 """
 struct RFLUFactorization{P, T} <: AbstractFactorization
@@ -1179,7 +1182,7 @@ end
 # But I'm not sure it makes sense as a GenericFactorization
 # since it just uses `LAPACK.getrf!`.
 """
-`FastLUFactorization()` 
+`FastLUFactorization()`
 
 The FastLapackInterface.jl version of the LU factorization. Notably,
 this version does not allow for choice of pivoting method.
@@ -1210,7 +1213,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::FastLUFactorization; kwargs..
 end
 
 """
-`FastQRFactorization()` 
+`FastQRFactorization()`
 
 The FastLapackInterface.jl version of the QR factorization.
 """

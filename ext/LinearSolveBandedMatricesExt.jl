@@ -6,7 +6,7 @@ import LinearSolve: defaultalg,
 
 # Defaults for BandedMatrices
 function defaultalg(A::BandedMatrix, b, ::OperatorAssumptions)
-    return DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
+    return DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
 end
 
 function defaultalg(A::Symmetric{<:Number, <:BandedMatrix}, b, ::OperatorAssumptions)

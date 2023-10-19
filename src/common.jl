@@ -14,7 +14,7 @@ However, in practice this computation is very expensive and thus not possible fo
 Therefore, OperatorCondition lets one share to LinearSolve the expected conditioning. The higher the
 expected condition number, the safer the algorithm needs to be and thus there is a trade-off between
 numerical performance and stability. By default the method assumes the operator may be ill-conditioned
-for the standard linear solvers to converge (such as LU-factorization), though more extreme 
+for the standard linear solvers to converge (such as LU-factorization), though more extreme
 ill-conditioning or well-conditioning could be the case and specified through this assumption.
 """
 EnumX.@enumx OperatorCondition begin

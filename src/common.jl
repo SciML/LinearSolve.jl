@@ -151,8 +151,8 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     end
 
     # Guard against type mismatch for user-specified reltol/abstol
-    reltol = eltype(prob.A)(reltol)
-    abstol = eltype(prob.A)(abstol)
+    reltol = eltype(prob.b)(reltol)
+    abstol = eltype(prob.b)(abstol)
 
     cacheval = init_cacheval(alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, verbose,
         assumptions)

@@ -115,8 +115,8 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     args...;
     alias_A = default_alias_A(alg, prob.A, prob.b),
     alias_b = default_alias_b(alg, prob.A, prob.b),
-    abstol = default_tol(eltype(prob.b)),
-    reltol = default_tol(eltype(prob.b)),
+    abstol = default_tol(real(eltype(prob.b))),
+    reltol = default_tol(real(eltype(prob.b))),
     maxiters::Int = length(prob.b),
     verbose::Bool = false,
     Pl = IdentityOperator(size(prob.A)[1]),
@@ -151,8 +151,8 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     end
 
     # Guard against type mismatch for user-specified reltol/abstol
-    reltol = eltype(prob.b)(reltol)
-    abstol = eltype(prob.b)(abstol)
+    reltol = real(eltype(prob.b))(reltol)
+    abstol = real(eltype(prob.b))(abstol)
 
     cacheval = init_cacheval(alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, verbose,
         assumptions)

@@ -153,24 +153,9 @@ end
     needs_square_A(alg)
 
 Returns `true` if the algorithm requires a square matrix.
-
-Note that this checks if the implementation of the algorithm needs a square matrix by
-trying to solve an underdetermined system. It is recommended to add a dispatch to this
-function for custom algorithms!
 """
 needs_square_A(::Nothing) = false  # Linear Solve automatically will use a correct alg!
-function needs_square_A(alg::SciMLLinearSolveAlgorithm)
-    try
-        A = [1.0 2.0;
-            3.0 4.0;
-            5.0 6.0]
-        b = ones(Float64, 3)
-        solve(LinearProblem(A, b), alg)
-        return false
-    catch err
-        return true
-    end
-end
+needs_square_A(alg::SciMLLinearSolveAlgorithm) = true
 for alg in (:QRFactorization, :FastQRFactorization, :NormalCholeskyFactorization,
     :NormalBunchKaufmanFactorization)
     @eval needs_square_A(::$(alg)) = false

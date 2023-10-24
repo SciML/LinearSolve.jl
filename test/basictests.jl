@@ -15,9 +15,19 @@ x1 = zero(b);
 A2 = A / 2;
 b2 = rand(n);
 x2 = zero(b);
+# Test system with complex numbers
+A3 = A .+ rand(n) .* im;
+b3 = rand(n);
+x3 = zero(b);
+# Test system with mixed types
+A4 = (A / 4) .|> Float32;
+b4 = rand(n) .|> Float32;
+x4 = zero(b) .|> Float32;
 
 prob1 = LinearProblem(A1, b1; u0 = x1)
 prob2 = LinearProblem(A2, b2; u0 = x2)
+prob3 = LinearProblem(A3, b3; u0 = x3)
+prob4 = LinearProblem(A4, b4; u0 = x4)
 
 cache_kwargs = (; verbose = true, abstol = 1e-8, reltol = 1e-8, maxiter = 30)
 
@@ -28,6 +38,10 @@ function test_interface(alg, prob1, prob2)
     A2 = prob2.A
     b2 = prob2.b
     x2 = prob2.u0
+    A3 = prob3.A
+    b3 = prob3.b
+    A4 = prob4.A
+    b4 = prob4.b
 
     sol = solve(prob1, alg; cache_kwargs...)
     @test A1 * sol.u ≈ b1
@@ -43,6 +57,22 @@ function test_interface(alg, prob1, prob2)
     cache.b = b2
     sol = solve!(cache; cache_kwargs...)
     @test A2 * sol.u ≈ b2
+
+    # Test complex numbers via cache interface
+    cache.A = A3
+    cache.b = b3
+    sol = solve!(cache; cache_kwargs...)
+    @test A3 * sol.u ≈ b3
+
+    # Test mixed types via cache interface
+    cache.A = A4
+    cache.b = b4
+    sol = solve!(cache; cache_kwargs...)
+    @test A4 * sol.u ≈ b4
+
+    # Test mixed types from scratch
+    sol = solve(prob4, alg; cache_kwargs...)
+    @test A4 * sol.u ≈ b4
 
     return
 end

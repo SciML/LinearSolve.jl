@@ -62,6 +62,9 @@ needs_concrete_A(alg::AbstractKrylovSubspaceMethod) = false
 needs_concrete_A(alg::AbstractSolveFunction) = false
 
 # Util
+is_underdetermined(x) = false
+is_underdetermined(A::AbstractMatrix) = size(A, 1) < size(A, 2)
+is_underdetermined(A::AbstractSciMLOperator) = size(A, 1) < size(A, 2)
 
 _isidentity_struct(A) = false
 _isidentity_struct(λ::Number) = isone(λ)
@@ -96,6 +99,7 @@ EnumX.@enumx DefaultAlgorithmChoice begin
     NormalCholeskyFactorization
     AppleAccelerateLUFactorization
     MKLLUFactorization
+    QRFactorizationPivoted
 end
 
 struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm

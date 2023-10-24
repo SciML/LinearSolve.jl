@@ -56,3 +56,12 @@ solve(LinearProblem(A, b), (LinearSolve.NormalCholeskyFactorization())).u;
 solve(LinearProblem(A, b),
     assumptions = (OperatorAssumptions(false;
         condition = OperatorCondition.WellConditioned))).u;
+
+# Underdetermined
+m, n = 2, 3
+
+A = rand(m, n)
+b = rand(m)
+prob = LinearProblem(A, b)
+res = A \ b
+@test solve(prob).u ≈ res

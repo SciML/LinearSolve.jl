@@ -143,6 +143,46 @@ end
     include("factorization_sparse.jl")
 end
 
+# Solver Specific Traits
+## Needs Square Matrix
+"""
+    needs_square_A(alg)
+
+Returns `true` if the algorithm requires a square matrix.
+
+Note that this checks if the implementation of the algorithm needs a square matrix by
+trying to solve an underdetermined system. It is recommended to add a dispatch to this
+function for custom algorithms!
+"""
+needs_square_A(::Nothing) = false  # Linear Solve automatically will use a correct alg!
+function needs_square_A(alg::SciMLLinearSolveAlgorithm)
+    try
+        A = [1.0 2.0;
+            3.0 4.0;
+            5.0 6.0]
+        b = ones(Float64, 3)
+        solve(LinearProblem(A, b), alg)
+        return false
+    catch err
+        return true
+    end
+end
+for alg in (:QRFactorization, :FastQRFactorization, :NormalCholeskyFactorization,
+    :NormalBunchKaufmanFactorization)
+    @eval needs_square_A(::$(alg)) = false
+end
+for kralg in (Krylov.lsmr!, Krylov.craigmr!)
+    @eval needs_square_A(::KrylovJL{$(typeof(kralg))}) = false
+end
+for alg in (:LUFactorization, :FastLUFactorization, :SVDFactorization,
+    :GenericFactorization, :GenericLUFactorization, :SimpleLUFactorization,
+    :RFLUFactorization, :UMFPACKFactorization, :KLUFactorization, :SparspakFactorization,
+    :DiagonalFactorization, :CholeskyFactorization, :BunchKaufmanFactorization,
+    :CHOLMODFactorization, :LDLtFactorization, :AppleAccelerateLUFactorization,
+    :MKLLUFactorization, :MetalLUFactorization)
+    @eval needs_square_A(::$(alg)) = true
+end
+
 const IS_OPENBLAS = Ref(true)
 isopenblas() = IS_OPENBLAS[]
 

@@ -8,7 +8,11 @@ b = rand(m)
 prob = LinearProblem(A, b)
 res = A \ b
 @test solve(prob).u ≈ res
+@test !LinearSolve.needs_square_A(QRFactorization())
 @test solve(prob, QRFactorization()) ≈ res
+@test !LinearSolve.needs_square_A(FastQRFactorization())
+@test solve(prob, FastQRFactorization()) ≈ res
+@test !LinearSolve.needs_square_A(KrylovJL_LSMR())
 @test solve(prob, KrylovJL_LSMR()) ≈ res
 
 A = sprand(m, n, 0.5)
@@ -23,6 +27,7 @@ A = sprand(n, m, 0.5)
 b = rand(n)
 prob = LinearProblem(A, b)
 res = Matrix(A) \ b
+@test !LinearSolve.needs_square_A(KrylovJL_CRAIGMR())
 @test solve(prob, KrylovJL_CRAIGMR()) ≈ res
 
 A = sprandn(1000, 100, 0.1)
@@ -35,7 +40,9 @@ A = randn(1000, 100)
 b = randn(1000)
 @test isapprox(solve(LinearProblem(A, b)).u, Symmetric(A' * A) \ (A' * b))
 solve(LinearProblem(A, b)).u;
+@test !LinearSolve.needs_square_A(NormalCholeskyFactorization())
 solve(LinearProblem(A, b), (LinearSolve.NormalCholeskyFactorization())).u;
+@test !LinearSolve.needs_square_A(NormalBunchKaufmanFactorization())
 solve(LinearProblem(A, b), (LinearSolve.NormalBunchKaufmanFactorization())).u;
 solve(LinearProblem(A, b),
     assumptions = (OperatorAssumptions(false;

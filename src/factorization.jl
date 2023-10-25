@@ -158,6 +158,16 @@ function QRFactorization(inplace = true)
     QRFactorization(pivot, 16, inplace)
 end
 
+@static if VERSION ≥ v"1.7beta"
+    function QRFactorization(pivot::LinearAlgebra.PivotingStrategy, inplace::Bool = true)
+        QRFactorization(pivot, 16, inplace)
+    end
+else
+    function QRFactorization(pivot::Val, inplace::Bool = true)
+        QRFactorization(pivot, 16, inplace)
+    end
+end
+
 function do_factorization(alg::QRFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
     if alg.inplace && !(A isa SparseMatrixCSC) && !(A isa GPUArraysCore.AbstractGPUArray)

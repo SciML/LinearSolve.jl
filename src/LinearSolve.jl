@@ -62,6 +62,9 @@ needs_concrete_A(alg::AbstractKrylovSubspaceMethod) = false
 needs_concrete_A(alg::AbstractSolveFunction) = false
 
 # Util
+is_underdetermined(x) = false
+is_underdetermined(A::AbstractMatrix) = size(A, 1) < size(A, 2)
+is_underdetermined(A::AbstractSciMLOperator) = size(A, 1) < size(A, 2)
 
 _isidentity_struct(A) = false
 _isidentity_struct(λ::Number) = isone(λ)
@@ -96,6 +99,7 @@ EnumX.@enumx DefaultAlgorithmChoice begin
     NormalCholeskyFactorization
     AppleAccelerateLUFactorization
     MKLLUFactorization
+    QRFactorizationPivoted
 end
 
 struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm
@@ -141,6 +145,31 @@ end
 
 @static if INCLUDE_SPARSE
     include("factorization_sparse.jl")
+end
+
+# Solver Specific Traits
+## Needs Square Matrix
+"""
+    needs_square_A(alg)
+
+Returns `true` if the algorithm requires a square matrix.
+"""
+needs_square_A(::Nothing) = false  # Linear Solve automatically will use a correct alg!
+needs_square_A(alg::SciMLLinearSolveAlgorithm) = true
+for alg in (:QRFactorization, :FastQRFactorization, :NormalCholeskyFactorization,
+    :NormalBunchKaufmanFactorization)
+    @eval needs_square_A(::$(alg)) = false
+end
+for kralg in (Krylov.lsmr!, Krylov.craigmr!)
+    @eval needs_square_A(::KrylovJL{$(typeof(kralg))}) = false
+end
+for alg in (:LUFactorization, :FastLUFactorization, :SVDFactorization,
+    :GenericFactorization, :GenericLUFactorization, :SimpleLUFactorization,
+    :RFLUFactorization, :UMFPACKFactorization, :KLUFactorization, :SparspakFactorization,
+    :DiagonalFactorization, :CholeskyFactorization, :BunchKaufmanFactorization,
+    :CHOLMODFactorization, :LDLtFactorization, :AppleAccelerateLUFactorization,
+    :MKLLUFactorization, :MetalLUFactorization)
+    @eval needs_square_A(::$(alg)) = true
 end
 
 const IS_OPENBLAS = Ref(true)

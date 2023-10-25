@@ -327,7 +327,12 @@ function defaultalg_symbol(::Type{T}) where {T}
     Symbol(split(string(SciMLBase.parameterless_type(T)), ".")[end])
 end
 defaultalg_symbol(::Type{<:GenericFactorization{typeof(ldlt!)}}) = :LDLtFactorization
-defaultalg_symbol(::Type{<:QRFactorization{ColumnNorm}}) = :QRFactorizationPivoted
+
+@static if VERSION >= v"1.7"
+    defaultalg_symbol(::Type{<:QRFactorization{ColumnNorm}}) = :QRFactorizationPivoted
+else
+    defaultalg_symbol(::Type{<:QRFactorization{Val{true}}}) = :QRFactorizationPivoted
+end
 
 """
 if alg.alg === DefaultAlgorithmChoice.LUFactorization

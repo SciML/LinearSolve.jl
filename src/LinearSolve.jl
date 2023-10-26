@@ -177,7 +177,7 @@ export LinearSolveFunction, DirectLdiv!
 export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
     KrylovJL_BICGSTAB, KrylovJL_LSMR, KrylovJL_CRAIGMR,
     IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
-    IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES,
+    IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES, IterativeSolversJL_IDRS,
     KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES
 
 export HYPREAlgorithm

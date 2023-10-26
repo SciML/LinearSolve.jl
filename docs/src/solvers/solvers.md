@@ -157,6 +157,7 @@ IterativeSolversJL_CG
 IterativeSolversJL_GMRES
 IterativeSolversJL_BICGSTAB
 IterativeSolversJL_MINRES
+IterativeSolversJL_IDRS
 IterativeSolversJL
 ```
 

@@ -250,7 +250,8 @@ end
             kwargs = (; gmres_restart = 5)
             for alg in (("Default", IterativeSolversJL(kwargs...)),
                 ("CG", IterativeSolversJL_CG(kwargs...)),
-                ("GMRES", IterativeSolversJL_GMRES(kwargs...))
+                ("GMRES", IterativeSolversJL_GMRES(kwargs...)),
+                ("IDRS", IterativeSolversJL_IDRS(kwargs...))
                 #           ("BICGSTAB",IterativeSolversJL_BICGSTAB(kwargs...)),
                 #            ("MINRES",IterativeSolversJL_MINRES(kwargs...)),
             )

@@ -144,7 +144,7 @@ function EnzymeCore.EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.s
             _linsolve.cacheval' \ dy
         elseif _linsolve.cacheval isa Tuple && _linsolve.cacheval[1] isa Factorization
             _linsolve.cacheval[1]' \ dy
-        elseif _linsolve.alg isa AbstractKrylovSubspaceMethod
+        elseif _linsolve.alg isa LinearSolve.AbstractKrylovSubspaceMethod
             # Doesn't modify `A`, so it's safe to just reuse it
             invprob = LinearSolve.LinearProblem(transpose(_linsolve.A), dy)
             solve(invprob;

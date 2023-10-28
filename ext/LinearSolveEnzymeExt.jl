@@ -58,14 +58,14 @@ function EnzymeCore.EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.i
             d_b .= 0
         end
     else
-        for i in 1:EnzymeRules.width(config)
-            if d_A !== prob_d_A[i]
-                prob_d_A[i] .+= d_A[i]
-                d_A[i] .= 0
+        for (_prob_d_A,_d_A,_prob_d_b, _d_b) in zip(prob_d_A, d_A, prob_d_b, d_b)
+            if _d_A !== _prob_d_A
+                _prob_d_A .+= _d_A
+                _d_A .= 0
             end
-            if d_b !== prob_d_b[i]
-                prob_d_b[i] .+= d_b[i]
-                d_b[i] .= 0
+            if _d_b !== _prob_d_b
+                _prob_d_b .+= _d_b
+                _d_b .= 0
             end
         end
     end

@@ -34,12 +34,8 @@ prob4 = LinearProblem(A4, b4; u0 = x4)
 cache_kwargs = (; verbose = true, abstol = 1e-8, reltol = 1e-8, maxiter = 30)
 
 function test_interface(alg, prob1, prob2)
-    A1 = prob1.A
-    b1 = prob1.b
-    x1 = prob1.u0
-    A2 = prob2.A
-    b2 = prob2.b
-    x2 = prob2.u0
+    A1, b1 = prob1.A, prob1.b
+    A2, b2 = prob2.A, prob2.b
 
     sol = solve(prob1, alg; cache_kwargs...)
     @test A1 * sol.u ≈ b1

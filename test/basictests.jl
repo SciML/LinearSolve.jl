@@ -220,19 +220,16 @@ end
         end
     end
 
-    test_algs = if VERSION >= v"1.9"
-        (LUFactorization(),
-            QRFactorization(),
-            SVDFactorization(),
-            RFLUFactorization(),
-            MKLLUFactorization(),
-            LinearSolve.defaultalg(prob1.A, prob1.b))
-    else
-        (LUFactorization(),
-            QRFactorization(),
-            SVDFactorization(),
-            RFLUFactorization(),
-            LinearSolve.defaultalg(prob1.A, prob1.b))
+    test_algs = [
+        LUFactorization(),
+        QRFactorization(),
+        SVDFactorization(),
+        RFLUFactorization(),
+        LinearSolve.defaultalg(prob1.A, prob1.b),
+    ]
+
+    if VERSION >= v"1.9"
+        push!(test_algs, MKLLUFactorization())
     end
 
     @testset "Concrete Factorizations" begin

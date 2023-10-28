@@ -269,14 +269,17 @@ end
 
     @testset "KrylovJL" begin
         kwargs = (; gmres_restart = 5)
-        for alg in (("Default", KrylovJL(kwargs...)),
+        algorithms = (
+            ("Default", KrylovJL(kwargs...)),
             ("CG", KrylovJL_CG(kwargs...)),
             ("GMRES", KrylovJL_GMRES(kwargs...)),
-            #           ("BICGSTAB",KrylovJL_BICGSTAB(kwargs...)),
-            ("MINRES", KrylovJL_MINRES(kwargs...)))
-            @testset "$(alg[1])" begin
-                test_interface(alg[2], prob1, prob2)
-                test_interface(alg[2], prob3, prob4)
+            # ("BICGSTAB",KrylovJL_BICGSTAB(kwargs...)),
+            ("MINRES", KrylovJL_MINRES(kwargs...))
+        )
+        for (name, algorithm) in algorithms
+            @testset "$name" begin
+                test_interface(algorithm, prob1, prob2)
+                test_interface(algorithm, prob3, prob4)
             end
         end
     end

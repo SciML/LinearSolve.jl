@@ -38,13 +38,12 @@ function test_interface(alg, prob1, prob2)
     A2 = prob2.A
     b2 = prob2.b
     x2 = prob2.u0
-    A3 = prob3.A
-    b3 = prob3.b
-    A4 = prob4.A
-    b4 = prob4.b
 
     sol = solve(prob1, alg; cache_kwargs...)
     @test A1 * sol.u ≈ b1
+
+    sol = solve(prob1, alg; cache_kwargs...)
+    @test A2 * sol.u ≈ b2
 
     cache = SciMLBase.init(prob1, alg; cache_kwargs...) # initialize cache
     sol = solve!(cache)
@@ -57,29 +56,13 @@ function test_interface(alg, prob1, prob2)
     cache.b = b2
     sol = solve!(cache; cache_kwargs...)
     @test A2 * sol.u ≈ b2
-
-    # Test complex numbers via cache interface
-    cache.A = A3
-    cache.b = b3
-    sol = solve!(cache; cache_kwargs...)
-    @test A3 * sol.u ≈ b3
-
-    # Test mixed types via cache interface
-    cache.A = A4
-    cache.b = b4
-    sol = solve!(cache; cache_kwargs...)
-    @test A4 * sol.u ≈ b4
-
-    # Test mixed types from scratch
-    sol = solve(prob4, alg; cache_kwargs...)
-    @test A4 * sol.u ≈ b4
-
     return
 end
 
 @testset "LinearSolve" begin
     @testset "Default Linear Solver" begin
         test_interface(nothing, prob1, prob2)
+        test_interface(nothing, prob3, prob4)
 
         A1 = prob1.A * prob1.A'
         b1 = prob1.b
@@ -251,6 +234,7 @@ end
         for alg in test_algs
             @testset "$alg" begin
                 test_interface(alg, prob1, prob2)
+                test_interface(alg, prob3, prob4)
             end
         end
         if LinearSolve.appleaccelerate_isavailable()
@@ -271,6 +255,7 @@ end
             @testset "fact_alg = $fact_alg" begin
                 alg = GenericFactorization(fact_alg = fact_alg)
                 test_interface(alg, prob1, prob2)
+                test_interface(alg, prob3, prob4)
             end
         end
     end
@@ -288,6 +273,7 @@ end
             ("MINRES", KrylovJL_MINRES(kwargs...)))
             @testset "$(alg[1])" begin
                 test_interface(alg[2], prob1, prob2)
+                test_interface(alg[2], prob3, prob4)
             end
         end
     end
@@ -303,6 +289,7 @@ end
             )
                 @testset "$(alg[1])" begin
                     test_interface(alg[2], prob1, prob2)
+                    test_interface(alg[2], prob3, prob4)
                 end
             end
         end
@@ -316,6 +303,7 @@ end
                 ("GMRES", KrylovKitJL_GMRES(kwargs...)))
                 @testset "$(alg[1])" begin
                     test_interface(alg[2], prob1, prob2)
+                    test_interface(alg[2], prob3, prob4)
                 end
                 @test alg[2] isa KrylovKitJL
             end

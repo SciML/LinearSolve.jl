@@ -42,7 +42,7 @@ function test_interface(alg, prob1, prob2)
     sol = solve(prob1, alg; cache_kwargs...)
     @test A1 * sol.u ≈ b1
 
-    sol = solve(prob1, alg; cache_kwargs...)
+    sol = solve(prob2, alg; cache_kwargs...)
     @test A2 * sol.u ≈ b2
 
     cache = SciMLBase.init(prob1, alg; cache_kwargs...) # initialize cache

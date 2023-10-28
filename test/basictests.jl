@@ -50,7 +50,8 @@ function test_interface(alg, prob1, prob2)
     sol = solve!(cache; cache_kwargs...)
     @test A2 * sol.u ≈ b1
 
-    cache.A = A2
+    # Test cache resue: both A and b change
+    cache.A = deepcopy(A2)
     cache.b = b2
     sol = solve!(cache; cache_kwargs...)
     @test A2 * sol.u ≈ b2

@@ -9,20 +9,22 @@ const Dual64 = ForwardDiff.Dual{Nothing, Float64, 1}
 n = 8
 A = Matrix(I, n, n)
 b = ones(n)
+# Real-valued systems
 A1 = A / 1;
 b1 = rand(n);
 x1 = zero(b);
+# A2 is similar to A1; created to test cache reuse
 A2 = A / 2;
 b2 = rand(n);
 x2 = zero(b);
-# Test system with complex numbers
-A3 = A .+ rand(n) .* im;
-b3 = rand(n);
-x3 = zero(b);
-# Test system with mixed types
-A4 = (A / 4) .|> Float32;
-b4 = rand(n) .|> Float32;
-x4 = zero(b) .|> Float32;
+# Complex systems + mismatch types with eltype(tol)
+A3 = (A .+ rand(n) .* im) .|> ComplexF32;
+b3 = rand(n) .|> ComplexF32;
+x3 = zero(b) .|> ComplexF32;
+# A4 is similar to A3; created to test cache reuse
+A4 = (A .+ rand(n) .* im) .|> ComplexF32;
+b4 = b3 / 4 .|> ComplexF32;
+x4 = zero(b) .|> ComplexF32;
 
 prob1 = LinearProblem(A1, b1; u0 = x1)
 prob2 = LinearProblem(A2, b2; u0 = x2)

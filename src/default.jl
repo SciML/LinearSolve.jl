@@ -412,10 +412,10 @@ end
         end
 
         ex = if ex == :()
-            Expr(:elseif, :(getproperty(DefaultAlgorithmChoice, $(Meta.quot(alg))) === cache.alg), newex,
+            Expr(:elseif, :(getproperty(DefaultAlgorithmChoice, $(Meta.quot(alg))) === cache.alg.alg), newex,
                 :(error("Algorithm Choice not Allowed")))
         else
-            Expr(:elseif, :(getproperty(DefaultAlgorithmChoice, $(Meta.quot(alg))) === cache.alg), newex, ex)
+            Expr(:elseif, :(getproperty(DefaultAlgorithmChoice, $(Meta.quot(alg))) === cache.alg.alg), newex, ex)
         end
     end
     ex = Expr(:if, ex.args...)

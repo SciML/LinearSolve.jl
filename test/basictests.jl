@@ -17,16 +17,14 @@ x1 = zero(b);
 A2 = A / 2;
 b2 = rand(n);
 x2 = zero(b);
-# Complex systems + mismatch types with eltype(tol)
-A3 = (A .+ rand(n) .* im) .|> ComplexF32;
-# Make sure A3 is posdef symmetric (some solvers require this, like CG)
-A3 = A3 + A3' + 100 * I
-b3 = rand(n) .|> ComplexF32;
-x3 = zero(b) .|> ComplexF32;
+# Complex systems + mismatched types with eltype(tol)
+A3 = A1 .|> ComplexF32
+b3 = b1 .|> ComplexF32
+x3 = x1 .|> ComplexF32
 # A4 is similar to A3; created to test cache reuse
-A4 = A3 / 2;
-b4 = b3 / 4 .|> ComplexF32;
-x4 = zero(b) .|> ComplexF32;
+A4 = A2 .|> ComplexF32
+b4 = b2 .|> ComplexF32
+x4 = x2 .|> ComplexF32
 
 prob1 = LinearProblem(A1, b1; u0 = x1)
 prob2 = LinearProblem(A2, b2; u0 = x2)

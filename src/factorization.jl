@@ -16,7 +16,7 @@ function _ldiv!(x::Vector, A::Factorization, b::Vector)
     ldiv!(A, x)
 end
 
-#RF Bad fallback: will fail if `A` is just a stand-in
+# RF Bad fallback: will fail if `A` is just a stand-in
 # This should instead just create the factorization type.
 function init_cacheval(alg::AbstractFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
     reltol, verbose::Bool, assumptions::OperatorAssumptions)

@@ -362,3 +362,61 @@ end
     end
     ex = Expr(:if, ex.args...)
 end
+
+"""
+```
+elseif DefaultAlgorithmChoice.LUFactorization === cache.alg
+    (cache.cacheval.LUFactorization)' \\ dy
+else
+    ...
+end
+```
+"""
+@generated function defaultalg_adjoint_eval(cache::LinearCache, dy)
+    ex = :()
+    for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))
+        newex = if alg in Symbol.((DefaultAlgorithmChoice.MKLLUFactorization,
+            DefaultAlgorithmChoice.AppleAccelerateLUFactorization,
+            DefaultAlgorithmChoice.RFLUFactorization))
+            quote
+                getproperty(cache.cacheval,$(Meta.quot(alg)))[1]' \ dy
+            end
+        elseif alg in Symbol.((DefaultAlgorithmChoice.LUFactorization,
+            DefaultAlgorithmChoice.QRFactorization,
+            DefaultAlgorithmChoice.KLUFactorization,
+            DefaultAlgorithmChoice.UMFPACKFactorization,
+            DefaultAlgorithmChoice.LDLtFactorization,
+            DefaultAlgorithmChoice.SparspakFactorization,
+            DefaultAlgorithmChoice.BunchKaufmanFactorization,
+            DefaultAlgorithmChoice.CHOLMODFactorization,
+            DefaultAlgorithmChoice.SVDFactorization,
+            DefaultAlgorithmChoice.CholeskyFactorization,
+            DefaultAlgorithmChoice.NormalCholeskyFactorization,
+            DefaultAlgorithmChoice.QRFactorizationPivoted,
+            DefaultAlgorithmChoice.GenericLUFactorization))
+            quote
+                getproperty(cache.cacheval,$(Meta.quot(alg)))' \ dy
+            end
+        elseif alg in Symbol.((DefaultAlgorithmChoice.KrylovJL_GMRES,))
+            quote
+                invprob = LinearSolve.LinearProblem(transpose(cache.A), dy)
+                solve(invprob, cache.alg;
+                    abstol = cache.val.abstol,
+                    reltol = cache.val.reltol,
+                    verbose = cache.val.verbose)
+            end
+        else
+            quote
+                error("Default linear solver with algorithm $(alg) is currently not supported by Enzyme rules on LinearSolve.jl. Please open an issue on LinearSolve.jl detailing which algorithm is missing the adjoint handling")
+            end
+        end
+
+        ex = if ex == :()
+            Expr(:elseif, :(getproperty(DefaultAlgorithmChoice, $(Meta.quot(alg))) === cache.alg.alg), newex,
+                :(error("Algorithm Choice not Allowed")))
+        else
+            Expr(:elseif, :(getproperty(DefaultAlgorithmChoice, $(Meta.quot(alg))) === cache.alg.alg), newex, ex)
+        end
+    end
+    ex = Expr(:if, ex.args...)
+end

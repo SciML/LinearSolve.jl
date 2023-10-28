@@ -147,10 +147,12 @@ function EnzymeCore.EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.s
         elseif _linsolve.alg isa LinearSolve.AbstractKrylovSubspaceMethod
             # Doesn't modify `A`, so it's safe to just reuse it
             invprob = LinearSolve.LinearProblem(transpose(_linsolve.A), dy)
-            solve(invprob;
+            solve(invprob, _linearsolve.alg;
                 abstol = _linsolve.val.abstol,
                 reltol = _linsolve.val.reltol,
                 verbose = _linsolve.val.verbose)
+        elseif _linsolve.alg isa LinearSolve.DefaultLinearSolver
+            LinearSolve.defaultalg_adjoint_eval(_linsolve, dy)
         else
             error("Algorithm $(_linsolve.alg) is currently not supported by Enzyme rules on LinearSolve.jl. Please open an issue on LinearSolve.jl detailing which algorithm is missing the adjoint handling")
         end 

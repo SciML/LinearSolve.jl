@@ -28,10 +28,27 @@ db12 = ForwardDiff.gradient(x->f(eltype(x).(A),x), copy(b1))
 
 A = rand(n, n);
 dA = zeros(n, n);
+b1 = rand(n);
+db1 = zeros(n);
+
+_ff = (x,y) -> f(x,y; alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization))
+_ff(copy(A), copy(b1))
+
+Enzyme.autodiff(Reverse, (x,y) -> f(x,y; alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)), Duplicated(copy(A), dA), Duplicated(copy(b1), db1))
+
+dA2 = ForwardDiff.gradient(x->f(x,eltype(x).(b1)), copy(A))
+db12 = ForwardDiff.gradient(x->f(eltype(x).(A),x), copy(b1))
+
+@test dA ≈ dA2
+@test db1 ≈ db12
+
+A = rand(n, n);
+dA = zeros(n, n);
 dA2 = zeros(n, n);
 b1 = rand(n);
 db1 = zeros(n);
 db12 = zeros(n);
+
 
 # Batch test
 n = 4

@@ -42,6 +42,11 @@ PrecompileTools.@recompile_invalidations begin
     using SciMLBase
 
     using MKL_jll
+
+    import Preferences
+    if Preferences.@load_preference("TriggerMKLLBT", true)
+        using MKL
+    end
 end
 
 using Reexport

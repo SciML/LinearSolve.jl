@@ -44,9 +44,10 @@ PrecompileTools.@recompile_invalidations begin
     using MKL_jll
 
     import Preferences
-    if Preferences.@load_preference("TriggerMKLLBT", true)
-        using MKL
-    end
+end
+
+if Preferences.@load_preference("TriggerMKLLBT", true)
+   using MKL
 end
 
 using Reexport

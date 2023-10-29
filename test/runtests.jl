@@ -32,6 +32,6 @@ if GROUP == "LinearSolvePardiso"
     @time @safetestset "Pardiso" include("pardiso/pardiso.jl")
 end
 
-if (GROUP == "All" || GROUP == "LinearSolveHYPRE") && HAS_EXTENSIONS
+if Base.Sys.islinux() && (GROUP == "All" || GROUP == "LinearSolveHYPRE") && HAS_EXTENSIONS
     @time @safetestset "LinearSolveHYPRE" include("hypretests.jl")
 end

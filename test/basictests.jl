@@ -231,8 +231,6 @@ end
         push!(test_algs, MKLLUFactorization())
     end
 
-    end
-
     @testset "Concrete Factorizations" begin
         for alg in test_algs
             @testset "$alg" begin

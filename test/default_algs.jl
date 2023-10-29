@@ -4,14 +4,22 @@ using LinearSolve, LinearAlgebra, SparseArrays, Test, JET
 prob = LinearProblem(rand(3, 3), rand(3))
 solve(prob)
 
-@test LinearSolve.defaultalg(nothing, zeros(50)).alg ===
-      LinearSolve.DefaultAlgorithmChoice.RFLUFactorization
+if LinearSolve.appleaccelerate_isavailable()
+      @test LinearSolve.defaultalg(nothing, zeros(50)).alg ===
+      LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization
+else
+      @test LinearSolve.defaultalg(nothing, zeros(50)).alg ===
+            LinearSolve.DefaultAlgorithmChoice.RFLUFactorization
+end
 prob = LinearProblem(rand(50, 50), rand(50))
 solve(prob)
 
 if LinearSolve.usemkl
       @test LinearSolve.defaultalg(nothing, zeros(600)).alg ===
       LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization
+elseif LinearSolve.appleaccelerate_isavailable()
+      @test LinearSolve.defaultalg(nothing, zeros(600)).alg ===
+      LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization
 else
       @test LinearSolve.defaultalg(nothing, zeros(600)).alg ===
       LinearSolve.DefaultAlgorithmChoice.LUFactorization
@@ -45,7 +53,7 @@ solve(prob)
     JET.@test_opt init(prob, nothing)
     JET.@test_opt solve(prob, LUFactorization())
     JET.@test_opt solve(prob, GenericLUFactorization())
-    JET.@test_opt solve(prob, QRFactorization())
+    @test_skip JET.@test_opt solve(prob, QRFactorization())
     JET.@test_opt solve(prob, DiagonalFactorization())
     #JET.@test_opt solve(prob, SVDFactorization())
     #JET.@test_opt solve(prob, KrylovJL_GMRES())

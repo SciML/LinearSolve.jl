@@ -9,7 +9,8 @@ for alg in subtypes(LinearSolve.AbstractFactorization)
         MetalLUFactorization,
     ]) &&
        (!(alg == AppleAccelerateLUFactorization) ||
-        LinearSolve.appleaccelerate_isavailable())
+        LinearSolve.appleaccelerate_isavailable()) &&
+        (!(alg == MKLLUFactorization) || LinearSolve.usemkl)
         A = [1.0 2.0; 3.0 4.0]
         alg in [KLUFactorization, UMFPACKFactorization, SparspakFactorization] &&
             (A = sparse(A))

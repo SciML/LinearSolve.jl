@@ -58,14 +58,14 @@ function EnzymeCore.EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.i
             d_b .= 0
         end
     else
-        for i in 1:EnzymeRules.width(config)
-            if d_A !== prob_d_A[i]
-                prob_d_A[i] .+= d_A[i]
-                d_A[i] .= 0
+        for (_prob_d_A,_d_A,_prob_d_b, _d_b) in zip(prob_d_A, d_A, prob_d_b, d_b)
+            if _d_A !== _prob_d_A
+                _prob_d_A .+= _d_A
+                _d_A .= 0
             end
-            if d_b !== prob_d_b[i]
-                prob_d_b[i] .+= d_b[i]
-                d_b[i] .= 0
+            if _d_b !== _prob_d_b
+                _prob_d_b .+= _d_b
+                _d_b .= 0
             end
         end
     end
@@ -144,13 +144,15 @@ function EnzymeCore.EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.s
             _linsolve.cacheval' \ dy
         elseif _linsolve.cacheval isa Tuple && _linsolve.cacheval[1] isa Factorization
             _linsolve.cacheval[1]' \ dy
-        elseif _linsolve.alg isa AbstractKrylovSubspaceMethod
+        elseif _linsolve.alg isa LinearSolve.AbstractKrylovSubspaceMethod
             # Doesn't modify `A`, so it's safe to just reuse it
             invprob = LinearSolve.LinearProblem(transpose(_linsolve.A), dy)
-            solve(invprob;
+            solve(invprob, _linearsolve.alg;
                 abstol = _linsolve.val.abstol,
                 reltol = _linsolve.val.reltol,
                 verbose = _linsolve.val.verbose)
+        elseif _linsolve.alg isa LinearSolve.DefaultLinearSolver
+            LinearSolve.defaultalg_adjoint_eval(_linsolve, dy)
         else
             error("Algorithm $(_linsolve.alg) is currently not supported by Enzyme rules on LinearSolve.jl. Please open an issue on LinearSolve.jl detailing which algorithm is missing the adjoint handling")
         end 

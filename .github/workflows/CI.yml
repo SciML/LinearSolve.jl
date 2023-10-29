@@ -28,6 +28,8 @@ jobs:
             group: 'LinearSolveHYPRE'
           - version: '1'
             group: 'LinearSolvePardiso'
+          - version: '1'
+            group: 'LinearSolveBandedMatrices'
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v1

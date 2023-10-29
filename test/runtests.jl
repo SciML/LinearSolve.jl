@@ -15,6 +15,7 @@ if GROUP == "All" || GROUP == "Core"
     @time @safetestset "Default Alg Tests" include("default_algs.jl")
     VERSION >= v"1.9" && @time @safetestset "Enzyme Derivative Rules" include("enzyme.jl")
     @time @safetestset "Traits" include("traits.jl")
+    VERSION >= v"1.9" && @time @safetestset "BandedMatrices" include("banded.jl")
 end
 
 if GROUP == "LinearSolveCUDA"

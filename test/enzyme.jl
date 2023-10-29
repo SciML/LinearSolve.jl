@@ -28,20 +28,47 @@ db12 = ForwardDiff.gradient(x->f(eltype(x).(A),x), copy(b1))
 
 A = rand(n, n);
 dA = zeros(n, n);
+b1 = rand(n);
+db1 = zeros(n);
+
+_ff = (x,y) -> f(x,y; alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization))
+_ff(copy(A), copy(b1))
+
+Enzyme.autodiff(Reverse, (x,y) -> f(x,y; alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)), Duplicated(copy(A), dA), Duplicated(copy(b1), db1))
+
+dA2 = ForwardDiff.gradient(x->f(x,eltype(x).(b1)), copy(A))
+db12 = ForwardDiff.gradient(x->f(eltype(x).(A),x), copy(b1))
+
+@test dA ≈ dA2
+@test db1 ≈ db12
+
+A = rand(n, n);
+dA = zeros(n, n);
 dA2 = zeros(n, n);
 b1 = rand(n);
 db1 = zeros(n);
 db12 = zeros(n);
 
-#=
-# Batch test fails
-# Captured in MWE: https://github.com/EnzymeAD/Enzyme.jl/issues/1075
+
+# Batch test
+n = 4
+A = rand(n, n);
+dA = zeros(n, n);
+dA2 = zeros(n, n);
+b1 = rand(n);
+db1 = zeros(n);
+db12 = zeros(n);
+
+function f(A, b1; alg = LUFactorization())
+    prob = LinearProblem(A, b1)
+    sol1 = solve(prob, alg)
+    s1 = sol1.u
+    norm(s1)
+end
 
 function fbatch(y, A, b1; alg = LUFactorization())
     prob = LinearProblem(A, b1)
-
     sol1 = solve(prob, alg)
-
     s1 = sol1.u
     y[1] = norm(s1)
     nothing
@@ -50,16 +77,28 @@ end
 y = [0.0]
 dy1 = [1.0]
 dy2 = [1.0]
+Enzyme.autodiff(Reverse, fbatch, Duplicated(y, dy1), Duplicated(copy(A), dA), Duplicated(copy(b1), db1))
+
+@test y[1] ≈ f(copy(A),b1)
+dA_2 = ForwardDiff.gradient(x->f(x,eltype(x).(b1)), copy(A))
+db1_2 = ForwardDiff.gradient(x->f(eltype(x).(A),x), copy(b1))
+
+@test dA ≈ dA_2
+@test db1 ≈ db1_2
+
+y .= 0
+dy1 .= 1
+dy2 .= 1
+dA .= 0
+dA2 .= 0
+db1 .= 0
+db12 .= 0
 Enzyme.autodiff(Reverse, fbatch, BatchDuplicated(y, (dy1, dy2)), BatchDuplicated(copy(A), (dA, dA2)), BatchDuplicated(copy(b1), (db1, db12)))
 
-dA2 = ForwardDiff.gradient(x->f(x,eltype(x).(b1)), copy(A))
-db12 = ForwardDiff.gradient(x->f(eltype(x).(A),x), copy(b1))
-
-@test_broken dA ≈ dA_2
-@test_broken dA2 ≈ dA_2
-@test_broken db1 ≈ db1_2
-@test_broken db12 ≈ db1_2
-=#
+@test dA ≈ dA_2
+@test db1 ≈ db1_2
+@test dA2 ≈ dA_2
+@test db12 ≈ db1_2
 
 function f(A, b1, b2; alg = LUFactorization())
     prob = LinearProblem(A, b1)

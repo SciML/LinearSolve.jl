@@ -311,6 +311,21 @@ function IterativeSolversJL_GMRES end
 
 """
 ```julia
+IterativeSolversJL_IDRS(args...; Pl = nothing, kwargs...)
+```
+
+A wrapper over the IterativeSolvers.jl IDR(S).
+
+
+!!! note
+    
+    Using this solver requires adding the package IterativeSolvers.jl, i.e. `using IterativeSolvers`
+
+"""
+function IterativeSolversJL_IDRS end
+
+"""
+```julia
 IterativeSolversJL_BICGSTAB(args...; Pl = nothing, Pr = nothing, kwargs...)
 ```
 

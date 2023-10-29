@@ -1,6 +1,6 @@
 needs_concrete_A(alg::DefaultLinearSolver) = true
 mutable struct DefaultLinearSolverInit{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12,
-    T13, T14, T15, T16, T17, T18}
+    T13, T14, T15, T16, T17, T18, T19}
     LUFactorization::T1
     QRFactorization::T2
     DiagonalFactorization::T3
@@ -19,6 +19,7 @@ mutable struct DefaultLinearSolverInit{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, 
     NormalCholeskyFactorization::T16
     AppleAccelerateLUFactorization::T17
     MKLLUFactorization::T18
+    QRFactorizationPivoted::T19
 end
 
 # Legacy fallback
@@ -168,8 +169,8 @@ function defaultalg(A, b, assump::OperatorAssumptions)
                        (A === nothing ? eltype(b) <: Union{Float32, Float64} :
                         eltype(A) <: Union{Float32, Float64})
                     DefaultAlgorithmChoice.RFLUFactorization
-                    #elseif A === nothing || A isa Matrix
-                    #    alg = FastLUFactorization()
+                #elseif A === nothing || A isa Matrix
+                #    alg = FastLUFactorization()
                 elseif usemkl && (A === nothing ? eltype(b) <: Union{Float32, Float64} :
                         eltype(A) <: Union{Float32, Float64})
                     DefaultAlgorithmChoice.MKLLUFactorization
@@ -199,9 +200,19 @@ function defaultalg(A, b, assump::OperatorAssumptions)
     elseif assump.condition === OperatorCondition.WellConditioned
         DefaultAlgorithmChoice.NormalCholeskyFactorization
     elseif assump.condition === OperatorCondition.IllConditioned
-        DefaultAlgorithmChoice.QRFactorization
+        if is_underdetermined(A)
+            # Underdetermined
+            DefaultAlgorithmChoice.QRFactorizationPivoted
+        else
+            DefaultAlgorithmChoice.QRFactorization
+        end
     elseif assump.condition === OperatorCondition.VeryIllConditioned
-        DefaultAlgorithmChoice.QRFactorization
+        if is_underdetermined(A)
+            # Underdetermined
+            DefaultAlgorithmChoice.QRFactorizationPivoted
+        else
+            DefaultAlgorithmChoice.QRFactorization
+        end
     elseif assump.condition === OperatorCondition.SuperIllConditioned
         DefaultAlgorithmChoice.SVDFactorization
     else
@@ -247,6 +258,12 @@ function algchoice_to_alg(alg::Symbol)
         NormalCholeskyFactorization()
     elseif alg === :AppleAccelerateLUFactorization
         AppleAccelerateLUFactorization()
+    elseif alg === :QRFactorizationPivoted
+        @static if VERSION ≥ v"1.7beta"
+            QRFactorization(ColumnNorm())
+        else
+            QRFactorization(Val(true))
+        end
     else
         error("Algorithm choice symbol $alg not allowed in the default")
     end
@@ -311,6 +328,12 @@ function defaultalg_symbol(::Type{T}) where {T}
 end
 defaultalg_symbol(::Type{<:GenericFactorization{typeof(ldlt!)}}) = :LDLtFactorization
 
+@static if VERSION >= v"1.7"
+    defaultalg_symbol(::Type{<:QRFactorization{ColumnNorm}}) = :QRFactorizationPivoted
+else
+    defaultalg_symbol(::Type{<:QRFactorization{Val{true}}}) = :QRFactorizationPivoted
+end
+
 """
 if alg.alg === DefaultAlgorithmChoice.LUFactorization
     SciMLBase.solve!(cache, LUFactorization(), args...; kwargs...))
@@ -335,6 +358,64 @@ end
                 :(error("Algorithm Choice not Allowed")))
         else
             Expr(:elseif, :(Symbol(alg.alg) === $(Meta.quot(alg))), newex, ex)
+        end
+    end
+    ex = Expr(:if, ex.args...)
+end
+
+"""
+```
+elseif DefaultAlgorithmChoice.LUFactorization === cache.alg
+    (cache.cacheval.LUFactorization)' \\ dy
+else
+    ...
+end
+```
+"""
+@generated function defaultalg_adjoint_eval(cache::LinearCache, dy)
+    ex = :()
+    for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))
+        newex = if alg in Symbol.((DefaultAlgorithmChoice.MKLLUFactorization,
+            DefaultAlgorithmChoice.AppleAccelerateLUFactorization,
+            DefaultAlgorithmChoice.RFLUFactorization))
+            quote
+                getproperty(cache.cacheval,$(Meta.quot(alg)))[1]' \ dy
+            end
+        elseif alg in Symbol.((DefaultAlgorithmChoice.LUFactorization,
+            DefaultAlgorithmChoice.QRFactorization,
+            DefaultAlgorithmChoice.KLUFactorization,
+            DefaultAlgorithmChoice.UMFPACKFactorization,
+            DefaultAlgorithmChoice.LDLtFactorization,
+            DefaultAlgorithmChoice.SparspakFactorization,
+            DefaultAlgorithmChoice.BunchKaufmanFactorization,
+            DefaultAlgorithmChoice.CHOLMODFactorization,
+            DefaultAlgorithmChoice.SVDFactorization,
+            DefaultAlgorithmChoice.CholeskyFactorization,
+            DefaultAlgorithmChoice.NormalCholeskyFactorization,
+            DefaultAlgorithmChoice.QRFactorizationPivoted,
+            DefaultAlgorithmChoice.GenericLUFactorization))
+            quote
+                getproperty(cache.cacheval,$(Meta.quot(alg)))' \ dy
+            end
+        elseif alg in Symbol.((DefaultAlgorithmChoice.KrylovJL_GMRES,))
+            quote
+                invprob = LinearSolve.LinearProblem(transpose(cache.A), dy)
+                solve(invprob, cache.alg;
+                    abstol = cache.val.abstol,
+                    reltol = cache.val.reltol,
+                    verbose = cache.val.verbose)
+            end
+        else
+            quote
+                error("Default linear solver with algorithm $(alg) is currently not supported by Enzyme rules on LinearSolve.jl. Please open an issue on LinearSolve.jl detailing which algorithm is missing the adjoint handling")
+            end
+        end
+
+        ex = if ex == :()
+            Expr(:elseif, :(getproperty(DefaultAlgorithmChoice, $(Meta.quot(alg))) === cache.alg.alg), newex,
+                :(error("Algorithm Choice not Allowed")))
+        else
+            Expr(:elseif, :(getproperty(DefaultAlgorithmChoice, $(Meta.quot(alg))) === cache.alg.alg), newex, ex)
         end
     end
     ex = Expr(:if, ex.args...)

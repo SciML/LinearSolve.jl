@@ -202,7 +202,7 @@ end
         end
     end
 
-    test_algs = if VERSION >= v"1.9"
+    test_algs = if VERSION >= v"1.9" && LinearSolve.usemkl
         (LUFactorization(),
             QRFactorization(),
             SVDFactorization(),

@@ -132,8 +132,8 @@ end
 function EnzymeCore.EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.solve!)}, ::Type{RT}, cache, linsolve::EnzymeCore.Annotation{LP}; kwargs...) where {RT, LP <: LinearSolve.LinearCache}
     y, dys, _linsolve, dAs, dbs = cache
 
-    @assert !(typeof(linsolve) <: Const)
-    @assert !(typeof(linsolve) <: Active)
+    @assert !(linsolve isa Const)
+    @assert !(linsolve isa Active)
 
     if EnzymeRules.width(config) == 1
         dys = (dys,)

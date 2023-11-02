@@ -90,7 +90,7 @@ function LinearSolve.init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, max
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
-    if cache.isfresh || !(typeof(alg) <: IterativeSolvers.GMRESIterable)
+    if cache.isfresh || !(alg isa IterativeSolvers.GMRESIterable)
         solver = LinearSolve.init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl,
             cache.Pr,
             cache.maxiters, cache.abstol, cache.reltol,

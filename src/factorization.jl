@@ -1342,7 +1342,7 @@ function init_cacheval(::SparspakFactorization, A, b, u, Pl, Pr, maxiters::Int, 
     reltol,
     verbose::Bool, assumptions::OperatorAssumptions)
     A = convert(AbstractMatrix, A)
-    if typeof(A) <: SparseArrays.AbstractSparseArray
+    if A isa SparseArrays.AbstractSparseArray
         return sparspaklu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                 nonzeros(A)),
             factorize = false)

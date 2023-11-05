@@ -28,7 +28,6 @@ end
 function EnzymeCore.EnzymeRules.forward(func::Const{typeof(LinearSolve.solve!)}, ::Type{RT}, linsolve::EnzymeCore.Annotation{LP}; kwargs...) where {RT, LP <: LinearSolve.LinearCache}
     @assert !(linsolve isa Const)
 
-    linsolve = deepcopy(linsolve) #mutates after function is applied
     res = func.val(linsolve.val; kwargs...)
     
     if RT <: Const

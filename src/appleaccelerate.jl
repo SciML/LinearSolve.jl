@@ -217,13 +217,13 @@ else
     nothing
 end
 
-function LinearSolve.init_cacheval(alg::AppleAccelerateLUFactorization, A::AbstractMatrix{<:Float64}, b::AbstractArray{<:Float64}, u, Pl, Pr,
+function LinearSolve.init_cacheval(alg::AppleAccelerateLUFactorization, A, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
     PREALLOCATED_APPLE_LU
 end
 
-function LinearSolve.init_cacheval(alg::AppleAccelerateLUFactorization, A, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(alg::AppleAccelerateLUFactorization, A::AbstractMatrix{<:Union{Float32,ComplexF32,ComplexF64}}, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
     A = rand(eltype(A), 0, 0)

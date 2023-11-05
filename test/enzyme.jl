@@ -208,13 +208,16 @@ manual_jac = map(onehot(A)) do dA
     y = A \ b1
     sum(inv(A) * (db1 - dA*y))
 end |> collect
+@show manual_jac
 
 fd_jac = FiniteDiff.finite_difference_jacobian(fA, A) |> vec
+@show fd_jac
 
 en_jac = map(onehot(A)) do dA
     eres = Enzyme.autodiff(Forward, fA, Duplicated(copy(A), dA))
     eres[1]
 end |> collect
+@show en_jac
 
 @test_broken en_jac ≈ manual_jac
 @test_broken en_jac ≈ fd_jac

@@ -72,6 +72,13 @@ end
     warm_start::Bool
 end
 
+function update_cacheval!(cache::LinearCache, cacheval::SimpleGMRESCache, name::Symbol, x)
+    (name != :b || cache.isfresh) && return cacheval
+    vec(cacheval.w) .= vec(x)
+    fill!(cacheval.x, 0)
+    return cacheval
+end
+
 """
     (c, s, ρ) = _sym_givens(a, b)
 

@@ -36,10 +36,9 @@ function EnzymeCore.EnzymeRules.forward(func::Const{typeof(LinearSolve.solve!)},
     end
     
     dres = deepcopy(res)
-    invA = inv(A)
     db = linsolve.dval.b
     dA = linsolve.dval.A
-    dres.u .= invA * (db - dA * res.u)
+    dres.u .= A \ (db - dA * res.u)
 
     if RT <: DuplicatedNoNeed
         return dres

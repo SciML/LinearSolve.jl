@@ -177,12 +177,6 @@ function fb(b; alg = LUFactorization())
 end
 fb(b1)
 
-manual_jac = map(onehot(b1)) do db
-    y = A \ b1
-    sum(inv(A) * (db - dA*y))
-end |> collect
-@show manual_jac
-
 fd_jac = FiniteDiff.finite_difference_jacobian(fb, b1) |> vec
 @show fd_jac
 
@@ -192,8 +186,7 @@ en_jac = map(onehot(b1)) do db1
 end |> collect
 @show en_jac
 
-@test_broken en_jac ≈ manual_jac
-@test_broken en_jac ≈ fd_jac
+@test en_jac ≈ fd_jac atol=1e-6
 
 function fA(A; alg = LUFactorization())
     prob = LinearProblem(A, b1)
@@ -204,12 +197,6 @@ function fA(A; alg = LUFactorization())
 end
 fA(A)
 
-manual_jac = map(onehot(A)) do dA
-    y = A \ b1
-    sum(inv(A) * (db1 - dA*y))
-end |> collect
-@show manual_jac
-
 fd_jac = FiniteDiff.finite_difference_jacobian(fA, A) |> vec
 @show fd_jac
 
@@ -219,5 +206,4 @@ en_jac = map(onehot(A)) do dA
 end |> collect
 @show en_jac
 
-@test_broken en_jac ≈ manual_jac
-@test_broken en_jac ≈ fd_jac
+@test en_jac ≈ fd_jac atol=1e-6

@@ -28,17 +28,22 @@ end
 function EnzymeCore.EnzymeRules.forward(func::Const{typeof(LinearSolve.solve!)}, ::Type{RT}, linsolve::EnzymeCore.Annotation{LP}; kwargs...) where {RT, LP <: LinearSolve.LinearCache}
     @assert !(linsolve isa Const)
 
-    A = deepcopy(linsolve.val.A) #mutates after function is applied
+    linsolve = deepcopy(linsolve) #mutates after function is applied
     res = func.val(linsolve.val; kwargs...)
     
     if RT <: Const
         return res
     end
-    
-    dres = deepcopy(res)
+   
+    b = deepcopy(linsolve.val.b)
+
     db = linsolve.dval.b
     dA = linsolve.dval.A
-    dres.u .= A \ (db - dA * res.u)
+
+    linsolve.val.b = db - dA * res.u
+    dres = func.val(linsolve.val; kwargs...)
+
+    linsolve.val.b = b
 
     if RT <: DuplicatedNoNeed
         return dres

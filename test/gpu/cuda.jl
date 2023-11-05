@@ -1,6 +1,8 @@
 using LinearSolve, CUDA, LinearAlgebra, SparseArrays
 using Test
 
+CUDA.allowscalar(false)
+
 n = 8
 A = Matrix(I, n, n)
 b = ones(n)
@@ -25,19 +27,19 @@ function test_interface(alg, prob1, prob2)
     x2 = prob2.u0
 
     y = solve(prob1, alg; cache_kwargs...)
-    @test Array(A1 * y) ≈ Array(b1)
+    @test CUDA.@allowscalar(Array(A1 * y) ≈ Array(b1))
 
     cache = SciMLBase.init(prob1, alg; cache_kwargs...) # initialize cache
     solve!(cache)
-    @test Array(A1 * cache.u) ≈ Array(b1)
+    @test CUDA.@allowscalar(Array(A1 * cache.u) ≈ Array(b1))
 
     cache.A = copy(A2)
     solve!(cache)
-    @test Array(A2 * cache.u) ≈ Array(b1)
+    @test CUDA.@allowscalar(Array(A2 * cache.u) ≈ Array(b1))
 
     cache.b = copy(b2)
     solve!(cache)
-    @test Array(A2 * cache.u) ≈ Array(b2)
+    @test CUDA.@allowscalar(Array(A2 * cache.u) ≈ Array(b2))
 
     return
 end

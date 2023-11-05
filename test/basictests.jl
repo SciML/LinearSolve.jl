@@ -235,11 +235,12 @@ end
         for alg in test_algs
             @testset "$alg" begin
                 test_interface(alg, prob1, prob2)
-                VERSION >= v"1.9" && (alg isa MKLLUFactorization || test_interface(alg, prob3, prob4))
+                VERSION >= v"1.9" && test_interface(alg, prob3, prob4)
             end
         end
         if LinearSolve.appleaccelerate_isavailable()
             test_interface(AppleAccelerateLUFactorization(), prob1, prob2)
+            test_interface(AppleAccelerateLUFactorization(), prob3, prob4)
         end
     end
 

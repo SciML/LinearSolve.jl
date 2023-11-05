@@ -97,7 +97,6 @@ julia = "1.9"
 BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
 BlockDiagonals = "0a1fb500-61f7-11e9-3c65-f5ef3456f9f0"
 Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
-EnzymeTestUtils = "12d8515a-0907-448a-8884-5fe00fdf1c5a"
 FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 HYPRE = "b5ffcf37-a2bd-41ab-a3da-4bd9bc8ad771"
@@ -116,4 +115,4 @@ SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "IterativeSolvers", "InteractiveUtils", "JET", "KrylovKit", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI", "BlockDiagonals", "Enzyme", "EnzymeTestUtils", "FiniteDiff", "BandedMatrices"]
+test = ["Test", "IterativeSolvers", "InteractiveUtils", "JET", "KrylovKit", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI", "BlockDiagonals", "Enzyme", "FiniteDiff", "BandedMatrices"]

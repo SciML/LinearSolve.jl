@@ -8,6 +8,46 @@ to avoid allocations and does not require libblastrampoline.
 """
 struct MKLLUFactorization <: AbstractFactorization end
 
+function getrf!(A::AbstractMatrix{<:ComplexF64};
+    ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
+    info = Ref{BlasInt}(),
+    check = false)
+    require_one_based_indexing(A)
+    check && chkfinite(A)
+    chkstride1(A)
+    m, n = size(A)
+    lda = max(1, stride(A, 2))
+    if isempty(ipiv)
+        ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
+    end
+    ccall((@blasfunc(zgetrf_), MKL_jll.libmkl_rt), Cvoid,
+        (Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64},
+            Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
+        m, n, A, lda, ipiv, info)
+    chkargsok(info[])
+    A, ipiv, info[], info #Error code is stored in LU factorization type
+end
+
+function getrf!(A::AbstractMatrix{<:ComplexF32};
+    ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
+    info = Ref{BlasInt}(),
+    check = false)
+    require_one_based_indexing(A)
+    check && chkfinite(A)
+    chkstride1(A)
+    m, n = size(A)
+    lda = max(1, stride(A, 2))
+    if isempty(ipiv)
+        ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
+    end
+    ccall((@blasfunc(cgetrf_), MKL_jll.libmkl_rt), Cvoid,
+        (Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32},
+            Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
+        m, n, A, lda, ipiv, info)
+    chkargsok(info[])
+    A, ipiv, info[], info #Error code is stored in LU factorization type
+end
+
 function getrf!(A::AbstractMatrix{<:Float64};
     ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
     info = Ref{BlasInt}(),
@@ -46,6 +86,56 @@ function getrf!(A::AbstractMatrix{<:Float32};
         m, n, A, lda, ipiv, info)
     chkargsok(info[])
     A, ipiv, info[], info #Error code is stored in LU factorization type
+end
+
+function getrs!(trans::AbstractChar,
+    A::AbstractMatrix{<:ComplexF64},
+    ipiv::AbstractVector{BlasInt},
+    B::AbstractVecOrMat{<:ComplexF64};
+    info = Ref{BlasInt}())
+    require_one_based_indexing(A, ipiv, B)
+    LinearAlgebra.LAPACK.chktrans(trans)
+    chkstride1(A, B, ipiv)
+    n = LinearAlgebra.checksquare(A)
+    if n != size(B, 1)
+        throw(DimensionMismatch("B has leading dimension $(size(B,1)), but needs $n"))
+    end
+    if n != length(ipiv)
+        throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
+    end
+    nrhs = size(B, 2)
+    ccall(("zgetrs_", MKL_jll.libmkl_rt), Cvoid,
+        (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt},
+            Ptr{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
+        trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
+        1)
+    LinearAlgebra.LAPACK.chklapackerror(BlasInt(info[]))
+    B
+end
+
+function getrs!(trans::AbstractChar,
+    A::AbstractMatrix{<:ComplexF32},
+    ipiv::AbstractVector{BlasInt},
+    B::AbstractVecOrMat{<:ComplexF32};
+    info = Ref{BlasInt}())
+    require_one_based_indexing(A, ipiv, B)
+    LinearAlgebra.LAPACK.chktrans(trans)
+    chkstride1(A, B, ipiv)
+    n = LinearAlgebra.checksquare(A)
+    if n != size(B, 1)
+        throw(DimensionMismatch("B has leading dimension $(size(B,1)), but needs $n"))
+    end
+    if n != length(ipiv)
+        throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
+    end
+    nrhs = size(B, 2)
+    ccall(("cgetrs_", MKL_jll.libmkl_rt), Cvoid,
+        (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt},
+            Ptr{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
+        trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
+        1)
+    LinearAlgebra.LAPACK.chklapackerror(BlasInt(info[]))
+    B
 end
 
 function getrs!(trans::AbstractChar,
@@ -106,10 +196,17 @@ const PREALLOCATED_MKL_LU = begin
     luinst = ArrayInterface.lu_instance(A), Ref{BlasInt}()
 end
 
-function init_cacheval(alg::MKLLUFactorization, A, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(alg::AppleAccelerateLUFactorization, A::AbstractMatrix{<:Float64}, b::AbstractArray{<:Float64}, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
     PREALLOCATED_MKL_LU
+end
+
+function LinearSolve.init_cacheval(alg::AppleAccelerateLUFactorization, A, b, u, Pl, Pr,
+    maxiters::Int, abstol, reltol, verbose::Bool,
+    assumptions::OperatorAssumptions)
+    A = rand(eltype(A), 0, 0)
+    ArrayInterface.lu_instance(A), Ref{BlasInt}()
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;

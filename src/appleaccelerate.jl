@@ -26,6 +26,46 @@ function appleaccelerate_isavailable()
     return true
 end
 
+function aa_getrf!(A::AbstractMatrix{<:ComplexF64};
+    ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
+    info = Ref{Cint}(),
+    check = false)
+    require_one_based_indexing(A)
+    check && chkfinite(A)
+    chkstride1(A)
+    m, n = size(A)
+    lda = max(1, stride(A, 2))
+    if isempty(ipiv)
+        ipiv = similar(A, Cint, min(size(A, 1), size(A, 2)))
+    end
+    ccall(("zgetrf_", libacc), Cvoid,
+        (Ref{Cint}, Ref{Cint}, Ptr{ComplexF64},
+            Ref{Cint}, Ptr{Cint}, Ptr{Cint}),
+        m, n, A, lda, ipiv, info)
+    info[] < 0 && throw(ArgumentError("Invalid arguments sent to LAPACK dgetrf_"))
+    A, ipiv, BlasInt(info[]), info #Error code is stored in LU factorization type
+end
+
+function aa_getrf!(A::AbstractMatrix{<:ComplexF32};
+    ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
+    info = Ref{Cint}(),
+    check = false)
+    require_one_based_indexing(A)
+    check && chkfinite(A)
+    chkstride1(A)
+    m, n = size(A)
+    lda = max(1, stride(A, 2))
+    if isempty(ipiv)
+        ipiv = similar(A, Cint, min(size(A, 1), size(A, 2)))
+    end
+    ccall(("cgetrf_", libacc), Cvoid,
+        (Ref{Cint}, Ref{Cint}, Ptr{ComplexF32},
+            Ref{Cint}, Ptr{Cint}, Ptr{Cint}),
+        m, n, A, lda, ipiv, info)
+    info[] < 0 && throw(ArgumentError("Invalid arguments sent to LAPACK dgetrf_"))
+    A, ipiv, BlasInt(info[]), info #Error code is stored in LU factorization type
+end
+
 function aa_getrf!(A::AbstractMatrix{<:Float64};
     ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
     info = Ref{Cint}(),
@@ -65,6 +105,55 @@ function aa_getrf!(A::AbstractMatrix{<:Float32};
         m, n, A, lda, ipiv, info)
     info[] < 0 && throw(ArgumentError("Invalid arguments sent to LAPACK dgetrf_"))
     A, ipiv, BlasInt(info[]), info #Error code is stored in LU factorization type
+end
+
+function aa_getrs!(trans::AbstractChar,
+    A::AbstractMatrix{<:ComplexF64},
+    ipiv::AbstractVector{Cint},
+    B::AbstractVecOrMat{<:ComplexF64};
+    info = Ref{Cint}())
+    require_one_based_indexing(A, ipiv, B)
+    LinearAlgebra.LAPACK.chktrans(trans)
+    chkstride1(A, B, ipiv)
+    n = LinearAlgebra.checksquare(A)
+    if n != size(B, 1)
+        throw(DimensionMismatch("B has leading dimension $(size(B,1)), but needs $n"))
+    end
+    if n != length(ipiv)
+        throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
+    end
+    nrhs = size(B, 2)
+    ccall(("zgetrs_", libacc), Cvoid,
+        (Ref{UInt8}, Ref{Cint}, Ref{Cint}, Ptr{ComplexF64}, Ref{Cint},
+            Ptr{Cint}, Ptr{ComplexF64}, Ref{Cint}, Ptr{Cint}, Clong),
+        trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
+        1)
+    LinearAlgebra.LAPACK.chklapackerror(BlasInt(info[]))
+end
+
+function aa_getrs!(trans::AbstractChar,
+    A::AbstractMatrix{<:ComplexF32},
+    ipiv::AbstractVector{Cint},
+    B::AbstractVecOrMat{<:ComplexF32};
+    info = Ref{Cint}())
+    require_one_based_indexing(A, ipiv, B)
+    LinearAlgebra.LAPACK.chktrans(trans)
+    chkstride1(A, B, ipiv)
+    n = LinearAlgebra.checksquare(A)
+    if n != size(B, 1)
+        throw(DimensionMismatch("B has leading dimension $(size(B,1)), but needs $n"))
+    end
+    if n != length(ipiv)
+        throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
+    end
+    nrhs = size(B, 2)
+    ccall(("cgetrs_", libacc), Cvoid,
+        (Ref{UInt8}, Ref{Cint}, Ref{Cint}, Ptr{ComplexF32}, Ref{Cint},
+            Ptr{Cint}, Ptr{ComplexF32}, Ref{Cint}, Ptr{Cint}, Clong),
+        trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
+        1)
+    LinearAlgebra.LAPACK.chklapackerror(BlasInt(info[]))
+    B
 end
 
 function aa_getrs!(trans::AbstractChar,
@@ -128,10 +217,18 @@ else
     nothing
 end
 
-function LinearSolve.init_cacheval(alg::AppleAccelerateLUFactorization, A, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(alg::AppleAccelerateLUFactorization, A::AbstractMatrix{<:Float64}, b::AbstractArray{<:Float64}, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
     PREALLOCATED_APPLE_LU
+end
+
+function LinearSolve.init_cacheval(alg::AppleAccelerateLUFactorization, A, b, u, Pl, Pr,
+    maxiters::Int, abstol, reltol, verbose::Bool,
+    assumptions::OperatorAssumptions)
+    A = rand(eltype(A), 0, 0)
+    luinst = ArrayInterface.lu_instance(A)
+    LU(luinst.factors, similar(A, Cint, 0), luinst.info), Ref{Cint}()
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::AppleAccelerateLUFactorization;

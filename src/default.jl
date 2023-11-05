@@ -162,9 +162,7 @@ function defaultalg(A, b, assump::OperatorAssumptions)
                 __conditioning(assump) === OperatorCondition.WellConditioned)
                 if length(b) <= 10
                     DefaultAlgorithmChoice.GenericLUFactorization
-                elseif VERSION >= v"1.8" && appleaccelerate_isavailable() &&
-                       (A === nothing ? eltype(b) <: Union{Float32, Float64} :
-                           eltype(A) <: Union{Float32, Float64})
+                elseif VERSION >= v"1.8" && appleaccelerate_isavailable()
                     DefaultAlgorithmChoice.AppleAccelerateLUFactorization
                 elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500) ||
                        (usemkl && length(b) <= 200)) &&
@@ -173,8 +171,7 @@ function defaultalg(A, b, assump::OperatorAssumptions)
                     DefaultAlgorithmChoice.RFLUFactorization
                 #elseif A === nothing || A isa Matrix
                 #    alg = FastLUFactorization()
-                elseif usemkl && (A === nothing ? eltype(b) <: Union{Float32, Float64} :
-                        eltype(A) <: Union{Float32, Float64})
+                elseif usemkl
                     DefaultAlgorithmChoice.MKLLUFactorization
                 else
                     DefaultAlgorithmChoice.LUFactorization
@@ -183,8 +180,7 @@ function defaultalg(A, b, assump::OperatorAssumptions)
                 DefaultAlgorithmChoice.QRFactorization
             elseif __conditioning(assump) === OperatorCondition.SuperIllConditioned
                 DefaultAlgorithmChoice.SVDFactorization
-            elseif usemkl && (A === nothing ? eltype(b) <: Union{Float32, Float64} :
-                        eltype(A) <: Union{Float32, Float64})
+            elseif usemkl
                 DefaultAlgorithmChoice.MKLLUFactorization
             else
                 DefaultAlgorithmChoice.LUFactorization

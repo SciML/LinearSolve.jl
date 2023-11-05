@@ -9,6 +9,47 @@ using Enzyme
 
 using EnzymeCore
 
+function EnzymeCore.EnzymeRules.forward(func::Const{typeof(LinearSolve.init)}, ::Type{RT}, prob::EnzymeCore.Annotation{LP}, alg::Const; kwargs...) where {RT, LP <: LinearSolve.LinearProblem}
+    @assert !(prob isa Const)
+    res = func.val(prob.val, alg.val; kwargs...)
+    if RT <: Const
+        return res
+    end
+    dres = func.val(prob.dval, alg.val; kwargs...)
+    dres.b .= res.b == dres.b ? zero(dres.b) : dres.b
+    dres.A .= res.A == dres.A ? zero(dres.A) : dres.A
+    if RT <: DuplicatedNoNeed
+        return dres
+    elseif RT <: Duplicated
+        return Duplicated(res, dres)
+    end
+end
+
+function EnzymeCore.EnzymeRules.forward(func::Const{typeof(LinearSolve.solve!)}, ::Type{RT}, linsolve::EnzymeCore.Annotation{LP}; kwargs...) where {RT, LP <: LinearSolve.LinearCache}
+    @assert !(linsolve isa Const)
+
+    A = deepcopy(linsolve.val.A) #mutates after function is applied
+    res = func.val(linsolve.val; kwargs...)
+    
+    if RT <: Const
+        return res
+    end
+    
+    dres = deepcopy(res)
+    invA = inv(A)
+    db = linsolve.dval.b
+    dA = linsolve.dval.A
+    dres.u .= invA * (db - dA * res.u)
+
+    if RT <: DuplicatedNoNeed
+        return dres
+    elseif RT <: Duplicated
+        return Duplicated(res, dres)
+    end
+
+    return Duplicated(res, dres)
+end
+
 function EnzymeCore.EnzymeRules.augmented_primal(config, func::Const{typeof(LinearSolve.init)}, ::Type{RT}, prob::EnzymeCore.Annotation{LP}, alg::Const; kwargs...) where {RT, LP <: LinearSolve.LinearProblem}
     res = func.val(prob.val, alg.val; kwargs...)
     dres = if EnzymeRules.width(config) == 1

@@ -1,5 +1,6 @@
 using Enzyme, ForwardDiff
 using LinearSolve, LinearAlgebra, Test
+using FiniteDiff
 
 n = 4
 A = rand(n, n);
@@ -162,3 +163,58 @@ Enzyme.autodiff(Reverse, f3, Duplicated(copy(A), dA), Duplicated(copy(b1), db1),
 @test db1 ≈ db12
 @test db2 ≈ db22
 =#
+
+
+A = rand(n, n);
+dA = zeros(n, n);
+b1 = rand(n);
+function fb(b; alg = LUFactorization())
+    prob = LinearProblem(A, b)
+
+    sol1 = solve(prob, alg)
+
+    sum(sol1.u)
+end
+fb(b1)
+
+manual_jac = map(onehot(b1)) do db
+    y = A \ b1
+    sum(inv(A) * (db - dA*y))
+end |> collect
+@show manual_jac
+
+fd_jac = FiniteDiff.finite_difference_jacobian(fb, b1) |> vec
+@show fd_jac
+
+en_jac = map(onehot(b1)) do db1
+    eres = Enzyme.autodiff(Forward, fb, Duplicated(copy(b1), db1))
+    eres[1]
+end |> collect
+@show en_jac
+
+@test_broken en_jac ≈ manual_jac
+@test_broken en_jac ≈ fd_jac
+
+function fA(A; alg = LUFactorization())
+    prob = LinearProblem(A, b1)
+
+    sol1 = solve(prob, alg)
+
+    sum(sol1.u)
+end
+fA(A)
+
+manual_jac = map(onehot(A)) do dA
+    y = A \ b1
+    sum(inv(A) * (db1 - dA*y))
+end |> collect
+
+fd_jac = FiniteDiff.finite_difference_jacobian(fA, A) |> vec
+
+en_jac = map(onehot(A)) do dA
+    eres = Enzyme.autodiff(Forward, fA, Duplicated(copy(A), dA))
+    eres[1]
+end |> collect
+
+@test_broken en_jac ≈ manual_jac
+@test_broken en_jac ≈ fd_jac

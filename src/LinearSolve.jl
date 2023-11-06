@@ -112,6 +112,8 @@ struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm
     alg::DefaultAlgorithmChoice.T
 end
 
+const BLASELTYPES = Union{Float32, Float64, ComplexF32, ComplexF64}
+
 include("common.jl")
 include("factorization.jl")
 include("appleaccelerate.jl")

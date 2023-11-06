@@ -186,7 +186,7 @@ en_jac = map(onehot(b1)) do db1
 end |> collect
 @show en_jac
 
-@test en_jac ≈ fd_jac atol=1e-6
+@test en_jac ≈ fd_jac rtol=1e-6
 
 function fA(A; alg = LUFactorization())
     prob = LinearProblem(A, b1)
@@ -206,4 +206,4 @@ en_jac = map(onehot(A)) do dA
 end |> collect
 @show en_jac
 
-@test en_jac ≈ fd_jac atol=1e-6
+@test en_jac ≈ fd_jac rtol=1e-6

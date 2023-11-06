@@ -33,7 +33,9 @@ function EnzymeCore.EnzymeRules.forward(func::Const{typeof(LinearSolve.solve!)},
     if RT <: Const
         return res
     end
-   
+    if linsolve.alg isa LinearSolve.AbstractKrylovSubspaceMethod
+        error("Algorithm $(_linsolve.alg) is currently not supported by Enzyme rules on LinearSolve.jl. Please open an issue on LinearSolve.jl detailing which algorithm is missing the adjoint handling")
+    end
     b = deepcopy(linsolve.val.b)
 
     db = linsolve.dval.b

@@ -156,7 +156,7 @@ function defaultalg(A, b, assump::OperatorAssumptions)
         # whether MKL or OpenBLAS is being used
         if (A === nothing && !(b isa GPUArraysCore.AbstractGPUArray)) || A isa Matrix
             if (A === nothing ||
-                eltype(A) <: Union{Float32, Float64, ComplexF32, ComplexF64}) &&
+                eltype(A) <: BLASELTYPES) &&
                ArrayInterface.can_setindex(b) &&
                (__conditioning(assump) === OperatorCondition.IllConditioned ||
                 __conditioning(assump) === OperatorCondition.WellConditioned)
@@ -180,7 +180,8 @@ function defaultalg(A, b, assump::OperatorAssumptions)
                 DefaultAlgorithmChoice.QRFactorization
             elseif __conditioning(assump) === OperatorCondition.SuperIllConditioned
                 DefaultAlgorithmChoice.SVDFactorization
-            elseif usemkl
+            elseif usemkl && (A === nothing ? eltype(b) <: BLASELTYPES :
+                        eltype(A) <: BLASELTYPES)
                 DefaultAlgorithmChoice.MKLLUFactorization
             else
                 DefaultAlgorithmChoice.LUFactorization

@@ -85,12 +85,20 @@ end
 function Base.setproperty!(cache::LinearCache, name::Symbol, x)
     if name === :A
         setfield!(cache, :isfresh, true)
+    elseif name === :b
+        # In case there is something that needs to be done when b is updated
+        update_cacheval!(cache, :b, x)
     elseif name === :cacheval && cache.alg isa DefaultLinearSolver
         @assert cache.cacheval isa DefaultLinearSolverInit
         return setfield!(cache.cacheval, Symbol(cache.alg.alg), x)
     end
     setfield!(cache, name, x)
 end
+
+function update_cacheval!(cache::LinearCache, name::Symbol, x)
+    return update_cacheval!(cache, cache.cacheval, name, x)
+end
+update_cacheval!(cache, cacheval, name::Symbol, x) = cacheval
 
 init_cacheval(alg::SciMLLinearSolveAlgorithm, args...) = nothing
 

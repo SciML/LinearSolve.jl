@@ -46,7 +46,7 @@ PrecompileTools.@recompile_invalidations begin
     import Preferences
 end
 
-if VERSION >= v"1.8" && Preferences.@load_preference("TriggerMKLLBT", true)
+if Preferences.@load_preference("TriggerMKLLBT", true)
    using MKL
 end
 

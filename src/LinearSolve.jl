@@ -42,12 +42,15 @@ PrecompileTools.@recompile_invalidations begin
     import Preferences
 end
 
-@static if Preferences.@load_preference("TriggerMKLLBT", true)
-   using MKL_jll
+if Preferences.@load_preference("TriggerMKLLBT", true)
    using MKL
-   const usemkl = MKL_jll.is_available()
+end
+
+if Preferences.@load_preference("LoadMKL_JLL", true)
+    using MKL_jll
+    const usemkl = MKL_jll.is_available()
 else
-   const usemkl = false
+    const usemkl = false
 end
 
 using Reexport

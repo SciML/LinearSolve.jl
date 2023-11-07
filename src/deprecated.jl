@@ -79,13 +79,6 @@ function set_cacheval(cache::LinearCache, alg_cache)
     end
 end
 
-@static if VERSION >= v"1.9" # qualified names only supported in Julia 1.9
-    @deprecate SciMLBase.solve(cache::LinearCache, args...; kwargs...) SciMLBase.solve!(cache::LinearCache,
-        args...;
-        kwargs...) false
-else
-    function SciMLBase.solve(cache::LinearCache, args...; kwargs...)
-        @warn "SciMLBase.solve(cache::LinearCache, args...; kwargs...) is deprecated for SciMLBase.solve!(cache::LinearCache, args...; kwargs...) to follow the CommonSolve.jl interface."
-        SciMLBase.solve!(cache::LinearCache, args...; kwargs...)
-    end
-end
+@deprecate SciMLBase.solve(cache::LinearCache, args...; kwargs...) SciMLBase.solve!(cache::LinearCache,
+    args...;
+    kwargs...) false

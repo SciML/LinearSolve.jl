@@ -97,11 +97,7 @@ function defaultalg(A::GPUArraysCore.AbstractGPUArray, b, assump::OperatorAssump
     if assump.condition === OperatorCondition.IllConditioned || !assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
     else
-        @static if VERSION >= v"1.8-"
-            DefaultLinearSolver(DefaultAlgorithmChoice.LUFactorization)
-        else
-            DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
-        end
+        DefaultLinearSolver(DefaultAlgorithmChoice.LUFactorization)
     end
 end
 
@@ -110,11 +106,7 @@ function defaultalg(A, b::GPUArraysCore.AbstractGPUArray, assump::OperatorAssump
     if assump.condition === OperatorCondition.IllConditioned || !assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
     else
-        @static if VERSION >= v"1.8-"
-            DefaultLinearSolver(DefaultAlgorithmChoice.LUFactorization)
-        else
-            DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
-        end
+        DefaultLinearSolver(DefaultAlgorithmChoice.LUFactorization)
     end
 end
 
@@ -124,11 +116,7 @@ function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.Abstract
     if assump.condition === OperatorCondition.IllConditioned || !assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
     else
-        @static if VERSION >= v"1.8-"
-            DefaultLinearSolver(DefaultAlgorithmChoice.LUFactorization)
-        else
-            DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
-        end
+        DefaultLinearSolver(DefaultAlgorithmChoice.LUFactorization)
     end
 end
 
@@ -162,7 +150,7 @@ function defaultalg(A, b, assump::OperatorAssumptions)
                 __conditioning(assump) === OperatorCondition.WellConditioned)
                 if length(b) <= 10
                     DefaultAlgorithmChoice.GenericLUFactorization
-                elseif VERSION >= v"1.8" && appleaccelerate_isavailable()
+                elseif appleaccelerate_isavailable()
                     DefaultAlgorithmChoice.AppleAccelerateLUFactorization
                 elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500) ||
                        (usemkl && length(b) <= 200)) &&
@@ -327,11 +315,7 @@ function defaultalg_symbol(::Type{T}) where {T}
 end
 defaultalg_symbol(::Type{<:GenericFactorization{typeof(ldlt!)}}) = :LDLtFactorization
 
-@static if VERSION >= v"1.7"
-    defaultalg_symbol(::Type{<:QRFactorization{ColumnNorm}}) = :QRFactorizationPivoted
-else
-    defaultalg_symbol(::Type{<:QRFactorization{Val{true}}}) = :QRFactorizationPivoted
-end
+defaultalg_symbol(::Type{<:QRFactorization{ColumnNorm}}) = :QRFactorizationPivoted
 
 """
 if alg.alg === DefaultAlgorithmChoice.LUFactorization

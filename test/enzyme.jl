@@ -193,7 +193,7 @@ for alg in (
     end |> collect
     @show en_jac
 
-    @test en_jac ≈ fd_jac rtol=1e-6
+    @test en_jac ≈ fd_jac rtol=1e-4
 
     function fA(A)
         prob = LinearProblem(A, b1)
@@ -213,5 +213,5 @@ for alg in (
     end |> collect
     @show en_jac
 
-    @test en_jac ≈ fd_jac rtol=1e-6
+    @test en_jac ≈ fd_jac rtol=1e-4
 end

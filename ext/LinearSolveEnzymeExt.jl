@@ -23,6 +23,7 @@ function EnzymeCore.EnzymeRules.forward(func::Const{typeof(LinearSolve.init)}, :
     elseif RT <: Duplicated
         return Duplicated(res, dres)
     end
+    error("Unsupported return type $RT")
 end
 
 function EnzymeCore.EnzymeRules.forward(func::Const{typeof(LinearSolve.solve!)}, ::Type{RT}, linsolve::EnzymeCore.Annotation{LP}; kwargs...) where {RT, LP <: LinearSolve.LinearCache}

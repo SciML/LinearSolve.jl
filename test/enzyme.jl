@@ -173,8 +173,7 @@ for alg in (
     RFLUFactorization(),
     # KrylovJL_GMRES(), fails
     )
-    alg_str = string(alg)
-    @show alg_str
+    @show alg
     function fb(b)
         prob = LinearProblem(A, b)
 

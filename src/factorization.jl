@@ -33,7 +33,7 @@ Julia's built in `lu`. Equivalent to calling `lu!(A)`
 * On dense matrices, this uses the current BLAS implementation of the user's computer,
 which by default is OpenBLAS but will use MKL if the user does `using MKL` in their
 system.
-* On sparse matrices, this will use UMFPACK from SuiteSparse. Note that this will not
+* On sparse matrices, this will use UMFPACK from SparseArrays. Note that this will not
 cache the symbolic factorization.
 * On CuMatrix, it will use a CUDA-accelerated LU from CuSolver.
 * On BandedMatrix and BlockBandedMatrix, it will use a banded LU.
@@ -139,7 +139,7 @@ Julia's built in `qr`. Equivalent to calling `qr!(A)`.
 * On dense matrices, this uses the current BLAS implementation of the user's computer
 which by default is OpenBLAS but will use MKL if the user does `using MKL` in their
 system.
-* On sparse matrices, this will use SPQR from SuiteSparse
+* On sparse matrices, this will use SPQR from SparseArrays
 * On CuMatrix, it will use a CUDA-accelerated QR from CuSolver.
 * On BandedMatrix and BlockBandedMatrix, it will use a banded QR.
 """
@@ -681,7 +681,7 @@ patterns with “more structure”.
 
 !!! note
 
-    By default, the SuiteSparse.jl are implemented for efficiency by caching the
+    By default, the SparseArrays.jl are implemented for efficiency by caching the
     symbolic factorization. I.e., if `set_A` is used, it is expected that the new
     `A` has the same sparsity pattern as the previous `A`. If this algorithm is to
     be used in a context where that assumption does not hold, set `reuse_symbolic=false`.
@@ -692,11 +692,11 @@ Base.@kwdef struct UMFPACKFactorization <: AbstractFactorization
 end
 
 @static if VERSION < v"1.9.0-DEV.1622"
-    const PREALLOCATED_UMFPACK = SuiteSparse.UMFPACK.UmfpackLU(C_NULL, C_NULL, 0, 0,
+    const PREALLOCATED_UMFPACK = SparseArrays.UMFPACK.UmfpackLU(C_NULL, C_NULL, 0, 0,
         [0], Int[], Float64[], 0)
-    finalizer(SuiteSparse.UMFPACK.umfpack_free_symbolic, PREALLOCATED_UMFPACK)
+    finalizer(SparseArrays.UMFPACK.umfpack_free_symbolic, PREALLOCATED_UMFPACK)
 else
-    const PREALLOCATED_UMFPACK = SuiteSparse.UMFPACK.UmfpackLU(SparseMatrixCSC(0, 0, [1],
+    const PREALLOCATED_UMFPACK = SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC(0, 0, [1],
         Int[],
         Float64[]))
 end
@@ -722,17 +722,17 @@ function init_cacheval(alg::UMFPACKFactorization, A::AbstractSparseArray, b, u, 
     A = convert(AbstractMatrix, A)
     zerobased = SparseArrays.getcolptr(A)[1] == 0
     @static if VERSION < v"1.9.0-DEV.1622"
-        res = SuiteSparse.UMFPACK.UmfpackLU(C_NULL, C_NULL, size(A, 1), size(A, 2),
+        res = SparseArrays.UMFPACK.UmfpackLU(C_NULL, C_NULL, size(A, 1), size(A, 2),
             zerobased ?
             copy(SparseArrays.getcolptr(A)) :
-            SuiteSparse.decrement(SparseArrays.getcolptr(A)),
+            SparseArrays.decrement(SparseArrays.getcolptr(A)),
             zerobased ? copy(rowvals(A)) :
-            SuiteSparse.decrement(rowvals(A)),
+            SparseArrays.decrement(rowvals(A)),
             copy(nonzeros(A)), 0)
-        finalizer(SuiteSparse.UMFPACK.umfpack_free_symbolic, res)
+        finalizer(SparseArrays.UMFPACK.umfpack_free_symbolic, res)
         return res
     else
-        return SuiteSparse.UMFPACK.UmfpackLU(SparseMatrixCSC(size(A)..., getcolptr(A),
+        return SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC(size(A)..., getcolptr(A),
             rowvals(A), nonzeros(A)))
     end
 end
@@ -744,9 +744,9 @@ function SciMLBase.solve!(cache::LinearCache, alg::UMFPACKFactorization; kwargs.
         cacheval = @get_cacheval(cache, :UMFPACKFactorization)
         if alg.reuse_symbolic
             # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
-            if alg.check_pattern && !(SuiteSparse.decrement(SparseArrays.getcolptr(A)) ==
+            if alg.check_pattern && !(SparseArrays.decrement(SparseArrays.getcolptr(A)) ==
                  cacheval.colptr &&
-                 SuiteSparse.decrement(SparseArrays.getrowval(A)) ==
+                 SparseArrays.decrement(SparseArrays.getrowval(A)) ==
                  cacheval.rowval)
                 fact = lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                     nonzeros(A)))
@@ -773,7 +773,7 @@ A fast sparse LU-factorization which specializes on sparsity patterns with “le
 
 !!! note
 
-    By default, the SuiteSparse.jl are implemented for efficiency by caching the
+    By default, the SparseArrays.jl are implemented for efficiency by caching the
     symbolic factorization. I.e., if `set_A` is used, it is expected that the new
     `A` has the same sparsity pattern as the previous `A`. If this algorithm is to
     be used in a context where that assumption does not hold, set `reuse_symbolic=false`.
@@ -816,9 +816,9 @@ function SciMLBase.solve!(cache::LinearCache, alg::KLUFactorization; kwargs...)
     if cache.isfresh
         cacheval = @get_cacheval(cache, :KLUFactorization)
         if cacheval !== nothing && alg.reuse_symbolic
-            if alg.check_pattern && !(SuiteSparse.decrement(SparseArrays.getcolptr(A)) ==
+            if alg.check_pattern && !(SparseArrays.decrement(SparseArrays.getcolptr(A)) ==
                  cacheval.colptr &&
-                 SuiteSparse.decrement(SparseArrays.getrowval(A)) == cacheval.rowval)
+                 SparseArrays.decrement(SparseArrays.getrowval(A)) == cacheval.rowval)
                 fact = KLU.klu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                     nonzeros(A)))
             else
@@ -1378,4 +1378,4 @@ for alg in InteractiveUtils.subtypes(AbstractFactorization)
             maxiters::Int, abstol, reltol, verbose::Bool,
             assumptions::OperatorAssumptions)
     end
-end
+    

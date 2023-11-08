@@ -12,6 +12,8 @@ _ldiv!(x, A, b) = ldiv!(x, A, b)
 
 function _ldiv!(x::Vector, A::Factorization, b::Vector)
     # workaround https://github.com/JuliaLang/julia/issues/43507
+    # Fallback if working with non-square matrices
+    length(x) != length(b) && return ldiv!(x, A, b)
     copyto!(x, b)
     ldiv!(A, x)
 end

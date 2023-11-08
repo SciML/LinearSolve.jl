@@ -18,7 +18,6 @@ PrecompileTools.@recompile_invalidations begin
     using SciMLOperators: AbstractSciMLOperator, IdentityOperator
     using Setfield
     using UnPack
-    using SuiteSparse
     using KLU
     using Sparspak
     using FastLapackInterface

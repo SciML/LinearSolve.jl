@@ -2,14 +2,14 @@
 # Missing ldiv! definitions: https://github.com/JuliaSparse/SparseArrays.jl/issues/242
 function _ldiv!(x::Vector,
     A::Union{SparseArrays.QR, LinearAlgebra.QRCompactWY,
-        SuiteSparse.SPQR.QRSparse,
-        SuiteSparse.CHOLMOD.Factor}, b::Vector)
+        SparseArrays.SPQR.QRSparse,
+        SparseArrays.CHOLMOD.Factor}, b::Vector)
     x .= A \ b
 end
 
 function _ldiv!(x::AbstractVector,
     A::Union{SparseArrays.QR, LinearAlgebra.QRCompactWY,
-        SuiteSparse.SPQR.QRSparse,
-        SuiteSparse.CHOLMOD.Factor}, b::AbstractVector)
+        SparseArrays.SPQR.QRSparse,
+        SparseArrays.CHOLMOD.Factor}, b::AbstractVector)
     x .= A \ b
 end

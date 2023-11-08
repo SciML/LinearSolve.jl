@@ -38,11 +38,7 @@ PrecompileTools.@recompile_invalidations begin
 
     # wrap
     import Krylov
-
     using SciMLBase
-
-    using MKL_jll
-
     import Preferences
 end
 
@@ -50,11 +46,16 @@ if Preferences.@load_preference("TriggerMKLLBT", true)
    using MKL
 end
 
+if Preferences.@load_preference("LoadMKL_JLL", true)
+    using MKL_jll
+    const usemkl = MKL_jll.is_available()
+else
+    const usemkl = false
+end
+
 using Reexport
 @reexport using SciMLBase
 using SciMLBase: _unwrap_val
-
-const usemkl = MKL_jll.is_available()
 
 abstract type SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
 abstract type AbstractFactorization <: SciMLLinearSolveAlgorithm end

@@ -41,10 +41,6 @@ PrecompileTools.@recompile_invalidations begin
     import Preferences
 end
 
-if Preferences.@load_preference("TriggerMKLLBT", true)
-   using MKL
-end
-
 if Preferences.@load_preference("LoadMKL_JLL", true)
     using MKL_jll
     const usemkl = MKL_jll.is_available()

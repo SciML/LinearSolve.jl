@@ -10,7 +10,7 @@ using LinearAlgebra.LAPACK: require_one_based_indexing, chkfinite, chkstride1,
                             @blasfunc, chkargsok
 using LinearSolve: ArrayInterface, BLISLUFactorization, @get_cacheval, LinearCache, SciMLBase
 
-const global libblis = dlopen(blis_jll.blis_path)
+const global libblis = blis_jll.blis
 
 function getrf!(A::AbstractMatrix{<:ComplexF64};
     ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),

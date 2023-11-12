@@ -1,4 +1,4 @@
-using BandedMatrices, LinearAlgebra, LinearSolve, Test
+using FastAlmostBandedMatrices, BandedMatrices, LinearAlgebra, LinearSolve, Test
 
 # Square Case
 n = 8
@@ -16,6 +16,12 @@ sol1 = solve(LinearProblem(A1, b1; u0 = x1))
 sol2 = solve(LinearProblem(A2, b2; u0 = x2))
 @test sol2.u ≈ A2 \ b2
 
+A = AlmostBandedMatrix(BandedMatrix(fill(2.0, n, n), (1, 1)), fill(3.0, 2, n))
+A[band(0)] .+= 1:n
+
+sol1ab = solve(LinearProblem(A, b; u0 = x1))
+@test sol1ab.u ≈ Matrix(A) \ b
+
 # Square Symmetric
 A1s = Symmetric(A1)
 A2s = Symmetric(A2)
@@ -31,8 +37,18 @@ b = rand(8)
 
 @test_throws ErrorException solve(LinearProblem(A, b)).u
 
+A = AlmostBandedMatrix(BandedMatrix(fill(2.0, n - 2, n), (1, 1)), fill(3.0, 2, n))
+A[band(0)] .+= 1:(n - 2)
+
+@test_throws ErrorException solve(LinearProblem(A, b)).u
+
 # Overdetermined
 A = BandedMatrix(ones(10, 8), (2, 0))
 b = rand(10)
+
+@test_nowarn solve(LinearProblem(A, b))
+
+A = AlmostBandedMatrix(BandedMatrix(fill(2.0, n + 2, n), (1, 1)), fill(3.0, 2, n))
+A[band(0)] .+= 1:n
 
 @test_nowarn solve(LinearProblem(A, b))

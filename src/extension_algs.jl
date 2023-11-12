@@ -326,3 +326,5 @@ A wrapper over Apple's Metal GPU library. Direct calls to Metal in a way that pr
 to avoid allocations and automatically offloads to the GPU.
 """
 struct MetalLUFactorization <: AbstractFactorization end
+
+struct BLISLUFactorization <: AbstractFactorization end

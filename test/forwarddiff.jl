@@ -10,12 +10,12 @@ n = 4
 A = rand(n, n);
 dA = zeros(n, n);
 b1 = rand(n);
-alg = LUFactorization()
-# for alg in (
-#         LUFactorization(), 
-#         # RFLUFactorization(),
-#         # KrylovJL_GMRES(),
-#     )
+# alg = LUFactorization()
+for alg in (
+        LUFactorization(), 
+        RFLUFactorization(),
+        KrylovJL_GMRES(),
+    )
     alg_str = string(alg)
     @show alg_str
     function fb(b)
@@ -51,19 +51,45 @@ alg = LUFactorization()
         sum(sol1.u)
     end
     fA(A)
-    db = zero(b1)
-    manual_jac = map(onehot(A)) do dA
-        y = A \ b1
-        sum(inv(A) * (db - dA*y))
-    end |> collect
-    display(reduce(hcat, manual_jac))
+    # db = zero(b1)
+    # manual_jac = map(onehot(A)) do dA
+    #     y = A \ b1
+    #     t = inv(A) * (db - dA*y)
+    # end |> collect
+    # display(reduce(hcat, manual_jac))
 
     fid_jac = FiniteDiff.finite_difference_jacobian(fA, A) |> vec
     @show fid_jac
 
-    # @test_throws MethodError fod_jac = ForwardDiff.gradient(fA, A) |> vec 
     fod_jac = ForwardDiff.gradient(fA, A) |> vec 
     @show fod_jac
 
     @test fod_jac ≈ fid_jac rtol=1e-6
-# end
+
+
+    # function fAb(Ab)
+    #     A = Ab[:, 1:n]
+    #     b1 = Ab[:, n+1]
+    #     prob = LinearProblem(A, b1)
+
+    #     sol1 = solve(prob, alg)
+
+    #     sum(sol1.u)
+    # end
+    # fAb(hcat(A, b1))
+    # # db = zero(b1)
+    # # manual_jac = map(onehot(A)) do dA
+    # #     y = A \ b1
+    # #     t = inv(A) * (db - dA*y)
+    # # end |> collect
+    # # display(reduce(hcat, manual_jac))
+
+    # fid_jac = FiniteDiff.finite_difference_jacobian(fAb, hcat(A, b1)) |> vec
+    # @show fid_jac
+
+    # fod_jac = ForwardDiff.gradient(fAb, hcat(A, b1)) |> vec 
+    # @show fod_jac
+
+    # @test fod_jac ≈ fid_jac rtol=1e-6
+
+end

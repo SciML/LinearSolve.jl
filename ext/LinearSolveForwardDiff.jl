@@ -14,10 +14,7 @@ function _solve!(cache, alg, dAs, dbs, A, b, T; kwargs...)
     reltol = cache.reltol isa Dual ? ForwardDiff.value(cache.reltol) : cache.reltol
     abstol = cache.abstol isa Dual ? ForwardDiff.value(cache.abstol) : cache.abstol
     u = eltype(cache.u) <: Dual ? ForwardDiff.value.(cache.u) : cache.u
-    @show typeof(cache.cacheval)
-    @show cache.cacheval isa Tuple
     cacheval = cache.cacheval isa Tuple ? cache.cacheval[1] : cache.cacheval
-    @show typeof(cacheval)
     cacheval = eltype(cacheval.factors) <: Dual ? begin 
         LinearSolve.LinearAlgebra.LU(ForwardDiff.value.(cacheval.factors), cacheval.ipiv, cacheval.info)
     end : cacheval

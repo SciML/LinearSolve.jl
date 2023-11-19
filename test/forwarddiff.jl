@@ -67,29 +67,29 @@ for alg in (
     @test fod_jac ≈ fid_jac rtol=1e-6
 
 
-    # function fAb(Ab)
-    #     A = Ab[:, 1:n]
-    #     b1 = Ab[:, n+1]
-    #     prob = LinearProblem(A, b1)
+    function fAb(Ab)
+        A = Ab[:, 1:n]
+        b1 = Ab[:, n+1]
+        prob = LinearProblem(A, b1)
 
-    #     sol1 = solve(prob, alg)
+        sol1 = solve(prob, alg)
 
-    #     sum(sol1.u)
-    # end
-    # fAb(hcat(A, b1))
-    # # db = zero(b1)
-    # # manual_jac = map(onehot(A)) do dA
-    # #     y = A \ b1
-    # #     t = inv(A) * (db - dA*y)
-    # # end |> collect
-    # # display(reduce(hcat, manual_jac))
+        sum(sol1.u)
+    end
+    fAb(hcat(A, b1))
+    # db = zero(b1)
+    # manual_jac = map(onehot(A)) do dA
+    #     y = A \ b1
+    #     t = inv(A) * (db - dA*y)
+    # end |> collect
+    # display(reduce(hcat, manual_jac))
 
-    # fid_jac = FiniteDiff.finite_difference_jacobian(fAb, hcat(A, b1)) |> vec
-    # @show fid_jac
+    fid_jac = FiniteDiff.finite_difference_jacobian(fAb, hcat(A, b1)) |> vec
+    @show fid_jac
 
-    # fod_jac = ForwardDiff.gradient(fAb, hcat(A, b1)) |> vec 
-    # @show fod_jac
+    fod_jac = ForwardDiff.gradient(fAb, hcat(A, b1)) |> vec 
+    @show fod_jac
 
-    # @test fod_jac ≈ fid_jac rtol=1e-6
+    @test fod_jac ≈ fid_jac rtol=1e-6
 
 end

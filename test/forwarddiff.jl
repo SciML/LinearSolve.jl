@@ -14,7 +14,7 @@ b1 = rand(n);
 for alg in (
         LUFactorization(), 
         RFLUFactorization(),
-        # KrylovJL_GMRES(),
+        # KrylovJL_GMRES(), dispatch fails
     )
     alg_str = string(alg)
     @show alg_str
@@ -30,14 +30,6 @@ for alg in (
     fid_jac = FiniteDiff.finite_difference_jacobian(fb, b1) |> vec
     @show fid_jac
 
-    # manual_jac = map(onehot(b1)) do db
-    #     y = A \ b1
-    #     inv(A) * (db - dA*y)
-    # end |> collect
-    # display(manual_jac)
-    # @show sum(manual_jac)
-    # @show sum.(manual_jac)
-
     fod_jac = ForwardDiff.gradient(fb, b1) |> vec
     @show fod_jac
 
@@ -51,12 +43,6 @@ for alg in (
         sum(sol1.u)
     end
     fA(A)
-    # db = zero(b1)
-    # manual_jac = map(onehot(A)) do dA
-    #     y = A \ b1
-    #     t = inv(A) * (db - dA*y)
-    # end |> collect
-    # display(reduce(hcat, manual_jac))
 
     fid_jac = FiniteDiff.finite_difference_jacobian(fA, A) |> vec
     @show fid_jac
@@ -77,12 +63,6 @@ for alg in (
         sum(sol1.u)
     end
     fAb(hcat(A, b1))
-    # db = zero(b1)
-    # manual_jac = map(onehot(A)) do dA
-    #     y = A \ b1
-    #     t = inv(A) * (db - dA*y)
-    # end |> collect
-    # display(reduce(hcat, manual_jac))
 
     fid_jac = FiniteDiff.finite_difference_jacobian(fAb, hcat(A, b1)) |> vec
     @show fid_jac

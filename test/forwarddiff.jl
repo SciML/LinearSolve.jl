@@ -10,7 +10,6 @@ n = 4
 A = rand(n, n);
 dA = zeros(n, n);
 b1 = rand(n);
-# alg = LUFactorization()
 for alg in (
         LUFactorization(), 
         RFLUFactorization(),

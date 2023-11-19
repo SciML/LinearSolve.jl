@@ -39,7 +39,7 @@ for ALG in subtypes(LinearSolve, LinearSolve.AbstractFactorization)
                     alg::$ALG,
                     kwargs...
                 ) where {T, V, P, B}
-            @info "using solve! df/dA"
+            # @info "using solve! df/dA"
             dAs = begin
                 t = collect.(ForwardDiff.partials.(cache.A))
                 [getindex.(t, i) for i in 1:P]
@@ -54,7 +54,7 @@ for ALG in subtypes(LinearSolve, LinearSolve.AbstractFactorization)
                     alg::$ALG; 
                     kwargs...
                 ) where {T, V, P, A_}
-            @info "using solve! df/db"
+            # @info "using solve! df/db"
             dAs = [zero(cache.A) for _=1:P]
             dbs = begin
                 t = collect.(ForwardDiff.partials.(cache.b))
@@ -69,7 +69,7 @@ for ALG in subtypes(LinearSolve, LinearSolve.AbstractFactorization)
                     alg::$ALG; 
                     kwargs...
                 ) where {T, V, P}
-            @info "using solve! df/dAb"
+            # @info "using solve! df/dAb"
             dAs = begin
                 t = collect.(ForwardDiff.partials.(cache.A))
                 [getindex.(t, i) for i in 1:P]

@@ -43,17 +43,17 @@ function test_interface(alg, prob1, prob2)
     sol = solve(prob2, alg; cache_kwargs...)
     @test A2 * sol.u ≈ b2
 
-    # Test cache resue: base mechanism
+    # Test cache reuse: base mechanism
     cache = SciMLBase.init(prob1, alg; cache_kwargs...) # initialize cache
     sol = solve!(cache)
     @test A1 * sol.u ≈ b1
 
-    # Test cache resue: only A changes
+    # Test cache reuse: only A changes
     cache.A = deepcopy(A2)
     sol = solve!(cache; cache_kwargs...)
     @test A2 * sol.u ≈ b1
 
-    # Test cache resue: both A and b change
+    # Test cache reuse: both A and b change
     cache.A = deepcopy(A2)
     cache.b = b2
     sol = solve!(cache; cache_kwargs...)

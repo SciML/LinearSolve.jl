@@ -109,7 +109,7 @@ NormalBunchKaufmanFactorization
 
 ### LinearSolve.jl
 
-LinearSolve.jl contains some linear solvers built in for specailized cases.
+LinearSolve.jl contains some linear solvers built in for specialized cases.
 
 ```@docs
 SimpleLUFactorization

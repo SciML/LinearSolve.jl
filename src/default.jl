@@ -175,6 +175,10 @@ function defaultalg(A, b, assump::OperatorAssumptions)
                 DefaultAlgorithmChoice.LUFactorization
             end
 
+            # For static arrays GMRES allocates a lot. Use factorization
+        elseif A isa StaticArray
+            DefaultAlgorithmChoice.LUFactorization
+
             # This catches the cases where a factorization overload could exist
             # For example, BlockBandedMatrix
         elseif A !== nothing && ArrayInterface.isstructured(A)
@@ -186,6 +190,9 @@ function defaultalg(A, b, assump::OperatorAssumptions)
         end
     elseif assump.condition === OperatorCondition.WellConditioned
         DefaultAlgorithmChoice.NormalCholeskyFactorization
+    elseif A isa StaticArray
+        # Static Array doesn't have QR() \ b defined
+        return DefaultAlgorithmChoice.SVDFactorization
     elseif assump.condition === OperatorCondition.IllConditioned
         if is_underdetermined(A)
             # Underdetermined

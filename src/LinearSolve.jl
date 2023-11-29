@@ -26,6 +26,8 @@ PrecompileTools.@recompile_invalidations begin
     using Requires
     import InteractiveUtils
 
+    import StaticArraysCore: StaticArray, SVector, MVector, SMatrix, MMatrix
+
     using LinearAlgebra: BlasInt, LU
     using LinearAlgebra.LAPACK: require_one_based_indexing,
         chkfinite, chkstride1,

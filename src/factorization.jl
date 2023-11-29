@@ -10,6 +10,9 @@ end
 
 _ldiv!(x, A, b) = ldiv!(x, A, b)
 
+_ldiv!(x::MVector, A, b::SVector) = (x .= A \ b)
+_ldiv!(::SVector, A, b::SVector) = (A \ b)
+
 function _ldiv!(x::Vector, A::Factorization, b::Vector)
     # workaround https://github.com/JuliaLang/julia/issues/43507
     # Fallback if working with non-square matrices
@@ -88,6 +91,8 @@ function do_factorization(alg::LUFactorization, A, b, u)
     if A isa AbstractSparseMatrixCSC
         return lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
             check = false)
+    elseif !ArrayInterface.can_setindex(typeof(A))
+        fact = lu(A, alg.pivot, check = false)
     else
         fact = lu!(A, alg.pivot, check = false)
     end
@@ -172,10 +177,14 @@ end
 
 function do_factorization(alg::QRFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
-    if alg.inplace && !(A isa SparseMatrixCSC) && !(A isa GPUArraysCore.AbstractGPUArray)
-        fact = qr!(A, alg.pivot)
+    if ArrayInterface.can_setindex(typeof(A))
+        if alg.inplace && !(A isa SparseMatrixCSC) && !(A isa GPUArraysCore.AbstractGPUArray)
+            fact = qr!(A, alg.pivot)
+        else
+            fact = qr(A) # CUDA.jl does not allow other args!
+        end
     else
-        fact = qr(A) # CUDA.jl does not allow other args!
+        fact = qr(A, alg.pivot)
     end
     return fact
 end
@@ -372,11 +381,15 @@ SVDFactorization() = SVDFactorization(false, LinearAlgebra.DivideAndConquer())
 
 function do_factorization(alg::SVDFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
-    fact = svd!(A; full = alg.full, alg = alg.alg)
+    if ArrayInterface.can_setindex(typeof(A))
+        fact = svd!(A; alg.full, alg.alg)
+    else
+        fact = svd(A; alg.full)
+    end
     return fact
 end
 
-function init_cacheval(alg::SVDFactorization, A::Matrix, b, u, Pl, Pr,
+function init_cacheval(alg::SVDFactorization, A::Union{Matrix, SMatrix}, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
     ArrayInterface.svd_instance(convert(AbstractMatrix, A))
@@ -1352,6 +1365,11 @@ function init_cacheval(::SparspakFactorization, A, b, u, Pl, Pr, maxiters::Int, 
         return sparspaklu(SparseMatrixCSC(0, 0, [1], Int[], eltype(A)[]),
             factorize = false)
     end
+end
+
+function init_cacheval(::SparspakFactorization, ::StaticArray, b, u, Pl, Pr,
+    maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::SparspakFactorization; kwargs...)

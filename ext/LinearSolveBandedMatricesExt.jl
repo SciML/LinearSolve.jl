@@ -5,7 +5,7 @@ import LinearSolve: defaultalg,
     do_factorization, init_cacheval, DefaultLinearSolver, DefaultAlgorithmChoice
 
 # Defaults for BandedMatrices
-function defaultalg(A::BandedMatrix, b, oa::OperatorAssumptions)
+function defaultalg(A::BandedMatrix, b, oa::OperatorAssumptions{Bool})
     if oa.issq
         return DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
     elseif LinearSolve.is_underdetermined(A)
@@ -15,7 +15,7 @@ function defaultalg(A::BandedMatrix, b, oa::OperatorAssumptions)
     end
 end
 
-function defaultalg(A::Symmetric{<:Number, <:BandedMatrix}, b, ::OperatorAssumptions)
+function defaultalg(A::Symmetric{<:Number, <:BandedMatrix}, b, ::OperatorAssumptions{Bool})
     return DefaultLinearSolver(DefaultAlgorithmChoice.CholeskyFactorization)
 end
 

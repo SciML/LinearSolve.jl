@@ -7,6 +7,7 @@ const GROUP = get(ENV, "GROUP", "All")
 const HAS_EXTENSIONS = isdefined(Base, :get_extension)
 
 if GROUP == "All" || GROUP == "Core"
+    @time @safetestset "Quality Assurance" include("qa.jl")
     @time @safetestset "Basic Tests" include("basictests.jl")
     VERSION >= v"1.9" && @time @safetestset "Re-solve" include("resolve.jl")
     @time @safetestset "Zero Initialization Tests" include("zeroinittests.jl")

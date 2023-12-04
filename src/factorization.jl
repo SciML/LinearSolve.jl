@@ -10,7 +10,7 @@ end
 
 _ldiv!(x, A, b) = ldiv!(x, A, b)
 
-_ldiv!(x::MVector, A, b::SVector) = (x .= A \ b)
+_ldiv!(x, A, b::SVector) = (x .= A \ b)
 _ldiv!(::SVector, A, b::SVector) = (A \ b)
 
 function _ldiv!(x::Vector, A::Factorization, b::Vector)
@@ -283,6 +283,12 @@ else
         end
         return fact
     end
+end
+
+function init_cacheval(alg::CholeskyFactorization, A::SMatrix, b, u, Pl, Pr,
+    maxiters::Int, abstol, reltol, verbose::Bool,
+    assumptions::OperatorAssumptions)
+    cholesky(A)  # StaticArrays doesn't have the pivot argument. Prevent generic fallback.
 end
 
 function init_cacheval(alg::CholeskyFactorization, A, b, u, Pl, Pr,

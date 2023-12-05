@@ -12,6 +12,7 @@ _ldiv!(x, A, b) = ldiv!(x, A, b)
 
 _ldiv!(x, A, b::SVector) = (x .= A \ b)
 _ldiv!(::SVector, A, b::SVector) = (A \ b)
+_ldiv!(::SVector, A, b) = (A \ b)
 
 function _ldiv!(x::Vector, A::Factorization, b::Vector)
     # workaround https://github.com/JuliaLang/julia/issues/43507
@@ -288,7 +289,7 @@ end
 function init_cacheval(alg::CholeskyFactorization, A::SMatrix, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
-    cholesky(A)  # StaticArrays doesn't have the pivot argument. Prevent generic fallback.
+    cholesky(SMatrix{1, 1}(one(eltype(A))))  # StaticArrays doesn't have the pivot argument. Prevent generic fallback.
 end
 
 function init_cacheval(alg::CholeskyFactorization, A, b, u, Pl, Pr,
@@ -1060,7 +1061,8 @@ end
 function init_cacheval(alg::NormalCholeskyFactorization, A, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
-    ArrayInterface.cholesky_instance(convert(AbstractMatrix, A), alg.pivot)
+    A_ = convert(AbstractMatrix, A)
+    ArrayInterface.cholesky_instance(Symmetric((A)' * A, :L), alg.pivot)
 end
 
 function init_cacheval(alg::NormalCholeskyFactorization,

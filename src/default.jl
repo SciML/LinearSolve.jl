@@ -192,7 +192,7 @@ function defaultalg(A, b, assump::OperatorAssumptions)
         DefaultAlgorithmChoice.NormalCholeskyFactorization
     elseif A isa StaticArray
         # Static Array doesn't have QR() \ b defined
-        return DefaultAlgorithmChoice.SVDFactorization
+        DefaultAlgorithmChoice.SVDFactorization
     elseif assump.condition === OperatorCondition.IllConditioned
         if is_underdetermined(A)
             # Underdetermined

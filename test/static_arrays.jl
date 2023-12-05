@@ -6,7 +6,6 @@ b = SVector{5}(rand(5))
 for alg in (nothing, LUFactorization(), SVDFactorization(), CholeskyFactorization(),
     KrylovJL_GMRES())
     sol = solve(LinearProblem(A, b), alg)
-    @show norm(A * sol .- b)
     @test norm(A * sol .- b) < 1e-10
 end
 

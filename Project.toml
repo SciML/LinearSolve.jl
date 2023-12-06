@@ -1,7 +1,7 @@
 name = "LinearSolve"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 authors = ["SciML"]
-version = "2.20.0"
+version = "2.20.1"
 
 [deps]
 ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
@@ -26,6 +26,7 @@ SciMLOperators = "c0aeaf25-5076-4817-a8d5-81caf7dfa961"
 Setfield = "efcf1570-3423-57d1-acb7-fd33fddbac46"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Sparspak = "e56a9233-b9d6-4f03-8d0f-1825330902ac"
+StaticArraysCore = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 
 [weakdeps]
@@ -48,6 +49,7 @@ LinearSolveBandedMatricesExt = "BandedMatrices"
 LinearSolveBlockDiagonalsExt = "BlockDiagonals"
 LinearSolveCUDAExt = "CUDA"
 LinearSolveEnzymeExt = ["Enzyme", "EnzymeCore"]
+LinearSolveFastAlmostBandedMatricesExt = ["FastAlmostBandedMatrices"]
 LinearSolveHYPREExt = "HYPRE"
 LinearSolveIterativeSolversExt = "IterativeSolvers"
 LinearSolveKernelAbstractionsExt = "KernelAbstractions"
@@ -55,7 +57,6 @@ LinearSolveKrylovKitExt = "KrylovKit"
 LinearSolveMetalExt = "Metal"
 LinearSolvePardisoExt = "Pardiso"
 LinearSolveRecursiveArrayToolsExt = "RecursiveArrayTools"
-LinearSolveFastAlmostBandedMatricesExt = ["FastAlmostBandedMatrices"]
 
 [compat]
 Aqua = "0.8"
@@ -101,6 +102,8 @@ SciMLOperators = "0.3"
 Setfield = "1"
 SparseArrays = "1.9"
 Sparspak = "0.3.6"
+StaticArraysCore = "1"
+StaticArrays = "1"
 Test = "1"
 UnPack = "1"
 julia = "1.9"
@@ -126,7 +129,8 @@ Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 RecursiveArrayTools = "731186ca-8d62-57ce-b412-fbd966d074cd"
 SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Aqua", "Test", "IterativeSolvers", "InteractiveUtils", "JET", "KrylovKit", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI", "BlockDiagonals", "Enzyme", "FiniteDiff", "BandedMatrices", "FastAlmostBandedMatrices"]
+test = ["Aqua", "Test", "IterativeSolvers", "InteractiveUtils", "JET", "KrylovKit", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI", "BlockDiagonals", "Enzyme", "FiniteDiff", "BandedMatrices", "FastAlmostBandedMatrices", "StaticArrays"]

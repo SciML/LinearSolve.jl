@@ -10,6 +10,10 @@ end
 
 _ldiv!(x, A, b) = ldiv!(x, A, b)
 
+_ldiv!(x, A, b::SVector) = (x .= A \ b)
+_ldiv!(::SVector, A, b::SVector) = (A \ b)
+_ldiv!(::SVector, A, b) = (A \ b)
+
 function _ldiv!(x::Vector, A::Factorization, b::Vector)
     # workaround https://github.com/JuliaLang/julia/issues/43507
     # Fallback if working with non-square matrices
@@ -74,6 +78,8 @@ function do_factorization(alg::LUFactorization, A, b, u)
     if A isa AbstractSparseMatrixCSC
         return lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
             check = false)
+    elseif !ArrayInterface.can_setindex(typeof(A))
+        fact = lu(A, alg.pivot, check = false)
     else
         fact = lu!(A, alg.pivot, check = false)
     end
@@ -136,10 +142,14 @@ end
 
 function do_factorization(alg::QRFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
-    if alg.inplace && !(A isa SparseMatrixCSC) && !(A isa GPUArraysCore.AbstractGPUArray)
-        fact = qr!(A, alg.pivot)
+    if ArrayInterface.can_setindex(typeof(A))
+        if alg.inplace && !(A isa SparseMatrixCSC) && !(A isa GPUArraysCore.AbstractGPUArray)
+            fact = qr!(A, alg.pivot)
+        else
+            fact = qr(A) # CUDA.jl does not allow other args!
+        end
     else
-        fact = qr(A) # CUDA.jl does not allow other args!
+        fact = qr(A, alg.pivot)
     end
     return fact
 end
@@ -200,6 +210,16 @@ function do_factorization(alg::CholeskyFactorization, A, b, u)
         fact = cholesky!(A, alg.pivot; tol = alg.tol, check = false)
     end
     return fact
+end
+
+function init_cacheval(alg::CholeskyFactorization, A::SMatrix{S1, S2}, b, u, Pl, Pr,
+    maxiters::Int, abstol, reltol, verbose::Bool,
+    assumptions::OperatorAssumptions) where {S1, S2}
+    # StaticArrays doesn't have the pivot argument. Prevent generic fallback.
+    # CholeskyFactorization is part of DefaultLinearSolver, so it is possible that `A` is
+    # not Hermitian.
+    (!issquare(A) || !ishermitian(A)) && return nothing
+    cholesky(A)
 end
 
 function init_cacheval(alg::CholeskyFactorization, A, b, u, Pl, Pr,
@@ -276,11 +296,15 @@ SVDFactorization() = SVDFactorization(false, LinearAlgebra.DivideAndConquer())
 
 function do_factorization(alg::SVDFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
-    fact = svd!(A; full = alg.full, alg = alg.alg)
+    if ArrayInterface.can_setindex(typeof(A))
+        fact = svd!(A; alg.full, alg.alg)
+    else
+        fact = svd(A; alg.full)
+    end
     return fact
 end
 
-function init_cacheval(alg::SVDFactorization, A::Matrix, b, u, Pl, Pr,
+function init_cacheval(alg::SVDFactorization, A::Union{Matrix, SMatrix}, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
     ArrayInterface.svd_instance(convert(AbstractMatrix, A))
@@ -882,7 +906,8 @@ end
 function init_cacheval(alg::NormalCholeskyFactorization, A, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
-    ArrayInterface.cholesky_instance(convert(AbstractMatrix, A), alg.pivot)
+    A_ = convert(AbstractMatrix, A)
+    ArrayInterface.cholesky_instance(Symmetric((A)' * A, :L), alg.pivot)
 end
 
 function init_cacheval(alg::NormalCholeskyFactorization,
@@ -1126,6 +1151,11 @@ function init_cacheval(::SparspakFactorization, A, b, u, Pl, Pr, maxiters::Int, 
         return sparspaklu(SparseMatrixCSC(0, 0, [1], Int[], eltype(A)[]),
             factorize = false)
     end
+end
+
+function init_cacheval(::SparspakFactorization, ::StaticArray, b, u, Pl, Pr,
+    maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::SparspakFactorization; kwargs...)

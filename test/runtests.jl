@@ -17,6 +17,7 @@ if GROUP == "All" || GROUP == "Core"
     @time @safetestset "Enzyme Derivative Rules" include("enzyme.jl")
     @time @safetestset "Traits" include("traits.jl")
     @time @safetestset "BandedMatrices" include("banded.jl")
+    @time @safetestset "Static Arrays" include("static_arrays.jl")
 end
 
 if GROUP == "LinearSolveCUDA"

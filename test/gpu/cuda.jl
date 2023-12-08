@@ -44,8 +44,8 @@ function test_interface(alg, prob1, prob2)
     return
 end
 
-@testset "CudaOffloadFactorization" begin
-    test_interface(CudaOffloadFactorization(), prob1, prob2)
+@testset "$alg" for alg in (CudaOffloadFactorization(), NormalCholeskyFactorization())
+    test_interface(alg, prob1, prob2)
 end
 
 @testset "Simple GMRES: restart = $restart" for restart in (true, false)

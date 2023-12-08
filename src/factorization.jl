@@ -896,7 +896,7 @@ default_alias_b(::NormalCholeskyFactorization, ::Any, ::Any) = true
 const PREALLOCATED_NORMALCHOLESKY = ArrayInterface.cholesky_instance(rand(1, 1), NoPivot())
 
 function init_cacheval(alg::NormalCholeskyFactorization,
-    A::Union{AbstractSparseArray,
+    A::Union{AbstractSparseArray, GPUArraysCore.AbstractGPUArray,
         Symmetric{<:Number, <:AbstractSparseArray}}, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
@@ -921,7 +921,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization; 
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
-        if A isa SparseMatrixCSC
+        if A isa SparseMatrixCSC || A isa GPUArraysCore.AbstractGPUArray
             fact = cholesky(Symmetric((A)' * A, :L); check = false)
         else
             fact = cholesky(Symmetric((A)' * A, :L), alg.pivot; check = false)

@@ -4,7 +4,7 @@ using FastAlmostBandedMatrices, LinearAlgebra, LinearSolve
 import LinearSolve: defaultalg,
     do_factorization, init_cacheval, DefaultLinearSolver, DefaultAlgorithmChoice
 
-function defaultalg(A::AlmostBandedMatrix, b, oa::OperatorAssumptions)
+function defaultalg(A::AlmostBandedMatrix, b, oa::OperatorAssumptions{Bool})
     if oa.issq
         return DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
     else

@@ -27,7 +27,7 @@ end
 defaultalg(A, b) = defaultalg(A, b, OperatorAssumptions(true))
 
 function defaultalg(A::Union{DiffEqArrayOperator, MatrixOperator}, b,
-    assump::OperatorAssumptions)
+    assump::OperatorAssumptions{Bool})
     defaultalg(A.A, b, assump)
 end
 
@@ -36,7 +36,7 @@ function defaultalg(A, b, assump::OperatorAssumptions{Nothing})
     defaultalg(A, b, OperatorAssumptions(issq, assump.condition))
 end
 
-function defaultalg(A::Tridiagonal, b, assump::OperatorAssumptions)
+function defaultalg(A::Tridiagonal, b, assump::OperatorAssumptions{Bool})
     if assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.LUFactorization)
     else
@@ -44,33 +44,33 @@ function defaultalg(A::Tridiagonal, b, assump::OperatorAssumptions)
     end
 end
 
-function defaultalg(A::SymTridiagonal, b, ::OperatorAssumptions)
+function defaultalg(A::SymTridiagonal, b, ::OperatorAssumptions{Bool})
     DefaultLinearSolver(DefaultAlgorithmChoice.LDLtFactorization)
 end
-function defaultalg(A::Bidiagonal, b, ::OperatorAssumptions)
+function defaultalg(A::Bidiagonal, b, ::OperatorAssumptions{Bool})
     DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
 end
-function defaultalg(A::Factorization, b, ::OperatorAssumptions)
+function defaultalg(A::Factorization, b, ::OperatorAssumptions{Bool})
     DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
 end
-function defaultalg(A::Diagonal, b, ::OperatorAssumptions)
+function defaultalg(A::Diagonal, b, ::OperatorAssumptions{Bool})
     DefaultLinearSolver(DefaultAlgorithmChoice.DiagonalFactorization)
 end
 
-function defaultalg(A::Hermitian, b, ::OperatorAssumptions)
+function defaultalg(A::Hermitian, b, ::OperatorAssumptions{Bool})
     DefaultLinearSolver(DefaultAlgorithmChoice.CholeskyFactorization)
 end
 
-function defaultalg(A::Symmetric{<:Number, <:Array}, b, ::OperatorAssumptions)
+function defaultalg(A::Symmetric{<:Number, <:Array}, b, ::OperatorAssumptions{Bool})
     DefaultLinearSolver(DefaultAlgorithmChoice.BunchKaufmanFactorization)
 end
 
-function defaultalg(A::Symmetric{<:Number, <:SparseMatrixCSC}, b, ::OperatorAssumptions)
+function defaultalg(A::Symmetric{<:Number, <:SparseMatrixCSC}, b, ::OperatorAssumptions{Bool})
     DefaultLinearSolver(DefaultAlgorithmChoice.CHOLMODFactorization)
 end
 
 function defaultalg(A::AbstractSparseMatrixCSC{Tv, Ti}, b,
-    assump::OperatorAssumptions) where {Tv, Ti}
+    assump::OperatorAssumptions{Bool}) where {Tv, Ti}
     if assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.SparspakFactorization)
     else
@@ -80,7 +80,7 @@ end
 
 @static if INCLUDE_SPARSE
     function defaultalg(A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
-        assump::OperatorAssumptions) where {Ti}
+        assump::OperatorAssumptions{Bool}) where {Ti}
         if assump.issq
             if length(b) <= 10_000 && length(nonzeros(A)) / length(A) < 2e-4
                 DefaultLinearSolver(DefaultAlgorithmChoice.KLUFactorization)
@@ -93,7 +93,7 @@ end
     end
 end
 
-function defaultalg(A::GPUArraysCore.AbstractGPUArray, b, assump::OperatorAssumptions)
+function defaultalg(A::GPUArraysCore.AbstractGPUArray, b, assump::OperatorAssumptions{Bool})
     if assump.condition === OperatorCondition.IllConditioned || !assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
     else
@@ -102,7 +102,7 @@ function defaultalg(A::GPUArraysCore.AbstractGPUArray, b, assump::OperatorAssump
 end
 
 # A === nothing case
-function defaultalg(A, b::GPUArraysCore.AbstractGPUArray, assump::OperatorAssumptions)
+function defaultalg(A::Nothing, b::GPUArraysCore.AbstractGPUArray, assump::OperatorAssumptions{Bool})
     if assump.condition === OperatorCondition.IllConditioned || !assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
     else
@@ -112,7 +112,7 @@ end
 
 # Ambiguity handling
 function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.AbstractGPUArray,
-    assump::OperatorAssumptions)
+    assump::OperatorAssumptions{Bool})
     if assump.condition === OperatorCondition.IllConditioned || !assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
     else
@@ -121,7 +121,7 @@ function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.Abstract
 end
 
 function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
-    assump::OperatorAssumptions)
+    assump::OperatorAssumptions{Bool})
     if has_ldiv!(A)
         return DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
     elseif !assump.issq
@@ -137,7 +137,7 @@ function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
 end
 
 # Allows A === nothing as a stand-in for dense matrix
-function defaultalg(A, b, assump::OperatorAssumptions)
+function defaultalg(A, b, assump::OperatorAssumptions{Bool})
     alg = if assump.issq
         # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
         # it makes sense according to the benchmarks, which is dependent on

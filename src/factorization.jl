@@ -215,10 +215,6 @@ end
 function init_cacheval(alg::CholeskyFactorization, A::SMatrix{S1, S2}, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions) where {S1, S2}
-    # StaticArrays doesn't have the pivot argument. Prevent generic fallback.
-    # CholeskyFactorization is part of DefaultLinearSolver, so it is possible that `A` is
-    # not Hermitian.
-    (!issquare(A) || !ishermitian(A)) && return nothing
     cholesky(A)
 end
 

@@ -124,9 +124,7 @@ function __init_u0_from_Ab(A, b)
     fill!(u0, false)
     return u0
 end
-function __init_u0_from_Ab(A::SMatrix{S1, S2}, b) where {S1, S2}
-    return zeros(SVector{S2, eltype(b)})
-end
+__init_u0_from_Ab(::SMatrix{S1, S2}, b) where {S1, S2} = zeros(SVector{S2, eltype(b)})
 
 function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     args...;

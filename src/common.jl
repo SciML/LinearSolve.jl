@@ -119,6 +119,15 @@ default_alias_b(::Any, ::Any, ::Any) = false
 default_alias_A(::AbstractKrylovSubspaceMethod, ::Any, ::Any) = true
 default_alias_b(::AbstractKrylovSubspaceMethod, ::Any, ::Any) = true
 
+function __init_u0_from_Ab(A, b)
+    u0 = similar(b, size(A, 2))
+    fill!(u0, false)
+    return u0
+end
+function __init_u0_from_Ab(A::SMatrix{S1, S2}, b) where {S1, S2}
+    return zeros(SVector{S2, eltype(b)})
+end
+
 function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     args...;
     alias_A = default_alias_A(alg, prob.A, prob.b),
@@ -133,7 +142,7 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     kwargs...)
     @unpack A, b, u0, p = prob
 
-    A = if alias_A
+    A = if alias_A || A isa SMatrix
         A
     elseif A isa Array || A isa SparseMatrixCSC
         copy(A)
@@ -143,7 +152,7 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
 
     b = if b isa SparseArrays.AbstractSparseArray && !(A isa Diagonal)
         Array(b) # the solution to a linear solve will always be dense!
-    elseif alias_b
+    elseif alias_b || b isa SVector
         b
     elseif b isa Array || b isa SparseMatrixCSC
         copy(b)
@@ -151,18 +160,13 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         deepcopy(b)
     end
 
-    u0 = if u0 !== nothing
-        u0
-    else
-        u0 = similar(b, size(A, 2))
-        fill!(u0, false)
-    end
+    u0_ = u0 !== nothing ? u0 : __init_u0_from_Ab(A, b)
 
     # Guard against type mismatch for user-specified reltol/abstol
     reltol = real(eltype(prob.b))(reltol)
     abstol = real(eltype(prob.b))(abstol)
 
-    cacheval = init_cacheval(alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, verbose,
+    cacheval = init_cacheval(alg, A, b, u0_, Pl, Pr, maxiters, abstol, reltol, verbose,
         assumptions)
     isfresh = true
     Tc = typeof(cacheval)
@@ -170,7 +174,7 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     cache = LinearCache{
         typeof(A),
         typeof(b),
-        typeof(u0),
+        typeof(u0_),
         typeof(p),
         typeof(alg),
         Tc,
@@ -180,7 +184,7 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         typeof(assumptions.issq),
     }(A,
         b,
-        u0,
+        u0_,
         p,
         alg,
         cacheval,

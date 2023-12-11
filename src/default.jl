@@ -36,6 +36,14 @@ function defaultalg(A, b, assump::OperatorAssumptions{Nothing})
     defaultalg(A, b, OperatorAssumptions(issq, assump.condition))
 end
 
+function defaultalg(A::SMatrix{S1, S2}, b, assump::OperatorAssumptions{Bool}) where {S1, S2}
+    if S1 == S2
+        return LUFactorization()
+    else
+        return SVDFactorization()  # QR(...) \ b is not defined currently
+    end
+end
+
 function defaultalg(A::Tridiagonal, b, assump::OperatorAssumptions{Bool})
     if assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.LUFactorization)
@@ -175,10 +183,6 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
                 DefaultAlgorithmChoice.LUFactorization
             end
 
-            # For static arrays GMRES allocates a lot. Use factorization
-        elseif A isa StaticArray
-            DefaultAlgorithmChoice.LUFactorization
-
             # This catches the cases where a factorization overload could exist
             # For example, BlockBandedMatrix
         elseif A !== nothing && ArrayInterface.isstructured(A)
@@ -190,9 +194,6 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
         end
     elseif assump.condition === OperatorCondition.WellConditioned
         DefaultAlgorithmChoice.NormalCholeskyFactorization
-    elseif A isa StaticArray
-        # Static Array doesn't have QR() \ b defined
-        DefaultAlgorithmChoice.SVDFactorization
     elseif assump.condition === OperatorCondition.IllConditioned
         if is_underdetermined(A)
             # Underdetermined
@@ -269,8 +270,7 @@ function SciMLBase.init(prob::LinearProblem, alg::Nothing,
     args...;
     assumptions = OperatorAssumptions(issquare(prob.A)),
     kwargs...)
-    alg = defaultalg(prob.A, prob.b, assumptions)
-    SciMLBase.init(prob, alg, args...; assumptions, kwargs...)
+    SciMLBase.init(prob, defaultalg(prob.A, prob.b, assumptions), args...; assumptions, kwargs...)
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::Nothing,

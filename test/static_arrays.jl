@@ -1,4 +1,4 @@
-using LinearSolve, StaticArrays, LinearAlgebra
+using LinearSolve, StaticArrays, LinearAlgebra, Test
 
 A = SMatrix{5, 5}(Hermitian(rand(5, 5) + I))
 b = SVector{5}(rand(5))

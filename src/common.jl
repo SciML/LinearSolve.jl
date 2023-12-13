@@ -169,31 +169,9 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     isfresh = true
     Tc = typeof(cacheval)
 
-    cache = LinearCache{
-        typeof(A),
-        typeof(b),
-        typeof(u0_),
-        typeof(p),
-        typeof(alg),
-        Tc,
-        typeof(Pl),
-        typeof(Pr),
-        typeof(reltol),
-        typeof(assumptions.issq),
-    }(A,
-        b,
-        u0_,
-        p,
-        alg,
-        cacheval,
-        isfresh,
-        Pl,
-        Pr,
-        abstol,
-        reltol,
-        maxiters,
-        verbose,
-        assumptions)
+    cache = LinearCache{typeof(A), typeof(b), typeof(u0_), typeof(p), typeof(alg), Tc,
+        typeof(Pl), typeof(Pr), typeof(reltol), typeof(assumptions.issq)}(A, b, u0_,
+        p, alg, cacheval, isfresh, Pl, Pr, abstol, reltol, maxiters, verbose, assumptions)
     return cache
 end
 
@@ -209,4 +187,34 @@ end
 
 function SciMLBase.solve!(cache::LinearCache, args...; kwargs...)
     solve!(cache, cache.alg, args...; kwargs...)
+end
+
+# Special Case for StaticArrays
+const StaticLinearProblem = LinearProblem{uType, iip, <:SMatrix,
+    <:Union{<:SMatrix, <:SVector}} where {uType, iip}
+
+function SciMLBase.solve(prob::StaticLinearProblem, args...; kwargs...)
+    return SciMLBase.solve(prob, nothing, args...; kwargs...)
+end
+
+function SciMLBase.solve(prob::StaticLinearProblem,
+        alg::Union{Nothing, SciMLLinearSolveAlgorithm}, args...; kwargs...)
+    if alg === nothing || alg isa DirectLdiv!
+        u = prob.A \ prob.b
+    elseif alg isa LUFactorization
+        u = lu(prob.A) \ prob.b
+    elseif alg isa QRFactorization
+        u = qr(prob.A) \ prob.b
+    elseif alg isa CholeskyFactorization
+        u = cholesky(prob.A) \ prob.b
+    elseif alg isa NormalCholeskyFactorization
+        u = cholesky(Symmetric(prob.A' * prob.A)) \ (prob.A' * prob.b)
+    elseif alg isa SVDFactorization
+        u = svd(prob.A) \ prob.b
+    else
+        # Slower Path but handles all cases
+        cache = init(prob, alg, args...; kwargs...)
+        return solve!(cache)
+    end
+    return SciMLBase.build_linear_solution(alg, u, nothing, prob)
 end

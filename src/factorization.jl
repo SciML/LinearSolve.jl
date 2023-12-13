@@ -975,11 +975,17 @@ function init_cacheval(alg::NormalCholeskyFactorization,
     ArrayInterface.cholesky_instance(convert(AbstractMatrix, A))
 end
 
+function init_cacheval(alg::NormalCholeskyFactorization, A::SMatrix, b, u, Pl, Pr,
+    maxiters::Int, abstol, reltol, verbose::Bool,
+    assumptions::OperatorAssumptions)
+    return cholesky(Symmetric((A)' * A))
+end
+
 function init_cacheval(alg::NormalCholeskyFactorization, A, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
     A_ = convert(AbstractMatrix, A)
-    ArrayInterface.cholesky_instance(Symmetric((A)' * A, :L), alg.pivot)
+    return ArrayInterface.cholesky_instance(Symmetric((A)' * A), alg.pivot)
 end
 
 function init_cacheval(alg::NormalCholeskyFactorization,
@@ -993,16 +999,19 @@ function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization; 
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
-        if A isa SparseMatrixCSC || A isa GPUArraysCore.AbstractGPUArray
-            fact = cholesky(Symmetric((A)' * A, :L); check = false)
+        if A isa SparseMatrixCSC || A isa GPUArraysCore.AbstractGPUArray || A isa SMatrix
+            fact = cholesky(Symmetric((A)' * A); check = false)
         else
-            fact = cholesky(Symmetric((A)' * A, :L), alg.pivot; check = false)
+            fact = cholesky(Symmetric((A)' * A), alg.pivot; check = false)
         end
         cache.cacheval = fact
         cache.isfresh = false
     end
     if A isa SparseMatrixCSC
         cache.u .= @get_cacheval(cache, :NormalCholeskyFactorization) \ (A' * cache.b)
+        y = cache.u
+    elseif A isa StaticArray
+        cache.u = @get_cacheval(cache, :NormalCholeskyFactorization) \ (A' * cache.b)
         y = cache.u
     else
         y = ldiv!(cache.u, @get_cacheval(cache, :NormalCholeskyFactorization), A' * cache.b)

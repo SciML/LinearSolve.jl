@@ -119,6 +119,13 @@ default_alias_b(::Any, ::Any, ::Any) = false
 default_alias_A(::AbstractKrylovSubspaceMethod, ::Any, ::Any) = true
 default_alias_b(::AbstractKrylovSubspaceMethod, ::Any, ::Any) = true
 
+function __init_u0_from_Ab(A, b)
+    u0 = similar(b, size(A, 2))
+    fill!(u0, false)
+    return u0
+end
+__init_u0_from_Ab(::SMatrix{S1, S2}, b) where {S1, S2} = zeros(SVector{S2, eltype(b)})
+
 function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     args...;
     alias_A = default_alias_A(alg, prob.A, prob.b),
@@ -133,7 +140,7 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     kwargs...)
     @unpack A, b, u0, p = prob
 
-    A = if alias_A
+    A = if alias_A || A isa SMatrix
         A
     elseif A isa Array || A isa SparseMatrixCSC
         copy(A)
@@ -143,7 +150,7 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
 
     b = if b isa SparseArrays.AbstractSparseArray && !(A isa Diagonal)
         Array(b) # the solution to a linear solve will always be dense!
-    elseif alias_b
+    elseif alias_b || b isa SVector
         b
     elseif b isa Array || b isa SparseMatrixCSC
         copy(b)
@@ -151,47 +158,20 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         deepcopy(b)
     end
 
-    u0 = if u0 !== nothing
-        u0
-    else
-        u0 = similar(b, size(A, 2))
-        fill!(u0, false)
-    end
+    u0_ = u0 !== nothing ? u0 : __init_u0_from_Ab(A, b)
 
     # Guard against type mismatch for user-specified reltol/abstol
     reltol = real(eltype(prob.b))(reltol)
     abstol = real(eltype(prob.b))(abstol)
 
-    cacheval = init_cacheval(alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, verbose,
+    cacheval = init_cacheval(alg, A, b, u0_, Pl, Pr, maxiters, abstol, reltol, verbose,
         assumptions)
     isfresh = true
     Tc = typeof(cacheval)
 
-    cache = LinearCache{
-        typeof(A),
-        typeof(b),
-        typeof(u0),
-        typeof(p),
-        typeof(alg),
-        Tc,
-        typeof(Pl),
-        typeof(Pr),
-        typeof(reltol),
-        typeof(assumptions.issq),
-    }(A,
-        b,
-        u0,
-        p,
-        alg,
-        cacheval,
-        isfresh,
-        Pl,
-        Pr,
-        abstol,
-        reltol,
-        maxiters,
-        verbose,
-        assumptions)
+    cache = LinearCache{typeof(A), typeof(b), typeof(u0_), typeof(p), typeof(alg), Tc,
+        typeof(Pl), typeof(Pr), typeof(reltol), typeof(assumptions.issq)}(A, b, u0_,
+        p, alg, cacheval, isfresh, Pl, Pr, abstol, reltol, maxiters, verbose, assumptions)
     return cache
 end
 
@@ -207,4 +187,34 @@ end
 
 function SciMLBase.solve!(cache::LinearCache, args...; kwargs...)
     solve!(cache, cache.alg, args...; kwargs...)
+end
+
+# Special Case for StaticArrays
+const StaticLinearProblem = LinearProblem{uType, iip, <:SMatrix,
+    <:Union{<:SMatrix, <:SVector}} where {uType, iip}
+
+function SciMLBase.solve(prob::StaticLinearProblem, args...; kwargs...)
+    return SciMLBase.solve(prob, nothing, args...; kwargs...)
+end
+
+function SciMLBase.solve(prob::StaticLinearProblem,
+        alg::Union{Nothing, SciMLLinearSolveAlgorithm}, args...; kwargs...)
+    if alg === nothing || alg isa DirectLdiv!
+        u = prob.A \ prob.b
+    elseif alg isa LUFactorization
+        u = lu(prob.A) \ prob.b
+    elseif alg isa QRFactorization
+        u = qr(prob.A) \ prob.b
+    elseif alg isa CholeskyFactorization
+        u = cholesky(prob.A) \ prob.b
+    elseif alg isa NormalCholeskyFactorization
+        u = cholesky(Symmetric(prob.A' * prob.A)) \ (prob.A' * prob.b)
+    elseif alg isa SVDFactorization
+        u = svd(prob.A) \ prob.b
+    else
+        # Slower Path but handles all cases
+        cache = init(prob, alg, args...; kwargs...)
+        return solve!(cache)
+    end
+    return SciMLBase.build_linear_solution(alg, u, nothing, prob)
 end

@@ -1,4 +1,4 @@
-using LinearSolve, CUDA, LinearAlgebra, SparseArrays
+using LinearSolve, CUDA, LinearAlgebra, SparseArrays, StableRNGs
 using Test
 
 CUDA.allowscalar(false)
@@ -72,4 +72,21 @@ using BlockDiagonals
     test_interface(SimpleGMRES(; blocksize = 2), prob1, prob2)
 
     @test solve(prob1, SimpleGMRES(; blocksize = 2)).u ≈ solve(prob2, SimpleGMRES()).u
+end
+
+# Test Dispatches for Adjoint/Transpose Types
+rng = StableRNG(0)
+
+A = Matrix(Hermitian(rand(rng, 5, 5) + I)) |> cu
+b = rand(rng, 5) |> cu
+prob1 = LinearProblem(A', b)
+prob2 = LinearProblem(transpose(A), b)
+
+@testset "Adjoint/Transpose Type: $(alg)" for alg in (NormalCholeskyFactorization(),
+        CholeskyFactorization(), LUFactorization(), QRFactorization(), nothing)
+    sol = solve(prob1, alg; alias_A = false)
+    @test norm(A' * sol.u .- b) < 1e-5
+
+    sol = solve(prob2, alg; alias_A = false)
+    @test norm(transpose(A) * sol.u .- b) < 1e-5
 end

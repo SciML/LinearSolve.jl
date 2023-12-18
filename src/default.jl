@@ -101,7 +101,7 @@ end
     end
 end
 
-function defaultalg(A::GPUArraysCore.AbstractGPUArray, b, assump::OperatorAssumptions{Bool})
+function defaultalg(A::GPUArraysCore.AnyGPUArray, b, assump::OperatorAssumptions{Bool})
     if assump.condition === OperatorCondition.IllConditioned || !assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
     else
@@ -110,7 +110,7 @@ function defaultalg(A::GPUArraysCore.AbstractGPUArray, b, assump::OperatorAssump
 end
 
 # A === nothing case
-function defaultalg(A::Nothing, b::GPUArraysCore.AbstractGPUArray, assump::OperatorAssumptions{Bool})
+function defaultalg(A::Nothing, b::GPUArraysCore.AnyGPUArray, assump::OperatorAssumptions{Bool})
     if assump.condition === OperatorCondition.IllConditioned || !assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
     else
@@ -119,7 +119,7 @@ function defaultalg(A::Nothing, b::GPUArraysCore.AbstractGPUArray, assump::Opera
 end
 
 # Ambiguity handling
-function defaultalg(A::GPUArraysCore.AbstractGPUArray, b::GPUArraysCore.AbstractGPUArray,
+function defaultalg(A::GPUArraysCore.AnyGPUArray, b::GPUArraysCore.AbstractGPUArray,
     assump::OperatorAssumptions{Bool})
     if assump.condition === OperatorCondition.IllConditioned || !assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)

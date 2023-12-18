@@ -78,6 +78,8 @@ function do_factorization(alg::LUFactorization, A, b, u)
     if A isa AbstractSparseMatrixCSC
         return lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
             check = false)
+    elseif A isa GPUArraysCore.AnyGPUArray
+        fact = lu(A; check = false)
     elseif !ArrayInterface.can_setindex(typeof(A))
         fact = lu(A, alg.pivot, check = false)
     else
@@ -96,6 +98,17 @@ function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization}, A, b
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
     ArrayInterface.lu_instance(convert(AbstractMatrix, A))
+end
+
+function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization},
+    A::Union{<:Adjoint, <:Transpose}, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
+    verbose::Bool, assumptions::OperatorAssumptions)
+    if alg isa LUFactorization
+        return lu(A; check=false)
+    else
+        A isa GPUArraysCore.AnyGPUArray && return nothing
+        return LinearAlgebra.generic_lufact!(copy(A), alg.pivot; check=false)
+    end
 end
 
 const PREALLOCATED_LU = ArrayInterface.lu_instance(rand(1, 1))
@@ -143,7 +156,7 @@ end
 function do_factorization(alg::QRFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
     if ArrayInterface.can_setindex(typeof(A))
-        if alg.inplace && !(A isa SparseMatrixCSC) && !(A isa GPUArraysCore.AbstractGPUArray)
+        if alg.inplace && !(A isa SparseMatrixCSC) && !(A isa GPUArraysCore.AnyGPUArray)
             fact = qr!(A, alg.pivot)
         else
             fact = qr(A) # CUDA.jl does not allow other args!
@@ -158,6 +171,12 @@ function init_cacheval(alg::QRFactorization, A, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
     ArrayInterface.qr_instance(convert(AbstractMatrix, A), alg.pivot)
+end
+
+function init_cacheval(alg::QRFactorization, A::Union{<:Adjoint, <:Transpose}, b, u, Pl, Pr,
+    maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    A isa GPUArraysCore.AnyGPUArray && return qr(A)
+    return qr(A, alg.pivot)
 end
 
 const PREALLOCATED_QR = ArrayInterface.qr_instance(rand(1, 1))
@@ -204,6 +223,8 @@ function do_factorization(alg::CholeskyFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
     if A isa SparseMatrixCSC
         fact = cholesky(A; shift = alg.shift, check = false, perm = alg.perm)
+    elseif A isa GPUArraysCore.AnyGPUArray
+        fact = cholesky(A; check = false)
     elseif alg.pivot === Val(false) || alg.pivot === NoPivot()
         fact = cholesky!(A, alg.pivot; check = false)
     else
@@ -218,9 +239,13 @@ function init_cacheval(alg::CholeskyFactorization, A::SMatrix{S1, S2}, b, u, Pl,
     cholesky(A)
 end
 
+function init_cacheval(alg::CholeskyFactorization, A::GPUArraysCore.AnyGPUArray, b, u, Pl,
+    Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    cholesky(A; check=false)
+end
+
 function init_cacheval(alg::CholeskyFactorization, A, b, u, Pl, Pr,
-    maxiters::Int, abstol, reltol, verbose::Bool,
-    assumptions::OperatorAssumptions)
+    maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     ArrayInterface.cholesky_instance(convert(AbstractMatrix, A), alg.pivot)
 end
 
@@ -968,7 +993,7 @@ default_alias_b(::NormalCholeskyFactorization, ::Any, ::Any) = true
 const PREALLOCATED_NORMALCHOLESKY = ArrayInterface.cholesky_instance(rand(1, 1), NoPivot())
 
 function init_cacheval(alg::NormalCholeskyFactorization,
-    A::Union{AbstractSparseArray, GPUArraysCore.AbstractGPUArray,
+    A::Union{AbstractSparseArray, GPUArraysCore.AnyGPUArray,
         Symmetric{<:Number, <:AbstractSparseArray}}, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
@@ -999,7 +1024,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization; 
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
-        if A isa SparseMatrixCSC || A isa GPUArraysCore.AbstractGPUArray || A isa SMatrix
+        if A isa SparseMatrixCSC || A isa GPUArraysCore.AnyGPUArray || A isa SMatrix
             fact = cholesky(Symmetric((A)' * A); check = false)
         else
             fact = cholesky(Symmetric((A)' * A), alg.pivot; check = false)

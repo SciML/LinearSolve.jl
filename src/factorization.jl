@@ -13,6 +13,11 @@ _ldiv!(x, A, b) = ldiv!(x, A, b)
 _ldiv!(x, A, b::SVector) = (x .= A \ b)
 _ldiv!(::SVector, A, b::SVector) = (A \ b)
 _ldiv!(::SVector, A, b) = (A \ b)
+_ldiv!(::StaticArraysCore.SVector, 
+       A::Union{SparseArrays.CHOLMOD.Factor, LinearAlgebra.QR, LinearAlgebra.QRCompactWY, SparseArrays.SPQR.QRSparse}, 
+       b::AbstractVector) = (A \ b)
+_ldiv!(::SVector, A::Union{SparseArrays.CHOLMOD.Factor, LinearAlgebra.QR, LinearAlgebra.QRCompactWY, SparseArrays.SPQR.QRSparse}, 
+       b::SVector) = (A \ b)
 
 function _ldiv!(x::Vector, A::Factorization, b::Vector)
     # workaround https://github.com/JuliaLang/julia/issues/43507

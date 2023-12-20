@@ -24,6 +24,8 @@ PrecompileTools.@recompile_invalidations begin
     using DocStringExtensions
     using EnumX
     using Requires
+    using Markdown
+    using ChainRulesCore
     import InteractiveUtils
 
     import StaticArraysCore: StaticArray, SVector, MVector, SMatrix, MMatrix
@@ -42,6 +44,8 @@ PrecompileTools.@recompile_invalidations begin
     using SciMLBase
     import Preferences
 end
+
+const CRC = ChainRulesCore
 
 if Preferences.@load_preference("LoadMKL_JLL", true)
     using MKL_jll
@@ -124,6 +128,7 @@ include("solve_function.jl")
 include("default.jl")
 include("init.jl")
 include("extension_algs.jl")
+include("adjoint.jl")
 include("deprecated.jl")
 
 @generated function SciMLBase.solve!(cache::LinearCache, alg::AbstractFactorization;
@@ -235,5 +240,7 @@ export AppleAccelerateLUFactorization
 export MetalLUFactorization
 
 export OperatorAssumptions, OperatorCondition
+
+export LinearSolveAdjoint
 
 end

@@ -65,7 +65,7 @@ end
 __issquare(assump::OperatorAssumptions) = assump.issq
 __conditioning(assump::OperatorAssumptions) = assump.condition
 
-mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq}
+mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, S}
     A::TA
     b::Tb
     u::Tu
@@ -80,6 +80,7 @@ mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq}
     maxiters::Int
     verbose::Bool
     assumptions::OperatorAssumptions{issq}
+    sensealg::S
 end
 
 function Base.setproperty!(cache::LinearCache, name::Symbol, x)
@@ -137,6 +138,7 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     Pl = IdentityOperator(size(prob.A)[1]),
     Pr = IdentityOperator(size(prob.A)[2]),
     assumptions = OperatorAssumptions(issquare(prob.A)),
+    sensealg = LinearSolveAdjoint(),
     kwargs...)
     @unpack A, b, u0, p = prob
 
@@ -170,8 +172,9 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     Tc = typeof(cacheval)
 
     cache = LinearCache{typeof(A), typeof(b), typeof(u0_), typeof(p), typeof(alg), Tc,
-        typeof(Pl), typeof(Pr), typeof(reltol), typeof(assumptions.issq)}(A, b, u0_,
-        p, alg, cacheval, isfresh, Pl, Pr, abstol, reltol, maxiters, verbose, assumptions)
+        typeof(Pl), typeof(Pr), typeof(reltol), typeof(assumptions.issq),
+        typeof(sensealg)}(A, b, u0_, p, alg, cacheval, isfresh, Pl, Pr, abstol, reltol,
+        maxiters, verbose, assumptions, sensealg)
     return cache
 end
 

@@ -37,9 +37,16 @@ struct SimpleGMRES{UBD} <: AbstractKrylovSubspaceMethod
     blocksize::Int
     warm_start::Bool
 
+    function SimpleGMRES{UBD}(; restart::Bool = true, blocksize::Int = 0,
+        warm_start::Bool = false, memory::Int = 20) where {UBD}
+        UBD && @assert blocksize > 0
+        return new{UBD}(restart, memory, blocksize, warm_start)
+    end
+
     function SimpleGMRES(; restart::Bool = true, blocksize::Int = 0,
         warm_start::Bool = false, memory::Int = 20)
-        return new{blocksize > 0}(restart, memory, blocksize, warm_start)
+        return SimpleGMRES{blocksize > 0}(; restart, memory, blocksize,
+            warm_start)
     end
 end
 

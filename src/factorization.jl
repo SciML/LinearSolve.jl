@@ -1010,7 +1010,7 @@ function init_cacheval(alg::NormalCholeskyFactorization, A, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
     A_ = convert(AbstractMatrix, A)
-    return ArrayInterface.cholesky_instance(Symmetric((A)' * A), alg.pivot)
+    return ArrayInterface.cholesky_instance(Symmetric(Matrix{eltype(A)}(undef,0,0)), alg.pivot)
 end
 
 function init_cacheval(alg::NormalCholeskyFactorization,

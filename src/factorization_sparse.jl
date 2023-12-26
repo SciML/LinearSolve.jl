@@ -13,3 +13,10 @@ function _ldiv!(x::AbstractVector,
         SparseArrays.CHOLMOD.Factor}, b::AbstractVector)
     x .= A \ b
 end
+
+# Ambiguity removal
+_ldiv!(::SVector, 
+       A::Union{SparseArrays.CHOLMOD.Factor, LinearAlgebra.QR, LinearAlgebra.QRCompactWY, SparseArrays.SPQR.QRSparse}, 
+       b::AbstractVector) = (A \ b)
+_ldiv!(::SVector, A::Union{SparseArrays.CHOLMOD.Factor, LinearAlgebra.QR, LinearAlgebra.QRCompactWY, SparseArrays.SPQR.QRSparse}, 
+       b::SVector) = (A \ b)

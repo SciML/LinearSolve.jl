@@ -1,6 +1,6 @@
 needs_concrete_A(alg::DefaultLinearSolver) = true
 mutable struct DefaultLinearSolverInit{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12,
-    T13, T14, T15, T16, T17, T18, T19}
+    T13, T14, T15, T16, T17, T18, T19, T20, T21}
     LUFactorization::T1
     QRFactorization::T2
     DiagonalFactorization::T3
@@ -20,6 +20,8 @@ mutable struct DefaultLinearSolverInit{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, 
     AppleAccelerateLUFactorization::T17
     MKLLUFactorization::T18
     QRFactorizationPivoted::T19
+    KrylovJL_CRAIGMR::T20
+    KrylovJL_LSMR::T21
 end
 
 # Legacy fallback
@@ -254,11 +256,11 @@ function algchoice_to_alg(alg::Symbol)
     elseif alg === :AppleAccelerateLUFactorization
         AppleAccelerateLUFactorization()
     elseif alg === :QRFactorizationPivoted
-        @static if VERSION ≥ v"1.7beta"
-            QRFactorization(ColumnNorm())
-        else
-            QRFactorization(Val(true))
-        end
+        QRFactorization(ColumnNorm())
+    elseif alg === :KrylovJL_CRAIGMR
+        KrylovJL_CRAIGMR()
+    elseif alg === :KrylovJL_LSMR
+        KrylovJL_LSMR()
     else
         error("Algorithm choice symbol $alg not allowed in the default")
     end
@@ -387,7 +389,7 @@ end
             quote
                 getproperty(cache.cacheval,$(Meta.quot(alg)))' \ dy
             end
-        elseif alg in Symbol.((DefaultAlgorithmChoice.KrylovJL_GMRES,))
+        elseif alg in Symbol.((DefaultAlgorithmChoice.KrylovJL_GMRES,DefaultAlgorithmChoice.KrylovJL_LSMR, DefaultAlgorithmChoice.KrylovJL_CRAIGMR))
             quote
                 invprob = LinearSolve.LinearProblem(transpose(cache.A), dy)
                 solve(invprob, cache.alg;

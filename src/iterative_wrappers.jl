@@ -243,7 +243,21 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     itmax = cache.maxiters
     verbose = cache.verbose ? 1 : 0
 
-    args = (@get_cacheval(cache, :KrylovJL_GMRES), cache.A, cache.b)
+    cacheval = if cache.alg isa DefaultLinearSolver
+        if alg.KrylovAlg === Krylov.gmres!
+            @get_cacheval(cache, :KrylovJL_GMRES)
+        elseif alg.KrylovAlg === Krylov.craigmr!
+            @get_cacheval(cache, :KrylovJL_CRAIGMR)
+        elseif alg.KrylovAlg === Krylov.lsmr!
+            @get_cacheval(cache, :KrylovJL_LSMR)
+        else
+            error("Default linear solver can only be these three choices! Report this bug!")
+        end
+    else
+        cache.cacheval
+    end
+
+    args = (cacheval, cache.A, cache.b)
     kwargs = (atol = atol, rtol = rtol, itmax = itmax, verbose = verbose,
         ldiv = true, history = true, alg.kwargs...)
 
@@ -268,7 +282,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     end
 
     stats = @get_cacheval(cache, :KrylovJL_GMRES).stats
-    resid = stats.residuals |> last
+    resid = !isempty(stats.residuals) ? last(stats.residuals) : zero(eltype(stats.residuals))
 
     retcode = if !stats.solved
         if stats.status == "maximum number of iterations exceeded"

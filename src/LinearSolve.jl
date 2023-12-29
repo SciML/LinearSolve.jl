@@ -103,6 +103,8 @@ EnumX.@enumx DefaultAlgorithmChoice begin
     AppleAccelerateLUFactorization
     MKLLUFactorization
     QRFactorizationPivoted
+    KrylovJL_CRAIGMR
+    KrylovJL_LSMR
 end
 
 struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm

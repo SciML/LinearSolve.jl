@@ -67,3 +67,42 @@ prob = LinearProblem(sparse(A), b)
 
 prob = LinearProblem(big.(rand(10, 10)), big.(zeros(10)))
 solve(prob)
+
+## Operator defaults
+## https://github.com/SciML/LinearSolve.jl/issues/414
+
+m, n = 2, 2
+A = rand(m, n)
+b = rand(m)
+x = rand(n)
+f = (du, u, p, t) -> mul!(du, A, u)
+fadj = (du, u, p, t) -> mul!(du, A', u)
+fo = FunctionOperator(f, x, b; op_adjoint = fadj)
+prob = LinearProblem(fo, b)
+sol1 = solve(prob)
+sol2 = solve(prob, LinearSolve.KrylovJL_GMRES())
+@test sol1.u == sol2.u
+
+m, n = 3, 2
+A = rand(m, n)
+b = rand(m)
+x = rand(n)
+f = (du, u, p, t) -> mul!(du, A, u)
+fadj = (du, u, p, t) -> mul!(du, A', u)
+fo = FunctionOperator(f, x, b; op_adjoint = fadj)
+prob = LinearProblem(fo, b)
+sol1 = solve(prob)
+sol2 = solve(prob, LinearSolve.KrylovJL_LSMR())
+@test sol1.u == sol2.u
+
+m, n = 2, 3
+A = rand(m, n)
+b = rand(m)
+x = rand(n)
+f = (du, u, p, t) -> mul!(du, A, u)
+fadj = (du, u, p, t) -> mul!(du, A', u)
+fo = FunctionOperator(f, x, b; op_adjoint = fadj)
+prob = LinearProblem(fo, b)
+sol1 = solve(prob)
+sol2 = solve(prob, LinearSolve.KrylovJL_CRAIGMR())
+@test sol1.u == sol2.u

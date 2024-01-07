@@ -91,7 +91,8 @@ end
 @static if INCLUDE_SPARSE
     function defaultalg(A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
         assump::OperatorAssumptions{Bool}) where {Ti}
-        if assump.issq
+        #TODO: find a way to supress the errors that KLU and UMFPACK.jl throw for singluar matrices
+        if false && assump.issq
             if length(b) <= 10_000 && length(nonzeros(A)) / length(A) < 2e-4
                 DefaultLinearSolver(DefaultAlgorithmChoice.KLUFactorization)
             else

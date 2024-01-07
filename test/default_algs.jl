@@ -35,15 +35,19 @@ solve(prob)
     LinearSolve.OperatorAssumptions(false)).alg ===
       LinearSolve.DefaultAlgorithmChoice.QRFactorization
 
-@test LinearSolve.defaultalg(sprand(10^4, 10^4, 1e-5) + I, zeros(1000)).alg ===
-      LinearSolve.DefaultAlgorithmChoice.KLUFactorization
-prob = LinearProblem(sprand(1000, 1000, 0.5), zeros(1000))
+
+A = spzeros(100, 100)
+A[1,1]=1
+prob = LinearProblem(A, ones(100))
+# test that solving a singluar problem doesn't error
 solve(prob)
 
-@test LinearSolve.defaultalg(sprand(11000, 11000, 0.001), zeros(11000)).alg ===
+# test_broken because these would be faster, but are currently not used by default
+# because they solvers throw errors for singular problems
+@test_broken LinearSolve.defaultalg(sprand(10^4, 10^4, 1e-5) + I, zeros(1000)).alg ===
+      LinearSolve.DefaultAlgorithmChoice.KLUFactorization
+@test_broken LinearSolve.defaultalg(sprand(11000, 11000, 0.001), zeros(11000)).alg ===
       LinearSolve.DefaultAlgorithmChoice.UMFPACKFactorization
-prob = LinearProblem(sprand(11000, 11000, 0.5), zeros(11000))
-solve(prob)
 
 # Test inference
 A = rand(4, 4)

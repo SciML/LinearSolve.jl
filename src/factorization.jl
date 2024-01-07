@@ -957,7 +957,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::RFLUFactorization{P, T};
         if length(ipiv) != min(size(A)...)
             ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
         end
-        fact = RecursiveFactorization.lu!(A, ipiv, Val(P), Val(T))
+        fact = RecursiveFactorization.lu!(A, ipiv, Val(P), Val(T), check=false)
         cache.cacheval = (fact, ipiv)
         cache.isfresh = false
     end

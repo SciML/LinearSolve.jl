@@ -35,6 +35,13 @@ solve(prob)
     LinearSolve.OperatorAssumptions(false)).alg ===
       LinearSolve.DefaultAlgorithmChoice.QRFactorization
 
+
+A = spzeros(100, 100)
+A[1,1]=1
+# test that solving a singluar problem doesn't error
+prob = LinearProblem(A, ones(100))
+solve(prob)
+
 @test LinearSolve.defaultalg(sprand(10^4, 10^4, 1e-5) + I, zeros(1000)).alg ===
       LinearSolve.DefaultAlgorithmChoice.KLUFactorization
 prob = LinearProblem(sprand(1000, 1000, 0.5), zeros(1000))

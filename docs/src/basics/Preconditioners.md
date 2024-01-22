@@ -83,13 +83,13 @@ The following preconditioners match the interface of LinearSolve.jl.
   - [Preconditioners.CholeskyPreconditioner(A, i)](https://github.com/JuliaLinearAlgebra/Preconditioners.jl):
     An incomplete Cholesky preconditioner with cut-off level `i`. Requires `A` as
     a `AbstractMatrix` and positive semi-definite.
-  - [AlgebraicMultiGrid](https://github.com/JuliaLinearAlgebra/AlgebraicMultigrid.jl):
+  - [AlgebraicMultigrid](https://github.com/JuliaLinearAlgebra/AlgebraicMultigrid.jl):
     Implementations of the algebraic multigrid method. Must be converted to a
-    preconditioner via `AlgebraicMultiGrid.aspreconditioner(AlgebraicMultiGrid.precmethod(A))`.
+    preconditioner via `AlgebraicMultigrid.aspreconditioner(AlgebraicMultigrid.precmethod(A))`.
     Requires `A` as a `AbstractMatrix`. Provides the following methods:
     
-      + `AlgebraicMultiGrid.ruge_stuben(A)`
-      + `AlgebraicMultiGrid.smoothed_aggregation(A)`
+      + `AlgebraicMultigrid.ruge_stuben(A)`
+      + `AlgebraicMultigrid.smoothed_aggregation(A)`
   - [PyAMG](https://github.com/cortner/PyAMG.jl):
     Implementations of the algebraic multigrid method. Must be converted to a
     preconditioner via `PyAMG.aspreconditioner(PyAMG.precmethod(A))`.

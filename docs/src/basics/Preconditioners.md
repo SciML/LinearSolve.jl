@@ -111,3 +111,9 @@ The following preconditioners match the interface of LinearSolve.jl.
     preconditioners which supports distributed computing via MPI. These can be
     written using the LinearSolve.jl interface choosing algorithms like `HYPRE.ILU`
     and `HYPRE.BoomerAMG`.
+  - [KrylovPreconditioners.jl](https://github.com/JuliaSmoothOptimizers/KrylovPreconditioners.jl/): Provides GPU-ready
+    preconditioners via KernelAbstractions.jl. At the time of writing the package provides the following methods:
+    
+      + Incomplete Cholesky decomposition `KrylovPreconditioners.kp_ic0(A)`
+      + Incomplete LU decomposition `KrylovPreconditioners.kp_ilu0(A)`
+      + Block Jacobi `KrylovPreconditioners.BlockJacobiPreconditioner(A, nblocks, device)`

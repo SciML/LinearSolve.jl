@@ -320,7 +320,7 @@ cache.cacheval = NamedTuple(LUFactorization = cache of LUFactorization, ...)
 end
 
 function defaultalg_symbol(::Type{T}) where {T}
-    Symbol(split(string(SciMLBase.parameterless_type(T)), ".")[end])
+    Base.typename(SciMLBase.parameterless_type(T)).name
 end
 defaultalg_symbol(::Type{<:GenericFactorization{typeof(ldlt!)}}) = :LDLtFactorization
 

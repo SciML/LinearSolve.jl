@@ -121,7 +121,7 @@ function defaultalg(A::Nothing, b::GPUArraysCore.AnyGPUArray, assump::OperatorAs
 end
 
 # Ambiguity handling
-function defaultalg(A::GPUArraysCore.AnyGPUArray, b::GPUArraysCore.AbstractGPUArray,
+function defaultalg(A::GPUArraysCore.AnyGPUArray, b::GPUArraysCore.AnyGPUArray,
     assump::OperatorAssumptions{Bool})
     if assump.condition === OperatorCondition.IllConditioned || !assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
@@ -152,7 +152,7 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
         # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
         # it makes sense according to the benchmarks, which is dependent on
         # whether MKL or OpenBLAS is being used
-        if (A === nothing && !(b isa GPUArraysCore.AbstractGPUArray)) || A isa Matrix
+        if (A === nothing && !(b isa GPUArraysCore.AnyGPUArray)) || A isa Matrix
             if (A === nothing ||
                 eltype(A) <: BLASELTYPES) &&
                ArrayInterface.can_setindex(b) &&
@@ -296,7 +296,7 @@ cache.cacheval = NamedTuple(LUFactorization = cache of LUFactorization, ...)
     abstol, reltol,
     verbose::Bool, assump::OperatorAssumptions)
     caches = map(first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))) do alg
-        if alg === :KrylovJL_GMRES
+        if alg === :KrylovJL_GMRES || alg === :KrylovJL_CRAIGMR || alg === :KrylovJL_LSMR
             quote
                 if A isa Matrix || A isa SparseMatrixCSC
                     nothing

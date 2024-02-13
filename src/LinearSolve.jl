@@ -182,6 +182,9 @@ end
 const IS_OPENBLAS = Ref(true)
 isopenblas() = IS_OPENBLAS[]
 
+const HAS_APPLE_ACCELERATE = Ref(false)
+appleaccelerate_isavailable() = HAS_APPLE_ACCELERATE[]
+
 PrecompileTools.@compile_workload begin
     A = rand(4, 4)
     b = rand(4)

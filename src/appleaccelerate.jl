@@ -14,16 +14,20 @@ to avoid allocations and does not require libblastrampoline.
 """
 struct AppleAccelerateLUFactorization <: AbstractFactorization end
 
-function appleaccelerate_isavailable()
-    libacc_hdl = Libdl.dlopen_e(libacc)
-    if libacc_hdl == C_NULL
-        return false
-    end
+@static if !Sys.isapple()
+    __appleaccelerate_isavailable() = false
+else
+    function __appleaccelerate_isavailable()
+        libacc_hdl = Libdl.dlopen_e(libacc)
+        if libacc_hdl == C_NULL
+            return false
+        end
 
-    if dlsym_e(libacc_hdl, "dgetrf_") == C_NULL
-        return false
+        if dlsym_e(libacc_hdl, "dgetrf_") == C_NULL
+            return false
+        end
+        return true
     end
-    return true
 end
 
 function aa_getrf!(A::AbstractMatrix{<:ComplexF64};

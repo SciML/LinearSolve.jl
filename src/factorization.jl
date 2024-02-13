@@ -1020,12 +1020,12 @@ function init_cacheval(alg::NormalCholeskyFactorization, A, b, u, Pl, Pr,
     return ArrayInterface.cholesky_instance(Symmetric(MType{eltype(A), 2}(undef,0,0)), alg.pivot)
 end
 
-const PREALLOCATED_NORMALCHOLESKY = ArrayInterface.cholesky_instance(
+const PREALLOCATED_NORMALCHOLESKY_SYMMETRIC = ArrayInterface.cholesky_instance(
     Symmetric(rand(1, 1)), NoPivot())
 
-function init_cacheval(alg::NormalCholeskyFactorization, A::Matrix, b, u, Pl, Pr,
+function init_cacheval(alg::NormalCholeskyFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    return PREALLOCATED_NORMALCHOLESKY
+    return PREALLOCATED_NORMALCHOLESKY_SYMMETRIC
 end
 
 function init_cacheval(alg::NormalCholeskyFactorization,

@@ -1016,8 +1016,7 @@ function init_cacheval(alg::NormalCholeskyFactorization, A, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
     A_ = convert(AbstractMatrix, A)
-    MType = ArrayInterface.parameterless_type(A_)
-    return ArrayInterface.cholesky_instance(Symmetric(MType{eltype(A), 2}(undef,0,0)), alg.pivot)
+    return ArrayInterface.cholesky_instance(Symmetric(Matrix{eltype(A)}(undef,0,0)), alg.pivot)
 end
 
 const PREALLOCATED_NORMALCHOLESKY_SYMMETRIC = ArrayInterface.cholesky_instance(

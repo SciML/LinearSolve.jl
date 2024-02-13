@@ -159,7 +159,8 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
                (__conditioning(assump) === OperatorCondition.IllConditioned ||
                 __conditioning(assump) === OperatorCondition.WellConditioned)
                 if length(b) <= 10
-                    DefaultAlgorithmChoice.GenericLUFactorization
+                    # DefaultAlgorithmChoice.GenericLUFactorization
+                    DefaultAlgorithmChoice.RFLUFactorization
                 elseif appleaccelerate_isavailable()
                     DefaultAlgorithmChoice.AppleAccelerateLUFactorization
                 elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500) ||

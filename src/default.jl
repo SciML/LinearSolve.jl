@@ -24,6 +24,23 @@ mutable struct DefaultLinearSolverInit{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, 
     KrylovJL_LSMR::T21
 end
 
+@generated function __setfield!(cache::DefaultLinearSolverInit, alg::DefaultLinearSolver, v)
+    ex = :()
+    for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))
+        newex = quote
+            setfield!(cache, $(Meta.quot(alg)), v)
+        end
+        alg_enum = getproperty(LinearSolve.DefaultAlgorithmChoice, alg) 
+        ex = if ex == :()
+            Expr(:elseif, :(alg.alg == $(alg_enum)), newex,
+                :(error("Algorithm Choice not Allowed")))
+        else
+            Expr(:elseif, :(alg.alg == $(alg_enum)), newex, ex)
+        end
+    end
+    ex = Expr(:if, ex.args...)
+end
+
 # Legacy fallback
 # For SciML algorithms already using `defaultalg`, all assume square matrix.
 defaultalg(A, b) = defaultalg(A, b, OperatorAssumptions(true))
@@ -218,7 +235,6 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
     DefaultLinearSolver(alg)
 end
 
-@inline algchoice_to_alg(::Val{alg}) where {alg} = algchoice_to_alg(alg)
 function algchoice_to_alg(alg::Symbol)
     if alg === :SVDFactorization
         SVDFactorization(false, LinearAlgebra.QRIteration())

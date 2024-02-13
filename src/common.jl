@@ -90,7 +90,8 @@ function Base.setproperty!(cache::LinearCache, name::Symbol, x)
         update_cacheval!(cache, :b, x)
     elseif name === :cacheval && cache.alg isa DefaultLinearSolver
         @assert cache.cacheval isa DefaultLinearSolverInit
-        return setfield!(cache.cacheval, Symbol(cache.alg.alg), x)
+        return __setfield!(cache.cacheval, cache.alg, x)
+        # return setfield!(cache.cacheval, Symbol(cache.alg.alg), x)
     end
     setfield!(cache, name, x)
 end

@@ -173,18 +173,24 @@ function init_cacheval(alg::QRFactorization, A, b, u, Pl, Pr,
     ArrayInterface.qr_instance(convert(AbstractMatrix, A), alg.pivot)
 end
 
+const PREALLOCATED_QR_ColumnNorm = ArrayInterface.qr_instance(rand(1, 1), ColumnNorm())
+
+function init_cacheval(alg::QRFactorization{ColumnNorm}, A::Matrix{Float64}, b, u, Pl, Pr,
+    maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    return PREALLOCATED_QR_ColumnNorm
+end
+
 function init_cacheval(alg::QRFactorization, A::Union{<:Adjoint, <:Transpose}, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     A isa GPUArraysCore.AnyGPUArray && return qr(A)
     return qr(A, alg.pivot)
 end
 
-const PREALLOCATED_QR = ArrayInterface.qr_instance(rand(1, 1))
+const PREALLOCATED_QR_NoPivot = ArrayInterface.qr_instance(rand(1, 1))
 
 function init_cacheval(alg::QRFactorization{NoPivot}, A::Matrix{Float64}, b, u, Pl, Pr,
-    maxiters::Int, abstol, reltol, verbose::Bool,
-    assumptions::OperatorAssumptions)
-    PREALLOCATED_QR
+    maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    return PREALLOCATED_QR_NoPivot
 end
 
 function init_cacheval(alg::QRFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
@@ -1011,6 +1017,14 @@ function init_cacheval(alg::NormalCholeskyFactorization, A, b, u, Pl, Pr,
     assumptions::OperatorAssumptions)
     A_ = convert(AbstractMatrix, A)
     return ArrayInterface.cholesky_instance(Symmetric(Matrix{eltype(A)}(undef,0,0)), alg.pivot)
+end
+
+const PREALLOCATED_NORMALCHOLESKY_SYMMETRIC = ArrayInterface.cholesky_instance(
+    Symmetric(rand(1, 1)), NoPivot())
+
+function init_cacheval(alg::NormalCholeskyFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
+    maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    return PREALLOCATED_NORMALCHOLESKY_SYMMETRIC
 end
 
 function init_cacheval(alg::NormalCholeskyFactorization,

@@ -24,6 +24,23 @@ mutable struct DefaultLinearSolverInit{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, 
     KrylovJL_LSMR::T21
 end
 
+@generated function __setfield!(cache::DefaultLinearSolverInit, alg::DefaultLinearSolver, v)
+    ex = :()
+    for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))
+        newex = quote
+            setfield!(cache, $(Meta.quot(alg)), v)
+        end
+        alg_enum = getproperty(LinearSolve.DefaultAlgorithmChoice, alg) 
+        ex = if ex == :()
+            Expr(:elseif, :(alg.alg == $(alg_enum)), newex,
+                :(error("Algorithm Choice not Allowed")))
+        else
+            Expr(:elseif, :(alg.alg == $(alg_enum)), newex, ex)
+        end
+    end
+    ex = Expr(:if, ex.args...)
+end
+
 # Legacy fallback
 # For SciML algorithms already using `defaultalg`, all assume square matrix.
 defaultalg(A, b) = defaultalg(A, b, OperatorAssumptions(true))
@@ -159,7 +176,7 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
                (__conditioning(assump) === OperatorCondition.IllConditioned ||
                 __conditioning(assump) === OperatorCondition.WellConditioned)
                 if length(b) <= 10
-                    DefaultAlgorithmChoice.GenericLUFactorization
+                    DefaultAlgorithmChoice.RFLUFactorization
                 elseif appleaccelerate_isavailable()
                     DefaultAlgorithmChoice.AppleAccelerateLUFactorization
                 elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500) ||
@@ -345,11 +362,12 @@ end
                 retcode = sol.retcode,
                 iters = sol.iters, stats = sol.stats)
         end
+        alg_enum = getproperty(LinearSolve.DefaultAlgorithmChoice, alg) 
         ex = if ex == :()
-            Expr(:elseif, :(Symbol(alg.alg) === $(Meta.quot(alg))), newex,
+            Expr(:elseif, :(alg.alg == $(alg_enum)), newex,
                 :(error("Algorithm Choice not Allowed")))
         else
-            Expr(:elseif, :(Symbol(alg.alg) === $(Meta.quot(alg))), newex, ex)
+            Expr(:elseif, :(alg.alg == $(alg_enum)), newex, ex)
         end
     end
     ex = Expr(:if, ex.args...)

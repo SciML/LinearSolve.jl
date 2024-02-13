@@ -218,6 +218,7 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
     DefaultLinearSolver(alg)
 end
 
+@inline algchoice_to_alg(::Val{alg}) where {alg} = algchoice_to_alg(alg)
 function algchoice_to_alg(alg::Symbol)
     if alg === :SVDFactorization
         SVDFactorization(false, LinearAlgebra.QRIteration())
@@ -345,11 +346,12 @@ end
                 retcode = sol.retcode,
                 iters = sol.iters, stats = sol.stats)
         end
+        alg_enum = getproperty(LinearSolve.DefaultAlgorithmChoice, alg) 
         ex = if ex == :()
-            Expr(:elseif, :(Symbol(alg.alg) === $(Meta.quot(alg))), newex,
+            Expr(:elseif, :(alg.alg == $(alg_enum)), newex,
                 :(error("Algorithm Choice not Allowed")))
         else
-            Expr(:elseif, :(Symbol(alg.alg) === $(Meta.quot(alg))), newex, ex)
+            Expr(:elseif, :(alg.alg == $(alg_enum)), newex, ex)
         end
     end
     ex = Expr(:if, ex.args...)

@@ -4,12 +4,13 @@ using LinearSolve
 using LinearSolve.LinearAlgebra
 isdefined(Base, :get_extension) ? (import Enzyme) : (import ..Enzyme)
 
-
 using Enzyme
 
 using EnzymeCore
 
-function EnzymeCore.EnzymeRules.forward(func::Const{typeof(LinearSolve.init)}, ::Type{RT}, prob::EnzymeCore.Annotation{LP}, alg::Const; kwargs...) where {RT, LP <: LinearSolve.LinearProblem}
+function EnzymeCore.EnzymeRules.forward(
+        func::Const{typeof(LinearSolve.init)}, ::Type{RT}, prob::EnzymeCore.Annotation{LP},
+        alg::Const; kwargs...) where {RT, LP <: LinearSolve.LinearProblem}
     @assert !(prob isa Const)
     res = func.val(prob.val, alg.val; kwargs...)
     if RT <: Const
@@ -26,11 +27,13 @@ function EnzymeCore.EnzymeRules.forward(func::Const{typeof(LinearSolve.init)}, :
     error("Unsupported return type $RT")
 end
 
-function EnzymeCore.EnzymeRules.forward(func::Const{typeof(LinearSolve.solve!)}, ::Type{RT}, linsolve::EnzymeCore.Annotation{LP}; kwargs...) where {RT, LP <: LinearSolve.LinearCache}
+function EnzymeCore.EnzymeRules.forward(func::Const{typeof(LinearSolve.solve!)},
+        ::Type{RT}, linsolve::EnzymeCore.Annotation{LP};
+        kwargs...) where {RT, LP <: LinearSolve.LinearCache}
     @assert !(linsolve isa Const)
 
     res = func.val(linsolve.val; kwargs...)
-    
+
     if RT <: Const
         return res
     end
@@ -56,7 +59,10 @@ function EnzymeCore.EnzymeRules.forward(func::Const{typeof(LinearSolve.solve!)},
     return Duplicated(res, dres)
 end
 
-function EnzymeCore.EnzymeRules.augmented_primal(config, func::Const{typeof(LinearSolve.init)}, ::Type{RT}, prob::EnzymeCore.Annotation{LP}, alg::Const; kwargs...) where {RT, LP <: LinearSolve.LinearProblem}
+function EnzymeCore.EnzymeRules.augmented_primal(
+        config, func::Const{typeof(LinearSolve.init)},
+        ::Type{RT}, prob::EnzymeCore.Annotation{LP}, alg::Const;
+        kwargs...) where {RT, LP <: LinearSolve.LinearProblem}
     res = func.val(prob.val, alg.val; kwargs...)
     dres = if EnzymeRules.width(config) == 1
         func.val(prob.dval, alg.val; kwargs...)
@@ -77,7 +83,6 @@ function EnzymeCore.EnzymeRules.augmented_primal(config, func::Const{typeof(Line
         (dval.b for dval in dres)
     end
 
-
     prob_d_A = if EnzymeRules.width(config) == 1
         prob.dval.A
     else
@@ -92,7 +97,10 @@ function EnzymeCore.EnzymeRules.augmented_primal(config, func::Const{typeof(Line
     return EnzymeCore.EnzymeRules.AugmentedReturn(res, dres, (d_A, d_b, prob_d_A, prob_d_b))
 end
 
-function EnzymeCore.EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.init)}, ::Type{RT}, cache, prob::EnzymeCore.Annotation{LP}, alg::Const; kwargs...) where {RT, LP <: LinearSolve.LinearProblem}
+function EnzymeCore.EnzymeRules.reverse(
+        config, func::Const{typeof(LinearSolve.init)}, ::Type{RT},
+        cache, prob::EnzymeCore.Annotation{LP}, alg::Const;
+        kwargs...) where {RT, LP <: LinearSolve.LinearProblem}
     d_A, d_b, prob_d_A, prob_d_b = cache
 
     if EnzymeRules.width(config) == 1
@@ -105,7 +113,7 @@ function EnzymeCore.EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.i
             d_b .= 0
         end
     else
-        for (_prob_d_A,_d_A,_prob_d_b, _d_b) in zip(prob_d_A, d_A, prob_d_b, d_b)
+        for (_prob_d_A, _d_A, _prob_d_b, _d_b) in zip(prob_d_A, d_A, prob_d_b, d_b)
             if _d_A !== _prob_d_A
                 _prob_d_A .+= _d_A
                 _d_A .= 0
@@ -123,7 +131,10 @@ end
 # y=inv(A) B
 #   dA −= z y^T  
 #   dB += z, where  z = inv(A^T) dy
-function EnzymeCore.EnzymeRules.augmented_primal(config, func::Const{typeof(LinearSolve.solve!)}, ::Type{RT}, linsolve::EnzymeCore.Annotation{LP}; kwargs...) where {RT, LP <: LinearSolve.LinearCache}
+function EnzymeCore.EnzymeRules.augmented_primal(
+        config, func::Const{typeof(LinearSolve.solve!)},
+        ::Type{RT}, linsolve::EnzymeCore.Annotation{LP};
+        kwargs...) where {RT, LP <: LinearSolve.LinearCache}
     res = func.val(linsolve.val; kwargs...)
 
     dres = if EnzymeRules.width(config) == 1
@@ -176,7 +187,9 @@ function EnzymeCore.EnzymeRules.augmented_primal(config, func::Const{typeof(Line
     return EnzymeCore.EnzymeRules.AugmentedReturn(res, dres, cache)
 end
 
-function EnzymeCore.EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.solve!)}, ::Type{RT}, cache, linsolve::EnzymeCore.Annotation{LP}; kwargs...) where {RT, LP <: LinearSolve.LinearCache}
+function EnzymeCore.EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.solve!)},
+        ::Type{RT}, cache, linsolve::EnzymeCore.Annotation{LP};
+        kwargs...) where {RT, LP <: LinearSolve.LinearCache}
     y, dys, _linsolve, dAs, dbs = cache
 
     @assert !(linsolve isa Const)
@@ -202,7 +215,7 @@ function EnzymeCore.EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.s
             LinearSolve.defaultalg_adjoint_eval(_linsolve, dy)
         else
             error("Algorithm $(_linsolve.alg) is currently not supported by Enzyme rules on LinearSolve.jl. Please open an issue on LinearSolve.jl detailing which algorithm is missing the adjoint handling")
-        end 
+        end
 
         dA .-= z * transpose(y)
         db .+= z

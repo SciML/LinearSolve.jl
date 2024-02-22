@@ -12,7 +12,7 @@ function hess_sparse(x::Vector{T}) where {T}
         1.0,
         1.0,
         12.0 * x[5]^2 + 1.0,
-        1.0,
+        1.0
     ]
 end
 rowval = [1, 1, 2, 2, 3, 4, 5, 6]
@@ -31,7 +31,7 @@ x0 = [
     1.023999999999997e-7,
     -1.0,
     0.33141395338218227,
-    -1.0,
+    -1.0
 ]
 n = length(x0)
 hess_mat = sparse(rowval, colval, hess_sparse(x0), n, n)

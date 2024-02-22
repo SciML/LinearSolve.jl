@@ -11,8 +11,8 @@ else
 end
 
 function LinearSolve.IterativeSolversJL(args...;
-    generate_iterator = IterativeSolvers.gmres_iterable!,
-    gmres_restart = 0, kwargs...)
+        generate_iterator = IterativeSolvers.gmres_iterable!,
+        gmres_restart = 0, kwargs...)
     return IterativeSolversJL(generate_iterator, gmres_restart,
         args, kwargs)
 end
@@ -49,9 +49,9 @@ LinearSolve.default_alias_A(::IterativeSolversJL, ::Any, ::Any) = true
 LinearSolve.default_alias_b(::IterativeSolversJL, ::Any, ::Any) = true
 
 function LinearSolve.init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, maxiters::Int,
-    abstol,
-    reltol,
-    verbose::Bool, assumptions::OperatorAssumptions)
+        abstol,
+        reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
     restart = (alg.gmres_restart == 0) ? min(20, size(A, 1)) : alg.gmres_restart
     s = :idrs_s in keys(alg.kwargs) ? alg.kwargs.idrs_s : 4 # shadow space
 
@@ -69,10 +69,10 @@ function LinearSolve.init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, max
     elseif alg.generate_iterator === IterativeSolvers.idrs_iterable!
         !!LinearSolve._isidentity_struct(Pr) &&
             @warn "$(alg.generate_iterator) doesn't support right preconditioning"
-        history = IterativeSolvers.ConvergenceHistory(partial=true)
+        history = IterativeSolvers.ConvergenceHistory(partial = true)
         history[:abstol] = abstol
         history[:reltol] = reltol
-        IterativeSolvers.idrs_iterable!(history, u, A, b, s, Pl, abstol, reltol, maxiters; 
+        IterativeSolvers.idrs_iterable!(history, u, A, b, s, Pl, abstol, reltol, maxiters;
             alg.kwargs...)
     elseif alg.generate_iterator === IterativeSolvers.bicgstabl_iterator!
         !!LinearSolve._isidentity_struct(Pr) &&
@@ -110,7 +110,8 @@ function SciMLBase.solve!(cache::LinearCache, alg::IterativeSolversJL; kwargs...
     end
     cache.verbose && println()
 
-    resid = cache.cacheval isa IterativeSolvers.IDRSIterable ? cache.cacheval.R : cache.cacheval.residual
+    resid = cache.cacheval isa IterativeSolvers.IDRSIterable ? cache.cacheval.R :
+            cache.cacheval.residual
     if resid isa IterativeSolvers.Residual
         resid = resid.current
     end

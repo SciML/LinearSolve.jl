@@ -79,6 +79,7 @@ function set_cacheval(cache::LinearCache, alg_cache)
     end
 end
 
-@deprecate SciMLBase.solve(cache::LinearCache, args...; kwargs...) SciMLBase.solve!(cache::LinearCache,
+@deprecate SciMLBase.solve(cache::LinearCache, args...; kwargs...) SciMLBase.solve!(
+    cache::LinearCache,
     args...;
     kwargs...) false

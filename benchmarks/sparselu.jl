@@ -36,7 +36,7 @@ algs = [
     UMFPACKFactorization(),
     KLUFactorization(),
     MKLPardisoFactorize(),
-    SparspakFactorization(),
+    SparspakFactorization()
 ]
 cols = [:red, :blue, :green, :magenta, :turqoise] # one color per alg
 lst = [:dash, :solid, :dashdot] # one line style per dim
@@ -65,7 +65,8 @@ function run_and_plot(; dims = [1, 2, 3], kmax = 12)
             u0 = rand(rng, n)
 
             for j in 1:length(algs)
-                bt = @belapsed solve(prob, $(algs[j])).u setup=(prob = LinearProblem(copy($A),
+                bt = @belapsed solve(prob, $(algs[j])).u setup=(prob = LinearProblem(
+                    copy($A),
                     copy($b);
                     u0 = copy($u0),
                     alias_A = true,

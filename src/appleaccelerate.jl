@@ -31,9 +31,9 @@ else
 end
 
 function aa_getrf!(A::AbstractMatrix{<:ComplexF64};
-    ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
-    info = Ref{Cint}(),
-    check = false)
+        ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
+        info = Ref{Cint}(),
+        check = false)
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -51,9 +51,9 @@ function aa_getrf!(A::AbstractMatrix{<:ComplexF64};
 end
 
 function aa_getrf!(A::AbstractMatrix{<:ComplexF32};
-    ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
-    info = Ref{Cint}(),
-    check = false)
+        ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
+        info = Ref{Cint}(),
+        check = false)
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -71,9 +71,9 @@ function aa_getrf!(A::AbstractMatrix{<:ComplexF32};
 end
 
 function aa_getrf!(A::AbstractMatrix{<:Float64};
-    ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
-    info = Ref{Cint}(),
-    check = false)
+        ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
+        info = Ref{Cint}(),
+        check = false)
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -91,9 +91,9 @@ function aa_getrf!(A::AbstractMatrix{<:Float64};
 end
 
 function aa_getrf!(A::AbstractMatrix{<:Float32};
-    ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
-    info = Ref{Cint}(),
-    check = false)
+        ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
+        info = Ref{Cint}(),
+        check = false)
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -112,10 +112,10 @@ function aa_getrf!(A::AbstractMatrix{<:Float32};
 end
 
 function aa_getrs!(trans::AbstractChar,
-    A::AbstractMatrix{<:ComplexF64},
-    ipiv::AbstractVector{Cint},
-    B::AbstractVecOrMat{<:ComplexF64};
-    info = Ref{Cint}())
+        A::AbstractMatrix{<:ComplexF64},
+        ipiv::AbstractVector{Cint},
+        B::AbstractVecOrMat{<:ComplexF64};
+        info = Ref{Cint}())
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -136,10 +136,10 @@ function aa_getrs!(trans::AbstractChar,
 end
 
 function aa_getrs!(trans::AbstractChar,
-    A::AbstractMatrix{<:ComplexF32},
-    ipiv::AbstractVector{Cint},
-    B::AbstractVecOrMat{<:ComplexF32};
-    info = Ref{Cint}())
+        A::AbstractMatrix{<:ComplexF32},
+        ipiv::AbstractVector{Cint},
+        B::AbstractVecOrMat{<:ComplexF32};
+        info = Ref{Cint}())
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -161,10 +161,10 @@ function aa_getrs!(trans::AbstractChar,
 end
 
 function aa_getrs!(trans::AbstractChar,
-    A::AbstractMatrix{<:Float64},
-    ipiv::AbstractVector{Cint},
-    B::AbstractVecOrMat{<:Float64};
-    info = Ref{Cint}())
+        A::AbstractMatrix{<:Float64},
+        ipiv::AbstractVector{Cint},
+        B::AbstractVecOrMat{<:Float64};
+        info = Ref{Cint}())
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -186,10 +186,10 @@ function aa_getrs!(trans::AbstractChar,
 end
 
 function aa_getrs!(trans::AbstractChar,
-    A::AbstractMatrix{<:Float32},
-    ipiv::AbstractVector{Cint},
-    B::AbstractVecOrMat{<:Float32};
-    info = Ref{Cint}())
+        A::AbstractMatrix{<:Float32},
+        ipiv::AbstractVector{Cint},
+        B::AbstractVecOrMat{<:Float32};
+        info = Ref{Cint}())
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -220,21 +220,22 @@ const PREALLOCATED_APPLE_LU = begin
 end
 
 function LinearSolve.init_cacheval(alg::AppleAccelerateLUFactorization, A, b, u, Pl, Pr,
-    maxiters::Int, abstol, reltol, verbose::Bool,
-    assumptions::OperatorAssumptions)
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
     PREALLOCATED_APPLE_LU
 end
 
-function LinearSolve.init_cacheval(alg::AppleAccelerateLUFactorization, A::AbstractMatrix{<:Union{Float32,ComplexF32,ComplexF64}}, b, u, Pl, Pr,
-    maxiters::Int, abstol, reltol, verbose::Bool,
-    assumptions::OperatorAssumptions)
+function LinearSolve.init_cacheval(alg::AppleAccelerateLUFactorization,
+        A::AbstractMatrix{<:Union{Float32, ComplexF32, ComplexF64}}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
     A = rand(eltype(A), 0, 0)
     luinst = ArrayInterface.lu_instance(A)
     LU(luinst.factors, similar(A, Cint, 0), luinst.info), Ref{Cint}()
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::AppleAccelerateLUFactorization;
-    kwargs...)
+        kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh

@@ -24,7 +24,7 @@ algs = [
     RFLUFactorization(),
     MKLLUFactorization(),
     FastLUFactorization(),
-    SimpleLUFactorization(),
+    SimpleLUFactorization()
 ]
 res = [Float64[] for i in 1:length(algs)]
 

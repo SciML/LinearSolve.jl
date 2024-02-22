@@ -9,9 +9,9 @@ to avoid allocations and does not require libblastrampoline.
 struct MKLLUFactorization <: AbstractFactorization end
 
 function getrf!(A::AbstractMatrix{<:ComplexF64};
-    ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
-    info = Ref{BlasInt}(),
-    check = false)
+        ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
+        info = Ref{BlasInt}(),
+        check = false)
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -29,9 +29,9 @@ function getrf!(A::AbstractMatrix{<:ComplexF64};
 end
 
 function getrf!(A::AbstractMatrix{<:ComplexF32};
-    ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
-    info = Ref{BlasInt}(),
-    check = false)
+        ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
+        info = Ref{BlasInt}(),
+        check = false)
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -49,9 +49,9 @@ function getrf!(A::AbstractMatrix{<:ComplexF32};
 end
 
 function getrf!(A::AbstractMatrix{<:Float64};
-    ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
-    info = Ref{BlasInt}(),
-    check = false)
+        ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
+        info = Ref{BlasInt}(),
+        check = false)
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -69,9 +69,9 @@ function getrf!(A::AbstractMatrix{<:Float64};
 end
 
 function getrf!(A::AbstractMatrix{<:Float32};
-    ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
-    info = Ref{BlasInt}(),
-    check = false)
+        ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
+        info = Ref{BlasInt}(),
+        check = false)
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -89,10 +89,10 @@ function getrf!(A::AbstractMatrix{<:Float32};
 end
 
 function getrs!(trans::AbstractChar,
-    A::AbstractMatrix{<:ComplexF64},
-    ipiv::AbstractVector{BlasInt},
-    B::AbstractVecOrMat{<:ComplexF64};
-    info = Ref{BlasInt}())
+        A::AbstractMatrix{<:ComplexF64},
+        ipiv::AbstractVector{BlasInt},
+        B::AbstractVecOrMat{<:ComplexF64};
+        info = Ref{BlasInt}())
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -114,10 +114,10 @@ function getrs!(trans::AbstractChar,
 end
 
 function getrs!(trans::AbstractChar,
-    A::AbstractMatrix{<:ComplexF32},
-    ipiv::AbstractVector{BlasInt},
-    B::AbstractVecOrMat{<:ComplexF32};
-    info = Ref{BlasInt}())
+        A::AbstractMatrix{<:ComplexF32},
+        ipiv::AbstractVector{BlasInt},
+        B::AbstractVecOrMat{<:ComplexF32};
+        info = Ref{BlasInt}())
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -139,10 +139,10 @@ function getrs!(trans::AbstractChar,
 end
 
 function getrs!(trans::AbstractChar,
-    A::AbstractMatrix{<:Float64},
-    ipiv::AbstractVector{BlasInt},
-    B::AbstractVecOrMat{<:Float64};
-    info = Ref{BlasInt}())
+        A::AbstractMatrix{<:Float64},
+        ipiv::AbstractVector{BlasInt},
+        B::AbstractVecOrMat{<:Float64};
+        info = Ref{BlasInt}())
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -164,10 +164,10 @@ function getrs!(trans::AbstractChar,
 end
 
 function getrs!(trans::AbstractChar,
-    A::AbstractMatrix{<:Float32},
-    ipiv::AbstractVector{BlasInt},
-    B::AbstractVecOrMat{<:Float32};
-    info = Ref{BlasInt}())
+        A::AbstractMatrix{<:Float32},
+        ipiv::AbstractVector{BlasInt},
+        B::AbstractVecOrMat{<:Float32};
+        info = Ref{BlasInt}())
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -197,20 +197,21 @@ const PREALLOCATED_MKL_LU = begin
 end
 
 function LinearSolve.init_cacheval(alg::MKLLUFactorization, A, b, u, Pl, Pr,
-    maxiters::Int, abstol, reltol, verbose::Bool,
-    assumptions::OperatorAssumptions)
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
     PREALLOCATED_MKL_LU
 end
 
-function LinearSolve.init_cacheval(alg::MKLLUFactorization, A::AbstractMatrix{<:Union{Float32,ComplexF32,ComplexF64}}, b, u, Pl, Pr,
-    maxiters::Int, abstol, reltol, verbose::Bool,
-    assumptions::OperatorAssumptions)
+function LinearSolve.init_cacheval(alg::MKLLUFactorization,
+        A::AbstractMatrix{<:Union{Float32, ComplexF32, ComplexF64}}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
     A = rand(eltype(A), 0, 0)
     ArrayInterface.lu_instance(A), Ref{BlasInt}()
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
-    kwargs...)
+        kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh

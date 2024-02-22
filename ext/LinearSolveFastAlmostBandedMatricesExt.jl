@@ -2,7 +2,8 @@ module LinearSolveFastAlmostBandedMatricesExt
 
 using FastAlmostBandedMatrices, LinearAlgebra, LinearSolve
 import LinearSolve: defaultalg,
-    do_factorization, init_cacheval, DefaultLinearSolver, DefaultAlgorithmChoice
+                    do_factorization, init_cacheval, DefaultLinearSolver,
+                    DefaultAlgorithmChoice
 
 function defaultalg(A::AlmostBandedMatrix, b, oa::OperatorAssumptions{Bool})
     if oa.issq

@@ -23,7 +23,7 @@ algs = [
     GenericLUFactorization(),
     RFLUFactorization(),
     AppleAccelerateLUFactorization(),
-    MetalLUFactorization(),
+    MetalLUFactorization()
 ]
 res = [Float32[] for i in 1:length(algs)]
 

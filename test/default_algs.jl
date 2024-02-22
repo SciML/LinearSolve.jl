@@ -5,24 +5,24 @@ prob = LinearProblem(rand(3, 3), rand(3))
 solve(prob)
 
 if LinearSolve.appleaccelerate_isavailable()
-      @test LinearSolve.defaultalg(nothing, zeros(50)).alg ===
-      LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization
+    @test LinearSolve.defaultalg(nothing, zeros(50)).alg ===
+          LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization
 else
-      @test LinearSolve.defaultalg(nothing, zeros(50)).alg ===
-            LinearSolve.DefaultAlgorithmChoice.RFLUFactorization
+    @test LinearSolve.defaultalg(nothing, zeros(50)).alg ===
+          LinearSolve.DefaultAlgorithmChoice.RFLUFactorization
 end
 prob = LinearProblem(rand(50, 50), rand(50))
 solve(prob)
 
 if LinearSolve.usemkl
-      @test LinearSolve.defaultalg(nothing, zeros(600)).alg ===
-      LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization
+    @test LinearSolve.defaultalg(nothing, zeros(600)).alg ===
+          LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization
 elseif LinearSolve.appleaccelerate_isavailable()
-      @test LinearSolve.defaultalg(nothing, zeros(600)).alg ===
-      LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization
+    @test LinearSolve.defaultalg(nothing, zeros(600)).alg ===
+          LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization
 else
-      @test LinearSolve.defaultalg(nothing, zeros(600)).alg ===
-      LinearSolve.DefaultAlgorithmChoice.LUFactorization
+    @test LinearSolve.defaultalg(nothing, zeros(600)).alg ===
+          LinearSolve.DefaultAlgorithmChoice.LUFactorization
 end
 
 prob = LinearProblem(rand(600, 600), rand(600))

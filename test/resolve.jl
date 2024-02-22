@@ -3,14 +3,14 @@ using LinearSolve, LinearAlgebra, SparseArrays, InteractiveUtils, Test
 for alg in subtypes(LinearSolve.AbstractFactorization)
     @show alg
     if !(alg in [
-        DiagonalFactorization,
-        CudaOffloadFactorization,
-        AppleAccelerateLUFactorization,
-        MetalLUFactorization,
-    ]) &&
+           DiagonalFactorization,
+           CudaOffloadFactorization,
+           AppleAccelerateLUFactorization,
+           MetalLUFactorization
+       ]) &&
        (!(alg == AppleAccelerateLUFactorization) ||
         LinearSolve.appleaccelerate_isavailable()) &&
-        (!(alg == MKLLUFactorization) || LinearSolve.usemkl)
+       (!(alg == MKLLUFactorization) || LinearSolve.usemkl)
         A = [1.0 2.0; 3.0 4.0]
         alg in [KLUFactorization, UMFPACKFactorization, SparspakFactorization] &&
             (A = sparse(A))
@@ -50,19 +50,19 @@ linsolve.A = A
 @test solve!(linsolve).u ≈ [1.0, 0.5]
 
 A = Symmetric([1.0 2.0
-    2.0 1.0])
+               2.0 1.0])
 b = [1.0, 2.0]
 prob = LinearProblem(A, b)
 linsolve = init(prob, BunchKaufmanFactorization(), alias_A = false, alias_b = false)
 @test solve!(linsolve).u ≈ [1.0, 0.0]
 @test solve!(linsolve).u ≈ [1.0, 0.0]
 A = Symmetric([1.0 2.0
-    2.0 1.0])
+               2.0 1.0])
 linsolve.A = A
 @test solve!(linsolve).u ≈ [1.0, 0.0]
 
 A = [1.0 2.0
-    2.0 1.0]
+     2.0 1.0]
 A = Symmetric(A * A')
 b = [1.0, 2.0]
 prob = LinearProblem(A, b)
@@ -70,7 +70,7 @@ linsolve = init(prob, CholeskyFactorization(), alias_A = false, alias_b = false)
 @test solve!(linsolve).u ≈ [-1 / 3, 2 / 3]
 @test solve!(linsolve).u ≈ [-1 / 3, 2 / 3]
 A = [1.0 2.0
-    2.0 1.0]
+     2.0 1.0]
 A = Symmetric(A * A')
 b = [1.0, 2.0]
 @test solve!(linsolve).u ≈ [-1 / 3, 2 / 3]

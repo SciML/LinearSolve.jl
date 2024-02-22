@@ -9,14 +9,16 @@ specialized dispatches.
 
 ## Arguments
 
-* `restart::Bool`: If `true`, then the solver will restart after `memory` iterations.
-* `memory::Int = 20`: The number of iterations before restarting. If restart is false, this
-  value is used to allocate memory and later expanded if more memory is required.
-* `blocksize::Int = 0`: If blocksize is `> 0`, the solver assumes that the matrix has a
-  uniformly sized block diagonal structure with square blocks of size `blocksize`. Misusing
-  this option will lead to incorrect results.
-    * If this is set `≤ 0` and during runtime we get a Block Diagonal Matrix, then we will
-      check if the specialized dispatch can be used.
+  - `restart::Bool`: If `true`, then the solver will restart after `memory` iterations.
+
+  - `memory::Int = 20`: The number of iterations before restarting. If restart is false, this
+    value is used to allocate memory and later expanded if more memory is required.
+  - `blocksize::Int = 0`: If blocksize is `> 0`, the solver assumes that the matrix has a
+    uniformly sized block diagonal structure with square blocks of size `blocksize`. Misusing
+    this option will lead to incorrect results.
+
+      + If this is set `≤ 0` and during runtime we get a Block Diagonal Matrix, then we will
+        check if the specialized dispatch can be used.
 
 !!! warning
 
@@ -38,13 +40,13 @@ struct SimpleGMRES{UBD} <: AbstractKrylovSubspaceMethod
     warm_start::Bool
 
     function SimpleGMRES{UBD}(; restart::Bool = true, blocksize::Int = 0,
-        warm_start::Bool = false, memory::Int = 20) where {UBD}
+            warm_start::Bool = false, memory::Int = 20) where {UBD}
         UBD && @assert blocksize > 0
         return new{UBD}(restart, memory, blocksize, warm_start)
     end
 
     function SimpleGMRES(; restart::Bool = true, blocksize::Int = 0,
-        warm_start::Bool = false, memory::Int = 20)
+            warm_start::Bool = false, memory::Int = 20)
         return SimpleGMRES{blocksize > 0}(; restart, memory, blocksize,
             warm_start)
     end
@@ -159,7 +161,7 @@ function init_cacheval(alg::SimpleGMRES{UDB}, args...; kwargs...) where {UDB}
 end
 
 function _init_cacheval(::Val{false}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiters::Int,
-    abstol, reltol, ::Bool, ::OperatorAssumptions; zeroinit = true, kwargs...)
+        abstol, reltol, ::Bool, ::OperatorAssumptions; zeroinit = true, kwargs...)
     @unpack memory, restart, blocksize, warm_start = alg
 
     if zeroinit
@@ -210,7 +212,8 @@ function _init_cacheval(::Val{false}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiter
     rNorm = β
     ε = abstol + reltol * rNorm
 
-    return SimpleGMRESCache{false}(memory, n, restart, maxiters, blocksize, ε, PlisI, PrisI,
+    return SimpleGMRESCache{false}(
+        memory, n, restart, maxiters, blocksize, ε, PlisI, PrisI,
         Pl, Pr, Δx, q, p, x, A, b, abstol, reltol, w, V, s, c, z, R, β, warm_start)
 end
 
@@ -304,7 +307,8 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
             # Compute and apply current Givens reflection Ωₖ.
             # [cₖ  sₖ] [ r̄ₖ.ₖ ] = [rₖ.ₖ]
             # [s̄ₖ -cₖ] [hₖ₊₁.ₖ]   [ 0  ]
-            (c[inner_iter], s[inner_iter], R[nr + inner_iter]) = _sym_givens(R[nr + inner_iter],
+            (c[inner_iter], s[inner_iter], R[nr + inner_iter]) = _sym_givens(
+                R[nr + inner_iter],
                 Hbis)
 
             # Update zₖ = (Qₖ)ᴴβe₁
@@ -387,8 +391,8 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
 end
 
 function _init_cacheval(::Val{true}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiters::Int,
-    abstol, reltol, ::Bool, ::OperatorAssumptions; zeroinit = true,
-    blocksize = alg.blocksize)
+        abstol, reltol, ::Bool, ::OperatorAssumptions; zeroinit = true,
+        blocksize = alg.blocksize)
     @unpack memory, restart, warm_start = alg
 
     if zeroinit

@@ -15,7 +15,7 @@ alternatively pass an already created solver to `HYPREAlgorithm` (and to the `Pl
 argument). See HYPRE.jl docs for how to set up solvers with specific options.
 
 !!! note
-    
+
     Using HYPRE solvers requires Julia version 1.9 or higher, and that the package HYPRE.jl
     is installed.
 
@@ -23,20 +23,20 @@ argument). See HYPRE.jl docs for how to set up solvers with specific options.
 
 The single positional argument `solver` has the following choices:
 
-- `HYPRE.BiCGSTAB`
-- `HYPRE.BoomerAMG`
-- `HYPRE.FlexGMRES`
-- `HYPRE.GMRES`
-- `HYPRE.Hybrid`
-- `HYPRE.ILU`
-- `HYPRE.ParaSails` (as preconditioner only)
-- `HYPRE.PCG`
+  - `HYPRE.BiCGSTAB`
+  - `HYPRE.BoomerAMG`
+  - `HYPRE.FlexGMRES`
+  - `HYPRE.GMRES`
+  - `HYPRE.Hybrid`
+  - `HYPRE.ILU`
+  - `HYPRE.ParaSails` (as preconditioner only)
+  - `HYPRE.PCG`
 
 ## Keyword Arguments
 
-* `Pl`: A choice of left preconditioner.
+  - `Pl`: A choice of left preconditioner.
 
-## Example 
+## Example
 
 For example, to use `HYPRE.PCG` as the solver, with `HYPRE.BoomerAMG` as the preconditioner,
 the algorithm should be defined as follows:
@@ -64,11 +64,11 @@ end
 """
 `CudaOffloadFactorization()`
 
-An offloading technique used to GPU-accelerate CPU-based computations. 
+An offloading technique used to GPU-accelerate CPU-based computations.
 Requires a sufficiently large `A` to overcome the data transfer costs.
 
 !!! note
-    
+
     Using this solver requires adding the package CUDA.jl, i.e. `using CUDA`
 """
 struct CudaOffloadFactorization <: LinearSolve.AbstractFactorization
@@ -85,15 +85,15 @@ end
 """
 ```julia
 MKLPardisoFactorize(; nprocs::Union{Int, Nothing} = nothing,
-                    matrix_type = nothing,
-                    iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
-                    dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
+    matrix_type = nothing,
+    iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
+    dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
 ```
 
 A sparse factorization method using MKL Pardiso.
 
 !!! note
-    
+
     Using this solver requires adding the package Pardiso.jl, i.e. `using Pardiso`
 
 ## Keyword Arguments
@@ -108,15 +108,15 @@ MKLPardisoFactorize(; kwargs...) = PardisoJL(; solver_type = 0, kwargs...)
 """
 ```julia
 MKLPardisoIterate(; nprocs::Union{Int, Nothing} = nothing,
-                    matrix_type = nothing,
-                    iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
-                    dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
+    matrix_type = nothing,
+    iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
+    dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
 ```
 
 A mixed factorization+iterative method using MKL Pardiso.
 
 !!! note
-    
+
     Using this solver requires adding the package Pardiso.jl, i.e. `using Pardiso`
 
 ## Keyword Arguments
@@ -131,10 +131,10 @@ MKLPardisoIterate(; kwargs...) = PardisoJL(; solver_type = 1, kwargs...)
 """
 ```julia
 PardisoJL(; nprocs::Union{Int, Nothing} = nothing,
-            solver_type = nothing,
-            matrix_type = nothing,
-            iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
-            dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
+    solver_type = nothing,
+    matrix_type = nothing,
+    iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
+    dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
 ```
 
 A generic method using MKL Pardiso. Specifying `solver_type` is required.
@@ -158,10 +158,10 @@ struct PardisoJL{T1, T2} <: LinearSolve.SciMLLinearSolveAlgorithm
     dparm::Union{Vector{Tuple{Int, Int}}, Nothing}
 
     function PardisoJL(; nprocs::Union{Int, Nothing} = nothing,
-        solver_type = nothing,
-        matrix_type = nothing,
-        iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
-        dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
+            solver_type = nothing,
+            matrix_type = nothing,
+            iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
+            dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
         ext = Base.get_extension(@__MODULE__, :LinearSolvePardisoExt)
         if ext === nothing
             error("PardisoJL requires that Pardiso is loaded, i.e. `using Pardiso`")
@@ -184,7 +184,7 @@ A generic iterative solver implementation allowing the choice of KrylovKit.jl
 solvers.
 
 !!! note
-    
+
     Using this solver requires adding the package KrylovKit.jl, i.e. `using KrylovKit`
 """
 struct KrylovKitJL{F, A, I, K} <: LinearSolve.AbstractKrylovSubspaceMethod
@@ -202,8 +202,8 @@ KrylovKitJL_CG(args...; Pl = nothing, Pr = nothing, kwargs...)
 A generic CG implementation for Hermitian and positive definite linear systems
 
 !!! note
-    
-    Using this solver requires adding the package KrylovKit.jl, i.e. `using KrylovKit`    
+
+    Using this solver requires adding the package KrylovKit.jl, i.e. `using KrylovKit`
 """
 function KrylovKitJL_CG end
 
@@ -215,7 +215,7 @@ KrylovKitJL_GMRES(args...; Pl = nothing, Pr = nothing, gmres_restart = 0, kwargs
 A generic GMRES implementation.
 
 !!! note
-    
+
     Using this solver requires adding the package KrylovKit.jl, i.e. `using KrylovKit`
 """
 function KrylovKitJL_GMRES end
@@ -223,18 +223,16 @@ function KrylovKitJL_GMRES end
 """
 ```julia
 IterativeSolversJL(args...;
-                   generate_iterator = IterativeSolvers.gmres_iterable!,
-                   Pl = nothing, Pr = nothing,
-                   gmres_restart = 0, kwargs...)
+    generate_iterator = IterativeSolvers.gmres_iterable!,
+    Pl = nothing, Pr = nothing,
+    gmres_restart = 0, kwargs...)
 ```
 
 A generic wrapper over the IterativeSolvers.jl solvers.
 
-
 !!! note
-    
-    Using this solver requires adding the package IterativeSolvers.jl, i.e. `using IterativeSolvers`
 
+    Using this solver requires adding the package IterativeSolvers.jl, i.e. `using IterativeSolvers`
 """
 struct IterativeSolversJL{F, I, A, K} <: LinearSolve.AbstractKrylovSubspaceMethod
     generate_iterator::F
@@ -251,24 +249,21 @@ IterativeSolversJL_CG(args...; Pl = nothing, Pr = nothing, kwargs...)
 A wrapper over the IterativeSolvers.jl CG.
 
 !!! note
-    
-    Using this solver requires adding the package IterativeSolvers.jl, i.e. `using IterativeSolvers`
 
+    Using this solver requires adding the package IterativeSolvers.jl, i.e. `using IterativeSolvers`
 """
 function IterativeSolversJL_CG end
 
 """
 ```julia
-IterativeSolversJL_GMRES(args...; Pl = nothing, Pr = nothing, gmres_restart=0, kwargs...)
+IterativeSolversJL_GMRES(args...; Pl = nothing, Pr = nothing, gmres_restart = 0, kwargs...)
 ```
 
 A wrapper over the IterativeSolvers.jl GMRES.
 
-
 !!! note
-    
-    Using this solver requires adding the package IterativeSolvers.jl, i.e. `using IterativeSolvers`
 
+    Using this solver requires adding the package IterativeSolvers.jl, i.e. `using IterativeSolvers`
 """
 function IterativeSolversJL_GMRES end
 
@@ -279,11 +274,9 @@ IterativeSolversJL_IDRS(args...; Pl = nothing, kwargs...)
 
 A wrapper over the IterativeSolvers.jl IDR(S).
 
-
 !!! note
-    
-    Using this solver requires adding the package IterativeSolvers.jl, i.e. `using IterativeSolvers`
 
+    Using this solver requires adding the package IterativeSolvers.jl, i.e. `using IterativeSolvers`
 """
 function IterativeSolversJL_IDRS end
 
@@ -294,11 +287,9 @@ IterativeSolversJL_BICGSTAB(args...; Pl = nothing, Pr = nothing, kwargs...)
 
 A wrapper over the IterativeSolvers.jl BICGSTAB.
 
-
 !!! note
-    
-    Using this solver requires adding the package IterativeSolvers.jl, i.e. `using IterativeSolvers`
 
+    Using this solver requires adding the package IterativeSolvers.jl, i.e. `using IterativeSolvers`
 """
 function IterativeSolversJL_BICGSTAB end
 
@@ -309,11 +300,9 @@ IterativeSolversJL_MINRES(args...; Pl = nothing, Pr = nothing, kwargs...)
 
 A wrapper over the IterativeSolvers.jl MINRES.
 
-
 !!! note
-    
-    Using this solver requires adding the package IterativeSolvers.jl, i.e. `using IterativeSolvers`
 
+    Using this solver requires adding the package IterativeSolvers.jl, i.e. `using IterativeSolvers`
 """
 function IterativeSolversJL_MINRES end
 

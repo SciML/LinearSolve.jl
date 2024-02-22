@@ -4,8 +4,8 @@ using LinearSolve, KrylovKit, LinearAlgebra
 using LinearSolve: LinearCache
 
 function LinearSolve.KrylovKitJL(args...;
-    KrylovAlg = KrylovKit.GMRES, gmres_restart = 0,
-    kwargs...)
+        KrylovAlg = KrylovKit.GMRES, gmres_restart = 0,
+        kwargs...)
     return KrylovKitJL(KrylovAlg, gmres_restart, args, kwargs)
 end
 

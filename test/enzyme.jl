@@ -22,8 +22,8 @@ f(A, b1) # Uses BLAS
 
 Enzyme.autodiff(Reverse, f, Duplicated(copy(A), dA), Duplicated(copy(b1), db1))
 
-dA2 = ForwardDiff.gradient(x->f(x,eltype(x).(b1)), copy(A))
-db12 = ForwardDiff.gradient(x->f(eltype(x).(A),x), copy(b1))
+dA2 = ForwardDiff.gradient(x -> f(x, eltype(x).(b1)), copy(A))
+db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x), copy(b1))
 
 @test dA ≈ dA2
 @test db1 ≈ db12
@@ -33,13 +33,20 @@ dA = zeros(n, n);
 b1 = rand(n);
 db1 = zeros(n);
 
-_ff = (x,y) -> f(x,y; alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization))
+_ff = (x, y) -> f(x,
+    y;
+    alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization))
 _ff(copy(A), copy(b1))
 
-Enzyme.autodiff(Reverse, (x,y) -> f(x,y; alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)), Duplicated(copy(A), dA), Duplicated(copy(b1), db1))
+Enzyme.autodiff(Reverse,
+    (x, y) -> f(x,
+        y;
+        alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)),
+    Duplicated(copy(A), dA),
+    Duplicated(copy(b1), db1))
 
-dA2 = ForwardDiff.gradient(x->f(x,eltype(x).(b1)), copy(A))
-db12 = ForwardDiff.gradient(x->f(eltype(x).(A),x), copy(b1))
+dA2 = ForwardDiff.gradient(x -> f(x, eltype(x).(b1)), copy(A))
+db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x), copy(b1))
 
 @test dA ≈ dA2
 @test db1 ≈ db12
@@ -50,7 +57,6 @@ dA2 = zeros(n, n);
 b1 = rand(n);
 db1 = zeros(n);
 db12 = zeros(n);
-
 
 # Batch test
 n = 4
@@ -79,11 +85,12 @@ end
 y = [0.0]
 dy1 = [1.0]
 dy2 = [1.0]
-Enzyme.autodiff(Reverse, fbatch, Duplicated(y, dy1), Duplicated(copy(A), dA), Duplicated(copy(b1), db1))
+Enzyme.autodiff(
+    Reverse, fbatch, Duplicated(y, dy1), Duplicated(copy(A), dA), Duplicated(copy(b1), db1))
 
-@test y[1] ≈ f(copy(A),b1)
-dA_2 = ForwardDiff.gradient(x->f(x,eltype(x).(b1)), copy(A))
-db1_2 = ForwardDiff.gradient(x->f(eltype(x).(A),x), copy(b1))
+@test y[1] ≈ f(copy(A), b1)
+dA_2 = ForwardDiff.gradient(x -> f(x, eltype(x).(b1)), copy(A))
+db1_2 = ForwardDiff.gradient(x -> f(eltype(x).(A), x), copy(b1))
 
 @test dA ≈ dA_2
 @test db1 ≈ db1_2
@@ -95,7 +102,8 @@ dA .= 0
 dA2 .= 0
 db1 .= 0
 db12 .= 0
-Enzyme.autodiff(Reverse, fbatch, BatchDuplicated(y, (dy1, dy2)), BatchDuplicated(copy(A), (dA, dA2)), BatchDuplicated(copy(b1), (db1, db12)))
+Enzyme.autodiff(Reverse, fbatch, BatchDuplicated(y, (dy1, dy2)),
+    BatchDuplicated(copy(A), (dA, dA2)), BatchDuplicated(copy(b1), (db1, db12)))
 
 @test dA ≈ dA_2
 @test db1 ≈ db1_2
@@ -119,11 +127,12 @@ b2 = rand(n);
 db2 = zeros(n);
 
 f(A, b1, b2)
-Enzyme.autodiff(Reverse, f, Duplicated(copy(A), dA), Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
+Enzyme.autodiff(Reverse, f, Duplicated(copy(A), dA),
+    Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
 
-dA2 = ForwardDiff.gradient(x->f(x,eltype(x).(b1),eltype(x).(b2)), copy(A))
-db12 = ForwardDiff.gradient(x->f(eltype(x).(A),x,eltype(x).(b2)), copy(b1))
-db22 = ForwardDiff.gradient(x->f(eltype(x).(A),eltype(x).(b1),x), copy(b2))
+dA2 = ForwardDiff.gradient(x -> f(x, eltype(x).(b1), eltype(x).(b2)), copy(A))
+db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x, eltype(x).(b2)), copy(b1))
+db22 = ForwardDiff.gradient(x -> f(eltype(x).(A), eltype(x).(b1), x), copy(b2))
 
 @test dA ≈ dA2
 @test db1 ≈ db12
@@ -142,7 +151,8 @@ f2(A, b1, b2)
 dA = zeros(n, n);
 db1 = zeros(n);
 db2 = zeros(n);
-Enzyme.autodiff(Reverse, f2, Duplicated(copy(A), dA), Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
+Enzyme.autodiff(Reverse, f2, Duplicated(copy(A), dA),
+    Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
 
 @test dA ≈ dA2
 @test db1 ≈ db12
@@ -169,10 +179,9 @@ A = rand(n, n);
 dA = zeros(n, n);
 b1 = rand(n);
 for alg in (
-    LUFactorization(), 
-    RFLUFactorization(),
-    # KrylovJL_GMRES(), fails
-    )
+    LUFactorization(),
+    RFLUFactorization()    # KrylovJL_GMRES(), fails
+)
     @show alg
     function fb(b)
         prob = LinearProblem(A, b)
@@ -192,7 +201,7 @@ for alg in (
     end |> collect
     @show en_jac
 
-    @test en_jac ≈ fd_jac rtol=1e-4
+    @test en_jac≈fd_jac rtol=1e-4
 
     function fA(A)
         prob = LinearProblem(A, b1)
@@ -212,5 +221,5 @@ for alg in (
     end |> collect
     @show en_jac
 
-    @test en_jac ≈ fd_jac rtol=1e-4
+    @test en_jac≈fd_jac rtol=1e-4
 end

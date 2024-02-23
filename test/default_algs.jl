@@ -38,7 +38,7 @@ solve(prob)
 
 A = spzeros(100, 100)
 A[1,1]=1
-# test that solving a singluar problem doesn't error
+# test that solving a singular problem doesn't error
 prob = LinearProblem(A, ones(100))
 solve(prob)
 

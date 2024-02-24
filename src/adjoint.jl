@@ -47,11 +47,7 @@ function CRC.rrule(::typeof(SciMLBase.solve), prob::LinearProblem,
             A_ = alias_A ? deepcopy(A) : A
         end
     else
-        if alg isa DefaultLinearSolver
-            A_ = deepcopy(A)
-        else
-            A_ = alias_A ? deepcopy(A) : A
-        end
+        A_ = deepcopy(A)
     end
 
     sol = solve!(cache)

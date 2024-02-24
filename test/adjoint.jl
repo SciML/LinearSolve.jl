@@ -51,15 +51,34 @@ end
 
 dA, db1, db2 = Zygote.gradient(f3, A, b1, b1)
 
-#= Needs ForwardDiff rules
-dA2 = ForwardDiff.gradient(x -> f3(x, eltype(x).(b1), eltype(x).(b1)), copy(A))
-db12 = ForwardDiff.gradient(x -> f3(eltype(x).(A), x, eltype(x).(b1)), copy(b1))
-db22 = ForwardDiff.gradient(x -> f3(eltype(x).(A), eltype(x).(b1), x), copy(b1))
+dA2 = FiniteDiff.finite_difference_gradient(
+    x -> f4(x, eltype(x).(b1), eltype(x).(b1)), copy(A))
+db12 = FiniteDiff.finite_difference_gradient(
+    x -> f4(eltype(x).(A), x, eltype(x).(b1)), copy(b1))
+db22 = FiniteDiff.finite_difference_gradient(
+    x -> f4(eltype(x).(A), eltype(x).(b1), x), copy(b1))
 
-@test dA ≈ dA2 atol=5e-5
+@test dA≈dA2 atol=5e-5
 @test db1 ≈ db12
 @test db2 ≈ db22
-=#
+
+function f4(A, b1, b2; alg = LUFactorization())
+    prob = LinearProblem(A, b1)
+    sol1 = solve(prob, alg; sensealg = LinearSolveAdjoint(; linsolve = KrylovJL_LSMR()))
+    prob = LinearProblem(A, b2)
+    sol2 = solve(prob, alg; sensealg = LinearSolveAdjoint(; linsolve = KrylovJL_GMRES()))
+    norm(sol1.u .+ sol2.u)
+end
+
+dA, db1, db2 = Zygote.gradient(f4, A, b1, b1)
+
+dA2 = ForwardDiff.gradient(x -> f4(x, eltype(x).(b1), eltype(x).(b1)), copy(A))
+db12 = ForwardDiff.gradient(x -> f4(eltype(x).(A), x, eltype(x).(b1)), copy(b1))
+db22 = ForwardDiff.gradient(x -> f4(eltype(x).(A), eltype(x).(b1), x), copy(b1))
+
+@test dA≈dA2 atol=5e-5
+@test db1 ≈ db12
+@test db2 ≈ db22
 
 A = rand(n, n);
 b1 = rand(n);

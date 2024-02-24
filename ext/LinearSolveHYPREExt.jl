@@ -5,7 +5,7 @@ using HYPRE.LibHYPRE: HYPRE_Complex
 using HYPRE: HYPRE, HYPREMatrix, HYPRESolver, HYPREVector
 using LinearSolve: HYPREAlgorithm, LinearCache, LinearProblem, LinearSolve,
                    OperatorAssumptions, default_tol, init_cacheval, __issquare,
-                   __conditioning
+                   __conditioning, LinearSolveAdjoint
 using SciMLBase: LinearProblem, SciMLBase
 using UnPack: @unpack
 using Setfield: @set!
@@ -68,6 +68,7 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
         Pl = LinearAlgebra.I,
         Pr = LinearAlgebra.I,
         assumptions = OperatorAssumptions(),
+        sensealg = LinearSolveAdjoint(),
         kwargs...)
     @unpack A, b, u0, p = prob
 
@@ -89,10 +90,9 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
     cache = LinearCache{
         typeof(A), typeof(b), typeof(u0), typeof(p), typeof(alg), Tc,
         typeof(Pl), typeof(Pr), typeof(reltol),
-        typeof(__issquare(assumptions))
+        typeof(__issquare(assumptions), typeof(sensealg))
     }(A, b, u0, p, alg, cacheval, isfresh, Pl, Pr, abstol, reltol,
-        maxiters,
-        verbose, assumptions)
+        maxiters, verbose, assumptions, sensealg)
     return cache
 end
 

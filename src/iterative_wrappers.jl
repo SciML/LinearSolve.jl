@@ -3,9 +3,9 @@
 """
 ```julia
 KrylovJL(args...; KrylovAlg = Krylov.gmres!,
-         Pl = nothing, Pr = nothing,
-         gmres_restart = 0, window = 0,
-         kwargs...)
+    Pl = nothing, Pr = nothing,
+    gmres_restart = 0, window = 0,
+    kwargs...)
 ```
 
 A generic wrapper over the Krylov.jl krylov-subspace iterative solvers.
@@ -19,8 +19,8 @@ struct KrylovJL{F, I, A, K} <: AbstractKrylovSubspaceMethod
 end
 
 function KrylovJL(args...; KrylovAlg = Krylov.gmres!,
-    gmres_restart = 0, window = 0,
-    kwargs...)
+        gmres_restart = 0, window = 0,
+        kwargs...)
     return KrylovJL(KrylovAlg, gmres_restart, window,
         args, kwargs)
 end
@@ -30,7 +30,7 @@ default_alias_b(::KrylovJL, ::Any, ::Any) = true
 
 """
 ```julia
-KrylovJL_CG(args...;  kwargs...)
+KrylovJL_CG(args...; kwargs...)
 ```
 
 A generic CG implementation for Hermitian and positive definite linear systems
@@ -41,7 +41,7 @@ end
 
 """
 ```julia
-KrylovJL_MINRES(args...;  kwargs...)
+KrylovJL_MINRES(args...; kwargs...)
 ```
 
 A generic MINRES implementation for Hermitian linear systems
@@ -52,7 +52,7 @@ end
 
 """
 ```julia
-KrylovJL_GMRES(args...;  gmres_restart = 0, window = 0, kwargs...)
+KrylovJL_GMRES(args...; gmres_restart = 0, window = 0, kwargs...)
 ```
 
 A generic GMRES implementation for square non-Hermitian linear systems
@@ -63,7 +63,7 @@ end
 
 """
 ```julia
-KrylovJL_BICGSTAB(args...;  kwargs...)
+KrylovJL_BICGSTAB(args...; kwargs...)
 ```
 
 A generic BICGSTAB implementation for square non-Hermitian linear systems
@@ -74,7 +74,7 @@ end
 
 """
 ```julia
-KrylovJL_LSMR(args...;  kwargs...)
+KrylovJL_LSMR(args...; kwargs...)
 ```
 
 A generic LSMR implementation for least-squares problems
@@ -85,7 +85,7 @@ end
 
 """
 ```julia
-KrylovJL_CRAIGMR(args...;  kwargs...)
+KrylovJL_CRAIGMR(args...; kwargs...)
 ```
 
 A generic CRAIGMR implementation for least-norm problems
@@ -170,7 +170,7 @@ end
 
 # zeroinit allows for init_cacheval to start by initing with A (0,0)
 function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
-    verbose::Bool, assumptions::OperatorAssumptions; zeroinit = true)
+        verbose::Bool, assumptions::OperatorAssumptions; zeroinit = true)
     KS = get_KrylovJL_solver(alg.KrylovAlg)
 
     if zeroinit
@@ -181,7 +181,7 @@ function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, re
                      alg.KrylovAlg === Krylov.gpmr! ||
                      alg.KrylovAlg === Krylov.fom!)
             if A isa SparseMatrixCSC
-                KS(SparseMatrixCSC(0, 0, [1], Int64[], eltype(A)[]), eltype(b)[], 1)
+                KS(SparseMatrixCSC(0, 0, [1], Int[], eltype(A)[]), eltype(b)[], 1)
             elseif A isa Matrix
                 KS(Matrix{eltype(A)}(undef, 0, 0), eltype(b)[], 1)
             else
@@ -189,7 +189,7 @@ function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, re
             end
         else
             if A isa SparseMatrixCSC
-                KS(SparseMatrixCSC(0, 0, [1], Int64[], eltype(A)[]), eltype(b)[])
+                KS(SparseMatrixCSC(0, 0, [1], Int[], eltype(A)[]), eltype(b)[])
             elseif A isa Matrix
                 KS(Matrix{eltype(A)}(undef, 0, 0), eltype(b)[])
             else
@@ -243,7 +243,21 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     itmax = cache.maxiters
     verbose = cache.verbose ? 1 : 0
 
-    args = (@get_cacheval(cache, :KrylovJL_GMRES), cache.A, cache.b)
+    cacheval = if cache.alg isa DefaultLinearSolver
+        if alg.KrylovAlg === Krylov.gmres!
+            @get_cacheval(cache, :KrylovJL_GMRES)
+        elseif alg.KrylovAlg === Krylov.craigmr!
+            @get_cacheval(cache, :KrylovJL_CRAIGMR)
+        elseif alg.KrylovAlg === Krylov.lsmr!
+            @get_cacheval(cache, :KrylovJL_LSMR)
+        else
+            error("Default linear solver can only be these three choices! Report this bug!")
+        end
+    else
+        cache.cacheval
+    end
+
+    args = (cacheval, cache.A, cache.b)
     kwargs = (atol = atol, rtol = rtol, itmax = itmax, verbose = verbose,
         ldiv = true, history = true, alg.kwargs...)
 
@@ -268,7 +282,8 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     end
 
     stats = @get_cacheval(cache, :KrylovJL_GMRES).stats
-    resid = stats.residuals |> last
+    resid = !isempty(stats.residuals) ? last(stats.residuals) :
+            zero(eltype(stats.residuals))
 
     retcode = if !stats.solved
         if stats.status == "maximum number of iterations exceeded"

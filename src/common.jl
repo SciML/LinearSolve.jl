@@ -7,7 +7,7 @@ can be dependent on the condition number of the matrix. The condition number can
 
 ```julia
 using LinearAlgebra
-cond(rand(100,100))
+cond(rand(100, 100))
 ```
 
 However, in practice this computation is very expensive and thus not possible for most practical cases.
@@ -59,7 +59,7 @@ struct OperatorAssumptions{T}
 end
 
 function OperatorAssumptions(issquare = nothing;
-    condition::OperatorCondition.T = OperatorCondition.IllConditioned)
+        condition::OperatorCondition.T = OperatorCondition.IllConditioned)
     OperatorAssumptions{typeof(issquare)}(issquare, condition)
 end
 __issquare(assump::OperatorAssumptions) = assump.issq
@@ -91,7 +91,8 @@ function Base.setproperty!(cache::LinearCache, name::Symbol, x)
         update_cacheval!(cache, :b, x)
     elseif name === :cacheval && cache.alg isa DefaultLinearSolver
         @assert cache.cacheval isa DefaultLinearSolverInit
-        return setfield!(cache.cacheval, Symbol(cache.alg.alg), x)
+        return __setfield!(cache.cacheval, cache.alg, x)
+        # return setfield!(cache.cacheval, Symbol(cache.alg.alg), x)
     end
     setfield!(cache, name, x)
 end
@@ -128,18 +129,18 @@ end
 __init_u0_from_Ab(::SMatrix{S1, S2}, b) where {S1, S2} = zeros(SVector{S2, eltype(b)})
 
 function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
-    args...;
-    alias_A = default_alias_A(alg, prob.A, prob.b),
-    alias_b = default_alias_b(alg, prob.A, prob.b),
-    abstol = default_tol(real(eltype(prob.b))),
-    reltol = default_tol(real(eltype(prob.b))),
-    maxiters::Int = length(prob.b),
-    verbose::Bool = false,
-    Pl = IdentityOperator(size(prob.A)[1]),
-    Pr = IdentityOperator(size(prob.A)[2]),
-    assumptions = OperatorAssumptions(issquare(prob.A)),
-    sensealg = LinearSolveAdjoint(),
-    kwargs...)
+        args...;
+        alias_A = default_alias_A(alg, prob.A, prob.b),
+        alias_b = default_alias_b(alg, prob.A, prob.b),
+        abstol = default_tol(real(eltype(prob.b))),
+        reltol = default_tol(real(eltype(prob.b))),
+        maxiters::Int = length(prob.b),
+        verbose::Bool = false,
+        Pl = IdentityOperator(size(prob.A)[1]),
+        Pr = IdentityOperator(size(prob.A)[2]),
+        assumptions = OperatorAssumptions(issquare(prob.A)),
+        sensealg = LinearSolveAdjoint(),
+        kwargs...)
     @unpack A, b, u0, p = prob
 
     A = if alias_A || A isa SMatrix
@@ -183,8 +184,8 @@ function SciMLBase.solve(prob::LinearProblem, args...; kwargs...)
 end
 
 function SciMLBase.solve(prob::LinearProblem,
-    alg::Union{SciMLLinearSolveAlgorithm, Nothing},
-    args...; kwargs...)
+        alg::Union{SciMLLinearSolveAlgorithm, Nothing},
+        args...; kwargs...)
     solve!(init(prob, alg, args...; kwargs...))
 end
 

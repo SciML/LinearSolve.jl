@@ -2,9 +2,9 @@ using LinearSolve, SparseArrays, Random
 import Pardiso
 
 A1 = sparse([1.0 0 -2 3
-    0 5 1 2
-    -2 1 4 -7
-    3 2 -7 5])
+             0 5 1 2
+             -2 1 4 -7
+             3 2 -7 5])
 b1 = rand(4)
 prob1 = LinearProblem(A1, b1)
 
@@ -119,7 +119,7 @@ iparm = [
     (61, 0),
     (62, 0),
     (63, 0),
-    (64, 0),
+    (64, 0)
 ]
 
 for i in iparm

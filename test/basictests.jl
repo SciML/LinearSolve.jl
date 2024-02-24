@@ -218,13 +218,12 @@ end
         end
     end
 
-  
     test_algs = [
         LUFactorization(),
         QRFactorization(),
         SVDFactorization(),
         RFLUFactorization(),
-        LinearSolve.defaultalg(prob1.A, prob1.b),
+        LinearSolve.defaultalg(prob1.A, prob1.b)
     ]
 
     if VERSION >= v"1.9" && LinearSolve.usemkl
@@ -289,9 +288,7 @@ end
             for alg in (("Default", IterativeSolversJL(kwargs...)),
                 ("CG", IterativeSolversJL_CG(kwargs...)),
                 ("GMRES", IterativeSolversJL_GMRES(kwargs...)),
-                ("IDRS", IterativeSolversJL_IDRS(kwargs...))
-                #           ("BICGSTAB",IterativeSolversJL_BICGSTAB(kwargs...)),
-                #            ("MINRES",IterativeSolversJL_MINRES(kwargs...)),
+                ("IDRS", IterativeSolversJL_IDRS(kwargs...))                #           ("BICGSTAB",IterativeSolversJL_BICGSTAB(kwargs...)),                #            ("MINRES",IterativeSolversJL_MINRES(kwargs...)),
             )
                 @testset "$(alg[1])" begin
                     test_interface(alg[2], prob1, prob2)
@@ -424,7 +421,7 @@ end
 
         @testset "LinearSolveFunction" begin
             function sol_func(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,
-                kwargs...)
+                    kwargs...)
                 if verbose == true
                     println("out-of-place solve")
                 end
@@ -432,7 +429,7 @@ end
             end
 
             function sol_func!(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,
-                kwargs...)
+                    kwargs...)
                 if verbose == true
                     println("in-place solve")
                 end

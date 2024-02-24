@@ -6,7 +6,7 @@ using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase, LinearSolve.ArrayInterfa
 using SciMLBase: AbstractSciMLOperator
 
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadFactorization;
-    kwargs...)
+        kwargs...)
     if cache.isfresh
         fact = qr(CUDA.CuArray(cache.A))
         cache.cacheval = fact
@@ -18,8 +18,8 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadFactor
 end
 
 function LinearSolve.init_cacheval(alg::CudaOffloadFactorization, A, b, u, Pl, Pr,
-    maxiters::Int, abstol, reltol, verbose::Bool,
-    assumptions::OperatorAssumptions)
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
     qr(CUDA.CuArray(A))
 end
 

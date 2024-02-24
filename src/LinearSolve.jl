@@ -32,8 +32,8 @@ PrecompileTools.@recompile_invalidations begin
 
     using LinearAlgebra: BlasInt, LU
     using LinearAlgebra.LAPACK: require_one_based_indexing,
-        chkfinite, chkstride1,
-        @blasfunc, chkargsok
+                                chkfinite, chkstride1,
+                                @blasfunc, chkargsok
 
     import GPUArraysCore
     import Preferences
@@ -108,6 +108,8 @@ EnumX.@enumx DefaultAlgorithmChoice begin
     AppleAccelerateLUFactorization
     MKLLUFactorization
     QRFactorizationPivoted
+    KrylovJL_CRAIGMR
+    KrylovJL_LSMR
 end
 
 struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm
@@ -132,7 +134,7 @@ include("adjoint.jl")
 include("deprecated.jl")
 
 @generated function SciMLBase.solve!(cache::LinearCache, alg::AbstractFactorization;
-    kwargs...)
+        kwargs...)
     quote
         if cache.isfresh
             fact = do_factorization(alg, cache.A, cache.b, cache.u)
@@ -186,6 +188,9 @@ end
 const IS_OPENBLAS = Ref(true)
 isopenblas() = IS_OPENBLAS[]
 
+const HAS_APPLE_ACCELERATE = Ref(false)
+appleaccelerate_isavailable() = HAS_APPLE_ACCELERATE[]
+
 PrecompileTools.@compile_workload begin
     A = rand(4, 4)
     b = rand(4)
@@ -215,19 +220,19 @@ PrecompileTools.@compile_workload begin
 end
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
-    GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
-    NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
-    UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization,
-    SparspakFactorization, DiagonalFactorization, CholeskyFactorization,
-    BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization
+       GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
+       NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
+       UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization,
+       SparspakFactorization, DiagonalFactorization, CholeskyFactorization,
+       BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization
 
 export LinearSolveFunction, DirectLdiv!
 
 export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
-    KrylovJL_BICGSTAB, KrylovJL_LSMR, KrylovJL_CRAIGMR,
-    IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
-    IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES, IterativeSolversJL_IDRS,
-    KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES
+       KrylovJL_BICGSTAB, KrylovJL_LSMR, KrylovJL_CRAIGMR,
+       IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
+       IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES, IterativeSolversJL_IDRS,
+       KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES
 
 export SimpleGMRES
 

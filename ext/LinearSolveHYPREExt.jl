@@ -4,8 +4,8 @@ using LinearAlgebra
 using HYPRE.LibHYPRE: HYPRE_Complex
 using HYPRE: HYPRE, HYPREMatrix, HYPRESolver, HYPREVector
 using LinearSolve: HYPREAlgorithm, LinearCache, LinearProblem, LinearSolve,
-    OperatorAssumptions, default_tol, init_cacheval, __issquare,
-    __conditioning
+                   OperatorAssumptions, default_tol, init_cacheval, __issquare,
+                   __conditioning
 using SciMLBase: LinearProblem, SciMLBase
 using UnPack: @unpack
 using Setfield: @set!
@@ -21,8 +21,8 @@ mutable struct HYPRECache
 end
 
 function LinearSolve.init_cacheval(alg::HYPREAlgorithm, A, b, u, Pl, Pr, maxiters::Int,
-    abstol, reltol,
-    verbose::Bool, assumptions::OperatorAssumptions)
+        abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
     return HYPRECache(nothing, nothing, nothing, nothing, true, true, true)
 end
 
@@ -54,21 +54,21 @@ end
 #   fill!(similar(b, size(A, 2)), false) since HYPREArrays are not AbstractArrays.
 
 function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
-    args...;
-    alias_A = false, alias_b = false,
-    # TODO: Implement eltype for HYPREMatrix in HYPRE.jl? Looks useful
-    #       even if it is not AbstractArray.
-    abstol = default_tol(prob.A isa HYPREMatrix ? HYPRE_Complex :
-                         eltype(prob.A)),
-    reltol = default_tol(prob.A isa HYPREMatrix ? HYPRE_Complex :
-                         eltype(prob.A)),
-    # TODO: Implement length() for HYPREVector in HYPRE.jl?
-    maxiters::Int = prob.b isa HYPREVector ? 1000 : length(prob.b),
-    verbose::Bool = false,
-    Pl = LinearAlgebra.I,
-    Pr = LinearAlgebra.I,
-    assumptions = OperatorAssumptions(),
-    kwargs...)
+        args...;
+        alias_A = false, alias_b = false,
+        # TODO: Implement eltype for HYPREMatrix in HYPRE.jl? Looks useful
+        #       even if it is not AbstractArray.
+        abstol = default_tol(prob.A isa HYPREMatrix ? HYPRE_Complex :
+                             eltype(prob.A)),
+        reltol = default_tol(prob.A isa HYPREMatrix ? HYPRE_Complex :
+                             eltype(prob.A)),
+        # TODO: Implement length() for HYPREVector in HYPRE.jl?
+        maxiters::Int = prob.b isa HYPREVector ? 1000 : length(prob.b),
+        verbose::Bool = false,
+        Pl = LinearAlgebra.I,
+        Pr = LinearAlgebra.I,
+        assumptions = OperatorAssumptions(),
+        kwargs...)
     @unpack A, b, u0, p = prob
 
     A = A isa HYPREMatrix ? A : HYPREMatrix(A)
@@ -89,7 +89,7 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
     cache = LinearCache{
         typeof(A), typeof(b), typeof(u0), typeof(p), typeof(alg), Tc,
         typeof(Pl), typeof(Pr), typeof(reltol),
-        typeof(__issquare(assumptions)),
+        typeof(__issquare(assumptions))
     }(A, b, u0, p, alg, cacheval, isfresh, Pl, Pr, abstol, reltol,
         maxiters,
         verbose, assumptions)
@@ -219,8 +219,8 @@ end
 
 # HYPREArrays are not AbstractArrays so perform some type-piracy
 function SciMLBase.LinearProblem(A::HYPREMatrix, b::HYPREVector,
-    p = SciMLBase.NullParameters();
-    u0::Union{HYPREVector, Nothing} = nothing, kwargs...)
+        p = SciMLBase.NullParameters();
+        u0::Union{HYPREVector, Nothing} = nothing, kwargs...)
     return LinearProblem{true}(A, b, p; u0 = u0, kwargs)
 end
 

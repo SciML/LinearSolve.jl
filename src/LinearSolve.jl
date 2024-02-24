@@ -23,7 +23,6 @@ PrecompileTools.@recompile_invalidations begin
     using FastLapackInterface
     using DocStringExtensions
     using EnumX
-    using Requires
     using Markdown
     using ChainRulesCore
     import InteractiveUtils

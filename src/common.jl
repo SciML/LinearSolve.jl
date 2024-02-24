@@ -180,11 +180,15 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
 end
 
 function SciMLBase.solve(prob::LinearProblem, args...; kwargs...)
-    solve!(init(prob, nothing, args...; kwargs...))
+    return solve(prob, nothing, args...; kwargs...)
 end
 
-function SciMLBase.solve(prob::LinearProblem,
-        alg::Union{SciMLLinearSolveAlgorithm, Nothing},
+function SciMLBase.solve(prob::LinearProblem, ::Nothing, args...;
+        assump = OperatorAssumptions(issquare(prob.A)), kwargs...)
+    return solve(prob, defaultalg(prob.A, prob.b, assump), args...; kwargs...)
+end
+
+function SciMLBase.solve(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         args...; kwargs...)
     solve!(init(prob, alg, args...; kwargs...))
 end

@@ -1,7 +1,7 @@
 # TODO: Preconditioners? Should Pl be transposed and made Pr and similar for Pr.
 
 @doc doc"""
-    LinearSolveAdjoint(; linsolve = nothing)
+    LinearSolveAdjoint(; linsolve = missing)
 
 Given a Linear Problem ``A x = b`` computes the sensitivities for ``A`` and ``b`` as:
 
@@ -18,53 +18,49 @@ For more details, check [these notes](https://math.mit.edu/~stevenj/18.336/adjoi
 ## Choice of Linear Solver
 
 Note that in most cases, it makes sense to use the same linear solver for the adjoint as the
-forward solve (this is done by keeping the linsolve as `nothing`). For example, if the
+forward solve (this is done by keeping the linsolve as `missing`). For example, if the
 forward solve was performed via a Factorization, then we can reuse the factorization for the
 adjoint solve. However, for specific structured matrices if ``A^T`` is known to have a
 specific structure distinct from ``A`` then passing in a `linsolve` will be more efficient.
 """
 @kwdef struct LinearSolveAdjoint{L} <:
               SciMLBase.AbstractSensitivityAlgorithm{0, false, :central}
-    linsolve::L = nothing
+    linsolve::L = missing
 end
 
-function CRC.rrule(::typeof(SciMLBase.init), prob::LinearProblem,
-        alg::SciMLLinearSolveAlgorithm, args...; kwargs...)
+function CRC.rrule(::typeof(SciMLBase.solve), prob::LinearProblem,
+        alg::SciMLLinearSolveAlgorithm, args...; alias_A = default_alias_A(
+            alg, prob.A, prob.b), kwargs...)
+    # sol = solve(prob, alg, args...; kwargs...)
     cache = init(prob, alg, args...; kwargs...)
-    function ∇init(∂cache)
-        ∂∅ = NoTangent()
-        ∂p = prob.p isa SciMLBase.NullParameters ? prob.p : ProjectTo(prob.p)(∂cache.p)
-        ∂prob = LinearProblem(∂cache.A, ∂cache.b, ∂p)
-        return (∂∅, ∂prob, ∂∅, ntuple(_ -> ∂∅, length(args))...)
-    end
-    return cache, ∇init
-end
+    (; A, sensealg) = cache
 
-function CRC.rrule(::typeof(SciMLBase.solve!), cache::LinearCache, alg, args...;
-        kwargs...)
-    (; A, b, sensealg) = cache
+    @assert sensealg isa LinearSolveAdjoint "Currently only `LinearSolveAdjoint` is supported for adjoint sensitivity analysis."
 
     # Decide if we need to cache `A` and `b` for the reverse pass
-    if sensealg.linsolve === nothing
+    if sensealg.linsolve === missing
         # We can reuse the factorization so no copy is needed
         # Krylov Methods don't modify `A`, so it's safe to just reuse it
         # No Copy is needed even for the default case
         if !(alg isa AbstractFactorization || alg isa AbstractKrylovSubspaceMethod ||
              alg isa DefaultLinearSolver)
-            A_ = cache.alias_A ? deepcopy(A) : A
+            A_ = alias_A ? deepcopy(A) : A
         end
     else
-        error("Not Implemented Yet!!!")
+        if alg isa DefaultLinearSolver
+            A_ = deepcopy(A)
+        else
+            A_ = alias_A ? deepcopy(A) : A
+        end
     end
 
-    # Forward Solve
-    sol = solve!(cache, alg, args...; kwargs...)
+    sol = solve!(cache)
 
-    function ∇solve!(∂sol)
-        @assert !cache.isfresh "`cache.A` has been updated between the forward and the \
-                                reverse pass. This is not supported."
+    function ∇linear_solve(∂sol)
+        ∂∅ = NoTangent()
+
         ∂u = ∂sol.u
-        if sensealg.linsolve === nothing
+        if sensealg.linsolve === missing
             λ = if cache.cacheval isa Factorization
                 cache.cacheval' \ ∂u
             elseif cache.cacheval isa Tuple && cache.cacheval[1] isa Factorization
@@ -79,25 +75,23 @@ function CRC.rrule(::typeof(SciMLBase.solve!), cache::LinearCache, alg, args...;
                 solve(invprob, alg; cache.abstol, cache.reltol, cache.verbose).u
             end
         else
-            error("Not Implemented Yet!!!")
+            invprob = LinearProblem(transpose(A_), ∂u) # We cached `A`
+            λ = solve(
+                invprob, sensealg.linsolve; cache.abstol, cache.reltol, cache.verbose).u
         end
 
         ∂A = -λ * transpose(sol.u)
         ∂b = λ
-        ∂∅ = NoTangent()
+        ∂prob = LinearProblem(∂A, ∂b, ∂∅)
 
-        ∂cache = LinearCache(∂A, ∂b, ∂∅, ∂∅, ∂∅, ∂∅, cache.isfresh, ∂∅, ∂∅, cache.abstol,
-            cache.reltol, cache.maxiters, cache.verbose, cache.assumptions, cache.sensealg)
-
-        return (∂∅, ∂cache, ∂∅, ntuple(_ -> ∂∅, length(args))...)
+        return (∂∅, ∂prob, ∂∅, ntuple(_ -> ∂∅, length(args))...)
     end
-    return sol, ∇solve!
+
+    return sol, ∇linear_solve
 end
 
 function CRC.rrule(::Type{<:LinearProblem}, A, b, p; kwargs...)
     prob = LinearProblem(A, b, p)
-    function ∇prob(∂prob)
-        return NoTangent(), ∂prob.A, ∂prob.b, ∂prob.p
-    end
+    ∇prob(∂prob) = (NoTangent(), ∂prob.A, ∂prob.b, ∂prob.p)
     return prob, ∇prob
 end

@@ -780,21 +780,26 @@ function SciMLBase.solve!(cache::LinearCache, alg::UMFPACKFactorization; kwargs.
                  SparseArrays.decrement(SparseArrays.getrowval(A)) ==
                  cacheval.rowval)
                 fact = lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                    nonzeros(A)))
+                    nonzeros(A)), check=false)
             else
                 fact = lu!(cacheval,
                     SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                        nonzeros(A)))
+                        nonzeros(A)), check=false)
             end
         else
-            fact = lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)))
+            fact = lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)), check=false)
         end
         cache.cacheval = fact
         cache.isfresh = false
     end
 
-    y = ldiv!(cache.u, @get_cacheval(cache, :UMFPACKFactorization), cache.b)
-    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    F =  @get_cacheval(cache, :UMFPACKFactorization)
+    if F.status == SparseArrays.UMFPACK.UMFPACK_OK
+        y = ldiv!(cache.u, F, cache.b)
+        SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    else
+        SciMLBase.build_linear_solution(alg, cache.u, nothing, cache; retcode=ReturnCode.Infeasible)
+    end
 end
 
 """
@@ -840,10 +845,10 @@ function init_cacheval(alg::KLUFactorization, A::AbstractSparseArray, b, u, Pl, 
         nonzeros(A)))
 end
 
+# TODO: guard this against errors
 function SciMLBase.solve!(cache::LinearCache, alg::KLUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
-
     if cache.isfresh
         cacheval = @get_cacheval(cache, :KLUFactorization)
         if cacheval !== nothing && alg.reuse_symbolic

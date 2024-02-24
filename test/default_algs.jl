@@ -35,6 +35,14 @@ solve(prob)
     LinearSolve.OperatorAssumptions(false)).alg ===
       LinearSolve.DefaultAlgorithmChoice.QRFactorization
 
+
+A = spzeros(2, 2)
+# test that solving a singular problem doesn't error
+prob = LinearProblem(A, ones(2))
+@test solve(prob, UMFPACKFactorization()).retcode == ReturnCode.Infeasible
+@test_broken solve(prob, KLUFactorization()).retcode == ReturnCode.Infeasible
+
+
 @test LinearSolve.defaultalg(sprand(10^4, 10^4, 1e-5) + I, zeros(1000)).alg ===
       LinearSolve.DefaultAlgorithmChoice.KLUFactorization
 prob = LinearProblem(sprand(1000, 1000, 0.5), zeros(1000))

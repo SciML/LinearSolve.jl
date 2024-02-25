@@ -206,7 +206,29 @@ function SciMLBase.solve(prob::StaticLinearProblem, args...; kwargs...)
 end
 
 function SciMLBase.solve(prob::StaticLinearProblem,
-        alg::Union{Nothing, SciMLLinearSolveAlgorithm}, args...; kwargs...)
+        alg::Nothing, args...; kwargs...)
+    if alg === nothing || alg isa DirectLdiv!
+        u = prob.A \ prob.b
+    elseif alg isa LUFactorization
+        u = lu(prob.A) \ prob.b
+    elseif alg isa QRFactorization
+        u = qr(prob.A) \ prob.b
+    elseif alg isa CholeskyFactorization
+        u = cholesky(prob.A) \ prob.b
+    elseif alg isa NormalCholeskyFactorization
+        u = cholesky(Symmetric(prob.A' * prob.A)) \ (prob.A' * prob.b)
+    elseif alg isa SVDFactorization
+        u = svd(prob.A) \ prob.b
+    else
+        # Slower Path but handles all cases
+        cache = init(prob, alg, args...; kwargs...)
+        return solve!(cache)
+    end
+    return SciMLBase.build_linear_solution(alg, u, nothing, prob)
+end
+
+function SciMLBase.solve(prob::StaticLinearProblem,
+        alg::SciMLLinearSolveAlgorithm, args...; kwargs...)
     if alg === nothing || alg isa DirectLdiv!
         u = prob.A \ prob.b
     elseif alg isa LUFactorization

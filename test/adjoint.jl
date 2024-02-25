@@ -52,11 +52,11 @@ end
 dA, db1, db2 = Zygote.gradient(f3, A, b1, b1)
 
 dA2 = FiniteDiff.finite_difference_gradient(
-    x -> f4(x, eltype(x).(b1), eltype(x).(b1)), copy(A))
+    x -> f3(x, eltype(x).(b1), eltype(x).(b1)), copy(A))
 db12 = FiniteDiff.finite_difference_gradient(
-    x -> f4(eltype(x).(A), x, eltype(x).(b1)), copy(b1))
+    x -> f3(eltype(x).(A), x, eltype(x).(b1)), copy(b1))
 db22 = FiniteDiff.finite_difference_gradient(
-    x -> f4(eltype(x).(A), eltype(x).(b1), x), copy(b1))
+    x -> f3(eltype(x).(A), eltype(x).(b1), x), copy(b1))
 
 @test dA≈dA2 atol=5e-5
 @test db1 ≈ db12

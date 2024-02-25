@@ -779,26 +779,30 @@ function SciMLBase.solve!(cache::LinearCache, alg::UMFPACKFactorization; kwargs.
                  cacheval.colptr &&
                  SparseArrays.decrement(SparseArrays.getrowval(A)) ==
                  cacheval.rowval)
-                fact = lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                    nonzeros(A)), check=false)
+                fact = lu(
+                    SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
+                        nonzeros(A)),
+                    check = false)
             else
                 fact = lu!(cacheval,
                     SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                        nonzeros(A)), check=false)
+                        nonzeros(A)), check = false)
             end
         else
-            fact = lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)), check=false)
+            fact = lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
+                check = false)
         end
         cache.cacheval = fact
         cache.isfresh = false
     end
 
-    F =  @get_cacheval(cache, :UMFPACKFactorization)
+    F = @get_cacheval(cache, :UMFPACKFactorization)
     if F.status == SparseArrays.UMFPACK.UMFPACK_OK
         y = ldiv!(cache.u, F, cache.b)
         SciMLBase.build_linear_solution(alg, y, nothing, cache)
     else
-        SciMLBase.build_linear_solution(alg, cache.u, nothing, cache; retcode=ReturnCode.Infeasible)
+        SciMLBase.build_linear_solution(
+            alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible)
     end
 end
 

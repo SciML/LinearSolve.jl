@@ -39,7 +39,7 @@ A = spzeros(2, 2)
 # test that solving a singular problem doesn't error
 prob = LinearProblem(A, ones(2))
 @test solve(prob, UMFPACKFactorization()).retcode == ReturnCode.Infeasible
-@test_broken solve(prob, KLUFactorization()).retcode == ReturnCode.Infeasible
+@test solve(prob, KLUFactorization()).retcode == ReturnCode.Infeasible
 
 @test LinearSolve.defaultalg(sprand(10^4, 10^4, 1e-5) + I, zeros(1000)).alg ===
       LinearSolve.DefaultAlgorithmChoice.KLUFactorization

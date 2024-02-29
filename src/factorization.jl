@@ -857,12 +857,12 @@ function SciMLBase.solve!(cache::LinearCache, alg::KLUFactorization; kwargs...)
         cacheval = @get_cacheval(cache, :KLUFactorization)
         if alg.reuse_symbolic
             if alg.check_pattern && !(SparseArrays.decrement(SparseArrays.getcolptr(A)) ==
-                cacheval.colptr &&
-                SparseArrays.decrement(SparseArrays.getrowval(A)) ==
-                cacheval.rowval)
+                 cacheval.colptr &&
+                 SparseArrays.decrement(SparseArrays.getrowval(A)) ==
+                 cacheval.rowval)
                 fact = KLU.klu(
                     SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                       nonzeros(A)),
+                        nonzeros(A)),
                     check = false)
             else
                 fact = KLU.klu!(cacheval, nonzeros(A), check = false)
@@ -877,7 +877,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KLUFactorization; kwargs...)
         cache.isfresh = false
     end
     F = @get_cacheval(cache, :KLUFactorization)
-    if F.status == KLU.KLU_OK
+    if F.common.status == KLU.KLU_OK
         y = ldiv!(cache.u, F, cache.b)
         SciMLBase.build_linear_solution(alg, y, nothing, cache)
     else

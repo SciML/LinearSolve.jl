@@ -855,23 +855,17 @@ function SciMLBase.solve!(cache::LinearCache, alg::KLUFactorization; kwargs...)
     A = convert(AbstractMatrix, A)
     if cache.isfresh
         cacheval = @get_cacheval(cache, :KLUFactorization)
-        if cacheval !== nothing && alg.reuse_symbolic
+        if alg.reuse_symbolic
             if alg.check_pattern && !(SparseArrays.decrement(SparseArrays.getcolptr(A)) ==
                  cacheval.colptr &&
-                 SparseArrays.decrement(SparseArrays.getrowval(A)) == cacheval.rowval)
-                fact = KLU.klu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                    nonzeros(A)))
-            else
-                # If we have a cacheval already, run umfpack_symbolic to ensure the symbolic factorization exists
-                # This won't recompute if it does.
-                KLU.klu_analyze!(cacheval)
-                copyto!(cacheval.nzval, nonzeros(A))
-                if cacheval._numeric === C_NULL # We MUST have a numeric factorization for reuse, unlike UMFPACK.
-                    KLU.klu_factor!(cacheval)
-                end
-                fact = KLU.klu!(cacheval,
+                 SparseArrays.decrement(SparseArrays.getrowval(A)) ==
+                 cacheval.rowval)
+                fact = KLU.klu(
                     SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                        nonzeros(A)))
+                        nonzeros(A)),
+                    check = false)
+            else
+                fact = KLU.klu!(cacheval, nonzeros(A), check = false)
             end
         else
             # New fact each time since the sparsity pattern can change
@@ -882,9 +876,14 @@ function SciMLBase.solve!(cache::LinearCache, alg::KLUFactorization; kwargs...)
         cache.cacheval = fact
         cache.isfresh = false
     end
-
-    y = ldiv!(cache.u, @get_cacheval(cache, :KLUFactorization), cache.b)
-    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    F = @get_cacheval(cache, :KLUFactorization)
+    if F.common.status == KLU.KLU_OK
+        y = ldiv!(cache.u, F, cache.b)
+        SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    else
+        SciMLBase.build_linear_solution(
+            alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible)
+    end
 end
 
 ## CHOLMODFactorization

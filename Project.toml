@@ -1,7 +1,7 @@
 name = "LinearSolve"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 authors = ["SciML"]
-version = "2.26.0"
+version = "2.27.0"
 
 [deps]
 ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
@@ -89,7 +89,7 @@ Libdl = "1.10"
 LinearAlgebra = "1.10"
 MPI = "0.20"
 Markdown = "1.10"
-Metal = "0.5"
+Metal = "1"
 MultiFloats = "1"
 Pardiso = "0.5"
 Pkg = "1"

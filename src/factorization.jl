@@ -739,6 +739,7 @@ patterns with “more structure”.
 Base.@kwdef struct UMFPACKFactorization <: AbstractFactorization
     reuse_symbolic::Bool = true
     check_pattern::Bool = true # Check factorization re-use
+    control::Vector{Float64}=SparseArrays.UMFPACK.get_umfpack_control(Float64,Int64) # Control Parameters of UMFPACK 
 end
 
 const PREALLOCATED_UMFPACK = SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC(0, 0, [1],
@@ -782,15 +783,15 @@ function SciMLBase.solve!(cache::LinearCache, alg::UMFPACKFactorization; kwargs.
                 fact = lu(
                     SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                         nonzeros(A)),
-                    check = false)
+                    check = false, control=alg.control)
             else
                 fact = lu!(cacheval,
                     SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                        nonzeros(A)), check = false)
+                        nonzeros(A)), check = false, control=alg.control)
             end
         else
             fact = lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
-                check = false)
+                check = false, control=alg.control)
         end
         cache.cacheval = fact
         cache.isfresh = false

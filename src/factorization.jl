@@ -736,10 +736,12 @@ patterns with “more structure”.
     `A` has the same sparsity pattern as the previous `A`. If this algorithm is to
     be used in a context where that assumption does not hold, set `reuse_symbolic=false`.
 """
+const default_control::Array{FLoat64}=[1.0, 0.2, 0.2, 0.1, 32.0, 0.0, 0.7, 0.0, 1.0, 0.3, 1.0, 1.0, 0.9, 0.0, 10.0, 0.001, 1.0, 0.5, 0.0, 1.0]
+
 Base.@kwdef struct UMFPACKFactorization <: AbstractFactorization
     reuse_symbolic::Bool = true
     check_pattern::Bool = true # Check factorization re-use
-    control::Vector{Float64}=SparseArrays.UMFPACK.get_umfpack_control(Float64,Int64) # Control Parameters of UMFPACK 
+    control::Vector{Float64}=nothing
 end
 
 const PREALLOCATED_UMFPACK = SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC(0, 0, [1],
@@ -772,6 +774,7 @@ end
 function SciMLBase.solve!(cache::LinearCache, alg::UMFPACKFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
+    isnothing(alg.control) ? control=default_control : control=alg.control
     if cache.isfresh
         cacheval = @get_cacheval(cache, :UMFPACKFactorization)
         if alg.reuse_symbolic
@@ -783,15 +786,15 @@ function SciMLBase.solve!(cache::LinearCache, alg::UMFPACKFactorization; kwargs.
                 fact = lu(
                     SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                         nonzeros(A)),
-                    check = false, control=alg.control)
+                    check = false, control=control)
             else
                 fact = lu!(cacheval,
                     SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                        nonzeros(A)), check = false, control=alg.control)
+                        nonzeros(A)), check = false, control=control)
             end
         else
             fact = lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
-                check = false, control=alg.control)
+                check = false, control=control)
         end
         cache.cacheval = fact
         cache.isfresh = false

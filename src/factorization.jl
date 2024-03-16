@@ -738,10 +738,10 @@ patterns with “more structure”.
 """
 const default_control::Array{FLoat64}=[1.0, 0.2, 0.2, 0.1, 32.0, 0.0, 0.7, 0.0, 1.0, 0.3, 1.0, 1.0, 0.9, 0.0, 10.0, 0.001, 1.0, 0.5, 0.0, 1.0]
 
-Base.@kwdef struct UMFPACKFactorization <: AbstractFactorization
+Base.@kwdef struct UMFPACKFactorization{T <: Union{Nothing, Vector{Float64}} <: AbstractFactorization
     reuse_symbolic::Bool = true
     check_pattern::Bool = true # Check factorization re-use
-    control::Vector{Float64}=nothing
+    control::T=nothing
 end
 
 const PREALLOCATED_UMFPACK = SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC(0, 0, [1],

@@ -736,7 +736,7 @@ patterns with “more structure”.
     `A` has the same sparsity pattern as the previous `A`. If this algorithm is to
     be used in a context where that assumption does not hold, set `reuse_symbolic=false`.
 """
-const default_control::Array{FLoat64}=[1.0, 0.2, 0.2, 0.1, 32.0, 0.0, 0.7, 0.0, 1.0, 0.3, 1.0, 1.0, 0.9, 0.0, 10.0, 0.001, 1.0, 0.5, 0.0, 1.0]
+const default_control=[1.0, 0.2, 0.2, 0.1, 32.0, 0.0, 0.7, 0.0, 1.0, 0.3, 1.0, 1.0, 0.9, 0.0, 10.0, 0.001, 1.0, 0.5, 0.0, 1.0]
 
 Base.@kwdef struct UMFPACKFactorization{T <: Union{Nothing, Vector{Float64}} <: AbstractFactorization
     reuse_symbolic::Bool = true

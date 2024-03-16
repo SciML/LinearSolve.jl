@@ -723,8 +723,14 @@ end
 
 ################################## Factorizations which require solve! overloads
 
+# Default control array of 20 elements from Umfpack
+
+#!!!ATTENTION
+#These array could change and whenever there will be a change in the SparseArrays package this array must be changed
+const default_control=[1.0, 0.2, 0.2, 0.1, 32.0, 0.0, 0.7, 0.0, 1.0, 0.3, 1.0, 1.0, 0.9, 0.0, 10.0, 0.001, 1.0, 0.5, 0.0, 1.0]
+
 """
-`UMFPACKFactorization(;reuse_symbolic=true, check_pattern=true)`
+`UMFPACKFactorization(;reuse_symbolic=true, check_pattern=true, control=Vector{Float64}(20))`
 
 A fast sparse multithreaded LU-factorization which specializes on sparsity
 patterns with “more structure”.
@@ -735,10 +741,14 @@ patterns with “more structure”.
     symbolic factorization. I.e., if `set_A` is used, it is expected that the new
     `A` has the same sparsity pattern as the previous `A`. If this algorithm is to
     be used in a context where that assumption does not hold, set `reuse_symbolic=false`.
-"""
-const default_control=[1.0, 0.2, 0.2, 0.1, 32.0, 0.0, 0.7, 0.0, 1.0, 0.3, 1.0, 1.0, 0.9, 0.0, 10.0, 0.001, 1.0, 0.5, 0.0, 1.0]
 
-Base.@kwdef struct UMFPACKFactorization{T <: Union{Nothing, Vector{Float64}} <: AbstractFactorization
+    There is also the possibility to set your own control array for the factorization that will be  
+    passed at the SparseArrays package. To do so u have to pass a Vector{Float64} with 20 elements.
+    If no vecetor is passed the default control array is used.
+    More details on the UMFPACK doc
+"""
+
+Base.@kwdef struct UMFPACKFactorization{T <: Union{Nothing, Vector{Float64}}} <: AbstractFactorization
     reuse_symbolic::Bool = true
     check_pattern::Bool = true # Check factorization re-use
     control::T=nothing

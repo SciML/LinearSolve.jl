@@ -4,7 +4,7 @@ A = sparse(rand(3,3));
 b=rand(3);
 prob = LinearProblem(A, b);
 
-#check without contro Vector
+#check without control Vector
 u=solve(prob,UMFPACKFactorization()).u
 
 #check plugging in a control vector

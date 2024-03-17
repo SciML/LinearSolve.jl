@@ -750,10 +750,6 @@ patterns with “more structure”.
     `A` has the same sparsity pattern as the previous `A`. If this algorithm is to
     be used in a context where that assumption does not hold, set `reuse_symbolic=false`.
 
-    There is also the possibility to set your own control array for the factorization that will be  
-    passed at the SparseArrays package. To do so u have to pass a Vector{Float64} with 20 elements.
-    If no vecetor is passed the default control array is used.
-    More details on the UMFPACK doc
 """
 
 Base.@kwdef struct UMFPACKFactorization{T <: Union{Nothing, Vector{Float64}}} <: AbstractFactorization

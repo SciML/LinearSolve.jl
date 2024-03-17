@@ -727,7 +727,7 @@ end
 
 #!!!ATTENTION
 #These array could change and whenever there will be a change in the SparseArrays package this array must be changed
-const default_control=[1.0, 0.2, 0.2, 0.1, 32.0, 0.0, 0.7, 0.0, 1.0, 0.3, 1.0, 1.0, 0.9, 0.0, 10.0, 0.001, 1.0, 0.5, 0.0, 1.0]
+const default_control=SparseArrays.UMFPACK.get_umfpack_control(Float64,Int64)
 
 """
 `UMFPACKFactorization(;reuse_symbolic=true, check_pattern=true, control=Vector{Float64}(20))`

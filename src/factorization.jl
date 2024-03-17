@@ -735,6 +735,14 @@ const default_control=[1.0, 0.2, 0.2, 0.1, 32.0, 0.0, 0.7, 0.0, 1.0, 0.3, 1.0, 1
 A fast sparse multithreaded LU-factorization which specializes on sparsity
 patterns with “more structure”.
 
+## Fields
+
+* `reuse_symbolic`: Whether the symbolic factorization is reused between calls. This requires that the sparsity pattern is
+  preserved. Defaults to true.
+* `check_pattern`: Whether the sparsity pattern is checked for changes to allow for symbolic factorization caching. 
+  The default is true.
+* `control`: A control vector for more options to pass to UMFPACK. See the UMFPACK documentation for more details.
+
 !!! note
 
     By default, the SparseArrays.jl are implemented for efficiency by caching the

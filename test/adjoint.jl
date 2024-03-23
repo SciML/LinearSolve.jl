@@ -1,6 +1,7 @@
 using Zygote, ForwardDiff
 using LinearSolve, LinearAlgebra, Test
 using FiniteDiff
+using LazyArrays: BroadcastArray
 
 n = 4
 A = rand(n, n);
@@ -18,6 +19,7 @@ end
 f(A, b1) # Uses BLAS
 
 dA, db1 = Zygote.gradient(f, A, b1)
+@test dA isa BroadcastArray
 
 dA2 = ForwardDiff.gradient(x -> f(x, eltype(x).(b1)), copy(A))
 db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x), copy(b1))
@@ -34,6 +36,7 @@ _ff = (x, y) -> f(x,
 _ff(copy(A), copy(b1))
 
 dA, db1 = Zygote.gradient(_ff, copy(A), copy(b1))
+@test dA isa BroadcastArray
 
 dA2 = ForwardDiff.gradient(x -> f(x, eltype(x).(b1)), copy(A))
 db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x), copy(b1))
@@ -50,6 +53,7 @@ function f3(A, b1, b2; alg = KrylovJL_GMRES())
 end
 
 dA, db1, db2 = Zygote.gradient(f3, A, b1, b1)
+@test dA isa BroadcastArray
 
 dA2 = FiniteDiff.finite_difference_gradient(
     x -> f3(x, eltype(x).(b1), eltype(x).(b1)), copy(A))
@@ -71,6 +75,7 @@ function f4(A, b1, b2; alg = LUFactorization())
 end
 
 dA, db1, db2 = Zygote.gradient(f4, A, b1, b1)
+@test dA isa BroadcastArray
 
 dA2 = ForwardDiff.gradient(x -> f4(x, eltype(x).(b1), eltype(x).(b1)), copy(A))
 db12 = ForwardDiff.gradient(x -> f4(eltype(x).(A), x, eltype(x).(b1)), copy(b1))

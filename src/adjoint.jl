@@ -76,7 +76,8 @@ function CRC.rrule(::typeof(SciMLBase.solve), prob::LinearProblem,
                 invprob, sensealg.linsolve; cache.abstol, cache.reltol, cache.verbose).u
         end
 
-        ∂A = -λ * transpose(sol.u)
+        tu = transpose(sol.u)
+        ∂A = BroadcastArray(@~ .-(λ .* tu))
         ∂b = λ
         ∂prob = LinearProblem(∂A, ∂b, ∂∅)
 

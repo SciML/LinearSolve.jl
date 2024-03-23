@@ -13,6 +13,7 @@ PrecompileTools.@recompile_invalidations begin
     using LinearAlgebra
     using SparseArrays
     using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
+    using LazyArrays: @~, BroadcastArray
     using SciMLBase: AbstractLinearAlgorithm
     using SciMLOperators
     using SciMLOperators: AbstractSciMLOperator, IdentityOperator

@@ -4,4 +4,4 @@ LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 
 [compat]
 Documenter = "1"
-LinearSolve = "1, 2"
+LinearSolve = "1, 2, 3"

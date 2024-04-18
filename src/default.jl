@@ -216,19 +216,9 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
     elseif assump.condition === OperatorCondition.WellConditioned
         DefaultAlgorithmChoice.NormalCholeskyFactorization
     elseif assump.condition === OperatorCondition.IllConditioned
-        if is_underdetermined(A)
-            # Underdetermined
-            DefaultAlgorithmChoice.QRFactorizationPivoted
-        else
-            DefaultAlgorithmChoice.QRFactorization
-        end
+        DefaultAlgorithmChoice.QRFactorizationPivoted
     elseif assump.condition === OperatorCondition.VeryIllConditioned
-        if is_underdetermined(A)
-            # Underdetermined
-            DefaultAlgorithmChoice.QRFactorizationPivoted
-        else
-            DefaultAlgorithmChoice.QRFactorization
-        end
+        DefaultAlgorithmChoice.QRFactorizationPivoted
     elseif assump.condition === OperatorCondition.SuperIllConditioned
         DefaultAlgorithmChoice.SVDFactorization
     else

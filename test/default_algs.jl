@@ -33,7 +33,7 @@ solve(prob)
 
 @test LinearSolve.defaultalg(nothing, zeros(5),
     LinearSolve.OperatorAssumptions(false)).alg ===
-      LinearSolve.DefaultAlgorithmChoice.QRFactorization
+      LinearSolve.DefaultAlgorithmChoice.QRFactorizationPivoted
 
 A = spzeros(2, 2)
 # test that solving a singular problem doesn't error
@@ -112,3 +112,35 @@ prob = LinearProblem(funcop, b)
 sol1 = solve(prob)
 sol2 = solve(prob, LinearSolve.KrylovJL_CRAIGMR())
 @test sol1.u == sol2.u
+
+# Default for Underdetermined problem but the size is a long rectangle
+A = [2.0 1.0
+     0.0 0.0
+     0.0 0.0]
+b = [1.0, 0.0, 0.0]
+prob = LinearProblem(A, b)
+sol = solve(prob)
+
+@test sol.u ≈ [0.4, 0.2]
+
+## Show that we cannot select a default alg once by checking the rank, since it might change
+## later in the cache
+## Common occurrence for iterative nonlinear solvers using linear solve
+A = [2.0 1.0
+     1.0 1.0
+     0.0 0.0]
+b = [1.0, 1.0, 0.0]
+prob = LinearProblem(A, b)
+
+cache = init(prob)
+sol = solve!(cache)
+
+@test sol.u ≈ [0.0, 1.0]
+
+cache.A = [2.0 1.0
+           0.0 0.0
+           0.0 0.0]
+
+sol = solve!(cache)
+
+@test sol.u ≈ [0.4, 0.2]

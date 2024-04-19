@@ -49,9 +49,14 @@ Julia's built in `lu`. Equivalent to calling `lu!(A)`
   - pivot: The choice of pivoting. Defaults to `LinearAlgebra.RowMaximum()`. The other choice is
     `LinearAlgebra.NoPivot()`.
 """
-struct LUFactorization{P} <: AbstractFactorization
-    pivot::P
+Base.@kwdef struct LUFactorization{P} <: AbstractFactorization
+    pivot::P = LinearAlgebra.RowMaximum()
+    reuse_symbolic::Bool = true
+    check_pattern::Bool = true # Check factorization re-use
 end
+
+# Legacy dispatch
+LUFactorization(pivot) = LUFactorization(;pivot=RowMaximum())
 
 """
 `GenericLUFactorization(pivot=LinearAlgebra.RowMaximum())`
@@ -69,9 +74,32 @@ struct GenericLUFactorization{P} <: AbstractFactorization
     pivot::P
 end
 
-LUFactorization() = LUFactorization(RowMaximum())
-
 GenericLUFactorization() = GenericLUFactorization(RowMaximum())
+
+function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
+    A = cache.A
+    A = convert(AbstractMatrix, A)
+    if cache.isfresh
+        cacheval = @get_cacheval(cache, :LUFactorization)
+        if A isa AbstractSparseMatrix && alg.reuse_symbolic
+            # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
+            # If SparseMatrixCSC, check if the pattern has changed
+            if alg.check_pattern && pattern_changed(cacheval, A)
+                fact = lu(A, check = false)
+            else
+                fact = lu!(cacheval, A, check = false)
+            end
+        else
+            fact = lu(A, check = false)
+        end
+        cache.cacheval = fact
+        cache.isfresh = false
+    end
+
+    F = @get_cacheval(cache, :LUFactorization)
+    y = ldiv!(cache.u, F, cache.b)
+    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+end
 
 function do_factorization(alg::LUFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
@@ -775,10 +803,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::UMFPACKFactorization; kwargs.
         cacheval = @get_cacheval(cache, :UMFPACKFactorization)
         if alg.reuse_symbolic
             # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
-            if alg.check_pattern && !(SparseArrays.decrement(SparseArrays.getcolptr(A)) ==
-                 cacheval.colptr &&
-                 SparseArrays.decrement(SparseArrays.getrowval(A)) ==
-                 cacheval.rowval)
+            if alg.check_pattern && pattern_changed(cacheval, A)
                 fact = lu(
                     SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                         nonzeros(A)),
@@ -856,10 +881,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KLUFactorization; kwargs...)
     if cache.isfresh
         cacheval = @get_cacheval(cache, :KLUFactorization)
         if alg.reuse_symbolic
-            if alg.check_pattern && !(SparseArrays.decrement(SparseArrays.getcolptr(A)) ==
-                 cacheval.colptr &&
-                 SparseArrays.decrement(SparseArrays.getrowval(A)) ==
-                 cacheval.rowval)
+            if alg.check_pattern && pattern_changed(cacheval, A)
                 fact = KLU.klu(
                     SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                         nonzeros(A)),

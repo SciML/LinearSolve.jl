@@ -82,6 +82,9 @@ _isidentity_struct(::SciMLOperators.IdentityOperator) = true
 # Dispatch Friendly way to check if an extension is loaded
 __is_extension_loaded(::Val) = false
 
+# Check if a sparsity pattern has changed
+pattern_changed(fact, A) = false
+
 function _fast_sym_givens! end
 
 # Code

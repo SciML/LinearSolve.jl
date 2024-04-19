@@ -97,7 +97,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
     end
 
     F = @get_cacheval(cache, :LUFactorization)
-    y = ldiv!(cache.u, F, cache.b)
+    y = _ldiv!(cache.u, F, cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 

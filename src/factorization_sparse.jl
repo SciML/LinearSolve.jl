@@ -27,3 +27,9 @@ function _ldiv!(::SVector,
         b::SVector)
     (A \ b)
 end
+
+function pattern_changed(fact, A::SparseArrays.SparseMatrixCSC)
+    !(SparseArrays.decrement(SparseArrays.getcolptr(A)) ==
+    fact.colptr && SparseArrays.decrement(SparseArrays.getrowval(A)) ==
+                 fact.rowval)
+end

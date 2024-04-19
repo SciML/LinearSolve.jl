@@ -82,6 +82,9 @@ _isidentity_struct(::SciMLOperators.IdentityOperator) = true
 # Dispatch Friendly way to check if an extension is loaded
 __is_extension_loaded(::Val) = false
 
+# Check if a sparsity pattern has changed
+pattern_changed(fact, A) = false
+
 function _fast_sym_givens! end
 
 # Code
@@ -218,6 +221,10 @@ PrecompileTools.@compile_workload begin
     sol = solve(prob) # in case sparspak is used as default
     sol = solve(prob, SparspakFactorization())
 end
+
+ALREADY_WARNED_CUDSS = Ref{Bool}(false)
+error_no_cudss_lu(A) = nothing
+cudss_loaded(A) = false
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,

@@ -132,6 +132,7 @@ end
 function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization},
         A::Union{<:Adjoint, <:Transpose}, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
+    error_no_cudss_lu(A)
     if alg isa LUFactorization
         return lu(A; check = false)
     else

@@ -222,6 +222,10 @@ PrecompileTools.@compile_workload begin
     sol = solve(prob, SparspakFactorization())
 end
 
+ALREADY_WARNED_CUDSS = Ref{Bool}(false)
+error_no_cudss_lu(A) = nothing
+cudss_loaded(A) = false
+
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
        NormalCholeskyFactorization, NormalBunchKaufmanFactorization,

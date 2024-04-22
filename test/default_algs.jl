@@ -33,7 +33,7 @@ solve(prob)
 
 @test LinearSolve.defaultalg(nothing, zeros(5),
     LinearSolve.OperatorAssumptions(false)).alg ===
-      LinearSolve.DefaultAlgorithmChoice.QRFactorizationPivoted
+      LinearSolve.DefaultAlgorithmChoice.QRFactorization
 
 A = spzeros(2, 2)
 # test that solving a singular problem doesn't error
@@ -121,7 +121,7 @@ b = [1.0, 0.0, 0.0]
 prob = LinearProblem(A, b)
 sol = solve(prob)
 
-@test sol.u ≈ [0.4, 0.2]
+@test !SciMLBase.successful_retcode(sol.retcode)
 
 ## Show that we cannot select a default alg once by checking the rank, since it might change
 ## later in the cache
@@ -143,4 +143,4 @@ cache.A = [2.0 1.0
 
 sol = solve!(cache)
 
-@test sol.u ≈ [0.4, 0.2]
+@test !SciMLBase.successful_retcode(sol.retcode)

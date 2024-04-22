@@ -136,26 +136,33 @@ include("extension_algs.jl")
 include("adjoint.jl")
 include("deprecated.jl")
 
+@inline function _notsuccessful(F::LinearAlgebra.QRCompactWY)
+    (m, n) = size(F)
+    U = view(F.factors, 1:min(m, n), 1:n)
+    return any(iszero, Iterators.reverse(@view U[diagind(U)]))
+end
+@inline _notsuccessful(F) = hasmethod(LinearAlgebra.issuccess, (typeof(F),)) ?
+                            !LinearAlgebra.issuccess(F) : false
+
 @generated function SciMLBase.solve!(cache::LinearCache, alg::AbstractFactorization;
         kwargs...)
     quote
         if cache.isfresh
             fact = do_factorization(alg, cache.A, cache.b, cache.u)
             cache.cacheval = fact
+
+            # If factorization was not successful, return failure. Don't reset `isfresh`
+            if _notsuccessful(fact)
+                return SciMLBase.build_linear_solution(
+                    alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
+            end
+
             cache.isfresh = false
         end
+
         y = _ldiv!(cache.u, @get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
             cache.b)
-
-        #=
-        retcode = if LinearAlgebra.issuccess(fact)
-            SciMLBase.ReturnCode.Success
-        else
-            SciMLBase.ReturnCode.Failure
-        end
-        SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = retcode)
-        =#
-        SciMLBase.build_linear_solution(alg, y, nothing, cache)
+        return SciMLBase.build_linear_solution(alg, y, nothing, cache)
     end
 end
 

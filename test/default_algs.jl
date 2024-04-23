@@ -112,3 +112,35 @@ prob = LinearProblem(funcop, b)
 sol1 = solve(prob)
 sol2 = solve(prob, LinearSolve.KrylovJL_CRAIGMR())
 @test sol1.u == sol2.u
+
+# Default for Underdetermined problem but the size is a long rectangle
+A = [2.0 1.0
+     0.0 0.0
+     0.0 0.0]
+b = [1.0, 0.0, 0.0]
+prob = LinearProblem(A, b)
+sol = solve(prob)
+
+@test !SciMLBase.successful_retcode(sol.retcode)
+
+## Show that we cannot select a default alg once by checking the rank, since it might change
+## later in the cache
+## Common occurrence for iterative nonlinear solvers using linear solve
+A = [2.0 1.0
+     1.0 1.0
+     0.0 0.0]
+b = [1.0, 1.0, 0.0]
+prob = LinearProblem(A, b)
+
+cache = init(prob)
+sol = solve!(cache)
+
+@test sol.u ≈ [0.0, 1.0]
+
+cache.A = [2.0 1.0
+           0.0 0.0
+           0.0 0.0]
+
+sol = solve!(cache)
+
+@test !SciMLBase.successful_retcode(sol.retcode)

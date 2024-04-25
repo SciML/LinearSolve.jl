@@ -43,18 +43,21 @@ function LinearSolve.init_cacheval(alg::CudaOffloadFactorization, A, b, u, Pl, P
     qr(CUDA.CuArray(A))
 end
 
-function LinearSolve.init_cacheval(::SparspakFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
-    Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+function LinearSolve.init_cacheval(
+        ::SparspakFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
+        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     nothing
 end
 
-function LinearSolve.init_cacheval(::KLUFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
-    Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+function LinearSolve.init_cacheval(
+        ::KLUFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
+        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     nothing
 end
 
-function LinearSolve.init_cacheval(::UMFPACKFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
-    Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+function LinearSolve.init_cacheval(
+        ::UMFPACKFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
+        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     nothing
 end
 

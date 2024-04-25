@@ -56,7 +56,7 @@ Base.@kwdef struct LUFactorization{P} <: AbstractFactorization
 end
 
 # Legacy dispatch
-LUFactorization(pivot) = LUFactorization(;pivot=RowMaximum())
+LUFactorization(pivot) = LUFactorization(; pivot = RowMaximum())
 
 """
 `GenericLUFactorization(pivot=LinearAlgebra.RowMaximum())`

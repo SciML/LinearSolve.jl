@@ -93,6 +93,12 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
             fact = lu(A, check = false)
         end
         cache.cacheval = fact
+
+        if !LinearAlgebra.issuccess(fact)
+            return SciMLBase.build_linear_solution(
+                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
+        end
+
         cache.isfresh = false
     end
 
@@ -187,7 +193,11 @@ function do_factorization(alg::QRFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
     if ArrayInterface.can_setindex(typeof(A))
         if alg.inplace && !(A isa SparseMatrixCSC) && !(A isa GPUArraysCore.AnyGPUArray)
-            fact = qr!(A, alg.pivot)
+            if A isa Symmetric
+                fact = qr(A, alg.pivot)
+            else
+                fact = qr!(A, alg.pivot)
+            end
         else
             fact = qr(A) # CUDA.jl does not allow other args!
         end
@@ -201,6 +211,12 @@ function init_cacheval(alg::QRFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     ArrayInterface.qr_instance(convert(AbstractMatrix, A), alg.pivot)
+end
+
+function init_cacheval(alg::QRFactorization, A::Symmetric, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+    return qr(convert(AbstractMatrix, A), alg.pivot)
 end
 
 const PREALLOCATED_QR_ColumnNorm = ArrayInterface.qr_instance(rand(1, 1), ColumnNorm())
@@ -1023,6 +1039,12 @@ function SciMLBase.solve!(cache::LinearCache, alg::RFLUFactorization{P, T};
         end
         fact = RecursiveFactorization.lu!(A, ipiv, Val(P), Val(T), check = false)
         cache.cacheval = (fact, ipiv)
+
+        if !LinearAlgebra.issuccess(fact)
+            return SciMLBase.build_linear_solution(
+                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
+        end
+
         cache.isfresh = false
     end
     y = ldiv!(cache.u, @get_cacheval(cache, :RFLUFactorization)[1], cache.b)

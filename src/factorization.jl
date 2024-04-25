@@ -1039,6 +1039,12 @@ function SciMLBase.solve!(cache::LinearCache, alg::RFLUFactorization{P, T};
         end
         fact = RecursiveFactorization.lu!(A, ipiv, Val(P), Val(T), check = false)
         cache.cacheval = (fact, ipiv)
+
+        if !LinearAlgebra.issuccess(fact)
+            return SciMLBase.build_linear_solution(
+                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
+        end
+
         cache.isfresh = false
     end
     y = ldiv!(cache.u, @get_cacheval(cache, :RFLUFactorization)[1], cache.b)

@@ -1,7 +1,7 @@
 name = "LinearSolve"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 authors = ["SciML"]
-version = "2.30.0"
+version = "2.30.1"
 
 [deps]
 ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
@@ -75,7 +75,7 @@ ConcreteStructs = "0.2.3"
 DocStringExtensions = "0.9.3"
 EnumX = "1.0.4"
 Enzyme = "0.11.15, 0.12"
-EnzymeCore = "0.6.5"
+EnzymeCore = "0.6.5, 0.7"
 FastAlmostBandedMatrices = "0.1"
 FastLapackInterface = "2"
 FiniteDiff = "2.22"

@@ -86,6 +86,7 @@ end
 ```julia
 MKLPardisoFactorize(; nprocs::Union{Int, Nothing} = nothing,
     matrix_type = nothing,
+    cache_analysis = false,
     iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
     dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
 ```
@@ -98,7 +99,11 @@ A sparse factorization method using MKL Pardiso.
 
 ## Keyword Arguments
 
-For the definition of the keyword arguments, see the Pardiso.jl documentation.
+Setting `cache_analysis = true` disables Pardiso's scaling and matching defaults
+and caches the result of the initial analysis phase for all further computations
+with this solver.
+
+For the definition of the other keyword arguments, see the Pardiso.jl documentation.
 All values default to `nothing` and the solver internally determines the values
 given the input types, and these keyword arguments are only for overriding the
 default handling process. This should not be required by most users.
@@ -109,6 +114,7 @@ MKLPardisoFactorize(; kwargs...) = PardisoJL(; solver_type = 0, kwargs...)
 ```julia
 MKLPardisoIterate(; nprocs::Union{Int, Nothing} = nothing,
     matrix_type = nothing,
+    cache_analysis = false,
     iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
     dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
 ```
@@ -121,7 +127,11 @@ A mixed factorization+iterative method using MKL Pardiso.
 
 ## Keyword Arguments
 
-For the definition of the keyword arguments, see the Pardiso.jl documentation.
+Setting `cache_analysis = true` disables Pardiso's scaling and matching defaults
+and caches the result of the initial analysis phase for all further computations
+with this solver.
+
+For the definition of the other keyword arguments, see the Pardiso.jl documentation.
 All values default to `nothing` and the solver internally determines the values
 given the input types, and these keyword arguments are only for overriding the
 default handling process. This should not be required by most users.
@@ -133,6 +143,7 @@ MKLPardisoIterate(; kwargs...) = PardisoJL(; solver_type = 1, kwargs...)
 PardisoJL(; nprocs::Union{Int, Nothing} = nothing,
     solver_type = nothing,
     matrix_type = nothing,
+    cache_analysis = false,
     iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
     dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
 ```
@@ -144,6 +155,10 @@ A generic method using MKL Pardiso. Specifying `solver_type` is required.
     Using this solver requires adding the package Pardiso.jl, i.e. `using Pardiso`
 
 ## Keyword Arguments
+
+Setting `cache_analysis = true` disables Pardiso's scaling and matching defaults
+and caches the result of the initial analysis phase for all further computations
+with this solver.
 
 For the definition of the keyword arguments, see the Pardiso.jl documentation.
 All values default to `nothing` and the solver internally determines the values

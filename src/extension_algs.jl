@@ -163,7 +163,7 @@ struct PardisoJL{T1, T2} <: LinearSolve.SciMLLinearSolveAlgorithm
             matrix_type = nothing,
             cache_analysis = false,
             iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
-            dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
+            dparm::Union{Vector{Tuple{Int, Float64}}, Nothing} = nothing)
         ext = Base.get_extension(@__MODULE__, :LinearSolvePardisoExt)
         if ext === nothing
             error("PardisoJL requires that Pardiso is loaded, i.e. `using Pardiso`")

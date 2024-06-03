@@ -32,11 +32,13 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
             vendor=:MKL
         end
     end
-    
+
+    transposed_iparm = 1
     solver = if vendor == :MKL
         solver = if Pardiso.mkl_is_available()
             solver = Pardiso.MKLPardisoSolver()
             nprocs !== nothing && Pardiso.set_nprocs!(solver, nprocs)
+            transposed_iparm = 2 # see https://www.intel.com/content/www/us/en/docs/onemkl/developer-reference-c/2024-0/pardiso-iparm-parameter.html#IPARM37
 
             solver
         else
@@ -84,7 +86,7 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
     end
 
     # Make sure to say it's transposed because its CSC not CSR
-    Pardiso.set_iparm!(solver, 12, 1)
+    Pardiso.set_iparm!(solver, 12, transposed_iparm)
 
     #=
     Note: It is recommended to use IPARM(11)=1 (scaling) and IPARM(13)=1 (matchings) for
@@ -107,12 +109,12 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
         # applies these exact factors L and U for the next steps in a
         # preconditioned Krylov-Subspace iteration. If the iteration does not
         # converge, the solver will automatically switch back to the numerical factorization.
-        Pardiso.set_iparm!(solver, 3, round(Int, abs(log10(reltol)), RoundDown) * 10 + 1)
+        Pardiso.set_iparm!(solver, 4, round(Int, abs(log10(reltol)), RoundDown) * 10 + 1)
     end
 
     Pardiso.pardiso(solver,
-        u,
-        SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
+                    u,
+                    SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
         b)
 
     return solver
@@ -121,7 +123,6 @@ end
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::PardisoJL; kwargs...)
     @unpack A, b, u = cache
     A = convert(AbstractMatrix, A)
-
     if cache.isfresh
         Pardiso.set_phase!(cache.cacheval, Pardiso.NUM_FACT)
         Pardiso.pardiso(cache.cacheval, A, eltype(A)[])
@@ -130,6 +131,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::PardisoJL; kwargs
 
     Pardiso.set_phase!(cache.cacheval, Pardiso.SOLVE_ITERATIVE_REFINE)
     Pardiso.pardiso(cache.cacheval, u, A, b)
+
     return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
 end
 

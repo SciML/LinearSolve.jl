@@ -22,21 +22,39 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
         reltol,
         verbose::Bool,
         assumptions::LinearSolve.OperatorAssumptions)
-    @unpack nprocs, solver_type, matrix_type, iparm, dparm = alg
+    @unpack nprocs, solver_type, matrix_type, iparm, dparm, vendor = alg
     A = convert(AbstractMatrix, A)
 
-    solver = if Pardiso.PARDISO_LOADED[]
-        solver = Pardiso.PardisoSolver()
-        solver_type !== nothing && Pardiso.set_solver!(solver, solver_type)
-
-        solver
-    else
-        solver = Pardiso.MKLPardisoSolver()
-        nprocs !== nothing && Pardiso.set_nprocs!(solver, nprocs)
-
-        solver
+    if isnothing(vendor)
+        if Pardiso.panua_is_available()
+            vendor=:Panua
+        else
+            vendor=:MKL
+        end
     end
+    
+    solver = if vendor == :MKL
+        solver = if Pardiso.mkl_is_available()
+            solver = Pardiso.MKLPardisoSolver()
+            nprocs !== nothing && Pardiso.set_nprocs!(solver, nprocs)
 
+            solver
+        else
+            error("MKL Pardiso is not available. On MacOSX, possibly, try Panua Pardiso.")
+        end
+    elseif vendor == :Panua
+        solver = if Pardiso.panua_is_available()
+            solver = Pardiso.PardisoSolver()
+            solver_type !== nothing && Pardiso.set_solver!(solver, solver_type)
+            
+            solver
+        else
+            error("Panua Pardiso is not available.")
+        end
+    else
+        error("Pardiso vendor must be either `:MKL` or `:Panua`")
+    end
+    
     Pardiso.pardisoinit(solver) # default initialization
 
     if matrix_type !== nothing

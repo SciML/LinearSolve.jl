@@ -253,6 +253,7 @@ export SimpleGMRES
 export HYPREAlgorithm
 export CudaOffloadFactorization
 export MKLPardisoFactorize, MKLPardisoIterate
+export PanuaPardisoFactorize, PanuaPardisoIterate
 export PardisoJL
 export MKLLUFactorization
 export AppleAccelerateLUFactorization

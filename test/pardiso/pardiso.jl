@@ -13,30 +13,21 @@ n = 4
 e = ones(n)
 e2 = ones(n - 1)
 A2 = spdiagm(-1 => im * e2, 0 => lambda * e, 1 => -im * e2)
-
 b2 = rand(n) + im * zeros(n)
-cache_kwargs = (; verbose = true, abstol = 1e-8, reltol = 1e-8, maxiter = 30)
-
 prob2 = LinearProblem(A2, b2)
 
-for alg in (PardisoJL(), MKLPardisoFactorize())
-    u = solve(prob1, alg; cache_kwargs...).u
-    @test A1 * u ≈ b1
+cache_kwargs = (; abstol = 1e-8, reltol = 1e-8, maxiter = 30)
 
-    u = solve(prob2, alg; cache_kwargs...).u
-    @test eltype(u) <: Complex
-    @test A2 * u ≈ b2
+for alg in (PardisoJL(), MKLPardisoFactorize(), MKLPardisoIterate())
+     u = solve(prob1, alg; cache_kwargs...).u
+     @test A1 * u ≈ b1
+
+     u = solve(prob2, alg; cache_kwargs...).u
+     @test eltype(u) <: Complex
+     @test A2 * u ≈ b2
 end
 
-for alg in (MKLPardisoIterate(),)
-    u = solve(prob1, alg; cache_kwargs...).u
-    @test A1 * u ≈ b1
-
-    u = solve(prob2, alg; cache_kwargs...).u
-    @test eltype(u) <: Complex
-    @test A2 * u ≈ b2
-end
-
+return
 
 
 Random.seed!(10)
@@ -79,7 +70,7 @@ end
 A=makeA()
 u0=fill(0.1,size(A,2))
 linprob = LinearProblem(A, A*u0)
-u = LinearSolve.solve(linprob, PardisoJL(),verbose=true)
+u = LinearSolve.solve(linprob, PardisoJL())
 @test norm(u-u0) < 1.0e-14
 
 

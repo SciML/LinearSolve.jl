@@ -25,7 +25,8 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
     @unpack nprocs, solver_type, matrix_type, cache_analysis, iparm, dparm = alg
     A = convert(AbstractMatrix, A)
 
-    solver = if Pardiso.PARDISO_LOADED[]
+    transposed_iparm = 1
+    solver = if false && Pardiso.PARDISO_LOADED[]
         solver = Pardiso.PardisoSolver()
         solver_type !== nothing && Pardiso.set_solver!(solver, solver_type)
 
@@ -33,7 +34,9 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
     else
         solver = Pardiso.MKLPardisoSolver()
         nprocs !== nothing && Pardiso.set_nprocs!(solver, nprocs)
-
+        # for mkl 1 means conjugated an 2 means transposed.
+        # https://www.intel.com/content/www/us/en/docs/onemkl/developer-reference-c/2024-0/pardiso-iparm-parameter.html#IPARM37
+        transposed_iparm = 2
         solver
     end
 
@@ -73,7 +76,8 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
         # applies these exact factors L and U for the next steps in a
         # preconditioned Krylov-Subspace iteration. If the iteration does not
         # converge, the solver will automatically switch back to the numerical factorization.
-        Pardiso.set_iparm!(solver, 3, round(Int, abs(log10(reltol)), RoundDown) * 10 + 1)
+        # Be aware that in the intel docs, iparm indexes are one lower.
+        Pardiso.set_iparm!(solver, 4, round(Int, abs(log10(reltol)), RoundDown) * 10 + 1)
     end
 
     # pass in vector of tuples like [(iparm::Int, key::Int) ...]
@@ -91,7 +95,7 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
 
     # Make sure to say it's transposed because its CSC not CSR
     # This is also the only value which should not be overwritten by users
-    Pardiso.set_iparm!(solver, 12, 1)
+    Pardiso.set_iparm!(solver, 12, transposed_iparm)
 
     if cache_analysis
         Pardiso.set_phase!(solver, Pardiso.ANALYSIS)

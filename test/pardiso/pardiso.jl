@@ -34,7 +34,7 @@ for alg in (MKLPardisoIterate(),)
 
     u = solve(prob2, alg; cache_kwargs...).u
     @test eltype(u) <: Complex
-    @test_broken A2 * u ≈ b2
+    @test A2 * u ≈ b2
 end
 
 

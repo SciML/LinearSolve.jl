@@ -108,7 +108,7 @@ All values default to `nothing` and the solver internally determines the values
 given the input types, and these keyword arguments are only for overriding the
 default handling process. This should not be required by most users.
 """
-MKLPardisoFactorize(; kwargs...) = PardisoJL(; vendor=:MKL, solver_type = 0, kwargs...)
+MKLPardisoFactorize(; kwargs...) = PardisoJL(; vendor = :MKL, solver_type = 0, kwargs...)
 
 """
 ```julia
@@ -136,8 +136,7 @@ All values default to `nothing` and the solver internally determines the values
 given the input types, and these keyword arguments are only for overriding the
 default handling process. This should not be required by most users.
 """
-MKLPardisoIterate(; kwargs...) = PardisoJL(; vendor=:MKL, solver_type = 1, kwargs...)
-
+MKLPardisoIterate(; kwargs...) = PardisoJL(; vendor = :MKL, solver_type = 1, kwargs...)
 
 """
 ```julia
@@ -165,7 +164,8 @@ All values default to `nothing` and the solver internally determines the values
 given the input types, and these keyword arguments are only for overriding the
 default handling process. This should not be required by most users.
 """
-PanuaPardisoFactorize(; kwargs...) = PardisoJL(; vendor=:Panua, solver_type = 0, kwargs...)
+PanuaPardisoFactorize(; kwargs...) = PardisoJL(;
+    vendor = :Panua, solver_type = 0, kwargs...)
 
 """
 ```julia
@@ -188,8 +188,7 @@ All values default to `nothing` and the solver internally determines the values
 given the input types, and these keyword arguments are only for overriding the
 default handling process. This should not be required by most users.
 """
-PanuaPardisoIterate(; kwargs...) = PardisoJL(; vendor=:Panua, solver_type = 1, kwargs...)
-
+PanuaPardisoIterate(; kwargs...) = PardisoJL(; vendor = :Panua, solver_type = 1, kwargs...)
 
 """
 ```julia
@@ -198,7 +197,7 @@ PardisoJL(; nprocs::Union{Int, Nothing} = nothing,
     matrix_type = nothing,
     iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
     dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
-    vendor::Union{Symbol,Nothing} = nothing
+    vendor::Union{Symbol, Nothing} = nothing
 )
 ```
 
@@ -225,7 +224,7 @@ struct PardisoJL{T1, T2} <: LinearSolve.SciMLLinearSolveAlgorithm
     cache_analysis::Bool
     iparm::Union{Vector{Tuple{Int, Int}}, Nothing}
     dparm::Union{Vector{Tuple{Int, Int}}, Nothing}
-    vendor::Union{Symbol,Nothing}
+    vendor::Union{Symbol, Nothing}
 
     function PardisoJL(; nprocs::Union{Int, Nothing} = nothing,
             solver_type = nothing,
@@ -233,7 +232,7 @@ struct PardisoJL{T1, T2} <: LinearSolve.SciMLLinearSolveAlgorithm
             cache_analysis = false,
             iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
             dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
-            vendor::Union{Symbol,Nothing}=nothing )
+            vendor::Union{Symbol, Nothing} = nothing)
         ext = Base.get_extension(@__MODULE__, :LinearSolvePardisoExt)
         if ext === nothing
             error("PardisoJL requires that Pardiso is loaded, i.e. `using Pardiso`")

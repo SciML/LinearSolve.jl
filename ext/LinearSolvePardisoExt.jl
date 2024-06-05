@@ -27,9 +27,9 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
 
     if isnothing(vendor)
         if Pardiso.panua_is_available()
-            vendor=:Panua
+            vendor = :Panua
         else
-            vendor=:MKL
+            vendor = :MKL
         end
     end
 
@@ -42,7 +42,7 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
 
             # for mkl 1 means conjugated and 2 means transposed.
             # https://www.intel.com/content/www/us/en/docs/onemkl/developer-reference-c/2024-0/pardiso-iparm-parameter.html#IPARM37
-            transposed_iparm = 2 
+            transposed_iparm = 2
 
             solver
         else
@@ -53,7 +53,7 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
             solver = Pardiso.PardisoSolver()
             Pardiso.pardisoinit(solver)
             solver_type !== nothing && Pardiso.set_solver!(solver, solver_type)
-            
+
             solver
         else
             error("Panua Pardiso is not available.")
@@ -61,7 +61,7 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
     else
         error("Pardiso vendor must be either `:MKL` or `:Panua`")
     end
-    
+
     if matrix_type !== nothing
         Pardiso.set_matrixtype!(solver, matrix_type)
     else
@@ -125,7 +125,6 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
             b)
     end
 
->>>>>>> main
     return solver
 end
 

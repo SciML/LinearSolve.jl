@@ -22,26 +22,44 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
         reltol,
         verbose::Bool,
         assumptions::LinearSolve.OperatorAssumptions)
-    @unpack nprocs, solver_type, matrix_type, cache_analysis, iparm, dparm = alg
+    @unpack nprocs, solver_type, matrix_type, cache_analysis, iparm, dparm, vendor = alg
     A = convert(AbstractMatrix, A)
 
+    if isnothing(vendor)
+        if Pardiso.panua_is_available()
+            vendor = :Panua
+        else
+            vendor = :MKL
+        end
+    end
+
     transposed_iparm = 1
-    solver = if Pardiso.PARDISO_LOADED[]
-        solver = Pardiso.PardisoSolver()
-        Pardiso.pardisoinit(solver)
-        solver_type !== nothing && Pardiso.set_solver!(solver, solver_type)
+    solver = if vendor == :MKL
+        solver = if Pardiso.mkl_is_available()
+            solver = Pardiso.MKLPardisoSolver()
+            Pardiso.pardisoinit(solver)
+            nprocs !== nothing && Pardiso.set_nprocs!(solver, nprocs)
 
-        solver
+            # for mkl 1 means conjugated and 2 means transposed.
+            # https://www.intel.com/content/www/us/en/docs/onemkl/developer-reference-c/2024-0/pardiso-iparm-parameter.html#IPARM37
+            transposed_iparm = 2
+
+            solver
+        else
+            error("MKL Pardiso is not available. On MacOSX, possibly, try Panua Pardiso.")
+        end
+    elseif vendor == :Panua
+        solver = if Pardiso.panua_is_available()
+            solver = Pardiso.PardisoSolver()
+            Pardiso.pardisoinit(solver)
+            solver_type !== nothing && Pardiso.set_solver!(solver, solver_type)
+
+            solver
+        else
+            error("Panua Pardiso is not available.")
+        end
     else
-        solver = Pardiso.MKLPardisoSolver()
-        Pardiso.pardisoinit(solver)
-        nprocs !== nothing && Pardiso.set_nprocs!(solver, nprocs)
-
-        # for mkl 1 means conjugated and 2 means transposed.
-        # https://www.intel.com/content/www/us/en/docs/onemkl/developer-reference-c/2024-0/pardiso-iparm-parameter.html#IPARM37
-        transposed_iparm = 2
-
-        solver
+        error("Pardiso vendor must be either `:MKL` or `:Panua`")
     end
 
     if matrix_type !== nothing
@@ -113,7 +131,6 @@ end
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::PardisoJL; kwargs...)
     @unpack A, b, u = cache
     A = convert(AbstractMatrix, A)
-
     if cache.isfresh
         phase = alg.cache_analysis ? Pardiso.NUM_FACT : Pardiso.ANALYSIS_NUM_FACT
         Pardiso.set_phase!(cache.cacheval, phase)

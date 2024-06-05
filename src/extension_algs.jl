@@ -108,7 +108,7 @@ All values default to `nothing` and the solver internally determines the values
 given the input types, and these keyword arguments are only for overriding the
 default handling process. This should not be required by most users.
 """
-MKLPardisoFactorize(; kwargs...) = PardisoJL(; solver_type = 0, kwargs...)
+MKLPardisoFactorize(; kwargs...) = PardisoJL(; vendor = :MKL, solver_type = 0, kwargs...)
 
 """
 ```julia
@@ -136,19 +136,18 @@ All values default to `nothing` and the solver internally determines the values
 given the input types, and these keyword arguments are only for overriding the
 default handling process. This should not be required by most users.
 """
-MKLPardisoIterate(; kwargs...) = PardisoJL(; solver_type = 1, kwargs...)
+MKLPardisoIterate(; kwargs...) = PardisoJL(; vendor = :MKL, solver_type = 1, kwargs...)
 
 """
 ```julia
-PardisoJL(; nprocs::Union{Int, Nothing} = nothing,
-    solver_type = nothing,
+PanuaPardisoFactorize(; nprocs::Union{Int, Nothing} = nothing,
     matrix_type = nothing,
     cache_analysis = false,
     iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
     dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
 ```
 
-A generic method using MKL Pardiso. Specifying `solver_type` is required.
+A sparse factorization method using Panua Pardiso.
 
 !!! note
 
@@ -165,6 +164,59 @@ All values default to `nothing` and the solver internally determines the values
 given the input types, and these keyword arguments are only for overriding the
 default handling process. This should not be required by most users.
 """
+PanuaPardisoFactorize(; kwargs...) = PardisoJL(;
+    vendor = :Panua, solver_type = 0, kwargs...)
+
+"""
+```julia
+PanuaPardisoIterate(; nprocs::Union{Int, Nothing} = nothing,
+    matrix_type = nothing,
+    iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
+    dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
+```
+
+A mixed factorization+iterative method using Panua Pardiso.
+
+!!! note
+
+    Using this solver requires adding the package Pardiso.jl, i.e. `using Pardiso`
+
+## Keyword Arguments
+
+For the definition of the keyword arguments, see the Pardiso.jl documentation.
+All values default to `nothing` and the solver internally determines the values
+given the input types, and these keyword arguments are only for overriding the
+default handling process. This should not be required by most users.
+"""
+PanuaPardisoIterate(; kwargs...) = PardisoJL(; vendor = :Panua, solver_type = 1, kwargs...)
+
+"""
+```julia
+PardisoJL(; nprocs::Union{Int, Nothing} = nothing,
+    solver_type = nothing,
+    matrix_type = nothing,
+    iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
+    dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
+    vendor::Union{Symbol, Nothing} = nothing
+)
+```
+
+A generic method using  Pardiso. Specifying `solver_type` is required.
+
+!!! note
+
+    Using this solver requires adding the package Pardiso.jl, i.e. `using Pardiso`
+
+## Keyword Arguments
+
+The `vendor` keyword allows to choose between Panua pardiso  (former pardiso-project.org; `vendor=:Panua`)
+and  MKL Pardiso (`vendor=:MKL`). If `vendor==nothing`, Panua pardiso is preferred over MKL Pardiso.
+
+For the definition of the other keyword arguments, see the Pardiso.jl documentation.
+All values default to `nothing` and the solver internally determines the values
+given the input types, and these keyword arguments are only for overriding the
+default handling process. This should not be required by most users.
+"""
 struct PardisoJL{T1, T2} <: LinearSolve.SciMLLinearSolveAlgorithm
     nprocs::Union{Int, Nothing}
     solver_type::T1
@@ -172,13 +224,15 @@ struct PardisoJL{T1, T2} <: LinearSolve.SciMLLinearSolveAlgorithm
     cache_analysis::Bool
     iparm::Union{Vector{Tuple{Int, Int}}, Nothing}
     dparm::Union{Vector{Tuple{Int, Int}}, Nothing}
+    vendor::Union{Symbol, Nothing}
 
     function PardisoJL(; nprocs::Union{Int, Nothing} = nothing,
             solver_type = nothing,
             matrix_type = nothing,
             cache_analysis = false,
             iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
-            dparm::Union{Vector{Tuple{Int, Float64}}, Nothing} = nothing)
+            dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
+            vendor::Union{Symbol, Nothing} = nothing)
         ext = Base.get_extension(@__MODULE__, :LinearSolvePardisoExt)
         if ext === nothing
             error("PardisoJL requires that Pardiso is loaded, i.e. `using Pardiso`")
@@ -188,7 +242,7 @@ struct PardisoJL{T1, T2} <: LinearSolve.SciMLLinearSolveAlgorithm
             @assert T1 <: Union{Int, Nothing, ext.Pardiso.Solver}
             @assert T2 <: Union{Int, Nothing, ext.Pardiso.MatrixType}
             return new{T1, T2}(
-                nprocs, solver_type, matrix_type, cache_analysis, iparm, dparm)
+                nprocs, solver_type, matrix_type, cache_analysis, iparm, dparm, vendor)
         end
     end
 end

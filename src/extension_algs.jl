@@ -86,6 +86,7 @@ end
 ```julia
 MKLPardisoFactorize(; nprocs::Union{Int, Nothing} = nothing,
     matrix_type = nothing,
+    cache_analysis = false,
     iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
     dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
 ```
@@ -98,7 +99,11 @@ A sparse factorization method using MKL Pardiso.
 
 ## Keyword Arguments
 
-For the definition of the keyword arguments, see the Pardiso.jl documentation.
+Setting `cache_analysis = true` disables Pardiso's scaling and matching defaults
+and caches the result of the initial analysis phase for all further computations
+with this solver.
+
+For the definition of the other keyword arguments, see the Pardiso.jl documentation.
 All values default to `nothing` and the solver internally determines the values
 given the input types, and these keyword arguments are only for overriding the
 default handling process. This should not be required by most users.
@@ -109,6 +114,7 @@ MKLPardisoFactorize(; kwargs...) = PardisoJL(; vendor=:MKL, solver_type = 0, kwa
 ```julia
 MKLPardisoIterate(; nprocs::Union{Int, Nothing} = nothing,
     matrix_type = nothing,
+    cache_analysis = false,
     iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
     dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
 ```
@@ -121,7 +127,11 @@ A mixed factorization+iterative method using MKL Pardiso.
 
 ## Keyword Arguments
 
-For the definition of the keyword arguments, see the Pardiso.jl documentation.
+Setting `cache_analysis = true` disables Pardiso's scaling and matching defaults
+and caches the result of the initial analysis phase for all further computations
+with this solver.
+
+For the definition of the other keyword arguments, see the Pardiso.jl documentation.
 All values default to `nothing` and the solver internally determines the values
 given the input types, and these keyword arguments are only for overriding the
 default handling process. This should not be required by most users.
@@ -133,6 +143,7 @@ MKLPardisoIterate(; kwargs...) = PardisoJL(; vendor=:MKL, solver_type = 1, kwarg
 ```julia
 PanuaPardisoFactorize(; nprocs::Union{Int, Nothing} = nothing,
     matrix_type = nothing,
+    cache_analysis = false,
     iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
     dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
 ```
@@ -144,6 +155,10 @@ A sparse factorization method using Panua Pardiso.
     Using this solver requires adding the package Pardiso.jl, i.e. `using Pardiso`
 
 ## Keyword Arguments
+
+Setting `cache_analysis = true` disables Pardiso's scaling and matching defaults
+and caches the result of the initial analysis phase for all further computations
+with this solver.
 
 For the definition of the keyword arguments, see the Pardiso.jl documentation.
 All values default to `nothing` and the solver internally determines the values
@@ -207,6 +222,7 @@ struct PardisoJL{T1, T2} <: LinearSolve.SciMLLinearSolveAlgorithm
     nprocs::Union{Int, Nothing}
     solver_type::T1
     matrix_type::T2
+    cache_analysis::Bool
     iparm::Union{Vector{Tuple{Int, Int}}, Nothing}
     dparm::Union{Vector{Tuple{Int, Int}}, Nothing}
     vendor::Union{Symbol,Nothing}
@@ -214,6 +230,7 @@ struct PardisoJL{T1, T2} <: LinearSolve.SciMLLinearSolveAlgorithm
     function PardisoJL(; nprocs::Union{Int, Nothing} = nothing,
             solver_type = nothing,
             matrix_type = nothing,
+            cache_analysis = false,
             iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
             dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
             vendor::Union{Symbol,Nothing}=nothing )
@@ -225,7 +242,8 @@ struct PardisoJL{T1, T2} <: LinearSolve.SciMLLinearSolveAlgorithm
             T2 = typeof(matrix_type)
             @assert T1 <: Union{Int, Nothing, ext.Pardiso.Solver}
             @assert T2 <: Union{Int, Nothing, ext.Pardiso.MatrixType}
-            return new{T1, T2}(nprocs, solver_type, matrix_type, iparm, dparm, vendor)
+            return new{T1, T2}(
+                nprocs, solver_type, matrix_type, cache_analysis, iparm, dparm, vendor)
         end
     end
 end

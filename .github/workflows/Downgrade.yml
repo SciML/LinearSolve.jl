@@ -10,22 +10,37 @@ on:
       - main
     paths-ignore:
       - 'docs/**'
+  schedule:
+    - cron: '20 17 * * 0'
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    env:
+      GROUP: ${{ matrix.group }}    
     strategy:
+      fail-fast: false
       matrix:
-        version: ['1']
         group:
           - Core
+          - LinearSolveHYPRE
+          - LinearSolvePardiso
+          - LinearSolveBandedMatrices
+        version:
+          - '1'
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
       - uses: julia-actions/julia-downgrade-compat@v1
-#        if: ${{ matrix.version == '1.6' }}
         with:
           skip: Pkg,TOML
+      - uses: julia-actions/cache@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1

@@ -7,7 +7,8 @@ on:
       - 'release-'
     tags: '*'
   pull_request:
-
+  schedule:
+    - cron: '20 17 * * 0'
 jobs:
   build:
     runs-on: ubuntu-latest

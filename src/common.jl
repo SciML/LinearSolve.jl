@@ -121,6 +121,8 @@ default_alias_b(::Any, ::Any, ::Any) = false
 default_alias_A(::AbstractKrylovSubspaceMethod, ::Any, ::Any) = true
 default_alias_b(::AbstractKrylovSubspaceMethod, ::Any, ::Any) = true
 
+DEFAULT_PRECS(A, p) = IdentityOperator(size(A)[1]), IdentityOperator(size(A)[2])
+
 function __init_u0_from_Ab(A, b)
     u0 = similar(b, size(A, 2))
     fill!(u0, false)
@@ -136,12 +138,12 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         reltol = default_tol(real(eltype(prob.b))),
         maxiters::Int = length(prob.b),
         verbose::Bool = false,
-        Pl = IdentityOperator(size(prob.A)[1]),
-        Pr = IdentityOperator(size(prob.A)[2]),
+        Pl = nothing,
+        Pr = nothing,
         assumptions = OperatorAssumptions(issquare(prob.A)),
         sensealg = LinearSolveAdjoint(),
         kwargs...)
-    @unpack A, b, u0, p = prob
+    (;A, b, u0, p) = prob
 
     A = if alias_A || A isa SMatrix
         A
@@ -167,6 +169,18 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     reltol = real(eltype(prob.b))(reltol)
     abstol = real(eltype(prob.b))(abstol)
 
+    precs = hasproperty(alg, :precs) ? alg.precs : DEFAULT_PRECS
+    _Pl, _Pr = precs(A, p)
+    if isnothing(Pl)
+        Pl = _Pl
+    else
+        @warn "passing Preconditioners at `init`/`solve` time is deprecated. Instead add a `precs` function to your algorithm."
+    end
+    if isnothing(Pr)
+        Pr = _Pr
+    else
+        @warn "passing Preconditioners at `init`/`solve` time is deprecated. Instead add a `precs` function to your algorithm."
+    end
     cacheval = init_cacheval(alg, A, b, u0_, Pl, Pr, maxiters, abstol, reltol, verbose,
         assumptions)
     isfresh = true
@@ -177,6 +191,33 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         typeof(sensealg)}(A, b, u0_, p, alg, cacheval, isfresh, Pl, Pr, abstol, reltol,
         maxiters, verbose, assumptions, sensealg)
     return cache
+end
+
+
+function SciMLBase.reinit!(cache::LinearCache;
+                           A = nothing,
+                           b = cache.b,
+                           u = cache.u,
+                           p = nothing,)
+    (; alg, cacheval, isfresh, abstol, reltol, maxiters, verbose, assumptions, sensealg) = cache
+
+    precs = hasproperty(alg, :precs) ? alg.precs : DEFAULT_PRECS
+    Pl, Pr = if isnothing(A) || isnothing(p)
+        (cache.Pl, cache.Pr)
+    else
+        if isnothing(A)
+            A = cache.A
+        end
+        if isnothing(p)
+            p = cache.p
+        end
+        precs(A, p)
+    end
+
+    return LinearCache{typeof(A), typeof(b), typeof(u), typeof(p), typeof(alg), typeof(cacheval),
+        typeof(Pl), typeof(Pr), typeof(reltol), typeof(assumptions.issq),
+        typeof(sensealg)}(A, b, u, p, alg, cacheval, isfresh, Pl, Pr, abstol, reltol,
+        maxiters, verbose, assumptions, sensealg)
 end
 
 function SciMLBase.solve(prob::LinearProblem, args...; kwargs...)

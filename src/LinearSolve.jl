@@ -5,45 +5,42 @@ if isdefined(Base, :Experimental) &&
 end
 
 import PrecompileTools
+ using ArrayInterface
+ using RecursiveFactorization
+ using Base: cache_dependencies, Bool
+ using LinearAlgebra
+ using SparseArrays
+ using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
+ using LazyArrays: @~, BroadcastArray
+ using SciMLBase: AbstractLinearAlgorithm
+ using SciMLOperators
+ using SciMLOperators: AbstractSciMLOperator, IdentityOperator
+ using Setfield
+ using UnPack
+ using KLU
+ using Sparspak
+ using FastLapackInterface
+ using DocStringExtensions
+ using EnumX
+ using Markdown
+ using ChainRulesCore
+ import InteractiveUtils
 
-PrecompileTools.@recompile_invalidations begin
-    using ArrayInterface
-    using RecursiveFactorization
-    using Base: cache_dependencies, Bool
-    using LinearAlgebra
-    using SparseArrays
-    using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
-    using LazyArrays: @~, BroadcastArray
-    using SciMLBase: AbstractLinearAlgorithm
-    using SciMLOperators
-    using SciMLOperators: AbstractSciMLOperator, IdentityOperator
-    using Setfield
-    using UnPack
-    using KLU
-    using Sparspak
-    using FastLapackInterface
-    using DocStringExtensions
-    using EnumX
-    using Markdown
-    using ChainRulesCore
-    import InteractiveUtils
+ import StaticArraysCore: StaticArray, SVector, MVector, SMatrix, MMatrix
 
-    import StaticArraysCore: StaticArray, SVector, MVector, SMatrix, MMatrix
+ using LinearAlgebra: BlasInt, LU
+ using LinearAlgebra.LAPACK: require_one_based_indexing,
+                             chkfinite, chkstride1,
+                             @blasfunc, chkargsok
 
-    using LinearAlgebra: BlasInt, LU
-    using LinearAlgebra.LAPACK: require_one_based_indexing,
-                                chkfinite, chkstride1,
-                                @blasfunc, chkargsok
+ import GPUArraysCore
+ import Preferences
+ import ConcreteStructs: @concrete
 
-    import GPUArraysCore
-    import Preferences
-    import ConcreteStructs: @concrete
-
-    # wrap
-    import Krylov
-    using SciMLBase
-    import Preferences
-end
+ # wrap
+ import Krylov
+ using SciMLBase
+ import Preferences
 
 const CRC = ChainRulesCore
 

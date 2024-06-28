@@ -198,13 +198,12 @@ function SciMLBase.reinit!(cache::LinearCache;
                            A = nothing,
                            b = cache.b,
                            u = cache.u,
-                           p = nothing,)
+                           p = nothing,
+                           reinit_cache = false,)
     (; alg, cacheval, isfresh, abstol, reltol, maxiters, verbose, assumptions, sensealg) = cache
 
     precs = hasproperty(alg, :precs) ? alg.precs : DEFAULT_PRECS
     Pl, Pr = if isnothing(A) || isnothing(p)
-        (cache.Pl, cache.Pr)
-    else
         if isnothing(A)
             A = cache.A
         end
@@ -212,12 +211,23 @@ function SciMLBase.reinit!(cache::LinearCache;
             p = cache.p
         end
         precs(A, p)
+    else
+        (cache.Pl, cache.Pr)
     end
 
-    return LinearCache{typeof(A), typeof(b), typeof(u), typeof(p), typeof(alg), typeof(cacheval),
-        typeof(Pl), typeof(Pr), typeof(reltol), typeof(assumptions.issq),
-        typeof(sensealg)}(A, b, u, p, alg, cacheval, isfresh, Pl, Pr, abstol, reltol,
-        maxiters, verbose, assumptions, sensealg)
+    if reinit_cache
+        return LinearCache{typeof(A), typeof(b), typeof(u), typeof(p), typeof(alg), typeof(cacheval),
+            typeof(Pl), typeof(Pr), typeof(reltol), typeof(assumptions.issq),
+            typeof(sensealg)}(A, b, u, p, alg, cacheval, isfresh, Pl, Pr, abstol, reltol,
+            maxiters, verbose, assumptions, sensealg)
+    else
+        cache.A = A
+        cache.b = b
+        cache.u = u
+        cache.p = p
+        cache.Pl = Pl
+        cache.Pr = Pr
+    end
 end
 
 function SciMLBase.solve(prob::LinearProblem, args...; kwargs...)

@@ -259,9 +259,10 @@ solvers.
 
     Using this solver requires adding the package KrylovKit.jl, i.e. `using KrylovKit`
 """
-struct KrylovKitJL{F, A, I, K} <: LinearSolve.AbstractKrylovSubspaceMethod
+struct KrylovKitJL{F, I, P, A, K} <: LinearSolve.AbstractKrylovSubspaceMethod
     KrylovAlg::F
     gmres_restart::I
+    precs::P
     args::A
     kwargs::K
 end
@@ -306,9 +307,10 @@ A generic wrapper over the IterativeSolvers.jl solvers.
 
     Using this solver requires adding the package IterativeSolvers.jl, i.e. `using IterativeSolvers`
 """
-struct IterativeSolversJL{F, I, A, K} <: LinearSolve.AbstractKrylovSubspaceMethod
+struct IterativeSolversJL{F, I, P, A, K} <: LinearSolve.AbstractKrylovSubspaceMethod
     generate_iterator::F
     gmres_restart::I
+    precs::P
     args::A
     kwargs::K
 end

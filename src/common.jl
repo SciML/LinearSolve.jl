@@ -200,7 +200,7 @@ function SciMLBase.reinit!(cache::LinearCache;
                            u = cache.u,
                            p = nothing,
                            reinit_cache = false,)
-    (; alg, cacheval, isfresh, abstol, reltol, maxiters, verbose, assumptions, sensealg) = cache
+    (; alg, cacheval, abstol, reltol, maxiters, verbose, assumptions, sensealg) = cache
 
     precs = hasproperty(alg, :precs) ? alg.precs : DEFAULT_PRECS
     Pl, Pr = if isnothing(A) || isnothing(p)
@@ -214,6 +214,7 @@ function SciMLBase.reinit!(cache::LinearCache;
     else
         (cache.Pl, cache.Pr)
     end
+    isfresh = true
 
     if reinit_cache
         return LinearCache{typeof(A), typeof(b), typeof(u), typeof(p), typeof(alg), typeof(cacheval),
@@ -227,6 +228,7 @@ function SciMLBase.reinit!(cache::LinearCache;
         cache.p = p
         cache.Pl = Pl
         cache.Pr = Pr
+        cache.isfresh = true
     end
 end
 

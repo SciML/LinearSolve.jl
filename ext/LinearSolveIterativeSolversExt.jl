@@ -1,7 +1,7 @@
 module LinearSolveIterativeSolversExt
 
 using LinearSolve, LinearAlgebra
-using LinearSolve: LinearCache
+using LinearSolve: LinearCache, DEFAULT_PRECS
 import LinearSolve: IterativeSolversJL
 
 if isdefined(Base, :get_extension)

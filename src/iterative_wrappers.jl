@@ -10,7 +10,7 @@ KrylovJL(args...; KrylovAlg = Krylov.gmres!,
 
 A generic wrapper over the Krylov.jl krylov-subspace iterative solvers.
 """
-struct KrylovJL{F, I, A, P, K} <: AbstractKrylovSubspaceMethod
+struct KrylovJL{F, I, P, A, K} <: AbstractKrylovSubspaceMethod
     KrylovAlg::F
     gmres_restart::I
     window::I

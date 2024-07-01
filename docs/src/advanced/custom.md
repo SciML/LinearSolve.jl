@@ -33,7 +33,7 @@ The inputs to the function are as follows:
   - `p`, a set of parameters
   - `newA`, a `Bool` which is `true` if `A` has been modified since last solve
   - `Pl`, left-preconditioner
-  - `Pr`, right-preconditioner
+  - `Pr`, right-preconditionerz
   - `solverdata`, solver cache set to `nothing` if solver hasn't been initialized
   - `kwargs`, standard SciML keyword arguments such as `verbose`, `maxiters`, `abstol`, `reltol`
 

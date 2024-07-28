@@ -44,7 +44,16 @@ import PrecompileTools
 
 const CRC = ChainRulesCore
 
-if Preferences.@load_preference("LoadMKL_JLL", true)
+# Check if Ryzen, since that's where MKL is slow
+function is_zen()
+   # znverX
+   n = Sys.CPU_NAME
+   length(n) == 6 || return false
+   return n[1] == 'z' && n[2] == 'n' && n[3] == 'v' &&
+      n[4] == 'e' && n[5] == 'r'
+end
+
+@static if Preferences.@load_preference("LoadMKL_JLL", is_zen())
     using MKL_jll
     const usemkl = MKL_jll.is_available()
 else

@@ -44,7 +44,7 @@ import PrecompileTools
 
 const CRC = ChainRulesCore
 
-if Preferences.@load_preference("LoadMKL_JLL", true)
+if Preferences.@load_preference("LoadMKL_JLL", !occursin("EPYC", cpubrand()))
     using MKL_jll
     const usemkl = MKL_jll.is_available()
 else

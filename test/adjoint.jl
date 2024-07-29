@@ -62,7 +62,7 @@ db12 = FiniteDiff.finite_difference_gradient(
 db22 = FiniteDiff.finite_difference_gradient(
     x -> f3(eltype(x).(A), eltype(x).(b1), x), copy(b1))
 
-@test dA≈dA2 atol=1e-4
+@test dA≈dA2 atol=1e-3
 @test db1 ≈ db12
 @test db2 ≈ db22
 

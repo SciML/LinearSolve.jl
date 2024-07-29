@@ -21,7 +21,7 @@ for alg in (nothing, LUFactorization(), SVDFactorization(), CholeskyFactorizatio
     if __non_native_static_array_alg(alg)
         @test_broken __solve_no_alloc(A, b, alg) isa SciMLBase.LinearSolution
     else
-        @test_nowarn __solve_no_alloc(A, b, alg) isa LinearSolution
+        @test_nowarn __solve_no_alloc(A, b, alg) isa SciMLBase.LinearSolution
     end
 
     cache = init(LinearProblem(A, b), alg)

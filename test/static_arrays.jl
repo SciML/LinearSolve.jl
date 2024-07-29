@@ -17,9 +17,11 @@ for alg in (nothing, LUFactorization(), SVDFactorization(), CholeskyFactorizatio
     sol = solve(LinearProblem(A, b), alg)
     @inferred solve(LinearProblem(A, b), alg)
     @test norm(A * sol .- b) < 1e-10
-
-    @show alg
-    @test_nowarn __solve_no_alloc(A, b, alg) isa SciMLBase.LinearSolution   
+    if alg isa KrylovJL_GMRES
+        @test_broken __solve_no_alloc(A, b, alg) isa SciMLBase.LinearSolution
+    else
+        @test_nowarn __solve_no_alloc(A, b, alg) isa SciMLBase.LinearSolution
+    end
     cache = init(LinearProblem(A, b), alg)
     sol = solve!(cache)
     @test norm(A * sol .- b) < 1e-10

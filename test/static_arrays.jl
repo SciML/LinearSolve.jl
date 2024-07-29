@@ -19,9 +19,9 @@ for alg in (nothing, LUFactorization(), SVDFactorization(), CholeskyFactorizatio
     @test norm(A * sol .- b) < 1e-10
 
     if __non_native_static_array_alg(alg)
-        @test_broken __solve_no_alloc(A, b, alg)
+        @test_broken __solve_no_alloc(A, b, alg) isa LinearSolution
     else
-        @test_nowarn __solve_no_alloc(A, b, alg)
+        @test_nowarn __solve_no_alloc(A, b, alg) isa LinearSolution
     end
 
     cache = init(LinearProblem(A, b), alg)

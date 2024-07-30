@@ -41,6 +41,8 @@ import PrecompileTools
  import Krylov
  using SciMLBase
  import Preferences
+ import CpuId
+
 const CRC = ChainRulesCore
 
 @static if Sys.ARCH === :x86_64 || Sys.ARCH === :i686

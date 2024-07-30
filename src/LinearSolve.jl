@@ -41,10 +41,11 @@ import PrecompileTools
  import Krylov
  using SciMLBase
  import Preferences
+ import CpuId
 
 const CRC = ChainRulesCore
 
-if Preferences.@load_preference("LoadMKL_JLL", true)
+if Preferences.@load_preference("LoadMKL_JLL", !occursin("EPYC", CpuId.cpubrand()))
     using MKL_jll
     const usemkl = MKL_jll.is_available()
 else

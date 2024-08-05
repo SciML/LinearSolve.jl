@@ -41,7 +41,6 @@ import PrecompileTools
  import Krylov
  using SciMLBase
  import Preferences
- import CpuId
 
 const CRC = ChainRulesCore
 

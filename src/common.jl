@@ -85,14 +85,14 @@ end
 
 function Base.setproperty!(cache::LinearCache, name::Symbol, x)
     if name === :A
-        if hasproperty(cache.alg, :precs)
+        if hasproperty(cache.alg, :precs) && !isnothing(cache.alg.precs)
             Pl, Pr = cache.alg.precs(x, cache.p)
             setfield!(cache, :Pl, Pl)
             setfield!(cache, :Pr, Pr)
         end
         setfield!(cache, :isfresh, true)
     elseif name === :p
-        if hasproperty(cache.alg, :precs)
+        if hasproperty(cache.alg, :precs) && !isnothing(cache.alg.precs)
             Pl, Pr = cache.alg.precs(cache.A, x)
             setfield!(cache, :Pl, Pl)
             setfield!(cache, :Pr, Pr)
@@ -180,7 +180,11 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     reltol = real(eltype(prob.b))(reltol)
     abstol = real(eltype(prob.b))(abstol)
 
-    precs = hasproperty(alg, :precs) ? alg.precs : DEFAULT_PRECS
+    precs = if hasproperty(alg, :precs)
+        isnothing(alg.precs) ? DEFAULT_PRECS : alg.precs
+    else
+        DEFAULT_PRECS
+    end
     _Pl, _Pr = precs(A, p)
     if isnothing(Pl)
         Pl = _Pl
@@ -215,7 +219,7 @@ function SciMLBase.reinit!(cache::LinearCache;
                            reinit_cache = false,)
     (; alg, cacheval, abstol, reltol, maxiters, verbose, assumptions, sensealg) = cache
 
-    precs = hasproperty(alg, :precs) ? alg.precs : DEFAULT_PRECS
+    precs = (hasproperty(alg, :precs) && !isnothing(alg.precs)) ? alg.precs : DEFAULT_PRECS
     Pl, Pr = if isnothing(A) || isnothing(p)
         if isnothing(A)
             A = cache.A

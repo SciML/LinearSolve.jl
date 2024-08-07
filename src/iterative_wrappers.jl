@@ -21,7 +21,7 @@ end
 
 function KrylovJL(args...; KrylovAlg = Krylov.gmres!,
         gmres_restart = 0, window = 0,
-        precs = DEFAULT_PRECS,
+        precs = nothing,
         kwargs...)
     return KrylovJL(KrylovAlg, gmres_restart, window,
         precs, args, kwargs)

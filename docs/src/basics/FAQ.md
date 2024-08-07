@@ -57,7 +57,7 @@ A = rand(n, n)
 b = rand(n)
 
 weights = [1e-1, 1]
-precs = Returns(LinearSolve.InvPreconditioner(Diagonal(weights)), Diagonal(weights))
+precs = Returns((LinearSolve.InvPreconditioner(Diagonal(weights)), Diagonal(weights)))
 
 prob = LinearProblem(A, b)
 sol = solve(prob, KrylovJL_GMRES(precs))

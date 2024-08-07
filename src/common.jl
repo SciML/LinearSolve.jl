@@ -85,7 +85,18 @@ end
 
 function Base.setproperty!(cache::LinearCache, name::Symbol, x)
     if name === :A
+        if hasproperty(cache.alg, :precs)
+            Pl, Pr = cache.alg.precs(A, cache.p)
+            setfield!(cache, :Pl, Pl)
+            setfield!(cache, :Pr, Pr)
+        end
         setfield!(cache, :isfresh, true)
+    elseif name === :p
+        if hasproperty(cache.alg, :precs)
+            Pl, Pr = cache.alg.precs(cache.A, p)
+            setfield!(cache, :Pl, Pl)
+            setfield!(cache, :Pr, Pr)
+        end
     elseif name === :b
         # In case there is something that needs to be done when b is updated
         update_cacheval!(cache, :b, x)
@@ -174,12 +185,14 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     if isnothing(Pl)
         Pl = _Pl
     else
-        @warn "passing Preconditioners at `init`/`solve` time is deprecated. Instead add a `precs` function to your algorithm."
+        # TODO: deprecate once all docs are updated to the new form
+        #@warn "passing Preconditioners at `init`/`solve` time is deprecated. Instead add a `precs` function to your algorithm."
     end
     if isnothing(Pr)
         Pr = _Pr
     else
-        @warn "passing Preconditioners at `init`/`solve` time is deprecated. Instead add a `precs` function to your algorithm."
+        # TODO: deprecate once all docs are updated to the new form
+        #@warn "passing Preconditioners at `init`/`solve` time is deprecated. Instead add a `precs` function to your algorithm."
     end
     cacheval = init_cacheval(alg, A, b, u0_, Pl, Pr, maxiters, abstol, reltol, verbose,
         assumptions)

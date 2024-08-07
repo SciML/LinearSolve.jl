@@ -86,14 +86,14 @@ end
 function Base.setproperty!(cache::LinearCache, name::Symbol, x)
     if name === :A
         if hasproperty(cache.alg, :precs)
-            Pl, Pr = cache.alg.precs(A, cache.p)
+            Pl, Pr = cache.alg.precs(x, cache.p)
             setfield!(cache, :Pl, Pl)
             setfield!(cache, :Pr, Pr)
         end
         setfield!(cache, :isfresh, true)
     elseif name === :p
         if hasproperty(cache.alg, :precs)
-            Pl, Pr = cache.alg.precs(cache.A, p)
+            Pl, Pr = cache.alg.precs(cache.A, x)
             setfield!(cache, :Pl, Pl)
             setfield!(cache, :Pr, Pr)
         end

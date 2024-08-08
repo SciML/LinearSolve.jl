@@ -768,11 +768,25 @@ end
 
 ################################## Factorizations which require solve! overloads
 
+# Default control array of 20 elements from Umfpack
+
+#!!!ATTENTION
+#These array could change and whenever there will be a change in the SparseArrays package this array must be changed
+const default_control=SparseArrays.UMFPACK.get_umfpack_control(Float64,Int64)
+
 """
-`UMFPACKFactorization(;reuse_symbolic=true, check_pattern=true)`
+`UMFPACKFactorization(;reuse_symbolic=true, check_pattern=true, control=Vector{Float64}(20))`
 
 A fast sparse multithreaded LU-factorization which specializes on sparsity
 patterns with “more structure”.
+
+## Fields
+
+* `reuse_symbolic`: Whether the symbolic factorization is reused between calls. This requires that the sparsity pattern is
+  preserved. Defaults to true.
+* `check_pattern`: Whether the sparsity pattern is checked for changes to allow for symbolic factorization caching. 
+  The default is true.
+* `control`: A control vector for more options to pass to UMFPACK. See the UMFPACK documentation for more details.
 
 !!! note
 
@@ -780,10 +794,13 @@ patterns with “more structure”.
     symbolic factorization. I.e., if `set_A` is used, it is expected that the new
     `A` has the same sparsity pattern as the previous `A`. If this algorithm is to
     be used in a context where that assumption does not hold, set `reuse_symbolic=false`.
+
 """
-Base.@kwdef struct UMFPACKFactorization <: AbstractFactorization
+
+Base.@kwdef struct UMFPACKFactorization{T <: Union{Nothing, Vector{Float64}}} <: AbstractFactorization
     reuse_symbolic::Bool = true
     check_pattern::Bool = true # Check factorization re-use
+    control::T=nothing
 end
 
 const PREALLOCATED_UMFPACK = SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC(0, 0, [1],
@@ -816,6 +833,7 @@ end
 function SciMLBase.solve!(cache::LinearCache, alg::UMFPACKFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
+    isnothing(alg.control) ? control=default_control : control=alg.control
     if cache.isfresh
         cacheval = @get_cacheval(cache, :UMFPACKFactorization)
         if alg.reuse_symbolic
@@ -824,15 +842,15 @@ function SciMLBase.solve!(cache::LinearCache, alg::UMFPACKFactorization; kwargs.
                 fact = lu(
                     SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                         nonzeros(A)),
-                    check = false)
+                    check = false, control=control)
             else
                 fact = lu!(cacheval,
                     SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                        nonzeros(A)), check = false)
+                        nonzeros(A)), check = false, control=control)
             end
         else
             fact = lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
-                check = false)
+                check = false, control=control)
         end
         cache.cacheval = fact
         cache.isfresh = false

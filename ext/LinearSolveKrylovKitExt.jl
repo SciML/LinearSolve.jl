@@ -1,12 +1,13 @@
 module LinearSolveKrylovKitExt
 
 using LinearSolve, KrylovKit, LinearAlgebra
-using LinearSolve: LinearCache
+using LinearSolve: LinearCache, DEFAULT_PRECS
 
 function LinearSolve.KrylovKitJL(args...;
         KrylovAlg = KrylovKit.GMRES, gmres_restart = 0,
+        precs = DEFAULT_PRECS,
         kwargs...)
-    return KrylovKitJL(KrylovAlg, gmres_restart, args, kwargs)
+    return KrylovKitJL(KrylovAlg, gmres_restart, precs, args, kwargs)
 end
 
 function LinearSolve.KrylovKitJL_CG(args...; kwargs...)

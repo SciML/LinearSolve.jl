@@ -1,7 +1,7 @@
 module LinearSolveIterativeSolversExt
 
 using LinearSolve, LinearAlgebra
-using LinearSolve: LinearCache
+using LinearSolve: LinearCache, DEFAULT_PRECS
 import LinearSolve: IterativeSolversJL
 
 if isdefined(Base, :get_extension)
@@ -12,9 +12,9 @@ end
 
 function LinearSolve.IterativeSolversJL(args...;
         generate_iterator = IterativeSolvers.gmres_iterable!,
-        gmres_restart = 0, kwargs...)
+        gmres_restart = 0, precs = DEFAULT_PRECS, kwargs...)
     return IterativeSolversJL(generate_iterator, gmres_restart,
-        args, kwargs)
+        precs, args, kwargs)
 end
 
 function LinearSolve.IterativeSolversJL_CG(args...; kwargs...)

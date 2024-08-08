@@ -45,8 +45,8 @@ a few ways:
 
 ## How do I use IterativeSolvers solvers with a weighted tolerance vector?
 
-IterativeSolvers.jl computes the norm after the application of the left preconditioner
-`Pl`. Thus, in order to use a vector tolerance `weights`, one can mathematically
+IterativeSolvers.jl computes the norm after the application of the left preconditioner.
+Thus, in order to use a vector tolerance `weights`, one can mathematically
 hack the system via the following formulation:
 
 ```@example FAQPrec
@@ -57,11 +57,10 @@ A = rand(n, n)
 b = rand(n)
 
 weights = [1e-1, 1]
-Pl = LinearSolve.InvPreconditioner(Diagonal(weights))
-Pr = Diagonal(weights)
+precs = Returns((LinearSolve.InvPreconditioner(Diagonal(weights)), Diagonal(weights)))
 
 prob = LinearProblem(A, b)
-sol = solve(prob, KrylovJL_GMRES(), Pl = Pl, Pr = Pr)
+sol = solve(prob, KrylovJL_GMRES(precs))
 
 sol.u
 ```
@@ -84,5 +83,5 @@ Pl = LinearSolve.ComposePreconditioner(LinearSolve.InvPreconditioner(Diagonal(we
 Pr = Diagonal(weights)
 
 prob = LinearProblem(A, b)
-sol = solve(prob, KrylovJL_GMRES(), Pl = Pl, Pr = Pr)
+sol = solve(prob, KrylovJL_GMRES(precs=Returns((Pl,Pr))))
 ```

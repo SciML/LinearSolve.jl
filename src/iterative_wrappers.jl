@@ -10,19 +10,21 @@ KrylovJL(args...; KrylovAlg = Krylov.gmres!,
 
 A generic wrapper over the Krylov.jl krylov-subspace iterative solvers.
 """
-struct KrylovJL{F, I, A, K} <: AbstractKrylovSubspaceMethod
+struct KrylovJL{F, I, P, A, K} <: AbstractKrylovSubspaceMethod
     KrylovAlg::F
     gmres_restart::I
     window::I
+    precs::P
     args::A
     kwargs::K
 end
 
 function KrylovJL(args...; KrylovAlg = Krylov.gmres!,
         gmres_restart = 0, window = 0,
+        precs = nothing,
         kwargs...)
     return KrylovJL(KrylovAlg, gmres_restart, window,
-        args, kwargs)
+        precs, args, kwargs)
 end
 
 default_alias_A(::KrylovJL, ::Any, ::Any) = true
@@ -231,8 +233,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
         cache.isfresh = false
     end
 
-    M = cache.Pl
-    N = cache.Pr
+    M, N = cache.Pl, cache.Pr
 
     # use no-op preconditioner for Krylov.jl (LinearAlgebra.I) when M/N is identity
     M = _isidentity_struct(M) ? I : M
@@ -258,25 +259,21 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     end
 
     args = (cacheval, cache.A, cache.b)
-    kwargs = (atol = atol, rtol = rtol, itmax = itmax, verbose = verbose,
+    kwargs = (atol = atol, rtol, itmax, verbose,
         ldiv = true, history = true, alg.kwargs...)
 
     if cache.cacheval isa Krylov.CgSolver
         N !== I &&
             @warn "$(alg.KrylovAlg) doesn't support right preconditioning."
-        Krylov.solve!(args...; M = M,
-            kwargs...)
+        Krylov.solve!(args...; M, kwargs...)
     elseif cache.cacheval isa Krylov.GmresSolver
-        Krylov.solve!(args...; M = M, N = N, restart = alg.gmres_restart > 0,
-            kwargs...)
+        Krylov.solve!(args...; M, N, restart = alg.gmres_restart > 0, kwargs...)
     elseif cache.cacheval isa Krylov.BicgstabSolver
-        Krylov.solve!(args...; M = M, N = N,
-            kwargs...)
+        Krylov.solve!(args...; M, N, kwargs...)
     elseif cache.cacheval isa Krylov.MinresSolver
         N !== I &&
             @warn "$(alg.KrylovAlg) doesn't support right preconditioning."
-        Krylov.solve!(args...; M = M,
-            kwargs...)
+        Krylov.solve!(args...; M, kwargs...)
     else
         Krylov.solve!(args...; kwargs...)
     end

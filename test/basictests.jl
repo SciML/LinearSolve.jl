@@ -1,6 +1,6 @@
 using LinearSolve, LinearAlgebra, SparseArrays, MultiFloats, ForwardDiff
 using SciMLOperators
-using IterativeSolvers, KrylovKit, MKL_jll
+using IterativeSolvers, KrylovKit, MKL_jll, KrylovPreconditioners
 using Test
 import Random
 
@@ -267,10 +267,12 @@ end
 
     @testset "KrylovJL" begin
         kwargs = (; gmres_restart = 5)
+        precs = (A,p=nothing) -> (BlockJacobiPreconditioner(A, 2), I)
         algorithms = (
             ("Default", KrylovJL(kwargs...)),
             ("CG", KrylovJL_CG(kwargs...)),
             ("GMRES", KrylovJL_GMRES(kwargs...)),
+            ("GMRES_prec", KrylovJL_GMRES(;precs, ldiv=false, kwargs...)),
             # ("BICGSTAB",KrylovJL_BICGSTAB(kwargs...)),
             ("MINRES", KrylovJL_MINRES(kwargs...))
         )

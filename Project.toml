@@ -90,6 +90,7 @@ JET = "0.8.28"
 KLU = "0.6"
 KernelAbstractions = "0.9.16"
 Krylov = "0.9"
+KrylovPreconditioners = "0.2"
 KrylovKit = "0.8"
 LazyArrays = "1.8, 2"
 Libdl = "1.10"
@@ -135,6 +136,7 @@ IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
 KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 KrylovKit = "0b1a1467-8014-51b9-945f-bf0ae24f4b77"
+KrylovPreconditioners = "45d422c2-293f-44ce-8315-2cb988662dec"
 MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
 Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
 MultiFloats = "bdf0d083-296b-4888-a5b6-7498122e68a5"
@@ -148,4 +150,4 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [targets]
-test = ["Aqua", "Test", "IterativeSolvers", "InteractiveUtils", "JET", "KrylovKit", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI", "BlockDiagonals", "Enzyme", "FiniteDiff", "BandedMatrices", "FastAlmostBandedMatrices", "StaticArrays", "AllocCheck", "StableRNGs", "Zygote"]
+test = ["Aqua", "Test", "IterativeSolvers", "InteractiveUtils", "JET", "KrylovKit", "KrylovPreconditioners", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI", "BlockDiagonals", "Enzyme", "FiniteDiff", "BandedMatrices", "FastAlmostBandedMatrices", "StaticArrays", "AllocCheck", "StableRNGs", "Zygote"]

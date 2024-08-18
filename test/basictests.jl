@@ -533,3 +533,23 @@ using BlockDiagonals
 
     @test solve(prob1, SimpleGMRES(; blocksize = 2)).u ≈ solve(prob2, SimpleGMRES()).u
 end
+
+@testset "AbstractSparseMatrixCSC" begin
+    struct MySparseMatrixCSC{Tv, Ti} <: SparseArrays.AbstractSparseMatrixCSC{Tv, Ti}
+        csc::SparseMatrixCSC{Tv, Ti}
+    end
+
+    Base.size(m::MySparseMatrixCSC) = size(m.csc)
+    SparseArrays.getcolptr(m::MySparseMatrixCSC) = SparseArrays.getcolptr(m.csc)
+    SparseArrays.rowvals(m::MySparseMatrixCSC) = SparseArrays.rowvals(m.csc)
+    SparseArrays.nonzeros(m::MySparseMatrixCSC) = SparseArrays.nonzeros(m.csc)
+
+    N = 10_000
+    A = spdiagm(1 => -ones(N - 1), 0 => fill(10.0, N), -1 => -ones(N - 1))
+    u0 = ones(size(A, 2))
+    b = A * u0
+    B = MySparseMatrixCSC(A)
+    pr = LinearProblem(B, b)
+    @time "solve MySparseMatrixCSC" u=solve(pr)
+    @test norm(u - u0, Inf) < 1.0e-13
+end

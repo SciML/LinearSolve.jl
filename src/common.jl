@@ -243,13 +243,15 @@ function SciMLBase.reinit!(cache::LinearCache;
             typeof(sensealg)}(A, b, u, p, alg, cacheval, isfresh, Pl, Pr, abstol, reltol,
             maxiters, verbose, assumptions, sensealg)
     else
-        cache.A = A
-        cache.b = b
-        cache.u = u
-        cache.p = p
-        cache.Pl = Pl
-        cache.Pr = Pr
-        cache.isfresh = true
+        # setfield! to bypass the setproperty! overloads
+        setfield!(cache, :A, A)
+        setfield!(cache, :b, b)
+        setfield!(cache, :u, u)
+        setfield!(cache, :p, :p)
+        setfield!(cache, :A, A)
+        setfield!(cache, :Pl, Pl)
+        setfield!(cache, :Pr, Pr)
+        setfield!(cache, :isfresh, true)
     end
 end
 

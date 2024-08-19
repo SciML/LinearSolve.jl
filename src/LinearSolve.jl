@@ -62,12 +62,15 @@ using SciMLBase: _unwrap_val
 
 abstract type SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
 abstract type AbstractFactorization <: SciMLLinearSolveAlgorithm end
+abstract type AbstractSparseFactorization <: AbstractFactorization end
+abstract type AbstractDenseFactorization <: AbstractFactorization end
 abstract type AbstractKrylovSubspaceMethod <: SciMLLinearSolveAlgorithm end
 abstract type AbstractSolveFunction <: SciMLLinearSolveAlgorithm end
 
 # Traits
 
 needs_concrete_A(alg::AbstractFactorization) = true
+needs_concrete_A(alg::AbstractSparseFactorization) = true
 needs_concrete_A(alg::AbstractKrylovSubspaceMethod) = false
 needs_concrete_A(alg::AbstractSolveFunction) = false
 

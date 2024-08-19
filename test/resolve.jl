@@ -1,6 +1,7 @@
 using LinearSolve, LinearAlgebra, SparseArrays, InteractiveUtils, Test
+using LinearSolve: AbstractDenseFactorization, AbstractSparseFactorization
 
-for alg in subtypes(LinearSolve.AbstractFactorization)
+for alg in vcat(InteractiveUtils.subtypes(AbstractDenseFactorization),InteractiveUtils.subtypes(AbstractSparseFactorization))
     @show alg
     if !(alg in [
            DiagonalFactorization,

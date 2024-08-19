@@ -49,7 +49,7 @@ Julia's built in `lu`. Equivalent to calling `lu!(A)`
   - pivot: The choice of pivoting. Defaults to `LinearAlgebra.RowMaximum()`. The other choice is
     `LinearAlgebra.NoPivot()`.
 """
-Base.@kwdef struct LUFactorization{P} <: AbstractFactorization
+Base.@kwdef struct LUFactorization{P} <: AbstractDenseFactorization
     pivot::P = LinearAlgebra.RowMaximum()
     reuse_symbolic::Bool = true
     check_pattern::Bool = true # Check factorization re-use
@@ -70,7 +70,7 @@ Has low overhead and is good for small matrices.
   - pivot: The choice of pivoting. Defaults to `LinearAlgebra.RowMaximum()`. The other choice is
     `LinearAlgebra.NoPivot()`.
 """
-struct GenericLUFactorization{P} <: AbstractFactorization
+struct GenericLUFactorization{P} <: AbstractDenseFactorization
     pivot::P
 end
 
@@ -177,7 +177,7 @@ Julia's built in `qr`. Equivalent to calling `qr!(A)`.
   - On CuMatrix, it will use a CUDA-accelerated QR from CuSolver.
   - On BandedMatrix and BlockBandedMatrix, it will use a banded QR.
 """
-struct QRFactorization{P} <: AbstractFactorization
+struct QRFactorization{P} <: AbstractDenseFactorization
     pivot::P
     blocksize::Int
     inplace::Bool
@@ -260,7 +260,7 @@ Julia's built in `cholesky`. Equivalent to calling `cholesky!(A)`.
   - shift: the shift argument in CHOLMOD. Only used for sparse matrices.
   - perm: the perm argument in CHOLMOD. Only used for sparse matrices.
 """
-struct CholeskyFactorization{P, P2} <: AbstractFactorization
+struct CholeskyFactorization{P, P2} <: AbstractDenseFactorization
     pivot::P
     tol::Int
     shift::Float64
@@ -319,7 +319,7 @@ end
 
 ## LDLtFactorization
 
-struct LDLtFactorization{T} <: AbstractFactorization
+struct LDLtFactorization{T} <: AbstractDenseFactorization
     shift::Float64
     perm::T
 end
@@ -361,7 +361,7 @@ Julia's built in `svd`. Equivalent to `svd!(A)`.
     which by default is OpenBLAS but will use MKL if the user does `using MKL` in their
     system.
 """
-struct SVDFactorization{A} <: AbstractFactorization
+struct SVDFactorization{A} <: AbstractDenseFactorization
     full::Bool
     alg::A
 end
@@ -410,7 +410,7 @@ Only for Symmetric matrices.
 
   - rook: whether to perform rook pivoting. Defaults to false.
 """
-Base.@kwdef struct BunchKaufmanFactorization <: AbstractFactorization
+Base.@kwdef struct BunchKaufmanFactorization <: AbstractDenseFactorization
     rook::Bool = false
 end
 
@@ -464,7 +464,7 @@ factorization API. Quoting from Base:
   - fact_alg: the factorization algorithm to use. Defaults to `LinearAlgebra.factorize`, but can be
     swapped to choices like `lu`, `qr`
 """
-struct GenericFactorization{F} <: AbstractFactorization
+struct GenericFactorization{F} <: AbstractDenseFactorization
     fact_alg::F
 end
 
@@ -781,7 +781,7 @@ patterns with “more structure”.
     `A` has the same sparsity pattern as the previous `A`. If this algorithm is to
     be used in a context where that assumption does not hold, set `reuse_symbolic=false`.
 """
-Base.@kwdef struct UMFPACKFactorization <: AbstractFactorization
+Base.@kwdef struct UMFPACKFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool = true
     check_pattern::Bool = true # Check factorization re-use
 end
@@ -860,7 +860,7 @@ A fast sparse LU-factorization which specializes on sparsity patterns with “le
     `A` has the same sparsity pattern as the previous `A`. If this algorithm is to
     be used in a context where that assumption does not hold, set `reuse_symbolic=false`.
 """
-Base.@kwdef struct KLUFactorization <: AbstractFactorization
+Base.@kwdef struct KLUFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool = true
     check_pattern::Bool = true
 end
@@ -941,7 +941,7 @@ Only supports sparse matrices.
   - shift: the shift argument in CHOLMOD.
   - perm: the perm argument in CHOLMOD
 """
-Base.@kwdef struct CHOLMODFactorization{T} <: AbstractFactorization
+Base.@kwdef struct CHOLMODFactorization{T} <: AbstractSparseFactorization
     shift::Float64 = 0.0
     perm::T = nothing
 end
@@ -993,7 +993,7 @@ implementation, usually outperforming OpenBLAS and MKL for smaller matrices
 (<500x500), but currently optimized only for Base `Array` with `Float32` or `Float64`.
 Additional optimization for complex matrices is in the works.
 """
-struct RFLUFactorization{P, T} <: AbstractFactorization
+struct RFLUFactorization{P, T} <: AbstractDenseFactorization
     RFLUFactorization(::Val{P}, ::Val{T}) where {P, T} = new{P, T}()
 end
 
@@ -1064,7 +1064,7 @@ be applied to well-conditioned matrices.
 
   - pivot: Defaults to RowMaximum(), but can be NoPivot()
 """
-struct NormalCholeskyFactorization{P} <: AbstractFactorization
+struct NormalCholeskyFactorization{P} <: AbstractDenseFactorization
     pivot::P
 end
 
@@ -1152,7 +1152,7 @@ be applied to well-conditioned matrices.
 
   - rook: whether to perform rook pivoting. Defaults to false.
 """
-struct NormalBunchKaufmanFactorization <: AbstractFactorization
+struct NormalBunchKaufmanFactorization <: AbstractDenseFactorization
     rook::Bool
 end
 
@@ -1189,7 +1189,7 @@ end
 
 A special implementation only for solving `Diagonal` matrices fast.
 """
-struct DiagonalFactorization <: AbstractFactorization end
+struct DiagonalFactorization <: AbstractDenseFactorization end
 
 function init_cacheval(alg::DiagonalFactorization, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
@@ -1225,7 +1225,7 @@ end
 The FastLapackInterface.jl version of the LU factorization. Notably,
 this version does not allow for choice of pivoting method.
 """
-struct FastLUFactorization <: AbstractFactorization end
+struct FastLUFactorization <: AbstractDenseFactorization end
 
 function init_cacheval(::FastLUFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
@@ -1255,7 +1255,7 @@ end
 
 The FastLapackInterface.jl version of the QR factorization.
 """
-struct FastQRFactorization{P} <: AbstractFactorization
+struct FastQRFactorization{P} <: AbstractDenseFactorization
     pivot::P
     blocksize::Int
 end
@@ -1329,7 +1329,7 @@ dispatch to route around standard BLAS routines in the case e.g. of arbitrary-pr
 floating point numbers or ForwardDiff.Dual.
 This e.g. allows for Automatic Differentiation (AD) of a sparse-matrix solve.
 """
-Base.@kwdef struct SparspakFactorization <: AbstractFactorization
+Base.@kwdef struct SparspakFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool = true
 end
 
@@ -1388,7 +1388,8 @@ function SciMLBase.solve!(cache::LinearCache, alg::SparspakFactorization; kwargs
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
-for alg in InteractiveUtils.subtypes(AbstractFactorization)
+for alg in vcat(InteractiveUtils.subtypes(AbstractDenseFactorization),
+    InteractiveUtils.subtypes(AbstractSparseFactorization))
     @eval function init_cacheval(alg::$alg, A::MatrixOperator, b, u, Pl, Pr,
             maxiters::Int, abstol, reltol, verbose::Bool,
             assumptions::OperatorAssumptions)

@@ -132,6 +132,9 @@ default_alias_b(::Any, ::Any, ::Any) = false
 default_alias_A(::AbstractKrylovSubspaceMethod, ::Any, ::Any) = true
 default_alias_b(::AbstractKrylovSubspaceMethod, ::Any, ::Any) = true
 
+default_alias_A(::AbstractSparseFactorization, ::Any, ::Any) = true
+default_alias_b(::AbstractSparseFactorization, ::Any, ::Any) = true
+
 DEFAULT_PRECS(A, p) = IdentityOperator(size(A)[1]), IdentityOperator(size(A)[2])
 
 function __init_u0_from_Ab(A, b)

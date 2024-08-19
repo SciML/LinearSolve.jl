@@ -547,9 +547,36 @@ end
     N = 10_000
     A = spdiagm(1 => -ones(N - 1), 0 => fill(10.0, N), -1 => -ones(N - 1))
     u0 = ones(size(A, 2))
+
     b = A * u0
     B = MySparseMatrixCSC(A)
     pr = LinearProblem(B, b)
+
+    # test default algorithn
     @time "solve MySparseMatrixCSC" u=solve(pr)
     @test norm(u - u0, Inf) < 1.0e-13
+    
+    # test Krylov algorithm with reinit!
+    pr = LinearProblem(B, b)
+    solver=KrylovJL_CG()
+    cache=init(pr,solver,maxiters=1000,reltol=1.0e-10)
+    u=solve!(cache)
+    A1 = spdiagm(1 => -ones(N - 1), 0 => fill(100.0, N), -1 => -ones(N - 1))
+    b1=A1*u0
+    B1= MySparseMatrixCSC(A1)
+    @test norm(u - u0, Inf) < 1.0e-8
+    reinit!(cache; A=B1, b=b1)
+    u=solve!(cache)
+    @test norm(u - u0, Inf) < 1.0e-8
+    
+    # test factorization with reinit!
+    pr = LinearProblem(B, b)
+    solver=SparspakFactorization()
+    cache=init(pr,solver)
+    u=solve!(cache)
+    @test norm(u - u0, Inf) < 1.0e-8
+    reinit!(cache; A=B1, b=b1)
+    u=solve!(cache)
+    @test norm(u - u0, Inf) < 1.0e-8
+    
 end

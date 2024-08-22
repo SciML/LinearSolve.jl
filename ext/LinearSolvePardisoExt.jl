@@ -132,6 +132,11 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::PardisoJL; kwargs
     @unpack A, b, u = cache
     A = convert(AbstractMatrix, A)
     if cache.isfresh
+        if hasproperty(alg, :precs) && !isnothing(alg.precs)
+            Pl, Pr = cache.alg.precs(x, cache.p)
+            cache.Pl = Pl
+            cache.Pr = Pr
+        end
         phase = alg.cache_analysis ? Pardiso.NUM_FACT : Pardiso.ANALYSIS_NUM_FACT
         Pardiso.set_phase!(cache.cacheval, phase)
         Pardiso.pardiso(cache.cacheval, A, eltype(A)[])

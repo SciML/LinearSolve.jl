@@ -84,19 +84,8 @@ mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, S}
 end
 
 function Base.setproperty!(cache::LinearCache, name::Symbol, x)
-    if name === :A
-        if hasproperty(cache.alg, :precs) && !isnothing(cache.alg.precs)
-            Pl, Pr = cache.alg.precs(x, cache.p)
-            setfield!(cache, :Pl, Pl)
-            setfield!(cache, :Pr, Pr)
-        end
+    if name === :A || name === :p
         setfield!(cache, :isfresh, true)
-    elseif name === :p
-        if hasproperty(cache.alg, :precs) && !isnothing(cache.alg.precs)
-            Pl, Pr = cache.alg.precs(cache.A, x)
-            setfield!(cache, :Pl, Pl)
-            setfield!(cache, :Pr, Pr)
-        end
     elseif name === :b
         # In case there is something that needs to be done when b is updated
         update_cacheval!(cache, :b, x)
@@ -224,20 +213,7 @@ function SciMLBase.reinit!(cache::LinearCache;
                            u = cache.u,
                            p = nothing,
                            reinit_cache = false,)
-    (; alg, cacheval, abstol, reltol, maxiters, verbose, assumptions, sensealg) = cache
-
-    precs = (hasproperty(alg, :precs) && !isnothing(alg.precs)) ? alg.precs : DEFAULT_PRECS
-    Pl, Pr = if isnothing(A) || isnothing(p)
-        if isnothing(A)
-            A = cache.A
-        end
-        if isnothing(p)
-            p = cache.p
-        end
-        precs(A, p)
-    else
-        (cache.Pl, cache.Pr)
-    end
+    (; alg, cacheval, abstol, reltol, maxiters, verbose, assumptions, sensealg, Pl, Pr) = cache
     isfresh = true
 
     if reinit_cache
@@ -250,8 +226,6 @@ function SciMLBase.reinit!(cache::LinearCache;
         cache.b = b
         cache.u = u
         cache.p = p
-        cache.Pl = Pl
-        cache.Pr = Pr
         cache.isfresh = true
     end
 end

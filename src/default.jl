@@ -92,35 +92,6 @@ function defaultalg(A::Symmetric{<:Number, <:Array}, b, ::OperatorAssumptions{Bo
     DefaultLinearSolver(DefaultAlgorithmChoice.BunchKaufmanFactorization)
 end
 
-function defaultalg(
-        A::Symmetric{<:Number, <:SparseMatrixCSC}, b, ::OperatorAssumptions{Bool})
-    DefaultLinearSolver(DefaultAlgorithmChoice.CHOLMODFactorization)
-end
-
-function defaultalg(A::AbstractSparseMatrixCSC{Tv, Ti}, b,
-        assump::OperatorAssumptions{Bool}) where {Tv, Ti}
-    if assump.issq
-        DefaultLinearSolver(DefaultAlgorithmChoice.SparspakFactorization)
-    else
-        error("Generic number sparse factorization for non-square is not currently handled")
-    end
-end
-
-@static if INCLUDE_SPARSE
-    function defaultalg(A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
-            assump::OperatorAssumptions{Bool}) where {Ti}
-        if assump.issq
-            if length(b) <= 10_000 && length(nonzeros(A)) / length(A) < 2e-4
-                DefaultLinearSolver(DefaultAlgorithmChoice.KLUFactorization)
-            else
-                DefaultLinearSolver(DefaultAlgorithmChoice.UMFPACKFactorization)
-            end
-        else
-            DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
-        end
-    end
-end
-
 function defaultalg(A::GPUArraysCore.AnyGPUArray, b, assump::OperatorAssumptions{Bool})
     if assump.condition === OperatorCondition.IllConditioned || !assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)

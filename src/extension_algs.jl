@@ -389,3 +389,98 @@ A wrapper over Apple's Metal GPU library. Direct calls to Metal in a way that pr
 to avoid allocations and automatically offloads to the GPU.
 """
 struct MetalLUFactorization <: AbstractFactorization end
+
+"""
+`UMFPACKFactorization(;reuse_symbolic=true, check_pattern=true)`
+
+A fast sparse multithreaded LU-factorization which specializes on sparsity
+patterns with “more structure”.
+
+!!! note
+
+    By default, the SparseArrays.jl are implemented for efficiency by caching the
+    symbolic factorization. I.e., if `set_A` is used, it is expected that the new
+    `A` has the same sparsity pattern as the previous `A`. If this algorithm is to
+    be used in a context where that assumption does not hold, set `reuse_symbolic=false`.
+
+!!! note
+
+    Using this solver requires adding the package SparseArrays.jl, i.e. `using SparseArrays`
+"""
+Base.@kwdef struct UMFPACKFactorization <: AbstractSparseFactorization
+    reuse_symbolic::Bool = true
+    check_pattern::Bool = true # Check factorization re-use
+
+    function UMFPACKFactorization()
+        ext = Base.get_extension(@__MODULE__, :LinearSolveSparseArraysExt)
+        if ext === nothing
+            error("UMFPACKFactorization requires that SparseArrays is loaded, i.e. `using SparseArrays`")
+        else
+            return new{}()
+        end
+    end
+end
+
+"""
+`KLUFactorization(;reuse_symbolic=true, check_pattern=true)`
+
+A fast sparse LU-factorization which specializes on sparsity patterns with “less structure”.
+
+!!! note
+
+    By default, the SparseArrays.jl are implemented for efficiency by caching the
+    symbolic factorization. I.e., if `set_A` is used, it is expected that the new
+    `A` has the same sparsity pattern as the previous `A`. If this algorithm is to
+    be used in a context where that assumption does not hold, set `reuse_symbolic=false`.
+
+!!! note
+
+    Using this solver requires adding the package SparseArrays.jl, i.e. `using SparseArrays`
+"""
+Base.@kwdef struct KLUFactorization <: AbstractSparseFactorization
+    reuse_symbolic::Bool = true
+    check_pattern::Bool = true
+
+    function KLUFactorization()
+        ext = Base.get_extension(@__MODULE__, :LinearSolveKLUExt)
+        if ext === nothing
+            error("KLUFactorization requires that KLU is loaded, i.e. `using KLU`")
+        else
+            return new{}()
+        end
+    end
+end
+
+## CHOLMODFactorization
+
+"""
+`CHOLMODFactorization(; shift = 0.0, perm = nothing)`
+
+A wrapper of CHOLMOD's polyalgorithm, mixing Cholesky factorization and ldlt.
+Tries cholesky for performance and retries ldlt if conditioning causes Cholesky
+to fail.
+
+Only supports sparse matrices.
+
+## Keyword Arguments
+
+  - shift: the shift argument in CHOLMOD.
+  - perm: the perm argument in CHOLMOD
+
+!!! note
+
+    Using this solver requires adding the package SparseArrays.jl, i.e. `using SparseArrays`
+"""
+Base.@kwdef struct CHOLMODFactorization{T} <: AbstractSparseFactorization
+    shift::Float64 = 0.0
+    perm::T = nothing
+
+    function CHOLMODFactorization()
+        ext = Base.get_extension(@__MODULE__, :LinearSolveSparseArraysExt)
+        if ext === nothing
+            error("CHOLMODFactorization requires that SparseArrays is loaded, i.e. `using SparseArrays`")
+        else
+            return new{}()
+        end
+    end
+end

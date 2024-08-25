@@ -149,7 +149,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::SimpleGMRES; kwargs...)
     if cache.isfresh
         solver = init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr,
             cache.maxiters, cache.abstol, cache.reltol, cache.verbose,
-            cache.assumptions; zeroinit = false)
+            cache.assumptions)
         cache.cacheval = solver
         cache.isfresh = false
     end
@@ -161,17 +161,8 @@ function init_cacheval(alg::SimpleGMRES{UDB}, args...; kwargs...) where {UDB}
 end
 
 function _init_cacheval(::Val{false}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiters::Int,
-        abstol, reltol, ::Bool, ::OperatorAssumptions; zeroinit = true, kwargs...)
+        abstol, reltol, ::Bool, ::OperatorAssumptions; kwargs...)
     @unpack memory, restart, blocksize, warm_start = alg
-
-    if zeroinit
-        return SimpleGMRESCache{false}(memory, 0, restart, maxiters, blocksize,
-            zero(eltype(u)) * reltol + abstol, false, false, Pl, Pr, similar(u, 0),
-            similar(u, 0), similar(u, 0), u, A, b, abstol, reltol, similar(u, 0),
-            Vector{typeof(u)}(undef, 0), Vector{eltype(u)}(undef, 0),
-            Vector{eltype(u)}(undef, 0), Vector{eltype(u)}(undef, 0),
-            Vector{eltype(u)}(undef, 0), zero(eltype(u)), warm_start)
-    end
 
     T = eltype(u)
     n = LinearAlgebra.checksquare(A)
@@ -391,16 +382,9 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
 end
 
 function _init_cacheval(::Val{true}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiters::Int,
-        abstol, reltol, ::Bool, ::OperatorAssumptions; zeroinit = true,
+        abstol, reltol, ::Bool, ::OperatorAssumptions;
         blocksize = alg.blocksize)
     @unpack memory, restart, warm_start = alg
-
-    if zeroinit
-        return SimpleGMRESCache{true}(memory, 0, restart, maxiters, blocksize,
-            zero(eltype(u)) * reltol + abstol, false, false, Pl, Pr, similar(u, 0),
-            similar(u, 0), similar(u, 0), u, A, b, abstol, reltol, similar(u, 0),
-            [u], [u], [u], [u], [u], zero(eltype(u)), warm_start)
-    end
 
     T = eltype(u)
     n = LinearAlgebra.checksquare(A)

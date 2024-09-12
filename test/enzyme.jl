@@ -176,15 +176,16 @@ Enzyme.autodiff(Reverse, f3, Duplicated(copy(A), dA), Duplicated(copy(b1), db1),
 =#
 
 A = rand(n, n);
+const _A = rand(n, n);
 dA = zeros(n, n);
-b1 = rand(n);
+const _b1 = rand(n);
 for alg in (
     LUFactorization(),
     RFLUFactorization()    # KrylovJL_GMRES(), fails
 )
     @show alg
     function fb(b)
-        prob = LinearProblem(A, b)
+        prob = LinearProblem(_A, b)
 
         sol1 = solve(prob, alg)
 
@@ -192,11 +193,11 @@ for alg in (
     end
     fb(b1)
 
-    fd_jac = FiniteDiff.finite_difference_jacobian(fb, b1) |> vec
+    fd_jac = FiniteDiff.finite_difference_jacobian(fb, _b1) |> vec
     @show fd_jac
 
     en_jac = map(onehot(b1)) do db1
-        eres = Enzyme.autodiff(Forward, fb, Duplicated(copy(b1), db1))
+        eres = Enzyme.autodiff(Forward, fb, Duplicated(copy(_b1), db1))
         eres[1]
     end |> collect
     @show en_jac

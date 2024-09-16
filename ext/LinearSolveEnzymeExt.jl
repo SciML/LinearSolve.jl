@@ -8,13 +8,17 @@ using Enzyme
 
 using EnzymeCore
 
-function EnzymeCore.EnzymeRules.forward(
+function EnzymeCore.EnzymeRules.forward(config::ConfigWidth{1},
         func::Const{typeof(LinearSolve.init)}, ::Type{RT}, prob::EnzymeCore.Annotation{LP},
         alg::Const; kwargs...) where {RT, LP <: LinearSolve.LinearProblem}
     @assert !(prob isa Const)
     res = func.val(prob.val, alg.val; kwargs...)
     if RT <: Const
-        return res
+        if EnzymeRules.needs_primal(config)
+            return res
+        else
+            return nothing
+        end
     end
     dres = func.val(prob.dval, alg.val; kwargs...)
     dres.b .= res.b == dres.b ? zero(dres.b) : dres.b
@@ -25,9 +29,19 @@ function EnzymeCore.EnzymeRules.forward(
         return Duplicated(res, dres)
     end
     error("Unsupported return type $RT")
+
+    if EnzymeRules.needs_primal(config) && EnzymeRules.needs_shadow(config)
+        Duplicated(res, dres)
+    elseif EnzymeRules.needs_shadow(config)
+        dres
+    elseif EnzymeRules.needs_primal(config)
+        res
+    else
+        nothing
+    end
 end
 
-function EnzymeCore.EnzymeRules.forward(func::Const{typeof(LinearSolve.solve!)},
+function EnzymeCore.EnzymeRules.forward(config::ConfigWidth{1}, func::Const{typeof(LinearSolve.solve!)},
         ::Type{RT}, linsolve::EnzymeCore.Annotation{LP};
         kwargs...) where {RT, LP <: LinearSolve.LinearCache}
     @assert !(linsolve isa Const)
@@ -35,7 +49,11 @@ function EnzymeCore.EnzymeRules.forward(func::Const{typeof(LinearSolve.solve!)},
     res = func.val(linsolve.val; kwargs...)
 
     if RT <: Const
-        return res
+        if EnzymeRules.needs_primal(config)
+            return res
+        else
+            return nothing
+        end
     end
     if linsolve.val.alg isa LinearSolve.AbstractKrylovSubspaceMethod
         error("Algorithm $(_linsolve.alg) is currently not supported by Enzyme rules on LinearSolve.jl. Please open an issue on LinearSolve.jl detailing which algorithm is missing the adjoint handling")
@@ -50,13 +68,15 @@ function EnzymeCore.EnzymeRules.forward(func::Const{typeof(LinearSolve.solve!)},
 
     linsolve.val.b = b
 
-    if RT <: DuplicatedNoNeed
-        return dres
-    elseif RT <: Duplicated
-        return Duplicated(res, dres)
+    if EnzymeRules.needs_primal(config) && EnzymeRules.needs_shadow(config)
+        Duplicated(res, dres)
+    elseif EnzymeRules.needs_shadow(config)
+        dres
+    elseif EnzymeRules.needs_primal(config)
+        res
+    else
+        nothing
     end
-
-    return Duplicated(res, dres)
 end
 
 function EnzymeCore.EnzymeRules.augmented_primal(

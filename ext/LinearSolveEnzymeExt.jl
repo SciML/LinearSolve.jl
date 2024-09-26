@@ -2,13 +2,9 @@ module LinearSolveEnzymeExt
 
 using LinearSolve
 using LinearSolve.LinearAlgebra
-isdefined(Base, :get_extension) ? (import Enzyme) : (import ..Enzyme)
-
-using Enzyme
-
 using EnzymeCore
 
-function EnzymeCore.EnzymeRules.forward(config::ConfigWidth{1},
+function EnzymeCore.EnzymeRules.forward(config::EnzymeCore.EnzymeRules.FwdConfigWidth{1},
         func::Const{typeof(LinearSolve.init)}, ::Type{RT}, prob::EnzymeCore.Annotation{LP},
         alg::Const; kwargs...) where {RT, LP <: LinearSolve.LinearProblem}
     @assert !(prob isa Const)
@@ -41,7 +37,8 @@ function EnzymeCore.EnzymeRules.forward(config::ConfigWidth{1},
     end
 end
 
-function EnzymeCore.EnzymeRules.forward(config::ConfigWidth{1}, func::Const{typeof(LinearSolve.solve!)},
+function EnzymeCore.EnzymeRules.forward(
+        config::EnzymeCore.EnzymeRules.FwdConfigWidth{1}, func::Const{typeof(LinearSolve.solve!)},
         ::Type{RT}, linsolve::EnzymeCore.Annotation{LP};
         kwargs...) where {RT, LP <: LinearSolve.LinearCache}
     @assert !(linsolve isa Const)

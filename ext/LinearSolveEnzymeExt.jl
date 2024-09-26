@@ -17,9 +17,15 @@ function EnzymeRules.forward(config::EnzymeRules.FwdConfigWidth{1},
             return nothing
         end
     end
+
     dres = func.val(prob.dval, alg.val; kwargs...)
-    dres.b .= res.b == dres.b ? zero(dres.b) : dres.b
-    dres.A .= res.A == dres.A ? zero(dres.A) : dres.A
+
+    if dres.b == res.b
+        dres.b .= false
+    end
+    if dres.A == res.A
+        dres.A .= false
+    end
 
     if EnzymeRules.needs_primal(config) && EnzymeRules.needs_shadow(config)
         return Duplicated(res, dres)
@@ -50,14 +56,12 @@ function EnzymeRules.forward(
     if linsolve.val.alg isa LinearSolve.AbstractKrylovSubspaceMethod
         error("Algorithm $(_linsolve.alg) is currently not supported by Enzyme rules on LinearSolve.jl. Please open an issue on LinearSolve.jl detailing which algorithm is missing the adjoint handling")
     end
-    b = deepcopy(linsolve.val.b)
 
-    db = linsolve.dval.b
-    dA = linsolve.dval.A
+    res = deepcopy(res)  # Without this copy, the next solve will end up mutating the result
 
-    linsolve.val.b = db - dA * res.u
+    b = linsolve.val.b
+    linsolve.val.b = linsolve.dval.b - linsolve.dval.A * res.u
     dres = func.val(linsolve.val; kwargs...)
-
     linsolve.val.b = b
 
     if EnzymeRules.needs_primal(config) && EnzymeRules.needs_shadow(config)

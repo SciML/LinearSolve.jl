@@ -132,37 +132,15 @@ function init_cacheval(
         alg::Union{LUFactorization, GenericLUFactorization}, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
-    ArrayInterface.lu_instance(convert(AbstractMatrix, A))
+    do_factorization(alg, A, b, u)
 end
 
-function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization},
-        A::Union{<:Adjoint, <:Transpose}, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
-    error_no_cudss_lu(A)
-    if alg isa LUFactorization
-        return lu(A; check = false)
-    else
-        A isa GPUArraysCore.AnyGPUArray && return nothing
-        return LinearAlgebra.generic_lufact!(copy(A), alg.pivot; check = false)
-    end
-end
-
-const PREALLOCATED_LU = ArrayInterface.lu_instance(rand(1, 1))
-
-function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization},
-        A::Matrix{Float64}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    PREALLOCATED_LU
-end
-
-function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization},
-        A::AbstractSciMLOperator, b, u, Pl, Pr,
+function init_cacheval(
+        alg::Union{LUFactorization, GenericLUFactorization}, A::AbstractSciMLOperator, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     nothing
 end
-
 ## QRFactorization
 
 """
@@ -210,34 +188,7 @@ end
 function init_cacheval(alg::QRFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
-    ArrayInterface.qr_instance(convert(AbstractMatrix, A), alg.pivot)
-end
-
-function init_cacheval(alg::QRFactorization, A::Symmetric, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    return qr(convert(AbstractMatrix, A), alg.pivot)
-end
-
-const PREALLOCATED_QR_ColumnNorm = ArrayInterface.qr_instance(rand(1, 1), ColumnNorm())
-
-function init_cacheval(alg::QRFactorization{ColumnNorm}, A::Matrix{Float64}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    return PREALLOCATED_QR_ColumnNorm
-end
-
-function init_cacheval(
-        alg::QRFactorization, A::Union{<:Adjoint, <:Transpose}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    A isa GPUArraysCore.AnyGPUArray && return qr(A)
-    return qr(A, alg.pivot)
-end
-
-const PREALLOCATED_QR_NoPivot = ArrayInterface.qr_instance(rand(1, 1))
-
-function init_cacheval(alg::QRFactorization{NoPivot}, A::Matrix{Float64}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    return PREALLOCATED_QR_NoPivot
+    do_factorization(alg, A, b, u)
 end
 
 function init_cacheval(alg::QRFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
@@ -286,28 +237,9 @@ function do_factorization(alg::CholeskyFactorization, A, b, u)
     return fact
 end
 
-function init_cacheval(alg::CholeskyFactorization, A::SMatrix{S1, S2}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions) where {S1, S2}
-    cholesky(A)
-end
-
-function init_cacheval(alg::CholeskyFactorization, A::GPUArraysCore.AnyGPUArray, b, u, Pl,
-        Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    cholesky(A; check = false)
-end
-
 function init_cacheval(alg::CholeskyFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ArrayInterface.cholesky_instance(convert(AbstractMatrix, A), alg.pivot)
-end
-
-const PREALLOCATED_CHOLESKY = ArrayInterface.cholesky_instance(rand(1, 1), NoPivot())
-
-function init_cacheval(alg::CholeskyFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    PREALLOCATED_CHOLESKY
+    do_factorization(alg, Hermitian(A), b, u)
 end
 
 function init_cacheval(alg::CholeskyFactorization,
@@ -344,12 +276,6 @@ function init_cacheval(alg::LDLtFactorization, A, b, u, Pl, Pr,
     nothing
 end
 
-function init_cacheval(alg::LDLtFactorization, A::SymTridiagonal, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    ArrayInterface.ldlt_instance(convert(AbstractMatrix, A))
-end
-
 ## SVDFactorization
 
 """
@@ -378,20 +304,6 @@ function do_factorization(alg::SVDFactorization, A, b, u)
     return fact
 end
 
-function init_cacheval(alg::SVDFactorization, A::Union{Matrix, SMatrix}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    ArrayInterface.svd_instance(convert(AbstractMatrix, A))
-end
-
-const PREALLOCATED_SVD = ArrayInterface.svd_instance(rand(1, 1))
-
-function init_cacheval(alg::SVDFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    PREALLOCATED_SVD
-end
-
 function init_cacheval(alg::SVDFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
@@ -418,23 +330,6 @@ function do_factorization(alg::BunchKaufmanFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
     fact = bunchkaufman!(A, alg.rook; check = false)
     return fact
-end
-
-function init_cacheval(alg::BunchKaufmanFactorization, A::Symmetric{<:Number, <:Matrix}, b,
-        u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    ArrayInterface.bunchkaufman_instance(convert(AbstractMatrix, A))
-end
-
-const PREALLOCATED_BUNCHKAUFMAN = ArrayInterface.bunchkaufman_instance(Symmetric(rand(1,
-    1)))
-
-function init_cacheval(alg::BunchKaufmanFactorization,
-        A::Symmetric{Float64, Matrix{Float64}}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    PREALLOCATED_BUNCHKAUFMAN
 end
 
 function init_cacheval(alg::BunchKaufmanFactorization, A, b, u, Pl, Pr,
@@ -480,178 +375,38 @@ function init_cacheval(
         alg::GenericFactorization{typeof(lu)}, A::AbstractMatrix, b, u, Pl, Pr,
         maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ArrayInterface.lu_instance(A)
+    lu(A)
 end
 function init_cacheval(
         alg::GenericFactorization{typeof(lu!)}, A::AbstractMatrix, b, u, Pl, Pr,
         maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ArrayInterface.lu_instance(A)
-end
-
-function init_cacheval(alg::GenericFactorization{typeof(lu)},
-        A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
-        maxiters::Int,
-        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ArrayInterface.lu_instance(A)
-end
-function init_cacheval(alg::GenericFactorization{typeof(lu!)},
-        A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
-        maxiters::Int,
-        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ArrayInterface.lu_instance(A)
-end
-function init_cacheval(alg::GenericFactorization{typeof(lu)}, A::Diagonal, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    Diagonal(inv.(A.diag))
-end
-function init_cacheval(alg::GenericFactorization{typeof(lu)}, A::Tridiagonal, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    ArrayInterface.lu_instance(A)
-end
-function init_cacheval(alg::GenericFactorization{typeof(lu!)}, A::Diagonal, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    Diagonal(inv.(A.diag))
-end
-function init_cacheval(
-        alg::GenericFactorization{typeof(lu!)}, A::Tridiagonal, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    ArrayInterface.lu_instance(A)
-end
-function init_cacheval(
-        alg::GenericFactorization{typeof(lu!)}, A::SymTridiagonal{T, V}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions) where {T, V}
-    LinearAlgebra.LDLt{T, SymTridiagonal{T, V}}(A)
-end
-function init_cacheval(
-        alg::GenericFactorization{typeof(lu)}, A::SymTridiagonal{T, V}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions) where {T, V}
-    LinearAlgebra.LDLt{T, SymTridiagonal{T, V}}(A)
+    lu(A)
 end
 
 function init_cacheval(
         alg::GenericFactorization{typeof(qr)}, A::AbstractMatrix, b, u, Pl, Pr,
         maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ArrayInterface.qr_instance(A)
+    qr(A)
 end
 function init_cacheval(
         alg::GenericFactorization{typeof(qr!)}, A::AbstractMatrix, b, u, Pl, Pr,
         maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ArrayInterface.qr_instance(A)
+    qr(A)
 end
-function init_cacheval(
-        alg::GenericFactorization{typeof(qr)}, A::SymTridiagonal{T, V}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions) where {T, V}
-    LinearAlgebra.LDLt{T, SymTridiagonal{T, V}}(A)
-end
-function init_cacheval(
-        alg::GenericFactorization{typeof(qr!)}, A::SymTridiagonal{T, V}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions) where {T, V}
-    LinearAlgebra.LDLt{T, SymTridiagonal{T, V}}(A)
-end
-
-function init_cacheval(alg::GenericFactorization{typeof(qr)},
-        A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
-        maxiters::Int,
-        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ArrayInterface.qr_instance(A)
-end
-function init_cacheval(alg::GenericFactorization{typeof(qr!)},
-        A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
-        maxiters::Int,
-        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ArrayInterface.qr_instance(A)
-end
-function init_cacheval(alg::GenericFactorization{typeof(qr)}, A::Diagonal, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    Diagonal(inv.(A.diag))
-end
-function init_cacheval(alg::GenericFactorization{typeof(qr)}, A::Tridiagonal, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    ArrayInterface.qr_instance(A)
-end
-function init_cacheval(alg::GenericFactorization{typeof(qr!)}, A::Diagonal, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    Diagonal(inv.(A.diag))
-end
-function init_cacheval(
-        alg::GenericFactorization{typeof(qr!)}, A::Tridiagonal, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    ArrayInterface.qr_instance(A)
-end
-
 function init_cacheval(
         alg::GenericFactorization{typeof(svd)}, A::AbstractMatrix, b, u, Pl, Pr,
         maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ArrayInterface.svd_instance(A)
+    svd(A)
 end
 function init_cacheval(
         alg::GenericFactorization{typeof(svd!)}, A::AbstractMatrix, b, u, Pl, Pr,
         maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ArrayInterface.svd_instance(A)
-end
-
-function init_cacheval(alg::GenericFactorization{typeof(svd)},
-        A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
-        maxiters::Int,
-        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ArrayInterface.svd_instance(A)
-end
-function init_cacheval(alg::GenericFactorization{typeof(svd!)},
-        A::StridedMatrix{<:LinearAlgebra.BlasFloat}, b, u, Pl, Pr,
-        maxiters::Int,
-        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ArrayInterface.svd_instance(A)
-end
-function init_cacheval(alg::GenericFactorization{typeof(svd)}, A::Diagonal, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    Diagonal(inv.(A.diag))
-end
-function init_cacheval(
-        alg::GenericFactorization{typeof(svd)}, A::Tridiagonal, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    ArrayInterface.svd_instance(A)
-end
-function init_cacheval(alg::GenericFactorization{typeof(svd!)}, A::Diagonal, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    Diagonal(inv.(A.diag))
-end
-function init_cacheval(alg::GenericFactorization{typeof(svd!)}, A::Tridiagonal, b, u, Pl,
-        Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    ArrayInterface.svd_instance(A)
-end
-function init_cacheval(
-        alg::GenericFactorization{typeof(svd!)}, A::SymTridiagonal{T, V}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions) where {T, V}
-    LinearAlgebra.LDLt{T, SymTridiagonal{T, V}}(A)
-end
-function init_cacheval(
-        alg::GenericFactorization{typeof(svd)}, A::SymTridiagonal{T, V}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions) where {T, V}
-    LinearAlgebra.LDLt{T, SymTridiagonal{T, V}}(A)
+    svd(A)
 end
 
 function init_cacheval(alg::GenericFactorization, A::Diagonal, b, u, Pl, Pr, maxiters::Int,
@@ -661,7 +416,7 @@ end
 function init_cacheval(alg::GenericFactorization, A::Tridiagonal, b, u, Pl, Pr,
         maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ArrayInterface.lu_instance(A)
+    lu(A, check=false)
 end
 function init_cacheval(alg::GenericFactorization, A::SymTridiagonal{T, V}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
@@ -729,7 +484,7 @@ function init_cacheval(
         alg::GenericFactorization{typeof(cholesky!)}, A::Tridiagonal, b, u, Pl, Pr,
         maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ArrayInterface.lu_instance(A)
+    cholesky!(A, check=false)
 end
 function init_cacheval(
         alg::GenericFactorization{typeof(cholesky!)}, A::SymTridiagonal{T, V}, b, u, Pl, Pr,
@@ -746,7 +501,7 @@ function init_cacheval(
         alg::GenericFactorization{typeof(cholesky)}, A::Tridiagonal, b, u, Pl, Pr,
         maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ArrayInterface.lu_instance(A)
+    cholesky!(A, check=false)
 end
 function init_cacheval(
         alg::GenericFactorization{typeof(cholesky)}, A::SymTridiagonal{T, V}, b, u, Pl, Pr,
@@ -786,21 +541,11 @@ Base.@kwdef struct UMFPACKFactorization <: AbstractSparseFactorization
     check_pattern::Bool = true # Check factorization re-use
 end
 
-const PREALLOCATED_UMFPACK = SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC(0, 0, [1],
-    Int[], Float64[]))
-
 function init_cacheval(alg::UMFPACKFactorization,
         A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
     nothing
-end
-
-function init_cacheval(alg::UMFPACKFactorization, A::SparseMatrixCSC{Float64, Int}, b, u,
-        Pl, Pr,
-        maxiters::Int, abstol, reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
-    PREALLOCATED_UMFPACK
 end
 
 function init_cacheval(alg::UMFPACKFactorization, A::AbstractSparseArray, b, u, Pl, Pr,
@@ -865,9 +610,6 @@ Base.@kwdef struct KLUFactorization <: AbstractSparseFactorization
     check_pattern::Bool = true
 end
 
-const PREALLOCATED_KLU = KLU.KLUFactorization(SparseMatrixCSC(0, 0, [1], Int[],
-    Float64[]))
-
 function init_cacheval(alg::KLUFactorization,
         A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol,
@@ -875,16 +617,8 @@ function init_cacheval(alg::KLUFactorization,
     nothing
 end
 
-function init_cacheval(alg::KLUFactorization, A::SparseMatrixCSC{Float64, Int}, b, u, Pl,
-        Pr,
-        maxiters::Int, abstol, reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
-    PREALLOCATED_KLU
-end
-
 function init_cacheval(alg::KLUFactorization, A::AbstractSparseArray, b, u, Pl, Pr,
-        maxiters::Int, abstol,
-        reltol,
+        maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
     A = convert(AbstractMatrix, A)
     return KLU.KLUFactorization(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
@@ -893,9 +627,9 @@ end
 
 # TODO: guard this against errors
 function SciMLBase.solve!(cache::LinearCache, alg::KLUFactorization; kwargs...)
-    A = cache.A
-    A = convert(AbstractMatrix, A)
     if cache.isfresh
+        A = cache.A
+        A = convert(AbstractMatrix, A)
         cacheval = @get_cacheval(cache, :KLUFactorization)
         if alg.reuse_symbolic
             if alg.check_pattern && pattern_changed(cacheval, A)
@@ -1004,14 +738,7 @@ end
 function init_cacheval(alg::RFLUFactorization, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
-    ArrayInterface.lu_instance(convert(AbstractMatrix, A)), ipiv
-end
-
-function init_cacheval(alg::RFLUFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
-        maxiters::Int,
-        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ipiv = Vector{LinearAlgebra.BlasInt}(undef, 0)
-    PREALLOCATED_LU, ipiv
+    lu!(convert(AbstractMatrix, A), check=false), ipiv
 end
 
 function init_cacheval(alg::RFLUFactorization,
@@ -1076,36 +803,18 @@ end
 default_alias_A(::NormalCholeskyFactorization, ::Any, ::Any) = true
 default_alias_b(::NormalCholeskyFactorization, ::Any, ::Any) = true
 
-const PREALLOCATED_NORMALCHOLESKY = ArrayInterface.cholesky_instance(rand(1, 1), NoPivot())
-
 function init_cacheval(alg::NormalCholeskyFactorization,
-        A::Union{AbstractSparseArray, GPUArraysCore.AnyGPUArray,
+        A::Union{AbstractSparseArray, GPUArraysCore.AnyGPUArray, SMatrix,
             Symmetric{<:Number, <:AbstractSparseArray}}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
-    ArrayInterface.cholesky_instance(convert(AbstractMatrix, A))
-end
-
-function init_cacheval(alg::NormalCholeskyFactorization, A::SMatrix, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    return cholesky(Symmetric((A)' * A))
+    cholesky!(convert(AbstractMatrix, A), check=false)
 end
 
 function init_cacheval(alg::NormalCholeskyFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
-    A_ = convert(AbstractMatrix, A)
-    return ArrayInterface.cholesky_instance(
-        Symmetric(Matrix{eltype(A)}(undef, 0, 0)), alg.pivot)
-end
-
-const PREALLOCATED_NORMALCHOLESKY_SYMMETRIC = ArrayInterface.cholesky_instance(
-    Symmetric(rand(1, 1)), NoPivot())
-
-function init_cacheval(alg::NormalCholeskyFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    return PREALLOCATED_NORMALCHOLESKY_SYMMETRIC
+    return cholesky(Symmetric(A' * A), alg.pivot, check=false)
 end
 
 function init_cacheval(alg::NormalCholeskyFactorization,
@@ -1120,9 +829,9 @@ function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization; 
     A = convert(AbstractMatrix, A)
     if cache.isfresh
         if A isa SparseMatrixCSC || A isa GPUArraysCore.AnyGPUArray || A isa SMatrix
-            fact = cholesky(Symmetric((A)' * A); check = false)
+            fact = cholesky(Symmetric(A' * A); check = false)
         else
-            fact = cholesky(Symmetric((A)' * A), alg.pivot; check = false)
+            fact = cholesky(Symmetric(A' * A), alg.pivot; check = false)
         end
         cache.cacheval = fact
         cache.isfresh = false
@@ -1166,7 +875,8 @@ default_alias_b(::NormalBunchKaufmanFactorization, ::Any, ::Any) = true
 function init_cacheval(alg::NormalBunchKaufmanFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
-    ArrayInterface.bunchkaufman_instance(convert(AbstractMatrix, A))
+    A = convert(AbstractMatrix, A)
+    bunchkaufman(Symmetric(A' * A), alg.rook)
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::NormalBunchKaufmanFactorization;
@@ -1174,7 +884,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::NormalBunchKaufmanFactorizati
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
-        fact = bunchkaufman(Symmetric((A)' * A), alg.rook)
+        fact = bunchkaufman(Symmetric(A' * A), alg.rook)
         cache.cacheval = fact
         cache.isfresh = false
     end
@@ -1231,7 +941,11 @@ function init_cacheval(::FastLUFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     ws = LUWs(A)
-    return WorkspaceAndFactors(ws, ArrayInterface.lu_instance(convert(AbstractMatrix, A)))
+    A = convert(AbstractMatrix, A)
+    ws_and_fact =  WorkspaceAndFactors(ws, ArrayInterface.lu_instance(A))
+    @set! ws_and_fact.factors = LinearAlgebra.LU(LAPACK.getrf!(ws_and_fact.workspace,
+            A)...)
+    return ws_and_fact
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::FastLUFactorization; kwargs...)
@@ -1264,27 +978,25 @@ end
 # but QRFactorization uses 16.
 FastQRFactorization() = FastQRFactorization(NoPivot(), 36)
 
-function init_cacheval(alg::FastQRFactorization{NoPivot}, A::AbstractMatrix, b, u, Pl, Pr,
+function init_cacheval(alg::FastQRFactorization{NoPivot}, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
+    A = convert(AbstractMatrix, A)
     ws = QRWYWs(A; blocksize = alg.blocksize)
-    return WorkspaceAndFactors(ws,
-        ArrayInterface.qr_instance(convert(AbstractMatrix, A)))
+    ws_and_fact = WorkspaceAndFactors(ws, ArrayInterface.qr_instance(A))
+    @set! ws_and_fact.factors = LinearAlgebra.QRCompactWY(LAPACK.geqrt!(
+        ws_and_fact.workspace, A)...)
+    return ws_and_fact
 end
-function init_cacheval(::FastQRFactorization{ColumnNorm}, A::AbstractMatrix, b, u, Pl, Pr,
+function init_cacheval(::FastQRFactorization{ColumnNorm}, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
+    A = convert(AbstractMatrix, A)
     ws = QRpWs(A)
-    return WorkspaceAndFactors(ws,
-        ArrayInterface.qr_instance(convert(AbstractMatrix, A)))
-end
-
-function init_cacheval(alg::FastQRFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    return init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
+    ws_and_fact = WorkspaceAndFactors(ws, ArrayInterface.qr_instance(A))
+    @set! ws_and_fact.factors = LinearAlgebra.QRPivoted(LAPACK.geqp3!(
+        ws_and_fact.workspace, A)...)
+    return ws_and_fact
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::FastQRFactorization{P};
@@ -1333,9 +1045,6 @@ Base.@kwdef struct SparspakFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool = true
 end
 
-const PREALLOCATED_SPARSEPAK = sparspaklu(SparseMatrixCSC(0, 0, [1], Int[], Float64[]),
-    factorize = false)
-
 function init_cacheval(alg::SparspakFactorization,
         A::Union{Matrix, Nothing, AbstractSciMLOperator}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol,
@@ -1343,26 +1052,17 @@ function init_cacheval(alg::SparspakFactorization,
     nothing
 end
 
-function init_cacheval(::SparspakFactorization, A::SparseMatrixCSC{Float64, Int}, b, u, Pl,
-        Pr, maxiters::Int, abstol,
-        reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
-    PREALLOCATED_SPARSEPAK
-end
-
 function init_cacheval(::SparspakFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
         reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
     A = convert(AbstractMatrix, A)
     if A isa SparseArrays.AbstractSparseArray
-        return sparspaklu(
-            SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                nonzeros(A)),
-            factorize = false)
+         return sparspaklu(
+             SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
+                nonzeros(A)))
     else
-        return sparspaklu(SparseMatrixCSC(0, 0, [1], Int[], eltype(A)[]),
-            factorize = false)
-    end
+        return sparspaklu(SparseMatrixCSC(A))
+     end
 end
 
 function init_cacheval(::SparspakFactorization, ::StaticArray, b, u, Pl, Pr,

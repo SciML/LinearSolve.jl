@@ -226,6 +226,11 @@ end
 
 function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     if cache.isfresh
+        if hasproperty(alg, :precs) && !isnothing(alg.precs)
+            Pl, Pr = cache.alg.precs(x, cache.p)
+            cache.Pl = Pl
+            cache.Pr = Pr
+        end
         solver = init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr,
             cache.maxiters, cache.abstol, cache.reltol, cache.verbose,
             cache.assumptions, zeroinit = false)

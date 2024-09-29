@@ -170,7 +170,7 @@ end
 dA = zeros(n, n);
 db1 = zeros(n);
 db2 = zeros(n);
-Enzyme.autodiff(Reverse, f3, Duplicated(copy(A), dA), Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
+Enzyme.autodiff(set_runtime_activity(Reverse), f3, Duplicated(copy(A), dA), Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
 
 @test dA ≈ dA2 atol=5e-5
 @test db1 ≈ db12

@@ -3,6 +3,9 @@ using SafeTestsets
 const LONGER_TESTS = false
 
 const GROUP = get(ENV, "GROUP", "All")
+@show GROUP
+@show keys(ENV)
+
 
 const HAS_EXTENSIONS = isdefined(Base, :get_extension)
 

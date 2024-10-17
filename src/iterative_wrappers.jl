@@ -225,6 +225,12 @@ function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, re
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
+    if cache.precsisfresh && !isnothing(alg.precs)
+        Pl, Pr = alg.precs(cache.A, cache.p)
+        cache.Pl = Pl
+        cache.Pr = Pr
+        cache.precsisfresh = false
+    end
     if cache.isfresh
         solver = init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr,
             cache.maxiters, cache.abstol, cache.reltol, cache.verbose,

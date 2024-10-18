@@ -284,6 +284,30 @@ end
         end
     end
 
+    @testset "Reuse precs" begin
+        num_precs_calls = 0
+
+        function countingprecs(A, p = nothing)
+            num_precs_calls += 1
+            (BlockJacobiPreconditioner(A, 2), I)
+        end
+
+        n = 10
+        A = spdiagm(-1 => -ones(n - 1), 0 => fill(10.0, n), 1 => -ones(n - 1))
+        b = rand(n)
+        p = LinearProblem(A, b)
+        x0 = solve(p, KrylovJL_CG(precs = countingprecs, ldiv = false))
+        cache = x0.cache
+        x0 = copy(x0)
+        for i in 4:(n - 3)
+            A[i, i + 3] -= 1.0e-4
+            A[i - 3, i] -= 1.0e-4
+        end
+        LinearSolve.reinit!(cache; A, reuse_precs = true)
+        x1 = copy(solve!(cache))
+        @test all(x0 .< x1) && num_precs_calls == 1
+    end
+
     if VERSION >= v"1.9-"
         @testset "IterativeSolversJL" begin
             kwargs = (; gmres_restart = 5)

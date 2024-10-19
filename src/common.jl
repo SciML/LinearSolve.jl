@@ -73,6 +73,7 @@ mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, S}
     alg::Talg
     cacheval::Tc  # store alg cache here
     isfresh::Bool # false => cacheval is set wrt A, true => update cacheval wrt A
+    precsisfresh::Bool # false => PR,PL is set wrt A, true => update PR,PL wrt A
     Pl::Tl        # preconditioners
     Pr::Tr
     abstol::Ttol
@@ -85,18 +86,10 @@ end
 
 function Base.setproperty!(cache::LinearCache, name::Symbol, x)
     if name === :A
-        if hasproperty(cache.alg, :precs) && !isnothing(cache.alg.precs)
-            Pl, Pr = cache.alg.precs(x, cache.p)
-            setfield!(cache, :Pl, Pl)
-            setfield!(cache, :Pr, Pr)
-        end
         setfield!(cache, :isfresh, true)
+        setfield!(cache, :precsisfresh, true)
     elseif name === :p
-        if hasproperty(cache.alg, :precs) && !isnothing(cache.alg.precs)
-            Pl, Pr = cache.alg.precs(cache.A, x)
-            setfield!(cache, :Pl, Pl)
-            setfield!(cache, :Pr, Pr)
-        end
+        setfield!(cache, :precsisfresh, true)
     elseif name === :b
         # In case there is something that needs to be done when b is updated
         update_cacheval!(cache, :b, x)
@@ -208,11 +201,12 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     cacheval = init_cacheval(alg, A, b, u0_, Pl, Pr, maxiters, abstol, reltol, verbose,
         assumptions)
     isfresh = true
+    precsisfresh = false
     Tc = typeof(cacheval)
 
     cache = LinearCache{typeof(A), typeof(b), typeof(u0_), typeof(p), typeof(alg), Tc,
         typeof(Pl), typeof(Pr), typeof(reltol), typeof(assumptions.issq),
-        typeof(sensealg)}(A, b, u0_, p, alg, cacheval, isfresh, Pl, Pr, abstol, reltol,
+        typeof(sensealg)}(A, b, u0_, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
         maxiters, verbose, assumptions, sensealg)
     return cache
 end
@@ -223,27 +217,26 @@ function SciMLBase.reinit!(cache::LinearCache;
                            b = cache.b,
                            u = cache.u,
                            p = nothing,
-                           reinit_cache = false,)
+                           reinit_cache = false,
+                           reuse_precs = false)
     (; alg, cacheval, abstol, reltol, maxiters, verbose, assumptions, sensealg) = cache
 
-    precs = (hasproperty(alg, :precs) && !isnothing(alg.precs)) ? alg.precs : DEFAULT_PRECS
-    Pl, Pr = if isnothing(A) || isnothing(p)
-        if isnothing(A)
-            A = cache.A
-        end
-        if isnothing(p)
-            p = cache.p
-        end
-        precs(A, p)
-    else
-        (cache.Pl, cache.Pr)
-    end
-    isfresh = true
 
+    isfresh = !isnothing(A)
+    precsisfresh = !reuse_precs && (isfresh || !isnothing(p))
+    isfresh |= cache.isfresh
+    precsisfresh |= cache.precsisfresh
+
+    A = isnothing(A) ? cache.A : A
+    b = isnothing(b) ? cache.b : b
+    u = isnothing(u) ? cache.u : u
+    p = isnothing(p) ? cache.p : p
+    Pl = cache.Pl
+    Pr = cache.Pr
     if reinit_cache
         return LinearCache{typeof(A), typeof(b), typeof(u), typeof(p), typeof(alg), typeof(cacheval),
             typeof(Pl), typeof(Pr), typeof(reltol), typeof(assumptions.issq),
-            typeof(sensealg)}(A, b, u, p, alg, cacheval, isfresh, Pl, Pr, abstol, reltol,
+            typeof(sensealg)}(A, b, u, p, alg, cacheval, precsisfresh, isfresh, Pl, Pr, abstol, reltol,
             maxiters, verbose, assumptions, sensealg)
     else
         cache.A = A
@@ -253,6 +246,7 @@ function SciMLBase.reinit!(cache::LinearCache;
         cache.Pl = Pl
         cache.Pr = Pr
         cache.isfresh = true
+        cache.precsisfresh = precsisfresh
     end
 end
 

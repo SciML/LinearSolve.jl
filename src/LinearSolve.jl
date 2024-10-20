@@ -5,42 +5,40 @@ if isdefined(Base, :Experimental) &&
 end
 
 import PrecompileTools
- using ArrayInterface
- using RecursiveFactorization
- using Base: cache_dependencies, Bool
- using LinearAlgebra
- using SparseArrays
- using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
- using LazyArrays: @~, BroadcastArray
- using SciMLBase: AbstractLinearAlgorithm
- using SciMLOperators
- using SciMLOperators: AbstractSciMLOperator, IdentityOperator
- using Setfield
- using UnPack
- using KLU
- using Sparspak
- using FastLapackInterface
- using DocStringExtensions
- using EnumX
- using Markdown
- using ChainRulesCore
- import InteractiveUtils
+using ArrayInterface
+using RecursiveFactorization
+using Base: cache_dependencies, Bool
+using LinearAlgebra
+using LazyArrays: @~, BroadcastArray
+using SciMLBase: AbstractLinearAlgorithm
+using SciMLOperators
+using SciMLOperators: AbstractSciMLOperator, IdentityOperator
+using Setfield
+using UnPack
+using KLU
+using Sparspak
+using FastLapackInterface
+using DocStringExtensions
+using EnumX
+using Markdown
+using ChainRulesCore
+import InteractiveUtils
 
- import StaticArraysCore: StaticArray, SVector, MVector, SMatrix, MMatrix
+import StaticArraysCore: StaticArray, SVector, MVector, SMatrix, MMatrix
 
- using LinearAlgebra: BlasInt, LU
- using LinearAlgebra.LAPACK: require_one_based_indexing,
-                             chkfinite, chkstride1,
-                             @blasfunc, chkargsok
+using LinearAlgebra: BlasInt, LU
+using LinearAlgebra.LAPACK: require_one_based_indexing,
+                            chkfinite, chkstride1,
+                            @blasfunc, chkargsok
 
- import GPUArraysCore
- import Preferences
- import ConcreteStructs: @concrete
+import GPUArraysCore
+import Preferences
+import ConcreteStructs: @concrete
 
- # wrap
- import Krylov
- using SciMLBase
- import Preferences
+# wrap
+import Krylov
+using SciMLBase
+import Preferences
 
 const CRC = ChainRulesCore
 
@@ -92,8 +90,6 @@ pattern_changed(fact, A) = false
 function _fast_sym_givens! end
 
 # Code
-
-const INCLUDE_SPARSE = Preferences.@load_preference("include_sparse", Base.USE_GPL_LIBS)
 
 EnumX.@enumx DefaultAlgorithmChoice begin
     LUFactorization
@@ -170,10 +166,6 @@ end
     end
 end
 
-@static if INCLUDE_SPARSE
-    include("factorization_sparse.jl")
-end
-
 # Solver Specific Traits
 ## Needs Square Matrix
 """
@@ -213,16 +205,6 @@ PrecompileTools.@compile_workload begin
     sol = solve(prob, LUFactorization())
     sol = solve(prob, RFLUFactorization())
     sol = solve(prob, KrylovJL_GMRES())
-end
-
-@static if INCLUDE_SPARSE
-    PrecompileTools.@compile_workload begin
-        A = sprand(4, 4, 0.3) + I
-        b = rand(4)
-        prob = LinearProblem(A, b)
-        sol = solve(prob, KLUFactorization())
-        sol = solve(prob, UMFPACKFactorization())
-    end
 end
 
 PrecompileTools.@compile_workload begin

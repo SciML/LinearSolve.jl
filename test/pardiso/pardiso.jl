@@ -177,3 +177,40 @@ for solver in solvers
         @test Pardiso.get_iparm(solver, i) == iparm[i][2]
     end
 end
+
+@testset "AbstractSparseMatrixCSC" begin
+    struct MySparseMatrixCSC2{Tv, Ti} <: SparseArrays.AbstractSparseMatrixCSC{Tv, Ti}
+        csc::SparseMatrixCSC{Tv, Ti}
+    end
+
+    Base.size(m::MySparseMatrixCSC2) = size(m.csc)
+    SparseArrays.getcolptr(m::MySparseMatrixCSC2) = SparseArrays.getcolptr(m.csc)
+    SparseArrays.rowvals(m::MySparseMatrixCSC2) = SparseArrays.rowvals(m.csc)
+    SparseArrays.nonzeros(m::MySparseMatrixCSC2) = SparseArrays.nonzeros(m.csc)
+
+    for alg in algs
+        N = 100
+        u0 = ones(N)
+        A0 = spdiagm(1 => -ones(N - 1), 0 => fill(10.0, N), -1 => -ones(N - 1))
+        b0 = A0 * u0
+        B0 = MySparseMatrixCSC2(A0)
+        A1 = spdiagm(1 => -ones(N - 1), 0 => fill(100.0, N), -1 => -ones(N - 1))
+        b1=A1*u0
+        B1= MySparseMatrixCSC2(A1)
+
+        
+        pr = LinearProblem(B0, b0)
+        # test default algorithn
+        u=solve(pr,alg)
+        @test norm(u - u0, Inf) < 1.0e-13
+    
+        # test factorization with reinit!
+        pr = LinearProblem(B0, b0)
+        cache=init(pr,alg)
+        u=solve!(cache)
+        @test norm(u - u0, Inf) < 1.0e-13
+        reinit!(cache; A=B1, b=b1)
+        u=solve!(cache)
+        @test norm(u - u0, Inf) < 1.0e-13
+    end
+end

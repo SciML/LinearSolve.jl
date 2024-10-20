@@ -134,12 +134,11 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::PardisoJL; kwargs
     if cache.isfresh
         phase = alg.cache_analysis ? Pardiso.NUM_FACT : Pardiso.ANALYSIS_NUM_FACT
         Pardiso.set_phase!(cache.cacheval, phase)
-        Pardiso.pardiso(cache.cacheval, A, eltype(A)[])
+        Pardiso.pardiso(cache.cacheval, SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)), eltype(A)[])
         cache.isfresh = false
     end
     Pardiso.set_phase!(cache.cacheval, Pardiso.SOLVE_ITERATIVE_REFINE)
-    Pardiso.pardiso(cache.cacheval, u, A, b)
-
+    Pardiso.pardiso(cache.cacheval, u, SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)), b)
     return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
 end
 

@@ -157,7 +157,7 @@ Enzyme.autodiff(Reverse, f2, Duplicated(copy(A), dA),
 @test db1 ≈ db12
 @test db2 ≈ db22
 
-#=
+
 function f3(A, b1, b2; alg = KrylovJL_GMRES())
     prob = LinearProblem(A, b1)
     cache = init(prob, alg)
@@ -167,12 +167,14 @@ function f3(A, b1, b2; alg = KrylovJL_GMRES())
     norm(s1 + s2)
 end
 
-Enzyme.autodiff(Reverse, f3, Duplicated(copy(A), dA), Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
+dA = zeros(n, n);
+db1 = zeros(n);
+db2 = zeros(n);
+Enzyme.autodiff(set_runtime_activity(Reverse), f3, Duplicated(copy(A), dA), Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
 
 @test dA ≈ dA2 atol=5e-5
 @test db1 ≈ db12
 @test db2 ≈ db22
-=#
 
 A = rand(n, n);
 dA = zeros(n, n);

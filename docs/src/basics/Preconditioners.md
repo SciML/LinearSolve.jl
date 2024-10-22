@@ -73,7 +73,7 @@ sol = solve(prob, KrylovJL_GMRES(precs = (A,p)->(Diagonal(A),I)) )
 sol.u
 ```
 This approach has the advantage that the specification of the preconditioner is possible without
-the knowledge of a concrete matrix `A`. It also allows to specifiy the preconditioner via a functor struct:
+the knowledge of a concrete matrix `A`. It also allows to specify the preconditioner via a callable object:
 
 ```@example precon2
 using LinearSolve, LinearAlgebra

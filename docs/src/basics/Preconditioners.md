@@ -36,19 +36,16 @@ and `Pr` for right preconditioner, respectively. By default, if no preconditione
 the identity ``I``.
 
 
-In the following, we will use the `DiagonalPreconditioner` to define a two-sided
-preconditioned system which first divides by some random numbers and then
-multiplies by the same values. This is commonly used in the case where if, instead
-of random, `s` is an approximation to the eigenvalues of a system.
+In the following, we will use a left sided diagonal (Jacobi) preconditioner.
 
-```@example precon
+```@example precon1
 using LinearSolve, LinearAlgebra
 n = 4
-s = rand(n)
-Pl = Diagonal(s)
 
 A = rand(n, n)
 b = rand(n)
+
+Pl=Diagonal(A)
 
 prob = LinearProblem(A, b)
 sol = solve(prob, KrylovJL_GMRES(), Pl = Pl)
@@ -56,14 +53,13 @@ sol.u
 ```
 
 Alternatively, preconditioners can be specified via the  `precs`  argument to the constructor of
-an iterative solver specification. This argument shall deliver a function mapping `A` and a
+an iterative solver specification. This argument shall deliver a factory method mapping `A` and a
 parameter `p` to a tuple `(Pl,Pr)` consisting a left and a right preconditioner.
 
 
 ```@example precon2
 using LinearSolve, LinearAlgebra
 n = 4
-s = rand(n)
 
 A = rand(n, n)
 b = rand(n)
@@ -73,26 +69,33 @@ sol = solve(prob, KrylovJL_GMRES(precs = (A,p)->(Diagonal(A),I)) )
 sol.u
 ```
 This approach has the advantage that the specification of the preconditioner is possible without
-the knowledge of a concrete matrix `A`. It also allows to specify the preconditioner via a callable object:
+the knowledge of a concrete matrix `A`. It also allows to specify the preconditioner via a callable object
+and to  pass parameters to the constructor of the preconditioner instances. The example below also shows how
+to reuse the preconditioner once constructed for the subsequent solution of a modified problem.
 
-```@example precon2
+```@example precon3
 using LinearSolve, LinearAlgebra
 
-struct DiagonalPrecs end
+Base.@kwdef struct WeightedDiagonalBuilder 
+    w::Float64
+end
 
-(::DiagonalPrecs)(A,p) = (Diagonal(A),I)
+(builder::WeightedDiagonalBuilder)(A,p) = (builder.w*Diagonal(A),I)
 
 n = 4
-s = rand(n)
-
-A = rand(n, n)
+A = n*I-rand(n, n)
 b = rand(n)
 
 prob = LinearProblem(A, b)
-sol = solve(prob, KrylovJL_GMRES(precs = DiagonalPrecs()) )
+sol = solve(prob, KrylovJL_GMRES(precs = WeightedDiagonalBuilder(w=0.9)) )
+sol.u
+
+B=A.+0.1
+cache=sol.cache
+reinit!(cache,A=B, reuse_precs=true)
+sol = solve!(cache, KrylovJL_GMRES(precs = WeightedDiagonalBuilder(w=0.9)) )
 sol.u
 ```
-
 ## Preconditioner Interface
 
 To define a new preconditioner you define a Julia type which satisfies the

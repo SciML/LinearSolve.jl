@@ -76,24 +76,24 @@ to reuse the preconditioner once constructed for the subsequent solution of a mo
 ```@example precon3
 using LinearSolve, LinearAlgebra
 
-Base.@kwdef struct WeightedDiagonalBuilder 
+Base.@kwdef struct WeightedDiagonalPreconBuilder
     w::Float64
 end
 
-(builder::WeightedDiagonalBuilder)(A,p) = (builder.w*Diagonal(A),I)
+(builder::WeightedDiagonalPreconBuilder)(A,p) = (builder.w*Diagonal(A),I)
 
 n = 4
 A = n*I-rand(n, n)
 b = rand(n)
 
 prob = LinearProblem(A, b)
-sol = solve(prob, KrylovJL_GMRES(precs = WeightedDiagonalBuilder(w=0.9)) )
+sol = solve(prob, KrylovJL_GMRES(precs = WeightedDiagonalPreconBuilder(w=0.9)) )
 sol.u
 
 B=A.+0.1
 cache=sol.cache
 reinit!(cache,A=B, reuse_precs=true)
-sol = solve!(cache, KrylovJL_GMRES(precs = WeightedDiagonalBuilder(w=0.9)) )
+sol = solve!(cache, KrylovJL_GMRES(precs = WeightedDiagonalPreconBuilder(w=0.9)) )
 sol.u
 ```
 ## Preconditioner Interface
@@ -128,14 +128,14 @@ The following preconditioners match the interface of LinearSolve.jl.
     Implementations of the algebraic multigrid method. Must be converted to a
     preconditioner via `AlgebraicMultigrid.aspreconditioner(AlgebraicMultigrid.precmethod(A))`.
     Requires `A` as a `AbstractMatrix`. Provides the following methods:
-    
+
       + `AlgebraicMultigrid.ruge_stuben(A)`
       + `AlgebraicMultigrid.smoothed_aggregation(A)`
   - [PyAMG](https://github.com/cortner/PyAMG.jl):
     Implementations of the algebraic multigrid method. Must be converted to a
     preconditioner via `PyAMG.aspreconditioner(PyAMG.precmethod(A))`.
     Requires `A` as a `AbstractMatrix`. Provides the following methods:
-    
+
       + `PyAMG.RugeStubenSolver(A)`
       + `PyAMG.SmoothedAggregationSolver(A)`
   - [ILUZero.ILU0Precon(A::SparseMatrixCSC{T,N}, b_type = T)](https://github.com/mcovalt/ILUZero.jl):
@@ -154,7 +154,7 @@ The following preconditioners match the interface of LinearSolve.jl.
     and `HYPRE.BoomerAMG`.
   - [KrylovPreconditioners.jl](https://github.com/JuliaSmoothOptimizers/KrylovPreconditioners.jl/): Provides GPU-ready
     preconditioners via KernelAbstractions.jl. At the time of writing the package provides the following methods:
-    
+
       + Incomplete Cholesky decomposition `KrylovPreconditioners.kp_ic0(A)`
       + Incomplete LU decomposition `KrylovPreconditioners.kp_ilu0(A)`
       + Block Jacobi `KrylovPreconditioners.BlockJacobiPreconditioner(A, nblocks, device)`

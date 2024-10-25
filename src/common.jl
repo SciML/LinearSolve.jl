@@ -149,10 +149,23 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         Pr = nothing,
         assumptions = OperatorAssumptions(issquare(prob.A)),
         sensealg = LinearSolveAdjoint(),
+        alias = LinearAliases(),
         kwargs...)
     (;A, b, u0, p) = prob
 
-    A = if alias_A || A isa SMatrix
+    if isnothing(alias.alias_A)
+        to_alias_A = alias_A
+    else
+        to_alias_A = alias.alias_A
+    end
+
+    if isnothing(alias.alias_b)
+        to_alias_b = alias_b
+    else
+        to_alias_b = alias.alias_b
+    end
+
+    A = if to_alias_A || A isa SMatrix
         A
     elseif A isa Array
         copy(A)
@@ -164,7 +177,7 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
 
     b = if b isa SparseArrays.AbstractSparseArray && !(A isa Diagonal)
         Array(b) # the solution to a linear solve will always be dense!
-    elseif alias_b || b isa SVector
+    elseif to_alias_b || b isa SVector
         b
     elseif b isa Array
         copy(b)

@@ -65,6 +65,17 @@ end
 
 """
 ```julia
+KrylovJL_BLOCK_GMRES(args...; gmres_restart = 0, window = 0, kwargs...)
+```
+
+A generic BLOCK-GMRES implementation for square non-Hermitian linear systems with multiple right-hand sides
+"""
+function KrylovJL_BLOCK_GMRES(args...; kwargs...)
+    KrylovJL(args...; KrylovAlg = Krylov.block_gmres!, kwargs...)
+end
+
+"""
+```julia
 KrylovJL_BICGSTAB(args...; kwargs...)
 ```
 
@@ -143,8 +154,10 @@ function get_KrylovJL_solver(KrylovAlg)
         Krylov.CrmrSolver
     elseif (KrylovAlg === Krylov.cg!)
         Krylov.CgSolver
-    elseif (KrylovAlg === Krylov.cg_lanczos!)
+    elseif (KrylovAlg === Krylov.cg_lanczos_shift!)
         Krylov.CgLanczosShiftSolver
+    elseif (KrylovAlg === Krylov.cgls_lanczos_shift!)
+        Krylov.CglsLanczosShiftSolver
     elseif (KrylovAlg === Krylov.cgls!)
         Krylov.CglsSolver
     elseif (KrylovAlg === Krylov.cg_lanczos!)
@@ -163,6 +176,8 @@ function get_KrylovJL_solver(KrylovAlg)
         Krylov.GpmrSolver
     elseif (KrylovAlg === Krylov.fom!)
         Krylov.FomSolver
+    elseif (KrylovAlg === Krylov.block_gmres!)
+        Krylov.BlockGmresSolver
     else
         error("Invalid Krylov method detected")
     end
@@ -181,7 +196,8 @@ function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, re
                      alg.KrylovAlg === Krylov.gmres! ||
                      alg.KrylovAlg === Krylov.fgmres! ||
                      alg.KrylovAlg === Krylov.gpmr! ||
-                     alg.KrylovAlg === Krylov.fom!)
+                     alg.KrylovAlg === Krylov.fom! ||
+                     alg.KrylovAlg === Krylov.block_gmres!)
             if A isa SparseMatrixCSC
                 KS(SparseMatrixCSC(0, 0, [1], Int[], eltype(A)[]), eltype(b)[], 1)
             elseif A isa Matrix
@@ -206,7 +222,8 @@ function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, re
                      alg.KrylovAlg === Krylov.gmres! ||
                      alg.KrylovAlg === Krylov.fgmres! ||
                      alg.KrylovAlg === Krylov.gpmr! ||
-                     alg.KrylovAlg === Krylov.fom!)
+                     alg.KrylovAlg === Krylov.fom! ||
+                     alg.KrylovAlg === Krylov.block_gmres!)
             KS(A, b, memory)
         elseif (alg.KrylovAlg === Krylov.minres! ||
                 alg.KrylovAlg === Krylov.symmlq! ||

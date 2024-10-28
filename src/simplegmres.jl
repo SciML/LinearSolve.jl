@@ -88,38 +88,7 @@ function update_cacheval!(cache::LinearCache, cacheval::SimpleGMRESCache, name::
     return cacheval
 end
 
-"""
-    (c, s, ρ) = _sym_givens(a, b)
-
-Numerically stable symmetric Givens reflection.
-Given `a` and `b` reals, return `(c, s, ρ)` such that
-
-    [ c  s ] [ a ] = [ ρ ]
-    [ s -c ] [ b ] = [ 0 ].
-"""
-function _sym_givens(a::T, b::T) where {T <: AbstractFloat}
-    # This has taken from Krylov.jl
-    if b == 0
-        c = ifelse(a == 0, one(T), sign(a)) # In Julia, sign(0) = 0.
-        s = zero(T)
-        ρ = abs(a)
-    elseif a == 0
-        c = zero(T)
-        s = sign(b)
-        ρ = abs(b)
-    elseif abs(b) > abs(a)
-        t = a / b
-        s = sign(b) / sqrt(one(T) + t * t)
-        c = s * t
-        ρ = b / s  # Computationally better than ρ = a / c since |c| ≤ |s|.
-    else
-        t = b / a
-        c = sign(a) / sqrt(one(T) + t * t)
-        s = c * t
-        ρ = a / c  # Computationally better than ρ = b / s since |s| ≤ |c|
-    end
-    return (c, s, ρ)
-end
+_sym_givens(a::T, b::T) where {T <: AbstractFloat} = Krylov.sym_givens(a, b)
 
 function _sym_givens!(c, s, R, nr::Int, inner_iter::Int, bsize::Int, Hbis)
     if __is_extension_loaded(Val(:KernelAbstractions))

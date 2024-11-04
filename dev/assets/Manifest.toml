@@ -54,9 +54,9 @@ version = "0.1.38"
 
 [[deps.Adapt]]
 deps = ["LinearAlgebra", "Requires"]
-git-tree-sha1 = "6a55b747d1812e699320963ffde36f1ebdda4099"
+git-tree-sha1 = "50c3c56a52972d78e8be9fd135bfb91c9574c140"
 uuid = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
-version = "4.0.4"
+version = "4.1.1"
 
     [deps.Adapt.extensions]
     AdaptStaticArraysExt = "StaticArrays"
@@ -100,9 +100,9 @@ version = "7.16.0"
 
 [[deps.ArrayLayouts]]
 deps = ["FillArrays", "LinearAlgebra"]
-git-tree-sha1 = "0dd7edaff278e346eb0ca07a7e75c9438408a3ce"
+git-tree-sha1 = "492681bc44fac86804706ddb37da10880a2bd528"
 uuid = "4c555306-a7a7-4459-81d9-ec55ddd5c99a"
-version = "1.10.3"
+version = "1.10.4"
 weakdeps = ["SparseArrays"]
 
     [deps.ArrayLayouts.extensions]
@@ -392,9 +392,9 @@ version = "0.6.0"
 
 [[deps.Krylov]]
 deps = ["LinearAlgebra", "Printf", "SparseArrays"]
-git-tree-sha1 = "71dd823bf0a5aaa8264e1143b96a0baa631f4ce0"
+git-tree-sha1 = "4f20a2df85a9e5d55c9e84634bbf808ed038cabd"
 uuid = "ba0b0d4f-ebba-5204-a429-3ac8c609bfb7"
-version = "0.9.7"
+version = "0.9.8"
 
 [[deps.LayoutPointers]]
 deps = ["ArrayInterface", "LinearAlgebra", "ManualMemory", "SIMDTypes", "Static", "StaticArrayInterface"]
@@ -461,9 +461,9 @@ version = "1.11.0"
 
 [[deps.Libiconv_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "f9557a255370125b405568f9767d6d195822a175"
+git-tree-sha1 = "61dfdba58e585066d8bce214c5a51eaa0539f269"
 uuid = "94ce4f54-9a6c-5748-9c1c-f9c7231a4531"
-version = "1.17.0+0"
+version = "1.17.0+1"
 
 [[deps.LinearAlgebra]]
 deps = ["Libdl", "OpenBLAS_jll", "libblastrampoline_jll"]
@@ -667,9 +667,9 @@ version = "1.3.4"
 
 [[deps.RecursiveArrayTools]]
 deps = ["Adapt", "ArrayInterface", "DocStringExtensions", "GPUArraysCore", "IteratorInterfaceExtensions", "LinearAlgebra", "RecipesBase", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface", "Tables"]
-git-tree-sha1 = "b034171b93aebc81b3e1890a036d13a9c4a9e3e0"
+git-tree-sha1 = "ed2514425d030d7c9054fa0f2275ada45681788d"
 uuid = "731186ca-8d62-57ce-b412-fbd966d074cd"
-version = "3.27.0"
+version = "3.27.2"
 
     [deps.RecursiveArrayTools.extensions]
     RecursiveArrayToolsFastBroadcastExt = "FastBroadcast"
@@ -737,9 +737,9 @@ version = "0.6.43"
 
 [[deps.SciMLBase]]
 deps = ["ADTypes", "Accessors", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "Expronicon", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "PrecompileTools", "Preferences", "Printf", "RecipesBase", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SciMLOperators", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface"]
-git-tree-sha1 = "26fea1911818cd480400f1a2b7f6b32c3cc3836a"
+git-tree-sha1 = "7a54136472ca0cb0f66ef22aa3f0ff198f379fa7"
 uuid = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
-version = "2.56.4"
+version = "2.58.0"
 
     [deps.SciMLBase.extensions]
     SciMLBaseChainRulesCoreExt = "ChainRulesCore"
@@ -854,9 +854,9 @@ version = "7.7.0+0"
 
 [[deps.SymbolicIndexingInterface]]
 deps = ["Accessors", "ArrayInterface", "RuntimeGeneratedFunctions", "StaticArraysCore"]
-git-tree-sha1 = "4bc96df5d71515b1cb86dd626915f06f4c0d46f5"
+git-tree-sha1 = "20cf607cafb31f922bce84d60379203e7a126911"
 uuid = "2efcf032-c050-4f8e-a9bb-153293bab1f5"
-version = "0.3.33"
+version = "0.3.34"
 
 [[deps.TOML]]
 deps = ["Dates"]

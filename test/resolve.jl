@@ -2,7 +2,11 @@ using LinearSolve, LinearAlgebra, SparseArrays, InteractiveUtils, Test
 using LinearSolve: AbstractDenseFactorization, AbstractSparseFactorization
 
 for alg in vcat(InteractiveUtils.subtypes(AbstractDenseFactorization),
-    InteractiveUtils.subtypes(AbstractSparseFactorization))
+                InteractiveUtils.subtypes(AbstractSparseFactorization))
+    if alg in [PardisoJL]
+        ## Pardiso has extra tests in test/pardiso/pardiso.jl
+        continue
+    end
     @show alg
     if !(alg in [
            DiagonalFactorization,

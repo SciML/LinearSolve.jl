@@ -20,7 +20,7 @@ alglist = (
     AppleAccelerateLUFactorization,
     MKLLUFactorization,
     KrylovJL_CRAIGMR,
-    KrylovJL_LSMR,
+    KrylovJL_LSMR
 )
 
 @testset "Success" begin

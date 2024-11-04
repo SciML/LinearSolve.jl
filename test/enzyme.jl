@@ -207,9 +207,9 @@ end
     @show fd_jac
 
     en_jac = map(onehot(A)) do dA
-                 return only(Enzyme.autodiff(set_runtime_activity(Forward), fnice,
-                     Duplicated(A, dA), Const(b1), Const(alg)))
-             end |> collect
+        return only(Enzyme.autodiff(set_runtime_activity(Forward), fnice,
+            Duplicated(A, dA), Const(b1), Const(alg)))
+    end |> collect
     @show en_jac
 
     @test en_jac≈fd_jac rtol=1e-4

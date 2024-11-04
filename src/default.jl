@@ -179,8 +179,8 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
                 __conditioning(assump) === OperatorCondition.WellConditioned)
                 if length(b) <= 10
                     DefaultAlgorithmChoice.RFLUFactorization
-                elseif appleaccelerate_isavailable() && b isa Array && 
-                    eltype(b) <: Union{Float32, Float64, ComplexF32, ComplexF64}
+                elseif appleaccelerate_isavailable() && b isa Array &&
+                       eltype(b) <: Union{Float32, Float64, ComplexF32, ComplexF64}
                     DefaultAlgorithmChoice.AppleAccelerateLUFactorization
                 elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500) ||
                         (usemkl && length(b) <= 200)) &&
@@ -189,8 +189,8 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
                     DefaultAlgorithmChoice.RFLUFactorization
                     #elseif A === nothing || A isa Matrix
                     #    alg = FastLUFactorization()
-                elseif usemkl && b isa Array && 
-                    eltype(b) <: Union{Float32, Float64, ComplexF32, ComplexF64}
+                elseif usemkl && b isa Array &&
+                       eltype(b) <: Union{Float32, Float64, ComplexF32, ComplexF64}
                     DefaultAlgorithmChoice.MKLLUFactorization
                 else
                     DefaultAlgorithmChoice.LUFactorization

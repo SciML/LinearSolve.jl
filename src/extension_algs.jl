@@ -217,7 +217,7 @@ All values default to `nothing` and the solver internally determines the values
 given the input types, and these keyword arguments are only for overriding the
 default handling process. This should not be required by most users.
 """
-struct PardisoJL{T1, T2}  <: AbstractSparseFactorization
+struct PardisoJL{T1, T2} <: AbstractSparseFactorization
     nprocs::Union{Int, Nothing}
     solver_type::T1
     matrix_type::T2

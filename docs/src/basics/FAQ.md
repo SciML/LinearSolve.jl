@@ -83,5 +83,5 @@ Pl = LinearSolve.ComposePreconditioner(LinearSolve.InvPreconditioner(Diagonal(we
 Pr = Diagonal(weights)
 
 prob = LinearProblem(A, b)
-sol = solve(prob, KrylovJL_GMRES(precs=Returns((Pl,Pr))))
+sol = solve(prob, KrylovJL_GMRES(precs = Returns((Pl, Pr))))
 ```

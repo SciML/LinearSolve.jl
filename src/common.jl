@@ -150,7 +150,7 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         assumptions = OperatorAssumptions(issquare(prob.A)),
         sensealg = LinearSolveAdjoint(),
         kwargs...)
-    (;A, b, u0, p) = prob
+    (; A, b, u0, p) = prob
 
     A = if alias_A || A isa SMatrix
         A
@@ -206,21 +206,20 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
 
     cache = LinearCache{typeof(A), typeof(b), typeof(u0_), typeof(p), typeof(alg), Tc,
         typeof(Pl), typeof(Pr), typeof(reltol), typeof(assumptions.issq),
-        typeof(sensealg)}(A, b, u0_, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
+        typeof(sensealg)}(
+        A, b, u0_, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
         maxiters, verbose, assumptions, sensealg)
     return cache
 end
 
-
 function SciMLBase.reinit!(cache::LinearCache;
-                           A = nothing,
-                           b = cache.b,
-                           u = cache.u,
-                           p = nothing,
-                           reinit_cache = false,
-                           reuse_precs = false)
+        A = nothing,
+        b = cache.b,
+        u = cache.u,
+        p = nothing,
+        reinit_cache = false,
+        reuse_precs = false)
     (; alg, cacheval, abstol, reltol, maxiters, verbose, assumptions, sensealg) = cache
-
 
     isfresh = !isnothing(A)
     precsisfresh = !reuse_precs && (isfresh || !isnothing(p))
@@ -234,9 +233,11 @@ function SciMLBase.reinit!(cache::LinearCache;
     Pl = cache.Pl
     Pr = cache.Pr
     if reinit_cache
-        return LinearCache{typeof(A), typeof(b), typeof(u), typeof(p), typeof(alg), typeof(cacheval),
+        return LinearCache{
+            typeof(A), typeof(b), typeof(u), typeof(p), typeof(alg), typeof(cacheval),
             typeof(Pl), typeof(Pr), typeof(reltol), typeof(assumptions.issq),
-            typeof(sensealg)}(A, b, u, p, alg, cacheval, precsisfresh, isfresh, Pl, Pr, abstol, reltol,
+            typeof(sensealg)}(
+            A, b, u, p, alg, cacheval, precsisfresh, isfresh, Pl, Pr, abstol, reltol,
             maxiters, verbose, assumptions, sensealg)
     else
         cache.A = A

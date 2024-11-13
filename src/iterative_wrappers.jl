@@ -96,6 +96,17 @@ function KrylovJL_CRAIGMR(args...; kwargs...)
     KrylovJL(args...; KrylovAlg = Krylov.craigmr!, kwargs...)
 end
 
+"""
+```julia
+KrylovJL_MINARES(args...; kwargs...)
+```
+
+A generic MINARES implementation for Hermitian linear systems
+"""
+function KrylovJL_MINARES(args...; kwargs...)
+    KrylovJL(args...; KrylovAlg = Krylov.minares!, kwargs...)
+end
+
 function get_KrylovJL_solver(KrylovAlg)
     KS = if (KrylovAlg === Krylov.lsmr!)
         Krylov.LsmrSolver
@@ -163,6 +174,8 @@ function get_KrylovJL_solver(KrylovAlg)
         Krylov.GpmrSolver
     elseif (KrylovAlg === Krylov.fom!)
         Krylov.FomSolver
+    elseif (KrylovAlg === Krylov.minares!)
+        Krylov.MinaresSolver
     else
         error("Invalid Krylov method detected")
     end

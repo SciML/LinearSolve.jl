@@ -275,7 +275,7 @@ end
             ("GMRES_prec", KrylovJL_GMRES(; precs, ldiv = false, kwargs...)),
             # ("BICGSTAB",KrylovJL_BICGSTAB(kwargs...)),
             ("MINRES", KrylovJL_MINRES(kwargs...)),
-            ("MINARES", KrylovJL_MINARES(kwards...))
+            ("MINARES", KrylovJL_MINARES(kwargs...))
         )
         for (name, algorithm) in algorithms
             @testset "$name" begin

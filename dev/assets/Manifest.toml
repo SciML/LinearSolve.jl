@@ -5,16 +5,18 @@ manifest_format = "2.0"
 project_hash = "22dd8ec74ae0dfd8e70474da400d7904580bed74"
 
 [[deps.ADTypes]]
-git-tree-sha1 = "eea5d80188827b35333801ef97a40c2ed653b081"
+git-tree-sha1 = "30bb95a372787af850addf28ac937f1be7b79173"
 uuid = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
-version = "1.9.0"
+version = "1.10.0"
 
     [deps.ADTypes.extensions]
     ADTypesChainRulesCoreExt = "ChainRulesCore"
+    ADTypesConstructionBaseExt = "ConstructionBase"
     ADTypesEnzymeCoreExt = "EnzymeCore"
 
     [deps.ADTypes.weakdeps]
     ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    ConstructionBase = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
     EnzymeCore = "f151be2c-9106-41f4-ab19-57ee4f262869"
 
 [[deps.ANSIColoredPrinters]]

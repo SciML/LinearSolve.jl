@@ -4,15 +4,13 @@ Many linear solvers can be accelerated by using what is known as a **preconditio
 an approximation to the matrix inverse action which is cheap to evaluate. These
 can improve the numerical conditioning of the solver process and in turn improve
 the performance. LinearSolve.jl provides an interface for the definition of
-preconditioners which works with the wrapped packages.
+preconditioners which works with the wrapped iterative solver packages.
 
 ## Using Preconditioners
 
 ### Mathematical Definition
 
-Preconditioners are specified in the keyword arguments to `init` or `solve`: `Pl` for left
-and `Pr` for right preconditioner, respectively.
-The right preconditioner, ``P_r`` transforms the linear system ``Au = b`` into the form:
+A right preconditioner, ``P_r`` transforms the linear system ``Au = b`` into the form:
 
 ```math
 AP_r^{-1}(P_r u) = AP_r^{-1}y = b
@@ -31,27 +29,70 @@ A two-sided preconditioned system is of the form:
 P_l^{-1}A P_r^{-1} (P_r u) = P_l^{-1}b
 ```
 
-By default, if no preconditioner is given, the preconditioner is assumed to be
+### Specifying  Preconditioners
+
+One way to specify preconditioners uses the `Pl` and `Pr`  keyword arguments to `init` or `solve`: `Pl` for left
+and `Pr` for right preconditioner, respectively. By default, if no preconditioner is given, the preconditioner is assumed to be
 the identity ``I``.
 
-### Using Preconditioners
+In the following, we will use a left sided diagonal (Jacobi) preconditioner.
 
-In the following, we will use the `DiagonalPreconditioner` to define a two-sided
-preconditioned system which first divides by some random numbers and then
-multiplies by the same values. This is commonly used in the case where if, instead
-of random, `s` is an approximation to the eigenvalues of a system.
-
-```@example precon
+```@example precon1
 using LinearSolve, LinearAlgebra
 n = 4
-s = rand(n)
-Pl = Diagonal(s)
+
+A = rand(n, n)
+b = rand(n)
+
+Pl = Diagonal(A)
+
+prob = LinearProblem(A, b)
+sol = solve(prob, KrylovJL_GMRES(), Pl = Pl)
+sol.u
+```
+
+Alternatively, preconditioners can be specified via the  `precs`  argument to the constructor of
+an iterative solver specification. This argument shall deliver a factory method mapping `A` and a
+parameter `p` to a tuple `(Pl,Pr)` consisting a left and a right preconditioner.
+
+```@example precon2
+using LinearSolve, LinearAlgebra
+n = 4
 
 A = rand(n, n)
 b = rand(n)
 
 prob = LinearProblem(A, b)
-sol = solve(prob, KrylovJL_GMRES(), Pl = Pl)
+sol = solve(prob, KrylovJL_GMRES(precs = (A, p) -> (Diagonal(A), I)))
+sol.u
+```
+
+This approach has the advantage that the specification of the preconditioner is possible without
+the knowledge of a concrete matrix `A`. It also allows to specify the preconditioner via a callable object
+and to  pass parameters to the constructor of the preconditioner instances. The example below also shows how
+to reuse the preconditioner once constructed for the subsequent solution of a modified problem.
+
+```@example precon3
+using LinearSolve, LinearAlgebra
+
+Base.@kwdef struct WeightedDiagonalPreconBuilder
+    w::Float64
+end
+
+(builder::WeightedDiagonalPreconBuilder)(A, p) = (builder.w * Diagonal(A), I)
+
+n = 4
+A = n * I - rand(n, n)
+b = rand(n)
+
+prob = LinearProblem(A, b)
+sol = solve(prob, KrylovJL_GMRES(precs = WeightedDiagonalPreconBuilder(w = 0.9)))
+sol.u
+
+B = A .+ 0.1
+cache = sol.cache
+reinit!(cache, A = B, reuse_precs = true)
+sol = solve!(cache, KrylovJL_GMRES(precs = WeightedDiagonalPreconBuilder(w = 0.9)))
 sol.u
 ```
 

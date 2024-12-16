@@ -139,8 +139,6 @@ __init_u0_from_Ab(::SMatrix{S1, S2}, b) where {S1, S2} = zeros(SVector{S2, eltyp
 
 function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         args...;
-        alias_A = default_alias_A(alg, prob.A, prob.b),
-        alias_b = default_alias_b(alg, prob.A, prob.b),
         alias = LinearAliasSpecifier(),
         abstol = default_tol(real(eltype(prob.b))),
         reltol = default_tol(real(eltype(prob.b))),

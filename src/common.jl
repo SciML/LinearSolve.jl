@@ -151,8 +151,6 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         kwargs...)
     (; A, b, u0, p) = prob
 
-    aliases = alias 
-
     if haskey(kwargs,:alias_A) || haskey(kwargs,:alias_b)
         aliases = LinearAliasSpecifier()
 

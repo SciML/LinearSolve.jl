@@ -84,9 +84,9 @@ prob2 = LinearProblem(transpose(A), b)
 
 @testset "Adjoint/Transpose Type: $(alg)" for alg in (NormalCholeskyFactorization(),
     CholeskyFactorization(), LUFactorization(), QRFactorization(), nothing)
-    sol = solve(prob1, alg; alias_A = false)
+    sol = solve(prob1, alg; alias = LinearAliasSpecifier(alias = LinearAliasSpecifier(alias_A = false)))
     @test norm(A' * sol.u .- b) < 1e-5
 
-    sol = solve(prob2, alg; alias_A = false)
+    sol = solve(prob2, alg; alias = LinearAliasSpecifier(alias_A = false))
     @test norm(transpose(A) * sol.u .- b) < 1e-5
 end

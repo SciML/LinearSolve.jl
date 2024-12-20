@@ -12,7 +12,7 @@ using LinearAlgebra
 using SparseArrays
 using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
 using LazyArrays: @~, BroadcastArray
-using SciMLBase: AbstractLinearAlgorithm
+using SciMLBase: AbstractLinearAlgorithm, LinearAliasSpecifier
 using SciMLOperators
 using SciMLOperators: AbstractSciMLOperator, IdentityOperator
 using Setfield

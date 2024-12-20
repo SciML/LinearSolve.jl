@@ -6,15 +6,11 @@ in order to give composability. These are also the options taken at `init` time.
 The following are the options these algorithms take, along with their defaults.
 
 ## General Controls
-
-  - `alias_A::Bool`: Whether to alias the matrix `A` or use a copy by default. When `true`,
-    algorithms like LU-factorization can be faster by reusing the memory via `lu!`,
-    but care must be taken as the original input will be modified. Default is `true` if the
-    algorithm is known not to modify `A`, otherwise is `false`.
-  - `alias_b::Bool`: Whether to alias the matrix `b` or use a copy by default. When `true`,
-    algorithms can write and change `b` upon usage. Care must be taken as the
-    original input will be modified. Default is `true` if the algorithm is known not to
-    modify `b`, otherwise `false`.
+  - `alias::LinearAliasSpecifier`: Holds the fields `alias_A` and `alias_b` which specify
+    whether to alias the matrices `A` and `b` respectively. When these fields are `true`,
+    `A` and `b` can be written to and changed by the solver algorithm. When fields are `nothing`
+    the default behavior is used, which is to default to `true` when the algorithm is known 
+    not to modify the matrices, and false otherwise.
   - `verbose`: Whether to print extra information. Defaults to `false`.
   - `assumptions`: Sets the assumptions of the operator in order to effect the default
     choice algorithm. See the [Operator Assumptions page for more details](@ref assumptions).

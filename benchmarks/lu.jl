@@ -41,8 +41,7 @@ for i in 1:length(ns)
         bt = @belapsed solve(prob, $(algs[j])).u setup=(prob = LinearProblem(copy(A),
             copy(b);
             u0 = copy(u0),
-            alias_A = true,
-            alias_b = true))
+            alias = LinearAliasSpecifier(alias_A = true, alias_b = true)))
         push!(res[j], luflop(n) / bt / 1e9)
     end
 end

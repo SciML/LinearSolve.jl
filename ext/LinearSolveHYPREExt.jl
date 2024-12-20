@@ -55,7 +55,7 @@ end
 
 function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
         args...;
-        alias_A = false, alias_b = false,
+        alias = LinearAliasSpecifier(),
         # TODO: Implement eltype for HYPREMatrix in HYPRE.jl? Looks useful
         #       even if it is not AbstractArray.
         abstol = default_tol(prob.A isa HYPREMatrix ? HYPRE_Complex :
@@ -71,6 +71,45 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
         sensealg = LinearSolveAdjoint(),
         kwargs...)
     @unpack A, b, u0, p = prob
+
+    if haskey(kwargs, :alias_A) || haskey(kwargs, :alias_b)
+        aliases = LinearAliasSpecifier()
+
+        if haskey(kwargs, :alias_A)
+            message = "`alias_A` keyword argument is deprecated, to set `alias_A`,
+            please use an ODEAliasSpecifier, e.g. `solve(prob, alias = LinearAliasSpecifier(alias_A = true))"
+            Base.depwarn(message, :init)
+            Base.depwarn(message, :solve)
+            aliases = LinearAliasSpecifier(alias_A = values(kwargs).alias_A)
+        end
+
+        if haskey(kwargs, :alias_b)
+            message = "`alias_b` keyword argument is deprecated, to set `alias_b`,
+            please use an ODEAliasSpecifier, e.g. `solve(prob, alias = LinearAliasSpecifier(alias_b = true))"
+            Base.depwarn(message, :init)
+            Base.depwarn(message, :solve)
+            aliases = LinearAliasSpecifier(
+                alias_A = aliases.alias_A, alias_b = values(kwargs).alias_b)
+        end
+    else
+        if alias isa Bool
+            aliases = LinearAliasSpecifier(alias = alias)
+        else
+            aliases = alias
+        end
+    end
+
+    if isnothing(aliases.alias_A)
+        alias_A = false
+    else
+        alias_A = aliases.alias_A
+    end
+
+    if isnothing(aliases.alias_b)
+        alias_b = false
+    else
+        alias_b = aliases.alias_b
+    end
 
     A = A isa HYPREMatrix ? A : HYPREMatrix(A)
     b = b isa HYPREVector ? b : HYPREVector(b)

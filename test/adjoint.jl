@@ -1,6 +1,6 @@
 using Zygote, ForwardDiff
 using LinearSolve, LinearAlgebra, Test
-using FiniteDiff
+using FiniteDiff, RecursiveFactorization
 using LazyArrays: BroadcastArray
 
 n = 4

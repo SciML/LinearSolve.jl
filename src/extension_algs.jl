@@ -103,7 +103,7 @@ struct RFLUFactorization{P, T} <: AbstractDenseFactorization
     end
 end
 
-function RFLUFactorization(; pivot = Val(true), thread = Val(true), throwerror=true)
+function RFLUFactorization(; pivot = Val(true), thread = Val(true), throwerror = true)
     RFLUFactorization(pivot, thread; throwerror)
 end
 

@@ -106,21 +106,6 @@ function defaultalg(A::AbstractSparseMatrixCSC{Tv, Ti}, b,
     end
 end
 
-@static if INCLUDE_SPARSE
-    function defaultalg(A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
-            assump::OperatorAssumptions{Bool}) where {Ti}
-        if assump.issq
-            if length(b) <= 10_000 && length(nonzeros(A)) / length(A) < 2e-4
-                DefaultLinearSolver(DefaultAlgorithmChoice.KLUFactorization)
-            else
-                DefaultLinearSolver(DefaultAlgorithmChoice.UMFPACKFactorization)
-            end
-        else
-            DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
-        end
-    end
-end
-
 function defaultalg(A::GPUArraysCore.AnyGPUArray, b, assump::OperatorAssumptions{Bool})
     if assump.condition === OperatorCondition.IllConditioned || !assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)

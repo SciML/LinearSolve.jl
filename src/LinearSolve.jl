@@ -8,16 +8,12 @@ import PrecompileTools
 using ArrayInterface
 using Base: cache_dependencies, Bool
 using LinearAlgebra
-using SparseArrays
-using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
 using LazyArrays: @~, BroadcastArray
 using SciMLBase: AbstractLinearAlgorithm, LinearAliasSpecifier
 using SciMLOperators
 using SciMLOperators: AbstractSciMLOperator, IdentityOperator
 using Setfield
 using UnPack
-using KLU
-using Sparspak
 using FastLapackInterface
 using DocStringExtensions
 using EnumX
@@ -93,7 +89,8 @@ function _fast_sym_givens! end
 
 # Code
 
-const INCLUDE_SPARSE = Preferences.@load_preference("include_sparse", Base.USE_GPL_LIBS)
+issparsematrixcsc(A) = false
+handle_sparsematrixcsc_lu(A) = lu(A)
 
 EnumX.@enumx DefaultAlgorithmChoice begin
     LUFactorization
@@ -170,10 +167,6 @@ end
     end
 end
 
-@static if INCLUDE_SPARSE
-    include("factorization_sparse.jl")
-end
-
 # Solver Specific Traits
 ## Needs Square Matrix
 """
@@ -212,16 +205,6 @@ PrecompileTools.@compile_workload begin
     sol = solve(prob)
     sol = solve(prob, LUFactorization())
     sol = solve(prob, KrylovJL_GMRES())
-end
-
-@static if INCLUDE_SPARSE
-    PrecompileTools.@compile_workload begin
-        A = sprand(4, 4, 0.3) + I
-        b = rand(4)
-        prob = LinearProblem(A, b)
-        sol = solve(prob, KLUFactorization())
-        sol = solve(prob, UMFPACKFactorization())
-    end
 end
 
 PrecompileTools.@compile_workload begin

@@ -139,9 +139,8 @@ end
 
 function do_factorization(alg::LUFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
-    if A isa AbstractSparseMatrixCSC
-        return lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
-            check = false)
+    if issparsematrixcsc(A)
+        fact = handle_sparsematrixcsc_lu(A)
     elseif A isa GPUArraysCore.AnyGPUArray
         fact = lu(A; check = false)
     elseif !ArrayInterface.can_setindex(typeof(A))
@@ -222,7 +221,7 @@ end
 function do_factorization(alg::QRFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
     if ArrayInterface.can_setindex(typeof(A))
-        if alg.inplace && !(A isa SparseMatrixCSC) && !(A isa GPUArraysCore.AnyGPUArray)
+        if alg.inplace && !issparsematrixcsc(A) && !(A isa GPUArraysCore.AnyGPUArray)
             if A isa Symmetric
                 fact = qr(A, alg.pivot)
             else
@@ -311,7 +310,7 @@ end
 
 function do_factorization(alg::CholeskyFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
-    if A isa SparseMatrixCSC
+    if issparsematrixcsc(A)
         fact = cholesky(A; shift = alg.shift, check = false, perm = alg.perm)
     elseif A isa GPUArraysCore.AnyGPUArray
         fact = cholesky(A; check = false)
@@ -367,7 +366,7 @@ end
 
 function do_factorization(alg::LDLtFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
-    if !(A isa SparseMatrixCSC)
+    if !issparsematrixcsc(A)
         fact = ldlt!(A)
     else
         fact = ldlt!(A, shift = alg.shift, perm = alg.perm)
@@ -792,15 +791,6 @@ function init_cacheval(
     LinearAlgebra.LDLt{T, SymTridiagonal{T, V}}(A)
 end
 
-function init_cacheval(alg::GenericFactorization,
-        A::Union{Hermitian{T, <:SparseMatrixCSC},
-            Symmetric{T, <:SparseMatrixCSC}}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions) where {T}
-    newA = copy(convert(AbstractMatrix, A))
-    do_factorization(alg, newA, b, u)
-end
-
 # Ambiguity handling dispatch
 
 ################################## Factorizations which require solve! overloads
@@ -823,66 +813,11 @@ Base.@kwdef struct UMFPACKFactorization <: AbstractSparseFactorization
     check_pattern::Bool = true # Check factorization re-use
 end
 
-const PREALLOCATED_UMFPACK = SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC(0, 0, [1],
-    Int[], Float64[]))
-
 function init_cacheval(alg::UMFPACKFactorization,
         A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
     nothing
-end
-
-function init_cacheval(alg::UMFPACKFactorization, A::SparseMatrixCSC{Float64, Int}, b, u,
-        Pl, Pr,
-        maxiters::Int, abstol, reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
-    PREALLOCATED_UMFPACK
-end
-
-function init_cacheval(alg::UMFPACKFactorization, A::AbstractSparseArray, b, u, Pl, Pr,
-        maxiters::Int, abstol,
-        reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
-    A = convert(AbstractMatrix, A)
-    zerobased = SparseArrays.getcolptr(A)[1] == 0
-    return SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC(size(A)..., getcolptr(A),
-        rowvals(A), nonzeros(A)))
-end
-
-function SciMLBase.solve!(cache::LinearCache, alg::UMFPACKFactorization; kwargs...)
-    A = cache.A
-    A = convert(AbstractMatrix, A)
-    if cache.isfresh
-        cacheval = @get_cacheval(cache, :UMFPACKFactorization)
-        if alg.reuse_symbolic
-            # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
-            if alg.check_pattern && pattern_changed(cacheval, A)
-                fact = lu(
-                    SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                        nonzeros(A)),
-                    check = false)
-            else
-                fact = lu!(cacheval,
-                    SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                        nonzeros(A)), check = false)
-            end
-        else
-            fact = lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
-                check = false)
-        end
-        cache.cacheval = fact
-        cache.isfresh = false
-    end
-
-    F = @get_cacheval(cache, :UMFPACKFactorization)
-    if F.status == SparseArrays.UMFPACK.UMFPACK_OK
-        y = ldiv!(cache.u, F, cache.b)
-        SciMLBase.build_linear_solution(alg, y, nothing, cache)
-    else
-        SciMLBase.build_linear_solution(
-            alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible)
-    end
 end
 
 """
@@ -902,64 +837,11 @@ Base.@kwdef struct KLUFactorization <: AbstractSparseFactorization
     check_pattern::Bool = true
 end
 
-const PREALLOCATED_KLU = KLU.KLUFactorization(SparseMatrixCSC(0, 0, [1], Int[],
-    Float64[]))
-
 function init_cacheval(alg::KLUFactorization,
         A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
     nothing
-end
-
-function init_cacheval(alg::KLUFactorization, A::SparseMatrixCSC{Float64, Int}, b, u, Pl,
-        Pr,
-        maxiters::Int, abstol, reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
-    PREALLOCATED_KLU
-end
-
-function init_cacheval(alg::KLUFactorization, A::AbstractSparseArray, b, u, Pl, Pr,
-        maxiters::Int, abstol,
-        reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
-    A = convert(AbstractMatrix, A)
-    return KLU.KLUFactorization(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-        nonzeros(A)))
-end
-
-# TODO: guard this against errors
-function SciMLBase.solve!(cache::LinearCache, alg::KLUFactorization; kwargs...)
-    A = cache.A
-    A = convert(AbstractMatrix, A)
-    if cache.isfresh
-        cacheval = @get_cacheval(cache, :KLUFactorization)
-        if alg.reuse_symbolic
-            if alg.check_pattern && pattern_changed(cacheval, A)
-                fact = KLU.klu(
-                    SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                        nonzeros(A)),
-                    check = false)
-            else
-                fact = KLU.klu!(cacheval, nonzeros(A), check = false)
-            end
-        else
-            # New fact each time since the sparsity pattern can change
-            # and thus it needs to reallocate
-            fact = KLU.klu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                nonzeros(A)))
-        end
-        cache.cacheval = fact
-        cache.isfresh = false
-    end
-    F = @get_cacheval(cache, :KLUFactorization)
-    if F.common.status == KLU.KLU_OK
-        y = ldiv!(cache.u, F, cache.b)
-        SciMLBase.build_linear_solution(alg, y, nothing, cache)
-    else
-        SciMLBase.build_linear_solution(
-            alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible)
-    end
 end
 
 ## CHOLMODFactorization
@@ -983,22 +865,11 @@ Base.@kwdef struct CHOLMODFactorization{T} <: AbstractSparseFactorization
     perm::T = nothing
 end
 
-const PREALLOCATED_CHOLMOD = cholesky(SparseMatrixCSC(0, 0, [1], Int[], Float64[]))
-
 function init_cacheval(alg::CHOLMODFactorization,
         A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
     nothing
-end
-
-function init_cacheval(alg::CHOLMODFactorization,
-        A::Union{SparseMatrixCSC{T, Int}, Symmetric{T, SparseMatrixCSC{T, Int}}}, b, u,
-        Pl, Pr,
-        maxiters::Int, abstol, reltol,
-        verbose::Bool, assumptions::OperatorAssumptions) where {T <:
-                                                                Union{Float32, Float64}}
-    PREALLOCATED_CHOLMOD
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::CHOLMODFactorization; kwargs...)
@@ -1046,14 +917,6 @@ default_alias_b(::NormalCholeskyFactorization, ::Any, ::Any) = true
 
 const PREALLOCATED_NORMALCHOLESKY = ArrayInterface.cholesky_instance(rand(1, 1), NoPivot())
 
-function init_cacheval(alg::NormalCholeskyFactorization,
-        A::Union{AbstractSparseArray, GPUArraysCore.AnyGPUArray,
-            Symmetric{<:Number, <:AbstractSparseArray}}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    ArrayInterface.cholesky_instance(convert(AbstractMatrix, A))
-end
-
 function init_cacheval(alg::NormalCholeskyFactorization, A::SMatrix, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
@@ -1087,7 +950,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization; 
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
-        if A isa SparseMatrixCSC || A isa GPUArraysCore.AnyGPUArray || A isa SMatrix
+        if issparsematrixcsc(A) || A isa GPUArraysCore.AnyGPUArray || A isa SMatrix
             fact = cholesky(Symmetric((A)' * A); check = false)
         else
             fact = cholesky(Symmetric((A)' * A), alg.pivot; check = false)
@@ -1095,7 +958,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization; 
         cache.cacheval = fact
         cache.isfresh = false
     end
-    if A isa SparseMatrixCSC
+    if issparsematrixcsc(A)
         cache.u .= @get_cacheval(cache, :NormalCholeskyFactorization) \ (A' * cache.b)
         y = cache.u
     elseif A isa StaticArray
@@ -1301,9 +1164,6 @@ Base.@kwdef struct SparspakFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool = true
 end
 
-const PREALLOCATED_SPARSEPAK = sparspaklu(SparseMatrixCSC(0, 0, [1], Int[], Float64[]),
-    factorize = false)
-
 function init_cacheval(alg::SparspakFactorization,
         A::Union{Matrix, Nothing, AbstractSciMLOperator}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol,
@@ -1311,49 +1171,9 @@ function init_cacheval(alg::SparspakFactorization,
     nothing
 end
 
-function init_cacheval(::SparspakFactorization, A::SparseMatrixCSC{Float64, Int}, b, u, Pl,
-        Pr, maxiters::Int, abstol,
-        reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
-    PREALLOCATED_SPARSEPAK
-end
-
-function init_cacheval(::SparspakFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
-        reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
-    A = convert(AbstractMatrix, A)
-    if A isa SparseArrays.AbstractSparseArray
-        return sparspaklu(
-            SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                nonzeros(A)),
-            factorize = false)
-    else
-        return sparspaklu(SparseMatrixCSC(0, 0, [1], Int[], eltype(A)[]),
-            factorize = false)
-    end
-end
-
 function init_cacheval(::SparspakFactorization, ::StaticArray, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     nothing
-end
-
-function SciMLBase.solve!(cache::LinearCache, alg::SparspakFactorization; kwargs...)
-    A = cache.A
-    if cache.isfresh
-        if cache.cacheval !== nothing && alg.reuse_symbolic
-            fact = sparspaklu!(@get_cacheval(cache, :SparspakFactorization),
-                SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                    nonzeros(A)))
-        else
-            fact = sparspaklu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                nonzeros(A)))
-        end
-        cache.cacheval = fact
-        cache.isfresh = false
-    end
-    y = ldiv!(cache.u, @get_cacheval(cache, :SparspakFactorization), cache.b)
-    SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
 for alg in vcat(InteractiveUtils.subtypes(AbstractDenseFactorization),

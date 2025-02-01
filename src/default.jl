@@ -178,14 +178,15 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
                (__conditioning(assump) === OperatorCondition.IllConditioned ||
                 __conditioning(assump) === OperatorCondition.WellConditioned)
                 if length(b) <= 10
-                    DefaultAlgorithmChoice.RFLUFactorization
+                    DefaultAlgorithmChoice.GenericLUFactorization
                 elseif appleaccelerate_isavailable() && b isa Array &&
                        eltype(b) <: Union{Float32, Float64, ComplexF32, ComplexF64}
                     DefaultAlgorithmChoice.AppleAccelerateLUFactorization
                 elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500) ||
                         (usemkl && length(b) <= 200)) &&
                        (A === nothing ? eltype(b) <: Union{Float32, Float64} :
-                        eltype(A) <: Union{Float32, Float64})
+                        eltype(A) <: Union{Float32, Float64}) &&
+                        Base.get_extension(@__MODULE__, :LinearSolveRecursiveFactorizationExt)
                     DefaultAlgorithmChoice.RFLUFactorization
                     #elseif A === nothing || A isa Matrix
                     #    alg = FastLUFactorization()

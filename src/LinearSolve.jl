@@ -6,7 +6,6 @@ end
 
 import PrecompileTools
 using ArrayInterface
-using RecursiveFactorization
 using Base: cache_dependencies, Bool
 using LinearAlgebra
 using SparseArrays

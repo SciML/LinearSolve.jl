@@ -21,7 +21,6 @@ MKL_jll = "856f044c-d86e-5d09-b602-aeab76dc8ba7"
 Markdown = "d6f4376e-aef5-505a-96c1-9c027394607a"
 PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 Preferences = "21216c6a-2e73-6563-6e65-726566657250"
-RecursiveFactorization = "f2c3362d-daeb-58d1-803e-2bc74f2840b4"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 SciMLOperators = "c0aeaf25-5076-4817-a8d5-81caf7dfa961"
@@ -45,6 +44,7 @@ KrylovKit = "0b1a1467-8014-51b9-945f-bf0ae24f4b77"
 Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
 Pardiso = "46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2"
 RecursiveArrayTools = "731186ca-8d62-57ce-b412-fbd966d074cd"
+RecursiveFactorization = "f2c3362d-daeb-58d1-803e-2bc74f2840b4"
 
 [extensions]
 LinearSolveBandedMatricesExt = "BandedMatrices"
@@ -60,6 +60,7 @@ LinearSolveKrylovKitExt = "KrylovKit"
 LinearSolveMetalExt = "Metal"
 LinearSolvePardisoExt = "Pardiso"
 LinearSolveRecursiveArrayToolsExt = "RecursiveArrayTools"
+LinearSolveRecursiveFactorizationExt = "RecursiveFactorization"
 
 [compat]
 AllocCheck = "0.2"

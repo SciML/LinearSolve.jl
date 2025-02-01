@@ -29,6 +29,35 @@ function init_cacheval(alg::AbstractFactorization, A, b, u, Pl, Pr, maxiters::In
     do_factorization(alg, convert(AbstractMatrix, A), b, u)
 end
 
+## RFLU Factorization
+
+function LinearSolve.init_cacheval(alg::RFLUFactorization, A, b, u, Pl, Pr, maxiters::Int,
+        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
+    ArrayInterface.lu_instance(convert(AbstractMatrix, A)), ipiv
+end
+
+function LinearSolve.init_cacheval(alg::RFLUFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
+        maxiters::Int,
+        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    ipiv = Vector{LinearAlgebra.BlasInt}(undef, 0)
+    PREALLOCATED_LU, ipiv
+end
+
+function LinearSolve.init_cacheval(alg::RFLUFactorization,
+        A::Union{AbstractSparseArray, AbstractSciMLOperator}, b, u, Pl, Pr,
+        maxiters::Int,
+        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing, nothing
+end
+
+function LinearSolve.init_cacheval(alg::RFLUFactorization,
+        A::Union{Diagonal, SymTridiagonal, Tridiagonal}, b, u, Pl, Pr,
+        maxiters::Int,
+        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing, nothing
+end
+
 ## LU Factorizations
 
 """

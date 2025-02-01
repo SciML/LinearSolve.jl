@@ -266,7 +266,7 @@ function algchoice_to_alg(alg::Symbol)
     elseif alg === :GenericLUFactorization
         GenericLUFactorization()
     elseif alg === :RFLUFactorization
-        RFLUFactorization()
+        RFLUFactorization(throwerror=false)
     elseif alg === :BunchKaufmanFactorization
         BunchKaufmanFactorization()
     elseif alg === :CHOLMODFactorization

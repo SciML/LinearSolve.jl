@@ -94,18 +94,17 @@ implementation, usually outperforming OpenBLAS and MKL for smaller matrices
 Additional optimization for complex matrices is in the works.
 """
 struct RFLUFactorization{P, T} <: AbstractDenseFactorization
-    function RFLUFactorization(::Val{P}, ::Val{T}) where {P, T}
+    function RFLUFactorization(::Val{P}, ::Val{T}; throwerror=true) where {P, T}
         ext = Base.get_extension(@__MODULE__, :LinearSolveRecursiveFactorizationExt)
         if ext === nothing
-            error("RFLUFactorization requires that RecursiveFactorization.jl is loaded, i.e. `using RecursiveFactorization`")
-        else
-            return new{P, T}()
+            throwerror && error("RFLUFactorization requires that RecursiveFactorization.jl is loaded, i.e. `using RecursiveFactorization`")
         end
+        return new{P, T}()
     end
 end
 
-function RFLUFactorization(; pivot = Val(true), thread = Val(true))
-    RFLUFactorization(pivot, thread)
+function RFLUFactorization(; pivot = Val(true), thread = Val(true), throwerror=true)
+    RFLUFactorization(pivot, thread; throwerror)
 end
 
 """

@@ -37,7 +37,8 @@ function LinearSolve.init_cacheval(alg::RFLUFactorization, A, b, u, Pl, Pr, maxi
     ArrayInterface.lu_instance(convert(AbstractMatrix, A)), ipiv
 end
 
-function LinearSolve.init_cacheval(alg::RFLUFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(
+        alg::RFLUFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
         maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     ipiv = Vector{LinearAlgebra.BlasInt}(undef, 0)

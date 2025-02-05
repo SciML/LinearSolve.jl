@@ -3,6 +3,8 @@ module LinearSolveRecursiveFactorizationExt
 using LinearSolve
 using LinearSolve.LinearAlgebra, LinearSolve.ArrayInterface, RecursiveFactorization
 
+LinearSolve.userecursivefactorization(A::Union{Nothing,AbstractMatrix}) = true
+
 function LinearSolve.init_cacheval(alg::RFLUFactorization, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))

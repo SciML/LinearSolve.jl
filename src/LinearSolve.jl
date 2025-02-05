@@ -91,7 +91,7 @@ function _fast_sym_givens! end
 
 issparsematrixcsc(A) = false
 handle_sparsematrixcsc_lu(A) = lu(A)
-issparsematrix(A) = false 
+issparsematrix(A) = false
 make_SparseMatrixCSC(A) = nothing
 makeempty_SparaseMatrixCSC(A) = nothing
 

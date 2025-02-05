@@ -8,14 +8,16 @@ using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
 const PREALLOCATED_SPARSEPAK = sparspaklu(SparseMatrixCSC(0, 0, [1], Int[], Float64[]),
     factorize = false)
 
-function LinearSolve.init_cacheval(::SparspakFactorization, A::SparseMatrixCSC{Float64, Int}, b, u, Pl,
+function LinearSolve.init_cacheval(
+        ::SparspakFactorization, A::SparseMatrixCSC{Float64, Int}, b, u, Pl,
         Pr, maxiters::Int, abstol,
         reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
     PREALLOCATED_SPARSEPAK
 end
 
-function LinearSolve.init_cacheval(::SparspakFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
+function LinearSolve.init_cacheval(
+        ::SparspakFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
         reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
     A = convert(AbstractMatrix, A)
@@ -30,7 +32,8 @@ function LinearSolve.init_cacheval(::SparspakFactorization, A, b, u, Pl, Pr, max
     end
 end
 
-function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::SparspakFactorization; kwargs...)
+function SciMLBase.solve!(
+        cache::LinearSolve.LinearCache, alg::SparspakFactorization; kwargs...)
     A = cache.A
     if cache.isfresh
         if cache.cacheval !== nothing && alg.reuse_symbolic

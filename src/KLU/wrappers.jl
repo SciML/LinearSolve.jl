@@ -27,31 +27,38 @@ function SuiteSparse_config_divcomplex_func_get()
 end
 
 function SuiteSparse_config_malloc_func_set(malloc_func)
-    ccall((:SuiteSparse_config_malloc_func_set, libsuitesparseconfig), Cvoid, (Ptr{Cvoid},), malloc_func)
+    ccall((:SuiteSparse_config_malloc_func_set, libsuitesparseconfig),
+        Cvoid, (Ptr{Cvoid},), malloc_func)
 end
 
 function SuiteSparse_config_calloc_func_set(calloc_func)
-    ccall((:SuiteSparse_config_calloc_func_set, libsuitesparseconfig), Cvoid, (Ptr{Cvoid},), calloc_func)
+    ccall((:SuiteSparse_config_calloc_func_set, libsuitesparseconfig),
+        Cvoid, (Ptr{Cvoid},), calloc_func)
 end
 
 function SuiteSparse_config_realloc_func_set(realloc_func)
-    ccall((:SuiteSparse_config_realloc_func_set, libsuitesparseconfig), Cvoid, (Ptr{Cvoid},), realloc_func)
+    ccall((:SuiteSparse_config_realloc_func_set, libsuitesparseconfig),
+        Cvoid, (Ptr{Cvoid},), realloc_func)
 end
 
 function SuiteSparse_config_free_func_set(free_func)
-    ccall((:SuiteSparse_config_free_func_set, libsuitesparseconfig), Cvoid, (Ptr{Cvoid},), free_func)
+    ccall((:SuiteSparse_config_free_func_set, libsuitesparseconfig),
+        Cvoid, (Ptr{Cvoid},), free_func)
 end
 
 function SuiteSparse_config_printf_func_set(printf_func)
-    ccall((:SuiteSparse_config_printf_func_set, libsuitesparseconfig), Cvoid, (Ptr{Cvoid},), printf_func)
+    ccall((:SuiteSparse_config_printf_func_set, libsuitesparseconfig),
+        Cvoid, (Ptr{Cvoid},), printf_func)
 end
 
 function SuiteSparse_config_hypot_func_set(hypot_func)
-    ccall((:SuiteSparse_config_hypot_func_set, libsuitesparseconfig), Cvoid, (Ptr{Cvoid},), hypot_func)
+    ccall((:SuiteSparse_config_hypot_func_set, libsuitesparseconfig),
+        Cvoid, (Ptr{Cvoid},), hypot_func)
 end
 
 function SuiteSparse_config_divcomplex_func_set(divcomplex_func)
-    ccall((:SuiteSparse_config_divcomplex_func_set, libsuitesparseconfig), Cvoid, (Ptr{Cvoid},), divcomplex_func)
+    ccall((:SuiteSparse_config_divcomplex_func_set, libsuitesparseconfig),
+        Cvoid, (Ptr{Cvoid},), divcomplex_func)
 end
 
 function SuiteSparse_config_malloc(s)
@@ -59,11 +66,13 @@ function SuiteSparse_config_malloc(s)
 end
 
 function SuiteSparse_config_calloc(n, s)
-    ccall((:SuiteSparse_config_calloc, libsuitesparseconfig), Ptr{Cvoid}, (Csize_t, Csize_t), n, s)
+    ccall((:SuiteSparse_config_calloc, libsuitesparseconfig),
+        Ptr{Cvoid}, (Csize_t, Csize_t), n, s)
 end
 
 function SuiteSparse_config_realloc(arg1, s)
-    ccall((:SuiteSparse_config_realloc, libsuitesparseconfig), Ptr{Cvoid}, (Ptr{Cvoid}, Csize_t), arg1, s)
+    ccall((:SuiteSparse_config_realloc, libsuitesparseconfig),
+        Ptr{Cvoid}, (Ptr{Cvoid}, Csize_t), arg1, s)
 end
 
 function SuiteSparse_config_free(arg1)
@@ -71,11 +80,14 @@ function SuiteSparse_config_free(arg1)
 end
 
 function SuiteSparse_config_hypot(x, y)
-    ccall((:SuiteSparse_config_hypot, libsuitesparseconfig), Cdouble, (Cdouble, Cdouble), x, y)
+    ccall((:SuiteSparse_config_hypot, libsuitesparseconfig),
+        Cdouble, (Cdouble, Cdouble), x, y)
 end
 
 function SuiteSparse_config_divcomplex(xr, xi, yr, yi, zr, zi)
-    ccall((:SuiteSparse_config_divcomplex, libsuitesparseconfig), Cint, (Cdouble, Cdouble, Cdouble, Cdouble, Ptr{Cdouble}, Ptr{Cdouble}), xr, xi, yr, yi, zr, zi)
+    ccall((:SuiteSparse_config_divcomplex, libsuitesparseconfig), Cint,
+        (Cdouble, Cdouble, Cdouble, Cdouble, Ptr{Cdouble}, Ptr{Cdouble}),
+        xr, xi, yr, yi, zr, zi)
 end
 
 function SuiteSparse_start()
@@ -87,15 +99,19 @@ function SuiteSparse_finish()
 end
 
 function SuiteSparse_malloc(nitems, size_of_item)
-    ccall((:SuiteSparse_malloc, libsuitesparseconfig), Ptr{Cvoid}, (Csize_t, Csize_t), nitems, size_of_item)
+    ccall((:SuiteSparse_malloc, libsuitesparseconfig),
+        Ptr{Cvoid}, (Csize_t, Csize_t), nitems, size_of_item)
 end
 
 function SuiteSparse_calloc(nitems, size_of_item)
-    ccall((:SuiteSparse_calloc, libsuitesparseconfig), Ptr{Cvoid}, (Csize_t, Csize_t), nitems, size_of_item)
+    ccall((:SuiteSparse_calloc, libsuitesparseconfig),
+        Ptr{Cvoid}, (Csize_t, Csize_t), nitems, size_of_item)
 end
 
 function SuiteSparse_realloc(nitems_new, nitems_old, size_of_item, p, ok)
-    ccall((:SuiteSparse_realloc, libsuitesparseconfig), Ptr{Cvoid}, (Csize_t, Csize_t, Csize_t, Ptr{Cvoid}, Ptr{Cint}), nitems_new, nitems_old, size_of_item, p, ok)
+    ccall((:SuiteSparse_realloc, libsuitesparseconfig), Ptr{Cvoid},
+        (Csize_t, Csize_t, Csize_t, Ptr{Cvoid}, Ptr{Cint}),
+        nitems_new, nitems_old, size_of_item, p, ok)
 end
 
 function SuiteSparse_free(p)
@@ -119,7 +135,9 @@ function SuiteSparse_hypot(x, y)
 end
 
 function SuiteSparse_divcomplex(ar, ai, br, bi, cr, ci)
-    ccall((:SuiteSparse_divcomplex, libsuitesparseconfig), Cint, (Cdouble, Cdouble, Cdouble, Cdouble, Ptr{Cdouble}, Ptr{Cdouble}), ar, ai, br, bi, cr, ci)
+    ccall((:SuiteSparse_divcomplex, libsuitesparseconfig), Cint,
+        (Cdouble, Cdouble, Cdouble, Cdouble, Ptr{Cdouble}, Ptr{Cdouble}),
+        ar, ai, br, bi, cr, ci)
 end
 
 function SuiteSparse_version(version)
@@ -135,27 +153,73 @@ function SuiteSparse_BLAS_integer_size()
 end
 
 function amd_order(n, Ap, Ai, P, Control, Info)
-    ccall((:amd_order, libamd), Cint, (Int32, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{Cdouble}), n, Ap, Ai, P, Control, Info)
+    ccall((:amd_order, libamd), Cint,
+        (Int32, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{Cdouble}),
+        n, Ap, Ai, P, Control, Info)
 end
 
 function amd_l_order(n, Ap, Ai, P, Control, Info)
-    ccall((:amd_l_order, libamd), Cint, (Int64, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{Cdouble}), n, Ap, Ai, P, Control, Info)
+    ccall((:amd_l_order, libamd), Cint,
+        (Int64, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{Cdouble}),
+        n, Ap, Ai, P, Control, Info)
 end
 
-function amd_2(n, Pe, Iw, Len, iwlen, pfree, Nv, Next, Last, Head, Elen, Degree, W, Control, Info)
-    ccall((:amd_2, libamd), Cvoid, (Int32, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Int32, Int32, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{Cdouble}), n, Pe, Iw, Len, iwlen, pfree, Nv, Next, Last, Head, Elen, Degree, W, Control, Info)
+function amd_2(
+        n, Pe, Iw, Len, iwlen, pfree, Nv, Next, Last, Head, Elen, Degree, W, Control, Info)
+    ccall((:amd_2, libamd),
+        Cvoid,
+        (Int32, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Int32, Int32,
+            Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32},
+            Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{Cdouble}),
+        n,
+        Pe,
+        Iw,
+        Len,
+        iwlen,
+        pfree,
+        Nv,
+        Next,
+        Last,
+        Head,
+        Elen,
+        Degree,
+        W,
+        Control,
+        Info)
 end
 
-function amd_l2(n, Pe, Iw, Len, iwlen, pfree, Nv, Next, Last, Head, Elen, Degree, W, Control, Info)
-    ccall((:amd_l2, libamd), Cvoid, (Int64, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Int64, Int64, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{Cdouble}), n, Pe, Iw, Len, iwlen, pfree, Nv, Next, Last, Head, Elen, Degree, W, Control, Info)
+function amd_l2(
+        n, Pe, Iw, Len, iwlen, pfree, Nv, Next, Last, Head, Elen, Degree, W, Control, Info)
+    ccall((:amd_l2, libamd),
+        Cvoid,
+        (Int64, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Int64, Int64,
+            Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Int64},
+            Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{Cdouble}),
+        n,
+        Pe,
+        Iw,
+        Len,
+        iwlen,
+        pfree,
+        Nv,
+        Next,
+        Last,
+        Head,
+        Elen,
+        Degree,
+        W,
+        Control,
+        Info)
 end
 
 function amd_valid(n_row, n_col, Ap, Ai)
-    ccall((:amd_valid, libamd), Cint, (Int32, Int32, Ptr{Int32}, Ptr{Int32}), n_row, n_col, Ap, Ai)
+    ccall((:amd_valid, libamd), Cint,
+        (Int32, Int32, Ptr{Int32}, Ptr{Int32}), n_row, n_col, Ap, Ai)
 end
 
 function amd_l_valid(n_row, n_col, Ap, Ai)
-    ccall((:amd_l_valid, libamd), Cint, (Int64, Int64, Ptr{Int64}, Ptr{Int64}), n_row, n_col, Ap, Ai)
+    ccall((:amd_l_valid, libamd), Cint,
+        (Int64, Int64, Ptr{Int64}, Ptr{Int64}), n_row, n_col, Ap, Ai)
 end
 
 function amd_defaults(Control)
@@ -187,7 +251,8 @@ function colamd_recommended(nnz, n_row, n_col)
 end
 
 function colamd_l_recommended(nnz, n_row, n_col)
-    ccall((:colamd_l_recommended, libamd), Csize_t, (Int64, Int64, Int64), nnz, n_row, n_col)
+    ccall(
+        (:colamd_l_recommended, libamd), Csize_t, (Int64, Int64, Int64), nnz, n_row, n_col)
 end
 
 function colamd_set_defaults(knobs)
@@ -199,19 +264,45 @@ function colamd_l_set_defaults(knobs)
 end
 
 function colamd(n_row, n_col, Alen, A, p, knobs, stats)
-    ccall((:colamd, libamd), Cint, (Int32, Int32, Int32, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{Int32}), n_row, n_col, Alen, A, p, knobs, stats)
+    ccall((:colamd, libamd), Cint,
+        (Int32, Int32, Int32, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{Int32}),
+        n_row, n_col, Alen, A, p, knobs, stats)
 end
 
 function colamd_l(n_row, n_col, Alen, A, p, knobs, stats)
-    ccall((:colamd_l, libamd), Cint, (Int64, Int64, Int64, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{Int64}), n_row, n_col, Alen, A, p, knobs, stats)
+    ccall((:colamd_l, libamd), Cint,
+        (Int64, Int64, Int64, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{Int64}),
+        n_row, n_col, Alen, A, p, knobs, stats)
 end
 
 function symamd(n, A, p, perm, knobs, stats, allocate, release)
-    ccall((:symamd, libamd), Cint, (Int32, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{Int32}, Ptr{Cvoid}, Ptr{Cvoid}), n, A, p, perm, knobs, stats, allocate, release)
+    ccall((:symamd, libamd),
+        Cint,
+        (Int32, Ptr{Int32}, Ptr{Int32}, Ptr{Int32},
+            Ptr{Cdouble}, Ptr{Int32}, Ptr{Cvoid}, Ptr{Cvoid}),
+        n,
+        A,
+        p,
+        perm,
+        knobs,
+        stats,
+        allocate,
+        release)
 end
 
 function symamd_l(n, A, p, perm, knobs, stats, allocate, release)
-    ccall((:symamd_l, libamd), Cint, (Int64, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{Int64}, Ptr{Cvoid}, Ptr{Cvoid}), n, A, p, perm, knobs, stats, allocate, release)
+    ccall((:symamd_l, libamd),
+        Cint,
+        (Int64, Ptr{Int64}, Ptr{Int64}, Ptr{Int64},
+            Ptr{Cdouble}, Ptr{Int64}, Ptr{Cvoid}, Ptr{Cvoid}),
+        n,
+        A,
+        p,
+        perm,
+        knobs,
+        stats,
+        allocate,
+        release)
 end
 
 function colamd_report(stats)
@@ -231,27 +322,79 @@ function symamd_l_report(stats)
 end
 
 function btf_maxtrans(nrow, ncol, Ap, Ai, maxwork, work, Match, Work)
-    ccall((:btf_maxtrans, libbtf), Int32, (Int32, Int32, Ptr{Int32}, Ptr{Int32}, Cdouble, Ptr{Cdouble}, Ptr{Int32}, Ptr{Int32}), nrow, ncol, Ap, Ai, maxwork, work, Match, Work)
+    ccall((:btf_maxtrans, libbtf),
+        Int32,
+        (Int32, Int32, Ptr{Int32}, Ptr{Int32}, Cdouble,
+            Ptr{Cdouble}, Ptr{Int32}, Ptr{Int32}),
+        nrow,
+        ncol,
+        Ap,
+        Ai,
+        maxwork,
+        work,
+        Match,
+        Work)
 end
 
 function btf_l_maxtrans(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
-    ccall((:btf_l_maxtrans, libbtf), Int64, (Int64, Int64, Ptr{Int64}, Ptr{Int64}, Cdouble, Ptr{Cdouble}, Ptr{Int64}, Ptr{Int64}), arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
+    ccall((:btf_l_maxtrans, libbtf),
+        Int64,
+        (Int64, Int64, Ptr{Int64}, Ptr{Int64}, Cdouble,
+            Ptr{Cdouble}, Ptr{Int64}, Ptr{Int64}),
+        arg1,
+        arg2,
+        arg3,
+        arg4,
+        arg5,
+        arg6,
+        arg7,
+        arg8)
 end
 
 function btf_strongcomp(n, Ap, Ai, Q, P, R, Work)
-    ccall((:btf_strongcomp, libbtf), Int32, (Int32, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}), n, Ap, Ai, Q, P, R, Work)
+    ccall((:btf_strongcomp, libbtf), Int32,
+        (Int32, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}),
+        n, Ap, Ai, Q, P, R, Work)
 end
 
 function btf_l_strongcomp(arg1, arg2, arg3, arg4, arg5, arg6, arg7)
-    ccall((:btf_l_strongcomp, libbtf), Int64, (Int64, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}), arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+    ccall((:btf_l_strongcomp, libbtf), Int64,
+        (Int64, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}),
+        arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 end
 
 function btf_order(n, Ap, Ai, maxwork, work, P, Q, R, nmatch, Work)
-    ccall((:btf_order, libbtf), Int32, (Int32, Ptr{Int32}, Ptr{Int32}, Cdouble, Ptr{Cdouble}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}), n, Ap, Ai, maxwork, work, P, Q, R, nmatch, Work)
+    ccall((:btf_order, libbtf),
+        Int32,
+        (Int32, Ptr{Int32}, Ptr{Int32}, Cdouble, Ptr{Cdouble},
+            Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}),
+        n,
+        Ap,
+        Ai,
+        maxwork,
+        work,
+        P,
+        Q,
+        R,
+        nmatch,
+        Work)
 end
 
 function btf_l_order(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10)
-    ccall((:btf_l_order, libbtf), Int64, (Int64, Ptr{Int64}, Ptr{Int64}, Cdouble, Ptr{Cdouble}, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}), arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10)
+    ccall((:btf_l_order, libbtf),
+        Int64,
+        (Int64, Ptr{Int64}, Ptr{Int64}, Cdouble, Ptr{Cdouble},
+            Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}),
+        arg1,
+        arg2,
+        arg3,
+        arg4,
+        arg5,
+        arg6,
+        arg7,
+        arg8,
+        arg9,
+        arg10)
 end
 
 mutable struct klu_symbolic
@@ -419,243 +562,565 @@ function klu_l_defaults(Common)
 end
 
 function klu_analyze(n, Ap, Ai, Common)
-    ccall((:klu_analyze, libklu), Ptr{klu_symbolic}, (Int32, Ptr{Int32}, Ptr{Int32}, Ptr{klu_common}), n, Ap, Ai, Common)
+    ccall((:klu_analyze, libklu), Ptr{klu_symbolic},
+        (Int32, Ptr{Int32}, Ptr{Int32}, Ptr{klu_common}), n, Ap, Ai, Common)
 end
 
 function klu_l_analyze(arg1, arg2, arg3, Common)
-    ccall((:klu_l_analyze, libklu), Ptr{klu_l_symbolic}, (Int64, Ptr{Int64}, Ptr{Int64}, Ptr{klu_l_common}), arg1, arg2, arg3, Common)
+    ccall((:klu_l_analyze, libklu), Ptr{klu_l_symbolic},
+        (Int64, Ptr{Int64}, Ptr{Int64}, Ptr{klu_l_common}), arg1, arg2, arg3, Common)
 end
 
 function klu_analyze_given(n, Ap, Ai, P, Q, Common)
-    ccall((:klu_analyze_given, libklu), Ptr{klu_symbolic}, (Int32, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{klu_common}), n, Ap, Ai, P, Q, Common)
+    ccall((:klu_analyze_given, libklu), Ptr{klu_symbolic},
+        (Int32, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{klu_common}),
+        n, Ap, Ai, P, Q, Common)
 end
 
 function klu_l_analyze_given(arg1, arg2, arg3, arg4, arg5, arg6)
-    ccall((:klu_l_analyze_given, libklu), Ptr{klu_l_symbolic}, (Int64, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{klu_l_common}), arg1, arg2, arg3, arg4, arg5, arg6)
+    ccall((:klu_l_analyze_given, libklu), Ptr{klu_l_symbolic},
+        (Int64, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{Int64}, Ptr{klu_l_common}),
+        arg1, arg2, arg3, arg4, arg5, arg6)
 end
 
 function klu_factor(Ap, Ai, Ax, Symbolic, Common)
-    ccall((:klu_factor, libklu), Ptr{klu_numeric}, (Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{klu_symbolic}, Ptr{klu_common}), Ap, Ai, Ax, Symbolic, Common)
+    ccall((:klu_factor, libklu), Ptr{klu_numeric},
+        (Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{klu_symbolic}, Ptr{klu_common}),
+        Ap, Ai, Ax, Symbolic, Common)
 end
 
 function klu_z_factor(Ap, Ai, Ax, Symbolic, Common)
-    ccall((:klu_z_factor, libklu), Ptr{klu_numeric}, (Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{klu_symbolic}, Ptr{klu_common}), Ap, Ai, Ax, Symbolic, Common)
+    ccall((:klu_z_factor, libklu), Ptr{klu_numeric},
+        (Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{klu_symbolic}, Ptr{klu_common}),
+        Ap, Ai, Ax, Symbolic, Common)
 end
 
 function klu_l_factor(arg1, arg2, arg3, arg4, arg5)
-    ccall((:klu_l_factor, libklu), Ptr{klu_l_numeric}, (Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{klu_l_symbolic}, Ptr{klu_l_common}), arg1, arg2, arg3, arg4, arg5)
+    ccall((:klu_l_factor, libklu), Ptr{klu_l_numeric},
+        (Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{klu_l_symbolic}, Ptr{klu_l_common}),
+        arg1, arg2, arg3, arg4, arg5)
 end
 
 function klu_zl_factor(arg1, arg2, arg3, arg4, arg5)
-    ccall((:klu_zl_factor, libklu), Ptr{klu_l_numeric}, (Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{klu_l_symbolic}, Ptr{klu_l_common}), arg1, arg2, arg3, arg4, arg5)
+    ccall((:klu_zl_factor, libklu), Ptr{klu_l_numeric},
+        (Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{klu_l_symbolic}, Ptr{klu_l_common}),
+        arg1, arg2, arg3, arg4, arg5)
 end
 
 function klu_solve(Symbolic, Numeric, ldim, nrhs, B, Common)
-    ccall((:klu_solve, libklu), Cint, (Ptr{klu_symbolic}, Ptr{klu_numeric}, Int32, Int32, Ptr{Cdouble}, Ptr{klu_common}), Symbolic, Numeric, ldim, nrhs, B, Common)
+    ccall((:klu_solve, libklu), Cint,
+        (Ptr{klu_symbolic}, Ptr{klu_numeric}, Int32, Int32, Ptr{Cdouble}, Ptr{klu_common}),
+        Symbolic, Numeric, ldim, nrhs, B, Common)
 end
 
 function klu_z_solve(Symbolic, Numeric, ldim, nrhs, B, Common)
-    ccall((:klu_z_solve, libklu), Cint, (Ptr{klu_symbolic}, Ptr{klu_numeric}, Int32, Int32, Ptr{Cdouble}, Ptr{klu_common}), Symbolic, Numeric, ldim, nrhs, B, Common)
+    ccall((:klu_z_solve, libklu), Cint,
+        (Ptr{klu_symbolic}, Ptr{klu_numeric}, Int32, Int32, Ptr{Cdouble}, Ptr{klu_common}),
+        Symbolic, Numeric, ldim, nrhs, B, Common)
 end
 
 function klu_l_solve(arg1, arg2, arg3, arg4, arg5, arg6)
-    ccall((:klu_l_solve, libklu), Cint, (Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Int64, Int64, Ptr{Cdouble}, Ptr{klu_l_common}), arg1, arg2, arg3, arg4, arg5, arg6)
+    ccall((:klu_l_solve, libklu),
+        Cint,
+        (Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Int64,
+            Int64, Ptr{Cdouble}, Ptr{klu_l_common}),
+        arg1,
+        arg2,
+        arg3,
+        arg4,
+        arg5,
+        arg6)
 end
 
 function klu_zl_solve(arg1, arg2, arg3, arg4, arg5, arg6)
-    ccall((:klu_zl_solve, libklu), Cint, (Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Int64, Int64, Ptr{Cdouble}, Ptr{klu_l_common}), arg1, arg2, arg3, arg4, arg5, arg6)
+    ccall((:klu_zl_solve, libklu),
+        Cint,
+        (Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Int64,
+            Int64, Ptr{Cdouble}, Ptr{klu_l_common}),
+        arg1,
+        arg2,
+        arg3,
+        arg4,
+        arg5,
+        arg6)
 end
 
 function klu_tsolve(Symbolic, Numeric, ldim, nrhs, B, Common)
-    ccall((:klu_tsolve, libklu), Cint, (Ptr{klu_symbolic}, Ptr{klu_numeric}, Int32, Int32, Ptr{Cdouble}, Ptr{klu_common}), Symbolic, Numeric, ldim, nrhs, B, Common)
+    ccall((:klu_tsolve, libklu), Cint,
+        (Ptr{klu_symbolic}, Ptr{klu_numeric}, Int32, Int32, Ptr{Cdouble}, Ptr{klu_common}),
+        Symbolic, Numeric, ldim, nrhs, B, Common)
 end
 
 function klu_z_tsolve(Symbolic, Numeric, ldim, nrhs, B, conj_solve, Common)
-    ccall((:klu_z_tsolve, libklu), Cint, (Ptr{klu_symbolic}, Ptr{klu_numeric}, Int32, Int32, Ptr{Cdouble}, Cint, Ptr{klu_common}), Symbolic, Numeric, ldim, nrhs, B, conj_solve, Common)
+    ccall((:klu_z_tsolve, libklu),
+        Cint,
+        (Ptr{klu_symbolic}, Ptr{klu_numeric}, Int32,
+            Int32, Ptr{Cdouble}, Cint, Ptr{klu_common}),
+        Symbolic,
+        Numeric,
+        ldim,
+        nrhs,
+        B,
+        conj_solve,
+        Common)
 end
 
 function klu_l_tsolve(arg1, arg2, arg3, arg4, arg5, arg6)
-    ccall((:klu_l_tsolve, libklu), Cint, (Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Int64, Int64, Ptr{Cdouble}, Ptr{klu_l_common}), arg1, arg2, arg3, arg4, arg5, arg6)
+    ccall((:klu_l_tsolve, libklu),
+        Cint,
+        (Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Int64,
+            Int64, Ptr{Cdouble}, Ptr{klu_l_common}),
+        arg1,
+        arg2,
+        arg3,
+        arg4,
+        arg5,
+        arg6)
 end
 
 function klu_zl_tsolve(arg1, arg2, arg3, arg4, arg5, arg6, arg7)
-    ccall((:klu_zl_tsolve, libklu), Cint, (Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Int64, Int64, Ptr{Cdouble}, Cint, Ptr{klu_l_common}), arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+    ccall((:klu_zl_tsolve, libklu),
+        Cint,
+        (Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Int64,
+            Int64, Ptr{Cdouble}, Cint, Ptr{klu_l_common}),
+        arg1,
+        arg2,
+        arg3,
+        arg4,
+        arg5,
+        arg6,
+        arg7)
 end
 
 function klu_refactor(Ap, Ai, Ax, Symbolic, Numeric, Common)
-    ccall((:klu_refactor, libklu), Cint, (Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}), Ap, Ai, Ax, Symbolic, Numeric, Common)
+    ccall((:klu_refactor, libklu),
+        Cint,
+        (Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble},
+            Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}),
+        Ap,
+        Ai,
+        Ax,
+        Symbolic,
+        Numeric,
+        Common)
 end
 
 function klu_z_refactor(Ap, Ai, Ax, Symbolic, Numeric, Common)
-    ccall((:klu_z_refactor, libklu), Cint, (Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}), Ap, Ai, Ax, Symbolic, Numeric, Common)
+    ccall((:klu_z_refactor, libklu),
+        Cint,
+        (Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble},
+            Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}),
+        Ap,
+        Ai,
+        Ax,
+        Symbolic,
+        Numeric,
+        Common)
 end
 
 function klu_l_refactor(arg1, arg2, arg3, arg4, arg5, arg6)
-    ccall((:klu_l_refactor, libklu), Cint, (Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Ptr{klu_l_common}), arg1, arg2, arg3, arg4, arg5, arg6)
+    ccall((:klu_l_refactor, libklu),
+        Cint,
+        (Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{klu_l_symbolic},
+            Ptr{klu_l_numeric}, Ptr{klu_l_common}),
+        arg1,
+        arg2,
+        arg3,
+        arg4,
+        arg5,
+        arg6)
 end
 
 function klu_zl_refactor(arg1, arg2, arg3, arg4, arg5, arg6)
-    ccall((:klu_zl_refactor, libklu), Cint, (Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Ptr{klu_l_common}), arg1, arg2, arg3, arg4, arg5, arg6)
+    ccall((:klu_zl_refactor, libklu),
+        Cint,
+        (Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{klu_l_symbolic},
+            Ptr{klu_l_numeric}, Ptr{klu_l_common}),
+        arg1,
+        arg2,
+        arg3,
+        arg4,
+        arg5,
+        arg6)
 end
 
 function klu_free_symbolic(Symbolic, Common)
-    ccall((:klu_free_symbolic, libklu), Cint, (Ptr{Ptr{klu_symbolic}}, Ptr{klu_common}), Symbolic, Common)
+    ccall((:klu_free_symbolic, libklu), Cint,
+        (Ptr{Ptr{klu_symbolic}}, Ptr{klu_common}), Symbolic, Common)
 end
 
 function klu_l_free_symbolic(arg1, arg2)
-    ccall((:klu_l_free_symbolic, libklu), Cint, (Ptr{Ptr{klu_l_symbolic}}, Ptr{klu_l_common}), arg1, arg2)
+    ccall((:klu_l_free_symbolic, libklu), Cint,
+        (Ptr{Ptr{klu_l_symbolic}}, Ptr{klu_l_common}), arg1, arg2)
 end
 
 function klu_free_numeric(Numeric, Common)
-    ccall((:klu_free_numeric, libklu), Cint, (Ptr{Ptr{klu_numeric}}, Ptr{klu_common}), Numeric, Common)
+    ccall((:klu_free_numeric, libklu), Cint,
+        (Ptr{Ptr{klu_numeric}}, Ptr{klu_common}), Numeric, Common)
 end
 
 function klu_z_free_numeric(Numeric, Common)
-    ccall((:klu_z_free_numeric, libklu), Cint, (Ptr{Ptr{klu_numeric}}, Ptr{klu_common}), Numeric, Common)
+    ccall((:klu_z_free_numeric, libklu), Cint,
+        (Ptr{Ptr{klu_numeric}}, Ptr{klu_common}), Numeric, Common)
 end
 
 function klu_l_free_numeric(arg1, arg2)
-    ccall((:klu_l_free_numeric, libklu), Cint, (Ptr{Ptr{klu_l_numeric}}, Ptr{klu_l_common}), arg1, arg2)
+    ccall((:klu_l_free_numeric, libklu), Cint,
+        (Ptr{Ptr{klu_l_numeric}}, Ptr{klu_l_common}), arg1, arg2)
 end
 
 function klu_zl_free_numeric(arg1, arg2)
-    ccall((:klu_zl_free_numeric, libklu), Cint, (Ptr{Ptr{klu_l_numeric}}, Ptr{klu_l_common}), arg1, arg2)
+    ccall((:klu_zl_free_numeric, libklu), Cint,
+        (Ptr{Ptr{klu_l_numeric}}, Ptr{klu_l_common}), arg1, arg2)
 end
 
 function klu_sort(Symbolic, Numeric, Common)
-    ccall((:klu_sort, libklu), Cint, (Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}), Symbolic, Numeric, Common)
+    ccall(
+        (:klu_sort, libklu), Cint, (Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}),
+        Symbolic, Numeric, Common)
 end
 
 function klu_z_sort(Symbolic, Numeric, Common)
-    ccall((:klu_z_sort, libklu), Cint, (Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}), Symbolic, Numeric, Common)
+    ccall((:klu_z_sort, libklu), Cint,
+        (Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}), Symbolic, Numeric, Common)
 end
 
 function klu_l_sort(arg1, arg2, arg3)
-    ccall((:klu_l_sort, libklu), Cint, (Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Ptr{klu_l_common}), arg1, arg2, arg3)
+    ccall((:klu_l_sort, libklu), Cint,
+        (Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Ptr{klu_l_common}), arg1, arg2, arg3)
 end
 
 function klu_zl_sort(arg1, arg2, arg3)
-    ccall((:klu_zl_sort, libklu), Cint, (Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Ptr{klu_l_common}), arg1, arg2, arg3)
+    ccall((:klu_zl_sort, libklu), Cint,
+        (Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Ptr{klu_l_common}), arg1, arg2, arg3)
 end
 
 function klu_flops(Symbolic, Numeric, Common)
-    ccall((:klu_flops, libklu), Cint, (Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}), Symbolic, Numeric, Common)
+    ccall((:klu_flops, libklu), Cint,
+        (Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}), Symbolic, Numeric, Common)
 end
 
 function klu_z_flops(Symbolic, Numeric, Common)
-    ccall((:klu_z_flops, libklu), Cint, (Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}), Symbolic, Numeric, Common)
+    ccall((:klu_z_flops, libklu), Cint,
+        (Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}), Symbolic, Numeric, Common)
 end
 
 function klu_l_flops(arg1, arg2, arg3)
-    ccall((:klu_l_flops, libklu), Cint, (Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Ptr{klu_l_common}), arg1, arg2, arg3)
+    ccall((:klu_l_flops, libklu), Cint,
+        (Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Ptr{klu_l_common}), arg1, arg2, arg3)
 end
 
 function klu_zl_flops(arg1, arg2, arg3)
-    ccall((:klu_zl_flops, libklu), Cint, (Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Ptr{klu_l_common}), arg1, arg2, arg3)
+    ccall((:klu_zl_flops, libklu), Cint,
+        (Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Ptr{klu_l_common}), arg1, arg2, arg3)
 end
 
 function klu_rgrowth(Ap, Ai, Ax, Symbolic, Numeric, Common)
-    ccall((:klu_rgrowth, libklu), Cint, (Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}), Ap, Ai, Ax, Symbolic, Numeric, Common)
+    ccall((:klu_rgrowth, libklu),
+        Cint,
+        (Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble},
+            Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}),
+        Ap,
+        Ai,
+        Ax,
+        Symbolic,
+        Numeric,
+        Common)
 end
 
 function klu_z_rgrowth(Ap, Ai, Ax, Symbolic, Numeric, Common)
-    ccall((:klu_z_rgrowth, libklu), Cint, (Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}), Ap, Ai, Ax, Symbolic, Numeric, Common)
+    ccall((:klu_z_rgrowth, libklu),
+        Cint,
+        (Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble},
+            Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}),
+        Ap,
+        Ai,
+        Ax,
+        Symbolic,
+        Numeric,
+        Common)
 end
 
 function klu_l_rgrowth(arg1, arg2, arg3, arg4, arg5, arg6)
-    ccall((:klu_l_rgrowth, libklu), Cint, (Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Ptr{klu_l_common}), arg1, arg2, arg3, arg4, arg5, arg6)
+    ccall((:klu_l_rgrowth, libklu),
+        Cint,
+        (Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{klu_l_symbolic},
+            Ptr{klu_l_numeric}, Ptr{klu_l_common}),
+        arg1,
+        arg2,
+        arg3,
+        arg4,
+        arg5,
+        arg6)
 end
 
 function klu_zl_rgrowth(arg1, arg2, arg3, arg4, arg5, arg6)
-    ccall((:klu_zl_rgrowth, libklu), Cint, (Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Ptr{klu_l_common}), arg1, arg2, arg3, arg4, arg5, arg6)
+    ccall((:klu_zl_rgrowth, libklu),
+        Cint,
+        (Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{klu_l_symbolic},
+            Ptr{klu_l_numeric}, Ptr{klu_l_common}),
+        arg1,
+        arg2,
+        arg3,
+        arg4,
+        arg5,
+        arg6)
 end
 
 function klu_condest(Ap, Ax, Symbolic, Numeric, Common)
-    ccall((:klu_condest, libklu), Cint, (Ptr{Int32}, Ptr{Cdouble}, Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}), Ap, Ax, Symbolic, Numeric, Common)
+    ccall((:klu_condest, libklu), Cint,
+        (Ptr{Int32}, Ptr{Cdouble}, Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}),
+        Ap, Ax, Symbolic, Numeric, Common)
 end
 
 function klu_z_condest(Ap, Ax, Symbolic, Numeric, Common)
-    ccall((:klu_z_condest, libklu), Cint, (Ptr{Int32}, Ptr{Cdouble}, Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}), Ap, Ax, Symbolic, Numeric, Common)
+    ccall((:klu_z_condest, libklu), Cint,
+        (Ptr{Int32}, Ptr{Cdouble}, Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}),
+        Ap, Ax, Symbolic, Numeric, Common)
 end
 
 function klu_l_condest(arg1, arg2, arg3, arg4, arg5)
-    ccall((:klu_l_condest, libklu), Cint, (Ptr{Int64}, Ptr{Cdouble}, Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Ptr{klu_l_common}), arg1, arg2, arg3, arg4, arg5)
+    ccall((:klu_l_condest, libklu),
+        Cint,
+        (Ptr{Int64}, Ptr{Cdouble}, Ptr{klu_l_symbolic},
+            Ptr{klu_l_numeric}, Ptr{klu_l_common}),
+        arg1,
+        arg2,
+        arg3,
+        arg4,
+        arg5)
 end
 
 function klu_zl_condest(arg1, arg2, arg3, arg4, arg5)
-    ccall((:klu_zl_condest, libklu), Cint, (Ptr{Int64}, Ptr{Cdouble}, Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Ptr{klu_l_common}), arg1, arg2, arg3, arg4, arg5)
+    ccall((:klu_zl_condest, libklu),
+        Cint,
+        (Ptr{Int64}, Ptr{Cdouble}, Ptr{klu_l_symbolic},
+            Ptr{klu_l_numeric}, Ptr{klu_l_common}),
+        arg1,
+        arg2,
+        arg3,
+        arg4,
+        arg5)
 end
 
 function klu_rcond(Symbolic, Numeric, Common)
-    ccall((:klu_rcond, libklu), Cint, (Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}), Symbolic, Numeric, Common)
+    ccall((:klu_rcond, libklu), Cint,
+        (Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}), Symbolic, Numeric, Common)
 end
 
 function klu_z_rcond(Symbolic, Numeric, Common)
-    ccall((:klu_z_rcond, libklu), Cint, (Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}), Symbolic, Numeric, Common)
+    ccall((:klu_z_rcond, libklu), Cint,
+        (Ptr{klu_symbolic}, Ptr{klu_numeric}, Ptr{klu_common}), Symbolic, Numeric, Common)
 end
 
 function klu_l_rcond(arg1, arg2, arg3)
-    ccall((:klu_l_rcond, libklu), Cint, (Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Ptr{klu_l_common}), arg1, arg2, arg3)
+    ccall((:klu_l_rcond, libklu), Cint,
+        (Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Ptr{klu_l_common}), arg1, arg2, arg3)
 end
 
 function klu_zl_rcond(arg1, arg2, arg3)
-    ccall((:klu_zl_rcond, libklu), Cint, (Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Ptr{klu_l_common}), arg1, arg2, arg3)
+    ccall((:klu_zl_rcond, libklu), Cint,
+        (Ptr{klu_l_symbolic}, Ptr{klu_l_numeric}, Ptr{klu_l_common}), arg1, arg2, arg3)
 end
 
 function klu_scale(scale, n, Ap, Ai, Ax, Rs, W, Common)
-    ccall((:klu_scale, libklu), Cint, (Cint, Int32, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Int32}, Ptr{klu_common}), scale, n, Ap, Ai, Ax, Rs, W, Common)
+    ccall((:klu_scale, libklu),
+        Cint,
+        (Cint, Int32, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble},
+            Ptr{Cdouble}, Ptr{Int32}, Ptr{klu_common}),
+        scale,
+        n,
+        Ap,
+        Ai,
+        Ax,
+        Rs,
+        W,
+        Common)
 end
 
 function klu_z_scale(scale, n, Ap, Ai, Ax, Rs, W, Common)
-    ccall((:klu_z_scale, libklu), Cint, (Cint, Int32, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Int32}, Ptr{klu_common}), scale, n, Ap, Ai, Ax, Rs, W, Common)
+    ccall((:klu_z_scale, libklu),
+        Cint,
+        (Cint, Int32, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble},
+            Ptr{Cdouble}, Ptr{Int32}, Ptr{klu_common}),
+        scale,
+        n,
+        Ap,
+        Ai,
+        Ax,
+        Rs,
+        W,
+        Common)
 end
 
 function klu_l_scale(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
-    ccall((:klu_l_scale, libklu), Cint, (Cint, Int64, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Int64}, Ptr{klu_l_common}), arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
+    ccall((:klu_l_scale, libklu),
+        Cint,
+        (Cint, Int64, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble},
+            Ptr{Cdouble}, Ptr{Int64}, Ptr{klu_l_common}),
+        arg1,
+        arg2,
+        arg3,
+        arg4,
+        arg5,
+        arg6,
+        arg7,
+        arg8)
 end
 
 function klu_zl_scale(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
-    ccall((:klu_zl_scale, libklu), Cint, (Cint, Int64, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Int64}, Ptr{klu_l_common}), arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
+    ccall((:klu_zl_scale, libklu),
+        Cint,
+        (Cint, Int64, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble},
+            Ptr{Cdouble}, Ptr{Int64}, Ptr{klu_l_common}),
+        arg1,
+        arg2,
+        arg3,
+        arg4,
+        arg5,
+        arg6,
+        arg7,
+        arg8)
 end
 
-function klu_extract(Numeric, Symbolic, Lp, Li, Lx, Up, Ui, Ux, Fp, Fi, Fx, P, Q, Rs, R, Common)
-    ccall((:klu_extract, libklu), Cint, (Ptr{klu_numeric}, Ptr{klu_symbolic}, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{Int32}, Ptr{klu_common}), Numeric, Symbolic, Lp, Li, Lx, Up, Ui, Ux, Fp, Fi, Fx, P, Q, Rs, R, Common)
+function klu_extract(
+        Numeric, Symbolic, Lp, Li, Lx, Up, Ui, Ux, Fp, Fi, Fx, P, Q, Rs, R, Common)
+    ccall((:klu_extract, libklu),
+        Cint,
+        (Ptr{klu_numeric}, Ptr{klu_symbolic}, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble},
+            Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble},
+            Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{Int32}, Ptr{klu_common}),
+        Numeric,
+        Symbolic,
+        Lp,
+        Li,
+        Lx,
+        Up,
+        Ui,
+        Ux,
+        Fp,
+        Fi,
+        Fx,
+        P,
+        Q,
+        Rs,
+        R,
+        Common)
 end
 
-function klu_z_extract(Numeric, Symbolic, Lp, Li, Lx, Lz, Up, Ui, Ux, Uz, Fp, Fi, Fx, Fz, P, Q, Rs, R, Common)
-    ccall((:klu_z_extract, libklu), Cint, (Ptr{klu_numeric}, Ptr{klu_symbolic}, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{Int32}, Ptr{klu_common}), Numeric, Symbolic, Lp, Li, Lx, Lz, Up, Ui, Ux, Uz, Fp, Fi, Fx, Fz, P, Q, Rs, R, Common)
+function klu_z_extract(Numeric, Symbolic, Lp, Li, Lx, Lz, Up, Ui,
+        Ux, Uz, Fp, Fi, Fx, Fz, P, Q, Rs, R, Common)
+    ccall((:klu_z_extract, libklu),
+        Cint,
+        (Ptr{klu_numeric}, Ptr{klu_symbolic}, Ptr{Int32}, Ptr{Int32},
+            Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble},
+            Ptr{Cdouble}, Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{Cdouble},
+            Ptr{Int32}, Ptr{Int32}, Ptr{Cdouble}, Ptr{Int32}, Ptr{klu_common}),
+        Numeric,
+        Symbolic,
+        Lp,
+        Li,
+        Lx,
+        Lz,
+        Up,
+        Ui,
+        Ux,
+        Uz,
+        Fp,
+        Fi,
+        Fx,
+        Fz,
+        P,
+        Q,
+        Rs,
+        R,
+        Common)
 end
 
-function klu_l_extract(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16)
-    ccall((:klu_l_extract, libklu), Cint, (Ptr{klu_l_numeric}, Ptr{klu_l_symbolic}, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{Int64}, Ptr{klu_l_common}), arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16)
+function klu_l_extract(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9,
+        arg10, arg11, arg12, arg13, arg14, arg15, arg16)
+    ccall((:klu_l_extract, libklu),
+        Cint,
+        (Ptr{klu_l_numeric}, Ptr{klu_l_symbolic}, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble},
+            Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble},
+            Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{Int64}, Ptr{klu_l_common}),
+        arg1,
+        arg2,
+        arg3,
+        arg4,
+        arg5,
+        arg6,
+        arg7,
+        arg8,
+        arg9,
+        arg10,
+        arg11,
+        arg12,
+        arg13,
+        arg14,
+        arg15,
+        arg16)
 end
 
-function klu_zl_extract(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19)
-    ccall((:klu_zl_extract, libklu), Cint, (Ptr{klu_l_numeric}, Ptr{klu_l_symbolic}, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{Int64}, Ptr{klu_l_common}), arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19)
+function klu_zl_extract(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10,
+        arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19)
+    ccall((:klu_zl_extract, libklu),
+        Cint,
+        (Ptr{klu_l_numeric}, Ptr{klu_l_symbolic}, Ptr{Int64}, Ptr{Int64},
+            Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble},
+            Ptr{Cdouble}, Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{Cdouble},
+            Ptr{Int64}, Ptr{Int64}, Ptr{Cdouble}, Ptr{Int64}, Ptr{klu_l_common}),
+        arg1,
+        arg2,
+        arg3,
+        arg4,
+        arg5,
+        arg6,
+        arg7,
+        arg8,
+        arg9,
+        arg10,
+        arg11,
+        arg12,
+        arg13,
+        arg14,
+        arg15,
+        arg16,
+        arg17,
+        arg18,
+        arg19)
 end
 
 function klu_malloc(n, size, Common)
-    ccall((:klu_malloc, libklu), Ptr{Cvoid}, (Csize_t, Csize_t, Ptr{klu_common}), n, size, Common)
+    ccall((:klu_malloc, libklu), Ptr{Cvoid},
+        (Csize_t, Csize_t, Ptr{klu_common}), n, size, Common)
 end
 
 function klu_free(p, n, size, Common)
-    ccall((:klu_free, libklu), Ptr{Cvoid}, (Ptr{Cvoid}, Csize_t, Csize_t, Ptr{klu_common}), p, n, size, Common)
+    ccall((:klu_free, libklu), Ptr{Cvoid},
+        (Ptr{Cvoid}, Csize_t, Csize_t, Ptr{klu_common}), p, n, size, Common)
 end
 
 function klu_realloc(nnew, nold, size, p, Common)
-    ccall((:klu_realloc, libklu), Ptr{Cvoid}, (Csize_t, Csize_t, Csize_t, Ptr{Cvoid}, Ptr{klu_common}), nnew, nold, size, p, Common)
+    ccall((:klu_realloc, libklu), Ptr{Cvoid},
+        (Csize_t, Csize_t, Csize_t, Ptr{Cvoid}, Ptr{klu_common}),
+        nnew, nold, size, p, Common)
 end
 
 function klu_l_malloc(arg1, arg2, arg3)
-    ccall((:klu_l_malloc, libklu), Ptr{Cvoid}, (Csize_t, Csize_t, Ptr{klu_l_common}), arg1, arg2, arg3)
+    ccall((:klu_l_malloc, libklu), Ptr{Cvoid},
+        (Csize_t, Csize_t, Ptr{klu_l_common}), arg1, arg2, arg3)
 end
 
 function klu_l_free(arg1, arg2, arg3, arg4)
-    ccall((:klu_l_free, libklu), Ptr{Cvoid}, (Ptr{Cvoid}, Csize_t, Csize_t, Ptr{klu_l_common}), arg1, arg2, arg3, arg4)
+    ccall((:klu_l_free, libklu), Ptr{Cvoid},
+        (Ptr{Cvoid}, Csize_t, Csize_t, Ptr{klu_l_common}), arg1, arg2, arg3, arg4)
 end
 
 function klu_l_realloc(arg1, arg2, arg3, arg4, arg5)
-    ccall((:klu_l_realloc, libklu), Ptr{Cvoid}, (Csize_t, Csize_t, Csize_t, Ptr{Cvoid}, Ptr{klu_l_common}), arg1, arg2, arg3, arg4, arg5)
+    ccall((:klu_l_realloc, libklu), Ptr{Cvoid},
+        (Csize_t, Csize_t, Csize_t, Ptr{Cvoid}, Ptr{klu_l_common}),
+        arg1, arg2, arg3, arg4, arg5)
 end
 
 const SUITESPARSE_OPENMP_MAX_THREADS = 1
@@ -690,7 +1155,8 @@ const SUITESPARSE_SUBSUB_VERSION = 1
 
 SUITESPARSE_VER_CODE(main, sub) = main * 1000 + sub
 
-const SUITESPARSE_VERSION = SUITESPARSE_VER_CODE(SUITESPARSE_MAIN_VERSION, SUITESPARSE_SUB_VERSION)
+const SUITESPARSE_VERSION = SUITESPARSE_VER_CODE(
+    SUITESPARSE_MAIN_VERSION, SUITESPARSE_SUB_VERSION)
 
 const AMD_CONTROL = 5
 

@@ -95,7 +95,7 @@ Additional optimization for complex matrices is in the works.
 """
 struct RFLUFactorization{P, T} <: AbstractDenseFactorization
     function RFLUFactorization(::Val{P}, ::Val{T}; throwerror = true) where {P, T}
-        if userecursivefactorization(nothing)
+        if !userecursivefactorization(nothing)
             throwerror &&
                 error("RFLUFactorization requires that RecursiveFactorization.jl is loaded, i.e. `using RecursiveFactorization`")
         end

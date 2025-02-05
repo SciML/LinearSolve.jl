@@ -14,7 +14,7 @@ function LinearSolve.init_cacheval(
         maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     ipiv = Vector{LinearAlgebra.BlasInt}(undef, 0)
-    PREALLOCATED_LU, ipiv
+    LinearSolve.PREALLOCATED_LU, ipiv
 end
 
 function LinearSolve.init_cacheval(alg::RFLUFactorization,

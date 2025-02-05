@@ -3,7 +3,7 @@ module LinearSolveRecursiveFactorizationExt
 using LinearSolve
 using LinearSolve.LinearAlgebra, LinearSolve.ArrayInterface, RecursiveFactorization
 
-LinearSolve.userecursivefactorization(A::Union{Nothing,AbstractMatrix}) = true
+LinearSolve.userecursivefactorization(A::Union{Nothing, AbstractMatrix}) = true
 
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::RFLUFactorization{P, T};
         kwargs...) where {P, T}

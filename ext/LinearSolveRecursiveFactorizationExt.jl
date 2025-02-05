@@ -5,34 +5,6 @@ using LinearSolve.LinearAlgebra, LinearSolve.ArrayInterface, RecursiveFactorizat
 
 LinearSolve.userecursivefactorization(A::Union{Nothing,AbstractMatrix}) = true
 
-function LinearSolve.init_cacheval(alg::RFLUFactorization, A, b, u, Pl, Pr, maxiters::Int,
-        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
-    ArrayInterface.lu_instance(convert(AbstractMatrix, A)), ipiv
-end
-
-function LinearSolve.init_cacheval(
-        alg::RFLUFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
-        maxiters::Int,
-        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ipiv = Vector{LinearAlgebra.BlasInt}(undef, 0)
-    LinearSolve.PREALLOCATED_LU, ipiv
-end
-
-function LinearSolve.init_cacheval(alg::RFLUFactorization,
-        A::Union{LinearSolve.SparseArrays.AbstractSparseArray, LinearSolve.SciMLOperators.AbstractSciMLOperator}, b, u, Pl, Pr,
-        maxiters::Int,
-        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    nothing, nothing
-end
-
-function LinearSolve.init_cacheval(alg::RFLUFactorization,
-        A::Union{Diagonal, SymTridiagonal, Tridiagonal}, b, u, Pl, Pr,
-        maxiters::Int,
-        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    nothing, nothing
-end
-
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::RFLUFactorization{P, T};
         kwargs...) where {P, T}
     A = cache.A

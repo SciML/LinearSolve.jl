@@ -187,7 +187,7 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
                        (A === nothing ? eltype(b) <: Union{Float32, Float64} :
                         eltype(A) <: Union{Float32, Float64}) &&
                        Base.get_extension(
-                           @__MODULE__, :LinearSolveRecursiveFactorizationExt)
+                           @__MODULE__, :LinearSolveRecursiveFactorizationExt) !== nothing
                     DefaultAlgorithmChoice.RFLUFactorization
                     #elseif A === nothing || A isa Matrix
                     #    alg = FastLUFactorization()

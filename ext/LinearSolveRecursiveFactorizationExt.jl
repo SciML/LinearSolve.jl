@@ -1,4 +1,4 @@
-module LinearSolveRecursiveFactorization
+module LinearSolveRecursiveFactorizationExt
 
 using LinearSolve, RecursiveArrayTools, LinearAlgebra, RecursiveFactorization
 

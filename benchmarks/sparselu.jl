@@ -69,8 +69,7 @@ function run_and_plot(; dims = [1, 2, 3], kmax = 12)
                     copy($A),
                     copy($b);
                     u0 = copy($u0),
-                    alias_A = true,
-                    alias_b = true))
+                    alias = LinearAliasSpecifier(alias_A = true, alias_b = true)))
                 push!(res[dim][j], bt)
             end
         end

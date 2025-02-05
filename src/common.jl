@@ -139,8 +139,7 @@ __init_u0_from_Ab(::SMatrix{S1, S2}, b) where {S1, S2} = zeros(SVector{S2, eltyp
 
 function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         args...;
-        alias_A = default_alias_A(alg, prob.A, prob.b),
-        alias_b = default_alias_b(alg, prob.A, prob.b),
+        alias = LinearAliasSpecifier(),
         abstol = default_tol(real(eltype(prob.b))),
         reltol = default_tol(real(eltype(prob.b))),
         maxiters::Int = length(prob.b),
@@ -151,6 +150,45 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         sensealg = LinearSolveAdjoint(),
         kwargs...)
     (; A, b, u0, p) = prob
+
+    if haskey(kwargs,:alias_A) || haskey(kwargs,:alias_b)
+        aliases = LinearAliasSpecifier()
+
+        if haskey(kwargs, :alias_A)
+            message = "`alias_A` keyword argument is deprecated, to set `alias_A`,
+            please use an ODEAliasSpecifier, e.g. `solve(prob, alias = LinearAliasSpecifier(alias_A = true))"
+            Base.depwarn(message, :init)
+            Base.depwarn(message, :solve)
+            aliases = LinearAliasSpecifier(alias_A = values(kwargs).alias_A)
+        end
+
+        if haskey(kwargs, :alias_b)
+            message = "`alias_b` keyword argument is deprecated, to set `alias_b`,
+            please use an ODEAliasSpecifier, e.g. `solve(prob, alias = LinearAliasSpecifier(alias_b = true))"
+            Base.depwarn(message, :init)
+            Base.depwarn(message, :solve)
+            aliases = LinearAliasSpecifier(alias_A = aliases.alias_A, alias_b = values(kwargs).alias_b)
+        end 
+    else
+        if alias isa Bool
+            aliases = LinearAliasSpecifier(alias = alias)
+        else
+            aliases = alias
+        end
+    end
+
+    if isnothing(aliases.alias_A)
+        alias_A = default_alias_A(alg, prob.A, prob.b)
+    else
+        alias_A = aliases.alias_A
+    end
+
+    if isnothing(aliases.alias_b)
+        alias_b = default_alias_b(alg, prob.A, prob.b)
+    else
+        alias_b = aliases.alias_b
+    end
+
 
     A = if alias_A || A isa SMatrix
         A

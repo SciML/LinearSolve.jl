@@ -1,7 +1,7 @@
 module LinearSolveRecursiveFactorizationExt
 
 using LinearSolve
-using LinearSolve.LinearAlgebra, RecursiveFactorization
+using LinearSolve.LinearAlgebra, LinearSolve.ArrayInterface, RecursiveFactorization
 
 function LinearSolve.init_cacheval(alg::RFLUFactorization, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)

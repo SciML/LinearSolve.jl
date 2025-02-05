@@ -151,7 +151,7 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         kwargs...)
     (; A, b, u0, p) = prob
 
-    if haskey(kwargs,:alias_A) || haskey(kwargs,:alias_b)
+    if haskey(kwargs, :alias_A) || haskey(kwargs, :alias_b)
         aliases = LinearAliasSpecifier()
 
         if haskey(kwargs, :alias_A)
@@ -167,8 +167,9 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
             please use an ODEAliasSpecifier, e.g. `solve(prob, alias = LinearAliasSpecifier(alias_b = true))"
             Base.depwarn(message, :init)
             Base.depwarn(message, :solve)
-            aliases = LinearAliasSpecifier(alias_A = aliases.alias_A, alias_b = values(kwargs).alias_b)
-        end 
+            aliases = LinearAliasSpecifier(
+                alias_A = aliases.alias_A, alias_b = values(kwargs).alias_b)
+        end
     else
         if alias isa Bool
             aliases = LinearAliasSpecifier(alias = alias)
@@ -189,24 +190,23 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         alias_b = aliases.alias_b
     end
 
-
     A = if alias_A || A isa SMatrix
         A
     elseif A isa Array
         copy(A)
-    elseif A isa AbstractSparseMatrixCSC
-        SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A))
+    elseif issparsematrixcsc(A)
+        make_SparseMatrixCSC(A)
     else
         deepcopy(A)
     end
 
-    b = if b isa SparseArrays.AbstractSparseArray && !(A isa Diagonal)
+    b = if issparsematrix(b) && !(A isa Diagonal)
         Array(b) # the solution to a linear solve will always be dense!
     elseif alias_b || b isa SVector
         b
     elseif b isa Array
         copy(b)
-    elseif b isa AbstractSparseMatrixCSC
+    elseif issparsematrixcsc(b)
         SparseMatrixCSC(size(b)..., getcolptr(b), rowvals(b), nonzeros(b))
     else
         deepcopy(b)

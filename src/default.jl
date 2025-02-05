@@ -92,35 +92,6 @@ function defaultalg(A::Symmetric{<:Number, <:Array}, b, ::OperatorAssumptions{Bo
     DefaultLinearSolver(DefaultAlgorithmChoice.BunchKaufmanFactorization)
 end
 
-function defaultalg(
-        A::Symmetric{<:Number, <:SparseMatrixCSC}, b, ::OperatorAssumptions{Bool})
-    DefaultLinearSolver(DefaultAlgorithmChoice.CHOLMODFactorization)
-end
-
-function defaultalg(A::AbstractSparseMatrixCSC{Tv, Ti}, b,
-        assump::OperatorAssumptions{Bool}) where {Tv, Ti}
-    if assump.issq
-        DefaultLinearSolver(DefaultAlgorithmChoice.SparspakFactorization)
-    else
-        error("Generic number sparse factorization for non-square is not currently handled")
-    end
-end
-
-@static if INCLUDE_SPARSE
-    function defaultalg(A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
-            assump::OperatorAssumptions{Bool}) where {Ti}
-        if assump.issq
-            if length(b) <= 10_000 && length(nonzeros(A)) / length(A) < 2e-4
-                DefaultLinearSolver(DefaultAlgorithmChoice.KLUFactorization)
-            else
-                DefaultLinearSolver(DefaultAlgorithmChoice.UMFPACKFactorization)
-            end
-        else
-            DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
-        end
-    end
-end
-
 function defaultalg(A::GPUArraysCore.AnyGPUArray, b, assump::OperatorAssumptions{Bool})
     if assump.condition === OperatorCondition.IllConditioned || !assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
@@ -165,6 +136,8 @@ function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
     end
 end
 
+userecursivefactorization(A) = false
+
 # Allows A === nothing as a stand-in for dense matrix
 function defaultalg(A, b, assump::OperatorAssumptions{Bool})
     alg = if assump.issq
@@ -178,14 +151,15 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
                (__conditioning(assump) === OperatorCondition.IllConditioned ||
                 __conditioning(assump) === OperatorCondition.WellConditioned)
                 if length(b) <= 10
-                    DefaultAlgorithmChoice.RFLUFactorization
+                    DefaultAlgorithmChoice.GenericLUFactorization
                 elseif appleaccelerate_isavailable() && b isa Array &&
                        eltype(b) <: Union{Float32, Float64, ComplexF32, ComplexF64}
                     DefaultAlgorithmChoice.AppleAccelerateLUFactorization
                 elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500) ||
                         (usemkl && length(b) <= 200)) &&
                        (A === nothing ? eltype(b) <: Union{Float32, Float64} :
-                        eltype(A) <: Union{Float32, Float64})
+                        eltype(A) <: Union{Float32, Float64}) &&
+                       userecursivefactorization(A)
                     DefaultAlgorithmChoice.RFLUFactorization
                     #elseif A === nothing || A isa Matrix
                     #    alg = FastLUFactorization()
@@ -265,7 +239,7 @@ function algchoice_to_alg(alg::Symbol)
     elseif alg === :GenericLUFactorization
         GenericLUFactorization()
     elseif alg === :RFLUFactorization
-        RFLUFactorization()
+        RFLUFactorization(throwerror = false)
     elseif alg === :BunchKaufmanFactorization
         BunchKaufmanFactorization()
     elseif alg === :CHOLMODFactorization
@@ -320,7 +294,7 @@ cache.cacheval = NamedTuple(LUFactorization = cache of LUFactorization, ...)
     caches = map(first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))) do alg
         if alg === :KrylovJL_GMRES || alg === :KrylovJL_CRAIGMR || alg === :KrylovJL_LSMR
             quote
-                if A isa Matrix || A isa SparseMatrixCSC
+                if A isa Matrix || issparsematrixcsc(A)
                     nothing
                 else
                     init_cacheval($(algchoice_to_alg(alg)), A, b, u, Pl, Pr, maxiters,

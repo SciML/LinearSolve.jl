@@ -1,6 +1,6 @@
-using LinearSolve, LinearAlgebra, SparseArrays, Test, JET
+using LinearSolve, RecursiveFactorization, LinearAlgebra, SparseArrays, Test, JET
 @test LinearSolve.defaultalg(nothing, zeros(3)).alg ===
-      LinearSolve.DefaultAlgorithmChoice.RFLUFactorization
+      LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
 prob = LinearProblem(rand(3, 3), rand(3))
 solve(prob)
 

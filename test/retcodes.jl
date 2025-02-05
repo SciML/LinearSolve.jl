@@ -1,4 +1,4 @@
-using LinearSolve
+using LinearSolve, RecursiveFactorization
 
 alglist = (
     LUFactorization,

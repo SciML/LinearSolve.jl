@@ -82,6 +82,31 @@ struct CudaOffloadFactorization <: LinearSolve.AbstractFactorization
     end
 end
 
+## RFLUFactorization
+
+"""
+`RFLUFactorization()`
+
+A fast pure Julia LU-factorization implementation
+using RecursiveFactorization.jl. This is by far the fastest LU-factorization
+implementation, usually outperforming OpenBLAS and MKL for smaller matrices
+(<500x500), but currently optimized only for Base `Array` with `Float32` or `Float64`.
+Additional optimization for complex matrices is in the works.
+"""
+struct RFLUFactorization{P, T} <: AbstractDenseFactorization
+    function RFLUFactorization(::Val{P}, ::Val{T}; throwerror = true) where {P, T}
+        if !userecursivefactorization(nothing)
+            throwerror &&
+                error("RFLUFactorization requires that RecursiveFactorization.jl is loaded, i.e. `using RecursiveFactorization`")
+        end
+        new{P, T}()
+    end
+end
+
+function RFLUFactorization(; pivot = Val(true), thread = Val(true), throwerror = true)
+    RFLUFactorization(pivot, thread; throwerror)
+end
+
 """
 ```julia
 MKLPardisoFactorize(; nprocs::Union{Int, Nothing} = nothing,

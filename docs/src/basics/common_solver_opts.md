@@ -6,10 +6,11 @@ in order to give composability. These are also the options taken at `init` time.
 The following are the options these algorithms take, along with their defaults.
 
 ## General Controls
+
   - `alias::LinearAliasSpecifier`: Holds the fields `alias_A` and `alias_b` which specify
     whether to alias the matrices `A` and `b` respectively. When these fields are `true`,
     `A` and `b` can be written to and changed by the solver algorithm. When fields are `nothing`
-    the default behavior is used, which is to default to `true` when the algorithm is known 
+    the default behavior is used, which is to default to `true` when the algorithm is known
     not to modify the matrices, and false otherwise.
   - `verbose`: Whether to print extra information. Defaults to `false`.
   - `assumptions`: Sets the assumptions of the operator in order to effect the default

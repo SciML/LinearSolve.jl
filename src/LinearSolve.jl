@@ -6,19 +6,14 @@ end
 
 import PrecompileTools
 using ArrayInterface
-using RecursiveFactorization
 using Base: cache_dependencies, Bool
 using LinearAlgebra
-using SparseArrays
-using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
 using LazyArrays: @~, BroadcastArray
 using SciMLBase: AbstractLinearAlgorithm, LinearAliasSpecifier
 using SciMLOperators
 using SciMLOperators: AbstractSciMLOperator, IdentityOperator
 using Setfield
 using UnPack
-using KLU
-using Sparspak
 using FastLapackInterface
 using DocStringExtensions
 using EnumX
@@ -94,7 +89,11 @@ function _fast_sym_givens! end
 
 # Code
 
-const INCLUDE_SPARSE = Preferences.@load_preference("include_sparse", Base.USE_GPL_LIBS)
+issparsematrixcsc(A) = false
+handle_sparsematrixcsc_lu(A) = lu(A)
+issparsematrix(A) = false
+make_SparseMatrixCSC(A) = nothing
+makeempty_SparaseMatrixCSC(A) = nothing
 
 EnumX.@enumx DefaultAlgorithmChoice begin
     LUFactorization
@@ -127,6 +126,7 @@ end
 const BLASELTYPES = Union{Float32, Float64, ComplexF32, ComplexF64}
 
 include("common.jl")
+include("extension_algs.jl")
 include("factorization.jl")
 include("appleaccelerate.jl")
 include("mkl.jl")
@@ -137,7 +137,6 @@ include("preconditioners.jl")
 include("solve_function.jl")
 include("default.jl")
 include("init.jl")
-include("extension_algs.jl")
 include("adjoint.jl")
 include("deprecated.jl")
 
@@ -169,10 +168,6 @@ end
             cache.b)
         return SciMLBase.build_linear_solution(alg, y, nothing, cache)
     end
-end
-
-@static if INCLUDE_SPARSE
-    include("factorization_sparse.jl")
 end
 
 # Solver Specific Traits
@@ -212,26 +207,7 @@ PrecompileTools.@compile_workload begin
     prob = LinearProblem(A, b)
     sol = solve(prob)
     sol = solve(prob, LUFactorization())
-    sol = solve(prob, RFLUFactorization())
     sol = solve(prob, KrylovJL_GMRES())
-end
-
-@static if INCLUDE_SPARSE
-    PrecompileTools.@compile_workload begin
-        A = sprand(4, 4, 0.3) + I
-        b = rand(4)
-        prob = LinearProblem(A, b)
-        sol = solve(prob, KLUFactorization())
-        sol = solve(prob, UMFPACKFactorization())
-    end
-end
-
-PrecompileTools.@compile_workload begin
-    A = sprand(4, 4, 0.3) + I
-    b = rand(4)
-    prob = LinearProblem(A * A', b)
-    sol = solve(prob) # in case sparspak is used as default
-    sol = solve(prob, SparspakFactorization())
 end
 
 ALREADY_WARNED_CUDSS = Ref{Bool}(false)

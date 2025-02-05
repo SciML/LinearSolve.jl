@@ -1,5 +1,5 @@
 using LinearSolve, LinearAlgebra, SparseArrays, MultiFloats, ForwardDiff
-using SciMLOperators
+using SciMLOperators, RecursiveFactorization, Sparspak
 using IterativeSolvers, KrylovKit, MKL_jll, KrylovPreconditioners
 using Test
 import Random

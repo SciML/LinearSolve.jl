@@ -17,7 +17,8 @@ basic machinery. A simplified version is:
 ```julia
 struct MyLUFactorization{P} <: LinearSolve.SciMLLinearSolveAlgorithm end
 
-function LinearSolve.init_cacheval(alg::MyLUFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
+function LinearSolve.init_cacheval(
+        alg::MyLUFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
         verbose::Bool, assump::LinearSolve.OperatorAssumptions)
     lu!(convert(AbstractMatrix, A))
 end
@@ -41,7 +42,8 @@ need to cache their own things, and so there's one value `cacheval` that is
 for the algorithms to modify. The function:
 
 ```julia
-init_cacheval(alg::MyLUFactorization, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose, assump)
+init_cacheval(
+    alg::MyLUFactorization, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose, assump)
 ```
 
 is what is called at `init` time to create the first `cacheval`. Note that this

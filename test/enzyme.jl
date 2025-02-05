@@ -1,6 +1,6 @@
 using Enzyme, ForwardDiff
 using LinearSolve, LinearAlgebra, Test
-using FiniteDiff
+using FiniteDiff, RecursiveFactorization
 
 n = 4
 A = rand(n, n);

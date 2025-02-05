@@ -6,7 +6,7 @@ using HYPRE: HYPRE, HYPREMatrix, HYPRESolver, HYPREVector
 using LinearSolve: HYPREAlgorithm, LinearCache, LinearProblem, LinearSolve,
                    OperatorAssumptions, default_tol, init_cacheval, __issquare,
                    __conditioning, LinearSolveAdjoint
-using SciMLBase: LinearProblem, SciMLBase
+using SciMLBase: LinearProblem, LinearAliasSpecifier, SciMLBase
 using UnPack: @unpack
 using Setfield: @set!
 

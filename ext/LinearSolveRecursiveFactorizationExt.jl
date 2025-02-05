@@ -50,7 +50,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::RFLUFactorization{P, T};
 
         cache.isfresh = false
     end
-    y = ldiv!(cache.u, @get_cacheval(cache, :RFLUFactorization)[1], cache.b)
+    y = ldiv!(cache.u, LinearSolve.@get_cacheval(cache, :RFLUFactorization)[1], cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 

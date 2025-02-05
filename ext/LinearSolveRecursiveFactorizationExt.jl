@@ -31,7 +31,7 @@ function LinearSolve.init_cacheval(alg::RFLUFactorization,
     nothing, nothing
 end
 
-function SciMLBase.solve!(cache::LinearCache, alg::RFLUFactorization{P, T};
+function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::RFLUFactorization{P, T};
         kwargs...) where {P, T}
     A = cache.A
     A = convert(AbstractMatrix, A)

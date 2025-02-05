@@ -219,7 +219,8 @@ function init_cacheval(alg::QRFactorization, A::Symmetric{<:Number, <:Array}, b,
     return qr(convert(AbstractMatrix, A), alg.pivot)
 end
 
-function init_cacheval(alg::QRFactorization, A::Symmetric{<:Number, <:SparseMatrixCSC}, b, u, Pl, Pr,
+function init_cacheval(
+        alg::QRFactorization, A::Symmetric{<:Number, <:SparseMatrixCSC}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     return nothing

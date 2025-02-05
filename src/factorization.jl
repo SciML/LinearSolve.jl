@@ -46,13 +46,6 @@ function LinearSolve.init_cacheval(
 end
 
 function LinearSolve.init_cacheval(alg::RFLUFactorization,
-        A::Union{AbstractSparseArray, AbstractSciMLOperator}, b, u, Pl, Pr,
-        maxiters::Int,
-        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    nothing, nothing
-end
-
-function LinearSolve.init_cacheval(alg::RFLUFactorization,
         A::Union{Diagonal, SymTridiagonal, Tridiagonal}, b, u, Pl, Pr,
         maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
@@ -111,7 +104,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
     A = convert(AbstractMatrix, A)
     if cache.isfresh
         cacheval = @get_cacheval(cache, :LUFactorization)
-        if A isa AbstractSparseMatrix && alg.reuse_symbolic
+        if issparsematrix(A) && alg.reuse_symbolic
             # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
             # If SparseMatrixCSC, check if the pattern has changed
             if alg.check_pattern && pattern_changed(cacheval, A)
@@ -246,13 +239,6 @@ function init_cacheval(alg::QRFactorization, A::Symmetric{<:Number, <:Array}, b,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     return qr(convert(AbstractMatrix, A), alg.pivot)
-end
-
-function init_cacheval(
-        alg::QRFactorization, A::Symmetric{<:Number, <:SparseMatrixCSC}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    return nothing
 end
 
 const PREALLOCATED_QR_ColumnNorm = ArrayInterface.qr_instance(rand(1, 1), ColumnNorm())

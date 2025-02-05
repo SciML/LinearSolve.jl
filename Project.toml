@@ -25,7 +25,6 @@ SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 SciMLOperators = "c0aeaf25-5076-4817-a8d5-81caf7dfa961"
 Setfield = "efcf1570-3423-57d1-acb7-fd33fddbac46"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
-Sparspak = "e56a9233-b9d6-4f03-8d0f-1825330902ac"
 StaticArraysCore = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 
@@ -44,6 +43,7 @@ Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
 Pardiso = "46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2"
 RecursiveArrayTools = "731186ca-8d62-57ce-b412-fbd966d074cd"
 RecursiveFactorization = "f2c3362d-daeb-58d1-803e-2bc74f2840b4"
+Sparspak = "e56a9233-b9d6-4f03-8d0f-1825330902ac"
 
 [extensions]
 LinearSolveBandedMatricesExt = "BandedMatrices"
@@ -60,6 +60,8 @@ LinearSolveMetalExt = "Metal"
 LinearSolvePardisoExt = "Pardiso"
 LinearSolveRecursiveArrayToolsExt = "RecursiveArrayTools"
 LinearSolveRecursiveFactorizationExt = "RecursiveFactorization"
+LinearSolveSparseArraysExt = "SparseArrays"
+LinearSolveSparspakExt = "Sparspak"
 
 [compat]
 AllocCheck = "0.2"
@@ -141,10 +143,11 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 RecursiveArrayTools = "731186ca-8d62-57ce-b412-fbd966d074cd"
 RecursiveFactorization = "f2c3362d-daeb-58d1-803e-2bc74f2840b4"
 SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
+Sparspak = "e56a9233-b9d6-4f03-8d0f-1825330902ac"
 StableRNGs = "860ef19b-820b-49d6-a774-d7a799459cd3"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [targets]
-test = ["Aqua", "Test", "IterativeSolvers", "InteractiveUtils", "JET", "KrylovKit", "KrylovPreconditioners", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI", "BlockDiagonals", "Enzyme", "FiniteDiff", "BandedMatrices", "FastAlmostBandedMatrices", "StaticArrays", "AllocCheck", "StableRNGs", "Zygote", "RecursiveFactorization"]
+test = ["Aqua", "Test", "IterativeSolvers", "InteractiveUtils", "JET", "KrylovKit", "KrylovPreconditioners", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI", "BlockDiagonals", "Enzyme", "FiniteDiff", "BandedMatrices", "FastAlmostBandedMatrices", "StaticArrays", "AllocCheck", "StableRNGs", "Zygote", "RecursiveFactorization", "Sparspak"]

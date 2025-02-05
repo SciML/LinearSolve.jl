@@ -194,19 +194,19 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         A
     elseif A isa Array
         copy(A)
-    elseif A isa AbstractSparseMatrixCSC
-        SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A))
+    elseif issparsematrixcsc(A)
+        make_SparseMatrixCSC(A)
     else
         deepcopy(A)
     end
 
-    b = if b isa SparseArrays.AbstractSparseArray && !(A isa Diagonal)
+    b = if issparsematrix(b) && !(A isa Diagonal)
         Array(b) # the solution to a linear solve will always be dense!
     elseif alias_b || b isa SVector
         b
     elseif b isa Array
         copy(b)
-    elseif b isa AbstractSparseMatrixCSC
+    elseif issparsematrixcsc(b)
         SparseMatrixCSC(size(b)..., getcolptr(b), rowvals(b), nonzeros(b))
     else
         deepcopy(b)

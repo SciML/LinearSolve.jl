@@ -1,9 +1,9 @@
-module LinearSolveSparsepakExt
+module LinearSolveSparspakExt
 
 using LinearSolve, LinearAlgebra
-using SparseArrays
-using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
 using Sparspak
+using Sparspak.SparseCSCInterface.SparseArrays
+using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
 
 const PREALLOCATED_SPARSEPAK = sparspaklu(SparseMatrixCSC(0, 0, [1], Int[], Float64[]),
     factorize = false)
@@ -15,7 +15,7 @@ function LinearSolve.init_cacheval(::SparspakFactorization, A::SparseMatrixCSC{F
     PREALLOCATED_SPARSEPAK
 end
 
-function init_cacheval(::SparspakFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
+function LinearSolve.init_cacheval(::SparspakFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
         reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
     A = convert(AbstractMatrix, A)
@@ -30,7 +30,7 @@ function init_cacheval(::SparspakFactorization, A, b, u, Pl, Pr, maxiters::Int, 
     end
 end
 
-function SciMLBase.solve!(cache::LinearCache, alg::SparspakFactorization; kwargs...)
+function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::SparspakFactorization; kwargs...)
     A = cache.A
     if cache.isfresh
         if cache.cacheval !== nothing && alg.reuse_symbolic
@@ -46,6 +46,14 @@ function SciMLBase.solve!(cache::LinearCache, alg::SparspakFactorization; kwargs
     end
     y = ldiv!(cache.u, LinearSolve.@get_cacheval(cache, :SparspakFactorization), cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
+end
+
+LinearSolve.PrecompileTools.@compile_workload begin
+    A = sprand(4, 4, 0.3) + I
+    b = rand(4)
+    prob = LinearProblem(A * A', b)
+    sol = solve(prob) # in case sparspak is used as default
+    sol = solve(prob, SparspakFactorization())
 end
 
 end

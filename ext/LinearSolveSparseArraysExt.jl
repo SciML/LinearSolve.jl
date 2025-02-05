@@ -1,4 +1,4 @@
-module LinearSolveSparseArrays
+module LinearSolveSparseArraysExt
 
 using LinearSolve, LinearAlgebra
 using SparseArrays
@@ -11,10 +11,42 @@ using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
 include("../src/KLU/klu.jl")
 
 LinearSolve.issparsematrixcsc(A::AbstractSparseMatrixCSC) = true
+LinearSolve.issparsematrix(A::AbstractSparseArray) = true
+LinearSolve.make_SparseMatrixCSC(A::AbstractSparseArray) = SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A))
+LinearSolve.makeempty_SparaseMatrixCSC(A::AbstractSparseArray) = SparseMatrixCSC(0, 0, [1], Int[], eltype(A)[])
+
+function LinearSolve.init_cacheval(alg::RFLUFactorization,
+        A::Union{AbstractSparseArray, LinearSolve.SciMLOperators.AbstractSciMLOperator}, b, u, Pl, Pr,
+        maxiters::Int,
+        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing, nothing
+end
+
+
+function LinearSolve.init_cacheval(
+        alg::QRFactorization, A::Symmetric{<:Number, <:SparseMatrixCSC}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+    return nothing
+end
 
 function LinearSolve.handle_sparsematrixcsc_lu(A::AbstractSparseMatrixCSC)
     lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
     check = false)
+end
+
+function LinearSolve.defaultalg(
+        A::Symmetric{<:Number, <:SparseMatrixCSC}, b, ::OperatorAssumptions{Bool})
+        LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.CHOLMODFactorization)
+end
+
+function LinearSolve.defaultalg(A::AbstractSparseMatrixCSC{Tv, Ti}, b,
+        assump::OperatorAssumptions{Bool}) where {Tv, Ti}
+    if assump.issq
+        DefaultLinearSolver(DefaultAlgorithmChoice.SparspakFactorization)
+    else
+        error("Generic number sparse factorization for non-square is not currently handled")
+    end
 end
 
 function LinearSolve.init_cacheval(alg::GenericFactorization,
@@ -46,7 +78,7 @@ function LinearSolve.init_cacheval(alg::UMFPACKFactorization, A::AbstractSparseA
         rowvals(A), nonzeros(A)))
 end
 
-function SciMLBase.solve!(cache::LinearCache, alg::UMFPACKFactorization; kwargs...)
+function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::UMFPACKFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
@@ -101,7 +133,7 @@ function LinearSolve.init_cacheval(alg::KLUFactorization, A::AbstractSparseArray
 end
 
 # TODO: guard this against errors
-function SciMLBase.solve!(cache::LinearCache, alg::KLUFactorization; kwargs...)
+function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
@@ -146,11 +178,11 @@ function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
 end
 
 function LinearSolve.init_cacheval(alg::NormalCholeskyFactorization,
-        A::Union{AbstractSparseArray, GPUArraysCore.AnyGPUArray,
+        A::Union{AbstractSparseArray, LinearSolve.GPUArraysCore.AnyGPUArray,
             Symmetric{<:Number, <:AbstractSparseArray}}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
-    ArrayInterface.cholesky_instance(convert(AbstractMatrix, A))
+        LinearSolve.ArrayInterface.cholesky_instance(convert(AbstractMatrix, A))
 end
 
 # Specialize QR for the non-square case
@@ -170,16 +202,16 @@ function LinearSolve._ldiv!(x::AbstractVector,
 end
 
 # Ambiguity removal
-function LinearSolve._ldiv!(::SVector,
+function LinearSolve._ldiv!(::LinearSolve.SVector,
         A::Union{SparseArrays.CHOLMOD.Factor, LinearAlgebra.QR,
             LinearAlgebra.QRCompactWY, SparseArrays.SPQR.QRSparse},
         b::AbstractVector)
     (A \ b)
 end
-function LinearSolve._ldiv!(::SVector,
+function LinearSolve._ldiv!(::LinearSolve.SVector,
         A::Union{SparseArrays.CHOLMOD.Factor, LinearAlgebra.QR,
             LinearAlgebra.QRCompactWY, SparseArrays.SPQR.QRSparse},
-        b::SVector)
+        b::LinearSolve.SVector)
     (A \ b)
 end
 

@@ -91,6 +91,9 @@ function _fast_sym_givens! end
 
 issparsematrixcsc(A) = false
 handle_sparsematrixcsc_lu(A) = lu(A)
+issparsematrix(A) = false 
+make_SparseMatrixCSC(A) = nothing
+makeempty_SparaseMatrixCSC(A) = nothing
 
 EnumX.@enumx DefaultAlgorithmChoice begin
     LUFactorization
@@ -205,14 +208,6 @@ PrecompileTools.@compile_workload begin
     sol = solve(prob)
     sol = solve(prob, LUFactorization())
     sol = solve(prob, KrylovJL_GMRES())
-end
-
-PrecompileTools.@compile_workload begin
-    A = sprand(4, 4, 0.3) + I
-    b = rand(4)
-    prob = LinearProblem(A * A', b)
-    sol = solve(prob) # in case sparspak is used as default
-    sol = solve(prob, SparspakFactorization())
 end
 
 ALREADY_WARNED_CUDSS = Ref{Bool}(false)

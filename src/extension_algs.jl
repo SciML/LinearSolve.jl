@@ -99,11 +99,12 @@ struct RFLUFactorization{P, T} <: AbstractDenseFactorization
             throwerror &&
                 error("RFLUFactorization requires that RecursiveFactorization.jl is loaded, i.e. `using RecursiveFactorization`")
         end
+        new{P, T}()
     end
 end
 
-function RFLUFactorization(; pivot = Val(true), thread = Val(true))
-    RFLUFactorization(pivot, thread)
+function RFLUFactorization(; pivot = Val(true), thread = Val(true), throwerror = true)
+    RFLUFactorization(pivot, thread; throwerror)
 end
 
 """

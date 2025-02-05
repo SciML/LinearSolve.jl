@@ -92,20 +92,6 @@ function defaultalg(A::Symmetric{<:Number, <:Array}, b, ::OperatorAssumptions{Bo
     DefaultLinearSolver(DefaultAlgorithmChoice.BunchKaufmanFactorization)
 end
 
-function defaultalg(
-        A::Symmetric{<:Number, <:SparseMatrixCSC}, b, ::OperatorAssumptions{Bool})
-    DefaultLinearSolver(DefaultAlgorithmChoice.CHOLMODFactorization)
-end
-
-function defaultalg(A::AbstractSparseMatrixCSC{Tv, Ti}, b,
-        assump::OperatorAssumptions{Bool}) where {Tv, Ti}
-    if assump.issq
-        DefaultLinearSolver(DefaultAlgorithmChoice.SparspakFactorization)
-    else
-        error("Generic number sparse factorization for non-square is not currently handled")
-    end
-end
-
 function defaultalg(A::GPUArraysCore.AnyGPUArray, b, assump::OperatorAssumptions{Bool})
     if assump.condition === OperatorCondition.IllConditioned || !assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
@@ -308,7 +294,7 @@ cache.cacheval = NamedTuple(LUFactorization = cache of LUFactorization, ...)
     caches = map(first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))) do alg
         if alg === :KrylovJL_GMRES || alg === :KrylovJL_CRAIGMR || alg === :KrylovJL_LSMR
             quote
-                if A isa Matrix || A isa SparseMatrixCSC
+                if A isa Matrix || issparsematrixcsc(A)
                     nothing
                 else
                     init_cacheval($(algchoice_to_alg(alg)), A, b, u, Pl, Pr, maxiters,

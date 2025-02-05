@@ -18,7 +18,7 @@ function LinearSolve.init_cacheval(
 end
 
 function LinearSolve.init_cacheval(alg::RFLUFactorization,
-        A::Union{LinearSolve.SparseArrays.AbstractSparseArray, AbstractSciMLOperator}, b, u, Pl, Pr,
+        A::Union{LinearSolve.SparseArrays.AbstractSparseArray, LinearSolve.SciMLOperators.AbstractSciMLOperator}, b, u, Pl, Pr,
         maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     nothing, nothing

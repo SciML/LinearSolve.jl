@@ -187,7 +187,8 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
                 elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500) ||
                         (usemkl && length(b) <= 200)) &&
                        (A === nothing ? eltype(b) <: Union{Float32, Float64} :
-                        eltype(A) <: Union{Float32, Float64}) && userecursivefactorization(A)
+                        eltype(A) <: Union{Float32, Float64}) &&
+                       userecursivefactorization(A)
                     DefaultAlgorithmChoice.RFLUFactorization
                     #elseif A === nothing || A isa Matrix
                     #    alg = FastLUFactorization()

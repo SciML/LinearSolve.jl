@@ -14,7 +14,6 @@ using SciMLOperators
 using SciMLOperators: AbstractSciMLOperator, IdentityOperator
 using Setfield
 using UnPack
-using FastLapackInterface
 using DocStringExtensions
 using EnumX
 using Markdown

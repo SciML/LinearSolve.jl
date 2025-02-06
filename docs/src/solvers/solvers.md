@@ -84,6 +84,10 @@ use `Krylov_GMRES()`.
 
 ### RecursiveFactorization.jl
 
+!!! note
+    
+    Using this solver requires adding the package RecursiveFactorization.jl, i.e. `using RecursiveFactorization`
+
 ```@docs
 RFLUFactorization
 ```
@@ -123,7 +127,13 @@ FastLapackInterface.jl is a package that allows for a lower-level interface to t
 calls to allow for preallocating workspaces to decrease the overhead of the wrappers.
 LinearSolve.jl provides a wrapper to these routines in a way where an initialized solver
 has a non-allocating LU factorization. In theory, this post-initialized solve should always
-be faster than the Base.LinearAlgebra version.
+be faster than the Base.LinearAlgebra version. In practice, with the way we wrap the solvers,
+we do not see a performance benefit and in fact benchmarks tend to show this inhibits
+performance.
+
+!!! note
+    
+    Using this solver requires adding the package FastLapackInterface.jl, i.e. `using FastLapackInterface`
 
 ```@docs
 FastLUFactorization
@@ -156,10 +166,6 @@ KrylovJL
 ```
 
 ### MKL.jl
-
-!!! note
-    
-    Using this solver requires adding the package MKL_jll.jl, i.e. `using MKL_jll`
 
 ```@docs
 MKLLUFactorization

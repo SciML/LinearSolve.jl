@@ -12,17 +12,20 @@ function LinearSolve.init_cacheval(::FastLUFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     ws = LUWs(A)
-    return WorkspaceAndFactors(ws, LinearSolve.ArrayInterface.lu_instance(convert(AbstractMatrix, A)))
+    return WorkspaceAndFactors(
+        ws, LinearSolve.ArrayInterface.lu_instance(convert(AbstractMatrix, A)))
 end
 
-function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::FastLUFactorization; kwargs...)
+function SciMLBase.solve!(
+        cache::LinearSolve.LinearCache, alg::FastLUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     ws_and_fact = LinearSolve.@get_cacheval(cache, :FastLUFactorization)
     if cache.isfresh
         # we will fail here if A is a different *size* than in a previous version of the same cache.
         # it may instead be desirable to resize the workspace.
-        LinearSolve.@set! ws_and_fact.factors = LinearAlgebra.LU(LAPACK.getrf!(ws_and_fact.workspace,
+        LinearSolve.@set! ws_and_fact.factors = LinearAlgebra.LU(LAPACK.getrf!(
+            ws_and_fact.workspace,
             A)...)
         cache.cacheval = ws_and_fact
         cache.isfresh = false
@@ -31,19 +34,21 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::FastLUFactorizati
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
-function LinearSolve.init_cacheval(alg::FastQRFactorization{NoPivot}, A::AbstractMatrix, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(
+        alg::FastQRFactorization{NoPivot}, A::AbstractMatrix, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     ws = QRWYWs(A; blocksize = alg.blocksize)
     return WorkspaceAndFactors(ws,
         LinearSolve.ArrayInterface.qr_instance(convert(AbstractMatrix, A)))
 end
-function LinearSolve.init_cacheval(::FastQRFactorization{ColumnNorm}, A::AbstractMatrix, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(
+        ::FastQRFactorization{ColumnNorm}, A::AbstractMatrix, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     ws = QRpWs(A)
     return WorkspaceAndFactors(ws,
-    LinearSolve.ArrayInterface.qr_instance(convert(AbstractMatrix, A)))
+        LinearSolve.ArrayInterface.qr_instance(convert(AbstractMatrix, A)))
 end
 
 function LinearSolve.init_cacheval(alg::FastQRFactorization, A, b, u, Pl, Pr,
@@ -77,6 +82,5 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::FastQRFactorizati
     y = ldiv!(cache.u, cache.cacheval.factors, cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
-
 
 end

@@ -129,7 +129,7 @@ LinearSolve.jl provides a wrapper to these routines in a way where an initialize
 has a non-allocating LU factorization. In theory, this post-initialized solve should always
 be faster than the Base.LinearAlgebra version. In practice, with the way we wrap the solvers,
 we do not see a performance benefit and in fact benchmarks tend to show this inhibits
-performance. 
+performance.
 
 !!! note
     

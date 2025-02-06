@@ -142,12 +142,20 @@ FastQRFactorization
 
 ### SuiteSparse.jl
 
+!!! note
+    
+    Using this solver requires adding the package SparseArrays.jl, i.e. `using SparseArrays`
+
 ```@docs
 KLUFactorization
 UMFPACKFactorization
 ```
 
 ### Sparspak.jl
+
+!!! note
+    
+    Using this solver requires adding the package Sparspak.jl, i.e. `using Sparspak`
 
 ```@docs
 SparspakFactorization

@@ -107,6 +107,31 @@ function RFLUFactorization(; pivot = Val(true), thread = Val(true), throwerror =
     RFLUFactorization(pivot, thread; throwerror)
 end
 
+# There's no options like pivot here.
+# But I'm not sure it makes sense as a GenericFactorization
+# since it just uses `LAPACK.getrf!`.
+"""
+`FastLUFactorization()`
+
+The FastLapackInterface.jl version of the LU factorization. Notably,
+this version does not allow for choice of pivoting method.
+"""
+struct FastLUFactorization <: AbstractDenseFactorization end
+
+"""
+`FastQRFactorization()`
+
+The FastLapackInterface.jl version of the QR factorization.
+"""
+struct FastQRFactorization{P} <: AbstractDenseFactorization
+    pivot::P
+    blocksize::Int
+end
+
+# is 36 or 16 better here? LinearAlgebra and FastLapackInterface use 36,
+# but QRFactorization uses 16.
+FastQRFactorization() = FastQRFactorization(NoPivot(), 36)
+
 """
 ```julia
 MKLPardisoFactorize(; nprocs::Union{Int, Nothing} = nothing,

@@ -15,7 +15,7 @@ LinearSolve.issparsematrix(A::AbstractSparseArray) = true
 function LinearSolve.make_SparseMatrixCSC(A::AbstractSparseArray)
     SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A))
 end
-function LinearSolve.makeempty_SparaseMatrixCSC(A::AbstractSparseArray)
+function LinearSolve.makeempty_SparseMatrixCSC(A::AbstractSparseArray)
     SparseMatrixCSC(0, 0, [1], Int[], eltype(A)[])
 end
 

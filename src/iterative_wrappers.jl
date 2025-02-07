@@ -196,7 +196,7 @@ function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, re
                      alg.KrylovAlg === Krylov.gpmr! ||
                      alg.KrylovAlg === Krylov.fom!)
             if issparsematrixcsc(A)
-                KS(makeempty_SparaseMatrixCSC(A), eltype(b)[], 1)
+                KS(makeempty_SparseMatrixCSC(A), eltype(b)[], 1)
             elseif A isa Matrix
                 KS(Matrix{eltype(A)}(undef, 0, 0), eltype(b)[], 1)
             else
@@ -204,7 +204,7 @@ function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, re
             end
         else
             if issparsematrixcsc(A)
-                KS(makeempty_SparaseMatrixCSC(A), eltype(b)[])
+                KS(makeempty_SparseMatrixCSC(A), eltype(b)[])
             elseif A isa Matrix
                 KS(Matrix{eltype(A)}(undef, 0, 0), eltype(b)[])
             else

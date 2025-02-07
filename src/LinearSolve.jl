@@ -92,7 +92,7 @@ issparsematrixcsc(A) = false
 handle_sparsematrixcsc_lu(A) = lu(A)
 issparsematrix(A) = false
 make_SparseMatrixCSC(A) = nothing
-makeempty_SparaseMatrixCSC(A) = nothing
+makeempty_SparseMatrixCSC(A) = nothing
 
 EnumX.@enumx DefaultAlgorithmChoice begin
     LUFactorization

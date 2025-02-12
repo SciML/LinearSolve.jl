@@ -237,6 +237,12 @@ function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, re
     return solver
 end
 
+# Krylov.jl tries to init with `ArrayPartition(undef, ...)`. Avoid hitting that!
+function init_cacheval(alg::LinearSolve.KrylovJL, A, b::RecursiveArrayTools.ArrayPartition, u, Pl, Pr,
+    maxiters::Int, abstol, reltol, verbose::Bool, ::LinearSolve.OperatorAssumptions)
+    return nothing
+end
+
 function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     if cache.precsisfresh && !isnothing(alg.precs)
         Pl, Pr = alg.precs(cache.A, cache.p)

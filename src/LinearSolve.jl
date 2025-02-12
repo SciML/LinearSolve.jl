@@ -19,6 +19,7 @@ using EnumX
 using Markdown
 using ChainRulesCore
 import InteractiveUtils
+import RecursiveArrayTools
 
 import StaticArraysCore: StaticArray, SVector, MVector, SMatrix, MMatrix
 

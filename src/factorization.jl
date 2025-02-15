@@ -1049,7 +1049,7 @@ Base.@kwdef struct SparspakFactorization <: AbstractSparseFactorization
 end
 
 function init_cacheval(alg::SparspakFactorization,
-        A::Union{Matrix, Nothing, AbstractSciMLOperator}, b, u, Pl, Pr,
+        A::Union{AbstractMatrix, Nothing, AbstractSciMLOperator}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
     nothing

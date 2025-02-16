@@ -53,7 +53,7 @@ function LinearSolve.defaultalg(A::AbstractSparseMatrixCSC{Tv, Ti}, b,
     elseif ext === nothing
         error("SparspakFactorization required for general sparse matrix types and with general Julia number types. Do `using Sparspak` in order to enable this functionality")
     else
-        error("Unreachable reached. Please report this error with a reproducer."
+        error("Unreachable reached. Please report this error with a reproducer.")
     end
 end
 

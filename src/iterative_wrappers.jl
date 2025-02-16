@@ -238,8 +238,9 @@ function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, re
 end
 
 # Krylov.jl tries to init with `ArrayPartition(undef, ...)`. Avoid hitting that!
-function init_cacheval(alg::LinearSolve.KrylovJL, A, b::RecursiveArrayTools.ArrayPartition, u, Pl, Pr,
-    maxiters::Int, abstol, reltol, verbose::Bool, ::LinearSolve.OperatorAssumptions)
+function init_cacheval(
+        alg::LinearSolve.KrylovJL, A, b::RecursiveArrayTools.ArrayPartition, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool, ::LinearSolve.OperatorAssumptions)
     return nothing
 end
 

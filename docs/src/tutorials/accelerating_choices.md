@@ -9,7 +9,7 @@
 Great, you've learned how to use LinearSolve.jl and you're using it daily,
 either directly or through other SciML libraries, and you want to improve
 your performance. How can this be done? While it might seem at first like a
-hopeless endevour, "A\b uses a BLAS library and so it's already highly optimized
+hopeless endeavour, "A\b uses a BLAS library and so it's already highly optimized
 C code", it turns out there are many factors you need to consider to squeeze out
 the last 10x of performance. And yes, it can be about a factor of 10 in some
 scenarios, so let's dive in.

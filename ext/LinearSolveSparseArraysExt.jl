@@ -47,7 +47,7 @@ function LinearSolve.defaultalg(A::AbstractSparseMatrixCSC{Tv, Ti}, b,
         assump::OperatorAssumptions{Bool}) where {Tv, Ti}
     ext = Base.get_extension(LinearSolve, :LinearSolveSparspakExt)
     if assump.issq && ext !== nothing
-        DefaultLinearSolver.DefaultLinearSolver(DefaultAlgorithmChoice.SparspakFactorization)
+        LinearSolve.DefaultLinearSolver(DefaultAlgorithmChoice.SparspakFactorization)
     elseif !assump.issq
         error("Generic number sparse factorization for non-square is not currently handled")
     elseif ext === nothing

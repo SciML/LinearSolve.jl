@@ -45,10 +45,15 @@ end
 
 function LinearSolve.defaultalg(A::AbstractSparseMatrixCSC{Tv, Ti}, b,
         assump::OperatorAssumptions{Bool}) where {Tv, Ti}
-    if assump.issq
-        DefaultLinearSolver(DefaultAlgorithmChoice.SparspakFactorization)
-    else
+    ext = Base.get_extension(LinearSolve, :LinearSolveSparspakExt)
+    if assump.issq && ext !== nothing
+        LinearSolve.DefaultLinearSolver(DefaultAlgorithmChoice.SparspakFactorization)
+    elseif !assump.issq
         error("Generic number sparse factorization for non-square is not currently handled")
+    elseif ext === nothing
+        error("SparspakFactorization required for general sparse matrix types and with general Julia number types. Do `using Sparspak` in order to enable this functionality")
+    else
+        error("Unreachable reached. Please report this error with a reproducer."
     end
 end
 

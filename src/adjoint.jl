@@ -62,21 +62,21 @@ function CRC.rrule(::typeof(SciMLBase.solve), prob::LinearProblem,
             elseif cache.cacheval isa Tuple && cache.cacheval[1] isa Factorization
                 first(cache.cacheval)' \ ∂u
             elseif alg isa AbstractKrylovSubspaceMethod
-                invprob = LinearProblem(transpose(cache.A), ∂u)
+                invprob = LinearProblem(adjoint(cache.A), ∂u)
                 solve(invprob, alg; cache.abstol, cache.reltol, cache.verbose).u
             elseif alg isa DefaultLinearSolver
                 LinearSolve.defaultalg_adjoint_eval(cache, ∂u)
             else
-                invprob = LinearProblem(transpose(A_), ∂u) # We cached `A`
+                invprob = LinearProblem(adjoint(A_), ∂u) # We cached `A`
                 solve(invprob, alg; cache.abstol, cache.reltol, cache.verbose).u
             end
         else
-            invprob = LinearProblem(transpose(A_), ∂u) # We cached `A`
+            invprob = LinearProblem(adjoint(A_), ∂u) # We cached `A`
             λ = solve(
                 invprob, sensealg.linsolve; cache.abstol, cache.reltol, cache.verbose).u
         end
 
-        tu = transpose(sol.u)
+        tu = adjoint(sol.u)
         ∂A = BroadcastArray(@~ .-(λ .* tu))
         ∂b = λ
         ∂prob = LinearProblem(∂A, ∂b, ∂∅)

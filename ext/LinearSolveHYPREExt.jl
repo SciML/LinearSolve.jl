@@ -77,7 +77,7 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
 
         if haskey(kwargs, :alias_A)
             message = "`alias_A` keyword argument is deprecated, to set `alias_A`,
-            please use an ODEAliasSpecifier, e.g. `solve(prob, alias = LinearAliasSpecifier(alias_A = true))"
+            please use an LinearAliasSpecifier, e.g. `solve(prob, alias = LinearAliasSpecifier(alias_A = true))"
             Base.depwarn(message, :init)
             Base.depwarn(message, :solve)
             aliases = LinearAliasSpecifier(alias_A = values(kwargs).alias_A)
@@ -85,7 +85,7 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
 
         if haskey(kwargs, :alias_b)
             message = "`alias_b` keyword argument is deprecated, to set `alias_b`,
-            please use an ODEAliasSpecifier, e.g. `solve(prob, alias = LinearAliasSpecifier(alias_b = true))"
+            please use an LinearAliasSpecifier, e.g. `solve(prob, alias = LinearAliasSpecifier(alias_b = true))"
             Base.depwarn(message, :init)
             Base.depwarn(message, :solve)
             aliases = LinearAliasSpecifier(

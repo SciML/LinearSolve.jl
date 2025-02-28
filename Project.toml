@@ -24,7 +24,6 @@ Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 SciMLOperators = "c0aeaf25-5076-4817-a8d5-81caf7dfa961"
 Setfield = "efcf1570-3423-57d1-acb7-fd33fddbac46"
-SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StaticArraysCore = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 
@@ -43,6 +42,7 @@ KrylovKit = "0b1a1467-8014-51b9-945f-bf0ae24f4b77"
 Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
 Pardiso = "46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2"
 RecursiveFactorization = "f2c3362d-daeb-58d1-803e-2bc74f2840b4"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Sparspak = "e56a9233-b9d6-4f03-8d0f-1825330902ac"
 
 [extensions]
@@ -58,10 +58,10 @@ LinearSolveIterativeSolversExt = "IterativeSolvers"
 LinearSolveKernelAbstractionsExt = "KernelAbstractions"
 LinearSolveKrylovKitExt = "KrylovKit"
 LinearSolveMetalExt = "Metal"
-LinearSolvePardisoExt = "Pardiso"
+LinearSolvePardisoExt = ["Pardiso", "SparseArrays"]
 LinearSolveRecursiveFactorizationExt = "RecursiveFactorization"
 LinearSolveSparseArraysExt = "SparseArrays"
-LinearSolveSparspakExt = "Sparspak"
+LinearSolveSparspakExt = ["SparseArrays", "Sparspak"]
 
 [compat]
 AllocCheck = "0.2"

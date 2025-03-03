@@ -4,8 +4,8 @@ using FiniteDiff, RecursiveFactorization
 using LazyArrays: BroadcastArray
 
 n = 4
-A = rand(n, n)
-b1 = rand(n)
+A = rand(n, n);
+b1 = rand(n);
 
 function f(A, b1; alg = LUFactorization())
     prob = LinearProblem(A, b1)

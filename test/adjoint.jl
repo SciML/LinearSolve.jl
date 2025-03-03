@@ -4,8 +4,8 @@ using FiniteDiff, RecursiveFactorization
 using LazyArrays: BroadcastArray
 
 n = 4
-A = rand(n, n) + 1im * rand(n, n);
-b1 = rand(n) + 1im * rand(n);
+A = rand(n, n)
+b1 = rand(n)
 
 function f(A, b1; alg = LUFactorization())
     prob = LinearProblem(A, b1)
@@ -85,8 +85,9 @@ db22 = ForwardDiff.gradient(x -> f4(eltype(x).(A), eltype(x).(b1), x), copy(b1))
 @test db1 ≈ db12
 @test db2 ≈ db22
 
-A = rand(n, n);
-b1 = rand(n);
+# Test complex numbers
+A = rand(n, n) + 1im * rand(n, n);
+b1 = rand(n) + 1im * rand(n);
 for alg in (
     LUFactorization(),
     RFLUFactorization(),

@@ -99,7 +99,7 @@ for alg in (
 
         sol1 = solve(prob, alg)
 
-        sum(sol1.u)
+        sum(abs2.(sol1.u))
     end
     fb(b1)
 
@@ -116,7 +116,7 @@ for alg in (
 
         sol1 = solve(prob, alg)
 
-        sum(sol1.u)
+        sum(abs2.(sol1.u))
     end
     fA(A)
 

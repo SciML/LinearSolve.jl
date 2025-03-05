@@ -46,7 +46,7 @@ db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x), copy(b1))
 
 # Test complex numbers
 A = rand(n, n) + 1im*rand(n, n);
-b1 = rand(n) + 1im*rand(n, n);
+b1 = rand(n) + 1im*rand(n);
 
 function f3(A, b1, b2; alg = KrylovJL_GMRES())
     prob = LinearProblem(A, b1)

@@ -44,6 +44,10 @@ db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x), copy(b1))
 @test dA ≈ dA2
 @test db1 ≈ db12
 
+# Test complex numbers
+A = rand(n, n) + 1im*rand(n, n);
+b1 = rand(n) + 1im*rand(n);
+
 function f3(A, b1, b2; alg = KrylovJL_GMRES())
     prob = LinearProblem(A, b1)
     sol1 = solve(prob, alg)
@@ -65,6 +69,9 @@ db22 = FiniteDiff.finite_difference_gradient(
 @test dA≈dA2 rtol=1e-3
 @test db1 ≈ db12
 @test db2 ≈ db22
+
+A = rand(n, n);
+b1 = rand(n);
 
 function f4(A, b1, b2; alg = LUFactorization())
     prob = LinearProblem(A, b1)

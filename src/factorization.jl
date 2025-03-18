@@ -1044,8 +1044,17 @@ dispatch to route around standard BLAS routines in the case e.g. of arbitrary-pr
 floating point numbers or ForwardDiff.Dual.
 This e.g. allows for Automatic Differentiation (AD) of a sparse-matrix solve.
 """
-Base.@kwdef struct SparspakFactorization <: AbstractSparseFactorization
-    reuse_symbolic::Bool = true
+struct SparspakFactorization <: AbstractSparseFactorization
+    reuse_symbolic::Bool
+    
+    function SparspakFactorization(;reuse_symbolic = true)
+        ext = Base.get_extension(@__MODULE__, :LinearSolveSparspakExt)
+        if ext === nothing
+            error("SparspakFactorization requires that Sparspak is loaded, i.e. `using Sparspak`")
+        else
+            new(reuse_symbolic)
+        end
+    end
 end
 
 function init_cacheval(alg::SparspakFactorization,

@@ -11,7 +11,7 @@ rows = Vector{Int}(undef, 0)
 for i in 1:n
     if i != 1
         push!(vals, dx2)
-        push!(cols, i-1)
+        push!(cols, i - 1)
         push!(rows, i)
     end
     push!(vals, -2dx2)

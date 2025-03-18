@@ -3,7 +3,7 @@ using LinearSolve
 using Test
 
 n = 10
-dx = 1/n
+dx = 1 / n
 dx2 = dx^-2
 vals = Vector{BigFloat}(undef, 0)
 cols = Vector{Int}(undef, 0)

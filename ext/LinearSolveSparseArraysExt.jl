@@ -187,7 +187,7 @@ function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions) where {T <:
-        BLASELTYPES}
+                                                                BLASELTYPES}
     PREALLOCATED_CHOLMOD
 end
 

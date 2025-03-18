@@ -1048,7 +1048,7 @@ This e.g. allows for Automatic Differentiation (AD) of a sparse-matrix solve.
 struct SparspakFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool
 
-    function SparspakFactorization(;reuse_symbolic = true, throwerror = true)
+    function SparspakFactorization(; reuse_symbolic = true, throwerror = true)
         ext = Base.get_extension(@__MODULE__, :LinearSolveSparspakExt)
         if throwerror && ext === nothing
             error("SparspakFactorization requires that Sparspak is loaded, i.e. `using Sparspak`")

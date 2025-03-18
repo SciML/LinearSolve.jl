@@ -3,6 +3,7 @@ module LinearSolveSparseArraysExt
 using LinearSolve, LinearAlgebra
 using SparseArrays
 using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
+using LinearSolve: BLASELTYPES
 
 # Can't `using KLU` because cannot have a dependency in there without
 # requiring the user does `using KLU`
@@ -39,7 +40,7 @@ function LinearSolve.handle_sparsematrixcsc_lu(A::AbstractSparseMatrixCSC)
 end
 
 function LinearSolve.defaultalg(
-        A::Symmetric{<:Number, <:SparseMatrixCSC}, b, ::OperatorAssumptions{Bool})
+        A::Symmetric{<:BLASELTYPES, <:SparseMatrixCSC}, b, ::OperatorAssumptions{Bool})
     LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.CHOLMODFactorization)
 end
 
@@ -78,7 +79,7 @@ function LinearSolve.init_cacheval(
 end
 
 function LinearSolve.init_cacheval(
-        alg::UMFPACKFactorization, A::AbstractSparseArray, b, u, Pl, Pr,
+        alg::UMFPACKFactorization, A::AbstractSparseArray{Float64}, b, u, Pl, Pr,
         maxiters::Int, abstol,
         reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
@@ -136,7 +137,7 @@ function LinearSolve.init_cacheval(
 end
 
 function LinearSolve.init_cacheval(
-        alg::KLUFactorization, A::AbstractSparseArray, b, u, Pl, Pr,
+        alg::KLUFactorization, A::AbstractSparseArray{Float64}, b, u, Pl, Pr,
         maxiters::Int, abstol,
         reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
@@ -186,15 +187,15 @@ function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions) where {T <:
-                                                                Union{Float32, Float64}}
+        BLASELTYPES}
     PREALLOCATED_CHOLMOD
 end
 
 function LinearSolve.init_cacheval(alg::NormalCholeskyFactorization,
-        A::Union{AbstractSparseArray, LinearSolve.GPUArraysCore.AnyGPUArray,
-            Symmetric{<:Number, <:AbstractSparseArray}}, b, u, Pl, Pr,
+        A::Union{AbstractSparseArray{T}, LinearSolve.GPUArraysCore.AnyGPUArray,
+            Symmetric{T, <:AbstractSparseArray{T}}}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
+        assumptions::OperatorAssumptions) where {T <: BLASELTYPES}
     LinearSolve.ArrayInterface.cholesky_instance(convert(AbstractMatrix, A))
 end
 

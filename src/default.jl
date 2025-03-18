@@ -229,7 +229,7 @@ function algchoice_to_alg(alg::Symbol)
     elseif alg === :DirectLdiv!
         DirectLdiv!()
     elseif alg === :SparspakFactorization
-        SparspakFactorization()
+        SparspakFactorization(throwerror = false)
     elseif alg === :KLUFactorization
         KLUFactorization()
     elseif alg === :UMFPACKFactorization

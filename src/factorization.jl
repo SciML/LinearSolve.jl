@@ -319,7 +319,7 @@ function init_cacheval(alg::CholeskyFactorization, A::GPUArraysCore.AnyGPUArray,
     cholesky(A; check = false)
 end
 
-function init_cacheval(alg::CholeskyFactorization, A, b, u, Pl, Pr,
+function init_cacheval(alg::CholeskyFactorization, A::AbstractArray{<:BLASELTYPES}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     ArrayInterface.cholesky_instance(convert(AbstractMatrix, A), alg.pivot)
 end
@@ -333,7 +333,7 @@ function init_cacheval(alg::CholeskyFactorization, A::Matrix{Float64}, b, u, Pl,
 end
 
 function init_cacheval(alg::CholeskyFactorization,
-        A::Union{Diagonal, AbstractSciMLOperator}, b, u, Pl, Pr,
+        A::Union{Diagonal, AbstractSciMLOperator, AbstractArray}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     nothing
@@ -1046,10 +1046,10 @@ This e.g. allows for Automatic Differentiation (AD) of a sparse-matrix solve.
 """
 struct SparspakFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool
-    
-    function SparspakFactorization(;reuse_symbolic = true)
+
+    function SparspakFactorization(;reuse_symbolic = true, throwerror = true)
         ext = Base.get_extension(@__MODULE__, :LinearSolveSparspakExt)
-        if ext === nothing
+        if throwerror && ext === nothing
             error("SparspakFactorization requires that Sparspak is loaded, i.e. `using Sparspak`")
         else
             new(reuse_symbolic)

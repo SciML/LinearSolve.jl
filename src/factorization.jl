@@ -319,7 +319,8 @@ function init_cacheval(alg::CholeskyFactorization, A::GPUArraysCore.AnyGPUArray,
     cholesky(A; check = false)
 end
 
-function init_cacheval(alg::CholeskyFactorization, A::AbstractArray{<:BLASELTYPES}, b, u, Pl, Pr,
+function init_cacheval(
+        alg::CholeskyFactorization, A::AbstractArray{<:BLASELTYPES}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     ArrayInterface.cholesky_instance(convert(AbstractMatrix, A), alg.pivot)
 end

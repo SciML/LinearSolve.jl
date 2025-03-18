@@ -25,6 +25,10 @@ if GROUP == "All" || GROUP == "Enzyme"
     @time @safetestset "Enzyme Derivative Rules" include("enzyme.jl")
 end
 
+if GROUP == "All" || GROUP == "DefaultsLoading"
+    @time @safetestset "Enzyme Derivative Rules" include("defaults_loading.jl")
+end
+
 if GROUP == "LinearSolveCUDA"
     Pkg.activate("gpu")
     Pkg.develop(PackageSpec(path = dirname(@__DIR__)))

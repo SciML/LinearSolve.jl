@@ -29,6 +29,7 @@ jobs:
           - "pre"
         group:
           - "Core"
+          - "DefaultsLoading"
           - "LinearSolveHYPRE"
           - "LinearSolvePardiso"
           - "LinearSolveBandedMatrices"

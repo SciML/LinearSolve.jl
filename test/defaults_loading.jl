@@ -19,7 +19,7 @@ for i in 1:n
     push!(rows, i)
     if i != n
         push!(vals, dx2)
-        push!(cols, i+1)
+        push!(cols, i + 1)
         push!(rows, i)
     end
 end

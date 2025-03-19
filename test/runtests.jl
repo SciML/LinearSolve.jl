@@ -25,7 +25,7 @@ if GROUP == "All" || GROUP == "Enzyme"
     @time @safetestset "Enzyme Derivative Rules" include("enzyme.jl")
 end
 
-if GROUP == "All" || GROUP == "DefaultsLoading"
+if GROUP == "DefaultsLoading"
     @time @safetestset "Enzyme Derivative Rules" include("defaults_loading.jl")
 end
 

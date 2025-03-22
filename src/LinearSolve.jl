@@ -138,7 +138,15 @@ include("solve_function.jl")
 include("default.jl")
 include("init.jl")
 include("adjoint.jl")
-include("deprecated.jl")
+
+## Deprecated, remove in July 2025
+
+@static if isdefined(SciMLBase, :DiffEqArrayOperator)
+    function defaultalg(A::SciMLBase.DiffEqArrayOperator, b,
+            assump::OperatorAssumptions{Bool})
+        defaultalg(A.A, b, assump)
+    end
+end
 
 @inline function _notsuccessful(F::LinearAlgebra.QRCompactWY)
     (m, n) = size(F)

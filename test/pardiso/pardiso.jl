@@ -54,17 +54,17 @@ prob = LinearProblem(copy(A), copy(b1))
 
 linsolve = init(prob, UMFPACKFactorization())
 sol11 = solve!(linsolve)
-linsolve = LinearSolve.set_b(sol11.cache, copy(b2))
+linsolve.b = copy(b2)
 sol12 = solve!(linsolve)
-linsolve = LinearSolve.set_A(sol12.cache, copy(A2))
+linsolve.A = copy(A2)
 sol13 = solve!(linsolve)
 
 for alg in algs
     linsolve = init(prob, alg)
     sol31 = solve!(linsolve)
-    linsolve = LinearSolve.set_b(sol31.cache, copy(b2))
+    linsolve.b = copy(b2)
     sol32 = solve!(linsolve)
-    linsolve = LinearSolve.set_A(sol32.cache, copy(A2))
+    linsolve.A = copy(A2)
     sol33 = solve!(linsolve)
     @test sol11.u ≈ sol31.u
     @test sol12.u ≈ sol32.u

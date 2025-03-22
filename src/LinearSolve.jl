@@ -143,7 +143,7 @@ include("adjoint.jl")
 
 @static if isdefined(SciMLBase, :DiffEqArrayOperator)
     function defaultalg(A::SciMLBase.DiffEqArrayOperator, b,
-        assump::OperatorAssumptions{Bool})
+            assump::OperatorAssumptions{Bool})
         defaultalg(A.A, b, assump)
     end
 end

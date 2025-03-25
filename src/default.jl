@@ -45,7 +45,7 @@ end
 # For SciML algorithms already using `defaultalg`, all assume square matrix.
 defaultalg(A, b) = defaultalg(A, b, OperatorAssumptions(true))
 
-function defaultalg(A::Union{DiffEqArrayOperator, MatrixOperator}, b,
+function defaultalg(A::MatrixOperator, b,
         assump::OperatorAssumptions{Bool})
     defaultalg(A.A, b, assump)
 end

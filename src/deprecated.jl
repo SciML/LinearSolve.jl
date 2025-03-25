@@ -83,3 +83,10 @@ end
     cache::LinearCache,
     args...;
     kwargs...) false
+
+@static if isdefined(SciMLBase, :DiffEqArrayOperator)
+    function defaultalg(A::DiffEqArrayOperator, b,
+            assump::OperatorAssumptions{Bool})
+        defaultalg(A.A, b, assump)
+    end
+end

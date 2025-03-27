@@ -523,6 +523,16 @@ end
             test_interface(nothing, prob3, prob4)
         end
     end
+
+    @testset "Sparse matrix (check pattern_changed)" begin
+        n = 4
+        A = spdiagm(1 => ones(n - 1), 0 => fill(2.0, n), -1 => ones(n - 1))
+        b = rand(n)
+        linprob = @inferred LinearProblem(A, b)
+        alg = @inferred LUFactorization()
+        linsolve = @inferred init(linprob, alg)
+        linres = @inferred solve!(linsolve)
+    end
 end # testset
 
 # https://github.com/SciML/LinearSolve.jl/issues/347

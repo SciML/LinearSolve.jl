@@ -229,7 +229,7 @@ function LinearSolve._ldiv!(::LinearSolve.SVector,
     (A \ b)
 end
 
-function pattern_changed(fact, A::SparseArrays.SparseMatrixCSC)
+function LinearSolve.pattern_changed(fact, A::SparseArrays.SparseMatrixCSC)
     !(SparseArrays.decrement(SparseArrays.getcolptr(A)) ==
       fact.colptr && SparseArrays.decrement(SparseArrays.getrowval(A)) ==
       fact.rowval)

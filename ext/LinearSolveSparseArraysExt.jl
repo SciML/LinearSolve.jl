@@ -3,7 +3,7 @@ module LinearSolveSparseArraysExt
 using LinearSolve, LinearAlgebra
 using SparseArrays
 using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
-using LinearSolve: BLASELTYPES
+using LinearSolve: BLASELTYPES, pattern_changed
 
 # Can't `using KLU` because cannot have a dependency in there without
 # requiring the user does `using KLU`
@@ -229,7 +229,7 @@ function LinearSolve._ldiv!(::LinearSolve.SVector,
     (A \ b)
 end
 
-function pattern_changed(fact, A::SparseArrays.SparseMatrixCSC)
+function LinearSolve.pattern_changed(fact, A::SparseArrays.SparseMatrixCSC)
     !(SparseArrays.decrement(SparseArrays.getcolptr(A)) ==
       fact.colptr && SparseArrays.decrement(SparseArrays.getrowval(A)) ==
       fact.rowval)

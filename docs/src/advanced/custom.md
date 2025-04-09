@@ -37,7 +37,7 @@ The inputs to the function are as follows:
   - `solverdata`, solver cache set to `nothing` if solver hasn't been initialized
   - `kwargs`, standard SciML keyword arguments such as `verbose`, `maxiters`, `abstol`, `reltol`
 
-The function `my_linsolve` must accept the above specified arguments and modify the, and return
+The function `my_linsolve` must accept the above specified arguments and modify them, and return
 the solution, `u`. As memory for `u` is already allocated, the user may choose
 to modify `u` in place as follows:
 

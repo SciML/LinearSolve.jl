@@ -291,17 +291,17 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     if cache.cacheval isa Krylov.CgWorkspace
         N !== I &&
             @warn "$(alg.KrylovAlg) doesn't support right preconditioning."
-        Krylov.solve!(args...; M, kwargs...)
+        Krylov.krylov_solve!(args...; M, kwargs...)
     elseif cache.cacheval isa Krylov.GmresWorkspace
-        Krylov.solve!(args...; M, N, restart = alg.gmres_restart > 0, kwargs...)
+        Krylov.krylov_solve!(args...; M, N, restart = alg.gmres_restart > 0, kwargs...)
     elseif cache.cacheval isa Krylov.BicgstabWorkspace
-        Krylov.solve!(args...; M, N, kwargs...)
+        Krylov.krylov_solve!(args...; M, N, kwargs...)
     elseif cache.cacheval isa Krylov.MinresWorkspace
         N !== I &&
             @warn "$(alg.KrylovAlg) doesn't support right preconditioning."
-        Krylov.solve!(args...; M, kwargs...)
+        Krylov.krylov_solve!(args...; M, kwargs...)
     else
-        Krylov.solve!(args...; kwargs...)
+        Krylov.krylov_solve!(args...; kwargs...)
     end
 
     stats = @get_cacheval(cache, :KrylovJL_GMRES).stats

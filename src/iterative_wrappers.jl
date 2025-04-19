@@ -109,73 +109,73 @@ end
 
 function get_KrylovJL_solver(KrylovAlg)
     KS = if (KrylovAlg === Krylov.lsmr!)
-        Krylov.LsmrSolver
+        Krylov.LsmrWorkspace
     elseif (KrylovAlg === Krylov.cgs!)
-        Krylov.CgsSolver
+        Krylov.CgsWorkspace
     elseif (KrylovAlg === Krylov.usymlq!)
-        Krylov.UsymlqSolver
+        Krylov.UsymlqWorkspace
     elseif (KrylovAlg === Krylov.lnlq!)
-        Krylov.LnlqSolver
+        Krylov.LnlqWorkspace
     elseif (KrylovAlg === Krylov.bicgstab!)
-        Krylov.BicgstabSolver
+        Krylov.BicgstabWorkspace
     elseif (KrylovAlg === Krylov.crls!)
-        Krylov.CrlsSolver
+        Krylov.CrlsWorkspace
     elseif (KrylovAlg === Krylov.lsqr!)
-        Krylov.LsqrSolver
+        Krylov.LsqrWorkspace
     elseif (KrylovAlg === Krylov.minres!)
-        Krylov.MinresSolver
+        Krylov.MinresWorkspace
     elseif (KrylovAlg === Krylov.cgne!)
-        Krylov.CgneSolver
+        Krylov.CgneWorkspace
     elseif (KrylovAlg === Krylov.dqgmres!)
-        Krylov.DqgmresSolver
+        Krylov.DqgmresWorkspace
     elseif (KrylovAlg === Krylov.symmlq!)
-        Krylov.SymmlqSolver
+        Krylov.SymmlqWorkspace
     elseif (KrylovAlg === Krylov.trimr!)
-        Krylov.TrimrSolver
+        Krylov.TrimrWorkspace
     elseif (KrylovAlg === Krylov.usymqr!)
-        Krylov.UsymqrSolver
+        Krylov.UsymqrWorkspace
     elseif (KrylovAlg === Krylov.bilqr!)
-        Krylov.BilqrSolver
+        Krylov.BilqrWorkspace
     elseif (KrylovAlg === Krylov.cr!)
-        Krylov.CrSolver
+        Krylov.CrWorkspace
     elseif (KrylovAlg === Krylov.craigmr!)
-        Krylov.CraigmrSolver
+        Krylov.CraigmrWorkspace
     elseif (KrylovAlg === Krylov.tricg!)
-        Krylov.TricgSolver
+        Krylov.TricgWorkspace
     elseif (KrylovAlg === Krylov.craig!)
-        Krylov.CraigSolver
+        Krylov.CraigWorkspace
     elseif (KrylovAlg === Krylov.diom!)
-        Krylov.DiomSolver
+        Krylov.DiomWorkspace
     elseif (KrylovAlg === Krylov.lslq!)
-        Krylov.LslqSolver
+        Krylov.LslqWorkspace
     elseif (KrylovAlg === Krylov.trilqr!)
-        Krylov.TrilqrSolver
+        Krylov.TrilqrWorkspace
     elseif (KrylovAlg === Krylov.crmr!)
-        Krylov.CrmrSolver
+        Krylov.CrmrWorkspace
     elseif (KrylovAlg === Krylov.cg!)
-        Krylov.CgSolver
+        Krylov.CgWorkspace
     elseif (KrylovAlg === Krylov.cg_lanczos!)
-        Krylov.CgLanczosShiftSolver
+        Krylov.CgLanczosShiftWorkspace
     elseif (KrylovAlg === Krylov.cgls!)
-        Krylov.CglsSolver
+        Krylov.CglsWorkspace
     elseif (KrylovAlg === Krylov.cg_lanczos!)
-        Krylov.CgLanczosSolver
+        Krylov.CgLanczosWorkspace
     elseif (KrylovAlg === Krylov.bilq!)
-        Krylov.BilqSolver
+        Krylov.BilqWorkspace
     elseif (KrylovAlg === Krylov.minres_qlp!)
-        Krylov.MinresQlpSolver
+        Krylov.MinresQlpWorkspace
     elseif (KrylovAlg === Krylov.qmr!)
-        Krylov.QmrSolver
+        Krylov.QmrWorkspace
     elseif (KrylovAlg === Krylov.gmres!)
-        Krylov.GmresSolver
+        Krylov.GmresWorkspace
     elseif (KrylovAlg === Krylov.fgmres!)
-        Krylov.FgmresSolver
+        Krylov.FgmresWorkspace
     elseif (KrylovAlg === Krylov.gpmr!)
-        Krylov.GpmrSolver
+        Krylov.GpmrWorkspace
     elseif (KrylovAlg === Krylov.fom!)
-        Krylov.FomSolver
+        Krylov.FomWorkspace
     elseif (KrylovAlg === Krylov.minares!)
-        Krylov.MinaresSolver
+        Krylov.MinaresWorkspace
     else
         error("Invalid Krylov method detected")
     end
@@ -196,11 +196,11 @@ function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, re
                      alg.KrylovAlg === Krylov.gpmr! ||
                      alg.KrylovAlg === Krylov.fom!)
             if issparsematrixcsc(A)
-                KS(makeempty_SparseMatrixCSC(A), eltype(b)[], 1)
+                KS(makeempty_SparseMatrixCSC(A), eltype(b)[]; memory = 1)
             elseif A isa Matrix
-                KS(Matrix{eltype(A)}(undef, 0, 0), eltype(b)[], 1)
+                KS(Matrix{eltype(A)}(undef, 0, 0), eltype(b)[]; memory = 1)
             else
-                KS(A, b, 1)
+                KS(A, b; memory = 1)
             end
         else
             if issparsematrixcsc(A)
@@ -220,7 +220,7 @@ function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, re
                      alg.KrylovAlg === Krylov.fgmres! ||
                      alg.KrylovAlg === Krylov.gpmr! ||
                      alg.KrylovAlg === Krylov.fom!)
-            KS(A, b, memory)
+            KS(A, b; memory)
         elseif (alg.KrylovAlg === Krylov.minres! ||
                 alg.KrylovAlg === Krylov.symmlq! ||
                 alg.KrylovAlg === Krylov.lslq! ||
@@ -288,20 +288,20 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     kwargs = (atol = atol, rtol, itmax, verbose,
         ldiv = true, history = true, alg.kwargs...)
 
-    if cache.cacheval isa Krylov.CgSolver
+    if cache.cacheval isa Krylov.CgWorkspace
         N !== I &&
             @warn "$(alg.KrylovAlg) doesn't support right preconditioning."
-        Krylov.solve!(args...; M, kwargs...)
-    elseif cache.cacheval isa Krylov.GmresSolver
-        Krylov.solve!(args...; M, N, restart = alg.gmres_restart > 0, kwargs...)
-    elseif cache.cacheval isa Krylov.BicgstabSolver
-        Krylov.solve!(args...; M, N, kwargs...)
-    elseif cache.cacheval isa Krylov.MinresSolver
+        Krylov.krylov_solve!(args...; M, kwargs...)
+    elseif cache.cacheval isa Krylov.GmresWorkspace
+        Krylov.krylov_solve!(args...; M, N, restart = alg.gmres_restart > 0, kwargs...)
+    elseif cache.cacheval isa Krylov.BicgstabWorkspace
+        Krylov.krylov_solve!(args...; M, N, kwargs...)
+    elseif cache.cacheval isa Krylov.MinresWorkspace
         N !== I &&
             @warn "$(alg.KrylovAlg) doesn't support right preconditioning."
-        Krylov.solve!(args...; M, kwargs...)
+        Krylov.krylov_solve!(args...; M, kwargs...)
     else
-        Krylov.solve!(args...; kwargs...)
+        Krylov.krylov_solve!(args...; kwargs...)
     end
 
     stats = @get_cacheval(cache, :KrylovJL_GMRES).stats

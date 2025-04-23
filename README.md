@@ -43,7 +43,7 @@ b2 = rand(n);
 prob = LinearProblem(A, b1)
 
 linsolve = init(prob)
-sol1 = solve(linsolve)
+sol1 = solve!(linsolve)
 
 sol1.u
 #=
@@ -55,7 +55,7 @@ sol1.u
 =#
 
 linsolve = LinearSolve.set_b(linsolve, b2)
-sol2 = solve(linsolve)
+sol2 = solve!(linsolve)
 
 sol2.u
 #=
@@ -67,7 +67,7 @@ sol2.u
 =#
 
 linsolve = LinearSolve.set_b(linsolve, b2)
-sol2 = solve(linsolve, IterativeSolversJL_GMRES()) # Switch to GMRES
+sol2 = solve!(linsolve, IterativeSolversJL_GMRES()) # Switch to GMRES
 sol2.u
 #=
 4-element Vector{Float64}:
@@ -79,7 +79,7 @@ sol2.u
 
 A2 = rand(n, n)
 linsolve = LinearSolve.set_A(linsolve, A2)
-sol3 = solve(linsolve)
+sol3 = solve!(linsolve)
 
 sol3.u
 #=

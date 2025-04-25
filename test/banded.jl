@@ -52,3 +52,9 @@ A = AlmostBandedMatrix(BandedMatrix(fill(2.0, n + 2, n), (1, 1)), fill(3.0, 2, n
 A[band(0)] .+= 1:n
 
 @test_nowarn solve(LinearProblem(A, b))
+
+# Workaround for no lu from BandedMatrices
+A = BandedMatrix{BigFloat}(ones(3, 3), (0, 0))
+b = BigFloat[1, 2, 3]
+prob = LinearProblem(A, b)
+@test_nowarn solve(prob)

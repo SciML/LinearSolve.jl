@@ -16,6 +16,11 @@ function defaultalg(A::BandedMatrix, b, oa::OperatorAssumptions{Bool})
     end
 end
 
+function defaultalg(
+        A::BandedMatrix{T}, b, oa::OperatorAssumptions{Bool}) where {T <: BigFloat}
+    return DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
+end
+
 function defaultalg(A::Symmetric{<:Number, <:BandedMatrix}, b, ::OperatorAssumptions{Bool})
     return DefaultLinearSolver(DefaultAlgorithmChoice.CholeskyFactorization)
 end
@@ -42,8 +47,9 @@ for alg in (:SVDFactorization, :MKLLUFactorization, :DiagonalFactorization,
     end
 end
 
-function init_cacheval(::LUFactorization, A::BandedMatrix, b, u, Pl, Pr, maxiters::Int,
-        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+function init_cacheval(::LUFactorization, A::BandedMatrix{T}, b, u, Pl, Pr, maxiters::Int,
+        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions) where {T}
+    (T <: BigFloat) && return qr(similar(A, 0, 0))
     return lu(similar(A, 0, 0))
 end
 

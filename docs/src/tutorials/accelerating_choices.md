@@ -64,7 +64,7 @@ Sparse linear solvers are not as dependent on the CPU but highly dependent on th
 is being solved. For example, this is for a 1D laplacian vs a 3D laplacian, changing N to make
 smaller and bigger versions:
 
-![Sparse Linear Solve Benchmarks](../assets/dense_linear_solves.png)
+![Sparse Linear Solve Benchmarks](../assets/sparse_linear_solves.png)
 
 Notice that the optimal linear solver changes based on problem (i.e. sparsity pattern) and size.
 LinearSolve.jl just uses a very simple "if small then use KLU and if large use UMFPACK", which

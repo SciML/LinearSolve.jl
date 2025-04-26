@@ -1,7 +1,7 @@
 # Getting Started with Solving Linear Systems in Julia
 
-A linear system $$Au=b$$ is specified by defining an `AbstractMatrix`. For the sake
-of simplicity, this tutorial will start by only showcasing concrete matrices.
+A linear system $$Au=b$$ is specified by defining an `AbstractMatrix` or `AbstractSciMLOperator`.
+For the sake of simplicity, this tutorial will start by only showcasing concrete matrices.
 
 The following defines a matrix and a `LinearProblem` which is subsequently solved
 by the default linear solver.
@@ -57,8 +57,23 @@ sol = solve(prob, KrylovJL_GMRES()) # Choosing algorithms is done the same way
 sol.u
 ```
 
+Similerly structure matrix types, like banded matrices, can be provided using special matrix
+types. While any `AbstractMatrix` type should be compatible via the general Julia interfaces,
+LinearSolve.jl specifically tests with the following cases:
+
+* [BandedMatrices.jl](https://github.com/JuliaLinearAlgebra/BandedMatrices.jl)
+* [BlockDiagonals.jl](https://github.com/JuliaArrays/BlockDiagonals.jl)
+* [CUDA.jl](https://cuda.juliagpu.org/stable/) (CUDA GPU-based dense and sparse matrices)
+* [FastAlmostBandedMatrices.jl](https://github.com/SciML/FastAlmostBandedMatrices.jl)
+* [Metal.jl](https://metal.juliagpu.org/stable/) (Apple M-series GPU-based dense matrices)
+
 ## Using Matrix-Free Operators
 
-`A`, or
-by providing a matrix-free operator for performing `A*x` operations via the
-function `A(u,p,t)` out-of-place and `A(du,u,p,t)` for in-place.
+In many cases where a sparse matrix gets really large, even the sparse representation
+cannot be stored in memory. However, in many such cases, such as with PDE discretizations,
+you may be able to write down a function that directly computes `A*x`. These "matrix-free"
+operators allow the user to define the `Ax=b` problem to be solved giving only the definition
+of `A*x` and allowing specific solvers (Krylov methods) to act without ever constructing
+the full matrix.
+
+**This will be documented in more detail in the near future**

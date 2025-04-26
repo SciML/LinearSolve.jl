@@ -1,9 +1,11 @@
 # Put in a separate page so it can be used by SciMLDocs.jl
 
 pages = ["index.md",
-    "Tutorials" => Any["tutorials/linear.md",
+    "tutorials/linear.md",
+    "Tutorials" => Any[
         "tutorials/caching_interface.md",
-        "tutorials/accelerating_choices.md"],
+        "tutorials/accelerating_choices.md",
+        "tutorials/gpu.md"],
     "Basics" => Any["basics/LinearProblem.md",
         "basics/common_solver_opts.md",
         "basics/OperatorAssumptions.md",

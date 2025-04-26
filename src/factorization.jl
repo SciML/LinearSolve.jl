@@ -117,7 +117,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
         end
         cache.cacheval = fact
 
-        if !LinearAlgebra.issuccess(fact)
+        if hasmethod(LinearAlgebra.issuccess, Tuple{typeof(fact)}) && !LinearAlgebra.issuccess(fact)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
         end

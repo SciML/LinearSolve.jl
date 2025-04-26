@@ -1,9 +1,7 @@
-# Solving Linear Systems in Julia
+# Getting Started with Solving Linear Systems in Julia
 
-A linear system $$Au=b$$ is specified by defining an `AbstractMatrix` `A`, or
-by providing a matrix-free operator for performing `A*x` operations via the
-function `A(u,p,t)` out-of-place and `A(du,u,p,t)` for in-place. For the sake
-of simplicity, this tutorial will only showcase concrete matrices.
+A linear system $$Au=b$$ is specified by defining an `AbstractMatrix`. For the sake
+of simplicity, this tutorial will start by only showcasing concrete matrices.
 
 The following defines a matrix and a `LinearProblem` which is subsequently solved
 by the default linear solver.
@@ -34,4 +32,33 @@ sol.u
 
 Thus, a package which uses LinearSolve.jl simply needs to allow the user to
 pass in an algorithm struct and all wrapped linear solvers are immediately
-available as tweaks to the general algorithm.
+available as tweaks to the general algorithm. For more information on the
+available solvers, see [the solvers page](@ref linearsystemsolvers)
+
+## Sparse and Structured Matrices
+
+There is no difference in the interface for using LinearSolve.jl on sparse
+and structured matrices. For example, the following now uses Julia's
+built-in [SparseArrays.jl](https://docs.julialang.org/en/v1/stdlib/SparseArrays/)
+to define a sparse matrix (`SparseMatrixCSC`) and solve the system using LinearSolve.jl.
+Note that `sprand` is a shorthand for quickly creating a sparse random matrix
+(see SparseArrays.jl for more details on defining sparse matrices).
+
+```@example linsys1
+using LinearSolve, SparseArrays
+
+A = sprand(4, 4, 0.75)
+b = rand(4)
+prob = LinearProblem(A, b)
+sol = solve(prob)
+sol.u
+
+sol = solve(prob, KrylovJL_GMRES()) # Choosing algorithms is done the same way
+sol.u
+```
+
+## Using Matrix-Free Operators
+
+`A`, or
+by providing a matrix-free operator for performing `A*x` operations via the
+function `A(u,p,t)` out-of-place and `A(du,u,p,t)` for in-place.

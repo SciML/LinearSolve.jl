@@ -78,7 +78,8 @@ should be thought about:
  3. A Krylov subspace method with proper preconditioning will be better than direct solvers
     when the matrices get large enough. You could always precondition a sparse matrix with
     iLU as an easy choice, though the tolerance would need to be tuned in a problem-specific
-    way.
+    way. Please see the [preconditioenrs page](https://docs.sciml.ai/LinearSolve/stable/basics/Preconditioners/)
+    for more information on defining and using preconditioners.
 
 !!! note
     

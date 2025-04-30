@@ -157,4 +157,4 @@ The following preconditioners match the interface of LinearSolve.jl.
     
       + Incomplete Cholesky decomposition `KrylovPreconditioners.kp_ic0(A)`
       + Incomplete LU decomposition `KrylovPreconditioners.kp_ilu0(A)`
-      + Block Jacobi `KrylovPreconditioners.BlockJacobiPreconditioner(A, nblocks, device)`
+      + Block Jacobi `KrylovPreconditioners.kp_block_jacobi(A)`

@@ -364,11 +364,19 @@ end
 @generated function defaultalg_adjoint_eval(cache::LinearCache, dy)
     ex = :()
     for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))
-        newex = if alg in Symbol.((DefaultAlgorithmChoice.MKLLUFactorization,
-            DefaultAlgorithmChoice.AppleAccelerateLUFactorization,
-            DefaultAlgorithmChoice.RFLUFactorization))
+        newex = if alg == Symbol(DefaultAlgorithmChoice.RFLUFactorization)
             quote
                 getproperty(cache.cacheval, $(Meta.quot(alg)))[1]' \ dy
+            end
+        elseif alg == Symbol(DefaultAlgorithmChoice.MKLLUFactorization)
+            quote
+                A = getproperty(cache.cacheval, $(Meta.quot(alg)))[1]
+                getrs!('T', A.factors, A.ipiv, dy)
+            end
+        elseif alg == Symbol(DefaultAlgorithmChoice.AppleAccelerateLUFactorization)
+            quote
+                A = getproperty(cache.cacheval, $(Meta.quot(alg)))[1]
+                aa_getrs!('T', A.factors, A.ipiv, dy)
             end
         elseif alg in Symbol.((DefaultAlgorithmChoice.LUFactorization,
             DefaultAlgorithmChoice.QRFactorization,

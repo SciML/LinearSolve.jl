@@ -82,10 +82,10 @@ LinearSolve.jl specifically tests with the following cases:
 
 !!! note
 
-  Choosing the most specific matrix structure that matches your specific system will give you the most performance.
-  Thus if your matrix is symmetric, specifically building with `Symmetric(A)` will be faster than simply using `A`,
-  and will generally lead to better automatic linear solver choices. Note that you can also choose the type for `b`,
-  but generally a dense vector will be the fastest here and many solvers will not support a sparse `b`.
+Choosing the most specific matrix structure that matches your specific system will give you the most performance.
+Thus if your matrix is symmetric, specifically building with `Symmetric(A)` will be faster than simply using `A`,
+and will generally lead to better automatic linear solver choices. Note that you can also choose the type for `b`,
+but generally a dense vector will be the fastest here and many solvers will not support a sparse `b`.
 
 ## Using Matrix-Free Operators
 

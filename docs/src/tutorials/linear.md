@@ -81,6 +81,7 @@ LinearSolve.jl specifically tests with the following cases:
   - [Metal.jl](https://metal.juliagpu.org/stable/) (Apple M-series GPU-based dense matrices) `MetalArray`
 
 !!! note
+    
 
 Choosing the most specific matrix structure that matches your specific system will give you the most performance.
 Thus if your matrix is symmetric, specifically building with `Symmetric(A)` will be faster than simply using `A`,

@@ -60,24 +60,25 @@ sol.u
 
 Similarly structure matrix types, like banded matrices, can be provided using special matrix
 types. While any `AbstractMatrix` type should be compatible via the general Julia interfaces,
-LinearSolve.jl specifically tests with the following cases:		
+LinearSolve.jl specifically tests with the following cases:
 
-* [LinearAlgebra.jl](https://docs.julialang.org/en/v1/stdlib/LinearAlgebra/)
-  * Symmetric
-  * Hermitian
-  * UpperTriangular
-  * UnitUpperTriangular
-  * LowerTriangular
-  * UnitLowerTriangular
-  * SymTridiagonal
-  * Tridiagonal
-  * Bidiagonal
-  * Diagonal
-* [BandedMatrices.jl](https://github.com/JuliaLinearAlgebra/BandedMatrices.jl) `BandedMatrix`
-* [BlockDiagonals.jl](https://github.com/JuliaArrays/BlockDiagonals.jl) `BlockDiagonal`
-* [CUDA.jl](https://cuda.juliagpu.org/stable/) (CUDA GPU-based dense and sparse matrices) `CuArray` (`GPUArray`)
-* [FastAlmostBandedMatrices.jl](https://github.com/SciML/FastAlmostBandedMatrices.jl) `FastAlmostBandedMatrix`
-* [Metal.jl](https://metal.juliagpu.org/stable/) (Apple M-series GPU-based dense matrices) `MetalArray`
+  - [LinearAlgebra.jl](https://docs.julialang.org/en/v1/stdlib/LinearAlgebra/)
+    
+      + Symmetric
+      + Hermitian
+      + UpperTriangular
+      + UnitUpperTriangular
+      + LowerTriangular
+      + UnitLowerTriangular
+      + SymTridiagonal
+      + Tridiagonal
+      + Bidiagonal
+      + Diagonal
+  - [BandedMatrices.jl](https://github.com/JuliaLinearAlgebra/BandedMatrices.jl) `BandedMatrix`
+  - [BlockDiagonals.jl](https://github.com/JuliaArrays/BlockDiagonals.jl) `BlockDiagonal`
+  - [CUDA.jl](https://cuda.juliagpu.org/stable/) (CUDA GPU-based dense and sparse matrices) `CuArray` (`GPUArray`)
+  - [FastAlmostBandedMatrices.jl](https://github.com/SciML/FastAlmostBandedMatrices.jl) `FastAlmostBandedMatrix`
+  - [Metal.jl](https://metal.juliagpu.org/stable/) (Apple M-series GPU-based dense matrices) `MetalArray`
 
 !!! note
 

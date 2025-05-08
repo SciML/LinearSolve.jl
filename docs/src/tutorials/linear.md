@@ -2,8 +2,9 @@
 
 A linear system $$Au=b$$ is specified by defining an `AbstractMatrix` or `AbstractSciMLOperator`.
 For the sake of simplicity, this tutorial will start by only showcasing concrete matrices.
+And specifically, we will start by using the basic Julia `Matrix` type.
 
-The following defines a matrix and a `LinearProblem` which is subsequently solved
+The following defines a `Matrix` and a `LinearProblem` which is subsequently solved
 by the default linear solver.
 
 ```@example linsys1
@@ -57,15 +58,36 @@ sol = solve(prob, KrylovJL_GMRES()) # Choosing algorithms is done the same way
 sol.u
 ```
 
-Similerly structure matrix types, like banded matrices, can be provided using special matrix
+Similarly structure matrix types, like banded matrices, can be provided using special matrix
 types. While any `AbstractMatrix` type should be compatible via the general Julia interfaces,
 LinearSolve.jl specifically tests with the following cases:
 
-* [BandedMatrices.jl](https://github.com/JuliaLinearAlgebra/BandedMatrices.jl)
-* [BlockDiagonals.jl](https://github.com/JuliaArrays/BlockDiagonals.jl)
-* [CUDA.jl](https://cuda.juliagpu.org/stable/) (CUDA GPU-based dense and sparse matrices)
-* [FastAlmostBandedMatrices.jl](https://github.com/SciML/FastAlmostBandedMatrices.jl)
-* [Metal.jl](https://metal.juliagpu.org/stable/) (Apple M-series GPU-based dense matrices)
+  - [LinearAlgebra.jl](https://docs.julialang.org/en/v1/stdlib/LinearAlgebra/)
+    
+      + Symmetric
+      + Hermitian
+      + UpperTriangular
+      + UnitUpperTriangular
+      + LowerTriangular
+      + UnitLowerTriangular
+      + SymTridiagonal
+      + Tridiagonal
+      + Bidiagonal
+      + Diagonal
+
+  - [BandedMatrices.jl](https://github.com/JuliaLinearAlgebra/BandedMatrices.jl) `BandedMatrix`
+  - [BlockDiagonals.jl](https://github.com/JuliaArrays/BlockDiagonals.jl) `BlockDiagonal`
+  - [CUDA.jl](https://cuda.juliagpu.org/stable/) (CUDA GPU-based dense and sparse matrices) `CuArray` (`GPUArray`)
+  - [FastAlmostBandedMatrices.jl](https://github.com/SciML/FastAlmostBandedMatrices.jl) `FastAlmostBandedMatrix`
+  - [Metal.jl](https://metal.juliagpu.org/stable/) (Apple M-series GPU-based dense matrices) `MetalArray`
+
+!!! note
+    
+
+Choosing the most specific matrix structure that matches your specific system will give you the most performance.
+Thus if your matrix is symmetric, specifically building with `Symmetric(A)` will be faster than simply using `A`,
+and will generally lead to better automatic linear solver choices. Note that you can also choose the type for `b`,
+but generally a dense vector will be the fastest here and many solvers will not support a sparse `b`.
 
 ## Using Matrix-Free Operators
 

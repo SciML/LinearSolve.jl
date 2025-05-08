@@ -74,6 +74,7 @@ LinearSolve.jl specifically tests with the following cases:
       + Tridiagonal
       + Bidiagonal
       + Diagonal
+
   - [BandedMatrices.jl](https://github.com/JuliaLinearAlgebra/BandedMatrices.jl) `BandedMatrix`
   - [BlockDiagonals.jl](https://github.com/JuliaArrays/BlockDiagonals.jl) `BlockDiagonal`
   - [CUDA.jl](https://cuda.juliagpu.org/stable/) (CUDA GPU-based dense and sparse matrices) `CuArray` (`GPUArray`)

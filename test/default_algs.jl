@@ -147,6 +147,17 @@ sol = solve!(cache)
 
 ## Non-square Sparse Defaults 
 # https://github.com/SciML/NonlinearSolve.jl/issues/599
+A = SparseMatrixCSC{Float64, Int64}([
+    1.0 0.0
+    1.0 1.0
+])
+b = ones(2)
+A2 = hcat(A,A)
+prob = LinearProblem(A, b)
+@test SciMLBase.successful_retcode(solve(prob))
+
+prob2 = LinearProblem(A2, b)
+@test SciMLBase.successful_retcode(solve(prob2))
 
 A = SparseMatrixCSC{Float64, Int32}([
     1.0 0.0
@@ -156,6 +167,8 @@ b = ones(2)
 A2 = hcat(A,A)
 prob = LinearProblem(A, b)
 @test SciMLBase.successful_retcode(solve(prob))
+
+@info "This test"
 
 prob2 = LinearProblem(A2, b)
 @test SciMLBase.successful_retcode(solve(prob2))

@@ -47,6 +47,7 @@ end
 function LinearSolve.defaultalg(A::AbstractSparseMatrixCSC{Tv, Ti}, b,
         assump::OperatorAssumptions{Bool}) where {Tv, Ti}
     ext = Base.get_extension(LinearSolve, :LinearSolveSparspakExt)
+    @show "here2", Tv, Ti, typeof(A)
     if assump.issq && ext !== nothing
         LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.SparspakFactorization)
     elseif !assump.issq
@@ -246,6 +247,7 @@ end
 function LinearSolve.defaultalg(
         A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
         assump::OperatorAssumptions{Bool}) where {Ti}
+    @show "here"
     if assump.issq
         if length(b) <= 10_000 && length(nonzeros(A)) / length(A) < 2e-4
             LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KLUFactorization)

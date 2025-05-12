@@ -83,10 +83,14 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol,
         reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
-    A = convert(AbstractMatrix, A)
-    zerobased = SparseArrays.getcolptr(A)[1] == 0
-    return SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC(size(A)..., getcolptr(A),
-        rowvals(A), nonzeros(A)))
+    if size(A,1) == size(A,2)
+        A = convert(AbstractMatrix, A)
+        zerobased = SparseArrays.getcolptr(A)[1] == 0
+        return SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC(size(A)..., getcolptr(A),
+            rowvals(A), nonzeros(A)))
+    else
+        PREALLOCATED_UMFPACK
+    end
 end
 
 function SciMLBase.solve!(
@@ -141,9 +145,13 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol,
         reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
-    A = convert(AbstractMatrix, A)
-    return KLU.KLUFactorization(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-        nonzeros(A)))
+    if size(A,1) == size(A,2)
+        A = convert(AbstractMatrix, A)
+        return KLU.KLUFactorization(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
+            nonzeros(A)))
+    else
+        PREALLOCATED_KLU
+    end
 end
 
 # TODO: guard this against errors

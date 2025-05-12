@@ -72,26 +72,19 @@ const PREALLOCATED_UMFPACK = SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC(0, 0
     Int[], Float64[]))
 
 function LinearSolve.init_cacheval(
-        alg::UMFPACKFactorization, A::SparseMatrixCSC{Float64, Int}, b, u,
+        alg::UMFPACKFactorization, A::AbstractArray, b, u,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
-    PREALLOCATED_UMFPACK
+    nothing
 end
 
 function LinearSolve.init_cacheval(
-        alg::UMFPACKFactorization, A::AbstractSparseArray{Float64}, b, u, Pl, Pr,
+        alg::UMFPACKFactorization, A::AbstractSparseArray{Float64, Int}, b, u, Pl, Pr,
         maxiters::Int, abstol,
         reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
-    if size(A,1) == size(A,2)
-        A = convert(AbstractMatrix, A)
-        zerobased = SparseArrays.getcolptr(A)[1] == 0
-        return SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC(size(A)..., getcolptr(A),
-            rowvals(A), nonzeros(A)))
-    else
-        PREALLOCATED_UMFPACK
-    end
+    PREALLOCATED_UMFPACK
 end
 
 function SciMLBase.solve!(
@@ -134,25 +127,19 @@ const PREALLOCATED_KLU = KLU.KLUFactorization(SparseMatrixCSC(0, 0, [1], Int[],
     Float64[]))
 
 function LinearSolve.init_cacheval(
-        alg::KLUFactorization, A::SparseMatrixCSC{Float64, Int}, b, u, Pl,
+        alg::KLUFactorization, A::AbstractArray, b, u, Pl,
         Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
-    PREALLOCATED_KLU
+    nothing
 end
 
 function LinearSolve.init_cacheval(
-        alg::KLUFactorization, A::AbstractSparseArray{Float64}, b, u, Pl, Pr,
+        alg::KLUFactorization, A::AbstractSparseArray{Float64, Int}, b, u, Pl, Pr,
         maxiters::Int, abstol,
         reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
-    if size(A,1) == size(A,2)
-        A = convert(AbstractMatrix, A)
-        return KLU.KLUFactorization(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-            nonzeros(A)))
-    else
-        PREALLOCATED_KLU
-    end
+    PREALLOCATED_KLU
 end
 
 # TODO: guard this against errors
@@ -247,7 +234,6 @@ end
 function LinearSolve.defaultalg(
         A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
         assump::OperatorAssumptions{Bool}) where {Ti}
-    @show "here"
     if assump.issq
         if length(b) <= 10_000 && length(nonzeros(A)) / length(A) < 2e-4
             LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KLUFactorization)

@@ -174,7 +174,7 @@ end
 
         y = _ldiv!(cache.u, @get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
             cache.b)
-        return SciMLBase.build_linear_solution(alg, y, nothing, cache)
+        return SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
     end
 end
 

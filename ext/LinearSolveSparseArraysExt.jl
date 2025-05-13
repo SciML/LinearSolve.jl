@@ -265,7 +265,7 @@ end
 function LinearSolve.init_cacheval(alg::QRFactorization, A::SparseMatrixCSC{Float64, Int}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
-    ArrayInterface.qr_instance(convert(AbstractMatrix, A), alg.pivot)
+    LinearSolve.ArrayInterface.qr_instance(convert(AbstractMatrix, A), alg.pivot)
 end
 
 function LinearSolve.init_cacheval(

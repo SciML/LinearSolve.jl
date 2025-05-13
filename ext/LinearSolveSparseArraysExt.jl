@@ -103,6 +103,14 @@ function LinearSolve.init_cacheval(
     PREALLOCATED_UMFPACK
 end
 
+function LinearSolve.init_cacheval(
+        alg::UMFPACKFactorization, A::AbstractSparseArray{Float64, Int32}, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC{Float64, Int32}(0, 0, [Int32(1)], Int32[], Float64[]))
+end
+
 function SciMLBase.solve!(
         cache::LinearSolve.LinearCache, alg::UMFPACKFactorization; kwargs...)
     A = cache.A
@@ -132,7 +140,7 @@ function SciMLBase.solve!(
     F = LinearSolve.@get_cacheval(cache, :UMFPACKFactorization)
     if F.status == SparseArrays.UMFPACK.UMFPACK_OK
         y = ldiv!(cache.u, F, cache.b)
-        SciMLBase.build_linear_solution(alg, y, nothing, cache)
+        SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
     else
         SciMLBase.build_linear_solution(
             alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible)
@@ -193,7 +201,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
     F = LinearSolve.@get_cacheval(cache, :KLUFactorization)
     if F.common.status == KLU.KLU_OK
         y = ldiv!(cache.u, F, cache.b)
-        SciMLBase.build_linear_solution(alg, y, nothing, cache)
+        SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
     else
         SciMLBase.build_linear_solution(
             alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible)

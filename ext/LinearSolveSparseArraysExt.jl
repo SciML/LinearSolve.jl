@@ -27,13 +27,6 @@ function LinearSolve.init_cacheval(alg::RFLUFactorization,
     nothing, nothing
 end
 
-function LinearSolve.init_cacheval(
-        alg::QRFactorization, A::Symmetric{<:Number, <:SparseMatrixCSC}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    return nothing
-end
-
 function LinearSolve.handle_sparsematrixcsc_lu(A::AbstractSparseMatrixCSC)
     lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
         check = false)
@@ -263,7 +256,7 @@ end
 
 # SPQR Handling
 function LinearSolve.init_cacheval(
-        alg::Union{QRFactorization}, A::AbstractSparseArray{<:Number, <:Integer}, b, u,
+        alg::QRFactorization, A::AbstractSparseArray{<:Number, <:Integer}, b, u,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
@@ -274,6 +267,13 @@ function init_cacheval(alg::QRFactorization, A::SparseMatrixCSC{Float64, Int}, b
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     ArrayInterface.qr_instance(convert(AbstractMatrix, A), alg.pivot)
+end
+
+function LinearSolve.init_cacheval(
+        alg::QRFactorization, A::Symmetric{<:Number, <:SparseMatrixCSC}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+    return nothing
 end
 
 LinearSolve.PrecompileTools.@compile_workload begin

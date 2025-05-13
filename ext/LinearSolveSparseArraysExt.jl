@@ -88,6 +88,14 @@ function LinearSolve.init_cacheval(
 end
 
 function LinearSolve.init_cacheval(
+        alg::Union{LUFactorization, GenericLUFactorization}, A::AbstractSparseArray{Float64, Int}, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    PREALLOCATED_UMFPACK
+end
+
+function LinearSolve.init_cacheval(
         alg::UMFPACKFactorization, A::AbstractSparseArray{Float64, Int}, b, u, Pl, Pr,
         maxiters::Int, abstol,
         reltol,

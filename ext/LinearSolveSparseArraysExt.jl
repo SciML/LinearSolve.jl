@@ -80,11 +80,19 @@ function LinearSolve.init_cacheval(
 end
 
 function LinearSolve.init_cacheval(
-        alg::Union{LUFactorization, GenericLUFactorization}, A::AbstractSparseArray{Float64, Int}, b, u,
+        alg::Union{LUFactorization, GenericLUFactorization}, A::AbstractSparseArray{Float64, Int64}, b, u,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
     PREALLOCATED_UMFPACK
+end
+
+function LinearSolve.init_cacheval(
+        alg::Union{LUFactorization, GenericLUFactorization}, A::AbstractSparseArray{Float64, Int32}, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC{Float64, Int32}(0, 0, [Int32(1)], Int32[], Float64[]))
 end
 
 function LinearSolve.init_cacheval(
@@ -143,11 +151,19 @@ function LinearSolve.init_cacheval(
 end
 
 function LinearSolve.init_cacheval(
-        alg::KLUFactorization, A::AbstractSparseArray{Float64, Int}, b, u, Pl, Pr,
+        alg::KLUFactorization, A::AbstractSparseArray{Float64, Int64}, b, u, Pl, Pr,
         maxiters::Int, abstol,
         reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
     PREALLOCATED_KLU
+end
+
+function LinearSolve.init_cacheval(
+        alg::KLUFactorization, A::AbstractSparseArray{Float64, Int32}, b, u, Pl, Pr,
+        maxiters::Int, abstol,
+        reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    KLU.KLUFactorization(SparseMatrixCSC{Float64, Int32}(0, 0, [Int32(1)], Int32[], Float64[]))
 end
 
 # TODO: guard this against errors
@@ -263,6 +279,12 @@ function LinearSolve.init_cacheval(
 end
 
 function LinearSolve.init_cacheval(alg::QRFactorization, A::SparseMatrixCSC{Float64, Int}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+    LinearSolve.ArrayInterface.qr_instance(convert(AbstractMatrix, A), alg.pivot)
+end
+
+function LinearSolve.init_cacheval(alg::QRFactorization, A::SparseMatrixCSC{Float64, Int32}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     LinearSolve.ArrayInterface.qr_instance(convert(AbstractMatrix, A), alg.pivot)

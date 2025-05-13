@@ -40,7 +40,6 @@ end
 function LinearSolve.defaultalg(A::AbstractSparseMatrixCSC{Tv, Ti}, b,
         assump::OperatorAssumptions{Bool}) where {Tv, Ti}
     ext = Base.get_extension(LinearSolve, :LinearSolveSparspakExt)
-    @show "here2", Tv, Ti, typeof(A)
     if assump.issq && ext !== nothing
         LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.SparspakFactorization)
     elseif !assump.issq
@@ -263,7 +262,7 @@ function LinearSolve.init_cacheval(
     nothing
 end
 
-function init_cacheval(alg::QRFactorization, A::SparseMatrixCSC{Float64, Int}, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(alg::QRFactorization, A::SparseMatrixCSC{Float64, Int}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     ArrayInterface.qr_instance(convert(AbstractMatrix, A), alg.pivot)

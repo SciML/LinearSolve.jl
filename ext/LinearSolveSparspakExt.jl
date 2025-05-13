@@ -29,7 +29,7 @@ function LinearSolve.init_cacheval(
                     nonzeros(A)),
                 factorize = false)
         else
-            return sparspaklu(SparseMatrixCSC(0, 0, [one(Ti)], Ti[], eltype(A)[]),
+            return sparspaklu(SparseMatrixCSC{Tv, Ti}(zero(Ti), zero(Ti), [one(Ti)], Ti[], eltype(A)[]),
                 factorize = false)
         end
     else

@@ -1,6 +1,9 @@
 using LinearSolve, RecursiveFactorization, LinearAlgebra, SparseArrays, Test
 using JET
 
+A = rand(4, 4)
+b = rand(4)
+prob = LinearProblem(A, b)
 JET.@test_opt init(prob, nothing)
 JET.@test_opt solve(prob, LUFactorization())
 JET.@test_opt solve(prob, GenericLUFactorization())

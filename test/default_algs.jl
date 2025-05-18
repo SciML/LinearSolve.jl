@@ -1,9 +1,5 @@
 using LinearSolve, RecursiveFactorization, LinearAlgebra, SparseArrays, Test
 
-if isempty(VERSION.prerelease)
-      using JET
-end
-
 @test LinearSolve.defaultalg(nothing, zeros(3)).alg ===
       LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
 prob = LinearProblem(rand(3, 3), rand(3))

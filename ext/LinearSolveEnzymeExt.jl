@@ -5,6 +5,8 @@ using LinearSolve.LinearAlgebra
 using EnzymeCore
 using EnzymeCore: EnzymeRules
 
+@inline EnzymeCore.EnzymeRules.inactive_type(::Type{<:LinearSolve.SciMLLinearSolveAlgorithm}) = true
+
 function EnzymeRules.forward(config::EnzymeRules.FwdConfigWidth{1},
         func::Const{typeof(LinearSolve.init)}, ::Type{RT}, prob::EnzymeCore.Annotation{LP},
         alg::Const; kwargs...) where {RT, LP <: LinearSolve.LinearProblem}
@@ -223,10 +225,10 @@ function EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.solve!)},
         elseif _linsolve.alg isa LinearSolve.AbstractKrylovSubspaceMethod
             # Doesn't modify `A`, so it's safe to just reuse it
             invprob = LinearSolve.LinearProblem(transpose(_linsolve.A), dy)
-            solve(invprob, _linearsolve.alg;
-                abstol = _linsolve.val.abstol,
-                reltol = _linsolve.val.reltol,
-                verbose = _linsolve.val.verbose)
+            solve(invprob, _linsolve.alg;
+                abstol = _linsolve.abstol,
+                reltol = _linsolve.reltol,
+                verbose = _linsolve.verbose)
         elseif _linsolve.alg isa LinearSolve.DefaultLinearSolver
             LinearSolve.defaultalg_adjoint_eval(_linsolve, dy)
         else

@@ -18,7 +18,6 @@ if GROUP == "All" || GROUP == "Core"
     @time @safetestset "Adjoint Sensitivity" include("adjoint.jl")
     @time @safetestset "Traits" include("traits.jl")
     @time @safetestset "BandedMatrices" include("banded.jl")
-    @time @safetestset "Static Arrays" include("static_arrays.jl")
 end
 
 # Don't run Enzyme tests on prerelease
@@ -28,6 +27,7 @@ if GROUP == "All" || GROUP == "NoPre" && isempty(VERSION.prerelease)
     Pkg.instantiate()
     @time @safetestset "Enzyme Derivative Rules" include("nopre/enzyme.jl")
     @time @safetestset "JET Tests" include("nopre/jet.jl")
+    @time @safetestset "Static Arrays" include("nopre/static_arrays.jl")
 end
 
 if GROUP == "DefaultsLoading"

@@ -22,11 +22,12 @@ if GROUP == "All" || GROUP == "Core"
 end
 
 # Don't run Enzyme tests on prerelease
-if GROUP == "All" || GROUP == "Enzyme" && isempty(VERSION.prerelease)
-    Pkg.activate("enzyme")
+if GROUP == "All" || GROUP == "NoPre" && isempty(VERSION.prerelease)
+    Pkg.activate("nopre")
     Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
     Pkg.instantiate()
-    @time @safetestset "Enzyme Derivative Rules" include("enzyme.jl")
+    @time @safetestset "Enzyme Derivative Rules" include("nopre/enzyme.jl")
+    @time @safetestset "JET Tests" include("nopre/jet.jl")
 end
 
 if GROUP == "DefaultsLoading"

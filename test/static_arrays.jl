@@ -1,12 +1,16 @@
 using LinearSolve, StaticArrays, LinearAlgebra, Test, StableRNGs
-using AllocCheck
 
 rng = StableRNG(0)
 
 A = SMatrix{5, 5}(Hermitian(rand(rng, 5, 5) + I))
 b = SVector{5}(rand(rng, 5))
 
-@check_allocs __solve_no_alloc(A, b, alg) = solve(LinearProblem(A, b), alg)
+if isempty(VERSION.prerelease)
+    using AllocCheck
+    @check_allocs __solve_no_alloc(A, b, alg) = solve(LinearProblem(A, b), alg)
+else
+    __solve_no_alloc(A, b, alg) = solve(LinearProblem(A, b), alg)
+end
 
 function __non_native_static_array_alg(alg)
     return alg isa SVDFactorization || alg isa KrylovJL

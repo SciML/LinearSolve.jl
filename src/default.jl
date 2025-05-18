@@ -136,6 +136,23 @@ function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
     end
 end
 
+# Fix ambiguity
+function defaultalg(A::SciMLBase.AbstractSciMLOperator, b::GPUArraysCore.AnyGPUArray,
+        assump::OperatorAssumptions{Bool})
+    if has_ldiv!(A)
+        return DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
+    elseif !assump.issq
+        m, n = size(A)
+        if m < n
+            DefaultLinearSolver(DefaultAlgorithmChoice.KrylovJL_CRAIGMR)
+        else
+            DefaultLinearSolver(DefaultAlgorithmChoice.KrylovJL_LSMR)
+        end
+    else
+        DefaultLinearSolver(DefaultAlgorithmChoice.KrylovJL_GMRES)
+    end
+end
+
 userecursivefactorization(A) = false
 
 # Allows A === nothing as a stand-in for dense matrix

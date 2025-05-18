@@ -225,10 +225,10 @@ function EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.solve!)},
         elseif _linsolve.alg isa LinearSolve.AbstractKrylovSubspaceMethod
             # Doesn't modify `A`, so it's safe to just reuse it
             invprob = LinearSolve.LinearProblem(transpose(_linsolve.A), dy)
-            solve(invprob, _linearsolve.alg;
-                abstol = _linsolve.val.abstol,
-                reltol = _linsolve.val.reltol,
-                verbose = _linsolve.val.verbose)
+            solve(invprob, _linsolve.alg;
+                abstol = _linsolve.abstol,
+                reltol = _linsolve.reltol,
+                verbose = _linsolve.verbose)
         elseif _linsolve.alg isa LinearSolve.DefaultLinearSolver
             LinearSolve.defaultalg_adjoint_eval(_linsolve, dy)
         else

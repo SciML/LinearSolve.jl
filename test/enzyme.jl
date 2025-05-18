@@ -157,7 +157,6 @@ Enzyme.autodiff(Reverse, f2, Duplicated(copy(A), dA),
 @test db1 ≈ db12
 @test db2 ≈ db22
 
-
 function f3(A, b1, b2; alg = KrylovJL_GMRES())
     prob = LinearProblem(A, b1)
     cache = init(prob, alg)

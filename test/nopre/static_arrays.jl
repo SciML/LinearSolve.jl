@@ -17,7 +17,7 @@ for alg in (nothing, LUFactorization(), SVDFactorization(), CholeskyFactorizatio
     sol = solve(LinearProblem(A, b), alg)
     @inferred solve(LinearProblem(A, b), alg)
     @test norm(A * sol .- b) < 1e-10
-    if alg isa KrylovJL{typeof(LinearSolve.Krylov.gmres!)}
+    if alg isa KrylovJL{typeof(LinearSolve.Krylov.gmres!)} && isempty(VERSION.prerelease)
         @test_broken __solve_no_alloc(A, b, alg) isa SciMLBase.LinearSolution
     else
         @test_nowarn __solve_no_alloc(A, b, alg) isa SciMLBase.LinearSolution

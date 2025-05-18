@@ -26,7 +26,7 @@ the performance to the expected state, please open an issue and we will improve 
 This is addressed in the [JuliaCon 2022 video](https://www.youtube.com/watch?v=JWI34_w-yYw&t=182s). This happens in
 a few ways:
 
- 1. The Fortran/C code that NumPy/SciPy uses is actually slow. It's [OpenBLAS](https://github.com/xianyi/OpenBLAS),
+ 1. The Fortran/C code that NumPy/SciPy uses is actually slow. It's [OpenBLAS](https://github.com/OpenMathLib/OpenBLAS),
     a library developed in part by the Julia Lab back in 2012 as a fast open source BLAS implementation. Many
     open source environments now use this build, including many R distributions. However, the Julia Lab has greatly
     improved its ability to generate optimized SIMD in platform-specific ways. This, and improved multithreading support

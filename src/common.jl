@@ -255,7 +255,6 @@ function SciMLBase.reinit!(cache::LinearCache;
         b = cache.b,
         u = cache.u,
         p = nothing,
-        reinit_cache = false,
         reuse_precs = false)
     (; alg, cacheval, abstol, reltol, maxiters, verbose, assumptions, sensealg) = cache
 
@@ -270,23 +269,16 @@ function SciMLBase.reinit!(cache::LinearCache;
     p = isnothing(p) ? cache.p : p
     Pl = cache.Pl
     Pr = cache.Pr
-    if reinit_cache
-        return LinearCache{
-            typeof(A), typeof(b), typeof(u), typeof(p), typeof(alg), typeof(cacheval),
-            typeof(Pl), typeof(Pr), typeof(reltol), typeof(assumptions.issq),
-            typeof(sensealg)}(
-            A, b, u, p, alg, cacheval, precsisfresh, isfresh, Pl, Pr, abstol, reltol,
-            maxiters, verbose, assumptions, sensealg)
-    else
-        cache.A = A
-        cache.b = b
-        cache.u = u
-        cache.p = p
-        cache.Pl = Pl
-        cache.Pr = Pr
-        cache.isfresh = true
-        cache.precsisfresh = precsisfresh
-    end
+
+    cache.A = A
+    cache.b = b
+    cache.u = u
+    cache.p = p
+    cache.Pl = Pl
+    cache.Pr = Pr
+    cache.isfresh = true
+    cache.precsisfresh = precsisfresh
+    nothing
 end
 
 function SciMLBase.solve(prob::LinearProblem, args...; kwargs...)

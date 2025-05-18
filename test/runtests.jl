@@ -21,12 +21,16 @@ if GROUP == "All" || GROUP == "Core"
     @time @safetestset "Static Arrays" include("static_arrays.jl")
 end
 
-if GROUP == "All" || GROUP == "Enzyme"
+# Don't run Enzyme tests on prerelease
+if GROUP == "All" || GROUP == "Enzyme" && isempty(VERSION.prerelease)
+    Pkg.activate("enzyme")
+    Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
+    Pkg.instantiate()
     @time @safetestset "Enzyme Derivative Rules" include("enzyme.jl")
 end
 
 if GROUP == "DefaultsLoading"
-    @time @safetestset "Enzyme Derivative Rules" include("defaults_loading.jl")
+    @time @safetestset "Defaults Loading Tests" include("defaults_loading.jl")
 end
 
 if GROUP == "LinearSolveCUDA"

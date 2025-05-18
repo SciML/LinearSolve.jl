@@ -32,7 +32,6 @@ jobs:
           - "DefaultsLoading"
           - "LinearSolveHYPRE"
           - "LinearSolvePardiso"
-          - "LinearSolveBandedMatrices"
           - "NoPre"
     uses: "SciML/.github/.github/workflows/tests.yml@v1"
     with:

@@ -1,4 +1,9 @@
-using LinearSolve, RecursiveFactorization, LinearAlgebra, SparseArrays, Test, JET
+using LinearSolve, RecursiveFactorization, LinearAlgebra, SparseArrays, Test
+
+if isempty(VERSION.prerelease)
+      using JET
+end
+
 @test LinearSolve.defaultalg(nothing, zeros(3)).alg ===
       LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
 prob = LinearProblem(rand(3, 3), rand(3))
@@ -55,19 +60,23 @@ solve(prob)
 A = rand(4, 4)
 b = rand(4)
 prob = LinearProblem(A, b)
-VERSION ≥ v"1.10-" && JET.@test_opt init(prob, nothing)
-JET.@test_opt solve(prob, LUFactorization())
-JET.@test_opt solve(prob, GenericLUFactorization())
-@test_skip JET.@test_opt solve(prob, QRFactorization())
-JET.@test_opt solve(prob, DiagonalFactorization())
-#JET.@test_opt solve(prob, SVDFactorization())
-#JET.@test_opt solve(prob, KrylovJL_GMRES())
+if if isempty(VERSION.prerelease) 
+      JET.@test_opt init(prob, nothing)
+      JET.@test_opt solve(prob, LUFactorization())
+      JET.@test_opt solve(prob, GenericLUFactorization())
+      @test_skip JET.@test_opt solve(prob, QRFactorization())
+      JET.@test_opt solve(prob, DiagonalFactorization())
+      #JET.@test_opt solve(prob, SVDFactorization())
+      #JET.@test_opt solve(prob, KrylovJL_GMRES())
+
+      prob = LinearProblem(sparse(A), b)
+      #JET.@test_opt solve(prob, UMFPACKFactorization())
+      #JET.@test_opt solve(prob, KLUFactorization())
+      #JET.@test_opt solve(prob, SparspakFactorization())
+      #JET.@test_opt solve(prob)
+end
 
 prob = LinearProblem(sparse(A), b)
-#JET.@test_opt solve(prob, UMFPACKFactorization())
-#JET.@test_opt solve(prob, KLUFactorization())
-#JET.@test_opt solve(prob, SparspakFactorization())
-#JET.@test_opt solve(prob)
 @inferred solve(prob)
 @inferred init(prob, nothing)
 

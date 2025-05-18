@@ -7,7 +7,7 @@ b = SVector{5}(rand(rng, 5))
 
 @static if isempty(VERSION.prerelease)
     using AllocCheck
-    @check_allocs __solve_no_alloc(A, b, alg) = solve(LinearProblem(A, b), alg)
+    AllocCheck.@check_allocs __solve_no_alloc(A, b, alg) = solve(LinearProblem(A, b), alg)
 else
     __solve_no_alloc(A, b, alg) = solve(LinearProblem(A, b), alg)
 end

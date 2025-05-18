@@ -5,7 +5,7 @@ rng = StableRNG(0)
 A = SMatrix{5, 5}(Hermitian(rand(rng, 5, 5) + I))
 b = SVector{5}(rand(rng, 5))
 
-if isempty(VERSION.prerelease)
+@static if isempty(VERSION.prerelease)
     using AllocCheck
     @check_allocs __solve_no_alloc(A, b, alg) = solve(LinearProblem(A, b), alg)
 else
@@ -21,7 +21,7 @@ for alg in (nothing, LUFactorization(), SVDFactorization(), CholeskyFactorizatio
     sol = solve(LinearProblem(A, b), alg)
     @inferred solve(LinearProblem(A, b), alg)
     @test norm(A * sol .- b) < 1e-10
-    if alg isa KrylovJL{typeof(LinearSolve.Krylov.gmres!)}
+    if alg isa KrylovJL{typeof(LinearSolve.Krylov.gmres!)} && isempty(VERSION.prerelease)
         @test_broken __solve_no_alloc(A, b, alg) isa SciMLBase.LinearSolution
     else
         @test_nowarn __solve_no_alloc(A, b, alg) isa SciMLBase.LinearSolution

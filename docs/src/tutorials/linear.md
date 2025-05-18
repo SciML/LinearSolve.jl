@@ -89,7 +89,7 @@ Thus if your matrix is symmetric, specifically building with `Symmetric(A)` will
 and will generally lead to better automatic linear solver choices. Note that you can also choose the type for `b`,
 but generally a dense vector will be the fastest here and many solvers will not support a sparse `b`.
 
-## Using Matrix-Free Operators
+## Using Matrix-Free Operators via SciMLOperators.jl
 
 In many cases where a sparse matrix gets really large, even the sparse representation
 cannot be stored in memory. However, in many such cases, such as with PDE discretizations,
@@ -98,4 +98,67 @@ operators allow the user to define the `Ax=b` problem to be solved giving only t
 of `A*x` and allowing specific solvers (Krylov methods) to act without ever constructing
 the full matrix.
 
-**This will be documented in more detail in the near future**
+The Matrix-Free operators are provided by the [SciMLOperators.jl interface](https://docs.sciml.ai/SciMLOperators/stable/).
+For example, for the matrix `A` defined via:
+
+```@example linsys1
+A = [-2.0  1  0  0  0
+      1 -2  1  0  0
+      0  1 -2  1  0
+      0  0  1 -2  1
+      0  0  0  1 -2]
+```
+
+We can define the `FunctionOperator` that does the `A*v` operations, without using the matrix `A`. This is done by defining
+a function `func(w,v,u,p,t)` which calculates `w = A(u,p,t)*v` (for the purposes of this tutorial, `A` is just a constant
+operator. See the [SciMLOperators.jl documentation](https://docs.sciml.ai/SciMLOperators/stable/) for more details on defining
+non-constant operators, operator algebras, and many more features). This is done by:
+
+```@example linsys1
+function Afunc!(w,v,u,p,t)
+    w[1] = -2v[1] + v[2]
+    for i in 2:4
+        w[i] = v[i-1] - 2v[i] + v[i+1]
+    end
+    w[5] = v[4] - 2v[5]
+    nothing
+end
+
+function Afunc!(v,u,p,t)
+    w = zeros(5)
+    Afunc!(w,v,u,p,t)
+    w
+end
+
+using SciMLOperators
+mfopA = FunctionOperator(Afunc!, zeros(5), zeros(5))
+```
+
+Let's check these are the same:
+
+```@example linsys1
+v = rand(5)
+mfopA*v - A*v
+```
+
+Notice `mfopA` does this without having to have `A` because it just uses the equivalent `Afunc!` instead. Now, even though
+we don't have a matrix, we can still solve linear systems defined by this operator. For example:
+
+```@example linsys1
+b = rand(5)
+prob = LinearProblem(mfopA, b)
+sol = solve(prob)
+sol.u
+```
+
+And we can check this is successful:
+
+```@example linsys1
+mfopA * sol.u - b
+```
+
+!!! note
+
+  Note that not all methods can use a matrix-free operator. For example, `LUFactorization()` requires a matrix. If you use an
+  invalid method, you will get an error. The methods particularly from KrylovJL are the ones preferred for these cases
+  (and are defaulted to).

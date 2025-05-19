@@ -175,6 +175,38 @@ Enzyme.autodiff(set_runtime_activity(Reverse), f3, Duplicated(copy(A), dA), Dupl
 @test db1 ≈ db12
 @test db2 ≈ db22
 
+function f4(A, b1, b2; alg = LUFactorization())
+    prob = LinearProblem(A, b1)
+    cache = init(prob, alg)
+    solve!(cache)
+    s1 = copy(cache.u)
+    cache.b = b2
+    solve!(cache)
+    s2 = copy(cache.u)
+    norm(s1 + s2)
+end
+
+A = rand(n, n);
+dA = zeros(n, n);
+b1 = rand(n);
+db1 = zeros(n);
+b2 = rand(n);
+db2 = zeros(n);
+
+f4(A, b1, b2)
+@test_throws "Adjoint case currently not handled" Enzyme.autodiff(Reverse, f4, Duplicated(copy(A), dA),
+    Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
+
+#=
+dA2 = ForwardDiff.gradient(x -> f4(x, eltype(x).(b1), eltype(x).(b2)), copy(A))
+db12 = ForwardDiff.gradient(x -> f4(eltype(x).(A), x, eltype(x).(b2)), copy(b1))
+db22 = ForwardDiff.gradient(x -> f4(eltype(x).(A), eltype(x).(b1), x), copy(b2))
+
+@test dA ≈ dA2
+@test db1 ≈ db12
+@test db2 ≈ db22
+=#
+
 A = rand(n, n);
 dA = zeros(n, n);
 b1 = rand(n);
@@ -215,3 +247,39 @@ end
 
     @test en_jac≈fd_jac rtol=1e-4
 end
+
+# https://github.com/SciML/LinearSolve.jl/issues/479
+function testls(A, b, u)
+    oa = OperatorAssumptions(true, condition = LinearSolve.OperatorCondition.WellConditioned)
+    prob = LinearProblem(A, b)
+    linsolve = init(prob, LUFactorization(), assumptions = oa)
+    cache =solve!(linsolve)
+    sum(cache.u)
+end
+
+A = [1. 2.; 3. 4.]
+b = [1., 2.]
+u = zero(b)
+dA = deepcopy(A)
+db = deepcopy(b)
+du = deepcopy(u)
+Enzyme.autodiff(Reverse, testls, Duplicated(A, dA), Duplicated(b, db), Duplicated(u, du))
+
+function testls(A, b, u)
+    oa = OperatorAssumptions(true, condition = LinearSolve.OperatorCondition.WellConditioned)
+    prob = LinearProblem(A, b)
+    linsolve = init(prob, LUFactorization(), assumptions = oa)
+    solve!(linsolve)
+    sum(linsolve.u)
+end
+A = [1. 2.; 3. 4.]
+b = [1., 2.]
+u = zero(b)
+dA2 = deepcopy(A)
+db2 = deepcopy(b)
+du2 = deepcopy(u)
+Enzyme.autodiff(Reverse, testls, Duplicated(A, dA2), Duplicated(b, db2), Duplicated(u, du2))
+
+@test dA == dA2
+@test db == db2
+@test du == du2

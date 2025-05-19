@@ -202,7 +202,11 @@ function EnzymeRules.augmented_primal(
     cachesolve = deepcopy(linsolve.val)
 
     cache = (copy(res.u), resvals, cachesolve, dAs, dbs)
-    return EnzymeRules.AugmentedReturn(res, dres, cache)
+
+    _res = EnzymeRules.needs_primal(config) ? res : nothing  
+    _dres = EnzymeRules.needs_shadow(config) ? dres : nothing
+    
+    return EnzymeRules.AugmentedReturn(_res, _dres, cache)
 end
 
 function EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.solve!)},
@@ -215,9 +219,22 @@ function EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.solve!)},
 
     if EnzymeRules.width(config) == 1
         dys = (dys,)
+        dlinsolves = (linsolve.dval,)
+        if (iszero(linsolve.dval.A) || iszero(linsolve.dval.b)) && !iszero(linsolve.dval.u)
+            error("Adjoint case currently not handled")
+        end
+    else
+        dlinsolves = linsolve.dval
+        if any(x->(iszero(x.A) || iszero(x.b)) && !iszero(x.u), linsolve.dval)
+            error("Adjoint case currently not handled")
+        end
     end
 
-    for (dA, db, dy) in zip(dAs, dbs, dys)
+    for (dA, db, dy, dy2) in zip(dAs, dbs, dys, dlinsolves)
+
+        # Add the contribution from direct `linsolve.u` modifications
+        dy .+= dy2.u
+
         z = if _linsolve.cacheval isa Factorization
             _linsolve.cacheval' \ dy
         elseif _linsolve.cacheval isa Tuple && _linsolve.cacheval[1] isa Factorization

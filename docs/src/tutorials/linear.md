@@ -158,7 +158,6 @@ mfopA * sol.u - b
 ```
 
 !!! note
-
   Note that not all methods can use a matrix-free operator. For example, `LUFactorization()` requires a matrix. If you use an
   invalid method, you will get an error. The methods particularly from KrylovJL are the ones preferred for these cases
   (and are defaulted to).

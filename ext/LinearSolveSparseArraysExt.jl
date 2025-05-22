@@ -225,19 +225,28 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
     end
 end
 
-const PREALLOCATED_CHOLMOD = cholesky(SparseMatrixCSC(0, 0, [1], Int[], Float64[]))
+const PREALLOCATED_CHOLMOD = cholesky(sparse([1.0]))
 
 function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
-        A::Symmetric{T, SparseMatrixCSC{T, Int}}, b, u,
+        A::Union{SparseMatrixCSC{T, Int}, Symmetric{T, SparseMatrixCSC{T, Int}}}, b, u,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions) where {T <:
-                                                                BLASELTYPES}
+                                                                Float64}
     PREALLOCATED_CHOLMOD
 end
 
 function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
-        A::SparseMatrixCSC{T, Int}, b, u,
+        A::Union{SparseMatrixCSC{T, Int}, Symmetric{T, SparseMatrixCSC{T, Int}}}, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions) where {T <:
+                                                                BLASELTYPES}
+    cholesky(sparse([one(T)]))
+end
+
+function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
+        A::AbstractArray, b, u,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions) where {T <:

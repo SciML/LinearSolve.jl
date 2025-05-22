@@ -242,7 +242,7 @@ function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions) where {T <:
                                                                 BLASELTYPES}
-    cholesky(sparse(rehape([one(T)],1,1)))
+    cholesky(sparse(reshape([one(T)],1,1)))
 end
 
 function LinearSolve.init_cacheval(alg::CHOLMODFactorization,

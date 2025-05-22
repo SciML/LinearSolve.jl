@@ -225,7 +225,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
     end
 end
 
-const PREALLOCATED_CHOLMOD = cholesky(sparse([1.0]))
+const PREALLOCATED_CHOLMOD = cholesky(sparse(reshape([1.0],1,1)))
 
 function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
         A::Union{SparseMatrixCSC{T, Int}, Symmetric{T, SparseMatrixCSC{T, Int}}}, b, u,

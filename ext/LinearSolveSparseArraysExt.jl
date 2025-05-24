@@ -249,8 +249,7 @@ function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
         A::AbstractArray, b, u,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
-        verbose::Bool, assumptions::OperatorAssumptions) where {T <:
-                                                                BLASELTYPES}
+        verbose::Bool, assumptions::OperatorAssumptions)
     nothing
 end
 

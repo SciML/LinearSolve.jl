@@ -234,7 +234,14 @@ function init_cacheval(alg::LUFactorization,
     PREALLOCATED_LU
 end
 
-function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization},
+function init_cacheval(alg::LUFactorization,
+        A::AbstractSciMLOperator, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+    nothing
+end
+
+function init_cacheval(alg::GenericLUFactorization,
         A::AbstractSciMLOperator, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)

@@ -42,8 +42,8 @@ end
 end
 
 # Handle special case of Column-pivoted QR fallback for LU
-function __setfield!(cache::DefaultLinearSolverInit, alg::DefaultLinearSolver, v::QRFactorization{ColumnNorm})
-
+function __setfield!(cache::DefaultLinearSolverInit, alg::DefaultLinearSolver, v::LinearAlgebra.QRPivoted)
+    setfield!(cache, :QRFactorizationPivoted, v)
 end
 
 # Legacy fallback

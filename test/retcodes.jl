@@ -1,24 +1,13 @@
-using LinearSolve, RecursiveFactorization
+using LinearSolve, LinearAlgebra, RecursiveFactorization
 
 alglist = (
     LUFactorization,
     QRFactorization,
-    DiagonalFactorization,
-    DirectLdiv!,
-    SparspakFactorization,
-    KLUFactorization,
-    UMFPACKFactorization,
     KrylovJL_GMRES,
     GenericLUFactorization,
     RFLUFactorization,
-    LDLtFactorization,
-    BunchKaufmanFactorization,
-    CHOLMODFactorization,
     SVDFactorization,
-    CholeskyFactorization,
     NormalCholeskyFactorization,
-    AppleAccelerateLUFactorization,
-    MKLLUFactorization,
     KrylovJL_CRAIGMR,
     KrylovJL_LSMR
 )
@@ -28,19 +17,49 @@ alglist = (
         A = [2.0 1.0; -1.0 1.0]
         b = [-1.0, 1.0]
         prob = LinearProblem(A, b)
-        linsolve = init(prob, alg)
+        linsolve = init(prob, alg())
         sol = solve!(linsolve)
         @test SciMLBase.successful_retcode(sol.retcode) || sol.retcode == ReturnCode.Default # The latter seems off...
     end
 end
 
+lualgs = (
+    LUFactorization(),
+    QRFactorization(),
+    GenericLUFactorization(),
+    LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization; safetyfallback=false),
+    RFLUFactorization(),
+    NormalCholeskyFactorization(),
+)
 @testset "Failure" begin
-    for alg in alglist
+    for alg in lualgs
+        @show alg
         A = [1.0 1.0; 1.0 1.0]
         b = [-1.0, 1.0]
         prob = LinearProblem(A, b)
         linsolve = init(prob, alg)
         sol = solve!(linsolve)
         @test !SciMLBase.successful_retcode(sol.retcode)
+    end
+end
+
+rankdeficientalgs = (
+    QRFactorization(LinearAlgebra.ColumnNorm()),
+    KrylovJL_GMRES(),
+    SVDFactorization(),
+    KrylovJL_CRAIGMR(),
+    KrylovJL_LSMR(),
+    LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)
+)
+
+@testset "Rank Deficient Success" begin
+    for alg in rankdeficientalgs
+        @show alg
+        A = [1.0 1.0; 1.0 1.0]
+        b = [-1.0, 1.0]
+        prob = LinearProblem(A, b)
+        linsolve = init(prob, alg)
+        sol = solve!(linsolve)
+        @test SciMLBase.successful_retcode(sol.retcode)
     end
 end

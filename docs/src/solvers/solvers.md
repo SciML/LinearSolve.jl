@@ -82,6 +82,12 @@ use `Krylov_GMRES()`.
 
 ## Full List of Methods
 
+### Polyalgorithms
+
+```@docs
+LinearSolve.DefaultLinearSolver
+```
+
 ### RecursiveFactorization.jl
 
 !!! note

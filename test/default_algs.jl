@@ -159,3 +159,17 @@ prob = LinearProblem(A, b)
 
 prob2 = LinearProblem(A2, b)
 @test SciMLBase.successful_retcode(solve(prob2))
+
+# Column-Pivoted QR fallback on failed LU
+A = [1.0 0 0 0
+     0  1 0 0
+     0  0 1 0
+    0 0 0 0]
+b = rand(4)
+prob = LinearProblem(A, b)
+sol = solve(prob, LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization; safetyfallback=false))
+@test sol.retcode === ReturnCode.Failure
+@test sol.u == zeros(4)
+
+sol = solve(prob)
+@test sol.u ≈ svd(A)\b

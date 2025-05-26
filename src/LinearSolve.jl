@@ -140,6 +140,7 @@ end
 
 const BLASELTYPES = Union{Float32, Float64, ComplexF32, ComplexF64}
 
+include("generic_lufact.jl")
 include("common.jl")
 include("extension_algs.jl")
 include("factorization.jl")
@@ -170,28 +171,6 @@ end
 end
 @inline _notsuccessful(F) = hasmethod(LinearAlgebra.issuccess, (typeof(F),)) ?
                             !LinearAlgebra.issuccess(F) : false
-
-@generated function SciMLBase.solve!(cache::LinearCache, alg::AbstractFactorization;
-        kwargs...)
-    quote
-        if cache.isfresh
-            fact = do_factorization(alg, cache.A, cache.b, cache.u)
-            cache.cacheval = fact
-
-            # If factorization was not successful, return failure. Don't reset `isfresh`
-            if _notsuccessful(fact)
-                return SciMLBase.build_linear_solution(
-                    alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
-            end
-
-            cache.isfresh = false
-        end
-
-        y = _ldiv!(cache.u, @get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
-            cache.b)
-        return SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
-    end
-end
 
 # Solver Specific Traits
 ## Needs Square Matrix

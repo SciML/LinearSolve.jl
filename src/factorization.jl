@@ -1,3 +1,25 @@
+@generated function SciMLBase.solve!(cache::LinearCache, alg::AbstractFactorization;
+        kwargs...)
+    quote
+        if cache.isfresh
+            fact = do_factorization(alg, cache.A, cache.b, cache.u)
+            cache.cacheval = fact
+
+            # If factorization was not successful, return failure. Don't reset `isfresh`
+            if _notsuccessful(fact)
+                return SciMLBase.build_linear_solution(
+                    alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
+            end
+
+            cache.isfresh = false
+        end
+
+        y = _ldiv!(cache.u, @get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
+            cache.b)
+        return SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
+    end
+end
+
 macro get_cacheval(cache, algsym)
     quote
         if $(esc(cache)).alg isa DefaultLinearSolver
@@ -7,6 +29,8 @@ macro get_cacheval(cache, algsym)
         end
     end
 end
+
+const PREALLOCATED_IPIV = Vector{LinearAlgebra.BlasInt}(undef, 0)
 
 _ldiv!(x, A, b) = ldiv!(x, A, b)
 
@@ -41,8 +65,7 @@ function LinearSolve.init_cacheval(
         alg::RFLUFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
         maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ipiv = Vector{LinearAlgebra.BlasInt}(undef, 0)
-    PREALLOCATED_LU, ipiv
+    PREALLOCATED_LU, PREALLOCATED_IPIV
 end
 
 function LinearSolve.init_cacheval(alg::RFLUFactorization,
@@ -144,14 +167,47 @@ function do_factorization(alg::LUFactorization, A, b, u)
     return fact
 end
 
-function do_factorization(alg::GenericLUFactorization, A, b, u)
-    A = convert(AbstractMatrix, A)
-    fact = LinearAlgebra.generic_lufact!(A, alg.pivot, check = false)
-    return fact
+function init_cacheval(
+        alg::GenericLUFactorization, A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+    ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
+    ArrayInterface.lu_instance(convert(AbstractMatrix, A)), ipiv
 end
 
 function init_cacheval(
-        alg::Union{LUFactorization, GenericLUFactorization}, A, b, u, Pl, Pr,
+        alg::GenericLUFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+    PREALLOCATED_LU, PREALLOCATED_IPIV
+end
+
+function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::GenericLUFactorization;
+        kwargs...)
+    A = cache.A
+    A = convert(AbstractMatrix, A)
+    fact, ipiv = LinearSolve.@get_cacheval(cache, :GenericLUFactorization)
+
+    if cache.isfresh
+        if length(ipiv) != min(size(A)...)
+            ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
+        end
+        fact = generic_lufact!(A, alg.pivot; check = false, ipiv)
+        cache.cacheval = (fact, ipiv)
+
+        if !LinearAlgebra.issuccess(fact)
+            return SciMLBase.build_linear_solution(
+                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
+        end
+
+        cache.isfresh = false
+    end
+    y = ldiv!(cache.u, LinearSolve.@get_cacheval(cache, :GenericLUFactorization)[1], cache.b)
+    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+end
+
+function init_cacheval(
+        alg::LUFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     ArrayInterface.lu_instance(convert(AbstractMatrix, A))
@@ -171,7 +227,7 @@ end
 
 const PREALLOCATED_LU = ArrayInterface.lu_instance(rand(1, 1))
 
-function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization},
+function init_cacheval(alg::LUFactorization,
         A::Matrix{Float64}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)

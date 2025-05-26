@@ -213,17 +213,20 @@ function init_cacheval(
     ArrayInterface.lu_instance(convert(AbstractMatrix, A))
 end
 
-function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization},
+function init_cacheval(alg::LUFactorization,
         A::Union{<:Adjoint, <:Transpose}, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
     error_no_cudss_lu(A)
-    if alg isa LUFactorization
-        return lu(A; check = false)
-    else
-        A isa GPUArraysCore.AnyGPUArray && return nothing
-        ipiv = Vector{LinearAlgebra.BlasInt}(undef, 0)
-        return LinearAlgebra.generic_lufact!(copy(A), alg.pivot; check = false)
-    end
+    return lu(A; check = false)
+end
+
+function init_cacheval(alg::GenericLUFactorization,
+        A::Union{<:Adjoint, <:Transpose}, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    error_no_cudss_lu(A)
+    A isa GPUArraysCore.AnyGPUArray && return nothing
+    ipiv = Vector{LinearAlgebra.BlasInt}(undef, 0)
+    return LinearAlgebra.generic_lufact!(copy(A), alg.pivot; check = false), ipiv
 end
 
 const PREALLOCATED_LU = ArrayInterface.lu_instance(rand(1, 1))

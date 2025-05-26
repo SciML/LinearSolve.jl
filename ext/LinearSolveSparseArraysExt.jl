@@ -64,7 +64,15 @@ const PREALLOCATED_UMFPACK = SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC(0, 0
     Int[], Float64[]))
 
 function LinearSolve.init_cacheval(
-        alg::Union{LUFactorization, GenericLUFactorization}, A::AbstractSparseArray{<:Number, <:Integer}, b, u,
+        alg::LUFactorization, A::AbstractSparseArray{<:Number, <:Integer}, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function LinearSolve.init_cacheval(
+        alg::GenericLUFactorization, A::AbstractSparseArray{<:Number, <:Integer}, b, u,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
@@ -80,7 +88,7 @@ function LinearSolve.init_cacheval(
 end
 
 function LinearSolve.init_cacheval(
-        alg::Union{LUFactorization, GenericLUFactorization}, A::AbstractSparseArray{Float64, Int64}, b, u,
+        alg::LUFactorization, A::AbstractSparseArray{Float64, Int64}, b, u,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
@@ -88,7 +96,7 @@ function LinearSolve.init_cacheval(
 end
 
 function LinearSolve.init_cacheval(
-        alg::Union{LUFactorization, GenericLUFactorization}, A::AbstractSparseArray{T, Int64}, b, u,
+        alg::LUFactorization, A::AbstractSparseArray{T, Int64}, b, u,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions) where {T<:BLASELTYPES}
@@ -96,7 +104,7 @@ function LinearSolve.init_cacheval(
 end
 
 function LinearSolve.init_cacheval(
-        alg::Union{LUFactorization, GenericLUFactorization}, A::AbstractSparseArray{T, Int32}, b, u,
+        alg::LUFactorization, A::AbstractSparseArray{T, Int32}, b, u,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions) where {T<:BLASELTYPES}

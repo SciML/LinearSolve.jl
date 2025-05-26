@@ -1,7 +1,7 @@
 # From LinearAlgebra.lu.jl
 # Modified to be non-allocating
 function generic_lufact!(A::AbstractMatrix{T}, pivot::Union{RowMaximum,NoPivot,RowNonZero} = lupivottype(T);
-                         check::Bool = true, ipiv = Vector{BlasInt}(undef, min(size(A)))) where {T}
+                         check::Bool = true, ipiv = Vector{BlasInt}(undef, min(size(A)...))) where {T}
     check && LinearAlgebra.LAPACK.chkfinite(A)
     # Extract values
     m, n = size(A)

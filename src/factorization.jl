@@ -192,7 +192,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::GenericLUFactoriz
         if length(ipiv) != min(size(A)...)
             ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
         end
-        fact = generic_lufact!(A, alg.pivot; check = false, ipiv)
+        fact = generic_lufact!(A, alg.pivot, ipiv; check = false)
         cache.cacheval = (fact, ipiv)
 
         if !LinearAlgebra.issuccess(fact)
@@ -221,6 +221,7 @@ function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization},
         return lu(A; check = false)
     else
         A isa GPUArraysCore.AnyGPUArray && return nothing
+        ipiv = Vector{LinearAlgebra.BlasInt}(undef, 0)
         return LinearAlgebra.generic_lufact!(copy(A), alg.pivot; check = false)
     end
 end

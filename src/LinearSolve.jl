@@ -119,8 +119,23 @@ EnumX.@enumx DefaultAlgorithmChoice begin
     KrylovJL_LSMR
 end
 
+"""
+    DefaultLinearSolver(;safetyfallback=true)
+
+The default linear solver. This is the algorithm chosen when `solve(prob)`
+is called. It's a polyalgorithm that detects the optimal method for a given
+`A, b` and hardware (Intel, AMD, GPU, etc.).
+
+## Keyword Arguments
+
+* `safetyfallback`: determines whether to fallback to a column-pivoted QR factorization
+  when an LU factorization fails. This can be required if `A` is rank-deficient. Defaults
+  to true.
+"""
 struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm
     alg::DefaultAlgorithmChoice.T
+    safetyfallback::Bool
+    DefaultLinearSolver(alg; safetyfallback=true) = new(alg,safetyfallback)
 end
 
 const BLASELTYPES = Union{Float32, Float64, ComplexF32, ComplexF64}

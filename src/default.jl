@@ -358,11 +358,29 @@ end
     ex = :()
     for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))
         if alg in Symbol.((DefaultAlgorithmChoice.LUFactorization,
-            DefaultAlgorithmChoice.RFLUFactorization,
             DefaultAlgorithmChoice.MKLLUFactorization,
             DefaultAlgorithmChoice.AppleAccelerateLUFactorization,
             DefaultAlgorithmChoice.GenericLUFactorization))
             newex = quote
+                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
+                if sol.retcode === ReturnCode.Failure && alg.safetyfallback
+                    ## TODO: Add verbosity logging here about using the fallback
+                    sol = SciMLBase.solve!(cache, QRFactorization(ColumnNorm()), args...; kwargs...)
+                    SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
+                        retcode = sol.retcode,
+                        iters = sol.iters, stats = sol.stats)
+                else
+                    SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
+                        retcode = sol.retcode,
+                        iters = sol.iters, stats = sol.stats)
+                end
+            end
+        elseif alg == Symbol(DefaultAlgorithmChoice.RFLUFactorization)
+            newex = quote
+                if !userecursivefactorization(nothing)
+                    error("Default algorithm calling solve on RecursiveFactorization without the package being loaded. This shouldn't happen.")
+                end
+
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
                     ## TODO: Add verbosity logging here about using the fallback

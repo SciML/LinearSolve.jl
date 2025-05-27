@@ -48,10 +48,15 @@ end
 
 # Legacy fallback
 # For SciML algorithms already using `defaultalg`, all assume square matrix.
-defaultalg(A, b) = defaultalg(A, b, OperatorAssumptions(true))
+defaultalg(A, b) = defaultalg(A, b, DefaultOperatorAssumptions(true))
 
 function defaultalg(A::MatrixOperator, b,
         assump::OperatorAssumptions{Bool})
+    defaultalg(A.A, b, assump)
+end
+
+function defaultalg(A::MatrixOperator, b,
+        assump::DefaultOperatorAssumptions{Bool})
     defaultalg(A.A, b, assump)
 end
 
@@ -60,7 +65,12 @@ function defaultalg(A, b, assump::OperatorAssumptions{Nothing})
     defaultalg(A, b, OperatorAssumptions(issq, assump.condition))
 end
 
-function defaultalg(A::SMatrix{S1, S2}, b, assump::OperatorAssumptions{Bool}) where {S1, S2}
+function defaultalg(A, b, assump::DefaultOperatorAssumptions{Nothing})
+    issq = issquare(A)
+    defaultalg(A, b, DefaultOperatorAssumptions(issq))
+end
+
+function defaultalg(A::SMatrix{S1, S2}, b, assump::AbstractOperatorAssumptions{Bool}) where {S1, S2}
     if S1 == S2
         return LUFactorization()
     else
@@ -68,7 +78,7 @@ function defaultalg(A::SMatrix{S1, S2}, b, assump::OperatorAssumptions{Bool}) wh
     end
 end
 
-function defaultalg(A::Tridiagonal, b, assump::OperatorAssumptions{Bool})
+function defaultalg(A::Tridiagonal, b, assump::AbstractOperatorAssumptions{Bool})
     if assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.LUFactorization)
     else
@@ -76,28 +86,28 @@ function defaultalg(A::Tridiagonal, b, assump::OperatorAssumptions{Bool})
     end
 end
 
-function defaultalg(A::SymTridiagonal, b, ::OperatorAssumptions{Bool})
+function defaultalg(A::SymTridiagonal, b, ::AbstractOperatorAssumptions{Bool})
     DefaultLinearSolver(DefaultAlgorithmChoice.LDLtFactorization)
 end
-function defaultalg(A::Bidiagonal, b, ::OperatorAssumptions{Bool})
+function defaultalg(A::Bidiagonal, b, ::AbstractOperatorAssumptions{Bool})
     DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
 end
-function defaultalg(A::Factorization, b, ::OperatorAssumptions{Bool})
+function defaultalg(A::Factorization, b, ::AbstractOperatorAssumptions{Bool})
     DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
 end
-function defaultalg(A::Diagonal, b, ::OperatorAssumptions{Bool})
+function defaultalg(A::Diagonal, b, ::AbstractOperatorAssumptions{Bool})
     DefaultLinearSolver(DefaultAlgorithmChoice.DiagonalFactorization)
 end
 
-function defaultalg(A::Hermitian, b, ::OperatorAssumptions{Bool})
+function defaultalg(A::Hermitian, b, ::AbstractOperatorAssumptions{Bool})
     DefaultLinearSolver(DefaultAlgorithmChoice.CholeskyFactorization)
 end
 
-function defaultalg(A::Symmetric{<:Number, <:Array}, b, ::OperatorAssumptions{Bool})
+function defaultalg(A::Symmetric{<:Number, <:Array}, b, ::AbstractOperatorAssumptions{Bool})
     DefaultLinearSolver(DefaultAlgorithmChoice.BunchKaufmanFactorization)
 end
 
-function defaultalg(A::GPUArraysCore.AnyGPUArray, b, assump::OperatorAssumptions{Bool})
+function defaultalg(A::GPUArraysCore.AnyGPUArray, b, assump::AbstractOperatorAssumptions{Bool})
     if assump.condition === OperatorCondition.IllConditioned || !assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
     else
@@ -107,7 +117,7 @@ end
 
 # A === nothing case
 function defaultalg(
-        A::Nothing, b::GPUArraysCore.AnyGPUArray, assump::OperatorAssumptions{Bool})
+        A::Nothing, b::GPUArraysCore.AnyGPUArray, assump::AbstractOperatorAssumptions{Bool})
     if assump.condition === OperatorCondition.IllConditioned || !assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
     else
@@ -117,7 +127,7 @@ end
 
 # Ambiguity handling
 function defaultalg(A::GPUArraysCore.AnyGPUArray, b::GPUArraysCore.AnyGPUArray,
-        assump::OperatorAssumptions{Bool})
+        assump::AbstractOperatorAssumptions{Bool})
     if assump.condition === OperatorCondition.IllConditioned || !assump.issq
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
     else
@@ -126,7 +136,7 @@ function defaultalg(A::GPUArraysCore.AnyGPUArray, b::GPUArraysCore.AnyGPUArray,
 end
 
 function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
-        assump::OperatorAssumptions{Bool})
+        assump::AbstractOperatorAssumptions{Bool})
     if has_ldiv!(A)
         return DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
     elseif !assump.issq
@@ -143,7 +153,7 @@ end
 
 # Fix ambiguity
 function defaultalg(A::SciMLBase.AbstractSciMLOperator, b::GPUArraysCore.AnyGPUArray,
-        assump::OperatorAssumptions{Bool})
+        assump::AbstractOperatorAssumptions{Bool})
     if has_ldiv!(A)
         return DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
     elseif !assump.issq
@@ -161,7 +171,7 @@ end
 userecursivefactorization(A) = false
 
 # Allows A === nothing as a stand-in for dense matrix
-function defaultalg(A, b, assump::OperatorAssumptions{Bool})
+function defaultalg(A, b, assump::AbstractOperatorAssumptions{Bool})
     alg = if assump.issq
         # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
         # it makes sense according to the benchmarks, which is dependent on
@@ -287,21 +297,21 @@ end
 
 function SciMLBase.init(prob::LinearProblem, alg::Nothing,
         args...;
-        assumptions = OperatorAssumptions(issquare(prob.A)),
+        assumptions = DefaultOperatorAssumptions(issquare(prob.A)),
         kwargs...)
     SciMLBase.init(
         prob, defaultalg(prob.A, prob.b, assumptions), args...; assumptions, kwargs...)
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::Nothing,
-        args...; assump::OperatorAssumptions = OperatorAssumptions(),
+        args...; assump::OperatorAssumptions = DefaultOperatorAssumptions(),
         kwargs...)
     @unpack A, b = cache
     SciMLBase.solve!(cache, defaultalg(A, b, assump), args...; kwargs...)
 end
 
 function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
-        verbose::Bool, assump::OperatorAssumptions)
+        verbose::Bool, assump::AbstractOperatorAssumptions)
     init_cacheval(defaultalg(A, b, assump), A, b, u, Pl, Pr, maxiters, abstol, reltol,
         verbose,
         assump)
@@ -312,7 +322,7 @@ cache.cacheval = NamedTuple(LUFactorization = cache of LUFactorization, ...)
 """
 @generated function init_cacheval(alg::DefaultLinearSolver, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol,
-        verbose::Bool, assump::OperatorAssumptions)
+        verbose::Bool, assump::AbstractOperatorAssumptions)
     caches = map(first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))) do alg
         if alg === :KrylovJL_GMRES || alg === :KrylovJL_CRAIGMR || alg === :KrylovJL_LSMR
             quote
@@ -353,7 +363,7 @@ end
 """
 @generated function SciMLBase.solve!(cache::LinearCache, alg::DefaultLinearSolver,
         args...;
-        assump::OperatorAssumptions = OperatorAssumptions(),
+        assump::AbstractOperatorAssumptions = DefaultOperatorAssumptions(),
         kwargs...)
     ex = :()
     for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))
@@ -363,25 +373,35 @@ end
             DefaultAlgorithmChoice.AppleAccelerateLUFactorization,
             DefaultAlgorithmChoice.GenericLUFactorization))
             newex = quote
-                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
-                if sol.retcode === ReturnCode.Failure && alg.safetyfallback
-                    ## TODO: Add verbosity logging here about using the fallback
-                    sol = SciMLBase.solve!(cache, QRFactorization(ColumnNorm()), args...; kwargs...)
-                    SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
-                        retcode = sol.retcode,
-                        iters = sol.iters, stats = sol.stats)
+                cacheval = @get_cacheval(cache, $(Meta.quot(alg)))
+                if cacheval === nothing 
+                    error("Nothing cache detected in solve. This is a default algorithm bug that shouldn't happen.")
                 else
-                    SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
-                        retcode = sol.retcode,
-                        iters = sol.iters, stats = sol.stats)
+                    sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
+                    if sol.retcode === ReturnCode.Failure && alg.safetyfallback
+                        ## TODO: Add verbosity logging here about using the fallback
+                        sol = SciMLBase.solve!(cache, QRFactorization(ColumnNorm()), args...; kwargs...)
+                        SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
+                            retcode = sol.retcode,
+                            iters = sol.iters, stats = sol.stats)
+                    else
+                        SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
+                            retcode = sol.retcode,
+                            iters = sol.iters, stats = sol.stats)
+                    end
                 end
             end
         else
             newex = quote
-                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
-                SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
-                    retcode = sol.retcode,
-                    iters = sol.iters, stats = sol.stats)
+                cacheval = @get_cacheval(cache, $(Meta.quot(alg)))
+                if cacheval === nothing 
+                    error("Nothing cache detected in solve. This is a default algorithm bug that shouldn't happen.")
+                else
+                    sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
+                    SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
+                        retcode = sol.retcode,
+                        iters = sol.iters, stats = sol.stats)
+                end
             end
         end
         alg_enum = getproperty(LinearSolve.DefaultAlgorithmChoice, alg)

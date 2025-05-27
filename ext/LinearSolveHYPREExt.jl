@@ -5,7 +5,7 @@ using HYPRE.LibHYPRE: HYPRE_Complex
 using HYPRE: HYPRE, HYPREMatrix, HYPRESolver, HYPREVector
 using LinearSolve: HYPREAlgorithm, LinearCache, LinearProblem, LinearSolve,
                    OperatorAssumptions, default_tol, init_cacheval, __issquare,
-                   __conditioning, LinearSolveAdjoint
+                   __conditioning, LinearSolveAdjoint, AbstractOperatorAssumptions
 using SciMLBase: LinearProblem, LinearAliasSpecifier, SciMLBase
 using UnPack: @unpack
 using Setfield: @set!
@@ -22,7 +22,7 @@ end
 
 function LinearSolve.init_cacheval(alg::HYPREAlgorithm, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
+        verbose::Bool, assumptions::AbstractOperatorAssumptions)
     return HYPRECache(nothing, nothing, nothing, nothing, true, true, true)
 end
 

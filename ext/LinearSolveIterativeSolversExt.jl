@@ -2,7 +2,7 @@ module LinearSolveIterativeSolversExt
 
 using LinearSolve, LinearAlgebra
 using LinearSolve: LinearCache, DEFAULT_PRECS
-import LinearSolve: IterativeSolversJL
+import LinearSolve: IterativeSolversJL, AbstractOperatorAssumptions
 
 if isdefined(Base, :get_extension)
     using IterativeSolvers
@@ -51,7 +51,7 @@ LinearSolve.default_alias_b(::IterativeSolversJL, ::Any, ::Any) = true
 function LinearSolve.init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, maxiters::Int,
         abstol,
         reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
+        verbose::Bool, assumptions::AbstractOperatorAssumptions)
     restart = (alg.gmres_restart == 0) ? min(20, size(A, 1)) : alg.gmres_restart
     s = :idrs_s in keys(alg.kwargs) ? alg.kwargs.idrs_s : 4 # shadow space
 

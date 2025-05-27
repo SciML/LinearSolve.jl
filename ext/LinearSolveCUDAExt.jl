@@ -3,6 +3,7 @@ module LinearSolveCUDAExt
 using CUDA
 using LinearSolve
 using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase, LinearSolve.ArrayInterface
+using LinearSolve: AbstractOperatorAssumptions
 using SciMLBase: AbstractSciMLOperator
 
 function LinearSolve.defaultalg(A::CUDA.CUSPARSE.CuSparseMatrixCSR{Tv, Ti}, b,
@@ -39,25 +40,25 @@ end
 
 function LinearSolve.init_cacheval(alg::CudaOffloadFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
+        assumptions::AbstractOperatorAssumptions)
     qr(CUDA.CuArray(A))
 end
 
 function LinearSolve.init_cacheval(
         ::SparspakFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
-        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::AbstractOperatorAssumptions)
     nothing
 end
 
 function LinearSolve.init_cacheval(
         ::KLUFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
-        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::AbstractOperatorAssumptions)
     nothing
 end
 
 function LinearSolve.init_cacheval(
         ::UMFPACKFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
-        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::AbstractOperatorAssumptions)
     nothing
 end
 

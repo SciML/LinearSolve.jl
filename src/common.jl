@@ -48,12 +48,28 @@ EnumX.@enumx OperatorCondition begin
     WellConditioned
 end
 
+abstract type AbstractOperatorAssumptions{issq} end
+
+"""
+    DefaultOperatorAssumptions(issquare = nothing)
+
+Sets the operator `A` assumptions used as part of the default algorithm. Is
+equivalent to `condition::OperatorCondition.T = IllConditioned` but uses
+a type in order to better specialize on the default conditioning assumption
+"""
+struct DefaultOperatorAssumptions{T} <: AbstractOperatorAssumptions{T}
+    issq::T
+end
+DefaultOperatorAssumptions() = DefaultOperatorAssumptions(nothing)
+__issquare(assump::DefaultOperatorAssumptions) = assump.issq
+__conditioning(assump::DefaultOperatorAssumptions) = OperatorCondition.IllConditioned
+
 """
     OperatorAssumptions(issquare = nothing; condition::OperatorCondition.T = IllConditioned)
 
 Sets the operator `A` assumptions used as part of the default algorithm
 """
-struct OperatorAssumptions{T}
+struct OperatorAssumptions{T <: Union{Nothing, Bool}} <: AbstractOperatorAssumptions{T}
     issq::T
     condition::OperatorCondition.T
 end
@@ -65,7 +81,7 @@ end
 __issquare(assump::OperatorAssumptions) = assump.issq
 __conditioning(assump::OperatorAssumptions) = assump.condition
 
-mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, S}
+mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, AS <: AbstractOperatorAssumptions, S}
     A::TA
     b::Tb
     u::Tu
@@ -80,7 +96,7 @@ mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, S}
     reltol::Ttol
     maxiters::Int
     verbose::Bool
-    assumptions::OperatorAssumptions{issq}
+    assumptions::AS
     sensealg::S
 end
 
@@ -243,7 +259,7 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     Tc = typeof(cacheval)
 
     cache = LinearCache{typeof(A), typeof(b), typeof(u0_), typeof(p), typeof(alg), Tc,
-        typeof(Pl), typeof(Pr), typeof(reltol), typeof(assumptions.issq),
+        typeof(Pl), typeof(Pr), typeof(reltol), typeof(assumptions),
         typeof(sensealg)}(
         A, b, u0_, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
         maxiters, verbose, assumptions, sensealg)
@@ -286,7 +302,7 @@ function SciMLBase.solve(prob::LinearProblem, args...; kwargs...)
 end
 
 function SciMLBase.solve(prob::LinearProblem, ::Nothing, args...;
-        assump = OperatorAssumptions(issquare(prob.A)), kwargs...)
+        assump = DefaultOperatorAssumptions(issquare(prob.A)), kwargs...)
     return solve(prob, defaultalg(prob.A, prob.b, assump), args...; kwargs...)
 end
 

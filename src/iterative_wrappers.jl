@@ -185,7 +185,7 @@ end
 
 # zeroinit allows for init_cacheval to start by initing with A (0,0)
 function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
-        verbose::Bool, assumptions::OperatorAssumptions; zeroinit = true)
+        verbose::Bool, assumptions::AbstractOperatorAssumptions; zeroinit = true)
     KS = get_KrylovJL_solver(alg.KrylovAlg)
 
     if zeroinit
@@ -240,11 +240,15 @@ end
 # Krylov.jl tries to init with `ArrayPartition(undef, ...)`. Avoid hitting that!
 function init_cacheval(
         alg::LinearSolve.KrylovJL, A, b::RecursiveArrayTools.ArrayPartition, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool, ::LinearSolve.OperatorAssumptions)
+        maxiters::Int, abstol, reltol, verbose::Bool, ::AbstractOperatorAssumptions)
     return nothing
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
+
+    cacheval = @get_cacheval(cache, :KrylovJL_GMRES)
+    cacheval === nothing && error("Nothing cache detected in solve. This is a default algorithm bug that shouldn't happen.")
+
     if cache.precsisfresh && !isnothing(alg.precs)
         Pl, Pr = alg.precs(cache.A, cache.p)
         cache.Pl = Pl

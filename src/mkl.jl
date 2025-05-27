@@ -198,14 +198,14 @@ end
 
 function LinearSolve.init_cacheval(alg::MKLLUFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
+        assumptions::AbstractOperatorAssumptions)
     PREALLOCATED_MKL_LU
 end
 
 function LinearSolve.init_cacheval(alg::MKLLUFactorization,
         A::AbstractMatrix{<:Union{Float32, ComplexF32, ComplexF64}}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
+        assumptions::AbstractOperatorAssumptions)
     A = rand(eltype(A), 0, 0)
     ArrayInterface.lu_instance(A), Ref{BlasInt}()
 end

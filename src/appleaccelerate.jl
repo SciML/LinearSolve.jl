@@ -221,14 +221,14 @@ end
 
 function LinearSolve.init_cacheval(alg::AppleAccelerateLUFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
+        assumptions::AbstractOperatorAssumptions)
     PREALLOCATED_APPLE_LU
 end
 
 function LinearSolve.init_cacheval(alg::AppleAccelerateLUFactorization,
         A::AbstractMatrix{<:Union{Float32, ComplexF32, ComplexF64}}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
+        assumptions::AbstractOperatorAssumptions)
     A = rand(eltype(A), 0, 0)
     luinst = ArrayInterface.lu_instance(A)
     LU(luinst.factors, similar(A, Cint, 0), luinst.info), Ref{Cint}()

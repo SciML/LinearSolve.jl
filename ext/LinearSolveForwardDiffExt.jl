@@ -39,14 +39,12 @@ function linearsolve_forwarddiff_solve(prob::LinearProblem, alg, args...; kwargs
     ∂_A = partial_vals(A)
     ∂_b = partial_vals(b)
 
-    
+    rhs = xp_linsolve_rhs(uu, ∂_A, ∂_b)
 
-    if uu isa Number
+    partial_prob = remake(newprob, b = rhs)
+    partial_sol = solve(partial_prob, alg, args...; kwargs...)
 
-    else
-
-    end
-
+    sol, partial_sol
 end
 
 
@@ -60,33 +58,27 @@ nodual_value(x::Dual) = ForwardDiff.value(x)
 nodual_value(x::AbstractArray{<:Dual}) = map(ForwardDiff.value, x)
 
 
-function x_p_linsolve(new_A, uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}}, ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}})
+function xp_linsolve_rhs(uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}}, ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}})
     A_list = partials_to_list(∂_A)
     b_list = partials_to_list(∂_b) 
 
     Auu = [A*uu for A in A_list]
 
-    linsol_rhs = reduce(hcat, b_list .- Auu)
-
-    new_A \ linsol_rhs
+    reduce(hcat, b_list .- Auu)
 end
 
-function x_p_linsolve(new_A, uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}}, ∂_b::Nothing)
+function xp_linsolve_rhs(uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}}, ∂_b::Nothing)
     A_list = partials_to_list(∂_A)
 
     Auu = [A*uu for A in A_list]
 
-    linsol_rhs = reduce(hcat, Auu)
-
-    new_A \ linsol_rhs
+    reduce(hcat, Auu)
 end
 
-function x_p_linsolve(new_A, uu, ∂_A::Nothing, ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}})
+function xp_linsolve_rhs(uu, ∂_A::Nothing, ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}})
     b_list = partials_to_list(∂_b)
 
-    linsol_rhs = reduce(hcat, b_list)
-
-    new_A \ linsol_rhs
+    reduce(hcat, b_list)
 end
 
 

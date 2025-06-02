@@ -1,56 +1,91 @@
 module LinearSolveForwardDiffExt 
 
 const DualLinearProblem = LinearProblem{
-    <:Union{Number, <:AbstractArray}, iip,
-    <:Union{<:Dual{T,V,P}, <:AbstractArray{<:Dual{T,V,P}}}, 
-    <:Union{<:Dual{T,V,P}, <:AbstractArray{<:Dual{T,V,P}}}, 
-    <:Union{Number, <:AbstractArray}
-} where {iip, T, V}
+    <:Union{Number,<:AbstractArray, Nothing},iip,
+    <:Union{<:Dual{T,V,P},<:AbstractArray{<:Dual{T,V,P}}},
+    <:Union{<:Dual{T,V,P},<:AbstractArray{<:Dual{T,V,P}}},
+    <:Union{Number,<:AbstractArray, SciMLBase.NullParameters}
+} where {iip, T, V, P}
 
 
 const DualALinearProblem = LinearProblem{
-    <:Union{Number, <:AbstractArray}, 
+    <:Union{Number,<:AbstractArray, Nothing},
     iip,
-    <:Union{<:Dual{T, V, P}, <:AbstractArray{<:Dual{T, V, P}}}, 
-    <:Union{Number, <:AbstractArray},
-    <:Union{Number, <:AbstractArray}
-}
+    <:Union{<:Dual{T,V,P},<:AbstractArray{<:Dual{T,V,P}}},
+    <:Union{Number,<:AbstractArray},
+    <:Union{Number,<:AbstractArray, SciMLBase.NullParameters}
+} where {iip, T, V, P}
 
 const DualBLinearProblem = LinearProblem{
-    <:Union{Number, <:AbstractArray}, 
+    <:Union{Number,<:AbstractArray, Nothing},
     iip,
-    <:Union{Number, <:AbstractArray}, 
-    <:Union{<:Dual{T, V, P}, <:AbstractArray{<:Dual{T, V, P}}},
-    <:Union{Number, <:AbstractArray}
-}
+    <:Union{Number,<:AbstractArray},
+    <:Union{<:Dual{T,V,P},<:AbstractArray{<:Dual{T,V,P}}},
+    <:Union{Number,<:AbstractArray, SciMLBase.NullParameters}
+} where {iip, T, V, P}
 
 const DualAbstractLinearProblem = Union{DualLinearProblem, DualALinearProblem, DualBLinearProblem}
-
 
 function linearsolve_forwarddiff_solve(prob::LinearProblem, alg, args...; kwargs...)
     new_A = nodual_value(prob.A)
     new_b = nodual_value(prob.b)
 
-    newprob = remake(prob; A = new_A, b = new_b)
+    newprob = remake(prob; A=new_A, b=new_b)
 
     sol = solve(newprob, alg, args...; kwargs...)
     uu = sol.u
 
+
+    # Solves Dual partials separately 
     ∂_A = partial_vals(A)
     ∂_b = partial_vals(b)
 
-    rhs = xp_linsolve_rhs(uu, ∂_A, ∂_b)
+    rhs_list = xp_linsolve_rhs(uu, ∂_A, ∂_b)
 
-    partial_prob = remake(newprob, b = rhs)
-    partial_sol = solve(partial_prob, alg, args...; kwargs...)
+    partial_sols = map(rhs_list) do rhs
+        partial_prob = remake(newprob, b=rhs)
+        solve(partial_prob, alg, args...; kwargs...).u
+    end
 
-    sol, partial_sol
+    sol, partial_sols
+end
+
+function __solve(prob::DualAbstractLinearProblem, alg, args...; kwargs...)
+    sol, partials = linearsolve_forwarddiff_solve(
+        prob, alg, args...; kwargs...
+    )
+
+    if get_dual_type(prob.A) !== nothing
+        dual_type = get_dual_type(prob.A)
+    elseif get_dual_type(prob.b) !== nothing
+        dual_type = get_dual_type(prob.b)
+        return sol
+    end
+
+    linearsolve_dual_solution(sol.u, partials, dual_type)
+
 end
 
 
+function linearsolve_dual_solution(
+    u::Number, partials, dual_type)
+    return dual_type(u, partials)
+end
+
+function linearsolve_dual_solution(
+    u::AbstractArray, partials, dual_type)
+    partials_list = RecursiveArrayTools.VectorOfArray(partials)
+    return map(((uᵢ, pᵢ),) -> dual_type(uᵢ, Partials(Tuple(pᵢ))), zip(u, partials_list[i, :] for i in 1:length(partials_list[1])))
+end
+
+
+get_dual_type(x::Dual) = typeof(x)
+get_dual_type(x::AbstractArray{<:Dual}) = eltype(x)
+get_dual_type(x) = nothing
+
 
 partial_vals(x::Dual) = ForwardDiff.partials(x)
-partial_vals(x::AbstractArray{<:Dual}) = map(ForwardDiff.value, x)
+partial_vals(x::AbstractArray{<:Dual}) = map(ForwardDiff.partials, x)
 partial_vals(x) = nothing
 
 nodual_value(x) = x
@@ -64,7 +99,7 @@ function xp_linsolve_rhs(uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials
 
     Auu = [A*uu for A in A_list]
 
-    reduce(hcat, b_list .- Auu)
+    b_list .- Auu
 end
 
 function xp_linsolve_rhs(uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}}, ∂_b::Nothing)
@@ -72,13 +107,13 @@ function xp_linsolve_rhs(uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials
 
     Auu = [A*uu for A in A_list]
 
-    reduce(hcat, Auu)
+    Auu
 end
 
 function xp_linsolve_rhs(uu, ∂_A::Nothing, ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}})
     b_list = partials_to_list(∂_b)
 
-    reduce(hcat, b_list)
+    b_list
 end
 
 

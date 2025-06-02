@@ -50,7 +50,16 @@ function linearsolve_forwarddiff_solve(prob::LinearProblem, alg, args...; kwargs
     sol, partial_sols
 end
 
-function __solve(prob::DualAbstractLinearProblem, alg, args...; kwargs...)
+function SciMLBase.solve(prob::DualAbstractLinearProblem, args...; kwargs...)
+    return solve(prob, nothing, args...; kwargs...)
+end
+
+function SciMLBase.solve(prob::DualAbstractLinearProblem, ::Nothing, args...;
+        assump = OperatorAssumptions(issquare(prob.A)), kwargs...)
+    return solve(prob, defaultalg(prob.A, prob.b, assump), args...; kwargs...)
+end
+
+function SciMLBase.solve(prob::DualAbstractLinearProblem, alg, args...; kwargs...)
     sol, partials = linearsolve_forwarddiff_solve(
         prob, alg, args...; kwargs...
     )
@@ -59,10 +68,14 @@ function __solve(prob::DualAbstractLinearProblem, alg, args...; kwargs...)
         dual_type = get_dual_type(prob.A)
     elseif get_dual_type(prob.b) !== nothing
         dual_type = get_dual_type(prob.b)
-        return sol
     end
 
-    linearsolve_dual_solution(sol.u, partials, dual_type)
+    dual_sol = linearsolve_dual_solution(sol.u, partials, dual_type)
+
+    return SciMLBase.build_linear_solution(
+        alg, dual_sol, sol.resid, sol.cache; sol.retcode, sol.iters, sol.stats
+    )
+
 
 end
 

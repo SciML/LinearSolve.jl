@@ -32,8 +32,16 @@ const DualBLinearProblem = LinearProblem{
 const DualAbstractLinearProblem = Union{
     DualLinearProblem, DualALinearProblem, DualBLinearProblem}
 
+LinearSolve.@concrete mutable struct DualLinearCache
+    cache
+    prob
+    alg
+    partials_A
+    partials_b
+end
+
 function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwargs...)
-    sol = solve!(cache, alg, args...; kwargs...)
+    sol = solve!(cache.cache, alg, args...; kwargs...)
     uu = sol.u
 
     # Solves Dual partials separately 
@@ -42,10 +50,15 @@ function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwa
 
     rhs_list = xp_linsolve_rhs(uu, ∂_A, ∂_b)
 
-    partial_sols = map(rhs_list) do rhs
-        partial_prob = remake(partial_prob, b = rhs)
-        solve(partial_prob, alg, args...; kwargs...).u
+    partial_prob = LinearProblem(cache.cache.A, rhs_list[1])
+    partial_cache = init(partial_prob, alg, args...; kwargs...)
+
+    for i in eachindex(rhs_list)
+        partial_cache.b = rhs_list[i]
+        rhs_list[i] = copy(solve!(partial_cache, alg).u)
     end
+
+    partial_sols = rhs_list
 
     sol, partial_sols
 end
@@ -135,19 +148,19 @@ function partials_to_list(partial_matrix)
     return res_list
 end
 
-function SciMLBase.init(prob::DualAbstractLinearProblem, alg::SciMLLinearSolveAlgorithm,
-    args...;
-    alias = LinearAliasSpecifier(),
-    abstol = default_tol(real(eltype(prob.b))),
-    reltol = default_tol(real(eltype(prob.b))),
-    maxiters::Int = length(prob.b),
-    verbose::Bool = false,
-    Pl = nothing,
-    Pr = nothing,
-    assumptions = OperatorAssumptions(issquare(prob.A)),
-    sensealg = LinearSolveAdjoint(),
-    kwargs...)
-
+function SciMLBase.init(
+        prob::DualAbstractLinearProblem, alg::LinearSolve.SciMLLinearSolveAlgorithm,
+        args...;
+        alias = LinearAliasSpecifier(),
+        abstol = LinearSolve.default_tol(real(eltype(prob.b))),
+        reltol = LinearSolve.default_tol(real(eltype(prob.b))),
+        maxiters::Int = length(prob.b),
+        verbose::Bool = false,
+        Pl = nothing,
+        Pr = nothing,
+        assumptions = OperatorAssumptions(issquare(prob.A)),
+        sensealg = LinearSolveAdjoint(),
+        kwargs...)
     new_A = nodual_value(prob.A)
     new_b = nodual_value(prob.b)
 
@@ -156,35 +169,28 @@ function SciMLBase.init(prob::DualAbstractLinearProblem, alg::SciMLLinearSolveAl
 
     newprob = remake(prob; A = new_A, b = new_b)
 
-    non_partial_cache = init(newprob, alg, args...; alias = alias, abstol = abstol, reltol = reltol,
+    non_partial_cache = init(
+        newprob, alg, args...; alias = alias, abstol = abstol, reltol = reltol,
         maxiters = maxiters, verbose = verbose, Pl = Pl, Pr = Pr, assumptions = assumptions,
         sensealg = sensealg, kwargs...)
 
     return DualLinearCache(non_partial_cache, prob, alg, ∂_A, ∂_b)
 end
 
-mutable struct DualLinearCache
-    cache
-    prob
-    alg
-    partials_A
-    partials_b
-end
-
 function SciMLBase.solve!(cache::DualLinearCache, args...; kwargs...)
-
-    sol, partials = linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwargs...)
+    sol, partials = linearsolve_forwarddiff_solve(
+        cache::DualLinearCache, cache.alg, args...; kwargs...)
 
     if get_dual_type(cache.prob.A) !== nothing
-        dual_type = get_dual_type(prob.A)
+        dual_type = get_dual_type(cache.prob.A)
     elseif get_dual_type(cache.prob.b) !== nothing
-        dual_type = get_dual_type(prob.b)
+        dual_type = get_dual_type(cache.prob.b)
     end
 
     dual_sol = linearsolve_dual_solution(sol.u, partials, dual_type)
 
     return SciMLBase.build_linear_solution(
-        alg, dual_sol, sol.resid, sol.cache; sol.retcode, sol.iters, sol.stats
+        cache.alg, dual_sol, sol.resid, sol.cache; sol.retcode, sol.iters, sol.stats
     )
 end
 

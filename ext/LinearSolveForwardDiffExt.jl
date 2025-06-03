@@ -178,7 +178,8 @@ function SciMLBase.init(
 end
 
 function SciMLBase.solve!(cache::DualLinearCache, args...; kwargs...)
-    sol, partials = linearsolve_forwarddiff_solve(
+    sol,
+    partials = linearsolve_forwarddiff_solve(
         cache::DualLinearCache, cache.alg, args...; kwargs...)
 
     if get_dual_type(cache.prob.A) !== nothing

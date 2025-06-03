@@ -1,6 +1,7 @@
 module LinearSolveForwardDiffExt
 
 using LinearSolve
+using LinearAlgebra
 using ForwardDiff
 using ForwardDiff: Dual, Partials
 using SciMLBase
@@ -52,6 +53,8 @@ function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwa
 
     partial_prob = LinearProblem(cache.cache.A, rhs_list[1])
     partial_cache = init(partial_prob, alg, args...; kwargs...)
+
+    Main.@infiltrate
 
     for i in eachindex(rhs_list)
         partial_cache.b = rhs_list[i]
@@ -107,7 +110,6 @@ function xp_linsolve_rhs(uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials
     b_list = partials_to_list(∂_b)
 
     Auu = [A * uu for A in A_list]
-
     b_list .- Auu
 end
 
@@ -117,13 +119,13 @@ function xp_linsolve_rhs(
 
     Auu = [A * uu for A in A_list]
 
-    Auu
+    -Auu
 end
 
 function xp_linsolve_rhs(
         uu, ∂_A::Nothing, ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}})
     b_list = partials_to_list(∂_b)
-
+    Main.@infiltrate
     b_list
 end
 

@@ -13,15 +13,15 @@ A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 
 prob = LinearProblem(A, b)
 overload_x_p = solve(prob)
-original_x_p = solve!(init(prob))
+original_x_p = A \ b
 
-@test overload_x_p ≈ original_x_p
+@test ≈(overload_x_p, original_x_p, rtol = 1e-9)
 
 A, _ = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 prob = LinearProblem(A, [6.0, 10.0, 25.0])
-@test solve(prob).retcode == ReturnCode.Default
+@test ≈(solve(prob).u, A \ [6.0, 10.0, 25.0], rtol = 1e-9) 
 
 _, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 A = [5.0 6.0 125.0; 15.0 10.0 21.0; 25.0 45.0 5.0]
 prob = LinearProblem(A, b)
-@test solve(prob).retcode == ReturnCode.Default
+@test ≈(solve(prob).u, A \ b, rtol = 1e-9)

@@ -37,6 +37,8 @@ LinearSolve.@concrete mutable struct DualLinearCache
     cache
     prob
     alg
+    A
+    b
     partials_A
     partials_b
 end
@@ -175,7 +177,7 @@ function SciMLBase.init(
         maxiters = maxiters, verbose = verbose, Pl = Pl, Pr = Pr, assumptions = assumptions,
         sensealg = sensealg, kwargs...)
 
-    return DualLinearCache(non_partial_cache, prob, alg, ∂_A, ∂_b)
+    return DualLinearCache(non_partial_cache, prob, alg, new_A, new_b, ∂_A, ∂_b)
 end
 
 function SciMLBase.solve!(cache::DualLinearCache, args...; kwargs...)

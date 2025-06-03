@@ -1,5 +1,11 @@
 module LinearSolveForwardDiffExt 
 
+using LinearSolve
+using ForwardDiff
+using ForwardDiff: Dual, Partials
+using SciMLBase
+using RecursiveArrayTools
+
 const DualLinearProblem = LinearProblem{
     <:Union{Number,<:AbstractArray, Nothing},iip,
     <:Union{<:Dual{T,V,P},<:AbstractArray{<:Dual{T,V,P}}},
@@ -27,6 +33,7 @@ const DualBLinearProblem = LinearProblem{
 const DualAbstractLinearProblem = Union{DualLinearProblem, DualALinearProblem, DualBLinearProblem}
 
 function linearsolve_forwarddiff_solve(prob::LinearProblem, alg, args...; kwargs...)
+    @info "here!"
     new_A = nodual_value(prob.A)
     new_b = nodual_value(prob.b)
 
@@ -37,8 +44,8 @@ function linearsolve_forwarddiff_solve(prob::LinearProblem, alg, args...; kwargs
 
 
     # Solves Dual partials separately 
-    ∂_A = partial_vals(A)
-    ∂_b = partial_vals(b)
+    ∂_A = partial_vals(prob.A)
+    ∂_b = partial_vals(prob.b)
 
     rhs_list = xp_linsolve_rhs(uu, ∂_A, ∂_b)
 
@@ -56,10 +63,10 @@ end
 
 function SciMLBase.solve(prob::DualAbstractLinearProblem, ::Nothing, args...;
         assump = OperatorAssumptions(issquare(prob.A)), kwargs...)
-    return solve(prob, defaultalg(prob.A, prob.b, assump), args...; kwargs...)
+    return solve(prob, LinearSolve.defaultalg(prob.A, prob.b, assump), args...; kwargs...)
 end
 
-function SciMLBase.solve(prob::DualAbstractLinearProblem, alg, args...; kwargs...)
+function SciMLBase.solve(prob::DualAbstractLinearProblem, alg::LinearSolve.SciMLLinearSolveAlgorithm, args...; kwargs...)
     sol, partials = linearsolve_forwarddiff_solve(
         prob, alg, args...; kwargs...
     )
@@ -152,7 +159,7 @@ function partials_to_list(partial_matrix)
     return res_list
 end
 
-
+end
 
 
 

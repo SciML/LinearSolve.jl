@@ -1,4 +1,4 @@
-module LinearSolveForwardDiffExt 
+module LinearSolveForwardDiffExt
 
 using LinearSolve
 using ForwardDiff
@@ -7,41 +7,40 @@ using SciMLBase
 using RecursiveArrayTools
 
 const DualLinearProblem = LinearProblem{
-    <:Union{Number,<:AbstractArray, Nothing},iip,
-    <:Union{<:Dual{T,V,P},<:AbstractArray{<:Dual{T,V,P}}},
-    <:Union{<:Dual{T,V,P},<:AbstractArray{<:Dual{T,V,P}}},
-    <:Union{Number,<:AbstractArray, SciMLBase.NullParameters}
+    <:Union{Number, <:AbstractArray, Nothing}, iip,
+    <:Union{<:Dual{T, V, P}, <:AbstractArray{<:Dual{T, V, P}}},
+    <:Union{<:Dual{T, V, P}, <:AbstractArray{<:Dual{T, V, P}}},
+    <:Union{Number, <:AbstractArray, SciMLBase.NullParameters}
 } where {iip, T, V, P}
 
-
 const DualALinearProblem = LinearProblem{
-    <:Union{Number,<:AbstractArray, Nothing},
+    <:Union{Number, <:AbstractArray, Nothing},
     iip,
-    <:Union{<:Dual{T,V,P},<:AbstractArray{<:Dual{T,V,P}}},
-    <:Union{Number,<:AbstractArray},
-    <:Union{Number,<:AbstractArray, SciMLBase.NullParameters}
+    <:Union{<:Dual{T, V, P}, <:AbstractArray{<:Dual{T, V, P}}},
+    <:Union{Number, <:AbstractArray},
+    <:Union{Number, <:AbstractArray, SciMLBase.NullParameters}
 } where {iip, T, V, P}
 
 const DualBLinearProblem = LinearProblem{
-    <:Union{Number,<:AbstractArray, Nothing},
+    <:Union{Number, <:AbstractArray, Nothing},
     iip,
-    <:Union{Number,<:AbstractArray},
-    <:Union{<:Dual{T,V,P},<:AbstractArray{<:Dual{T,V,P}}},
-    <:Union{Number,<:AbstractArray, SciMLBase.NullParameters}
+    <:Union{Number, <:AbstractArray},
+    <:Union{<:Dual{T, V, P}, <:AbstractArray{<:Dual{T, V, P}}},
+    <:Union{Number, <:AbstractArray, SciMLBase.NullParameters}
 } where {iip, T, V, P}
 
-const DualAbstractLinearProblem = Union{DualLinearProblem, DualALinearProblem, DualBLinearProblem}
+const DualAbstractLinearProblem = Union{
+    DualLinearProblem, DualALinearProblem, DualBLinearProblem}
 
 function linearsolve_forwarddiff_solve(prob::LinearProblem, alg, args...; kwargs...)
     @info "here!"
     new_A = nodual_value(prob.A)
     new_b = nodual_value(prob.b)
 
-    newprob = remake(prob; A=new_A, b=new_b)
+    newprob = remake(prob; A = new_A, b = new_b)
 
     sol = solve(newprob, alg, args...; kwargs...)
     uu = sol.u
-
 
     # Solves Dual partials separately 
     ∂_A = partial_vals(prob.A)
@@ -50,7 +49,7 @@ function linearsolve_forwarddiff_solve(prob::LinearProblem, alg, args...; kwargs
     rhs_list = xp_linsolve_rhs(uu, ∂_A, ∂_b)
 
     partial_sols = map(rhs_list) do rhs
-        partial_prob = remake(newprob, b=rhs)
+        partial_prob = remake(newprob, b = rhs)
         solve(partial_prob, alg, args...; kwargs...).u
     end
 
@@ -66,7 +65,8 @@ function SciMLBase.solve(prob::DualAbstractLinearProblem, ::Nothing, args...;
     return solve(prob, LinearSolve.defaultalg(prob.A, prob.b, assump), args...; kwargs...)
 end
 
-function SciMLBase.solve(prob::DualAbstractLinearProblem, alg::LinearSolve.SciMLLinearSolveAlgorithm, args...; kwargs...)
+function SciMLBase.solve(prob::DualAbstractLinearProblem,
+        alg::LinearSolve.SciMLLinearSolveAlgorithm, args...; kwargs...)
     sol, partials = linearsolve_forwarddiff_solve(
         prob, alg, args...; kwargs...
     )
@@ -82,27 +82,23 @@ function SciMLBase.solve(prob::DualAbstractLinearProblem, alg::LinearSolve.SciML
     return SciMLBase.build_linear_solution(
         alg, dual_sol, sol.resid, sol.cache; sol.retcode, sol.iters, sol.stats
     )
-
-
 end
 
-
 function linearsolve_dual_solution(
-    u::Number, partials, dual_type)
+        u::Number, partials, dual_type)
     return dual_type(u, partials)
 end
 
 function linearsolve_dual_solution(
-    u::AbstractArray, partials, dual_type)
+        u::AbstractArray, partials, dual_type)
     partials_list = RecursiveArrayTools.VectorOfArray(partials)
-    return map(((uᵢ, pᵢ),) -> dual_type(uᵢ, Partials(Tuple(pᵢ))), zip(u, partials_list[i, :] for i in 1:length(partials_list[1])))
+    return map(((uᵢ, pᵢ),) -> dual_type(uᵢ, Partials(Tuple(pᵢ))),
+        zip(u, partials_list[i, :] for i in 1:length(partials_list[1])))
 end
-
 
 get_dual_type(x::Dual) = typeof(x)
 get_dual_type(x::AbstractArray{<:Dual}) = eltype(x)
 get_dual_type(x) = nothing
-
 
 partial_vals(x::Dual) = ForwardDiff.partials(x)
 partial_vals(x::AbstractArray{<:Dual}) = map(ForwardDiff.partials, x)
@@ -112,46 +108,46 @@ nodual_value(x) = x
 nodual_value(x::Dual) = ForwardDiff.value(x)
 nodual_value(x::AbstractArray{<:Dual}) = map(ForwardDiff.value, x)
 
-
-function xp_linsolve_rhs(uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}}, ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}})
+function xp_linsolve_rhs(uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}},
+        ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}})
     A_list = partials_to_list(∂_A)
-    b_list = partials_to_list(∂_b) 
+    b_list = partials_to_list(∂_b)
 
-    Auu = [A*uu for A in A_list]
+    Auu = [A * uu for A in A_list]
 
     b_list .- Auu
 end
 
-function xp_linsolve_rhs(uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}}, ∂_b::Nothing)
+function xp_linsolve_rhs(
+        uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}}, ∂_b::Nothing)
     A_list = partials_to_list(∂_A)
 
-    Auu = [A*uu for A in A_list]
+    Auu = [A * uu for A in A_list]
 
     Auu
 end
 
-function xp_linsolve_rhs(uu, ∂_A::Nothing, ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}})
+function xp_linsolve_rhs(
+        uu, ∂_A::Nothing, ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}})
     b_list = partials_to_list(∂_b)
 
     b_list
 end
 
-
-
 function partials_to_list(partial_matrix::Vector)
     p = eachindex(first(partial_matrix))
-    [[partial[i] for partial in partial_matrix]  for i in p]
+    [[partial[i] for partial in partial_matrix] for i in p]
 end
 
 function partials_to_list(partial_matrix)
     p = length(first(partial_matrix))
-    m,n = size(partial_matrix)
-    res_list = fill(zeros(m,n),p)
+    m, n = size(partial_matrix)
+    res_list = fill(zeros(m, n), p)
     for k in 1:p
-        res = zeros(m,n)
+        res = zeros(m, n)
         for i in 1:m
             for j in 1:n
-                res[i,j] = partial_matrix[i,j][k]
+                res[i, j] = partial_matrix[i, j][k]
             end
         end
         res_list[k] = res
@@ -160,11 +156,3 @@ function partials_to_list(partial_matrix)
 end
 
 end
-
-
-
-
-
-
-
-

@@ -290,7 +290,8 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
 
     if cache.cacheval isa Krylov.CgWorkspace
         N !== I &&
-            @warn "$(alg.KrylovAlg) doesn't support right preconditioning."
+            @SciMLMessage("$(alg.KrylovAlg) doesn't support right preconditioning.",
+                verbose, :no_right_preconditioning, :performance)
         Krylov.krylov_solve!(args...; M, kwargs...)
     elseif cache.cacheval isa Krylov.GmresWorkspace
         Krylov.krylov_solve!(args...; M, N, restart = alg.gmres_restart > 0, kwargs...)
@@ -298,7 +299,8 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
         Krylov.krylov_solve!(args...; M, N, kwargs...)
     elseif cache.cacheval isa Krylov.MinresWorkspace
         N !== I &&
-            @warn "$(alg.KrylovAlg) doesn't support right preconditioning."
+            @SciMLMessage("$(alg.KrylovAlg) doesn't support right preconditioning.",
+                verbose, :no_right_preconditioning, :performance)
         Krylov.krylov_solve!(args...; M, kwargs...)
     else
         Krylov.krylov_solve!(args...; kwargs...)

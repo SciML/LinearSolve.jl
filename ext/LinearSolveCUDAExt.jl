@@ -45,26 +45,26 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadFactor
 end
 
 function LinearSolve.init_cacheval(alg::CudaOffloadFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
+        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
         assumptions::OperatorAssumptions)
     qr(CUDA.CuArray(A))
 end
 
 function LinearSolve.init_cacheval(
         ::SparspakFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
-        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+        Pl, Pr, maxiters::Int, abstol, reltol, verbose::LinearVerbosity, assumptions::OperatorAssumptions)
     nothing
 end
 
 function LinearSolve.init_cacheval(
         ::KLUFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
-        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+        Pl, Pr, maxiters::Int, abstol, reltol, verbose::LinearVerbosity, assumptions::OperatorAssumptions)
     nothing
 end
 
 function LinearSolve.init_cacheval(
         ::UMFPACKFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
-        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+        Pl, Pr, maxiters::Int, abstol, reltol, verbose::LinearVerbosity, assumptions::OperatorAssumptions)
     nothing
 end
 

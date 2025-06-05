@@ -46,6 +46,8 @@ function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwa
     sol = solve!(cache.linear_cache, alg, args...; kwargs...)
     uu = sol.u
 
+    primal_sol = deepcopy(sol)
+
     # Solves Dual partials separately 
     ∂_A = cache.partials_A
     ∂_b = cache.partials_b
@@ -54,9 +56,8 @@ function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwa
     rhs_list = xp_linsolve_rhs(uu, ∂_A, ∂_b)
 
     new_A = nodual_value(cache.A)
-    partial_prob = LinearProblem(new_A, rhs_list[1])
-    partial_cache = init(partial_prob, alg, args...; u0 = dual_u0, kwargs...)
-
+    partial_cache = cache.linear_cache
+    partial_cache.u0 = dual_u0
     for i in eachindex(rhs_list)
         partial_cache.b = rhs_list[i]
         rhs_list[i] = copy(solve!(partial_cache, alg).u)
@@ -64,7 +65,7 @@ function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwa
 
     partial_sols = rhs_list
 
-    sol, partial_sols
+    primal_sol, partial_sols
 end
 
 function xp_linsolve_rhs(uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}},

@@ -193,36 +193,7 @@ function Base.getproperty(dc::DualLinearCache, sym::Symbol)
     end
 end
 
-function SciMLBase.reinit!(cache::DualLinearCache;
-        A = nothing,
-        b = cache.b,
-        u = cache.u,
-        p = nothing,
-        reuse_precs = false)
-    (; alg, cacheval, abstol, reltol, maxiters, verbose, assumptions, sensealg) = cache
 
-    isfresh = !isnothing(A)
-    precsisfresh = !reuse_precs && (isfresh || !isnothing(p))
-    isfresh |= cache.isfresh
-    precsisfresh |= cache.precsisfresh
-
-    A = isnothing(A) ? cache.A : A
-    b = isnothing(b) ? cache.b : b
-    u = isnothing(u) ? cache.u : u
-    p = isnothing(p) ? cache.p : p
-    Pl = cache.Pl
-    Pr = cache.Pr
-
-    cache.A = A
-    cache.b = b
-    cache.u = u
-    cache.p = p
-    cache.Pl = Pl
-    cache.Pr = Pr
-    cache.isfresh = true
-    cache.precsisfresh = precsisfresh
-    nothing
-end
 
 # Helper functions for Dual numbers
 get_dual_type(x::Dual) = typeof(x)

@@ -178,9 +178,9 @@ function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)
         setfield!(dc, :partials_A, partial_vals(val))
     elseif  sym === :b
         setfield!(dc, :partials_b, partial_vals(val))
+    else
+        setfield!(dc, sym, val)
     end
-
-    return val
 end
 
 function Base.getproperty(dc::DualLinearCache, sym::Symbol)

@@ -37,6 +37,7 @@ LinearSolve.@concrete mutable struct DualLinearCache
     linear_cache
     prob
     alg
+    dual_u0
     partials_A
     partials_b
 end
@@ -48,12 +49,13 @@ function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwa
     # Solves Dual partials separately 
     ∂_A = cache.partials_A
     ∂_b = cache.partials_b
+    dual_u0 = only(partials_to_list(cache.dual_u0))
 
     rhs_list = xp_linsolve_rhs(uu, ∂_A, ∂_b)
 
     new_A = nodual_value(cache.A)
     partial_prob = LinearProblem(new_A, rhs_list[1])
-    partial_cache = init(partial_prob, alg, args...; kwargs...)
+    partial_cache = init(partial_prob, alg, args...; u0 = dual_u0, kwargs...)
 
     for i in eachindex(rhs_list)
         partial_cache.b = rhs_list[i]
@@ -130,20 +132,23 @@ function SciMLBase.init(
         sensealg = LinearSolveAdjoint(),
         kwargs...)
 
-    new_A = nodual_value(prob.A)
-    new_b = nodual_value(prob.b)
+    (; A, b, u0, p) = prob
 
-    ∂_A = partial_vals(prob.A)
-    ∂_b = partial_vals(prob.b)
+    new_A = nodual_value(A)
+    new_b = nodual_value(b)
+    new_u0 = nodual_value(u0)
+
+    ∂_A = partial_vals(A)
+    ∂_b = partial_vals(b)
+    dual_u0 = partial_vals(u0)
 
     newprob = remake(prob; A = new_A, b = new_b)
 
     non_partial_cache = init(
         newprob, alg, args...; alias = alias, abstol = abstol, reltol = reltol,
         maxiters = maxiters, verbose = verbose, Pl = Pl, Pr = Pr, assumptions = assumptions,
-        sensealg = sensealg, kwargs...)
-
-    return DualLinearCache(non_partial_cache, prob, alg, ∂_A, ∂_b)
+        sensealg = sensealg, u0 = new_u0, kwargs...)
+    return DualLinearCache(non_partial_cache, prob, alg, dual_u0, ∂_A, ∂_b)
 end
 
 function SciMLBase.solve!(cache::DualLinearCache, args...; kwargs...)

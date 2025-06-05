@@ -142,7 +142,7 @@ function SciMLBase.init(
     ∂_b = partial_vals(b)
     dual_u0 = partial_vals(u0)
 
-    newprob = remake(prob; A = new_A, b = new_b)
+    newprob = remake(prob; A = new_A, b = new_b, u0 = new_u0)
 
     non_partial_cache = init(
         newprob, alg, args...; alias = alias, abstol = abstol, reltol = reltol,

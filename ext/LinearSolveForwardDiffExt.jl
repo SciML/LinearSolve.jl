@@ -51,12 +51,12 @@ function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwa
     # Solves Dual partials separately 
     ∂_A = cache.partials_A
     ∂_b = cache.partials_b
-    dual_u0 = only(partials_to_list(cache.dual_u0))
+    dual_u0 = !isnothing(cache.dual_u0) ? only(partials_to_list(cache.dual_u0)) : cache.linear_cache.u
 
     rhs_list = xp_linsolve_rhs(uu, ∂_A, ∂_b)
 
     partial_cache = cache.linear_cache
-    partial_cache.u0 = dual_u0
+    partial_cache.u = dual_u0
     for i in eachindex(rhs_list)
         partial_cache.b = rhs_list[i]
         rhs_list[i] = copy(solve!(partial_cache, alg).u)
@@ -142,7 +142,8 @@ function SciMLBase.init(
     ∂_b = partial_vals(b)
     dual_u0 = partial_vals(u0)
 
-    newprob = remake(prob; A = new_A, b = new_b, u0 = new_u0)
+    newprob = LinearProblem(new_A, new_b, u0 = new_u0)
+    #remake(prob; A = new_A, b = new_b, u0 = new_u0)
 
     non_partial_cache = init(
         newprob, alg, args...; alias = alias, abstol = abstol, reltol = reltol,

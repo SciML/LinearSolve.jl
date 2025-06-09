@@ -44,6 +44,7 @@ end
 
 function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwargs...)
     sol = solve!(cache.linear_cache, alg, args...; kwargs...)
+    primal_b = copy(cache.linear_cache.b)
     uu = sol.u
 
     primal_sol = deepcopy(sol)
@@ -57,10 +58,14 @@ function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwa
 
     partial_cache = cache.linear_cache
     partial_cache.u = dual_u0
+
     for i in eachindex(rhs_list)
         partial_cache.b = rhs_list[i]
-        rhs_list[i] = copy(solve!(partial_cache, alg).u)
+        rhs_list[i] = copy(solve!(partial_cache, alg, args...; kwargs...).u)
     end
+
+    # Reset to the original `b`, users will expect that `b` doesn't change if they don't tell it to
+    partial_cache.b = primal_b
 
     partial_sols = rhs_list
 
@@ -173,7 +178,7 @@ end
 # If setting A or b for DualLinearCache, also set it for the underlying LinearCache
 function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)
     # If the property is A or b, also update it in the LinearCache
-    if sym === :A || sym === :b
+    if sym === :A || sym === :b || sym === :u
         if hasproperty(dc, :linear_cache)
             setproperty!(dc.linear_cache, sym, nodual_value(val))
         end

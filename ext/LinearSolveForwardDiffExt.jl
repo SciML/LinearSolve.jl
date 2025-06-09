@@ -55,7 +55,6 @@ function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwa
 
     rhs_list = xp_linsolve_rhs(uu, ∂_A, ∂_b)
 
-    new_A = nodual_value(cache.A)
     partial_cache = cache.linear_cache
     partial_cache.u0 = dual_u0
     for i in eachindex(rhs_list)

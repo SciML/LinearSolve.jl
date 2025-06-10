@@ -268,7 +268,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     atol = float(cache.abstol)
     rtol = float(cache.reltol)
     itmax = cache.maxiters
-    verbose = cache.verbose ? 1 : 0
+    verbose = cache.verbose
 
     cacheval = if cache.alg isa DefaultLinearSolver
         if alg.KrylovAlg === Krylov.gmres!

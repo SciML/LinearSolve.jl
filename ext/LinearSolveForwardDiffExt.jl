@@ -35,8 +35,7 @@ const DualAbstractLinearProblem = Union{
 
 LinearSolve.@concrete mutable struct DualLinearCache
     linear_cache
-    prob
-    alg
+    dual_type
     dual_u0
     partials_A
     partials_b
@@ -147,14 +146,20 @@ function SciMLBase.init(
     ∂_b = partial_vals(b)
     dual_u0 = partial_vals(u0)
 
-    newprob = LinearProblem(new_A, new_b, u0 = new_u0)
+    primal_prob = LinearProblem(new_A, new_b, u0 = new_u0)
     #remake(prob; A = new_A, b = new_b, u0 = new_u0)
 
+    if get_dual_type(prob.A) !== nothing
+        dual_type = get_dual_type(prob.A)
+    elseif get_dual_type(prob.b) !== nothing
+        dual_type = get_dual_type(prob.b)
+    end
+
     non_partial_cache = init(
-        newprob, alg, args...; alias = alias, abstol = abstol, reltol = reltol,
+        primal_prob, alg, args...; alias = alias, abstol = abstol, reltol = reltol,
         maxiters = maxiters, verbose = verbose, Pl = Pl, Pr = Pr, assumptions = assumptions,
         sensealg = sensealg, u0 = new_u0, kwargs...)
-    return DualLinearCache(non_partial_cache, prob, alg, dual_u0, ∂_A, ∂_b)
+    return DualLinearCache(non_partial_cache, dual_type, dual_u0, ∂_A, ∂_b)
 end
 
 function SciMLBase.solve!(cache::DualLinearCache, args...; kwargs...)
@@ -162,26 +167,21 @@ function SciMLBase.solve!(cache::DualLinearCache, args...; kwargs...)
     partials = linearsolve_forwarddiff_solve(
         cache::DualLinearCache, cache.alg, args...; kwargs...)
 
-    if get_dual_type(cache.prob.A) !== nothing
-        dual_type = get_dual_type(cache.prob.A)
-    elseif get_dual_type(cache.prob.b) !== nothing
-        dual_type = get_dual_type(cache.prob.b)
-    end
-
-    dual_sol = linearsolve_dual_solution(sol.u, partials, dual_type)
+    dual_sol = linearsolve_dual_solution(sol.u, partials, cache.dual_type)
 
     return SciMLBase.build_linear_solution(
         cache.alg, dual_sol, sol.resid, sol.cache; sol.retcode, sol.iters, sol.stats
     )
 end
 
-# If setting A or b for DualLinearCache, also set it for the underlying LinearCache
+# If setting A or b for DualLinearCache, put the Dual-stripped versions in the LinearCache
+# Also "forwards" setproperty so that 
 function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)
     # If the property is A or b, also update it in the LinearCache
     if sym === :A || sym === :b || sym === :u
-        if hasproperty(dc, :linear_cache)
-            setproperty!(dc.linear_cache, sym, nodual_value(val))
-        end
+        setproperty!(dc.linear_cache, sym, nodual_value(val))
+    elseif hasfield(LinearSolve.LinearCache, sym)
+        setproperty!(dc.linear_cache, sym, val)
     end
 
     # Update the partials if setting A or b
@@ -194,13 +194,12 @@ function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)
     end
 end
 
+# "Forwards" getproperty to LinearCache if necessary
 function Base.getproperty(dc::DualLinearCache, sym::Symbol)
-    if sym === :A
-        return dc.linear_cache.A
-    elseif sym === :b
-        return dc.linear_cache.b
+    if hasfield(LinearSolve.LinearCache, sym)
+        return getproperty(dc.linear_cache, sym)
     else
-        getfield(dc,sym)
+        return getfield(dc, sym)
     end
 end
 

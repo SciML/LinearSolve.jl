@@ -21,7 +21,7 @@ krylov_overload_x_p = solve(prob, KrylovJL_GMRES())
 krylov_prob = LinearProblem(A, b, u0 = rand(3))
 krylov_u0_sol = solve(krylov_prob, KrylovJL_GMRES())
 
-@test ≈(krylov_u0_sol, original_x_p, rtol = 1e-9)
+@test ≈(krylov_u0_sol, backslash_x_p, rtol = 1e-9)
 
 
 A, _ = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])

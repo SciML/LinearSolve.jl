@@ -36,12 +36,13 @@ const DualAbstractLinearProblem = Union{
 LinearSolve.@concrete mutable struct DualLinearCache
     linear_cache
     dual_type
-    dual_u0
     partials_A
     partials_b
 end
 
 function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwargs...)
+    # Solve the primal problem
+    dual_u0 = copy(cache.linear_cache.u)
     sol = solve!(cache.linear_cache, alg, args...; kwargs...)
     primal_b = copy(cache.linear_cache.b)
     uu = sol.u
@@ -51,7 +52,6 @@ function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwa
     # Solves Dual partials separately 
     ∂_A = cache.partials_A
     ∂_b = cache.partials_b
-    dual_u0 = !isnothing(cache.dual_u0) ? only(partials_to_list(cache.dual_u0)) : cache.linear_cache.u
 
     rhs_list = xp_linsolve_rhs(uu, ∂_A, ∂_b)
 
@@ -137,14 +137,12 @@ function SciMLBase.init(
         kwargs...)
 
     (; A, b, u0, p) = prob
-
     new_A = nodual_value(A)
     new_b = nodual_value(b)
     new_u0 = nodual_value(u0)
 
     ∂_A = partial_vals(A)
     ∂_b = partial_vals(b)
-    dual_u0 = partial_vals(u0)
 
     primal_prob = LinearProblem(new_A, new_b, u0 = new_u0)
     #remake(prob; A = new_A, b = new_b, u0 = new_u0)
@@ -159,7 +157,7 @@ function SciMLBase.init(
         primal_prob, alg, args...; alias = alias, abstol = abstol, reltol = reltol,
         maxiters = maxiters, verbose = verbose, Pl = Pl, Pr = Pr, assumptions = assumptions,
         sensealg = sensealg, u0 = new_u0, kwargs...)
-    return DualLinearCache(non_partial_cache, dual_type, dual_u0, ∂_A, ∂_b)
+    return DualLinearCache(non_partial_cache, dual_type, ∂_A, ∂_b)
 end
 
 function SciMLBase.solve!(cache::DualLinearCache, args...; kwargs...)
@@ -168,9 +166,8 @@ function SciMLBase.solve!(cache::DualLinearCache, args...; kwargs...)
         cache::DualLinearCache, cache.alg, args...; kwargs...)
 
     dual_sol = linearsolve_dual_solution(sol.u, partials, cache.dual_type)
-
     return SciMLBase.build_linear_solution(
-        cache.alg, dual_sol, sol.resid, sol.cache; sol.retcode, sol.iters, sol.stats
+        cache.alg, dual_sol, sol.resid, cache; sol.retcode, sol.iters, sol.stats
     )
 end
 

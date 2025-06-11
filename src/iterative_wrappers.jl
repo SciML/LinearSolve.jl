@@ -284,8 +284,14 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
         cache.cacheval
     end
 
+    krylovJL_verbose = SciMLBase.@match verbose.numerical.KrylovJL_verbosity begin
+        SciMLBase.Verbosity.None() => 0
+        ::SciMLBase.Verbosity.Type => 1
+        _ => error("Invalid verbosity.")
+    end
+
     args = (cacheval, cache.A, cache.b)
-    kwargs = (atol = atol, rtol, itmax, verbose,
+    kwargs = (atol = atol, rtol, itmax, verbose = krylovJL_verbose,
         ldiv = true, history = true, alg.kwargs...)
 
     if cache.cacheval isa Krylov.CgWorkspace
@@ -333,3 +339,5 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     return SciMLBase.build_linear_solution(alg, cache.u, Ref(resid), cache;
         iters = stats.niter, retcode, stats)
 end
+
+

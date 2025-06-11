@@ -9,7 +9,7 @@ using ArrayInterface
 using Base: cache_dependencies, Bool
 using LinearAlgebra
 using LazyArrays: @~, BroadcastArray
-using SciMLBase: AbstractLinearAlgorithm, LinearAliasSpecifier, LinearVerbosity, Verbosity, @SciMLMessage
+using SciMLBase: AbstractLinearAlgorithm, LinearAliasSpecifier, LinearVerbosity, Verbosity, @SciMLMessage, LinearVerbosity
 using SciMLOperators
 using SciMLOperators: AbstractSciMLOperator, IdentityOperator
 using Setfield

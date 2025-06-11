@@ -52,3 +52,31 @@ x_p = solve!(cache)
 backslash_x_p = new_A \ new_b
 
 @test ≈(x_p, backslash_x_p, rtol = 1e-9)
+
+# Just update A
+A, b = h([ForwardDiff.Dual(10.0, 1.0, 0.0), ForwardDiff.Dual(10.0, 0.0, 1.0)])
+
+prob = LinearProblem(A, b)
+cache = init(prob)
+
+new_A, _ = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+cache.A = new_A
+
+x_p = solve!(cache)
+backslash_x_p = new_A \ b
+
+@test ≈(x_p, backslash_x_p, rtol = 1e-9)
+
+# Just update b
+A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+
+prob = LinearProblem(A, b)
+cache = init(prob)
+
+_, new_b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+cache.b = new_b
+
+x_p = solve!(cache)
+backslash_x_p = A \ new_b
+
+@test ≈(x_p, backslash_x_p, rtol = 1e-9)

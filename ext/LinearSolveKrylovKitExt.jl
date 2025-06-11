@@ -42,7 +42,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovKitJL; kwargs...)
         iters = iters)
 end
 
-function verbosity_to_KrylovKit(verb::SciML.Verbosity.Type)
+function verbosity_to_KrylovKit(verb::SciMLBase.Verbosity.Type)
     SciML.@match verb begin
         Verbosity.None() => 0
         Verbosity.Warn() => 1

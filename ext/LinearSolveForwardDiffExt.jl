@@ -11,7 +11,7 @@ const DualLinearProblem = LinearProblem{
     <:Union{Number, <:AbstractArray, Nothing}, iip,
     <:Union{<:Dual{T, V, P}, <:AbstractArray{<:Dual{T, V, P}}},
     <:Union{<:Dual{T, V, P}, <:AbstractArray{<:Dual{T, V, P}}},
-    <:Union{Number, <:AbstractArray, SciMLBase.NullParameters}
+    <:Any
 } where {iip, T, V, P}
 
 const DualALinearProblem = LinearProblem{
@@ -19,7 +19,7 @@ const DualALinearProblem = LinearProblem{
     iip,
     <:Union{<:Dual{T, V, P}, <:AbstractArray{<:Dual{T, V, P}}},
     <:Union{Number, <:AbstractArray},
-    <:Union{Number, <:AbstractArray, SciMLBase.NullParameters}
+    <:Any
 } where {iip, T, V, P}
 
 const DualBLinearProblem = LinearProblem{
@@ -27,7 +27,7 @@ const DualBLinearProblem = LinearProblem{
     iip,
     <:Union{Number, <:AbstractArray},
     <:Union{<:Dual{T, V, P}, <:AbstractArray{<:Dual{T, V, P}}},
-    <:Union{Number, <:AbstractArray, SciMLBase.NullParameters}
+    <:Any
 } where {iip, T, V, P}
 
 const DualAbstractLinearProblem = Union{

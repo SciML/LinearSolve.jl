@@ -16,6 +16,7 @@ if GROUP == "All" || GROUP == "Core"
     @time @safetestset "SparseVector b Tests" include("sparse_vector.jl")
     @time @safetestset "Default Alg Tests" include("default_algs.jl")
     @time @safetestset "Adjoint Sensitivity" include("adjoint.jl")
+    @time @safetestset "ForwardDiff Overloads" include("forwarddiff_overloads.jl")
     @time @safetestset "Traits" include("traits.jl")
     @time @safetestset "BandedMatrices" include("banded.jl")
 end

@@ -3,7 +3,7 @@ module LinearSolveSparseArraysExt
 using LinearSolve, LinearAlgebra
 using SparseArrays
 using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
-using LinearSolve: BLASELTYPES, pattern_changed
+using LinearSolve: BLASELTYPES, pattern_changed, ArrayInterface
 
 # Can't `using KLU` because cannot have a dependency in there without
 # requiring the user does `using KLU`

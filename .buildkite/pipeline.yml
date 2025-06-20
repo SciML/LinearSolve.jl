@@ -12,6 +12,6 @@ steps:
       GROUP: 'LinearSolveCUDA'
       JULIA_PKG_SERVER: "" # it often struggles with our large artifacts
       # SECRET_CODECOV_TOKEN: "..."
-    timeout_in_minutes: 30
+    timeout_in_minutes: 180
     # Don't run Buildkite if the commit message includes the text [skip tests]
     if: build.message !~ /\[skip tests\]/

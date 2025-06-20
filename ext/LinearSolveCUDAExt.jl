@@ -5,6 +5,10 @@ using LinearSolve
 using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase, LinearSolve.ArrayInterface
 using SciMLBase: AbstractSciMLOperator
 
+function LinearSolve.is_cusparse(A::Union{CUDA.CUSPARSE.CuSparseMatrixCSR, CUDA.CUSPARSE.CuSparseMatrixCSC})
+    true
+end
+
 function LinearSolve.defaultalg(A::CUDA.CUSPARSE.CuSparseMatrixCSR{Tv, Ti}, b,
         assump::OperatorAssumptions{Bool}) where {Tv, Ti}
     if LinearSolve.cudss_loaded(A)

@@ -100,7 +100,11 @@ function LinearSolve.init_cacheval(
         Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions) where {T<:BLASELTYPES}
-    SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC{T, Int64}(zero(Int64), zero(Int64), [Int64(1)], Int64[], T[]))
+    if is_cusparse(A)
+        ArrayInterface.lu_instance(A)
+    else
+        SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC{T, Int64}(zero(Int64), zero(Int64), [Int64(1)], Int64[], T[]))
+    end
 end
 
 function LinearSolve.init_cacheval(
@@ -108,7 +112,19 @@ function LinearSolve.init_cacheval(
         Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions) where {T<:BLASELTYPES}
-    SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC{T, Int32}(zero(Int32), zero(Int32), [Int32(1)], Int32[], T[]))
+    if LinearSolve.is_cusparse(A)
+        ArrayInterface.lu_instance(A)
+    else
+        SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC{T, Int32}(zero(Int32), zero(Int32), [Int32(1)], Int32[], T[]))
+    end
+end
+
+function LinearSolve.init_cacheval(
+        alg::LUFactorization, A::LinearSolve.GPUArraysCore.AnyGPUArray, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    ArrayInterface.lu_instance(A)
 end
 
 function LinearSolve.init_cacheval(
@@ -118,6 +134,14 @@ function LinearSolve.init_cacheval(
         verbose::Bool, assumptions::OperatorAssumptions)
     
     PREALLOCATED_UMFPACK
+end
+
+function LinearSolve.init_cacheval(
+        alg::UMFPACKFactorization, A::LinearSolve.GPUArraysCore.AnyGPUArray, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
 end
 
 function LinearSolve.init_cacheval(
@@ -189,6 +213,14 @@ function LinearSolve.init_cacheval(
         reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
     PREALLOCATED_KLU
+end
+
+function LinearSolve.init_cacheval(
+        alg::KLUFactorization, A::LinearSolve.GPUArraysCore.AnyGPUArray, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
 end
 
 function LinearSolve.init_cacheval(

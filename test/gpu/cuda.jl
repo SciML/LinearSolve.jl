@@ -1,4 +1,5 @@
 using LinearSolve, CUDA, LinearAlgebra, SparseArrays, StableRNGs
+using CUDA.CUSPARSE, CUDSS
 using Test
 
 CUDA.allowscalar(false)
@@ -90,4 +91,18 @@ prob2 = LinearProblem(transpose(A), b)
 
     sol = solve(prob2, alg; alias = LinearAliasSpecifier(alias_A = false))
     @test norm(transpose(A) * sol.u .- b) < 1e-5
+end
+
+@testset "CUDSS" begin
+    T = Float32
+    n = 100
+    A_cpu = sprand(T, n, n, 0.05) + I
+    x_cpu = zeros(T, n)
+    b_cpu = rand(T, n)
+
+    A_gpu_csr = CuSparseMatrixCSR(A_cpu)
+    b_gpu = CuVector(b_cpu)
+
+    prob = LinearProblem(A_gpu_csr, b_gpu)
+    sol = solve(prob)
 end

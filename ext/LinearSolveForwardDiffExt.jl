@@ -96,6 +96,7 @@ function xp_linsolve_rhs(
     b_list
 end
 
+#=
 function SciMLBase.solve(prob::DualAbstractLinearProblem, args...; kwargs...)
     return solve(prob, nothing, args...; kwargs...)
 end
@@ -109,6 +110,7 @@ function SciMLBase.solve(prob::DualAbstractLinearProblem,
         alg::LinearSolve.SciMLLinearSolveAlgorithm, args...; kwargs...)
     solve!(init(prob, alg, args...; kwargs...))
 end
+=#
 
 function linearsolve_dual_solution(
         u::Number, partials, dual_type)
@@ -122,6 +124,7 @@ function linearsolve_dual_solution(
         zip(u, partials_list[i, :] for i in 1:length(partials_list[1])))
 end
 
+#=
 function SciMLBase.init(
         prob::DualAbstractLinearProblem, alg::LinearSolve.SciMLLinearSolveAlgorithm,
         args...;
@@ -170,6 +173,7 @@ function SciMLBase.solve!(cache::DualLinearCache, args...; kwargs...)
         cache.alg, dual_sol, sol.resid, cache; sol.retcode, sol.iters, sol.stats
     )
 end
+=#
 
 # If setting A or b for DualLinearCache, put the Dual-stripped versions in the LinearCache
 # Also "forwards" setproperty so that 

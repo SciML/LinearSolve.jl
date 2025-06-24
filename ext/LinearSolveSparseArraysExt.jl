@@ -100,7 +100,7 @@ function LinearSolve.init_cacheval(
         Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions) where {T<:BLASELTYPES}
-    if is_cusparse(A)
+    if LinearSolve.is_cusparse(A)
         ArrayInterface.lu_instance(A)
     else
         SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC{T, Int64}(zero(Int64), zero(Int64), [Int64(1)], Int64[], T[]))

@@ -70,7 +70,6 @@ function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwa
 
     # Reset to the original `b` and `u`, users will expect that `b` doesn't change if they don't tell it to
     cache.linear_cache.b = primal_b
-    Main.@infiltrate
 
     partial_sols = rhs_list
 
@@ -174,10 +173,9 @@ function SciMLBase.solve!(cache::DualLinearCache, args...; kwargs...)
         cache::DualLinearCache, cache.alg, args...; kwargs...)
 
     dual_sol = linearsolve_dual_solution(sol.u, partials, cache.dual_type)
-    Main.@infiltrate
 
     cache.dual_u = dual_sol
-    Main.@infiltrate
+
     return SciMLBase.build_linear_solution(
         cache.alg, dual_sol, sol.resid, cache; sol.retcode, sol.iters, sol.stats
     )

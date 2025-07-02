@@ -189,9 +189,12 @@ function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)
     # If the property is A or b, also update it in the LinearCache
     if sym === :A || sym === :b || sym === :u
         setproperty!(dc.linear_cache, sym, nodual_value(val))
+    elseif hasfield(DualLinearCache, sym)
+        setfield!(dc,sym,val)
     elseif hasfield(LinearSolve.LinearCache, sym)
         setproperty!(dc.linear_cache, sym, val)
     end
+    
 
     # Update the partials if setting A or b
     if sym === :A
@@ -199,7 +202,6 @@ function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)
     elseif sym === :b
         setfield!(dc, :partials_b, partial_vals(val))
     elseif sym === :u
-        Main.@infiltrate
         setfield!(dc, :partials_u, partial_vals(val))
     end
 end
@@ -258,3 +260,4 @@ end
 
 
 end
+

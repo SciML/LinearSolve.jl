@@ -7,31 +7,45 @@ using ForwardDiff: Dual, Partials
 using SciMLBase
 using RecursiveArrayTools
 
-const DualLinearProblem = LinearProblem{
+
+# Define type for non-nested dual numbers
+const SingleDual{T, V, P} = Dual{T, V, P} where {T, V <:Float64 , P}
+
+# Define type for nested dual numbers
+const NestedDual{T, V, P} = Dual{T, V, P} where {T, V <: Dual, P}
+
+const SingleDualLinearProblem = LinearProblem{
     <:Union{Number, <:AbstractArray, Nothing}, iip,
-    <:Union{<:Dual{T, V, P}, <:AbstractArray{<:Dual{T, V, P}}},
-    <:Union{<:Dual{T, V, P}, <:AbstractArray{<:Dual{T, V, P}}},
+    <:Union{<:SingleDual, <:AbstractArray{<:SingleDual}},
+    <:Union{<:SingleDual, <:AbstractArray{<:SingleDual}},
     <:Any
-} where {iip, T, V, P}
+} where {iip}
+
+const NestedDualLinearProblem = LinearProblem{
+    <:Union{Number, <:AbstractArray, Nothing}, iip,
+    <:Union{<:NestedDual, <:AbstractArray{<:NestedDual}},
+    <:Union{<:NestedDual, <:AbstractArray{<:NestedDual}},
+    <:Any
+} where {iip}
 
 const DualALinearProblem = LinearProblem{
     <:Union{Number, <:AbstractArray, Nothing},
     iip,
-    <:Union{<:Dual{T, V, P}, <:AbstractArray{<:Dual{T, V, P}}},
+    <:Union{<:SingleDual, <:AbstractArray{<:SingleDual}},
     <:Union{Number, <:AbstractArray},
     <:Any
-} where {iip, T, V, P}
+} where {iip}
 
 const DualBLinearProblem = LinearProblem{
     <:Union{Number, <:AbstractArray, Nothing},
     iip,
     <:Union{Number, <:AbstractArray},
-    <:Union{<:Dual{T, V, P}, <:AbstractArray{<:Dual{T, V, P}}},
+    <:Union{<:SingleDual, <:AbstractArray{<:SingleDual}},
     <:Any
-} where {iip, T, V, P}
+} where {iip}
 
 const DualAbstractLinearProblem = Union{
-    DualLinearProblem, DualALinearProblem, DualBLinearProblem}
+    SingleDualLinearProblem, DualALinearProblem, DualBLinearProblem}
 
 LinearSolve.@concrete mutable struct DualLinearCache
     linear_cache

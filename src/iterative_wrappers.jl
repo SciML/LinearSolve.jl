@@ -285,8 +285,8 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     end
 
     krylovJL_verbose = SciMLBase.@match verbose.numerical.KrylovJL_verbosity begin
-        SciMLBase.Verbosity.None() => 0
-        ::SciMLBase.Verbosity.Type => 1
+        Verbosity.None() => 0
+        ::Verbosity.Type => 1
         _ => error("Invalid verbosity.")
     end
 

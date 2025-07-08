@@ -16,11 +16,12 @@ using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, Bunc
                      norm,
                      qr, qr!, svd, svd!
 using LazyArrays: @~, BroadcastArray
-using SciMLBase: SciMLBase, LinearAliasSpecifier, LinearVerbosity, Verbosity, @SciMLMessage, LinearVerbosity, AbstractSciMLOperator,
+using SciMLBase: SciMLBase, LinearAliasSpecifier, AbstractSciMLOperator,
                  init, solve!, reinit!, solve, ReturnCode, LinearProblem
 using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator,
                       MatrixOperator,
                       has_ldiv!, issquare
+using SciMLVerbosity: Verbosity, @SciMLMessage, @match, AbstractVerbositySpecifier
 using Setfield: @set, @set!
 using UnPack: @unpack
 using DocStringExtensions: DocStringExtensions
@@ -152,6 +153,7 @@ const BLASELTYPES = Union{Float32, Float64, ComplexF32, ComplexF64}
 
 function defaultalg_symbol end
 
+include("verbosity.jl")
 include("generic_lufact.jl")
 include("common.jl")
 include("extension_algs.jl")

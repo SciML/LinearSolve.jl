@@ -123,7 +123,7 @@ function LinearSolve.init_cacheval(
         alg::LUFactorization, A::LinearSolve.GPUArraysCore.AnyGPUArray, b, u,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
+        verbose::LinearVerbosity, assumptions::OperatorAssumptions)
     ArrayInterface.lu_instance(A)
 end
 
@@ -140,7 +140,7 @@ function LinearSolve.init_cacheval(
         alg::UMFPACKFactorization, A::LinearSolve.GPUArraysCore.AnyGPUArray, b, u,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
+        verbose::LinearVerbosity, assumptions::OperatorAssumptions)
     nothing
 end
 
@@ -219,7 +219,7 @@ function LinearSolve.init_cacheval(
         alg::KLUFactorization, A::LinearSolve.GPUArraysCore.AnyGPUArray, b, u,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
+        verbose::LinearVerbosity, assumptions::OperatorAssumptions)
     nothing
 end
 

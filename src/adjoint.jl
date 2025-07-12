@@ -29,7 +29,6 @@ specific structure distinct from ``A`` then passing in a `linsolve` will be more
 end
 
 function CRC.rrule(T::typeof(SciMLBase.solve), prob::LinearProblem, alg::Nothing, args...; kwargs...)
-    @show "here?"
     assump = OperatorAssumptions(issquare(prob.A))
     alg = defaultalg(prob.A, prob.b, assump)
     @show alg

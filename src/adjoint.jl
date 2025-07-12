@@ -31,7 +31,6 @@ end
 function CRC.rrule(T::typeof(SciMLBase.solve), prob::LinearProblem, alg::Nothing, args...; kwargs...)
     assump = OperatorAssumptions(issquare(prob.A))
     alg = defaultalg(prob.A, prob.b, assump)
-    @show alg
     CRC.rrule(T, prob, alg, args...; kwargs...)
 end
 

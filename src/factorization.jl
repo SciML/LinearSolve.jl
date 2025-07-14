@@ -150,7 +150,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
 
     F = @get_cacheval(cache, :LUFactorization)
     y = _ldiv!(cache.u, F, cache.b)
-    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
 end
 
 function do_factorization(alg::LUFactorization, A, b, u)
@@ -203,7 +203,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::GenericLUFactoriz
         cache.isfresh = false
     end
     y = ldiv!(cache.u, LinearSolve.@get_cacheval(cache, :GenericLUFactorization)[1], cache.b)
-    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
 end
 
 function init_cacheval(
@@ -953,6 +953,12 @@ A fast factorization which uses a Cholesky factorization on A * A'. Can be much
 faster than LU factorization, but is not as numerically stable and thus should only
 be applied to well-conditioned matrices.
 
+!!! warn
+    `NormalCholeskyFactorization` should only be applied to well-conditioned matrices. As a
+    method it is not able to easily identify possible numerical issues. As a check it is
+    recommended that the user checks `A*u-b` is approximately zero, as this may be untrue
+    even if `sol.retcode === ReturnCode.Success` due to numerical stability issues.
+
 ## Positional Arguments
 
   - pivot: Defaults to RowMaximum(), but can be NoPivot()
@@ -1010,6 +1016,12 @@ function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization; 
             fact = cholesky(Symmetric((A)' * A), alg.pivot; check = false)
         end
         cache.cacheval = fact
+
+        if hasmethod(LinearAlgebra.issuccess, Tuple{typeof(fact)}) && !LinearAlgebra.issuccess(fact)
+            return SciMLBase.build_linear_solution(
+                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
+        end
+
         cache.isfresh = false
     end
     if issparsematrixcsc(A)
@@ -1021,7 +1033,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization; 
     else
         y = ldiv!(cache.u, @get_cacheval(cache, :NormalCholeskyFactorization), A' * cache.b)
     end
-    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
 end
 
 ## NormalBunchKaufmanFactorization

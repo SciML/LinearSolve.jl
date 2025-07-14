@@ -1,4 +1,4 @@
-using LinearSolve, LinearAlgebra, RecursiveFactorization
+using LinearSolve, LinearAlgebra, RecursiveFactorization, Test
 
 alglist = (
     LUFactorization,
@@ -14,12 +14,13 @@ alglist = (
 
 @testset "Success" begin
     for alg in alglist
+        @show alg
         A = [2.0 1.0; -1.0 1.0]
         b = [-1.0, 1.0]
         prob = LinearProblem(A, b)
         linsolve = init(prob, alg())
         sol = solve!(linsolve)
-        @test SciMLBase.successful_retcode(sol.retcode) || sol.retcode == ReturnCode.Default # The latter seems off...
+        @test SciMLBase.successful_retcode(sol.retcode)
     end
 end
 
@@ -39,7 +40,13 @@ lualgs = (
         prob = LinearProblem(A, b)
         linsolve = init(prob, alg)
         sol = solve!(linsolve)
-        @test !SciMLBase.successful_retcode(sol.retcode)
+        if alg isa NormalCholeskyFactorization
+             # This is a known and documented incorrectness in NormalCholeskyFactorization
+             # due to numerical instability in its method that is fundamental.
+            @test SciMLBase.successful_retcode(sol.retcode)
+        else
+            @test !SciMLBase.successful_retcode(sol.retcode)
+        end
     end
 end
 

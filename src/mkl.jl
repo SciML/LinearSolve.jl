@@ -220,7 +220,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
         fact = LU(res[1:3]...), res[4]
         cache.cacheval = fact
 
-        if !LinearAlgebra.issuccess(fact)
+        if !LinearAlgebra.issuccess(fact[1])
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
         end

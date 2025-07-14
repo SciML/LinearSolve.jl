@@ -61,36 +61,6 @@ LinearSolve.@concrete mutable struct DualLinearCache
     dual_u
 end
 
-# function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwargs...)
-#     # Solve the primal problem
-#     dual_u0 = copy(cache.linear_cache.u)
-#     sol = solve!(cache.linear_cache, alg, args...; kwargs...)
-#     primal_b = copy(cache.linear_cache.b)
-#     uu = sol.u
-
-#     primal_sol = deepcopy(sol)
-
-#     # Solves Dual partials separately 
-#     ∂_A = cache.partials_A
-#     ∂_b = cache.partials_b
-
-#     rhs_list = xp_linsolve_rhs(uu, ∂_A, ∂_b)
-
-#     cache.linear_cache.u = dual_u0
-#     # We can reuse the linear cache, because the same factorization will work for the partials.
-#     for i in eachindex(rhs_list)
-#         cache.linear_cache.b = rhs_list[i]
-#         rhs_list[i] = copy(solve!(cache.linear_cache, alg, args...; kwargs...).u)
-#     end
-
-#     # Reset to the original `b` and `u`, users will expect that `b` doesn't change if they don't tell it to
-#     cache.linear_cache.b = primal_b
-
-#     partial_sols = rhs_list
-
-#     primal_sol, partial_sols
-# end
-
 function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwargs...)
     # Solve the primal problem
     dual_u0 = copy(cache.linear_cache.u)
@@ -108,16 +78,15 @@ function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwa
 
     cache.linear_cache.u = dual_u0
     # We can reuse the linear cache, because the same factorization will work for the partials.
-    partial_sols = []
     for i in eachindex(rhs_list)
         cache.linear_cache.b = rhs_list[i]
-        # For nested duals, the result of this solve might also be a dual number
-        # which will be handled recursively by the same mechanism
-        push!(partial_sols, copy(solve!(cache.linear_cache, alg, args...; kwargs...).u))
+        rhs_list[i] = copy(solve!(cache.linear_cache, alg, args...; kwargs...).u)
     end
 
-    # Reset to the original `b` and `u`
+    # Reset to the original `b` and `u`, users will expect that `b` doesn't change if they don't tell it to
     cache.linear_cache.b = primal_b
+
+    partial_sols = rhs_list
 
     primal_sol, partial_sols
 end
@@ -146,30 +115,6 @@ function xp_linsolve_rhs(
     b_list = partials_to_list(∂_b)
     b_list
 end
-
-#=
-function SciMLBase.solve(prob::DualAbstractLinearProblem, args...; kwargs...)
-    return solve(prob, nothing, args...; kwargs...)
-end
-
-function SciMLBase.solve(prob::DualAbstractLinearProblem, ::Nothing, args...;
-        assump = OperatorAssumptions(issquare(nodual_value(prob.A))), kwargs...)
-    # Extract primal values
-    primal_A = nodual_value(prob.A)
-    primal_b = nodual_value(prob.b)
-
-    # Use the default algorithm selection based on primal values
-    default_alg = LinearSolve.defaultalg(primal_A, primal_b, assump)
-
-    # Solve with the selected algorithm
-    return solve(prob, default_alg, args...; kwargs...)
-end
-
-function SciMLBase.solve(prob::DualAbstractLinearProblem,
-        alg::LinearSolve.SciMLLinearSolveAlgorithm, args...; kwargs...)
-    solve!(init(prob, alg, args...; kwargs...))
-end
-=#
 
 function linearsolve_dual_solution(
         u::Number, partials, dual_type)
@@ -252,7 +197,7 @@ function SciMLBase.init(
         primal_prob, alg, args...; alias = alias, abstol = abstol, reltol = reltol,
         maxiters = maxiters, verbose = verbose, Pl = Pl, Pr = Pr, assumptions = assumptions,
         sensealg = sensealg, u0 = new_u0, kwargs...)
-    return DualLinearCache(non_partial_cache, dual_type, ∂_A, ∂_b, !isnothing(∂_b) ? zero.(∂_b) : ∂_b, A, b, zero.(b))
+    return DualLinearCache(non_partial_cache, dual_type, ∂_A, ∂_b, !isnothing(∂_b) ? zero.(∂_b) : ∂_b, A, b, zeros(dual_type, length(b)))
 end
 
 function SciMLBase.solve!(cache::DualLinearCache, args...; kwargs...)
@@ -264,14 +209,13 @@ function SciMLBase.solve!(cache::DualLinearCache, alg::SciMLLinearSolveAlgorithm
     partials = linearsolve_forwarddiff_solve(
         cache::DualLinearCache, cache.alg, args...; kwargs...)
     dual_sol = linearsolve_dual_solution(sol.u, partials, cache.dual_type)
-
+    Main.@infiltrate
     cache.dual_u = dual_sol
 
     return SciMLBase.build_linear_solution(
         cache.alg, dual_sol, sol.resid, cache; sol.retcode, sol.iters, sol.stats
     )
 end
-=#
 
 # If setting A or b for DualLinearCache, put the Dual-stripped versions in the LinearCache
 function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)

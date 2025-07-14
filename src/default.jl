@@ -362,7 +362,10 @@ end
             DefaultAlgorithmChoice.AppleAccelerateLUFactorization,
             DefaultAlgorithmChoice.GenericLUFactorization))
             newex = quote
-                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
+                @info $(algchoice_to_alg(alg))
+                alg = $(algchoice_to_alg(alg))
+                #Main.@infiltrate
+                sol = SciMLBase.solve!(cache, alg, args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
                     ## TODO: Add verbosity logging here about using the fallback
                     sol = SciMLBase.solve!(cache, QRFactorization(ColumnNorm()), args...; kwargs...)

@@ -1,6 +1,7 @@
 module LinearSolveForwardDiffExt
 
 using LinearSolve
+using LinearSolve: SciMLLinearSolveAlgorithm
 using LinearAlgebra
 using ForwardDiff
 using ForwardDiff: Dual, Partials
@@ -92,7 +93,9 @@ end
 
 function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwargs...)
     # Solve the primal problem
+    #Main.@infiltrate
     dual_u0 = copy(cache.linear_cache.u)
+    #Main.@infiltrate
     sol = solve!(cache.linear_cache, alg, args...; kwargs...)
     primal_b = copy(cache.linear_cache.b)
     uu = sol.u
@@ -104,6 +107,7 @@ function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwa
     ∂_b = cache.partials_b
 
     rhs_list = xp_linsolve_rhs(uu, ∂_A, ∂_b)
+    #Main.@infiltrate
 
     cache.linear_cache.u = dual_u0
     # We can reuse the linear cache, because the same factorization will work for the partials.
@@ -152,8 +156,16 @@ function SciMLBase.solve(prob::DualAbstractLinearProblem, args...; kwargs...)
 end
 
 function SciMLBase.solve(prob::DualAbstractLinearProblem, ::Nothing, args...;
-        assump = OperatorAssumptions(issquare(prob.A)), kwargs...)
-    return solve(prob, LinearSolve.defaultalg(prob.A, prob.b, assump), args...; kwargs...)
+        assump = OperatorAssumptions(issquare(nodual_value(prob.A))), kwargs...)
+    # Extract primal values
+    primal_A = nodual_value(prob.A)
+    primal_b = nodual_value(prob.b)
+
+    # Use the default algorithm selection based on primal values
+    default_alg = LinearSolve.defaultalg(primal_A, primal_b, assump)
+
+    # Solve with the selected algorithm
+    return solve(prob, default_alg, args...; kwargs...)
 end
 
 function SciMLBase.solve(prob::DualAbstractLinearProblem,
@@ -226,10 +238,10 @@ function SciMLBase.init(
         verbose::Bool = false,
         Pl = nothing,
         Pr = nothing,
-        assumptions = OperatorAssumptions(issquare(prob.A)),
+        assumptions = nothing,
         sensealg = LinearSolveAdjoint(),
         kwargs...)
-
+    @info "here!"
     (; A, b, u0, p) = prob
     new_A = nodual_value(A)
     new_b = nodual_value(b)
@@ -240,12 +252,14 @@ function SciMLBase.init(
 
     primal_prob = remake(prob; A = new_A, b = new_b, u0 = new_u0)
 
+    assumptions = OperatorAssumptions(issquare(primal_prob.A))
+
     if get_dual_type(prob.A) !== nothing
         dual_type = get_dual_type(prob.A)
     elseif get_dual_type(prob.b) !== nothing
         dual_type = get_dual_type(prob.b)
     end
-
+    #Main.@infiltrate
     non_partial_cache = init(
         primal_prob, alg, args...; alias = alias, abstol = abstol, reltol = reltol,
         maxiters = maxiters, verbose = verbose, Pl = Pl, Pr = Pr, assumptions = assumptions,
@@ -254,10 +268,15 @@ function SciMLBase.init(
 end
 
 function SciMLBase.solve!(cache::DualLinearCache, args...; kwargs...)
+   solve!(cache, cache.alg, args...; kwargs...)
+end
+
+function SciMLBase.solve!(cache::DualLinearCache, alg::SciMLLinearSolveAlgorithm, args...; kwargs...)
+    #Main.@infiltrate
     sol,
     partials = linearsolve_forwarddiff_solve(
         cache::DualLinearCache, cache.alg, args...; kwargs...)
-
+    #Main.@infiltrate
     dual_sol = linearsolve_dual_solution(sol.u, partials, cache.dual_type)
 
     cache.dual_u = dual_sol
@@ -334,9 +353,9 @@ end
 function partials_to_list(partial_matrix)
     p = length(first(partial_matrix))
     m, n = size(partial_matrix)
-    res_list = fill(zeros(m, n), p)
+    res_list = fill(zeros(typeof(partial_matrix[1, 1][1]), m, n), p)
     for k in 1:p
-        res = zeros(m, n)
+        res = zeros(typeof(partial_matrix[1, 1][1]), m, n)
         for i in 1:m
             for j in 1:n
                 res[i, j] = partial_matrix[i, j][k]

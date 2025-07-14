@@ -132,7 +132,7 @@ function linearsolve_dual_solution(u::AbstractArray, partials,
     # Handle single-level duals for arrays
     partials_list = RecursiveArrayTools.VectorOfArray(partials)
     return map(((uᵢ, pᵢ),) -> dual_type(uᵢ, Partials(Tuple(pᵢ))),
-        zip(u, partials_list.u[i, :] for i in 1:length(partials_list.u[1])))
+        zip(u, partials_list[i, :] for i in 1:length(partials_list.u[1])))
 end
 
 

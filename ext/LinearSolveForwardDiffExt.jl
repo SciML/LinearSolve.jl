@@ -93,9 +93,7 @@ end
 
 function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwargs...)
     # Solve the primal problem
-    #Main.@infiltrate
     dual_u0 = copy(cache.linear_cache.u)
-    #Main.@infiltrate
     sol = solve!(cache.linear_cache, alg, args...; kwargs...)
     primal_b = copy(cache.linear_cache.b)
     uu = sol.u
@@ -107,7 +105,6 @@ function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwa
     ∂_b = cache.partials_b
 
     rhs_list = xp_linsolve_rhs(uu, ∂_A, ∂_b)
-    #Main.@infiltrate
 
     cache.linear_cache.u = dual_u0
     # We can reuse the linear cache, because the same factorization will work for the partials.
@@ -185,13 +182,6 @@ function linearsolve_dual_solution(u::Number, partials,
     return dual_type(u, partials)
 end
 
-# function linearsolve_dual_solution(
-#         u::AbstractArray, partials, dual_type)
-#     partials_list = RecursiveArrayTools.VectorOfArray(partials)
-#     return map(((uᵢ, pᵢ),) -> dual_type(uᵢ, Partials(Tuple(pᵢ))),
-#         zip(u, partials_list[i, :] for i in 1:length(partials_list[1])))
-# end
-
 function linearsolve_dual_solution(u::AbstractArray, partials,
         dual_type::Type{<:Dual{T, V, P}}) where {T, V <: AbstractFloat, P}
     # Handle single-level duals for arrays
@@ -258,7 +248,6 @@ function SciMLBase.init(
     elseif get_dual_type(prob.b) !== nothing
         dual_type = get_dual_type(prob.b)
     end
-    #Main.@infiltrate
     non_partial_cache = init(
         primal_prob, alg, args...; alias = alias, abstol = abstol, reltol = reltol,
         maxiters = maxiters, verbose = verbose, Pl = Pl, Pr = Pr, assumptions = assumptions,
@@ -271,11 +260,9 @@ function SciMLBase.solve!(cache::DualLinearCache, args...; kwargs...)
 end
 
 function SciMLBase.solve!(cache::DualLinearCache, alg::SciMLLinearSolveAlgorithm, args...; kwargs...)
-    #Main.@infiltrate
     sol,
     partials = linearsolve_forwarddiff_solve(
         cache::DualLinearCache, cache.alg, args...; kwargs...)
-    #Main.@infiltrate
     dual_sol = linearsolve_dual_solution(sol.u, partials, cache.dual_type)
 
     cache.dual_u = dual_sol

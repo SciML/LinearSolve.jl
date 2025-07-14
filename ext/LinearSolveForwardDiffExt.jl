@@ -45,7 +45,7 @@ const DualBLinearProblem = LinearProblem{
 } where {iip}
 
 const DualAbstractLinearProblem = Union{
-    SingleDualLinearProblem, DualALinearProblem, DualBLinearProblem}
+    SingleDualLinearProblem, DualALinearProblem, DualBLinearProblem, NestedDualLinearProblem}
 
 LinearSolve.@concrete mutable struct DualLinearCache
     linear_cache
@@ -59,6 +59,36 @@ LinearSolve.@concrete mutable struct DualLinearCache
     dual_b
     dual_u
 end
+
+# function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwargs...)
+#     # Solve the primal problem
+#     dual_u0 = copy(cache.linear_cache.u)
+#     sol = solve!(cache.linear_cache, alg, args...; kwargs...)
+#     primal_b = copy(cache.linear_cache.b)
+#     uu = sol.u
+
+#     primal_sol = deepcopy(sol)
+
+#     # Solves Dual partials separately 
+#     ∂_A = cache.partials_A
+#     ∂_b = cache.partials_b
+
+#     rhs_list = xp_linsolve_rhs(uu, ∂_A, ∂_b)
+
+#     cache.linear_cache.u = dual_u0
+#     # We can reuse the linear cache, because the same factorization will work for the partials.
+#     for i in eachindex(rhs_list)
+#         cache.linear_cache.b = rhs_list[i]
+#         rhs_list[i] = copy(solve!(cache.linear_cache, alg, args...; kwargs...).u)
+#     end
+
+#     # Reset to the original `b` and `u`, users will expect that `b` doesn't change if they don't tell it to
+#     cache.linear_cache.b = primal_b
+
+#     partial_sols = rhs_list
+
+#     primal_sol, partial_sols
+# end
 
 function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwargs...)
     # Solve the primal problem
@@ -77,15 +107,16 @@ function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwa
 
     cache.linear_cache.u = dual_u0
     # We can reuse the linear cache, because the same factorization will work for the partials.
+    partial_sols = []
     for i in eachindex(rhs_list)
         cache.linear_cache.b = rhs_list[i]
-        rhs_list[i] = copy(solve!(cache.linear_cache, alg, args...; kwargs...).u)
+        # For nested duals, the result of this solve might also be a dual number
+        # which will be handled recursively by the same mechanism
+        push!(partial_sols, copy(solve!(cache.linear_cache, alg, args...; kwargs...).u))
     end
 
-    # Reset to the original `b` and `u`, users will expect that `b` doesn't change if they don't tell it to
+    # Reset to the original `b` and `u`
     cache.linear_cache.b = primal_b
-
-    partial_sols = rhs_list
 
     primal_sol, partial_sols
 end
@@ -136,14 +167,55 @@ function linearsolve_dual_solution(
     return dual_type(u, partials)
 end
 
-function linearsolve_dual_solution(
-        u::AbstractArray, partials, dual_type)
+function linearsolve_dual_solution(u::Number, partials,
+        dual_type::Type{<:Dual{T, V, P}}) where {T, V <: AbstractFloat, P}
+    # Handle single-level duals
+    return dual_type(u, partials)
+end
+
+# function linearsolve_dual_solution(
+#         u::AbstractArray, partials, dual_type)
+#     partials_list = RecursiveArrayTools.VectorOfArray(partials)
+#     return map(((uᵢ, pᵢ),) -> dual_type(uᵢ, Partials(Tuple(pᵢ))),
+#         zip(u, partials_list[i, :] for i in 1:length(partials_list[1])))
+# end
+
+function linearsolve_dual_solution(u::AbstractArray, partials,
+        dual_type::Type{<:Dual{T, V, P}}) where {T, V <: AbstractFloat, P}
+    # Handle single-level duals for arrays
     partials_list = RecursiveArrayTools.VectorOfArray(partials)
     return map(((uᵢ, pᵢ),) -> dual_type(uᵢ, Partials(Tuple(pᵢ))),
         zip(u, partials_list[i, :] for i in 1:length(partials_list[1])))
 end
 
-#=
+
+function linearsolve_dual_solution(
+        u::Number, partials, dual_type::Type{<:Dual{T, V, P}}) where {T, V <: Dual, P}
+    # Handle nested duals - recursive case
+    # For nested duals, u itself could be a dual number with its own partials
+    inner_dual_type = V
+    outer_tag_type = T
+
+    # Reconstruct the nested dual by first building the inner dual, then the outer one
+    inner_dual = u  # u is already a dual for the inner level
+
+    # Create outer dual with the inner dual as its value
+    return Dual{outer_tag_type, typeof(inner_dual), P}(inner_dual, partials)
+end
+
+function linearsolve_dual_solution(u::AbstractArray, partials,
+        dual_type::Type{<:Dual{T, V, P}}) where {T, V <: Dual, P}
+    # Handle nested duals for arrays - recursive case
+    inner_dual_type = V
+    outer_tag_type = T
+
+    partials_list = RecursiveArrayTools.VectorOfArray(partials)
+
+    # For nested duals, each element of u could be a dual number with its own partials
+    return map(((uᵢ, pᵢ),) -> Dual{outer_tag_type, typeof(uᵢ), P}(uᵢ, Partials(Tuple(pᵢ))),
+        zip(u, partials_list[i, :] for i in 1:length(partials_list[1])))
+end
+
 function SciMLBase.init(
         prob::DualAbstractLinearProblem, alg::LinearSolve.SciMLLinearSolveAlgorithm,
         args...;
@@ -235,18 +307,23 @@ end
 
 
 
-# Helper functions for Dual numbers
-get_dual_type(x::Dual) = typeof(x)
+# Enhanced helper functions for Dual numbers to handle recursion
+get_dual_type(x::Dual{T, V, P}) where {T, V <: AbstractFloat, P} = typeof(x)
+get_dual_type(x::Dual{T, V, P}) where {T, V <: Dual, P} = typeof(x)
 get_dual_type(x::AbstractArray{<:Dual}) = eltype(x)
 get_dual_type(x) = nothing
 
-partial_vals(x::Dual) = ForwardDiff.partials(x)
+# Add recursive handling for nested dual partials
+partial_vals(x::Dual{T, V, P}) where {T, V <: AbstractFloat, P} = ForwardDiff.partials(x)
+partial_vals(x::Dual{T, V, P}) where {T, V <: Dual, P} = ForwardDiff.partials(x)
 partial_vals(x::AbstractArray{<:Dual}) = map(ForwardDiff.partials, x)
 partial_vals(x) = nothing
 
+# Add recursive handling for nested dual values
 nodual_value(x) = x
-nodual_value(x::Dual) = ForwardDiff.value(x)
-nodual_value(x::AbstractArray{<:Dual}) = map(ForwardDiff.value, x)
+nodual_value(x::Dual{T, V, P}) where {T, V <: AbstractFloat, P} = ForwardDiff.value(x)
+nodual_value(x::Dual{T, V, P}) where {T, V <: Dual, P} = x.value  # Keep the inner dual intact
+nodual_value(x::AbstractArray{<:Dual}) = map(nodual_value, x)
 
 
 function partials_to_list(partial_matrix::Vector)

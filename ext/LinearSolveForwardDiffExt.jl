@@ -241,7 +241,6 @@ function SciMLBase.init(
         assumptions = nothing,
         sensealg = LinearSolveAdjoint(),
         kwargs...)
-    @info "here!"
     (; A, b, u0, p) = prob
     new_A = nodual_value(A)
     new_b = nodual_value(b)

@@ -10,7 +10,7 @@ using RecursiveArrayTools
 
 
 # Define type for non-nested dual numbers
-const SingleDual{T, V, P} = Dual{T, V, P} where {T, V <:Number , P}
+const SingleDual{T, V, P} = Dual{T, V, P} where {T, V <:AbstractFloat , P}
 
 # Define type for nested dual numbers
 const NestedDual{T, V, P} = Dual{T, V, P} where {T, V <:Dual, P}
@@ -46,7 +46,7 @@ const DualBLinearProblem = LinearProblem{
 } where {iip}
 
 const DualAbstractLinearProblem = Union{
-    SingleDualLinearProblem, DualALinearProblem, DualBLinearProblem, NestedDualLinearProblem}
+    SingleDualLinearProblem, DualALinearProblem, DualBLinearProblem}#, NestedDualLinearProblem}
 
 LinearSolve.@concrete mutable struct DualLinearCache
     linear_cache
@@ -132,7 +132,7 @@ function linearsolve_dual_solution(u::AbstractArray, partials,
     # Handle single-level duals for arrays
     partials_list = RecursiveArrayTools.VectorOfArray(partials)
     return map(((uᵢ, pᵢ),) -> dual_type(uᵢ, Partials(Tuple(pᵢ))),
-        zip(u, partials_list[i, :] for i in 1:length(partials_list[1])))
+        zip(u, partials_list.u[i, :] for i in 1:length(partials_list.u[1])))
 end
 
 

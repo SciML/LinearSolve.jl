@@ -14,7 +14,6 @@ alglist = (
 
 @testset "Success" begin
     for alg in alglist
-        @show alg
         A = [2.0 1.0; -1.0 1.0]
         b = [-1.0, 1.0]
         prob = LinearProblem(A, b)

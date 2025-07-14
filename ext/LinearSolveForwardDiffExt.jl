@@ -10,7 +10,7 @@ using RecursiveArrayTools
 
 
 # Define type for non-nested dual numbers
-const SingleDual{T, V, P} = Dual{T, V, P} where {T, V <:AbstractFloat , P}
+const SingleDual{T, V, P} = Dual{T, V, P} where {T, V <:Number , P}
 
 # Define type for nested dual numbers
 const NestedDual{T, V, P} = Dual{T, V, P} where {T, V <: Dual, P}

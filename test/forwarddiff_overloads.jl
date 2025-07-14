@@ -80,3 +80,60 @@ x_p = solve!(cache)
 backslash_x_p = A \ new_b
 
 @test ≈(x_p, backslash_x_p, rtol = 1e-9)
+
+# Nested Duals
+function h(p)
+    (A = [p[1] p[2]+1 p[2]^3;
+          3*p[1] p[1]+5 p[2] * p[1]-4;
+          p[2]^2 9*p[1] p[2]],
+        b = [p[1] + 1, p[2] * 2, p[1]^2])
+end
+
+A, b = h([ForwardDiff.Dual(ForwardDiff.Dual(5.0, 1.0, 0.0), 1.0, 0.0),
+    ForwardDiff.Dual(ForwardDiff.Dual(5.0, 1.0, 0.0), 0.0, 1.0)])
+
+prob = LinearProblem(A, b)
+overload_x_p = solve(prob)
+
+original_x_p = A \ b
+
+≈(overload_x_p, original_x_p, rtol = 1e-9)
+
+function linprob_f(p)
+    A, b = h(p)
+    prob = LinearProblem(A, b)
+    solve(prob)
+end
+
+function slash_f(p)
+    A, b = h(p)
+    A \ b
+end
+
+≈(ForwardDiff.jacobian(slash_f, [5.0, 5.0]), ForwardDiff.jacobian(linprob_f, [5.0, 5.0]))
+
+≈(ForwardDiff.jacobian(p -> ForwardDiff.jacobian(slash_f, [5.0, p[1]]), [5.0]),
+    ForwardDiff.jacobian(p -> ForwardDiff.jacobian(linprob_f, [5.0, p[1]]), [5.0]))
+
+function g(p)
+    (A = [p[1] p[1]+1 p[1]^3;
+          3*p[1] p[1]+5 p[1] * p[1]-4;
+          p[1]^2 9*p[1] p[1]],
+        b = [p[1] + 1, p[1] * 2, p[1]^2])
+end
+
+function slash_f_hes(p)
+    A, b = g(p)
+    x = A \ b
+    sum(x)
+end
+
+function linprob_f_hes(p)
+    A, b = g(p)
+    prob = LinearProblem(A, b)
+    x = solve(prob)
+    sum(x)
+end
+
+≈(ForwardDiff.hessian(slash_f_hes, [5.0]),
+    ForwardDiff.hessian(linprob_f_hes, [5.0]))

@@ -13,7 +13,7 @@ using RecursiveArrayTools
 const SingleDual{T, V, P} = Dual{T, V, P} where {T, V <:Number , P}
 
 # Define type for nested dual numbers
-const NestedDual{T, V, P} = Dual{T, V, P} where {T, V <: Dual, P}
+const NestedDual{T, V, P} = Dual{T, V, P} where {T, V <:Dual, P}
 
 const SingleDualLinearProblem = LinearProblem{
     <:Union{Number, <:AbstractArray, Nothing}, iip,

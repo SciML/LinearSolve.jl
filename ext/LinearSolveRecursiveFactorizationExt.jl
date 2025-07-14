@@ -25,7 +25,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::RFLUFactorization
         cache.isfresh = false
     end
     y = ldiv!(cache.u, LinearSolve.@get_cacheval(cache, :RFLUFactorization)[1], cache.b)
-    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
 end
 
 end

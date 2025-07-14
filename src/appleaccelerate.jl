@@ -243,6 +243,11 @@ function SciMLBase.solve!(cache::LinearCache, alg::AppleAccelerateLUFactorizatio
         res = aa_getrf!(A; ipiv = cacheval[1].ipiv, info = cacheval[2])
         fact = LU(res[1:3]...), res[4]
         cache.cacheval = fact
+
+        if !LinearAlgebra.issuccess(fact)
+            return SciMLBase.build_linear_solution(
+                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
+        end
         cache.isfresh = false
     end
 
@@ -258,5 +263,5 @@ function SciMLBase.solve!(cache::LinearCache, alg::AppleAccelerateLUFactorizatio
         aa_getrs!('N', A.factors, A.ipiv, cache.u; info)
     end
 
-    SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
+    SciMLBase.build_linear_solution(alg, cache.u, nothing, cache; retcode = ReturnCode.Success)
 end

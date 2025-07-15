@@ -1,4 +1,4 @@
-using LinearSolve, LinearAlgebra, RecursiveFactorization, Test
+using LinearSolve, LinearAlgebra, RecursiveFactorization, StaticArrays, Test
 
 alglist = (
     LUFactorization,

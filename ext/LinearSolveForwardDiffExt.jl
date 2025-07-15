@@ -8,45 +8,31 @@ using ForwardDiff: Dual, Partials
 using SciMLBase
 using RecursiveArrayTools
 
-
-# Define type for non-nested dual numbers
-const SingleDual{T, V, P} = Dual{T, V, P} where {T, V <:Number , P}
-
-# Define type for nested dual numbers
-const NestedDual{T, V, P} = Dual{T, V, P} where {T, V <:Dual, P}
-
-const SingleDualLinearProblem = LinearProblem{
+const DualLinearProblem = LinearProblem{
     <:Union{Number, <:AbstractArray, Nothing}, iip,
-    <:Union{<:SingleDual, <:AbstractArray{<:SingleDual}},
-    <:Union{<:SingleDual, <:AbstractArray{<:SingleDual}},
+    <:Union{<:Dual{T, V, P}, <:AbstractArray{<:Dual{T, V, P}}},
+    <:Union{<:Dual{T, V, P}, <:AbstractArray{<:Dual{T, V, P}}},
     <:Any
-} where {iip}
-
-const NestedDualLinearProblem = LinearProblem{
-    <:Union{Number, <:AbstractArray, Nothing}, iip,
-    <:Union{<:NestedDual, <:AbstractArray{<:NestedDual}},
-    <:Union{<:NestedDual, <:AbstractArray{<:NestedDual}},
-    <:Any
-} where {iip}
+} where {iip, T, V, P}
 
 const DualALinearProblem = LinearProblem{
     <:Union{Number, <:AbstractArray, Nothing},
     iip,
-    <:Union{<:SingleDual, <:AbstractArray{<:SingleDual}},
+    <:Union{<:Dual{T, V, P}, <:AbstractArray{<:Dual{T, V, P}}},
     <:Union{Number, <:AbstractArray},
     <:Any
-} where {iip}
+} where {iip, T, V, P}
 
 const DualBLinearProblem = LinearProblem{
     <:Union{Number, <:AbstractArray, Nothing},
     iip,
     <:Union{Number, <:AbstractArray},
-    <:Union{<:SingleDual, <:AbstractArray{<:SingleDual}},
+    <:Union{<:Dual{T, V, P}, <:AbstractArray{<:Dual{T, V, P}}},
     <:Any
-} where {iip}
+} where {iip, T, V, P}
 
 const DualAbstractLinearProblem = Union{
-    SingleDualLinearProblem, DualALinearProblem, DualBLinearProblem}#, NestedDualLinearProblem}
+    DualLinearProblem, DualALinearProblem, DualBLinearProblem}
 
 LinearSolve.@concrete mutable struct DualLinearCache
     linear_cache
@@ -63,6 +49,7 @@ end
 
 function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwargs...)
     # Solve the primal problem
+    @info "here"
     dual_u0 = copy(cache.linear_cache.u)
     sol = solve!(cache.linear_cache, alg, args...; kwargs...)
     primal_b = copy(cache.linear_cache.b)
@@ -122,45 +109,17 @@ function linearsolve_dual_solution(
 end
 
 function linearsolve_dual_solution(u::Number, partials,
-        dual_type::Type{<:Dual{T, V, P}}) where {T, V <: AbstractFloat, P}
+        dual_type::Type{<:Dual{T, V, P}}) where {T, V, P}
     # Handle single-level duals
     return dual_type(u, partials)
 end
 
 function linearsolve_dual_solution(u::AbstractArray, partials,
-        dual_type::Type{<:Dual{T, V, P}}) where {T, V <: AbstractFloat, P}
+        dual_type::Type{<:Dual{T, V, P}}) where {T, V, P}
     # Handle single-level duals for arrays
     partials_list = RecursiveArrayTools.VectorOfArray(partials)
     return map(((uᵢ, pᵢ),) -> dual_type(uᵢ, Partials(Tuple(pᵢ))),
         zip(u, partials_list[i, :] for i in 1:length(partials_list.u[1])))
-end
-
-
-function linearsolve_dual_solution(
-        u::Number, partials, dual_type::Type{<:Dual{T, V, P}}) where {T, V <: Dual, P}
-    # Handle nested duals - recursive case
-    # For nested duals, u itself could be a dual number with its own partials
-    inner_dual_type = V
-    outer_tag_type = T
-
-    # Reconstruct the nested dual by first building the inner dual, then the outer one
-    inner_dual = u  # u is already a dual for the inner level
-
-    # Create outer dual with the inner dual as its value
-    return Dual{outer_tag_type, typeof(inner_dual), P}(inner_dual, partials)
-end
-
-function linearsolve_dual_solution(u::AbstractArray, partials,
-        dual_type::Type{<:Dual{T, V, P}}) where {T, V <: Dual, P}
-    # Handle nested duals for arrays - recursive case
-    inner_dual_type = V
-    outer_tag_type = T
-
-    partials_list = RecursiveArrayTools.VectorOfArray(partials)
-
-    # For nested duals, each element of u could be a dual number with its own partials
-    return map(((uᵢ, pᵢ),) -> Dual{outer_tag_type, typeof(uᵢ), P}(uᵢ, Partials(Tuple(pᵢ))),
-        zip(u, partials_list[i, :] for i in 1:length(partials_list[1])))
 end
 
 function SciMLBase.init(

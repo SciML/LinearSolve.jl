@@ -105,6 +105,19 @@ original_x_p = A \ b
 
 @test ≈(overload_x_p, original_x_p, rtol = 1e-9)
 
+prob = LinearProblem(A, b)
+cache = init(prob)
+
+new_A, new_b = h([ForwardDiff.Dual(ForwardDiff.Dual(10.0, 1.0, 0.0), 1.0, 0.0),
+    ForwardDiff.Dual(ForwardDiff.Dual(10.0, 1.0, 0.0), 0.0, 1.0)])
+
+cache.A = new_A
+cache.b = new_b
+
+@test cache.A == new_A
+@test cache.b == new_b
+
+
 function linprob_f(p)
     A, b = h(p)
     prob = LinearProblem(A, b)

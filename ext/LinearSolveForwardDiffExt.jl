@@ -167,7 +167,12 @@ function SciMLBase.solve!(cache::DualLinearCache, alg::SciMLLinearSolveAlgorithm
     partials = linearsolve_forwarddiff_solve(
         cache::DualLinearCache, cache.alg, args...; kwargs...)
     dual_sol = linearsolve_dual_solution(sol.u, partials, cache.dual_type)
-    cache.dual_u = dual_sol
+    
+    if cache.dual_u isa AbstractArray
+        cache.dual_u[:] = dual_sol
+    else
+        cache.dual_u = dual_sol
+    end
 
     return SciMLBase.build_linear_solution(
         cache.alg, dual_sol, sol.resid, cache; sol.retcode, sol.iters, sol.stats

@@ -24,12 +24,11 @@ krylov_u0_sol = solve(krylov_prob, KrylovJL_GMRES())
 
 @test ≈(krylov_u0_sol, backslash_x_p, rtol = 1e-9)
 
-
 A, _ = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 backslash_x_p = A \ [6.0, 10.0, 25.0]
 prob = LinearProblem(A, [6.0, 10.0, 25.0])
 
-@test ≈(solve(prob).u, backslash_x_p, rtol = 1e-9) 
+@test ≈(solve(prob).u, backslash_x_p, rtol = 1e-9)
 @test ≈(solve(prob, KrylovJL_GMRES()).u, backslash_x_p, rtol = 1e-9)
 
 _, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
@@ -117,7 +116,6 @@ cache.b = new_b
 @test cache.A == new_A
 @test cache.b == new_b
 
-
 function linprob_f(p)
     A, b = h(p)
     prob = LinearProblem(A, b)
@@ -129,7 +127,8 @@ function slash_f(p)
     A \ b
 end
 
-@test ≈(ForwardDiff.jacobian(slash_f, [5.0, 5.0]), ForwardDiff.jacobian(linprob_f, [5.0, 5.0]))
+@test ≈(
+    ForwardDiff.jacobian(slash_f, [5.0, 5.0]), ForwardDiff.jacobian(linprob_f, [5.0, 5.0]))
 
 @test ≈(ForwardDiff.jacobian(p -> ForwardDiff.jacobian(slash_f, [5.0, p[1]]), [5.0]),
     ForwardDiff.jacobian(p -> ForwardDiff.jacobian(linprob_f, [5.0, p[1]]), [5.0]))
@@ -157,8 +156,8 @@ end
 @test ≈(ForwardDiff.hessian(slash_f_hes, [5.0]),
     ForwardDiff.hessian(linprob_f_hes, [5.0]))
 
-
 # Test aliasing
+A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 
 prob = LinearProblem(A, b)
 cache = init(prob)
@@ -174,7 +173,6 @@ x_p = solve!(cache)
 backslash_x_p = new_A \ new_b
 
 @test linu == cache.u
-
 
 # Test Float Only solvers
 

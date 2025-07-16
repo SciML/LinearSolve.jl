@@ -236,7 +236,7 @@ nodual_value(x::Dual{T, V, P}) where {T, V <: Dual, P} = x.value  # Keep the inn
 nodual_value(x::AbstractArray{<:Dual}) = map(nodual_value, x)
 
 
-function partials_to_list(partial_matrix::Vector)
+function partials_to_list(partial_matrix::AbstractArray{T, 1}) where {T}
     p = eachindex(first(partial_matrix))
     [[partial[i] for partial in partial_matrix] for i in p]
 end

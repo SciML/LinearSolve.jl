@@ -49,6 +49,7 @@ end
 
 function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwargs...)
     # Solve the primal problem
+    @info "here"
     dual_u0 = copy(cache.linear_cache.u)
     sol = solve!(cache.linear_cache, alg, args...; kwargs...)
     primal_b = copy(cache.linear_cache.b)
@@ -131,7 +132,7 @@ function SciMLBase.init(
         verbose::Bool = false,
         Pl = nothing,
         Pr = nothing,
-        assumptions = nothing,
+        assumptions = OperatorAssumptions(issquare(prob.A)),
         sensealg = LinearSolveAdjoint(),
         kwargs...)
     (; A, b, u0, p) = prob
@@ -144,15 +145,15 @@ function SciMLBase.init(
 
     primal_prob = remake(prob; A = new_A, b = new_b, u0 = new_u0)
 
-    assumptions = OperatorAssumptions(issquare(primal_prob.A))
-
     if get_dual_type(prob.A) !== nothing
         dual_type = get_dual_type(prob.A)
     elseif get_dual_type(prob.b) !== nothing
         dual_type = get_dual_type(prob.b)
     end
+    Main.@infiltrate
     non_partial_cache = init(
-        primal_prob, alg, args...; alias = alias, abstol = abstol, reltol = reltol,
+        primal_prob, LinearSolve.defaultalg(primal_prob.A, primal_prob.b, assumptions), args...;
+        alias = alias, abstol = abstol, reltol = reltol,
         maxiters = maxiters, verbose = verbose, Pl = Pl, Pr = Pr, assumptions = assumptions,
         sensealg = sensealg, u0 = new_u0, kwargs...)
     return DualLinearCache(non_partial_cache, dual_type, ∂_A, ∂_b, !isnothing(∂_b) ? zero.(∂_b) : ∂_b, A, b, zeros(dual_type, length(b)))

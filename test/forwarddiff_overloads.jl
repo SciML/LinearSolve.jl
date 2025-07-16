@@ -61,6 +61,7 @@ cache = init(prob)
 
 new_A, _ = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 cache.A = new_A
+@test cache.A = new_A
 
 x_p = solve!(cache)
 backslash_x_p = new_A \ b
@@ -75,6 +76,7 @@ cache = init(prob)
 
 _, new_b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 cache.b = new_b
+@test cache.b == new_b
 
 x_p = solve!(cache)
 backslash_x_p = A \ new_b
@@ -97,7 +99,7 @@ overload_x_p = solve(prob)
 
 original_x_p = A \ b
 
-≈(overload_x_p, original_x_p, rtol = 1e-9)
+@test ≈(overload_x_p, original_x_p, rtol = 1e-9)
 
 function linprob_f(p)
     A, b = h(p)
@@ -110,9 +112,9 @@ function slash_f(p)
     A \ b
 end
 
-≈(ForwardDiff.jacobian(slash_f, [5.0, 5.0]), ForwardDiff.jacobian(linprob_f, [5.0, 5.0]))
+@test ≈(ForwardDiff.jacobian(slash_f, [5.0, 5.0]), ForwardDiff.jacobian(linprob_f, [5.0, 5.0]))
 
-≈(ForwardDiff.jacobian(p -> ForwardDiff.jacobian(slash_f, [5.0, p[1]]), [5.0]),
+@test ≈(ForwardDiff.jacobian(p -> ForwardDiff.jacobian(slash_f, [5.0, p[1]]), [5.0]),
     ForwardDiff.jacobian(p -> ForwardDiff.jacobian(linprob_f, [5.0, p[1]]), [5.0]))
 
 function g(p)
@@ -135,5 +137,5 @@ function linprob_f_hes(p)
     sum(x)
 end
 
-≈(ForwardDiff.hessian(slash_f_hes, [5.0]),
+@test ≈(ForwardDiff.hessian(slash_f_hes, [5.0]),
     ForwardDiff.hessian(linprob_f_hes, [5.0]))

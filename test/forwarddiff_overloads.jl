@@ -186,7 +186,7 @@ backslash_x_p = A \ b
 
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 
-prob = LinearProblem(A, b)
+prob = LinearProblem(sparse(A), sparse(b))
 overload_x_p = solve(prob, UMFPACKFactorization())
 backslash_x_p = A \ b
 

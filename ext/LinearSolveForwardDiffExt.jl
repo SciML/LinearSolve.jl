@@ -176,23 +176,22 @@ end
 
 # If setting A or b for DualLinearCache, put the Dual-stripped versions in the LinearCache
 function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)
-    # If the property is A or b, also update it in the LinearCache
-    if sym === :A || sym === :b || sym === :u
+    if sym === :A
         setproperty!(dc.linear_cache, sym, nodual_value(val))
+        setfield!(dc, :dual_A, val)
+        setfield!(dc, :partials_A, partial_vals(val))
+    elseif sym === :b
+        setproperty!(dc.linear_cache, sym, nodual_value(val))
+        setfield!(dc, :dual_b, val)
+        setfield!(dc, :partials_b, partial_vals(val))
+    elseif sym === :u
+        setproperty!(dc.linear_cache, sym, nodual_value(val))
+        setfield!(dc, :dual_u, val)
+        setfield!(dc, :partials_u, partial_vals(val))
     elseif hasfield(DualLinearCache, sym)
         setfield!(dc,sym,val)
     elseif hasfield(LinearSolve.LinearCache, sym)
         setproperty!(dc.linear_cache, sym, val)
-    end
-    
-
-    # Update the partials if setting A or b
-    if sym === :A
-        setfield!(dc, :partials_A, partial_vals(val))
-    elseif sym === :b
-        setfield!(dc, :partials_b, partial_vals(val))
-    elseif sym === :u
-        setfield!(dc, :partials_u, partial_vals(val))
     end
 end
 

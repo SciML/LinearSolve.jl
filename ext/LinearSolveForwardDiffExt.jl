@@ -150,9 +150,11 @@ function SciMLBase.init(
     elseif get_dual_type(prob.b) !== nothing
         dual_type = get_dual_type(prob.b)
     end
-    Main.@infiltrate
+
+    alg isa LinearSolve.DefaultLinearSolver ? real_alg = LinearSolve.defaultalg(primal_prob.A, primal_prob.b) : real_alg = alg
+
     non_partial_cache = init(
-        primal_prob, LinearSolve.defaultalg(primal_prob.A, primal_prob.b, assumptions), args...;
+        primal_prob, real_alg, assumptions, args...;
         alias = alias, abstol = abstol, reltol = reltol,
         maxiters = maxiters, verbose = verbose, Pl = Pl, Pr = Pr, assumptions = assumptions,
         sensealg = sensealg, u0 = new_u0, kwargs...)

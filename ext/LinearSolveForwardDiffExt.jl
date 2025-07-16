@@ -181,22 +181,26 @@ end
 
 # If setting A or b for DualLinearCache, put the Dual-stripped versions in the LinearCache
 function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)
-    if sym === :A
+    # If the property is A or b, also update it in the LinearCache
+    if sym === :A || sym === :b || sym === :u
         setproperty!(dc.linear_cache, sym, nodual_value(val))
+    elseif hasfield(DualLinearCache, sym)
+        setfield!(dc, sym, val)
+    elseif hasfield(LinearSolve.LinearCache, sym)
+        setproperty!(dc.linear_cache, sym, val)
+    end
+
+
+    # Update the partials if setting A or b
+    if sym === :A
         setfield!(dc, :dual_A, val)
         setfield!(dc, :partials_A, partial_vals(val))
     elseif sym === :b
-        setproperty!(dc.linear_cache, sym, nodual_value(val))
         setfield!(dc, :dual_b, val)
         setfield!(dc, :partials_b, partial_vals(val))
     elseif sym === :u
-        setproperty!(dc.linear_cache, sym, nodual_value(val))
         setfield!(dc, :dual_u, val)
         setfield!(dc, :partials_u, partial_vals(val))
-    elseif hasfield(DualLinearCache, sym)
-        setfield!(dc,sym,val)
-    elseif hasfield(LinearSolve.LinearCache, sym)
-        setproperty!(dc.linear_cache, sym, val)
     end
 end
 
@@ -236,7 +240,7 @@ nodual_value(x::Dual{T, V, P}) where {T, V <: Dual, P} = x.value  # Keep the inn
 nodual_value(x::AbstractArray{<:Dual}) = map(nodual_value, x)
 
 
-function partials_to_list(partial_matrix::AbstractArray{T, 1}) where {T}
+function partials_to_list(partial_matrix::AbstractVector{T}) where {T}
     p = eachindex(first(partial_matrix))
     [[partial[i] for partial in partial_matrix] for i in p]
 end

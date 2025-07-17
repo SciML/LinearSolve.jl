@@ -49,7 +49,6 @@ end
 
 function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwargs...)
     # Solve the primal problem
-    @info "here"
     dual_u0 = copy(cache.linear_cache.u)
     sol = solve!(cache.linear_cache, alg, args...; kwargs...)
     primal_b = copy(cache.linear_cache.b)

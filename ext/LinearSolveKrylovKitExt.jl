@@ -26,6 +26,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovKitJL; kwargs...)
     rtol = float(cache.reltol)
     maxiter = cache.maxiters
     verbosity = cache.verbose ? 1 : 0
+    verbosity = verbosity_to_KrylovKit(cache.verbose.numerical.Krylovkit_verbosity)
     krylovdim = (alg.gmres_restart == 0) ? min(20, size(cache.A, 1)) : alg.gmres_restart
 
     kwargs = (atol = atol, rtol = rtol, maxiter = maxiter, verbosity = verbosity,
@@ -41,4 +42,13 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovKitJL; kwargs...)
         iters = iters)
 end
 
+function verbosity_to_KrylovKit(verb::Verbosity.Type)
+    SciML.@match verb begin
+        Verbosity.None() => 0
+        Verbosity.Warn() => 1
+        Verbosity.Error() => 2
+        Verbosity.Info() => 3
+        Level(x) => x
+        _ => error("Not a valid verbosity level for KrylovKit.")
+    end
 end

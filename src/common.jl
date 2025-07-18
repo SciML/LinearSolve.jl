@@ -79,7 +79,7 @@ mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, S}
     abstol::Ttol
     reltol::Ttol
     maxiters::Int
-    verbose::Bool
+    verbose::LinearVerbosity
     assumptions::OperatorAssumptions{issq}
     sensealg::S
 end
@@ -143,7 +143,7 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         abstol = default_tol(real(eltype(prob.b))),
         reltol = default_tol(real(eltype(prob.b))),
         maxiters::Int = length(prob.b),
-        verbose::Bool = false,
+        verbose::LinearVerbosity = LinearVerbosity(),
         Pl = nothing,
         Pr = nothing,
         assumptions = OperatorAssumptions(issquare(prob.A)),

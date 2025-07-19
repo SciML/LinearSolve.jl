@@ -57,10 +57,10 @@ A = rand(n, n)
 b = rand(n)
 
 weights = [1e-1, 1]
-precs = Returns((LinearSolve.InvPreconditioner(Diagonal(weights)), Diagonal(weights)))
+precs = Returns((LS.InvPreconditioner(LA.Diagonal(weights)), LA.Diagonal(weights)))
 
-prob = LinearProblem(A, b)
-sol = solve(prob, KrylovJL_GMRES(precs))
+prob = LS.LinearProblem(A, b)
+sol = LS.solve(prob, LS.KrylovJL_GMRES(precs))
 
 sol.u
 ```
@@ -70,18 +70,19 @@ can use `ComposePreconditioner` to apply the preconditioner after the applicatio
 of the weights like as follows:
 
 ```@example FAQ2
-using LinearSolve, LinearAlgebra
+import LinearSolve as LS
+import LinearAlgebra as LA
 
 n = 4
 A = rand(n, n)
 b = rand(n)
 
 weights = rand(n)
-realprec = lu(rand(n, n)) # some random preconditioner
-Pl = LinearSolve.ComposePreconditioner(LinearSolve.InvPreconditioner(Diagonal(weights)),
+realprec = LA.lu(rand(n, n)) # some random preconditioner
+Pl = LS.ComposePreconditioner(LS.InvPreconditioner(LA.Diagonal(weights)),
     realprec)
-Pr = Diagonal(weights)
+Pr = LA.Diagonal(weights)
 
-prob = LinearProblem(A, b)
-sol = solve(prob, KrylovJL_GMRES(precs = Returns((Pl, Pr))))
+prob = LS.LinearProblem(A, b)
+sol = LS.solve(prob, LS.KrylovJL_GMRES(precs = Returns((Pl, Pr))))
 ```

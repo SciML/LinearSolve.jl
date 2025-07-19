@@ -27,12 +27,12 @@ GPU offloading is simple as it's done simply by changing the solver algorithm. T
 example from the start of the documentation:
 
 ```julia
-using LinearSolve
+import LinearSolve as LS
 
 A = rand(4, 4)
 b = rand(4)
-prob = LinearProblem(A, b)
-sol = solve(prob)
+prob = LS.LinearProblem(A, b)
+sol = LS.solve(prob)
 sol.u
 ```
 
@@ -40,7 +40,7 @@ This computation can be moved to the GPU by the following:
 
 ```julia
 using CUDA # Add the GPU library
-sol = solve(prob, CudaOffloadFactorization())
+sol = LS.solve(prob, LS.CudaOffloadFactorization())
 sol.u
 ```
 
@@ -56,8 +56,8 @@ using CUDA
 
 A = rand(4, 4) |> cu
 b = rand(4) |> cu
-prob = LinearProblem(A, b)
-sol = solve(prob)
+prob = LS.LinearProblem(A, b)
+sol = LS.solve(prob)
 sol.u
 ```
 
@@ -81,13 +81,13 @@ move things to CPU on command.
     However, this change in numerical precision needs to be accounted for in your mathematics
     as it could lead to instabilities. To disable this, use a constructor that is more
     specific about the bitsize, such as `CuArray{Float64}(A)`. Additionally, preferring more
-    stable factorization methods, such as `QRFactorization()`, can improve the numerics in
+    stable factorization methods, such as `LS.QRFactorization()`, can improve the numerics in
     such cases.
 
 Similarly to other use cases, you can choose the solver, for example:
 
 ```julia
-sol = solve(prob, QRFactorization())
+sol = LS.solve(prob, LS.QRFactorization())
 ```
 
 ## Sparse Matrices on GPUs
@@ -96,10 +96,12 @@ Currently, sparse matrix computations on GPUs are only supported for CUDA. This 
 the `CUDA.CUSPARSE` sublibrary.
 
 ```julia
-using LinearAlgebra, CUDA.CUSPARSE
+import LinearAlgebra as LA
+import SparseArrays as SA
+import CUDA
 T = Float32
 n = 100
-A_cpu = sprand(T, n, n, 0.05) + I
+A_cpu = SA.sprand(T, n, n, 0.05) + LA.I
 x_cpu = zeros(T, n)
 b_cpu = rand(T, n)
 
@@ -112,7 +114,7 @@ In order to solve such problems using a direct method, you must add
 
 ```julia
 using CUDSS
-sol = solve(prob, LUFactorization())
+sol = LS.solve(prob, LS.LUFactorization())
 ```
 
 !!! note
@@ -122,13 +124,13 @@ sol = solve(prob, LUFactorization())
 Note that `KrylovJL` methods also work with sparse GPU arrays:
 
 ```julia
-sol = solve(prob, KrylovJL_GMRES())
+sol = LS.solve(prob, LS.KrylovJL_GMRES())
 ```
 
 Note that CUSPARSE also has some GPU-based preconditioners, such as a built-in `ilu`. However:
 
 ```julia
-sol = solve(prob, KrylovJL_GMRES(precs = (A, p) -> (CUDA.CUSPARSE.ilu02!(A, 'O'), I)))
+sol = LS.solve(prob, LS.KrylovJL_GMRES(precs = (A, p) -> (CUDA.CUSPARSE.ilu02!(A, 'O'), LA.I)))
 ```
 
 However, right now CUSPARSE is missing the right `ldiv!` implementation for this to work

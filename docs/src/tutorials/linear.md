@@ -8,16 +8,16 @@ The following defines a `Matrix` and a `LinearProblem` which is subsequently sol
 by the default linear solver.
 
 ```@example linsys1
-using LinearSolve
+import LinearSolve as LS
 
 A = rand(4, 4)
 b = rand(4)
-prob = LinearProblem(A, b)
-sol = solve(prob)
+prob = LS.LinearProblem(A, b)
+sol = LS.solve(prob)
 sol.u
 ```
 
-Note that `solve(prob)` is equivalent to `solve(prob,nothing)` where `nothing`
+Note that `LS.solve(prob)` is equivalent to `LS.solve(prob,nothing)` where `nothing`
 denotes the choice of the default linear solver. This is equivalent to the
 Julia built-in `A\b`, where the solution is recovered via `sol.u`. The power
 of this package comes into play when changing the algorithms. For example,
@@ -27,7 +27,7 @@ LinearSolve.jl, there is one interface and changing linear solvers is simply
 the switch of the algorithm choice:
 
 ```@example linsys1
-sol = solve(prob, KrylovJL_GMRES())
+sol = LS.solve(prob, LS.KrylovJL_GMRES())
 sol.u
 ```
 
@@ -38,23 +38,24 @@ available solvers, see [the solvers page](@ref linearsystemsolvers)
 
 ## Sparse and Structured Matrices
 
-There is no difference in the interface for using LinearSolve.jl on sparse
+There is no difference in the interface for LinearSolve.jl on sparse
 and structured matrices. For example, the following now uses Julia's
 built-in [SparseArrays.jl](https://docs.julialang.org/en/v1/stdlib/SparseArrays/)
-to define a sparse matrix (`SparseMatrixCSC`) and solve the system using LinearSolve.jl.
+to define a sparse matrix (`SparseMatrixCSC`) and solve the system with LinearSolve.jl.
 Note that `sprand` is a shorthand for quickly creating a sparse random matrix
 (see SparseArrays.jl for more details on defining sparse matrices).
 
 ```@example linsys1
-using LinearSolve, SparseArrays
+import LinearSolve as LS
+import SparseArrays as SA
 
-A = sprand(4, 4, 0.75)
+A = SA.sprand(4, 4, 0.75)
 b = rand(4)
-prob = LinearProblem(A, b)
-sol = solve(prob)
+prob = LS.LinearProblem(A, b)
+sol = LS.solve(prob)
 sol.u
 
-sol = solve(prob, KrylovJL_GMRES()) # Choosing algorithms is done the same way
+sol = LS.solve(prob, LS.KrylovJL_GMRES()) # Choosing algorithms is done the same way
 sol.u
 ```
 
@@ -130,8 +131,8 @@ function Afunc!(v,u,p,t)
     w
 end
 
-using SciMLOperators
-mfopA = FunctionOperator(Afunc!, zeros(5), zeros(5))
+import SciMLOperators as SMO
+mfopA = SMO.FunctionOperator(Afunc!, zeros(5), zeros(5))
 ```
 
 Let's check these are the same:
@@ -146,8 +147,8 @@ we don't have a matrix, we can still solve linear systems defined by this operat
 
 ```@example linsys1
 b = rand(5)
-prob = LinearProblem(mfopA, b)
-sol = solve(prob)
+prob = LS.LinearProblem(mfopA, b)
+sol = LS.solve(prob)
 sol.u
 ```
 
@@ -158,6 +159,6 @@ mfopA * sol.u - b
 ```
 
 !!! note
-  Note that not all methods can use a matrix-free operator. For example, `LUFactorization()` requires a matrix. If you use an
+  Note that not all methods can use a matrix-free operator. For example, `LS.LUFactorization()` requires a matrix. If you use an
   invalid method, you will get an error. The methods particularly from KrylovJL are the ones preferred for these cases
   (and are defaulted to).

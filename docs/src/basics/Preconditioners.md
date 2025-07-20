@@ -38,16 +38,17 @@ the identity ``I``.
 In the following, we will use a left sided diagonal (Jacobi) preconditioner.
 
 ```@example precon1
-using LinearSolve, LinearAlgebra
+import LinearSolve as LS
+import LinearAlgebra as LA
 n = 4
 
 A = rand(n, n)
 b = rand(n)
 
-Pl = Diagonal(A)
+Pl = LA.Diagonal(A)
 
-prob = LinearProblem(A, b)
-sol = solve(prob, KrylovJL_GMRES(), Pl = Pl)
+prob = LS.LinearProblem(A, b)
+sol = LS.solve(prob, LS.KrylovJL_GMRES(), Pl = Pl)
 sol.u
 ```
 
@@ -56,14 +57,15 @@ an iterative solver specification. This argument shall deliver a factory method 
 parameter `p` to a tuple `(Pl,Pr)` consisting a left and a right preconditioner.
 
 ```@example precon2
-using LinearSolve, LinearAlgebra
+import LinearSolve as LS
+import LinearAlgebra as LA
 n = 4
 
 A = rand(n, n)
 b = rand(n)
 
-prob = LinearProblem(A, b)
-sol = solve(prob, KrylovJL_GMRES(precs = (A, p) -> (Diagonal(A), I)))
+prob = LS.LinearProblem(A, b)
+sol = LS.solve(prob, LS.KrylovJL_GMRES(precs = (A, p) -> (LA.Diagonal(A), LA.I)))
 sol.u
 ```
 
@@ -73,26 +75,27 @@ and to  pass parameters to the constructor of the preconditioner instances. The 
 to reuse the preconditioner once constructed for the subsequent solution of a modified problem.
 
 ```@example precon3
-using LinearSolve, LinearAlgebra
+import LinearSolve as LS
+import LinearAlgebra as LA
 
 Base.@kwdef struct WeightedDiagonalPreconBuilder
     w::Float64
 end
 
-(builder::WeightedDiagonalPreconBuilder)(A, p) = (builder.w * Diagonal(A), I)
+(builder::WeightedDiagonalPreconBuilder)(A, p) = (builder.w * LA.Diagonal(A), LA.I)
 
 n = 4
-A = n * I - rand(n, n)
+A = n * LA.I - rand(n, n)
 b = rand(n)
 
-prob = LinearProblem(A, b)
-sol = solve(prob, KrylovJL_GMRES(precs = WeightedDiagonalPreconBuilder(w = 0.9)))
+prob = LS.LinearProblem(A, b)
+sol = LS.solve(prob, LS.KrylovJL_GMRES(precs = WeightedDiagonalPreconBuilder(w = 0.9)))
 sol.u
 
 B = A .+ 0.1
 cache = sol.cache
-reinit!(cache, A = B, reuse_precs = true)
-sol = solve!(cache, KrylovJL_GMRES(precs = WeightedDiagonalPreconBuilder(w = 0.9)))
+LS.reinit!(cache, A = B, reuse_precs = true)
+sol = LS.solve!(cache, LS.KrylovJL_GMRES(precs = WeightedDiagonalPreconBuilder(w = 0.9)))
 sol.u
 ```
 

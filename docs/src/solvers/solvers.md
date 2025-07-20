@@ -1,6 +1,6 @@
 # [Linear System Solvers](@id linearsystemsolvers)
 
-`solve(prob::LinearProblem,alg;kwargs)`
+`LS.solve(prob::LS.LinearProblem,alg;kwargs)`
 
 Solves for ``Au=b`` in the problem defined by `prob` using the algorithm
 `alg`. If no algorithm is given, a default algorithm will be chosen.
@@ -11,7 +11,7 @@ Solves for ``Au=b`` in the problem defined by `prob` using the algorithm
 
 The default algorithm `nothing` is good for picking an algorithm that will work,
 but one may need to change this to receive more performance or precision. If
-more precision is necessary, `QRFactorization()` and `SVDFactorization()` are
+more precision is necessary, `LS.QRFactorization()` and `LS.SVDFactorization()` are
 the best choices, with SVD being the slowest but most precise.
 
 For efficiency, `RFLUFactorization` is the fastest for dense LU-factorizations until around
@@ -59,7 +59,7 @@ has, for example if positive definite then `Krylov_CG()`, but if no good propert
 use `Krylov_GMRES()`.
 
 Finally, a user can pass a custom function for handling the linear solve using
-`LinearSolveFunction()` if existing solvers are not optimally suited for their application.
+`LS.LinearSolveFunction()` if existing solvers are not optimally suited for their application.
 The interface is detailed [here](@ref custom).
 
 ### Lazy SciMLOperators

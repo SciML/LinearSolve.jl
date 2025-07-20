@@ -4,9 +4,10 @@ using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
                     @get_cacheval, CHOLMODFactorization, GenericFactorization, GenericLUFactorization,
                     KLUFactorization, LUFactorization, NormalCholeskyFactorization, OperatorAssumptions,
                     QRFactorization, RFLUFactorization, UMFPACKFactorization, solve
-using LinearAlgebra
-using SparseArrays
-using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
+using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!
+using SparseArrays: SparseArrays, AbstractSparseArray, AbstractSparseMatrixCSC, SparseMatrixCSC, 
+                    nonzeros, rowvals, getcolptr, sparse, sprand
+using Base: /, \, convert
 using SciMLBase: SciMLBase, LinearProblem, ReturnCode
 
 # Can't `using KLU` because cannot have a dependency in there without

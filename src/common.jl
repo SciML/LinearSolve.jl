@@ -207,7 +207,8 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     elseif b isa Array
         copy(b)
     elseif issparsematrixcsc(b)
-        SparseMatrixCSC(size(b)..., getcolptr(b), rowvals(b), nonzeros(b))
+        # Extension must be loaded if issparsematrixcsc returns true
+        make_SparseMatrixCSC(b)
     else
         deepcopy(b)
     end

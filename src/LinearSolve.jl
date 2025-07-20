@@ -11,7 +11,7 @@ using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, Bunc
                     ColumnNorm, Diagonal, Factorization, Hermitian, I, LAPACK, NoPivot, 
                     RowMaximum, RowNonZero, SymTridiagonal, Symmetric, Transpose, 
                     Tridiagonal, UniformScaling, axpby!, axpy!, bunchkaufman, bunchkaufman!,
-                    cholesky, cholesky!, diagind, dot, ldiv!, ldlt!, lu, lu!, mul!, norm,
+                    cholesky, cholesky!, diagind, dot, inv, ldiv!, ldlt!, lu, lu!, mul!, norm,
                     qr, qr!, svd, svd!
 using LazyArrays: @~, BroadcastArray
 using SciMLBase: SciMLBase, LinearAliasSpecifier, AbstractSciMLOperator,
@@ -96,6 +96,11 @@ handle_sparsematrixcsc_lu(A) = lu(A)
 issparsematrix(A) = false
 make_SparseMatrixCSC(A) = nothing
 makeempty_SparseMatrixCSC(A) = nothing
+
+# Stub functions for SparseArrays - overridden in extension
+getcolptr(A) = error("SparseArrays extension not loaded")
+rowvals(A) = error("SparseArrays extension not loaded")
+nonzeros(A) = error("SparseArrays extension not loaded")
 
 EnumX.@enumx DefaultAlgorithmChoice begin
     LUFactorization

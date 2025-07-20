@@ -143,7 +143,7 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         abstol = default_tol(real(eltype(prob.b))),
         reltol = default_tol(real(eltype(prob.b))),
         maxiters::Int = length(prob.b),
-        verbose::LinearVerbosity = LinearVerbosity(),
+        verbose = LinearVerbosity(),
         Pl = nothing,
         Pr = nothing,
         assumptions = OperatorAssumptions(issquare(prob.A)),
@@ -198,6 +198,16 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         make_SparseMatrixCSC(A)
     else
         deepcopy(A)
+    end
+
+    if verbose isa Bool
+        #@warn "Using `true` or `false` for `verbose` is being deprecated. Please use a `LinearVerbosity` type to specify verbosity settings.
+        # For details see the verbosity section of the common solver options documentation page."
+        if verbose
+            verbose = LinearVerbosity()
+        else
+            verbose = LinearVerbosity(Verbosity.None())
+        end
     end
 
     b = if issparsematrix(b) && !(A isa Diagonal)

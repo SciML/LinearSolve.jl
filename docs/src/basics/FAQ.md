@@ -50,7 +50,8 @@ Thus, in order to use a vector tolerance `weights`, one can mathematically
 hack the system via the following formulation:
 
 ```@example FAQPrec
-using LinearSolve, LinearAlgebra
+import LinearSolve as LS
+import LinearAlgebra as LA
 
 n = 2
 A = rand(n, n)

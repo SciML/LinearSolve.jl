@@ -2,7 +2,7 @@ module LinearSolveEnzymeExt
 
 using LinearSolve: LinearSolve, SciMLLinearSolveAlgorithm, init, solve!, LinearProblem, 
                    LinearCache, AbstractKrylovSubspaceMethod, DefaultLinearSolver, 
-                   defaultalg_adjoint_eval
+                   defaultalg_adjoint_eval, solve
 using LinearSolve.LinearAlgebra
 using EnzymeCore
 using EnzymeCore: EnzymeRules

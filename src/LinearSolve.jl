@@ -237,6 +237,8 @@ error_no_cudss_lu(A) = nothing
 cudss_loaded(A) = false
 is_cusparse(A) = false
 
+export LinearVerbosity, LinearErrorControlVerbosity, LinearPerformanceVerbosity, LinearNumericalVerbosity
+
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
        NormalCholeskyFactorization, NormalBunchKaufmanFactorization,

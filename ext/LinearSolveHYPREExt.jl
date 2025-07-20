@@ -5,7 +5,7 @@ using HYPRE.LibHYPRE: HYPRE_Complex
 using HYPRE: HYPRE, HYPREMatrix, HYPRESolver, HYPREVector
 using LinearSolve: HYPREAlgorithm, LinearCache, LinearProblem, LinearSolve,
                    OperatorAssumptions, default_tol, init_cacheval, __issquare,
-                   __conditioning, LinearSolveAdjoint
+                   __conditioning, LinearSolveAdjoint, LinearVerbosity
 using SciMLBase: LinearProblem, LinearAliasSpecifier, SciMLBase
 using UnPack: @unpack
 using Setfield: @set!

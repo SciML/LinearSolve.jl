@@ -3,6 +3,7 @@ module LinearSolveIterativeSolversExt
 using LinearSolve, LinearAlgebra
 using LinearSolve: LinearCache, DEFAULT_PRECS
 import LinearSolve: IterativeSolversJL
+using SciMLVerbosity: @SciMLMessage, Verbosity
 
 if isdefined(Base, :get_extension)
     using IterativeSolvers
@@ -114,7 +115,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::IterativeSolversJL; kwargs...
     i = 0
     for iter in enumerate(cache.cacheval)
         i += 1
-        @SciMLMessage("Iter: $(iter[1]), residual: $(iter[2])", cache.verbose, :IterativeSolvers_iterations)
+        @SciMLMessage("Iter: $(iter[1]), residual: $(iter[2])", cache.verbose, :IterativeSolvers_iterations, :numerical)
         # TODO inject callbacks KSP into solve! cb!(cache.cacheval)
     end
 

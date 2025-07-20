@@ -77,6 +77,7 @@ ChainRulesCore = "1.22"
 ConcreteStructs = "0.2.3"
 DocStringExtensions = "0.9.3"
 EnumX = "1.0.4"
+ExplicitImports = "1"
 EnzymeCore = "0.8.1"
 FastAlmostBandedMatrices = "0.1"
 FastLapackInterface = "2"
@@ -122,6 +123,7 @@ julia = "1.10"
 [extras]
 AllocCheck = "9b6a8646-10ed-4001-bbdc-1d2f46dfbb1a"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+ExplicitImports = "7d51a73a-1435-4ff3-83d9-f097790105c7"
 BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
 BlockDiagonals = "0a1fb500-61f7-11e9-3c65-f5ef3456f9f0"
 FastAlmostBandedMatrices = "9d29842c-ecb8-4973-b1e9-a27b1157504e"
@@ -150,4 +152,4 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [targets]
-test = ["Aqua", "Test", "IterativeSolvers", "InteractiveUtils", "KrylovKit", "KrylovPreconditioners", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI", "BlockDiagonals", "FiniteDiff", "BandedMatrices", "FastAlmostBandedMatrices", "StaticArrays", "AllocCheck", "StableRNGs", "Zygote", "RecursiveFactorization", "Sparspak", "FastLapackInterface", "SparseArrays"]
+test = ["Aqua", "Test", "IterativeSolvers", "InteractiveUtils", "KrylovKit", "KrylovPreconditioners", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI", "BlockDiagonals", "FiniteDiff", "BandedMatrices", "FastAlmostBandedMatrices", "StaticArrays", "AllocCheck", "StableRNGs", "Zygote", "RecursiveFactorization", "Sparspak", "FastLapackInterface", "SparseArrays", "ExplicitImports"]

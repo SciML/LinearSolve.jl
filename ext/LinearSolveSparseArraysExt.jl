@@ -1,9 +1,13 @@
 module LinearSolveSparseArraysExt
 
-using LinearSolve, LinearAlgebra
+using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
+                    @get_cacheval, CHOLMODFactorization, GenericFactorization, GenericLUFactorization,
+                    KLUFactorization, LUFactorization, NormalCholeskyFactorization, OperatorAssumptions,
+                    QRFactorization, RFLUFactorization, UMFPACKFactorization, solve
+using LinearAlgebra
 using SparseArrays
 using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
-using LinearSolve: BLASELTYPES, pattern_changed, ArrayInterface
+using SciMLBase: SciMLBase, LinearProblem, ReturnCode
 
 # Can't `using KLU` because cannot have a dependency in there without
 # requiring the user does `using KLU`

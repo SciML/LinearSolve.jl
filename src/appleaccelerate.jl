@@ -252,7 +252,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::AppleAccelerateLUFactorizatio
     end
 
     A, info = @get_cacheval(cache, :AppleAccelerateLUFactorization)
-    LinearAlgebra.require_one_based_indexing(cache.u, cache.b)
+    require_one_based_indexing(cache.u, cache.b)
     m, n = size(A, 1), size(A, 2)
     if m > n
         Bc = copy(cache.b)

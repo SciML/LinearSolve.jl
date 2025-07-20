@@ -5,27 +5,33 @@ if isdefined(Base, :Experimental) &&
 end
 
 import PrecompileTools
-using ArrayInterface
-using Base: cache_dependencies, Bool
-using LinearAlgebra
+using ArrayInterface: ArrayInterface
+using Base: Bool, convert, copyto!, adjoint, transpose, /, \, require_one_based_indexing
+using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, BunchKaufman, 
+                    ColumnNorm, Diagonal, Factorization, Hermitian, I, LAPACK, NoPivot, 
+                    RowMaximum, RowNonZero, SymTridiagonal, Symmetric, Transpose, 
+                    Tridiagonal, UniformScaling, axpby!, axpy!, bunchkaufman, bunchkaufman!,
+                    cholesky, cholesky!, diagind, dot, ldiv!, ldlt!, lu, lu!, mul!, norm,
+                    qr, qr!, svd, svd!
 using LazyArrays: @~, BroadcastArray
-using SciMLBase: AbstractLinearAlgorithm, LinearAliasSpecifier
-using SciMLOperators
-using SciMLOperators: AbstractSciMLOperator, IdentityOperator
-using Setfield
-using UnPack
-using DocStringExtensions
-using EnumX
-using Markdown
-using ChainRulesCore
+using SciMLBase: SciMLBase, LinearAliasSpecifier, AbstractSciMLOperator,
+                 init, solve!, reinit!, solve, ReturnCode, LinearProblem
+using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator, MatrixOperator,
+                     has_ldiv!, issquare
+using Setfield: @set, @set!
+using UnPack: @unpack
+using DocStringExtensions: DocStringExtensions
+using EnumX: EnumX, @enumx
+using Markdown: Markdown, @doc_str
+using ChainRulesCore: ChainRulesCore
+using Reexport: Reexport, @reexport
+using Libdl: Libdl, dlsym_e
 import InteractiveUtils
 import RecursiveArrayTools
 
-import StaticArraysCore: StaticArray, SVector, MVector, SMatrix, MMatrix
+import StaticArraysCore: StaticArray, SVector, SMatrix
 
-using LinearAlgebra: BlasInt, LU
-using LinearAlgebra.LAPACK: require_one_based_indexing,
-                            chkfinite, chkstride1,
+using LinearAlgebra.LAPACK: chkfinite, chkstride1,
                             @blasfunc, chkargsok
 
 import GPUArraysCore
@@ -34,8 +40,6 @@ import ConcreteStructs: @concrete
 
 # wrap
 import Krylov
-using SciMLBase
-import Preferences
 
 const CRC = ChainRulesCore
 
@@ -51,9 +55,7 @@ else
     const usemkl = false
 end
 
-using Reexport
 @reexport using SciMLBase
-using SciMLBase: _unwrap_val
 
 abstract type SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
 abstract type AbstractFactorization <: SciMLLinearSolveAlgorithm end

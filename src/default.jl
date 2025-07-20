@@ -125,7 +125,7 @@ function defaultalg(A::GPUArraysCore.AnyGPUArray, b::GPUArraysCore.AnyGPUArray,
     end
 end
 
-function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
+function defaultalg(A::SciMLOperators.AbstractSciMLOperator, b,
         assump::OperatorAssumptions{Bool})
     if has_ldiv!(A)
         return DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
@@ -142,7 +142,7 @@ function defaultalg(A::SciMLBase.AbstractSciMLOperator, b,
 end
 
 # Fix ambiguity
-function defaultalg(A::SciMLBase.AbstractSciMLOperator, b::GPUArraysCore.AnyGPUArray,
+function defaultalg(A::SciMLOperators.AbstractSciMLOperator, b::GPUArraysCore.AnyGPUArray,
         assump::OperatorAssumptions{Bool})
     if has_ldiv!(A)
         return DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)

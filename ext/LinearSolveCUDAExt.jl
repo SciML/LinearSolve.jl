@@ -2,6 +2,7 @@ module LinearSolveCUDAExt
 
 using CUDA
 using LinearSolve
+using LinearSolve: OperatorAssumptions
 using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase, LinearSolve.ArrayInterface
 using SciMLBase: AbstractSciMLOperator
 

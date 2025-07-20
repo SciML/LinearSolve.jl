@@ -1,7 +1,8 @@
 module LinearSolveRecursiveFactorizationExt
 
-using LinearSolve
+using LinearSolve: LinearSolve, userecursivefactorization, LinearCache, @get_cacheval, RFLUFactorization
 using LinearSolve.LinearAlgebra, LinearSolve.ArrayInterface, RecursiveFactorization
+using SciMLBase: SciMLBase, ReturnCode
 
 LinearSolve.userecursivefactorization(A::Union{Nothing, AbstractMatrix}) = true
 

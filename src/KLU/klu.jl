@@ -1,15 +1,20 @@
 module KLU
 
-using SparseArrays
-using SparseArrays: SparseMatrixCSC
+using SparseArrays: SparseArrays, SparseMatrixCSC
 import SparseArrays: nnz
 
 export klu, klu!
 
 const libklu = :libklu
+const libsuitesparseconfig = :libsuitesparseconfig
+using Base: Ptr, Cvoid, Cint, Cdouble, Cchar, Csize_t
 include("wrappers.jl")
 
-import Base: (\), size, getproperty, setproperty!, propertynames, show
+import Base: (\), size, getproperty, setproperty!, propertynames, show,
+             copy, eachindex, view, sortperm, unsafe_load, zeros, convert, eltype,
+             length, parent, stride, finalizer, Complex, complex, imag, real, map!,
+             summary, println, oneunit, sizeof, isdefined, setfield!, getfield,
+             OutOfMemoryError, ArgumentError, OverflowError, ErrorException, DimensionMismatch
 
 # Convert from 1-based to 0-based indices
 function decrement!(A::AbstractArray{T}) where {T <: Integer}
@@ -29,7 +34,8 @@ function increment!(A::AbstractArray{T}) where {T <: Integer}
 end
 increment(A::AbstractArray{<:Integer}) = increment!(copy(A))
 
-using LinearAlgebra
+using LinearAlgebra: LinearAlgebra, ldiv!, Adjoint, Transpose, Factorization
+import LinearAlgebra: issuccess
 
 const AdjointFact = isdefined(LinearAlgebra, :AdjointFactorization) ?
                     LinearAlgebra.AdjointFactorization : Adjoint

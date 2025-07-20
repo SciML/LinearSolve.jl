@@ -1,9 +1,17 @@
 module LinearSolveSparseArraysExt
 
-using LinearSolve, LinearAlgebra
-using SparseArrays
-using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
-using LinearSolve: BLASELTYPES, pattern_changed, ArrayInterface
+using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
+                    @get_cacheval, CHOLMODFactorization, GenericFactorization, GenericLUFactorization,
+                    KLUFactorization, LUFactorization, NormalCholeskyFactorization, OperatorAssumptions,
+                    QRFactorization, RFLUFactorization, UMFPACKFactorization, solve
+using ArrayInterface: ArrayInterface
+using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!, QR
+using SparseArrays: SparseArrays, AbstractSparseArray, AbstractSparseMatrixCSC, SparseMatrixCSC, 
+                    nonzeros, rowvals, getcolptr, sparse, sprand
+using SparseArrays.UMFPACK: UMFPACK_OK
+using Base: /, \, convert
+using SciMLBase: SciMLBase, LinearProblem, ReturnCode
+import StaticArraysCore: SVector
 
 # Can't `using KLU` because cannot have a dependency in there without
 # requiring the user does `using KLU`
@@ -187,7 +195,7 @@ function SciMLBase.solve!(
     end
 
     F = LinearSolve.@get_cacheval(cache, :UMFPACKFactorization)
-    if F.status == SparseArrays.UMFPACK.UMFPACK_OK
+    if F.status == UMFPACK_OK
         y = ldiv!(cache.u, F, cache.b)
         SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
     else
@@ -298,36 +306,36 @@ function LinearSolve.init_cacheval(alg::NormalCholeskyFactorization,
             Symmetric{T, <:AbstractSparseArray{T}}}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions) where {T <: BLASELTYPES}
-    LinearSolve.ArrayInterface.cholesky_instance(convert(AbstractMatrix, A))
+    ArrayInterface.cholesky_instance(convert(AbstractMatrix, A))
 end
 
 # Specialize QR for the non-square case
 # Missing ldiv! definitions: https://github.com/JuliaSparse/SparseArrays.jl/issues/242
 function LinearSolve._ldiv!(x::Vector,
-        A::Union{SparseArrays.QR, LinearAlgebra.QRCompactWY,
+        A::Union{QR, LinearAlgebra.QRCompactWY,
             SparseArrays.SPQR.QRSparse,
             SparseArrays.CHOLMOD.Factor}, b::Vector)
     x .= A \ b
 end
 
 function LinearSolve._ldiv!(x::AbstractVector,
-        A::Union{SparseArrays.QR, LinearAlgebra.QRCompactWY,
+        A::Union{QR, LinearAlgebra.QRCompactWY,
             SparseArrays.SPQR.QRSparse,
             SparseArrays.CHOLMOD.Factor}, b::AbstractVector)
     x .= A \ b
 end
 
 # Ambiguity removal
-function LinearSolve._ldiv!(::LinearSolve.SVector,
+function LinearSolve._ldiv!(::SVector,
         A::Union{SparseArrays.CHOLMOD.Factor, LinearAlgebra.QR,
             LinearAlgebra.QRCompactWY, SparseArrays.SPQR.QRSparse},
         b::AbstractVector)
     (A \ b)
 end
-function LinearSolve._ldiv!(::LinearSolve.SVector,
+function LinearSolve._ldiv!(::SVector,
         A::Union{SparseArrays.CHOLMOD.Factor, LinearAlgebra.QR,
             LinearAlgebra.QRCompactWY, SparseArrays.SPQR.QRSparse},
-        b::LinearSolve.SVector)
+        b::SVector)
     (A \ b)
 end
 
@@ -363,7 +371,7 @@ end
 function LinearSolve.init_cacheval(alg::QRFactorization, A::SparseMatrixCSC{Float64, <:Integer}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
-    LinearSolve.ArrayInterface.qr_instance(convert(AbstractMatrix, A), alg.pivot)
+    ArrayInterface.qr_instance(convert(AbstractMatrix, A), alg.pivot)
 end
 
 function LinearSolve.init_cacheval(

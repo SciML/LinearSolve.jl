@@ -1,13 +1,14 @@
 # Linear Verbosity
 
-linear_defaults = Dict(
+const linear_defaults = Dict{Symbol, Verbosity.Type}(
     :default_lu_fallback => Verbosity.Warn(),
     :no_right_preconditioning => Verbosity.Warn(),
     :using_iterative_solvers => Verbosity.Warn(),
     :using_IterativeSolvers => Verbosity.Warn(),
     :IterativeSolvers_iterations => Verbosity.Warn(),
     :KrylovKit_verbosity => Verbosity.Warn(),
-    :KrylovJL_verbosity => Verbosity.None()
+    :KrylovJL_verbosity => Verbosity.None(),
+    :HYPRE_verbosity => Verbosity.Level(1)
 )
 mutable struct LinearErrorControlVerbosity
     default_lu_fallback::Verbosity.Type
@@ -76,14 +77,16 @@ mutable struct LinearNumericalVerbosity
     IterativeSolvers_iterations::Verbosity.Type
     KrylovKit_verbosity::Verbosity.Type
     KrylovJL_verbosity::Verbosity.Type
+    HYPRE_verbosity::Verbosity.Type
 
     function LinearNumericalVerbosity(;
             using_IterativeSolvers = linear_defaults[:using_IterativeSolvers],
             IterativeSolvers_iterations = linear_defaults[:IterativeSolvers_iterations],
             KrylovKit_verbosity = linear_defaults[:KrylovKit_verbosity],
-            KrylovJL_verbosity = linear_defaults[:KrylovJL_verbosity])
+            KrylovJL_verbosity = linear_defaults[:KrylovJL_verbosity],
+            HYPRE_verbosity = linear_defaults[:HYPRE_verbosity])
         new(using_IterativeSolvers, IterativeSolvers_iterations,
-            KrylovKit_verbosity, KrylovJL_verbosity)
+            KrylovKit_verbosity, KrylovJL_verbosity, HYPRE_verbosity)
     end
 
     function LinearNumericalVerbosity(verbose::Verbosity.Type)

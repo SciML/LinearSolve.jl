@@ -7,6 +7,7 @@ using LinearSolve: HYPREAlgorithm, LinearCache, LinearProblem, LinearSolve,
                    OperatorAssumptions, default_tol, init_cacheval, __issquare,
                    __conditioning, LinearSolveAdjoint, LinearVerbosity
 using SciMLBase: LinearProblem, LinearAliasSpecifier, SciMLBase
+using SciMLVerbosity: @match, Verbosity
 using UnPack: @unpack
 using Setfield: @set!
 
@@ -64,7 +65,7 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
                              eltype(prob.A)),
         # TODO: Implement length() for HYPREVector in HYPRE.jl?
         maxiters::Int = prob.b isa HYPREVector ? 1000 : length(prob.b),
-        verbose::LinearVerbosity = false,
+        verbose = LinearVerbosity(),
         Pl = LinearAlgebra.I,
         Pr = LinearAlgebra.I,
         assumptions = OperatorAssumptions(),
@@ -159,10 +160,22 @@ function create_solver(alg::HYPREAlgorithm, cache::LinearCache)
     solver = create_solver(alg.solver, comm)
 
     # Construct solver options
+
+
+    # This should be a function in SciMLVerbosity
+    verbose = @match cache.verbose.numerical.HYPRE_verbosity begin
+            Verbosity.None() => 0
+            Verbosity.Info() => 1
+            Verbosity.Warn() => 2
+            Verbosity.Error() => 3
+            Verbosity.Level(i) => i
+    end
+
+
     solver_options = (;
         AbsoluteTol = cache.abstol,
         MaxIter = cache.maxiters,
-        PrintLevel = Int(cache.verbose),
+        PrintLevel = verbose,
         Tol = cache.reltol)
 
     # Preconditioner (uses Pl even though it might not be a *left* preconditioner just *a*

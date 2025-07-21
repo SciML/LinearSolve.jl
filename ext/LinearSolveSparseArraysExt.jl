@@ -3,7 +3,7 @@ module LinearSolveSparseArraysExt
 using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
                     @get_cacheval, CHOLMODFactorization, GenericFactorization, GenericLUFactorization,
                     KLUFactorization, LUFactorization, NormalCholeskyFactorization, OperatorAssumptions,
-                    QRFactorization, RFLUFactorization, UMFPACKFactorization, solve
+                    QRFactorization, RFLUFactorization, UMFPACKFactorization, solve, LinearVerbosity
 using ArrayInterface: ArrayInterface
 using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!, QR
 using SparseArrays: SparseArrays, AbstractSparseArray, AbstractSparseMatrixCSC, SparseMatrixCSC, 

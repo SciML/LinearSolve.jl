@@ -25,7 +25,7 @@ function LinearSolve.defaultalg(A::CUDA.CUSPARSE.CuSparseMatrixCSR{Tv, Ti}, b,
 end
 
 function LinearSolve.error_no_cudss_lu(A::CUDA.CUSPARSE.CuSparseMatrixCSR)
-    if !LinearSolve.CUDSS_LOADED[]
+    if !LinearSolve.cudss_loaded[]
         error("CUDSS.jl is required for LU Factorizations on CuSparseMatrixCSR. Please load this library.")
     end
     nothing

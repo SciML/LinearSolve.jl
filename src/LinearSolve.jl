@@ -18,7 +18,7 @@ using SciMLBase: SciMLBase, LinearAliasSpecifier, AbstractSciMLOperator,
                  init, solve!, reinit!, solve, ReturnCode, LinearProblem
 using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator, MatrixOperator,
                      has_ldiv!, issquare
-using SciMLVerbosity: Verbosity, @SciMLMessage, @match, AbstractVerbositySpecifier
+using SciMLVerbosity: Verbosity, @SciMLMessage, @match, AbstractVerbositySpecifier, verbosity_to_int, verbosity_to_bool
 using Setfield: @set, @set!
 using UnPack: @unpack
 using DocStringExtensions: DocStringExtensions

@@ -73,7 +73,10 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
             error("Number type not supported by Pardiso")
         end
     end
-    verbose && Pardiso.set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
+
+    @SciMLMessage(verbose, :pardiso_verbosity, :numerical) do 
+        Pardiso.set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
+    end
 
     #=
     Note: It is recommended to use IPARM(11)=1 (scaling) and IPARM(13)=1 (matchings) for

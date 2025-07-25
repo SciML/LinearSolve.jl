@@ -7,7 +7,7 @@ using LinearSolve: HYPREAlgorithm, LinearCache, LinearProblem, LinearSolve,
                    OperatorAssumptions, default_tol, init_cacheval, __issquare,
                    __conditioning, LinearSolveAdjoint, LinearVerbosity
 using SciMLBase: LinearProblem, LinearAliasSpecifier, SciMLBase
-using SciMLVerbosity: @match, Verbosity
+using SciMLVerbosity: @match, Verbosity, verbosity_to_int
 using UnPack: @unpack
 using Setfield: @set!
 
@@ -162,15 +162,7 @@ function create_solver(alg::HYPREAlgorithm, cache::LinearCache)
     # Construct solver options
 
 
-    # This should be a function in SciMLVerbosity
-    verbose = @match cache.verbose.numerical.HYPRE_verbosity begin
-            Verbosity.None() => 0
-            Verbosity.Info() => 1
-            Verbosity.Warn() => 2
-            Verbosity.Error() => 3
-            Verbosity.Level(i) => i
-    end
-
+    verbose = verbosity_to_int(cache.verbose.numerical.HYPRE_verbosity)
 
     solver_options = (;
         AbsoluteTol = cache.abstol,

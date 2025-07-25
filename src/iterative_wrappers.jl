@@ -284,11 +284,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
         cache.cacheval
     end
 
-    krylovJL_verbose = SciMLBase.@match verbose.numerical.KrylovJL_verbosity begin
-        Verbosity.None() => 0
-        ::Verbosity.Type => 1
-        _ => error("Invalid verbosity.")
-    end
+    krylovJL_verbose = verbosity_to_int(verbose.numerical.KrylovJL_verbosity)
 
     args = (cacheval, cache.A, cache.b)
     kwargs = (atol = atol, rtol, itmax, verbose = krylovJL_verbose,

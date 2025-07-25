@@ -208,6 +208,8 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         else
             verbose = LinearVerbosity(Verbosity.None())
         end
+    elseif verbose isa Verbosity.Type
+        verbose = LinearVerbosity(verbose)
     end
 
     b = if issparsematrix(b) && !(A isa Diagonal)

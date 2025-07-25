@@ -50,7 +50,7 @@ These settings are meant for individual settings within a category. These can al
 - Verbosity.Level(n) - Show messages with a log level setting of n
 
 #### Group Settings
-These settings are meant for 
+These settings are meant for controlling a group of settings. 
 - Verbosity.Default() - Use the default settings
 - Verbosity.All() - Show all possible messages
 

@@ -10,7 +10,7 @@ const linear_defaults = Dict{Symbol, Verbosity.Type}(
     :KrylovJL_verbosity => Verbosity.None(),
     :HYPRE_verbosity => Verbosity.Level(1)
 )
-struct LinearErrorControlVerbosity
+mutable struct LinearErrorControlVerbosity
     default_lu_fallback::Verbosity.Type
 
     function LinearErrorControlVerbosity(;
@@ -41,7 +41,7 @@ struct LinearErrorControlVerbosity
     end
 end
 
-struct LinearPerformanceVerbosity
+mutable struct LinearPerformanceVerbosity
     no_right_preconditioning::Verbosity.Type
 
     function LinearPerformanceVerbosity(;
@@ -72,7 +72,7 @@ struct LinearPerformanceVerbosity
     end
 end
 
-struct LinearNumericalVerbosity
+mutable struct LinearNumericalVerbosity
     using_IterativeSolvers::Verbosity.Type
     IterativeSolvers_iterations::Verbosity.Type
     KrylovKit_verbosity::Verbosity.Type

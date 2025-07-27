@@ -1,6 +1,7 @@
 module LinearSolvePardisoExt
 
 using Pardiso, LinearSolve
+using SciMLVerbosity: @SciMLMessage
 using SparseArrays
 using SparseArrays: nonzeros, rowvals, getcolptr
 using LinearSolve: PardisoJL, @unpack

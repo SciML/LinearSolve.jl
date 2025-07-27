@@ -21,7 +21,7 @@ using SciMLBase: SciMLBase, LinearAliasSpecifier, AbstractSciMLOperator,
 using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator,
                       MatrixOperator,
                       has_ldiv!, issquare
-using SciMLVerbosity: Verbosity, @SciMLMessage, @match, AbstractVerbositySpecifier, verbosity_to_int, verbosity_to_bool
+using SciMLVerbosity: Verbosity, @SciMLMessage, @match, AbstractVerbositySpecifier, verbosity_to_int
 using Setfield: @set, @set!
 using UnPack: @unpack
 using DocStringExtensions: DocStringExtensions

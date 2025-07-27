@@ -1,12 +1,15 @@
 module LinearSolveSparseArraysExt
 
 using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
-                    @get_cacheval, CHOLMODFactorization, GenericFactorization, GenericLUFactorization,
-                    KLUFactorization, LUFactorization, NormalCholeskyFactorization, OperatorAssumptions,
-                    QRFactorization, RFLUFactorization, UMFPACKFactorization, solve
+                   @get_cacheval, CHOLMODFactorization, GenericFactorization,
+                   GenericLUFactorization,
+                   KLUFactorization, LUFactorization, NormalCholeskyFactorization,
+                   OperatorAssumptions,
+                   QRFactorization, RFLUFactorization, UMFPACKFactorization, solve
 using ArrayInterface: ArrayInterface
 using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!, QR
-using SparseArrays: SparseArrays, AbstractSparseArray, AbstractSparseMatrixCSC, SparseMatrixCSC, 
+using SparseArrays: SparseArrays, AbstractSparseArray, AbstractSparseMatrixCSC,
+                    SparseMatrixCSC,
                     nonzeros, rowvals, getcolptr, sparse, sprand
 using SparseArrays.UMFPACK: UMFPACK_OK
 using Base: /, \, convert
@@ -107,11 +110,12 @@ function LinearSolve.init_cacheval(
         alg::LUFactorization, A::AbstractSparseArray{T, Int64}, b, u,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
-        verbose::Bool, assumptions::OperatorAssumptions) where {T<:BLASELTYPES}
+        verbose::Bool, assumptions::OperatorAssumptions) where {T <: BLASELTYPES}
     if LinearSolve.is_cusparse(A)
         ArrayInterface.lu_instance(A)
     else
-        SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC{T, Int64}(zero(Int64), zero(Int64), [Int64(1)], Int64[], T[]))
+        SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC{T, Int64}(
+            zero(Int64), zero(Int64), [Int64(1)], Int64[], T[]))
     end
 end
 
@@ -119,11 +123,12 @@ function LinearSolve.init_cacheval(
         alg::LUFactorization, A::AbstractSparseArray{T, Int32}, b, u,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
-        verbose::Bool, assumptions::OperatorAssumptions) where {T<:BLASELTYPES}
+        verbose::Bool, assumptions::OperatorAssumptions) where {T <: BLASELTYPES}
     if LinearSolve.is_cusparse(A)
         ArrayInterface.lu_instance(A)
     else
-        SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC{T, Int32}(zero(Int32), zero(Int32), [Int32(1)], Int32[], T[]))
+        SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC{T, Int32}(
+            zero(Int32), zero(Int32), [Int32(1)], Int32[], T[]))
     end
 end
 
@@ -140,7 +145,6 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol,
         reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
-    
     PREALLOCATED_UMFPACK
 end
 
@@ -156,16 +160,18 @@ function LinearSolve.init_cacheval(
         alg::UMFPACKFactorization, A::AbstractSparseArray{T, Int64}, b, u,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
-        verbose::Bool, assumptions::OperatorAssumptions) where {T<:BLASELTYPES}
-    SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC{T, Int64}(zero(Int64), zero(Int64), [Int64(1)], Int64[], T[]))
+        verbose::Bool, assumptions::OperatorAssumptions) where {T <: BLASELTYPES}
+    SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC{T, Int64}(
+        zero(Int64), zero(Int64), [Int64(1)], Int64[], T[]))
 end
 
 function LinearSolve.init_cacheval(
         alg::UMFPACKFactorization, A::AbstractSparseArray{T, Int32}, b, u,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
-        verbose::Bool, assumptions::OperatorAssumptions) where {T<:BLASELTYPES}
-    SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC{T, Int32}(zero(Int32), zero(Int32), [Int32(1)], Int32[], T[]))
+        verbose::Bool, assumptions::OperatorAssumptions) where {T <: BLASELTYPES}
+    SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC{T, Int32}(
+        zero(Int32), zero(Int32), [Int32(1)], Int32[], T[]))
 end
 
 function SciMLBase.solve!(
@@ -197,7 +203,8 @@ function SciMLBase.solve!(
     F = LinearSolve.@get_cacheval(cache, :UMFPACKFactorization)
     if F.status == UMFPACK_OK
         y = ldiv!(cache.u, F, cache.b)
-        SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
+        SciMLBase.build_linear_solution(
+            alg, y, nothing, cache; retcode = ReturnCode.Success)
     else
         SciMLBase.build_linear_solution(
             alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible)
@@ -236,7 +243,8 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol,
         reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
-    KLU.KLUFactorization(SparseMatrixCSC{Float64, Int32}(0, 0, [Int32(1)], Int32[], Float64[]))
+    KLU.KLUFactorization(SparseMatrixCSC{Float64, Int32}(
+        0, 0, [Int32(1)], Int32[], Float64[]))
 end
 
 # TODO: guard this against errors
@@ -266,14 +274,15 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
     F = LinearSolve.@get_cacheval(cache, :KLUFactorization)
     if F.common.status == KLU.KLU_OK
         y = ldiv!(cache.u, F, cache.b)
-        SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
+        SciMLBase.build_linear_solution(
+            alg, y, nothing, cache; retcode = ReturnCode.Success)
     else
         SciMLBase.build_linear_solution(
             alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible)
     end
 end
 
-const PREALLOCATED_CHOLMOD = cholesky(sparse(reshape([1.0],1,1)))
+const PREALLOCATED_CHOLMOD = cholesky(sparse(reshape([1.0], 1, 1)))
 
 function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
         A::Union{SparseMatrixCSC{T, Int}, Symmetric{T, SparseMatrixCSC{T, Int}}}, b, u,
@@ -290,7 +299,7 @@ function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions) where {T <:
                                                                 BLASELTYPES}
-    cholesky(sparse(reshape([one(T)],1,1)))
+    cholesky(sparse(reshape([one(T)], 1, 1)))
 end
 
 function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
@@ -368,7 +377,8 @@ function LinearSolve.init_cacheval(
     nothing
 end
 
-function LinearSolve.init_cacheval(alg::QRFactorization, A::SparseMatrixCSC{Float64, <:Integer}, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(
+        alg::QRFactorization, A::SparseMatrixCSC{Float64, <:Integer}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     ArrayInterface.qr_instance(convert(AbstractMatrix, A), alg.pivot)

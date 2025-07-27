@@ -7,17 +7,20 @@ end
 import PrecompileTools
 using ArrayInterface: ArrayInterface
 using Base: Bool, convert, copyto!, adjoint, transpose, /, \, require_one_based_indexing
-using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, BunchKaufman, 
-                    ColumnNorm, Diagonal, Factorization, Hermitian, I, LAPACK, NoPivot, 
-                    RowMaximum, RowNonZero, SymTridiagonal, Symmetric, Transpose, 
-                    Tridiagonal, UniformScaling, axpby!, axpy!, bunchkaufman, bunchkaufman!,
-                    cholesky, cholesky!, diagind, dot, inv, ldiv!, ldlt!, lu, lu!, mul!, norm,
-                    qr, qr!, svd, svd!
+using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, BunchKaufman,
+                     ColumnNorm, Diagonal, Factorization, Hermitian, I, LAPACK, NoPivot,
+                     RowMaximum, RowNonZero, SymTridiagonal, Symmetric, Transpose,
+                     Tridiagonal, UniformScaling, axpby!, axpy!, bunchkaufman,
+                     bunchkaufman!,
+                     cholesky, cholesky!, diagind, dot, inv, ldiv!, ldlt!, lu, lu!, mul!,
+                     norm,
+                     qr, qr!, svd, svd!
 using LazyArrays: @~, BroadcastArray
 using SciMLBase: SciMLBase, LinearAliasSpecifier, AbstractSciMLOperator,
                  init, solve!, reinit!, solve, ReturnCode, LinearProblem
-using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator, MatrixOperator,
-                     has_ldiv!, issquare
+using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator,
+                      MatrixOperator,
+                      has_ldiv!, issquare
 using Setfield: @set, @set!
 using UnPack: @unpack
 using DocStringExtensions: DocStringExtensions
@@ -135,14 +138,14 @@ is called. It's a polyalgorithm that detects the optimal method for a given
 
 ## Keyword Arguments
 
-* `safetyfallback`: determines whether to fallback to a column-pivoted QR factorization
-  when an LU factorization fails. This can be required if `A` is rank-deficient. Defaults
-  to true.
+  - `safetyfallback`: determines whether to fallback to a column-pivoted QR factorization
+    when an LU factorization fails. This can be required if `A` is rank-deficient. Defaults
+    to true.
 """
 struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm
     alg::DefaultAlgorithmChoice.T
     safetyfallback::Bool
-    DefaultLinearSolver(alg; safetyfallback=true) = new(alg,safetyfallback)
+    DefaultLinearSolver(alg; safetyfallback = true) = new(alg, safetyfallback)
 end
 
 const BLASELTYPES = Union{Float32, Float64, ComplexF32, ComplexF64}

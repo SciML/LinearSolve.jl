@@ -28,7 +28,8 @@ specific structure distinct from ``A`` then passing in a `linsolve` will be more
     linsolve::L = missing
 end
 
-function CRC.rrule(T::typeof(SciMLBase.solve), prob::LinearProblem, alg::Nothing, args...; kwargs...)
+function CRC.rrule(
+        T::typeof(SciMLBase.solve), prob::LinearProblem, alg::Nothing, args...; kwargs...)
     assump = OperatorAssumptions(issquare(prob.A))
     alg = defaultalg(prob.A, prob.b, assump)
     CRC.rrule(T, prob, alg, args...; kwargs...)

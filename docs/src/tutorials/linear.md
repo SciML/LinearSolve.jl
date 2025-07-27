@@ -103,11 +103,11 @@ The Matrix-Free operators are provided by the [SciMLOperators.jl interface](http
 For example, for the matrix `A` defined via:
 
 ```@example linsys1
-A = [-2.0  1  0  0  0
-      1 -2  1  0  0
-      0  1 -2  1  0
-      0  0  1 -2  1
-      0  0  0  1 -2]
+A = [-2.0 1 0 0 0
+     1 -2 1 0 0
+     0 1 -2 1 0
+     0 0 1 -2 1
+     0 0 0 1 -2]
 ```
 
 We can define the `FunctionOperator` that does the `A*v` operations, without using the matrix `A`. This is done by defining
@@ -116,18 +116,18 @@ operator. See the [SciMLOperators.jl documentation](https://docs.sciml.ai/SciMLO
 non-constant operators, operator algebras, and many more features). This is done by:
 
 ```@example linsys1
-function Afunc!(w,v,u,p,t)
+function Afunc!(w, v, u, p, t)
     w[1] = -2v[1] + v[2]
     for i in 2:4
-        w[i] = v[i-1] - 2v[i] + v[i+1]
+        w[i] = v[i - 1] - 2v[i] + v[i + 1]
     end
     w[5] = v[4] - 2v[5]
     nothing
 end
 
-function Afunc!(v,u,p,t)
+function Afunc!(v, u, p, t)
     w = zeros(5)
-    Afunc!(w,v,u,p,t)
+    Afunc!(w, v, u, p, t)
     w
 end
 
@@ -159,6 +159,8 @@ mfopA * sol.u - b
 ```
 
 !!! note
-  Note that not all methods can use a matrix-free operator. For example, `LS.LUFactorization()` requires a matrix. If you use an
-  invalid method, you will get an error. The methods particularly from KrylovJL are the ones preferred for these cases
-  (and are defaulted to).
+    
+
+Note that not all methods can use a matrix-free operator. For example, `LS.LUFactorization()` requires a matrix. If you use an
+invalid method, you will get an error. The methods particularly from KrylovJL are the ones preferred for these cases
+(and are defaulted to).

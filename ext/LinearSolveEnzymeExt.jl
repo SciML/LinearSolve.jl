@@ -1,7 +1,7 @@
 module LinearSolveEnzymeExt
 
-using LinearSolve: LinearSolve, SciMLLinearSolveAlgorithm, init, solve!, LinearProblem, 
-                   LinearCache, AbstractKrylovSubspaceMethod, DefaultLinearSolver, 
+using LinearSolve: LinearSolve, SciMLLinearSolveAlgorithm, init, solve!, LinearProblem,
+                   LinearCache, AbstractKrylovSubspaceMethod, DefaultLinearSolver,
                    defaultalg_adjoint_eval, solve
 using LinearSolve.LinearAlgebra
 using EnzymeCore
@@ -205,9 +205,9 @@ function EnzymeRules.augmented_primal(
 
     cache = (copy(res.u), resvals, cachesolve, dAs, dbs)
 
-    _res = EnzymeRules.needs_primal(config) ? res : nothing  
+    _res = EnzymeRules.needs_primal(config) ? res : nothing
     _dres = EnzymeRules.needs_shadow(config) ? dres : nothing
-    
+
     return EnzymeRules.AugmentedReturn(_res, _dres, cache)
 end
 

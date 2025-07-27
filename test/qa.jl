@@ -24,9 +24,10 @@ end
     if klu_mod !== nothing
         unanalyzable_mods = (unanalyzable_mods..., klu_mod)
     end
-    
-    @test check_no_implicit_imports(LinearSolve; skip = (Base, Core), 
+
+    @test check_no_implicit_imports(LinearSolve; skip = (Base, Core),
         allow_unanalyzable = unanalyzable_mods) === nothing
-    @test check_no_stale_explicit_imports(LinearSolve; allow_unanalyzable = unanalyzable_mods) === nothing
+    @test check_no_stale_explicit_imports(
+        LinearSolve; allow_unanalyzable = unanalyzable_mods) === nothing
     @test check_all_qualified_accesses_via_owners(LinearSolve) === nothing
 end

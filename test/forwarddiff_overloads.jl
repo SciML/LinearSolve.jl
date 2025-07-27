@@ -94,7 +94,8 @@ function h(p)
         b = [p[1] + 1, p[2] * 2, p[1]^2])
 end
 
-A, b = h([ForwardDiff.Dual(ForwardDiff.Dual(5.0, 1.0, 0.0), 1.0, 0.0),
+A,
+b = h([ForwardDiff.Dual(ForwardDiff.Dual(5.0, 1.0, 0.0), 1.0, 0.0),
     ForwardDiff.Dual(ForwardDiff.Dual(5.0, 1.0, 0.0), 0.0, 1.0)])
 
 prob = LinearProblem(A, b)
@@ -107,7 +108,8 @@ original_x_p = A \ b
 prob = LinearProblem(A, b)
 cache = init(prob)
 
-new_A, new_b = h([ForwardDiff.Dual(ForwardDiff.Dual(10.0, 1.0, 0.0), 1.0, 0.0),
+new_A,
+new_b = h([ForwardDiff.Dual(ForwardDiff.Dual(10.0, 1.0, 0.0), 1.0, 0.0),
     ForwardDiff.Dual(ForwardDiff.Dual(10.0, 1.0, 0.0), 0.0, 1.0)])
 
 cache.A = new_A

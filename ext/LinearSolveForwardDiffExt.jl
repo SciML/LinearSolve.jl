@@ -150,26 +150,29 @@ function SciMLBase.init(
         dual_type = get_dual_type(prob.b)
     end
 
-    alg isa LinearSolve.DefaultLinearSolver ? real_alg = LinearSolve.defaultalg(primal_prob.A, primal_prob.b) : real_alg = alg
+    alg isa LinearSolve.DefaultLinearSolver ?
+    real_alg = LinearSolve.defaultalg(primal_prob.A, primal_prob.b) : real_alg = alg
 
     non_partial_cache = init(
         primal_prob, real_alg, assumptions, args...;
         alias = alias, abstol = abstol, reltol = reltol,
         maxiters = maxiters, verbose = verbose, Pl = Pl, Pr = Pr, assumptions = assumptions,
         sensealg = sensealg, u0 = new_u0, kwargs...)
-    return DualLinearCache(non_partial_cache, dual_type, ∂_A, ∂_b, !isnothing(∂_b) ? zero.(∂_b) : ∂_b, A, b, zeros(dual_type, length(b)))
+    return DualLinearCache(non_partial_cache, dual_type, ∂_A, ∂_b,
+        !isnothing(∂_b) ? zero.(∂_b) : ∂_b, A, b, zeros(dual_type, length(b)))
 end
 
 function SciMLBase.solve!(cache::DualLinearCache, args...; kwargs...)
-   solve!(cache, cache.alg, args...; kwargs...)
+    solve!(cache, cache.alg, args...; kwargs...)
 end
 
-function SciMLBase.solve!(cache::DualLinearCache, alg::SciMLLinearSolveAlgorithm, args...; kwargs...)
+function SciMLBase.solve!(
+        cache::DualLinearCache, alg::SciMLLinearSolveAlgorithm, args...; kwargs...)
     sol,
     partials = linearsolve_forwarddiff_solve(
         cache::DualLinearCache, cache.alg, args...; kwargs...)
     dual_sol = linearsolve_dual_solution(sol.u, partials, cache.dual_type)
-    
+
     if cache.dual_u isa AbstractArray
         cache.dual_u[:] = dual_sol
     else
@@ -191,7 +194,6 @@ function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)
     elseif hasfield(LinearSolve.LinearCache, sym)
         setproperty!(dc.linear_cache, sym, val)
     end
-
 
     # Update the partials if setting A or b
     if sym === :A
@@ -221,8 +223,6 @@ function Base.getproperty(dc::DualLinearCache, sym::Symbol)
     end
 end
 
-
-
 # Enhanced helper functions for Dual numbers to handle recursion
 get_dual_type(x::Dual{T, V, P}) where {T, V <: AbstractFloat, P} = typeof(x)
 get_dual_type(x::Dual{T, V, P}) where {T, V <: Dual, P} = typeof(x)
@@ -240,7 +240,6 @@ nodual_value(x) = x
 nodual_value(x::Dual{T, V, P}) where {T, V <: AbstractFloat, P} = ForwardDiff.value(x)
 nodual_value(x::Dual{T, V, P}) where {T, V <: Dual, P} = x.value  # Keep the inner dual intact
 nodual_value(x::AbstractArray{<:Dual}) = map(nodual_value, x)
-
 
 function partials_to_list(partial_matrix::AbstractVector{T}) where {T}
     p = eachindex(first(partial_matrix))
@@ -263,6 +262,4 @@ function partials_to_list(partial_matrix)
     return res_list
 end
 
-
 end
-

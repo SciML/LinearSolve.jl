@@ -42,7 +42,8 @@ end
 end
 
 # Handle special case of Column-pivoted QR fallback for LU
-function __setfield!(cache::DefaultLinearSolverInit, alg::DefaultLinearSolver, v::LinearAlgebra.QRPivoted)
+function __setfield!(cache::DefaultLinearSolverInit,
+        alg::DefaultLinearSolver, v::LinearAlgebra.QRPivoted)
     setfield!(cache, :QRFactorizationPivoted, v)
 end
 
@@ -365,7 +366,8 @@ end
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
                     ## TODO: Add verbosity logging here about using the fallback
-                    sol = SciMLBase.solve!(cache, QRFactorization(ColumnNorm()), args...; kwargs...)
+                    sol = SciMLBase.solve!(
+                        cache, QRFactorization(ColumnNorm()), args...; kwargs...)
                     SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
                         retcode = sol.retcode,
                         iters = sol.iters, stats = sol.stats)
@@ -384,7 +386,8 @@ end
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
                     ## TODO: Add verbosity logging here about using the fallback
-                    sol = SciMLBase.solve!(cache, QRFactorization(ColumnNorm()), args...; kwargs...)
+                    sol = SciMLBase.solve!(
+                        cache, QRFactorization(ColumnNorm()), args...; kwargs...)
                     SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
                         retcode = sol.retcode,
                         iters = sol.iters, stats = sol.stats)

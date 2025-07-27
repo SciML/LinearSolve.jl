@@ -1,7 +1,7 @@
 module LinearSolvePardisoExt
 
 using Pardiso, LinearSolve
-using SciMLVerbosity: @SciMLMessage
+using SciMLVerbosity: @SciMLMessage, verbosity_to_bool
 using SparseArrays
 using SparseArrays: nonzeros, rowvals, getcolptr
 using LinearSolve: PardisoJL, @unpack
@@ -75,7 +75,7 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
         end
     end
 
-    @SciMLMessage(verbose, :pardiso_verbosity, :numerical) do 
+    if verbosity_to_bool(verbose.numerical.pardiso_verbosity)
         Pardiso.set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
     end
 

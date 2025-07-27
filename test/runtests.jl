@@ -4,7 +4,7 @@ const LONGER_TESTS = false
 
 const GROUP = get(ENV, "GROUP", "All")
 
-const HAS_EXTENSIONS = isdefined(Base, :get_extension)
+const HAS_EXTENSIONS = true
 
 if GROUP == "All" || GROUP == "Core"
     @time @safetestset "Basic Tests" include("basictests.jl")

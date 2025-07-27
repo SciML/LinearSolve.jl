@@ -89,7 +89,7 @@ mutable struct LinearNumericalVerbosity
             HYPRE_verbosity = linear_defaults[:HYPRE_verbosity],
             pardiso_verbosity = linear_defaults[:pardiso_verbosity])
         new(using_IterativeSolvers, IterativeSolvers_iterations,
-            KrylovKit_verbosity, KrylovJL_verbosity, HYPRE_verbosity)
+            KrylovKit_verbosity, KrylovJL_verbosity, HYPRE_verbosity, pardiso_verbosity)
     end
 
     function LinearNumericalVerbosity(verbose::Verbosity.Type)

@@ -32,13 +32,15 @@ dA = zeros(n, n);
 b1 = rand(n);
 db1 = zeros(n);
 
-_ff = (x, y) -> f(x,
+_ff = (x,
+    y) -> f(x,
     y;
     alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization))
 _ff(copy(A), copy(b1))
 
 Enzyme.autodiff(Reverse,
-    (x, y) -> f(x,
+    (x,
+        y) -> f(x,
         y;
         alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)),
     Duplicated(copy(A), dA),
@@ -169,7 +171,8 @@ end
 dA = zeros(n, n);
 db1 = zeros(n);
 db2 = zeros(n);
-Enzyme.autodiff(set_runtime_activity(Reverse), f3, Duplicated(copy(A), dA), Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
+Enzyme.autodiff(set_runtime_activity(Reverse), f3, Duplicated(copy(A), dA),
+    Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
 
 @test dA ≈ dA2 atol=5e-5
 @test db1 ≈ db12
@@ -194,7 +197,8 @@ b2 = rand(n);
 db2 = zeros(n);
 
 f4(A, b1, b2)
-@test_throws "Adjoint case currently not handled" Enzyme.autodiff(Reverse, f4, Duplicated(copy(A), dA),
+@test_throws "Adjoint case currently not handled" Enzyme.autodiff(
+    Reverse, f4, Duplicated(copy(A), dA),
     Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
 
 #=
@@ -250,15 +254,16 @@ end
 
 # https://github.com/SciML/LinearSolve.jl/issues/479
 function testls(A, b, u)
-    oa = OperatorAssumptions(true, condition = LinearSolve.OperatorCondition.WellConditioned)
+    oa = OperatorAssumptions(
+        true, condition = LinearSolve.OperatorCondition.WellConditioned)
     prob = LinearProblem(A, b)
     linsolve = init(prob, LUFactorization(), assumptions = oa)
-    cache =solve!(linsolve)
+    cache = solve!(linsolve)
     sum(cache.u)
 end
 
-A = [1. 2.; 3. 4.]
-b = [1., 2.]
+A = [1.0 2.0; 3.0 4.0]
+b = [1.0, 2.0]
 u = zero(b)
 dA = deepcopy(A)
 db = deepcopy(b)
@@ -266,14 +271,15 @@ du = deepcopy(u)
 Enzyme.autodiff(Reverse, testls, Duplicated(A, dA), Duplicated(b, db), Duplicated(u, du))
 
 function testls(A, b, u)
-    oa = OperatorAssumptions(true, condition = LinearSolve.OperatorCondition.WellConditioned)
+    oa = OperatorAssumptions(
+        true, condition = LinearSolve.OperatorCondition.WellConditioned)
     prob = LinearProblem(A, b)
     linsolve = init(prob, LUFactorization(), assumptions = oa)
     solve!(linsolve)
     sum(linsolve.u)
 end
-A = [1. 2.; 3. 4.]
-b = [1., 2.]
+A = [1.0 2.0; 3.0 4.0]
+b = [1.0, 2.0]
 u = zero(b)
 dA2 = deepcopy(A)
 db2 = deepcopy(b)

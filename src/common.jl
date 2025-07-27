@@ -311,7 +311,8 @@ end
 function SciMLBase.solve(prob::StaticLinearProblem,
         alg::Nothing, args...; kwargs...)
     u = prob.A \ prob.b
-    return SciMLBase.build_linear_solution(alg, u, nothing, prob; retcode = ReturnCode.Success)
+    return SciMLBase.build_linear_solution(
+        alg, u, nothing, prob; retcode = ReturnCode.Success)
 end
 
 function SciMLBase.solve(prob::StaticLinearProblem,
@@ -333,5 +334,6 @@ function SciMLBase.solve(prob::StaticLinearProblem,
         cache = init(prob, alg, args...; kwargs...)
         return solve!(cache)
     end
-    return SciMLBase.build_linear_solution(alg, u, nothing, prob; retcode = ReturnCode.Success)
+    return SciMLBase.build_linear_solution(
+        alg, u, nothing, prob; retcode = ReturnCode.Success)
 end

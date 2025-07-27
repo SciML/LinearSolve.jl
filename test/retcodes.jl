@@ -27,9 +27,10 @@ lualgs = (
     LUFactorization(),
     QRFactorization(),
     GenericLUFactorization(),
-    LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization; safetyfallback=false),
+    LinearSolve.DefaultLinearSolver(
+        LinearSolve.DefaultAlgorithmChoice.LUFactorization; safetyfallback = false),
     RFLUFactorization(),
-    NormalCholeskyFactorization(),
+    NormalCholeskyFactorization()
 )
 @testset "Failure" begin
     for alg in lualgs
@@ -40,8 +41,8 @@ lualgs = (
         linsolve = init(prob, alg)
         sol = solve!(linsolve)
         if alg isa NormalCholeskyFactorization
-             # This is a known and documented incorrectness in NormalCholeskyFactorization
-             # due to numerical instability in its method that is fundamental.
+            # This is a known and documented incorrectness in NormalCholeskyFactorization
+            # due to numerical instability in its method that is fundamental.
             @test SciMLBase.successful_retcode(sol.retcode)
         else
             @test !SciMLBase.successful_retcode(sol.retcode)

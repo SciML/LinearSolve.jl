@@ -2,20 +2,20 @@
 
 LinearSolve.jl provides two ways to GPU accelerate linear solves:
 
-* Offloading: offloading takes a CPU-based problem and automatically transforms it into a
-  GPU-based problem in the background, and returns the solution on CPU. Thus using
-  offloading requires no change on the part of the user other than to choose an offloading
-  solver.
-* Array type interface: the array type interface requires that the user defines the
-  `LinearProblem` using an `AbstractGPUArray` type and chooses an appropriate solver
-  (or uses the default solver). The solution will then be returned as a GPU array type.
+  - Offloading: offloading takes a CPU-based problem and automatically transforms it into a
+    GPU-based problem in the background, and returns the solution on CPU. Thus using
+    offloading requires no change on the part of the user other than to choose an offloading
+    solver.
+  - Array type interface: the array type interface requires that the user defines the
+    `LinearProblem` using an `AbstractGPUArray` type and chooses an appropriate solver
+    (or uses the default solver). The solution will then be returned as a GPU array type.
 
 The offloading approach has the advantage of being simpler and requiring no change to
 existing CPU code, while having the disadvantage of having more overhead. In the following
 sections we will demonstrate how to use each of the approaches.
 
 !!! warn
-
+    
     GPUs are not always faster! Your matrices need to be sufficiently large in order for
     GPU accelerations to actually be faster. For offloading it's around 1,000 x 1,000 matrices
     and for Array type interface it's around 100 x 100. For sparse matrices, it is highly
@@ -74,7 +74,7 @@ to return it to the CPU. This setup does no automated memory transfers and will 
 move things to CPU on command.
 
 !!! warn
-
+    
     Many GPU functionalities, such as `CUDA.cu`, have a built-in preference for `Float32`.
     Generally it is much faster to use 32-bit floating point operations on GPU than 64-bit
     operations, and thus this is generally the right choice if going to such platforms.
@@ -118,7 +118,7 @@ sol = LS.solve(prob, LS.LUFactorization())
 ```
 
 !!! note
-
+    
     For now, CUDSS only supports CuSparseMatrixCSR type matrices.
 
 Note that `KrylovJL` methods also work with sparse GPU arrays:
@@ -130,7 +130,8 @@ sol = LS.solve(prob, LS.KrylovJL_GMRES())
 Note that CUSPARSE also has some GPU-based preconditioners, such as a built-in `ilu`. However:
 
 ```julia
-sol = LS.solve(prob, LS.KrylovJL_GMRES(precs = (A, p) -> (CUDA.CUSPARSE.ilu02!(A, 'O'), LA.I)))
+sol = LS.solve(
+    prob, LS.KrylovJL_GMRES(precs = (A, p) -> (CUDA.CUSPARSE.ilu02!(A, 'O'), LA.I)))
 ```
 
 However, right now CUSPARSE is missing the right `ldiv!` implementation for this to work

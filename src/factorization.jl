@@ -16,7 +16,8 @@
 
         y = _ldiv!(cache.u, @get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
             cache.b)
-        return SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
+        return SciMLBase.build_linear_solution(
+            alg, y, nothing, cache; retcode = ReturnCode.Success)
     end
 end
 
@@ -140,7 +141,8 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
         end
         cache.cacheval = fact
 
-        if hasmethod(LinearAlgebra.issuccess, Tuple{typeof(fact)}) && !LinearAlgebra.issuccess(fact)
+        if hasmethod(LinearAlgebra.issuccess, Tuple{typeof(fact)}) &&
+           !LinearAlgebra.issuccess(fact)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
         end
@@ -202,7 +204,8 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::GenericLUFactoriz
 
         cache.isfresh = false
     end
-    y = ldiv!(cache.u, LinearSolve.@get_cacheval(cache, :GenericLUFactorization)[1], cache.b)
+    y = ldiv!(
+        cache.u, LinearSolve.@get_cacheval(cache, :GenericLUFactorization)[1], cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
 end
 
@@ -954,6 +957,7 @@ faster than LU factorization, but is not as numerically stable and thus should o
 be applied to well-conditioned matrices.
 
 !!! warn
+
     `NormalCholeskyFactorization` should only be applied to well-conditioned matrices. As a
     method it is not able to easily identify possible numerical issues. As a check it is
     recommended that the user checks `A*u-b` is approximately zero, as this may be untrue
@@ -1017,7 +1021,8 @@ function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization; 
         end
         cache.cacheval = fact
 
-        if hasmethod(LinearAlgebra.issuccess, Tuple{typeof(fact)}) && !LinearAlgebra.issuccess(fact)
+        if hasmethod(LinearAlgebra.issuccess, Tuple{typeof(fact)}) &&
+           !LinearAlgebra.issuccess(fact)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
         end

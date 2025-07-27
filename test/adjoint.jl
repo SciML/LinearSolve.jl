@@ -30,7 +30,8 @@ db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x), copy(b1))
 A = rand(n, n);
 b1 = rand(n);
 
-_ff = (x, y) -> f(x,
+_ff = (x,
+    y) -> f(x,
     y;
     alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization))
 _ff(copy(A), copy(b1))

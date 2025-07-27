@@ -20,8 +20,7 @@ function LinearSolve.init_cacheval(
         ::SparspakFactorization, A::AbstractSparseMatrixCSC{Tv, Ti}, b, u, Pl, Pr, maxiters::Int, abstol,
         reltol,
         verbose::Bool, assumptions::OperatorAssumptions) where {Tv, Ti}
-    
-    if size(A,1) == size(A,2)
+    if size(A, 1) == size(A, 2)
         A = convert(AbstractMatrix, A)
         if A isa SparseArrays.AbstractSparseArray
             return sparspaklu(
@@ -29,7 +28,8 @@ function LinearSolve.init_cacheval(
                     nonzeros(A)),
                 factorize = false)
         else
-            return sparspaklu(SparseMatrixCSC{Tv, Ti}(zero(Ti), zero(Ti), [one(Ti)], Ti[], eltype(A)[]),
+            return sparspaklu(
+                SparseMatrixCSC{Tv, Ti}(zero(Ti), zero(Ti), [one(Ti)], Ti[], eltype(A)[]),
                 factorize = false)
         end
     else

@@ -14,7 +14,8 @@ import Base: (\), size, getproperty, setproperty!, propertynames, show,
              copy, eachindex, view, sortperm, unsafe_load, zeros, convert, eltype,
              length, parent, stride, finalizer, Complex, complex, imag, real, map!,
              summary, println, oneunit, sizeof, isdefined, setfield!, getfield,
-             OutOfMemoryError, ArgumentError, OverflowError, ErrorException, DimensionMismatch
+             OutOfMemoryError, ArgumentError, OverflowError, ErrorException,
+             DimensionMismatch
 
 # Convert from 1-based to 0-based indices
 function decrement!(A::AbstractArray{T}) where {T <: Integer}

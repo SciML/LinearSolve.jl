@@ -139,7 +139,7 @@ Let's check these are the same:
 
 ```@example linsys1
 v = rand(5)
-mfopA*v - A*v
+mfopA * v - A * v
 ```
 
 Notice `mfopA` does this without having to have `A` because it just uses the equivalent `Afunc!` instead. Now, even though

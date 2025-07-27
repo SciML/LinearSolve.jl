@@ -31,7 +31,7 @@ A = rand(n, n);
 b1 = rand(n);
 
 _ff = (x,
-    y) -> f(x,
+y) -> f(x,
     y;
     alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization))
 _ff(copy(A), copy(b1))

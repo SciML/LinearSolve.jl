@@ -227,7 +227,7 @@ function EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.solve!)},
         end
     else
         dlinsolves = linsolve.dval
-        if any(x->(iszero(x.A) || iszero(x.b)) && !iszero(x.u), linsolve.dval)
+        if any(x -> (iszero(x.A) || iszero(x.b)) && !iszero(x.u), linsolve.dval)
             error("Adjoint case currently not handled. Instead of using `solve!(cache); s1 = copy(cache.u) ...`, use `sol = solve!(cache); s1 = copy(sol.u)`.")
         end
     end

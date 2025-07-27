@@ -308,7 +308,7 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
             # [cₖ  sₖ] [ r̄ₖ.ₖ ] = [rₖ.ₖ]
             # [s̄ₖ -cₖ] [hₖ₊₁.ₖ]   [ 0  ]
             (c[inner_iter], s[inner_iter],
-                R[nr + inner_iter]) = _sym_givens(
+            R[nr + inner_iter]) = _sym_givens(
                 R[nr + inner_iter],
                 Hbis)
 

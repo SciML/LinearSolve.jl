@@ -33,14 +33,14 @@ b1 = rand(n);
 db1 = zeros(n);
 
 _ff = (x,
-    y) -> f(x,
+y) -> f(x,
     y;
     alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization))
 _ff(copy(A), copy(b1))
 
 Enzyme.autodiff(Reverse,
     (x,
-        y) -> f(x,
+    y) -> f(x,
         y;
         alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)),
     Duplicated(copy(A), dA),
@@ -174,7 +174,7 @@ db2 = zeros(n);
 Enzyme.autodiff(set_runtime_activity(Reverse), f3, Duplicated(copy(A), dA),
     Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
 
-@test dA ≈ dA2 atol=5e-5
+@test dA≈dA2 atol=5e-5
 @test db1 ≈ db12
 @test db2 ≈ db22
 

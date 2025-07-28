@@ -5,7 +5,8 @@ using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
                    GenericLUFactorization,
                    KLUFactorization, LUFactorization, NormalCholeskyFactorization,
                    OperatorAssumptions,
-                   QRFactorization, RFLUFactorization, UMFPACKFactorization, solve, LinearVerbosity
+                   QRFactorization, RFLUFactorization, UMFPACKFactorization, solve,
+                   LinearVerbosity
 using ArrayInterface: ArrayInterface
 using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!, QR
 using SparseArrays: SparseArrays, AbstractSparseArray, AbstractSparseMatrixCSC,
@@ -289,7 +290,7 @@ function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::LinearVerbosity, assumptions::OperatorAssumptions) where {T <:
-                                                                Float64}
+                                                                           Float64}
     PREALLOCATED_CHOLMOD
 end
 
@@ -298,7 +299,7 @@ function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::LinearVerbosity, assumptions::OperatorAssumptions) where {T <:
-                                                                BLASELTYPES}
+                                                                           BLASELTYPES}
     cholesky(sparse(reshape([one(T)], 1, 1)))
 end
 

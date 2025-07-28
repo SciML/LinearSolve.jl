@@ -10,13 +10,18 @@ A = [1.0 0 0 0
 b = rand(4)
 prob = LinearProblem(A, b)
 
-@test_logs (:warn, "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(prob, 
-verbose=LinearVerbosity(default_lu_fallback=Verbosity.Warn()))
+@test_logs (:warn,
+    "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(
+    prob,
+    verbose = LinearVerbosity(default_lu_fallback = Verbosity.Warn()))
 
-@test_logs (:warn, "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(
+@test_logs (:warn,
+    "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(
     prob, verbose = true)
 
 @test_logs min_level = SciMLVerbosity.Logging.Warn solve(prob, verbose = false)
 
-@test_logs (:info, "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(prob, 
-verbose=LinearVerbosity(default_lu_fallback=Verbosity.Info()))
+@test_logs (:info,
+    "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(
+    prob,
+    verbose = LinearVerbosity(default_lu_fallback = Verbosity.Info()))

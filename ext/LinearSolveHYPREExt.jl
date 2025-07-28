@@ -161,7 +161,6 @@ function create_solver(alg::HYPREAlgorithm, cache::LinearCache)
 
     # Construct solver options
 
-
     verbose = verbosity_to_int(cache.verbose.numerical.HYPRE_verbosity)
 
     solver_options = (;

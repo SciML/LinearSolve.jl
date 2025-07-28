@@ -365,8 +365,8 @@ end
             newex = quote
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
-                    @SciMLMessage("LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.", 
-                    cache.verbose, :default_lu_fallback, :error_control)
+                    @SciMLMessage("LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.",
+                        cache.verbose, :default_lu_fallback, :error_control)
 
                     sol = SciMLBase.solve!(
                         cache, QRFactorization(ColumnNorm()), args...; kwargs...)

@@ -32,52 +32,57 @@ The verbosity system in LinearSolve.jl provides fine-grained control over the di
 
 The verbosity system is organized hierarchically into three main categories:
 
-1. Error Control - Messages related to fallbacks and error handling
-2. Performance - Messages related to performance considerations
-3. Numerical - Messages related to numerical solvers and iterations
+ 1. Error Control - Messages related to fallbacks and error handling
+ 2. Performance - Messages related to performance considerations
+ 3. Numerical - Messages related to numerical solvers and iterations
 
 Each category can be configured independently, and individual settings can be adjusted to suit your needs.
 
 ### Verbosity Levels
+
 The following verbosity levels are available:
 
 #### Individual Settings
+
 These settings are meant for individual settings within a category. These can also be used to set all of the individual settings in a group to the same value.
-- Verbosity.None() - Suppress all messages
-- Verbosity.Info() - Show message as log message at info level
-- Verbosity.Warn() - Show warnings (default for most settings)
-- Verbosity.Error() - Throw errors instead of warnings
-- Verbosity.Level(n) - Show messages with a log level setting of n
+
+  - Verbosity.None() - Suppress all messages
+  - Verbosity.Info() - Show message as log message at info level
+  - Verbosity.Warn() - Show warnings (default for most settings)
+  - Verbosity.Error() - Throw errors instead of warnings
+  - Verbosity.Level(n) - Show messages with a log level setting of n
 
 #### Group Settings
-These settings are meant for controlling a group of settings. 
-- Verbosity.Default() - Use the default settings
-- Verbosity.All() - Show all possible messages
 
-### Basic Usage 
+These settings are meant for controlling a group of settings.
+
+  - Verbosity.Default() - Use the default settings
+  - Verbosity.All() - Show all possible messages
+
+### Basic Usage
 
 #### Global Verbosity Control
 
-```julia 
+```julia
 using LinearSolve
 
 # Suppress all messages
 verbose = LinearVerbosity(Verbosity.None())
 prob = LinearProblem(A, b)
-sol = solve(prob; verbose=verbose)
+sol = solve(prob; verbose = verbose)
 
 # Show all messages
 verbose = LinearVerbosity(Verbosity.All())
-sol = solve(prob; verbose=verbose)
+sol = solve(prob; verbose = verbose)
 
 # Use default settings
 verbose = LinearVerbosity(Verbosity.Default())
-sol = solve(prob; verbose=verbose)
+sol = solve(prob; verbose = verbose)
 ```
 
-#### Group Level Control 
+#### Group Level Control
 
-```julia 
+```julia
 # Customize by category
 verbose = LinearVerbosity(
     error_control = Verbosity.Warn(),   # Show warnings for error control related issues
@@ -85,12 +90,14 @@ verbose = LinearVerbosity(
     numerical = Verbosity.Info()        # Show all numerical related log messages at info level
 )
 
-sol = solve(prob; verbose=verbose)
+sol = solve(prob; verbose = verbose)
 ```
 
 #### Fine-grained Control
-The constructor for `LinearVerbosity` allows you to set verbosity for each specific message toggle, giving you fine-grained control. 
-The verbosity settings for the toggles are automatically passed to the group objects. 
+
+The constructor for `LinearVerbosity` allows you to set verbosity for each specific message toggle, giving you fine-grained control.
+The verbosity settings for the toggles are automatically passed to the group objects.
+
 ```julia
 # Set specific message types
 verbose = LinearVerbosity(
@@ -100,17 +107,23 @@ verbose = LinearVerbosity(
     KrylovKit_verbosity = Verbosity.Level(KrylovKit.WARN_LEVEL) # Set KrylovKit verbosity level using KrylovKit's own verbosity levels
 )
 
-sol = solve(prob; verbose=verbose)
+sol = solve(prob; verbose = verbose)
 
 ```
 
 #### Verbosity Levels
+
 ##### Error Control Settings
-- default_lu_fallback: Controls messages when falling back to LU factorization (default: Warn)
+
+  - default_lu_fallback: Controls messages when falling back to LU factorization (default: Warn)
+
 ##### Performance Settings
-- no_right_preconditioning: Controls messages when right preconditioning is not used (default: Warn)
+
+  - no_right_preconditioning: Controls messages when right preconditioning is not used (default: Warn)
+
 ##### Numerical Settings
-- using_IterativeSolvers: Controls messages when using the IterativeSolvers.jl package (default: Warn)
-- IterativeSolvers_iterations: Controls messages about iteration counts from IterativeSolvers.jl (default: Warn)
-- KrylovKit_verbosity: Controls messages from the KrylovKit.jl package (default: Warn)
-- KrylovJL_verbosity: Controls verbosity of the KrylovJL.jl package (default: None)
+
+  - using_IterativeSolvers: Controls messages when using the IterativeSolvers.jl package (default: Warn)
+  - IterativeSolvers_iterations: Controls messages about iteration counts from IterativeSolvers.jl (default: Warn)
+  - KrylovKit_verbosity: Controls messages from the KrylovKit.jl package (default: Warn)
+  - KrylovJL_verbosity: Controls verbosity of the KrylovJL.jl package (default: None)

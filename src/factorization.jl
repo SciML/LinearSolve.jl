@@ -385,7 +385,8 @@ function init_cacheval(alg::CholeskyFactorization, A::SMatrix{S1, S2}, b, u, Pl,
 end
 
 function init_cacheval(alg::CholeskyFactorization, A::GPUArraysCore.AnyGPUArray, b, u, Pl,
-        Pr, maxiters::Int, abstol, reltol, verbose::LinearVerbosity, assumptions::OperatorAssumptions)
+        Pr, maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
+        assumptions::OperatorAssumptions)
     cholesky(A; check = false)
 end
 

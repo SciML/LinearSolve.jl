@@ -21,7 +21,8 @@ using SciMLBase: SciMLBase, LinearAliasSpecifier, AbstractSciMLOperator,
 using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator,
                       MatrixOperator,
                       has_ldiv!, issquare
-using SciMLVerbosity: Verbosity, @SciMLMessage, @match, AbstractVerbositySpecifier, verbosity_to_int
+using SciMLVerbosity: Verbosity, @SciMLMessage, @match, AbstractVerbositySpecifier,
+                      verbosity_to_int
 using Setfield: @set, @set!
 using UnPack: @unpack
 using DocStringExtensions: DocStringExtensions
@@ -237,7 +238,8 @@ error_no_cudss_lu(A) = nothing
 cudss_loaded(A) = false
 is_cusparse(A) = false
 
-export LinearVerbosity, LinearErrorControlVerbosity, LinearPerformanceVerbosity, LinearNumericalVerbosity
+export LinearVerbosity, LinearErrorControlVerbosity, LinearPerformanceVerbosity,
+       LinearNumericalVerbosity
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,

@@ -66,7 +66,7 @@ function LinearSolve.init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, max
             kwargs...)
     elseif alg.generate_iterator === IterativeSolvers.idrs_iterable!
         !!LinearSolve._isidentity_struct(Pr) &&
-            @SciMLMessage("$(alg.generate_iterator) doesn't support right preconditioning", 
+            @SciMLMessage("$(alg.generate_iterator) doesn't support right preconditioning",
                 verbose, :no_right_preconditioning, :performance)
         history = IterativeSolvers.ConvergenceHistory(partial = true)
         history[:abstol] = abstol
@@ -107,11 +107,13 @@ function SciMLBase.solve!(cache::LinearCache, alg::IterativeSolversJL; kwargs...
     end
     purge_history!(cache.cacheval, cache.u, cache.b)
 
-    @SciMLMessage("Using IterativeSolvers.$(alg.generate_iterator)", cache.verbose, :using_IterativeSolvers, :numerical)
+    @SciMLMessage("Using IterativeSolvers.$(alg.generate_iterator)",
+        cache.verbose, :using_IterativeSolvers, :numerical)
     i = 0
     for iter in enumerate(cache.cacheval)
         i += 1
-        @SciMLMessage("Iter: $(iter[1]), residual: $(iter[2])", cache.verbose, :IterativeSolvers_iterations, :numerical)
+        @SciMLMessage("Iter: $(iter[1]), residual: $(iter[2])",
+            cache.verbose, :IterativeSolvers_iterations, :numerical)
         # TODO inject callbacks KSP into solve! cb!(cache.cacheval)
     end
 

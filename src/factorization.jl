@@ -861,9 +861,11 @@ patterns with “more structure”.
 !!! note
 
     By default, the SparseArrays.jl are implemented for efficiency by caching the
-    symbolic factorization. I.e., if `set_A` is used, it is expected that the new
-    `A` has the same sparsity pattern as the previous `A`. If this algorithm is to
-    be used in a context where that assumption does not hold, set `reuse_symbolic=false`.
+    symbolic factorization. If the sparsity pattern of `A` may change between solves, set `reuse_symbolic=false`. 
+    If the pattern is assumed or known to be constant, set `reuse_symbolic=true` to avoid 
+    unnecessary recomputation. To further reduce computational overhead, you can disable
+    pattern checks entirely by setting `check_pattern = false`. Note that this may error
+    if the sparsity pattern does change unexpectedly.
 """
 Base.@kwdef struct UMFPACKFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool = true
@@ -885,9 +887,11 @@ A fast sparse LU-factorization which specializes on sparsity patterns with “le
 !!! note
 
     By default, the SparseArrays.jl are implemented for efficiency by caching the
-    symbolic factorization. I.e., if `set_A` is used, it is expected that the new
-    `A` has the same sparsity pattern as the previous `A`. If this algorithm is to
-    be used in a context where that assumption does not hold, set `reuse_symbolic=false`.
+    symbolic factorization. If the sparsity pattern of `A` may change between solves, set `reuse_symbolic=false`. 
+    If the pattern is assumed or known to be constant, set `reuse_symbolic=true` to avoid 
+    unnecessary recomputation. To further reduce computational overhead, you can disable
+    pattern checks entirely by setting `check_pattern = false`. Note that this may error
+    if the sparsity pattern does change unexpectedly.
 """
 Base.@kwdef struct KLUFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool = true

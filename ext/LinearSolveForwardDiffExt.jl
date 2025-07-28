@@ -128,7 +128,7 @@ function SciMLBase.init(
         abstol = LinearSolve.default_tol(real(eltype(prob.b))),
         reltol = LinearSolve.default_tol(real(eltype(prob.b))),
         maxiters::Int = length(prob.b),
-        verbose::Bool = false,
+        verbose = LinearVerbosity(),
         Pl = nothing,
         Pr = nothing,
         assumptions = OperatorAssumptions(issquare(prob.A)),

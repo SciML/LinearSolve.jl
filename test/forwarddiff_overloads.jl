@@ -208,6 +208,16 @@ function static_h(p)
     (A, b)
 end
 
+# Check to make sure it's not a DualLinearCache
+function static_linsolve_cache_check(p)
+    A,b = static_h(p)
+    prob = LinearProblem(A, b)
+    cache = init(prob)
+    cache isa LinearCache
+end
+
+@test static_linsolve_cache_check([5.0, 5.0])
+
 function static_linsolve(p)
     A, b = static_h(p)
     prob = LinearProblem(A, b)
@@ -221,3 +231,11 @@ end
 
 @test (ForwardDiff.jacobian(static_linsolve, [5.0, 5.0]) ≈
        ForwardDiff.jacobian(static_backslash, [5.0, 5.0]))
+
+#Test to make sure that the cache is not a DualLinearCache
+A, b = static_h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+
+static_dual_prob = LinearProblem(A, b)
+static_dual_cache = init(static_dual_prob)
+
+@test static_dual_cache isa LinearSolve.LinearCache

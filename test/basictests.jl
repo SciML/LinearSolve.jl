@@ -198,24 +198,22 @@ end
         test_interface(SparspakFactorization(), prob1, prob2)
     end
 
-    if VERSION >= v"1.9"
-        @testset "FastLAPACK Factorizations" begin
-            A1 = A / 1
-            b1 = rand(n)
-            x1 = zero(b)
-            A2 = A / 2
-            b2 = rand(n)
-            x2 = zero(b)
+    @testset "FastLAPACK Factorizations" begin
+        A1 = A / 1
+        b1 = rand(n)
+        x1 = zero(b)
+        A2 = A / 2
+        b2 = rand(n)
+        x2 = zero(b)
 
-            prob1 = LinearProblem(A1, b1; u0 = x1)
-            prob2 = LinearProblem(A2, b2; u0 = x2)
-            test_interface(LinearSolve.FastLUFactorization(), prob1, prob2)
-            test_interface(LinearSolve.FastQRFactorization(), prob1, prob2)
+        prob1 = LinearProblem(A1, b1; u0 = x1)
+        prob2 = LinearProblem(A2, b2; u0 = x2)
+        test_interface(LinearSolve.FastLUFactorization(), prob1, prob2)
+        test_interface(LinearSolve.FastQRFactorization(), prob1, prob2)
 
-            # TODO: Resizing tests. Upstream doesn't currently support it.
-            # Need to be absolutely certain we never segfault with incorrect
-            # ws sizes.
-        end
+        # TODO: Resizing tests. Upstream doesn't currently support it.
+        # Need to be absolutely certain we never segfault with incorrect
+        # ws sizes.
     end
 
     test_algs = [
@@ -226,7 +224,7 @@ end
         LinearSolve.defaultalg(prob1.A, prob1.b)
     ]
 
-    if VERSION >= v"1.9" && LinearSolve.usemkl
+    if LinearSolve.usemkl
         push!(test_algs, MKLLUFactorization())
     end
 
@@ -234,7 +232,7 @@ end
         for alg in test_algs
             @testset "$alg" begin
                 test_interface(alg, prob1, prob2)
-                VERSION >= v"1.9" && test_interface(alg, prob3, prob4)
+                test_interface(alg, prob3, prob4)
             end
         end
         if LinearSolve.appleaccelerate_isavailable()

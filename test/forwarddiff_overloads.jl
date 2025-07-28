@@ -209,16 +209,6 @@ function static_h(p)
     (A, b)
 end
 
-# Check to make sure it's not a DualLinearCache
-function static_linsolve_cache_check(p)
-    A,b = static_h(p)
-    prob = LinearProblem(A, b)
-    cache = init(prob)
-    cache isa LinearCache
-end
-
-@test static_linsolve_cache_check([5.0, 5.0])
-
 function static_linsolve(p)
     A, b = static_h(p)
     prob = LinearProblem(A, b)

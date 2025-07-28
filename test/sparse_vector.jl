@@ -45,7 +45,7 @@ linsolve = init(prob);
 H = hess_mat' * hess_mat
 prob = LinearProblem(H, hess_mat' * grad_vec)
 linsolve = init(prob, CholeskyFactorization())
-VERSION >= v"1.8" && @test solve!(linsolve).u ≈ H \ Array(hess_mat' * grad_vec)
+@test solve!(linsolve).u ≈ H \ Array(hess_mat' * grad_vec)
 
 # https://github.com/SciML/LinearSolve.jl/issues/614
 A = sprand(ComplexF64, 10, 10, 0.5)

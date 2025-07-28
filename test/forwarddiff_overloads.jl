@@ -2,6 +2,7 @@ using LinearSolve
 using ForwardDiff
 using Test
 using SparseArrays
+using StaticArrays
 
 function h(p)
     (A = [p[1] p[2]+1 p[2]^3;

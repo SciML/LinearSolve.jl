@@ -1115,6 +1115,61 @@ function SciMLBase.solve!(cache::LinearCache, alg::DiagonalFactorization;
     SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
 end
 
+## CUSOLVERRFFactorization
+
+"""
+`CUSOLVERRFFactorization(; symbolic = :RF, reuse_symbolic = true)`
+
+A GPU-accelerated sparse LU factorization using NVIDIA's cusolverRF library.
+This solver is specifically designed for sparse matrices on CUDA GPUs and 
+provides high-performance factorization and solve capabilities.
+
+## Keyword Arguments
+
+  - `symbolic`: The symbolic factorization method to use. Options are:
+    - `:RF` (default): Use cusolverRF's built-in symbolic analysis
+    - `:KLU`: Use KLU for symbolic analysis
+  - `reuse_symbolic`: Whether to reuse the symbolic factorization when the 
+    sparsity pattern doesn't change (default: `true`)
+
+!!! note
+    This solver requires CUSOLVERRF.jl to be loaded and only supports 
+    `Float64` element types with `Int32` indices.
+"""
+Base.@kwdef struct CUSOLVERRFFactorization <: AbstractSparseFactorization
+    symbolic::Symbol = :RF
+    reuse_symbolic::Bool = true
+end
+
+function init_cacheval(alg::CUSOLVERRFFactorization,
+        A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function SciMLBase.solve!(cache::LinearCache, alg::CUSOLVERRFFactorization; kwargs...)
+    error_no_cusolverrf(cache.A)
+    error("CUSOLVERRFFactorization requires CUSOLVERRF.jl to be loaded")
+end
+
+ALREADY_WARNED_CUSOLVERRF = Ref{Bool}(false)
+cusolverrf_loaded(A) = false
+
+function error_no_cusolverrf(A)
+    if LinearSolve.cusolverrf_loaded(A)
+        return nothing
+    end
+    if !ALREADY_WARNED_CUSOLVERRF[]
+        @error """
+        Attempt to use CUSOLVERRFFactorization without loading CUSOLVERRF.jl.
+        Please load the library first with `using CUSOLVERRF`.
+        """
+        ALREADY_WARNED_CUSOLVERRF[] = true
+    end
+    return nothing
+end
+
 ## SparspakFactorization is here since it's MIT licensed, not GPL
 
 """

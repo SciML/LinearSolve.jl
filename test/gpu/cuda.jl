@@ -106,3 +106,10 @@ end
     prob = LinearProblem(A_gpu_csr, b_gpu)
     sol = solve(prob)
 end
+
+# Include CUSOLVERRF tests if available
+if Base.find_package("CUSOLVERRF") !== nothing
+    @testset "CUSOLVERRF" begin
+        include("cusolverrf.jl")
+    end
+end

@@ -2,3 +2,12 @@
 fom = "fom"
 Pris = "Pris"
 PARM = "PARM"
+# Additional SciML terms
+setp = "setp"
+getp = "getp"
+indexin = "indexin"
+ists = "ists"
+ispcs = "ispcs"
+eqs = "eqs"
+rhs = "rhs"
+MTK = "MTK"

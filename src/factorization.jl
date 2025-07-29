@@ -861,8 +861,8 @@ patterns with “more structure”.
 !!! note
 
     By default, the SparseArrays.jl are implemented for efficiency by caching the
-    symbolic factorization. If the sparsity pattern of `A` may change between solves, set `reuse_symbolic=false`. 
-    If the pattern is assumed or known to be constant, set `reuse_symbolic=true` to avoid 
+    symbolic factorization. If the sparsity pattern of `A` may change between solves, set `reuse_symbolic=false`.
+    If the pattern is assumed or known to be constant, set `reuse_symbolic=true` to avoid
     unnecessary recomputation. To further reduce computational overhead, you can disable
     pattern checks entirely by setting `check_pattern = false`. Note that this may error
     if the sparsity pattern does change unexpectedly.
@@ -887,8 +887,8 @@ A fast sparse LU-factorization which specializes on sparsity patterns with “le
 !!! note
 
     By default, the SparseArrays.jl are implemented for efficiency by caching the
-    symbolic factorization. If the sparsity pattern of `A` may change between solves, set `reuse_symbolic=false`. 
-    If the pattern is assumed or known to be constant, set `reuse_symbolic=true` to avoid 
+    symbolic factorization. If the sparsity pattern of `A` may change between solves, set `reuse_symbolic=false`.
+    If the pattern is assumed or known to be constant, set `reuse_symbolic=true` to avoid
     unnecessary recomputation. To further reduce computational overhead, you can disable
     pattern checks entirely by setting `check_pattern = false`. Note that this may error
     if the sparsity pattern does change unexpectedly.

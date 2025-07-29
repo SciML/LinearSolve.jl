@@ -338,6 +338,7 @@ function SciMLBase.solve(prob::StaticLinearProblem,
         alg, u, nothing, prob; retcode = ReturnCode.Success)
 end
 
+# Here to make sure that StaticLinearProblems with Dual elements don't create a Dual linear cache
 function SciMLBase.init(prob::StaticLinearProblem, alg::SciMLLinearSolveAlgorithm,
         args...;
         alias = LinearAliasSpecifier(),

@@ -34,7 +34,7 @@ there are a few major tips to note when fine tuning the results to your system:
     v7 it's no longer loaded by default! Thus if your matrices are in this range and you would
     value better run times at the cost of compile and load times, it is recommended you add
     `using RecursiveFactorization`. The defaulting algorithm will then consider it in its list
-    and will automatically (in an architecture-specific way) insert it as it feels necesssary.
+    and will automatically (in an architecture-specific way) insert it as it feels necessary.
  2. One of the major factors that can inhibit BLAS performance on LU factorization is multithreading.
     In many of these plots you can see a giant dip in GFLOPs (higher is better) when a certain size
     threshold is hit. This is because, for the number of chosen threads, there was not enough work

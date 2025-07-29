@@ -1,4 +1,9 @@
 [default.extend-words]
+# LinearSolve Specific
+fom = "fom"
+Pris = "Pris"
+PARM = "PARM"
+
 # Julia-specific functions
 indexin = "indexin"
 findfirst = "findfirst"

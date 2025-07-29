@@ -38,7 +38,7 @@ algs = [
     MKLPardisoFactorize(),
     SparspakFactorization()
 ]
-cols = [:red, :blue, :green, :magenta, :turqoise] # one color per alg
+cols = [:red, :blue, :green, :magenta, :turquoise] # one color per alg
 lst = [:dash, :solid, :dashdot] # one line style per dim
 
 __parameterless_type(T) = Base.typename(T).wrapper

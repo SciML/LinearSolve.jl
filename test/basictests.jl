@@ -2,6 +2,9 @@ using LinearSolve, LinearAlgebra, SparseArrays, MultiFloats, ForwardDiff
 using SciMLOperators, RecursiveFactorization, Sparspak, FastLapackInterface
 using IterativeSolvers, KrylovKit, MKL_jll, KrylovPreconditioners
 using Test
+
+# Import JLL packages for extensions
+using blis_jll, LAPACK_jll
 import Random
 
 const Dual64 = ForwardDiff.Dual{Nothing, Float64, 1}
@@ -226,6 +229,13 @@ end
 
     if LinearSolve.usemkl
         push!(test_algs, MKLLUFactorization())
+    end
+    
+    # Add BLIS when the extension is available
+    try
+        push!(test_algs, LinearSolve.BLISLUFactorization())
+    catch
+        # BLIS extension not available, skip
     end
 
     @testset "Concrete Factorizations" begin

@@ -16,10 +16,12 @@ the best choices, with SVD being the slowest but most precise.
 
 For efficiency, `RFLUFactorization` is the fastest for dense LU-factorizations until around
 150x150 matrices, though this can be dependent on the exact details of the hardware. After this
-point, `MKLLUFactorization` is usually faster on most hardware. Note that on Mac computers
-that `AppleAccelerateLUFactorization` is generally always the fastest. `LUFactorization` will
-use your base system BLAS which can be fast or slow depending on the hardware configuration.
-`SimpleLUFactorization` will be fast only on very small matrices but can cut down on compile times.
+point, `MKLLUFactorization` is usually faster on most hardware. `BLISLUFactorization` provides
+another high-performance option that combines optimized BLAS operations with stable LAPACK routines.
+Note that on Mac computers that `AppleAccelerateLUFactorization` is generally always the fastest. 
+`LUFactorization` will use your base system BLAS which can be fast or slow depending on the hardware 
+configuration. `SimpleLUFactorization` will be fast only on very small matrices but can cut down on 
+compile times.
 
 For very large dense factorizations, offloading to the GPU can be preferred. Metal.jl can be used
 on Mac hardware to offload, and has a cutoff point of being faster at around size 20,000 x 20,000
@@ -183,6 +185,17 @@ KrylovJL
 
 ```@docs
 MKLLUFactorization
+```
+
+### BLIS.jl
+
+!!! note
+    
+    Using this solver requires that the package blis_jll is available. The solver will 
+    be automatically available when blis_jll is loaded, i.e., `using blis_jll`.
+
+```@docs
+BLISLUFactorization
 ```
 
 ### AppleAccelerate.jl

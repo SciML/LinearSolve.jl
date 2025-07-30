@@ -4,7 +4,7 @@ using IterativeSolvers, KrylovKit, MKL_jll, KrylovPreconditioners
 using Test
 
 # Import JLL packages for extensions
-using blis_jll, LAPACK_jll
+using blis_jll
 import Random
 
 const Dual64 = ForwardDiff.Dual{Nothing, Float64, 1}

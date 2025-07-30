@@ -1,3 +1,17 @@
+"""
+LinearSolveBLISExt
+
+Extension module that provides BLIS (BLAS-like Library Instantiation Software) integration
+for LinearSolve.jl. This extension combines BLIS for optimized BLAS operations with 
+reference LAPACK for LAPACK operations, providing a high-performance yet stable linear 
+algebra backend.
+
+Key features:
+- Uses BLIS for BLAS operations (matrix multiplication, etc.)
+- Uses reference LAPACK for LAPACK operations (LU factorization, solve, etc.)
+- Supports all standard numeric types (Float32/64, ComplexF32/64)
+- Follows MKL-style ccall patterns for consistency
+"""
 module LinearSolveBLISExt
 
 using Libdl
@@ -14,7 +28,12 @@ using LinearSolve: ArrayInterface, BLISLUFactorization, @get_cacheval, LinearCac
 const global libblis = blis_jll.blis
 const global liblapack = LAPACK_jll.liblapack_path
 
-# Define the factorization method for BLISLUFactorization
+"""
+    LinearSolve.do_factorization(alg::BLISLUFactorization, A, b, u)
+
+Perform LU factorization using BLIS for the underlying BLAS operations.
+This method converts the matrix to a standard format and calls the BLIS-backed getrf! routine.
+"""
 function LinearSolve.do_factorization(alg::BLISLUFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
     ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))

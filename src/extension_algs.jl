@@ -440,4 +440,39 @@ to avoid allocations and automatically offloads to the GPU.
 """
 struct MetalLUFactorization <: AbstractFactorization end
 
+"""
+```julia
+BLISLUFactorization()
+```
+
+A wrapper over BLIS (BLAS-like Library Instantiation Software) for high-performance 
+BLAS operations combined with reference LAPACK for stability. This provides optimized 
+linear algebra operations while maintaining numerical accuracy and broad compatibility.
+
+BLIS provides highly optimized BLAS routines that can outperform reference BLAS 
+implementations, especially for certain matrix sizes and operations. The integration 
+uses BLIS for BLAS operations (like matrix multiplication) and falls back to reference 
+LAPACK for LAPACK operations (like LU factorization and solve).
+
+!!! note
+
+    Using this solver requires that the package blis_jll is available. The solver will 
+    be automatically available when blis_jll is loaded, i.e., `using blis_jll`.
+
+## Performance Characteristics
+
+- **Strengths**: Optimized BLAS operations, good performance on modern hardware
+- **Use cases**: General dense linear systems where BLAS optimization matters
+- **Compatibility**: Works with all numeric types (Float32/64, Complex32/64)
+
+## Example
+
+```julia
+using LinearSolve, blis_jll
+A = rand(100, 100)
+b = rand(100)
+prob = LinearProblem(A, b)
+sol = solve(prob, BLISLUFactorization())
+```
+"""
 struct BLISLUFactorization <: AbstractFactorization end

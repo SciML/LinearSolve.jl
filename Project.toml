@@ -129,6 +129,7 @@ Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 ExplicitImports = "7d51a73a-1435-4ff3-83d9-f097790105c7"
 BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
 BlockDiagonals = "0a1fb500-61f7-11e9-3c65-f5ef3456f9f0"
+blis_jll = "6136c539-28a5-5bf0-87cc-b183200dce32"
 FastAlmostBandedMatrices = "9d29842c-ecb8-4973-b1e9-a27b1157504e"
 FastLapackInterface = "29a986be-02c6-4525-aec4-84b980013641"
 FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
@@ -155,4 +156,4 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [targets]
-test = ["Aqua", "Test", "IterativeSolvers", "InteractiveUtils", "KrylovKit", "KrylovPreconditioners", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI", "BlockDiagonals", "FiniteDiff", "BandedMatrices", "FastAlmostBandedMatrices", "StaticArrays", "AllocCheck", "StableRNGs", "Zygote", "RecursiveFactorization", "Sparspak", "FastLapackInterface", "SparseArrays", "ExplicitImports"]
+test = ["Aqua", "Test", "IterativeSolvers", "InteractiveUtils", "KrylovKit", "KrylovPreconditioners", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI", "BlockDiagonals", "FiniteDiff", "BandedMatrices", "blis_jll", "FastAlmostBandedMatrices", "StaticArrays", "AllocCheck", "StableRNGs", "Zygote", "RecursiveFactorization", "Sparspak", "FastLapackInterface", "SparseArrays", "ExplicitImports"]

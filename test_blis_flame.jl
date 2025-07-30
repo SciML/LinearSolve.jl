@@ -5,14 +5,15 @@ Pkg.activate(".")
 
 # First, install and load the required JLL packages (since they're weak dependencies)
 try
-    Pkg.add(["blis_jll", "libflame_jll"])
+    Pkg.add(["blis_jll", "LAPACK_jll"])
 catch e
     println("Note: JLL packages may already be installed: ", e)
 end
 
-using blis_jll, libflame_jll
+using LinearAlgebra  # For norm function
+using blis_jll, LAPACK_jll
 println("BLIS path: ", blis_jll.blis)
-println("libFLAME path: ", libflame_jll.libflame)
+println("LAPACK path: ", LAPACK_jll.liblapack_path)
 
 # Load LinearSolve and test the BLIS extension - this should trigger the extension loading
 using LinearSolve
@@ -22,7 +23,7 @@ A = rand(4, 4)
 b = rand(4)
 prob = LinearProblem(A, b)
 
-println("Testing BLISLUFactorization with FLAME...")
+println("Testing BLISLUFactorization with BLIS+LAPACK...")
 try
     sol = solve(prob, LinearSolve.BLISLUFactorization())
     println("✓ BLISLUFactorization successful!")

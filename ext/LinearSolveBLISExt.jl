@@ -6,18 +6,13 @@ using LAPACK_jll
 using LinearAlgebra
 using LinearSolve
 
-using LinearAlgebra: libblastrampoline, BlasInt, LU
+using LinearAlgebra: BlasInt, LU
 using LinearAlgebra.LAPACK: require_one_based_indexing, chkfinite, chkstride1, 
                             @blasfunc, chkargsok
 using LinearSolve: ArrayInterface, BLISLUFactorization, @get_cacheval, LinearCache, SciMLBase, do_factorization
 
 const global libblis = blis_jll.blis
-const global liblapack = libblastrampoline
-
-# Forward the libraries to libblastrampoline
-# BLIS for BLAS operations, LAPACK_jll for LAPACK operations  
-BLAS.lbt_forward(libblis; clear=true, verbose=true, suffix_hint="64_")
-BLAS.lbt_forward(LAPACK_jll.liblapack_path; suffix_hint="64_", verbose=true)
+const global liblapack = LAPACK_jll.liblapack_path
 
 # Define the factorization method for BLISLUFactorization
 function LinearSolve.do_factorization(alg::BLISLUFactorization, A, b, u)

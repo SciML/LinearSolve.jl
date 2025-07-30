@@ -17,7 +17,7 @@ the best choices, with SVD being the slowest but most precise.
 For efficiency, `RFLUFactorization` is the fastest for dense LU-factorizations until around
 150x150 matrices, though this can be dependent on the exact details of the hardware. After this
 point, `MKLLUFactorization` is usually faster on most hardware. `BLISLUFactorization` provides
-another high-performance option that combines optimized BLAS operations with stable LAPACK routines.
+another high-performance option that combines optimized BLAS operations from BLIS with optimized LAPACK routines from libflame.
 Note that on Mac computers that `AppleAccelerateLUFactorization` is generally always the fastest. 
 `LUFactorization` will use your base system BLAS which can be fast or slow depending on the hardware 
 configuration. `SimpleLUFactorization` will be fast only on very small matrices but can cut down on 
@@ -191,8 +191,9 @@ MKLLUFactorization
 
 !!! note
     
-    Using this solver requires that the package blis_jll is available. The solver will 
-    be automatically available when blis_jll is loaded, i.e., `using blis_jll`.
+    Using this solver requires that both blis_jll and libflame_jll packages are available. 
+    The solver will be automatically available when both packages are loaded, i.e., 
+    `using blis_jll, libflame_jll`.
 
 ```@docs
 BLISLUFactorization

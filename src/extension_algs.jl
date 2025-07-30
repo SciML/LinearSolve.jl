@@ -446,18 +446,20 @@ BLISLUFactorization()
 ```
 
 A wrapper over BLIS (BLAS-like Library Instantiation Software) for high-performance 
-BLAS operations combined with reference LAPACK for stability. This provides optimized 
-linear algebra operations while maintaining numerical accuracy and broad compatibility.
+BLAS operations combined with libflame for optimized LAPACK operations. This provides 
+a fully optimized linear algebra stack with both high-performance BLAS and LAPACK routines.
 
 BLIS provides highly optimized BLAS routines that can outperform reference BLAS 
-implementations, especially for certain matrix sizes and operations. The integration 
-uses BLIS for BLAS operations (like matrix multiplication) and falls back to reference 
-LAPACK for LAPACK operations (like LU factorization and solve).
+implementations, especially for certain matrix sizes and operations. libflame provides 
+optimized LAPACK operations that complement BLIS. The integration uses BLIS for BLAS 
+operations (like matrix multiplication) and libflame for LAPACK operations (like LU 
+factorization and solve).
 
 !!! note
 
-    Using this solver requires that the package blis_jll is available. The solver will 
-    be automatically available when blis_jll is loaded, i.e., `using blis_jll`.
+    Using this solver requires that both blis_jll and libflame_jll packages are available. 
+    The solver will be automatically available when both packages are loaded, i.e., 
+    `using blis_jll, libflame_jll`.
 
 ## Performance Characteristics
 
@@ -468,7 +470,7 @@ LAPACK for LAPACK operations (like LU factorization and solve).
 ## Example
 
 ```julia
-using LinearSolve, blis_jll
+using LinearSolve, blis_jll, libflame_jll
 A = rand(100, 100)
 b = rand(100)
 prob = LinearProblem(A, b)

@@ -3,12 +3,12 @@ LinearSolveBLISExt
 
 Extension module that provides BLIS (BLAS-like Library Instantiation Software) integration
 for LinearSolve.jl. This extension combines BLIS for optimized BLAS operations with 
-reference LAPACK for LAPACK operations, providing a high-performance yet stable linear 
-algebra backend.
+libflame for optimized LAPACK operations, providing a fully optimized linear algebra 
+backend.
 
 Key features:
 - Uses BLIS for BLAS operations (matrix multiplication, etc.)
-- Uses reference LAPACK for LAPACK operations (LU factorization, solve, etc.)
+- Uses libflame for LAPACK operations (LU factorization, solve, etc.)
 - Supports all standard numeric types (Float32/64, ComplexF32/64)
 - Follows MKL-style ccall patterns for consistency
 """
@@ -16,17 +16,17 @@ module LinearSolveBLISExt
 
 using Libdl
 using blis_jll
-using LAPACK_jll
+using libflame_jll
 using LinearAlgebra
 using LinearSolve
 
-using LinearAlgebra: BlasInt, LU
+using LinearAlgebra: BlasInt, LU, libblastrampoline
 using LinearAlgebra.LAPACK: require_one_based_indexing, chkfinite, chkstride1, 
                             @blasfunc, chkargsok
 using LinearSolve: ArrayInterface, BLISLUFactorization, @get_cacheval, LinearCache, SciMLBase, do_factorization
 
 const global libblis = blis_jll.blis
-const global liblapack = LAPACK_jll.liblapack_path
+const global libflame = libflame_jll.libflame
 
 """
     LinearSolve.do_factorization(alg::BLISLUFactorization, A, b, u)
@@ -54,7 +54,7 @@ function getrf!(A::AbstractMatrix{<:ComplexF64};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(zgetrf_), liblapack), Cvoid,
+    ccall(("zgetrf_", libflame), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -74,7 +74,7 @@ function getrf!(A::AbstractMatrix{<:ComplexF32};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(cgetrf_), liblapack), Cvoid,
+    ccall(("cgetrf_", libflame), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -94,7 +94,7 @@ function getrf!(A::AbstractMatrix{<:Float64};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(dgetrf_), liblapack), Cvoid,
+    ccall(("dgetrf_", libflame), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -114,7 +114,7 @@ function getrf!(A::AbstractMatrix{<:Float32};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(sgetrf_), liblapack), Cvoid,
+    ccall(("sgetrf_", libflame), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -138,7 +138,7 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall(("zgetrs_", liblapack), Cvoid,
+    ccall((@blasfunc(zgetrs_), libblis), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
@@ -163,7 +163,7 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall(("cgetrs_", liblapack), Cvoid,
+    ccall((@blasfunc(cgetrs_), libblis), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
@@ -188,7 +188,7 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall(("dgetrs_", liblapack), Cvoid,
+    ccall((@blasfunc(dgetrs_), libblis), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{Float64}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
@@ -213,7 +213,7 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall(("sgetrs_", liblapack), Cvoid,
+    ccall((@blasfunc(sgetrs_), libblis), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{Float32}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,

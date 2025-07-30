@@ -69,7 +69,7 @@ elseif VERSION < v"1.13"
             pivot::Union{RowMaximum, NoPivot, RowNonZero} = LinearAlgebra.lupivottype(T),
             ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...));
             check::Bool = true, allowsingular::Bool = false) where {T}
-        check && LAPACK.chkfinite(A)
+        check && LinearAlgebra.LAPACK.chkfinite(A)
         # Extract values
         m, n = size(A)
         minmn = min(m, n)

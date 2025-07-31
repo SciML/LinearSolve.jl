@@ -176,6 +176,11 @@ include("adjoint.jl")
     end
 end
 
+@inline function _notsuccessful(F::LinearAlgebra.QRCompactWY{T, A}) where {T,A<:GPUArraysCore.AnyGPUArray}
+    hasmethod(LinearAlgebra.issuccess, (typeof(F),)) ?
+                            !LinearAlgebra.issuccess(F) : false
+end
+
 @inline function _notsuccessful(F::LinearAlgebra.QRCompactWY)
     (m, n) = size(F)
     U = view(F.factors, 1:min(m, n), 1:n)

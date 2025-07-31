@@ -55,7 +55,7 @@
                 # Update the rest
                 for j in (k + 1):n
                     for i in (k + 1):m
-                        A[i, j] -= A[i, k] * A[k, j]
+                        A[i, j] -= A[i, k]*A[k, j]
                     end
                 end
             end
@@ -119,7 +119,7 @@ elseif VERSION < v"1.13"
                 # Update the rest
                 for j in (k + 1):n
                     for i in (k + 1):m
-                        A[i, j] -= A[i, k] * A[k, j]
+                        A[i, j] -= A[i, k]*A[k, j]
                     end
                 end
             end

@@ -80,7 +80,7 @@ staticarrayalgs = (
 )
 @testset "StaticArray Success" begin
     A = Float64[1 2 3; 4 3.5 1.7; 5.2 1.8 9.7]
-    A = A * A'
+    A = A*A'
     b = Float64[2, 5, 8]
     prob1 = LinearProblem(SMatrix{3, 3}(A), SVector{3}(b))
     sol = solve(prob1)

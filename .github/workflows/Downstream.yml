@@ -28,7 +28,7 @@ jobs:
         with:
           version: ${{ matrix.julia-version }}
           arch: x64
-      - uses: julia-actions/julia-buildpkg@latest
+      - uses: julia-actions/julia-buildpkg@v1.7.0
       - name: Clone Downstream
         uses: actions/checkout@v4
         with:

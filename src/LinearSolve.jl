@@ -176,9 +176,10 @@ include("adjoint.jl")
     end
 end
 
-@inline function _notsuccessful(F::LinearAlgebra.QRCompactWY{T, A}) where {T,A<:GPUArraysCore.AnyGPUArray}
+@inline function _notsuccessful(F::LinearAlgebra.QRCompactWY{
+        T, A}) where {T, A <: GPUArraysCore.AnyGPUArray}
     hasmethod(LinearAlgebra.issuccess, (typeof(F),)) ?
-                            !LinearAlgebra.issuccess(F) : false
+    !LinearAlgebra.issuccess(F) : false
 end
 
 @inline function _notsuccessful(F::LinearAlgebra.QRCompactWY)

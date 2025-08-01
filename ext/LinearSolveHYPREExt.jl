@@ -5,8 +5,9 @@ using HYPRE.LibHYPRE: HYPRE_Complex
 using HYPRE: HYPRE, HYPREMatrix, HYPRESolver, HYPREVector
 using LinearSolve: HYPREAlgorithm, LinearCache, LinearProblem, LinearSolve,
                    OperatorAssumptions, default_tol, init_cacheval, __issquare,
-                   __conditioning, LinearSolveAdjoint
+                   __conditioning, LinearSolveAdjoint, LinearVerbosity
 using SciMLBase: LinearProblem, LinearAliasSpecifier, SciMLBase
+using SciMLVerbosity: @match, Verbosity, verbosity_to_int
 using UnPack: @unpack
 using Setfield: @set!
 
@@ -22,7 +23,7 @@ end
 
 function LinearSolve.init_cacheval(alg::HYPREAlgorithm, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
+        verbose::LinearVerbosity, assumptions::OperatorAssumptions)
     return HYPRECache(nothing, nothing, nothing, nothing, true, true, true)
 end
 
@@ -64,7 +65,7 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
                              eltype(prob.A)),
         # TODO: Implement length() for HYPREVector in HYPRE.jl?
         maxiters::Int = prob.b isa HYPREVector ? 1000 : length(prob.b),
-        verbose::Bool = false,
+        verbose = LinearVerbosity(),
         Pl = LinearAlgebra.I,
         Pr = LinearAlgebra.I,
         assumptions = OperatorAssumptions(),
@@ -159,10 +160,13 @@ function create_solver(alg::HYPREAlgorithm, cache::LinearCache)
     solver = create_solver(alg.solver, comm)
 
     # Construct solver options
+
+    verbose = verbosity_to_int(cache.verbose.numerical.HYPRE_verbosity)
+
     solver_options = (;
         AbsoluteTol = cache.abstol,
         MaxIter = cache.maxiters,
-        PrintLevel = Int(cache.verbose),
+        PrintLevel = verbose,
         Tol = cache.reltol)
 
     # Preconditioner (uses Pl even though it might not be a *left* preconditioner just *a*

@@ -19,7 +19,7 @@ struct MyLUFactorization{P} <: LinearSolve.SciMLLinearSolveAlgorithm end
 
 function LinearSolve.init_cacheval(
         alg::MyLUFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
-        verbose::Bool, assump::LinearSolve.OperatorAssumptions)
+        verbose::LinearVerbosity, assump::LinearSolve.OperatorAssumptions)
     lu!(convert(AbstractMatrix, A))
 end
 

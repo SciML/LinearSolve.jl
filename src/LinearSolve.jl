@@ -21,6 +21,8 @@ using SciMLBase: SciMLBase, LinearAliasSpecifier, AbstractSciMLOperator,
 using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator,
                       MatrixOperator,
                       has_ldiv!, issquare
+using SciMLVerbosity: Verbosity, @SciMLMessage, @match, AbstractVerbositySpecifier,
+                      verbosity_to_int
 using Setfield: @set, @set!
 using UnPack: @unpack
 using DocStringExtensions: DocStringExtensions
@@ -152,6 +154,7 @@ const BLASELTYPES = Union{Float32, Float64, ComplexF32, ComplexF64}
 
 function defaultalg_symbol end
 
+include("verbosity.jl")
 include("generic_lufact.jl")
 include("common.jl")
 include("extension_algs.jl")
@@ -234,6 +237,9 @@ ALREADY_WARNED_CUDSS = Ref{Bool}(false)
 error_no_cudss_lu(A) = nothing
 cudss_loaded(A) = false
 is_cusparse(A) = false
+
+export LinearVerbosity, LinearErrorControlVerbosity, LinearPerformanceVerbosity,
+       LinearNumericalVerbosity
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,

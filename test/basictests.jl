@@ -507,10 +507,8 @@ end
             prob3 = LinearProblem(op1, b1; u0 = x1)
             prob4 = LinearProblem(op2, b2; u0 = x2)
 
-            @test LinearSolve.defaultalg(op1, x1).alg ===
-                  LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
-            @test LinearSolve.defaultalg(op2, x2).alg ===
-                  LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
+            @test LinearSolve.defaultalg(op1, x1).alg === LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
+            @test LinearSolve.defaultalg(op2, x2).alg === LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
             @test LinearSolve.defaultalg(op3, x1).alg ===
                   LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
             @test LinearSolve.defaultalg(op4, x2).alg ===

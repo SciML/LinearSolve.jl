@@ -1,7 +1,6 @@
 using LinearSolve, RecursiveFactorization, LinearAlgebra, SparseArrays, Test
 
-@test LinearSolve.defaultalg(nothing, zeros(3)).alg ===
-      LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
+@test LinearSolve.defaultalg(nothing, zeros(3)).alg === LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
 prob = LinearProblem(rand(3, 3), rand(3))
 solve(prob)
 

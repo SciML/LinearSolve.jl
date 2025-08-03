@@ -2,6 +2,7 @@ module LinearSolveBLISExt
 
 using Libdl
 using blis_jll
+using LAPACK_jll
 using LinearAlgebra
 using LinearSolve
 
@@ -11,6 +12,7 @@ using LinearAlgebra.LAPACK: require_one_based_indexing, chkfinite, chkstride1,
 using LinearSolve: ArrayInterface, BLISLUFactorization, @get_cacheval, LinearCache, SciMLBase
 
 const global libblis = blis_jll.blis
+const global liblapack = LAPACK_jll.liblapack
 
 function getrf!(A::AbstractMatrix{<:ComplexF64};
     ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
@@ -24,7 +26,7 @@ function getrf!(A::AbstractMatrix{<:ComplexF64};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(zgetrf_), libblis), Cvoid,
+    ccall((@blasfunc(zgetrf_), liblapack), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -44,7 +46,7 @@ function getrf!(A::AbstractMatrix{<:ComplexF32};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(cgetrf_), libblis), Cvoid,
+    ccall((@blasfunc(cgetrf_), liblapack), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -64,7 +66,7 @@ function getrf!(A::AbstractMatrix{<:Float64};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(dgetrf_), libblis), Cvoid,
+    ccall((@blasfunc(dgetrf_), liblapack), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -84,7 +86,7 @@ function getrf!(A::AbstractMatrix{<:Float32};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(sgetrf_), libblis), Cvoid,
+    ccall((@blasfunc(sgetrf_), liblapack), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -108,7 +110,7 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall(("zgetrs_", libblis), Cvoid,
+    ccall(("zgetrs_", liblapack), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
@@ -133,7 +135,7 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall(("cgetrs_", libblis), Cvoid,
+    ccall(("cgetrs_", liblapack), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
@@ -158,7 +160,7 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall(("dgetrs_", libblis), Cvoid,
+    ccall(("dgetrs_", liblapack), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{Float64}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
@@ -183,7 +185,7 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall(("sgetrs_", libblis), Cvoid,
+    ccall(("sgetrs_", liblapack), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{Float32}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,

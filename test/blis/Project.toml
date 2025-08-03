@@ -1,0 +1,6 @@
+[deps]
+LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
+blis_jll = "6136c539-28a5-5bf0-87cc-b183200dce32"
+LAPACK_jll = "51474c39-65e3-53ba-86ba-03b1b862ec14"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

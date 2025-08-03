@@ -227,22 +227,17 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
         cache.isfresh = false
     end
 
-    y = ldiv!(cache.u, @get_cacheval(cache, :MKLLUFactorization)[1], cache.b)
-    SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
-
-    #=
     A, info = @get_cacheval(cache, :MKLLUFactorization)
-    LinearAlgebra.require_one_based_indexing(cache.u, cache.b)
+    require_one_based_indexing(cache.u, cache.b)
     m, n = size(A, 1), size(A, 2)
     if m > n
         Bc = copy(cache.b)
         getrs!('N', A.factors, A.ipiv, Bc; info)
-        return copyto!(cache.u, 1, Bc, 1, n)
+        copyto!(cache.u, 1, Bc, 1, n)
     else
         copyto!(cache.u, cache.b)
         getrs!('N', A.factors, A.ipiv, cache.u; info)
     end
 
-    SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
-    =#
+    SciMLBase.build_linear_solution(alg, cache.u, nothing, cache; retcode = ReturnCode.Success)
 end

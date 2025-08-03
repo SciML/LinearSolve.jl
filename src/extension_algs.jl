@@ -441,3 +441,40 @@ to avoid allocations and automatically offloads to the GPU.
 struct MetalLUFactorization <: AbstractFactorization end
 
 struct BLISLUFactorization <: AbstractFactorization end
+
+"""
+```julia
+BLISFlameLUFactorization()
+```
+
+A high-performance factorization that combines BLIS (BLAS-like Library Instantiation Software) 
+for optimized BLAS operations with libflame for optimized LAPACK operations. This provides 
+a fully integrated high-performance linear algebra stack.
+
+Unlike BLISLUFactorization which uses BLIS + reference LAPACK, this implementation uses 
+BLIS + libflame, where both libraries are designed to work together optimally. libflame 
+provides highly optimized LAPACK routines that complement BLIS's optimized BLAS operations.
+
+!!! note
+
+    Using this solver requires that both blis_jll and libflame_jll packages are available. 
+    The solver will be automatically available when both packages are loaded, i.e., 
+    `using blis_jll, libflame_jll`.
+
+## Performance Characteristics
+
+- **Strengths**: Fully optimized BLAS+LAPACK stack, designed for integration
+- **Use cases**: High-performance dense linear systems where both BLAS and LAPACK optimization matter
+- **Compatibility**: Works with all numeric types (Float32/64, Complex32/64)
+
+## Example
+
+```julia
+using LinearSolve, blis_jll, libflame_jll
+A = rand(100, 100)
+b = rand(100)
+prob = LinearProblem(A, b)  
+sol = solve(prob, BLISFlameLUFactorization())
+```
+"""
+struct BLISFlameLUFactorization <: AbstractFactorization end

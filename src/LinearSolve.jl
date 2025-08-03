@@ -260,6 +260,8 @@ export PardisoJL
 export MKLLUFactorization
 export AppleAccelerateLUFactorization
 export MetalLUFactorization
+export BLISLUFactorization
+export BLISFlameLUFactorization
 
 export OperatorAssumptions, OperatorCondition
 

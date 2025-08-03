@@ -11,6 +11,13 @@ catch LoadError
     # BLIS dependencies not available, tests will be skipped
 end
 
+# Try to load BLISFlame extension
+try
+    using blis_jll, libflame_jll, LAPACK_jll
+catch LoadError
+    # BLISFlame dependencies not available, tests will be skipped
+end
+
 const Dual64 = ForwardDiff.Dual{Nothing, Float64, 1}
 
 n = 8
@@ -238,6 +245,11 @@ end
     # Test BLIS if extension is available
     if Base.get_extension(LinearSolve, :LinearSolveBLISExt) !== nothing
         push!(test_algs, BLISLUFactorization())
+    end
+
+    # Test BLISFlame if extension is available
+    if Base.get_extension(LinearSolve, :LinearSolveBLISFlameExt) !== nothing
+        push!(test_algs, BLISFlameLUFactorization())
     end
 
     @testset "Concrete Factorizations" begin

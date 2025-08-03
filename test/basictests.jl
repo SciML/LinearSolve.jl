@@ -4,6 +4,13 @@ using IterativeSolvers, KrylovKit, MKL_jll, KrylovPreconditioners
 using Test
 import Random
 
+# Try to load BLIS extension
+try
+    using blis_jll, LAPACK_jll
+catch LoadError
+    # BLIS dependencies not available, tests will be skipped
+end
+
 const Dual64 = ForwardDiff.Dual{Nothing, Float64, 1}
 
 n = 8
@@ -226,6 +233,11 @@ end
 
     if LinearSolve.usemkl
         push!(test_algs, MKLLUFactorization())
+    end
+
+    # Test BLIS if extension is available
+    if Base.get_extension(LinearSolve, :LinearSolveBLISExt) !== nothing
+        push!(test_algs, BLISLUFactorization())
     end
 
     @testset "Concrete Factorizations" begin

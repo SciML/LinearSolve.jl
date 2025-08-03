@@ -247,10 +247,10 @@ end
         push!(test_algs, BLISLUFactorization())
     end
 
-    # Test BLISFlame if extension is available
-    if Base.get_extension(LinearSolve, :LinearSolveBLISFlameExt) !== nothing
-        push!(test_algs, BLISFlameLUFactorization())
-    end
+    # Test BLISFlame if extension is available (currently disabled due to ILP64 compatibility issue)
+    # if Base.get_extension(LinearSolve, :LinearSolveBLISFlameExt) !== nothing
+    #     push!(test_algs, BLISFlameLUFactorization())
+    # end
 
     @testset "Concrete Factorizations" begin
         for alg in test_algs

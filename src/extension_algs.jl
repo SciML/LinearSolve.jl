@@ -447,33 +447,39 @@ struct BLISLUFactorization <: AbstractFactorization end
 BLISFlameLUFactorization()
 ```
 
-A high-performance factorization that combines BLIS (BLAS-like Library Instantiation Software) 
-for optimized BLAS operations with libflame for optimized LAPACK operations. This provides 
-a fully integrated high-performance linear algebra stack.
+**WORK IN PROGRESS**: A high-performance factorization intended to combine BLIS 
+(BLAS-like Library Instantiation Software) for optimized BLAS operations with libflame 
+for optimized LAPACK operations.
 
-Unlike BLISLUFactorization which uses BLIS + reference LAPACK, this implementation uses 
-BLIS + libflame, where both libraries are designed to work together optimally. libflame 
-provides highly optimized LAPACK routines that complement BLIS's optimized BLAS operations.
+## Current Status - Integration Challenges
 
-!!! note
+This implementation currently faces two main challenges:
 
-    Using this solver requires that both blis_jll and libflame_jll packages are available. 
-    The solver will be automatically available when both packages are loaded, i.e., 
-    `using blis_jll, libflame_jll`.
+1. **ILP64 Compatibility**: libflame_jll uses 32-bit integers while Julia's LinearAlgebra 
+   uses 64-bit integers (ILP64), causing "undefined symbol" errors when calling libflame functions.
 
-## Performance Characteristics
+2. **Missing Functions**: libflame doesn't provide `getrs` functions (solve operations), 
+   only factorization functions (`getrf`).
 
-- **Strengths**: Fully optimized BLAS+LAPACK stack, designed for integration
-- **Use cases**: High-performance dense linear systems where both BLAS and LAPACK optimization matter
-- **Compatibility**: Works with all numeric types (Float32/64, Complex32/64)
+## Current Implementation
 
-## Example
+- **BLAS Operations**: Uses BLIS for optimized BLAS operations via libblastrampoline
+- **Factorization**: Attempts to use libflame for LU factorization (currently fails due to ILP64 issue)
+- **Solve**: Falls back to reference LAPACK for solve operations (libflame doesn't provide these)
+
+!!! warning
+
+    This solver is currently not functional due to the compatibility issues described above.
+    It serves as a foundation for future libflame integration when these issues are resolved.
+
+## Example (currently fails)
 
 ```julia
 using LinearSolve, blis_jll, libflame_jll
 A = rand(100, 100)
 b = rand(100)
 prob = LinearProblem(A, b)  
+# This will currently fail due to ILP64 compatibility issue
 sol = solve(prob, BLISFlameLUFactorization())
 ```
 """

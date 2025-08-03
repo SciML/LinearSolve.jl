@@ -2,20 +2,21 @@
 LinearSolveBLISFlameExt
 
 Extension module that provides BLISFlameLUFactorization for LinearSolve.jl.
+This extension combines BLIS for optimized BLAS operations with libflame for 
+optimized LAPACK operations.
 
-IMPORTANT LIMITATION: The current libflame_jll package is compiled with 32-bit integers,
-but Julia's LinearAlgebra uses 64-bit integers (ILP64). This makes direct libflame 
-integration impossible. As a result, this implementation falls back to using BLIS for 
-BLAS operations and reference LAPACK for all LAPACK operations.
+WORK IN PROGRESS: There are currently compatibility issues with libflame_jll:
+- libflame_jll uses 32-bit integers while Julia's LinearAlgebra uses 64-bit integers (ILP64)
+- This causes "undefined symbol" errors when calling libflame functions
+- Need to resolve integer size compatibility for full integration
 
 Technical approach:
-- Uses BLIS for underlying BLAS operations via libblastrampoline  
-- Uses reference LAPACK for both factorization (getrf) and solve (getrs) operations
-- Essentially equivalent to BLISLUFactorization but with different naming for compatibility
+- Uses BLIS for underlying BLAS operations via libblastrampoline
+- Uses libflame for LU factorization (getrf functions) - currently blocked by ILP64 issue
+- Uses libflame for solve operations (getrs functions) - libflame doesn't provide these
 - Follows the same API patterns as other LinearSolve extensions
 
-This serves as a placeholder for future libflame integration when compatible packages 
-become available, while still providing the BLIS performance benefits.
+This is the foundation for the intended BLIS + libflame integration from PR #660.
 """
 module LinearSolveBLISFlameExt
 
@@ -33,15 +34,14 @@ using LinearSolve: ArrayInterface, BLISFlameLUFactorization, @get_cacheval, Line
 
 # Library handles  
 const global libblis = blis_jll.blis
-const global liblapack = LAPACK_jll.liblapack
+const global libflame = libflame_jll.libflame
 
-# Note: libflame integration is not feasible due to ILP64/32-bit integer mismatch
-# This implementation uses reference LAPACK for all LAPACK operations
+# NOTE: libflame integration currently blocked by ILP64/32-bit integer compatibility issue
+# libflame expects 32-bit integers but Julia uses 64-bit integers in ILP64 mode
 
 """
-LU factorization implementations using reference LAPACK.
-These mirror the standard LAPACK interface but are included here for consistency
-and to enable future libflame integration when compatible packages become available.
+LU factorization implementations using libflame for LAPACK operations.
+WORK IN PROGRESS: Currently blocked by ILP64/32-bit integer compatibility.
 """
 
 function getrf!(A::AbstractMatrix{<:ComplexF64};
@@ -57,8 +57,8 @@ function getrf!(A::AbstractMatrix{<:ComplexF64};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
     
-    # Use reference LAPACK (libflame not compatible with ILP64)
-    ccall((@blasfunc(zgetrf_), liblapack), Cvoid,
+    # Call libflame's zgetrf - currently fails due to ILP64 issue
+    ccall((@blasfunc(zgetrf_), libflame), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -79,7 +79,7 @@ function getrf!(A::AbstractMatrix{<:ComplexF32};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
     
-    ccall((@blasfunc(cgetrf_), liblapack), Cvoid,
+    ccall((@blasfunc(cgetrf_), libflame), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -100,7 +100,7 @@ function getrf!(A::AbstractMatrix{<:Float64};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
     
-    ccall((@blasfunc(dgetrf_), liblapack), Cvoid,
+    ccall((@blasfunc(dgetrf_), libflame), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -121,7 +121,7 @@ function getrf!(A::AbstractMatrix{<:Float32};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
     
-    ccall((@blasfunc(sgetrf_), liblapack), Cvoid,
+    ccall((@blasfunc(sgetrf_), libflame), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -130,7 +130,10 @@ function getrf!(A::AbstractMatrix{<:Float32};
 end
 
 """
-Linear system solve implementations using libflame.
+Linear system solve implementations.
+WORK IN PROGRESS: libflame doesn't provide getrs functions, so we need to use
+BLAS triangular solve operations or fall back to reference LAPACK.
+This is part of the integration challenge.
 """
 
 function getrs!(trans::AbstractChar,
@@ -149,7 +152,10 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall((@blasfunc(zgetrs_), liblapack), Cvoid,
+    
+    # WORK IN PROGRESS: libflame doesn't provide getrs, need alternative approach
+    # For now, fall back to reference LAPACK for solve step
+    ccall((@blasfunc(zgetrs_), LAPACK_jll.liblapack), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
@@ -174,7 +180,8 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall((@blasfunc(cgetrs_), liblapack), Cvoid,
+    # WORK IN PROGRESS: libflame doesn't provide getrs, fall back to reference LAPACK
+    ccall((@blasfunc(cgetrs_), LAPACK_jll.liblapack), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
@@ -199,7 +206,8 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall((@blasfunc(dgetrs_), liblapack), Cvoid,
+    # WORK IN PROGRESS: libflame doesn't provide getrs, fall back to reference LAPACK
+    ccall((@blasfunc(dgetrs_), LAPACK_jll.liblapack), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{Float64}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
@@ -224,7 +232,8 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall((@blasfunc(sgetrs_), liblapack), Cvoid,
+    # WORK IN PROGRESS: libflame doesn't provide getrs, fall back to reference LAPACK
+    ccall((@blasfunc(sgetrs_), LAPACK_jll.liblapack), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{Float32}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,

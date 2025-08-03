@@ -10,6 +10,7 @@ using LinearAlgebra: BlasInt, LU
 using LinearAlgebra.LAPACK: require_one_based_indexing, chkfinite, chkstride1, 
                             @blasfunc, chkargsok
 using LinearSolve: ArrayInterface, BLISLUFactorization, @get_cacheval, LinearCache, SciMLBase
+using SciMLBase: ReturnCode
 
 const global libblis = blis_jll.blis
 const global liblapack = LAPACK_jll.liblapack
@@ -224,27 +225,27 @@ function SciMLBase.solve!(cache::LinearCache, alg::BLISLUFactorization;
         res = getrf!(A; ipiv = cacheval[1].ipiv, info = cacheval[2])
         fact = LU(res[1:3]...), res[4]
         cache.cacheval = fact
+
+        if !LinearAlgebra.issuccess(fact[1])
+            return SciMLBase.build_linear_solution(
+                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
+        end
         cache.isfresh = false
     end
 
-    y = ldiv!(cache.u, @get_cacheval(cache, :BLISLUFactorization)[1], cache.b)
-    SciMLBase.build_linear_solution(alg, y, nothing, cache)
-
-    #=
     A, info = @get_cacheval(cache, :BLISLUFactorization)
-    LinearAlgebra.require_one_based_indexing(cache.u, cache.b)
+    require_one_based_indexing(cache.u, cache.b)
     m, n = size(A, 1), size(A, 2)
     if m > n
         Bc = copy(cache.b)
         getrs!('N', A.factors, A.ipiv, Bc; info)
-        return copyto!(cache.u, 1, Bc, 1, n)
+        copyto!(cache.u, 1, Bc, 1, n)
     else
         copyto!(cache.u, cache.b)
         getrs!('N', A.factors, A.ipiv, cache.u; info)
     end
 
-    SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
-    =#
+    SciMLBase.build_linear_solution(alg, cache.u, nothing, cache; retcode = ReturnCode.Success)
 end
 
 end

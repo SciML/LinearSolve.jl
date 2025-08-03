@@ -49,8 +49,8 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Sparspak = "e56a9233-b9d6-4f03-8d0f-1825330902ac"
 
 [extensions]
-LinearSolveBandedMatricesExt = "BandedMatrices"
 LinearSolveBLISExt = ["blis_jll", "LAPACK_jll"]
+LinearSolveBandedMatricesExt = "BandedMatrices"
 LinearSolveBlockDiagonalsExt = "BlockDiagonals"
 LinearSolveCUDAExt = "CUDA"
 LinearSolveCUDSSExt = "CUDSS"

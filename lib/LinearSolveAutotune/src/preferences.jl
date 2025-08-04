@@ -11,13 +11,13 @@ function set_algorithm_preferences(categories::Dict{String, String})
 
     for (range, algorithm) in categories
         pref_key = "best_algorithm_$(replace(range, "+" => "plus", "-" => "_"))"
-        # Set preferences in LinearSolve.jl, not LinearSolveAutotune
-        Preferences.set_preferences!(LinearSolve, pref_key => algorithm)
+        # Set preferences in LinearSolve.jl, not LinearSolveAutotune (force=true allows overwriting)
+        Preferences.set_preferences!(LinearSolve, pref_key => algorithm; force = true)
         @info "Set preference $pref_key = $algorithm in LinearSolve.jl"
     end
 
     # Set a timestamp for when these preferences were created
-    Preferences.set_preferences!(LinearSolve, "autotune_timestamp" => string(Dates.now()))
+    Preferences.set_preferences!(LinearSolve, "autotune_timestamp" => string(Dates.now()); force = true)
 
     @info "Preferences updated in LinearSolve.jl. You may need to restart Julia for changes to take effect."
 end
@@ -58,11 +58,11 @@ function clear_algorithm_preferences()
 
     for range in ranges
         pref_key = "best_algorithm_$range"
-        # Delete preferences from LinearSolve.jl
-        Preferences.delete_preferences!(LinearSolve, pref_key)
+        # Delete preferences from LinearSolve.jl (force=true ensures deletion works)
+        Preferences.delete_preferences!(LinearSolve, pref_key; force = true)
     end
 
-    Preferences.delete_preferences!(LinearSolve, "autotune_timestamp")
+    Preferences.delete_preferences!(LinearSolve, "autotune_timestamp"; force = true)
 
     @info "Preferences cleared from LinearSolve.jl."
 end

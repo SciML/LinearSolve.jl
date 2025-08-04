@@ -15,6 +15,21 @@ function setup_github_authentication()
     # No environment variable - provide setup instructions and get token
     max_input_attempts = 3
     
+    # Handle REPL state issue by doing a throwaway first attempt
+    if max_input_attempts > 1
+        println()
+        println("🔧 Initializing input system...")
+        print("Press Enter to continue: ")
+        flush(stdout)
+        try
+            sleep(0.1)
+            readline()  # Throwaway read to clear REPL state
+        catch
+            # Ignore any errors from this throwaway attempt
+        end
+        println("✅ Input system ready!")
+    end
+    
     for input_attempt in 1:max_input_attempts
         println()
         println("🚀 Help Improve LinearSolve.jl for Everyone!")

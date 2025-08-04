@@ -10,6 +10,7 @@ using Random
 using LinearAlgebra
 using Printf
 using Dates
+using RecursiveFactorization  # Hard dependency to ensure RFLUFactorization is available
 
 # Optional dependencies for telemetry and plotting
 using GitHub

@@ -81,7 +81,11 @@ function defaultalg(A::SymTridiagonal, b, ::OperatorAssumptions{Bool})
     DirectLdiv!()
 end
 function defaultalg(A::Bidiagonal, b, ::OperatorAssumptions{Bool})
-    DirectLdiv!()
+    @static if VERSION>=v"1.11"
+        DirectLdiv!()
+    else
+        DefaultLinearSolver(DefaultAlgorithmChoice.LUFactorization)
+    end
 end
 function defaultalg(A::Factorization, b, ::OperatorAssumptions{Bool})
     DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)

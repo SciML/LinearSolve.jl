@@ -583,7 +583,7 @@ function create_results_pr(target_repo, fallback_repo, branch_name, folder_name,
         fork_existed = false
         try
             @info "📋 Creating fork of $actual_target_repo..."
-            fork_repo_obj = GitHub.fork(target_repo_obj, auth=auth)
+            fork_repo_obj = GitHub.create_fork(target_repo_obj, auth=auth)
             @info "✅ Fork created: $(user.login)/$repo_name"
             # Wait a moment for new fork to be ready
             sleep(3)

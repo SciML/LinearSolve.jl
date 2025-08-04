@@ -18,6 +18,29 @@ using RecursiveFactorization  # Hard dependency to ensure RFLUFactorization is a
 using GitHub
 using Plots
 
+# Load JLL packages when available for better library access
+const BLIS_JLL_AVAILABLE = Ref(false)
+const LAPACK_JLL_AVAILABLE = Ref(false)
+
+function __init__()
+    # Try to load JLL packages at runtime
+    try
+        @eval using BLIS_jll
+        BLIS_JLL_AVAILABLE[] = true
+        @info "BLIS_jll loaded for enhanced BLIS library access"
+    catch
+        @debug "BLIS_jll not available, using standard BLIS detection"
+    end
+    
+    try
+        @eval using LAPACK_jll  
+        LAPACK_JLL_AVAILABLE[] = true
+        @info "LAPACK_jll loaded for enhanced LAPACK library access"
+    catch
+        @debug "LAPACK_jll not available, using standard LAPACK detection"
+    end
+end
+
 export autotune_setup
 
 include("algorithms.jl")

@@ -4,11 +4,23 @@
     is_cuda_available()
 
 Check if CUDA hardware and packages are available.
+Issues warnings if CUDA hardware is detected but packages aren't loaded.
 """
 function is_cuda_available()
     # Check if CUDA extension is loaded
     ext = Base.get_extension(LinearSolve, :LinearSolveCUDAExt)
     if ext === nothing
+        # Check if we might have CUDA hardware but missing packages
+        try
+            # Try to detect NVIDIA GPUs via nvidia-smi or similar system indicators
+            if haskey(ENV, "CUDA_VISIBLE_DEVICES") ||
+               (Sys.islinux() && isfile("/proc/driver/nvidia/version")) ||
+               (Sys.iswindows() && success(`where nvidia-smi`))
+                @warn "CUDA hardware may be available but CUDA.jl extension is not loaded. Consider adding `using CUDA` to enable GPU algorithms."
+            end
+        catch
+            # Silently continue if detection fails
+        end
         return false
     end
 
@@ -25,6 +37,7 @@ end
     is_metal_available()
 
 Check if Metal (Apple Silicon) hardware and packages are available.
+Issues warnings if Metal hardware is detected but packages aren't loaded.
 """
 function is_metal_available()
     # Check if we're on macOS with Apple Silicon
@@ -32,9 +45,15 @@ function is_metal_available()
         return false
     end
 
+    # Check if this is Apple Silicon
+    is_apple_silicon = Sys.ARCH == :aarch64
+
     # Check if Metal extension is loaded
     ext = Base.get_extension(LinearSolve, :LinearSolveMetalExt)
     if ext === nothing
+        if is_apple_silicon
+            @warn "Apple Silicon hardware detected but Metal.jl extension is not loaded. Consider adding `using Metal` to enable GPU algorithms."
+        end
         return false
     end
 

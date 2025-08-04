@@ -44,21 +44,60 @@ function setup_github_authentication()
         println("🔑 Paste your GitHub token here (or press Enter to skip):")
         print("Token: ")
         flush(stdout)  # Ensure the prompt is displayed before reading
-        token = strip(readline())
+        
+        # Add a small safety delay to ensure prompt is fully displayed
+        sleep(0.05)
+        
+        # Read the token input
+        token = ""
+        try
+            token = strip(readline())
+        catch e
+            println("❌ Input error: $e")
+            println("🔄 Please try again...")
+            flush(stdout)
+            sleep(0.1)
+            continue
+        end
         
         if !isempty(token)
+            # Wrap everything in a protective try-catch to prevent REPL interference
+            auth_success = false
+            auth_result = nothing
+            
             try
-                # Test the token
-                ENV["GITHUB_TOKEN"] = token
-                auth = GitHub.authenticate(token)
+                println("🔍 Testing token...")
+                flush(stdout)
+                
+                # Clean the token of any potential whitespace/newlines
+                clean_token = strip(replace(token, r"\s+" => ""))
+                ENV["GITHUB_TOKEN"] = clean_token
+                
+                # Test authentication
+                auth_result = GitHub.authenticate(clean_token)
+                
                 println("✅ Perfect! Authentication successful - your results will help everyone!")
-                flush(stdout)  # Ensure success message is displayed
-                return auth
+                flush(stdout)
+                auth_success = true
+                
             catch e
                 println("❌ Token authentication failed: $e")
-                println("💡 Make sure the token has 'public_repo' or 'Public Repositories' access")
-                flush(stdout)  # Ensure error messages are displayed
-                delete!(ENV, "GITHUB_TOKEN")
+                println("💡 Make sure the token:")
+                println("   • Has 'public_repo' or 'Public Repositories' access")
+                println("   • Was copied completely without extra characters")
+                println("   • Is not expired")
+                flush(stdout)
+                
+                # Clean up on failure
+                if haskey(ENV, "GITHUB_TOKEN")
+                    delete!(ENV, "GITHUB_TOKEN")
+                end
+                auth_success = false
+            end
+            
+            if auth_success && auth_result !== nothing
+                return auth_result
+            else
                 attempts += 1
                 if attempts < max_attempts
                     println("🔄 Let's try again...")

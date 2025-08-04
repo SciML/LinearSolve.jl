@@ -308,29 +308,30 @@ By default, autotune results are shared with the LinearSolve.jl community to hel
 
 ### GitHub Authentication for Telemetry
 
-When telemetry is enabled, you'll be prompted to authenticate with GitHub:
+When telemetry is enabled, the system will check for GitHub authentication:
 
 ```julia
-# This will prompt for GitHub authentication
+# This will show setup instructions if GITHUB_TOKEN not found
 results = autotune_setup(telemetry = true)
 ```
 
-You have three options:
+**Quick Setup (30 seconds):**
 
-1. **Environment Variable (Recommended)**: Set `GITHUB_TOKEN` before running Julia:
+1. **Create GitHub Token**: Open [https://github.com/settings/tokens?type=beta](https://github.com/settings/tokens?type=beta)
+   - Click "Generate new token"
+   - Name: "LinearSolve Autotune"
+   - Expiration: 90 days (or longer)
+   - Repository access: "Public Repositories (read-only)"
+   - Generate and copy the token
+
+2. **Set Environment Variable**:
    ```bash
-   export GITHUB_TOKEN=your_personal_access_token
-   julia
+   export GITHUB_TOKEN=paste_your_token_here
    ```
 
-2. **Interactive Authentication**: Enter your token when prompted during autotune
+3. **Restart Julia** and run autotune again
 
-3. **Skip Telemetry**: Choose to continue without sharing results
-
-To create a GitHub Personal Access Token:
-1. Go to [GitHub Settings > Tokens](https://github.com/settings/tokens)
-2. Generate a new token with `public_repo` scope
-3. Use it with the autotune process
+That's it! Your results will automatically be shared to help the community.
 
 ### Disabling Telemetry
 

@@ -4,14 +4,14 @@
     setup_github_authentication()
 
 Set up GitHub authentication for telemetry uploads.
-Returns authentication object if successful, nothing if user cancels.
+Returns authentication object if successful, nothing if setup needed.
 """
 function setup_github_authentication()
     # Check if GITHUB_TOKEN environment variable exists
     if haskey(ENV, "GITHUB_TOKEN") && !isempty(ENV["GITHUB_TOKEN"])
         try
             auth = GitHub.authenticate(ENV["GITHUB_TOKEN"])
-            @info "✅ GitHub authentication successful using GITHUB_TOKEN environment variable"
+            @info "✅ GitHub authentication successful - ready to share results!"
             return auth
         catch e
             @warn "❌ GITHUB_TOKEN exists but authentication failed: $e"
@@ -20,65 +20,34 @@ function setup_github_authentication()
         end
     end
     
-    # No environment variable - ask user to authenticate
+    # No environment variable - provide setup instructions
     println()
-    println("🔐 GitHub Authentication Required for Telemetry")
+    println("🚀 Help Improve LinearSolve.jl for Everyone!")
     println("="^50)
-    println("To share benchmark results with the LinearSolve.jl community, you need to")
-    println("authenticate with GitHub. This helps improve algorithm selection for everyone!")
+    println("Your benchmark results help the community by improving automatic")
+    println("algorithm selection. Setting up GitHub authentication takes 30 seconds:")
     println()
-    println("Options:")
-    println("1. Set GITHUB_TOKEN environment variable (recommended for automation)")
-    println("2. Authenticate interactively now")
-    println("3. Skip telemetry (disable sharing)")
+    println("📋 Quick Setup (copy & paste these commands):")
     println()
+    println("1️⃣  Create a GitHub token:")
+    println("   Open: https://github.com/settings/tokens?type=beta")
+    println("   • Click 'Generate new token'")
+    println("   • Name: 'LinearSolve Autotune'") 
+    println("   • Expiration: 90 days (or longer)")
+    println("   • Repository access: 'Public Repositories (read-only)'")
+    println("   • Click 'Generate token' and copy it")
+    println()
+    println("2️⃣  Set the token (paste your token after the =):")
+    println("   export GITHUB_TOKEN=paste_your_token_here")
+    println()
+    println("3️⃣  Restart Julia and run autotune again")
+    println()
+    println("That's it! Your results will automatically be shared to help everyone.")
+    println("="^50)
+    println()
+    println("⏭️  Continuing without telemetry for now (results saved locally)")
     
-    while true
-        print("Choose option (1/2/3): ")
-        choice = readline()
-        
-        if choice == "1"
-            println()
-            println("To set up GITHUB_TOKEN:")
-            println("1. Go to https://github.com/settings/tokens")
-            println("2. Generate a Personal Access Token with 'public_repo' scope")
-            println("3. Set environment variable: export GITHUB_TOKEN=your_token_here")
-            println("4. Restart Julia and run autotune again")
-            println()
-            println("⚠️  Continuing without telemetry for this session...")
-            return nothing
-            
-        elseif choice == "2"
-            println()
-            print("Enter your GitHub Personal Access Token: ")
-            token = readline()
-            
-            if isempty(token)
-                println("❌ No token provided. Skipping telemetry.")
-                return nothing
-            end
-            
-            try
-                # Set temporarily for this session
-                ENV["GITHUB_TOKEN"] = token
-                auth = GitHub.authenticate(token)
-                println("✅ Authentication successful! Token set for this session.")
-                return auth
-            catch e
-                println("❌ Authentication failed: $e")
-                println("Please check that your token is valid and has 'public_repo' scope.")
-                continue
-            end
-            
-        elseif choice == "3"
-            println("⚠️  Skipping telemetry. Results will not be shared with the community.")
-            return nothing
-            
-        else
-            println("❌ Invalid choice. Please enter 1, 2, or 3.")
-            continue
-        end
-    end
+    return nothing
 end
 
 """

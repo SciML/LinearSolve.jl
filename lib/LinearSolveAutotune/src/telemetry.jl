@@ -371,8 +371,8 @@ function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dic
             end
         end
 
-        # Post the comment
-        GitHub.create_comment(repo_obj, issue_number, comment_body, auth = auth)
+        # Post the comment using the correct GitHub.jl API
+        GitHub.create_comment(repo_obj, issue_number; body = comment_body, auth = auth)
 
         @info "✅ Successfully posted benchmark results to GitHub issue #$issue_number"
 

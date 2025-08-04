@@ -32,18 +32,52 @@ function setup_github_authentication()
         println("    • Repository access: 'Public Repositories (read-only)'")
         println("4️⃣  Click 'Generate token' and copy it")
         println()
-        println("🔑 Paste your GitHub token here (just the token, not as Julia code):")
+        println("🔑 Paste your GitHub token here:")
+        println("    (If it shows julia> prompt, just paste the token there and press Enter)")
         print("Token: ")
         flush(stdout)
         
-        # Get token input with better REPL handling
+        # Get token input - handle both direct input and REPL interpretation
         token = ""
         try
             sleep(0.1)  # Small delay for I/O stability
-            token = String(strip(readline()))  # Convert to String explicitly
+            input_line = String(strip(readline()))
+            
+            # If we got direct input, use it
+            if !isempty(input_line)
+                token = input_line
+            else
+                # Check if token was interpreted as Julia code and became a variable
+                # Look for common GitHub token patterns in global variables
+                println("🔍 Looking for token that may have been interpreted as Julia code...")
+                for name in names(Main, all=true)
+                    if startswith(string(name), "github_pat_") || startswith(string(name), "ghp_")
+                        try
+                            value = getfield(Main, name)
+                            if isa(value, AbstractString) && length(value) > 20
+                                println("✅ Found token variable: $(name)")
+                                token = String(value)
+                                break
+                            end
+                        catch
+                            continue
+                        end
+                    end
+                end
+                
+                # If still no token, try one more direct input
+                if isempty(token)
+                    println("💡 Please paste your token again (make sure to press Enter after):")
+                    print("Token: ")
+                    flush(stdout)
+                    sleep(0.1)
+                    token = String(strip(readline()))
+                end
+            end
+            
         catch e
             println("❌ Input error: $e")
-            println("💡 Make sure to paste the token as a string, not Julia code")
+            println("💡 No worries - this sometimes happens with token input")
             continue
         end
         

@@ -78,7 +78,7 @@ results = autotune_setup(eltypes = (BigFloat,), telemetry = false)
 ```
 """
 function autotune_setup(;
-        large_matrices::Bool = false,
+        large_matrices::Bool = true,
         telemetry::Bool = true,
         make_plot::Bool = true,
         set_preferences::Bool = true,

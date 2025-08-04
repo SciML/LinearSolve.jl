@@ -35,10 +35,13 @@ function get_available_algorithms(; skip_missing_algs::Bool = false)
         end
     end
 
-    # BLIS if available and hardware supports it
+    # BLIS if JLL packages are available and hardware supports it
     try
-        # Check if BLIS is loaded and BLISLUFactorization is available
-        if isdefined(LinearSolve, :BLISLUFactorization) && hasmethod(LinearSolve.BLISLUFactorization, ())
+        # Check if BLIS_jll and LAPACK_jll are available, which enable BLISLUFactorization
+        blis_jll_available = haskey(Base.loaded_modules, Base.PkgId(Base.UUID("068f7417-6964-5086-9a5b-bc0c5b4f7fa6"), "BLIS_jll"))
+        lapack_jll_available = haskey(Base.loaded_modules, Base.PkgId(Base.UUID("51474c39-65e3-53ba-86ba-03b1b862ec14"), "LAPACK_jll"))
+        
+        if (blis_jll_available || lapack_jll_available) && isdefined(LinearSolve, :BLISLUFactorization) && hasmethod(LinearSolve.BLISLUFactorization, ())
             # Test if BLIS works on this hardware
             try
                 test_alg = LinearSolve.BLISLUFactorization()
@@ -54,15 +57,19 @@ function get_available_algorithms(; skip_missing_algs::Bool = false)
                 end
             end
         else
-            msg = "BLIS.jl not loaded or BLISLUFactorization not available"
+            if blis_jll_available || lapack_jll_available
+                msg = "BLIS_jll/LAPACK_jll loaded but BLISLUFactorization not available in LinearSolve"
+            else
+                msg = "BLIS_jll and LAPACK_jll not loaded - BLISLUFactorization requires these JLL packages"
+            end
             if skip_missing_algs
                 @warn msg
             else
-                @info msg  # Not having BLIS is not an error
+                @info msg  # Not having BLIS JLL packages is not an error
             end
         end
     catch e
-        msg = "Error checking BLIS availability: $e"
+        msg = "Error checking BLIS JLL package availability: $e"
         if skip_missing_algs
             @warn msg
         else

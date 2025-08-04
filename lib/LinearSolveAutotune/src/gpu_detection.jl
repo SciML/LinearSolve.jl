@@ -242,18 +242,26 @@ function get_detailed_system_info()
         system_data["apple_accelerate_used"] = false
     end
     
-    # BLIS availability check
+    # BLIS availability check - based on JLL packages
     system_data["blis_available"] = false
     system_data["blis_used"] = false
+    system_data["blis_jll_loaded"] = false
+    system_data["lapack_jll_loaded"] = false
+    
     try
-        # Check if BLIS is loaded and BLISLUFactorization is available
-        if isdefined(LinearSolve, :BLISLUFactorization) && hasmethod(LinearSolve.BLISLUFactorization, ())
+        # Check if BLIS_jll and LAPACK_jll are loaded
+        system_data["blis_jll_loaded"] = haskey(Base.loaded_modules, Base.PkgId(Base.UUID("068f7417-6964-5086-9a5b-bc0c5b4f7fa6"), "BLIS_jll"))
+        system_data["lapack_jll_loaded"] = haskey(Base.loaded_modules, Base.PkgId(Base.UUID("51474c39-65e3-53ba-86ba-03b1b862ec14"), "LAPACK_jll"))
+        
+        # BLIS is available if JLL packages are loaded and BLISLUFactorization exists
+        if (system_data["blis_jll_loaded"] || system_data["lapack_jll_loaded"]) && 
+           isdefined(LinearSolve, :BLISLUFactorization) && hasmethod(LinearSolve.BLISLUFactorization, ())
             system_data["blis_available"] = true
             # Check if BLIS is actually being used (contains "blis" in BLAS vendor)
             system_data["blis_used"] = contains(lowercase(string(system_data["blas_vendor"])), "blis")
         end
     catch
-        # If there's any error checking BLIS, leave as false
+        # If there's any error checking BLIS JLL packages, leave as false
     end
     
     # GPU information

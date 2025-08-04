@@ -569,24 +569,45 @@ function create_results_pr(target_repo, fallback_repo, branch_name, folder_name,
         user = GitHub.whoami(auth=auth)
         source_repo = user.login * "/" * repo_name
         
-        # Try to get or create a fork
+        # First, check if we need to create the target repository
+        if actual_target_repo == fallback_repo
+            @info "📋 Target repository doesn't exist, using fallback: $actual_target_repo"
+        end
+        
+        # Always try to create a fork first (this ensures we have a fork to work with)
         fork_repo_obj = nothing
         try
-            fork_repo_obj = GitHub.repo(source_repo, auth=auth)
-            @info "📋 Using existing fork: $source_repo"
-        catch
-            @info "📋 Creating fork of $target_repo..."
+            @info "📋 Creating/updating fork of $actual_target_repo..."
             fork_repo_obj = GitHub.fork(target_repo_obj, auth=auth)
+            @info "✅ Fork created/updated: $(user.login)/$repo_name"
             # Wait a moment for fork to be ready
-            sleep(2)
+            sleep(3)
+        catch e
+            @info "📋 Fork may already exist, trying to access existing fork..."
+            try
+                fork_repo_obj = GitHub.repo(source_repo, auth=auth)
+                @info "✅ Using existing fork: $source_repo"
+            catch e2
+                error("Failed to create or access fork: $e2")
+            end
         end
         
         # Get the default branch (usually main)
         default_branch = target_repo_obj.default_branch
+        @info "📋 Default branch: $default_branch"
         
-        # Get the SHA of the default branch
-        main_branch_ref = GitHub.reference(fork_repo_obj, "heads/$default_branch", auth=auth)
-        base_sha = main_branch_ref.object["sha"]
+        # Get the SHA of the default branch from the fork
+        try
+            main_branch_ref = GitHub.reference(fork_repo_obj, "heads/$default_branch", auth=auth)
+            base_sha = main_branch_ref.object["sha"]
+            @info "📋 Base SHA: $base_sha"
+        catch e
+            # If the fork doesn't have the branch yet, get it from the target
+            @info "📋 Getting base SHA from target repository..."
+            main_branch_ref = GitHub.reference(target_repo_obj, "heads/$default_branch", auth=auth)
+            base_sha = main_branch_ref.object["sha"]
+            @info "📋 Base SHA from target: $base_sha"
+        end
         
         # Create new branch
         try

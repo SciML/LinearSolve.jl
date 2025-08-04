@@ -318,11 +318,13 @@ This is expected - arbitrary precision arithmetic is much slower than hardware f
 
 ## Community and Telemetry
 
-By default, autotune results are shared with the LinearSolve.jl community to help improve algorithm selection for everyone. The shared data includes:
+By default, autotune results are shared with the LinearSolve.jl community via public GitHub gists to help improve algorithm selection for everyone. The shared data includes:
 
 - System information (OS, CPU, core count, etc.)
 - Algorithm performance results
 - NO personal information or sensitive data
+
+Results are uploaded as public gists that can be easily searched and viewed by the community.
 
 ### GitHub Authentication for Telemetry
 
@@ -333,7 +335,7 @@ When telemetry is enabled, the system will prompt you to set up GitHub authentic
 results = autotune_setup(telemetry = true)
 ```
 
-The system will wait for you to create and paste a GitHub token. This helps the community by sharing performance data across different hardware configurations.
+The system will wait for you to create and paste a GitHub token. This helps the community by sharing performance data across different hardware configurations via easily discoverable GitHub gists.
 
 **Interactive Setup:**
 The autotune process will show step-by-step instructions and wait for you to:

@@ -325,14 +325,12 @@ function format_detailed_results_markdown(df::DataFrame)
 end
 
 """
-    upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dict}, auth; 
-                     repo="SciML/LinearSolve.jl", issue_number=669)
+    upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dict}, auth)
 
-Upload benchmark results to GitHub issue as a comment.
+Upload benchmark results to GitHub as a gist for community sharing.
 Requires a pre-authenticated GitHub.jl auth object.
 """
-function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dict}, auth;
-        repo = "SciML/LinearSolve.jl", issue_number = 669)
+function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dict}, auth)
     
     if auth === nothing
         @info "⚠️  No GitHub authentication available. Saving results locally instead of uploading."
@@ -345,39 +343,53 @@ function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dic
         return
     end
     
-    @info "📤 Uploading results to GitHub issue #$issue_number in $repo"
+    @info "📤 Creating GitHub gist with benchmark results..."
 
     try
-
-        # Get the repository
-        repo_obj = GitHub.repo(repo)
-
-        # Create the comment content
-        comment_body = content
-
-        # Handle different plot file formats
+        # Create gist content
+        gist_content = content
+        
+        # Add plot file information to the gist
         if plot_files !== nothing
             if isa(plot_files, Tuple)
                 # Backward compatibility: single plot
                 png_file, pdf_file = plot_files
-                comment_body *= "\n\n**Note**: Benchmark plots have been generated locally as `$png_file` and `$pdf_file`."
+                gist_content *= "\n\n**Note**: Benchmark plots have been generated locally as `$png_file` and `$pdf_file`."
             elseif isa(plot_files, Dict)
                 # Multiple plots by element type
-                comment_body *= "\n\n**Note**: Benchmark plots have been generated locally:"
+                gist_content *= "\n\n**Note**: Benchmark plots have been generated locally:"
                 for (eltype, files) in plot_files
                     png_file, pdf_file = files
-                    comment_body *= "\n- $eltype: `$png_file` and `$pdf_file`"
+                    gist_content *= "\n- $eltype: `$png_file` and `$pdf_file`"
                 end
             end
         end
-
-        # Post the comment using the correct GitHub.jl API
-        GitHub.create_comment(repo_obj, issue_number; body = comment_body, auth = auth)
-
-        @info "✅ Successfully posted benchmark results to GitHub issue #$issue_number"
+        
+        # Create gist files dictionary
+        files = Dict{String, Dict{String, String}}()
+        timestamp = replace(string(Dates.now()), ":" => "-")
+        filename = "LinearSolve_autotune_$(timestamp).md"
+        files[filename] = Dict("content" => gist_content)
+        
+        # Create the gist
+        gist_data = Dict(
+            "description" => "LinearSolve.jl Autotune Benchmark Results - $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM"))",
+            "public" => true,
+            "files" => files
+        )
+        
+        # Use GitHub.jl to create gist
+        gist_result = GitHub.create_gist(gist_data; auth = auth)
+        
+        gist_url = gist_result.html_url
+        @info "✅ Successfully created GitHub gist: $gist_url"
+        @info "🔗 Your benchmark results are now available to help the LinearSolve.jl community!"
+        
+        # Also mention where to find community gists
+        @info "💡 To see other community benchmarks, search GitHub gists for 'LinearSolve autotune'"
 
     catch e
-        @warn "❌ Failed to upload to GitHub: $e"
+        @warn "❌ Failed to create GitHub gist: $e"
         @info "💡 This could be due to network issues, repository permissions, or API limits."
 
         # Save locally as fallback

@@ -181,7 +181,7 @@ function autotune_setup(;
 
     # Upload telemetry if requested
     if telemetry && nrow(successful_results) > 0
-        @info "📤 Preparing telemetry data for sharing..."
+        @info "📤 Preparing telemetry data for community sharing..."
         markdown_content = format_results_for_github(results_df, system_info, categories)
         upload_to_github(markdown_content, plot_files, github_auth)
     end

@@ -9,22 +9,13 @@ Returns authentication object if successful, nothing if setup needed.
 function setup_github_authentication()
     # Check if GITHUB_TOKEN environment variable exists
     if haskey(ENV, "GITHUB_TOKEN") && !isempty(ENV["GITHUB_TOKEN"])
-        try
-            auth = GitHub.authenticate(ENV["GITHUB_TOKEN"])
-            @info "✅ GitHub authentication successful - ready to share results!"
-            return auth
-        catch e
-            @warn "❌ GITHUB_TOKEN exists but authentication failed: $e"
-            @info "Please check that your GITHUB_TOKEN is valid and has appropriate permissions"
-            return nothing
-        end
+        return test_github_authentication(ENV["GITHUB_TOKEN"])
     end
     
-    # No environment variable - provide setup instructions and wait for token
-    attempts = 0
-    max_attempts = 3
+    # No environment variable - provide setup instructions and get token
+    max_input_attempts = 3
     
-    while attempts < max_attempts
+    for input_attempt in 1:max_input_attempts
         println()
         println("🚀 Help Improve LinearSolve.jl for Everyone!")
         println("="^50)
@@ -41,100 +32,110 @@ function setup_github_authentication()
         println("    • Repository access: 'Public Repositories (read-only)'")
         println("4️⃣  Click 'Generate token' and copy it")
         println()
-        println("🔑 Paste your GitHub token here (or press Enter to skip):")
+        println("🔑 Paste your GitHub token here:")
         print("Token: ")
-        flush(stdout)  # Ensure the prompt is displayed before reading
+        flush(stdout)
         
-        # Add a small safety delay to ensure prompt is fully displayed
-        sleep(0.05)
-        
-        # Read the token input
+        # Get token input
         token = ""
         try
+            sleep(0.1)  # Small delay for I/O stability
             token = strip(readline())
         catch e
             println("❌ Input error: $e")
-            println("🔄 Please try again...")
-            flush(stdout)
-            sleep(0.1)
             continue
         end
         
         if !isempty(token)
-            # Wrap everything in a protective try-catch to prevent REPL interference
-            auth_success = false
-            auth_result = nothing
-            
-            try
-                println("🔍 Testing token...")
-                flush(stdout)
-                
-                # Clean the token of any potential whitespace/newlines
-                clean_token = strip(replace(token, r"\s+" => ""))
-                ENV["GITHUB_TOKEN"] = clean_token
-                
-                # Test authentication
-                auth_result = GitHub.authenticate(clean_token)
-                
-                println("✅ Perfect! Authentication successful - your results will help everyone!")
-                flush(stdout)
-                auth_success = true
-                
-            catch e
-                println("❌ Token authentication failed: $e")
-                println("💡 Make sure the token:")
-                println("   • Has 'public_repo' or 'Public Repositories' access")
-                println("   • Was copied completely without extra characters")
-                println("   • Is not expired")
-                flush(stdout)
-                
-                # Clean up on failure
-                if haskey(ENV, "GITHUB_TOKEN")
-                    delete!(ENV, "GITHUB_TOKEN")
-                end
-                auth_success = false
+            # Clean and validate token format
+            clean_token = strip(replace(token, r"[\r\n\t ]+" => ""))
+            if length(clean_token) < 10
+                println("❌ Token seems too short. Please check and try again.")
+                continue
             end
             
-            if auth_success && auth_result !== nothing
+            # Set environment variable
+            ENV["GITHUB_TOKEN"] = clean_token
+            
+            # Test authentication with multiple attempts (addressing the "third attempt works" issue)
+            auth_result = test_github_authentication(clean_token)
+            if auth_result !== nothing
                 return auth_result
-            else
-                attempts += 1
-                if attempts < max_attempts
-                    println("🔄 Let's try again...")
-                    flush(stdout)
-                    continue
-                end
             end
-        else
-            attempts += 1
-            if attempts < max_attempts
-                println()
-                println("⏰ Hold on! This really helps the LinearSolve.jl community.")
-                println("   Your hardware's benchmark data improves algorithm selection for everyone.")
-                println("   It only takes 30 seconds and makes LinearSolve.jl better for all users.")
-                println()
-                println("🤝 Please help the community - try setting up the token?")
-                print("Response (y/n): ")
-                flush(stdout)  # Ensure the prompt is displayed before reading
-                response = strip(lowercase(readline()))
-                if response == "n" || response == "no"
-                    attempts += 1
-                    if attempts < max_attempts
-                        println("🙏 One more chance - the community really benefits from diverse hardware data!")
-                        continue
-                    end
-                else
-                    # Reset attempts if they want to try again
-                    attempts = 0
-                    continue
-                end
-            end
+            
+            # If all authentication attempts failed, clean up and continue to next input attempt
+            delete!(ENV, "GITHUB_TOKEN")
+        end
+        
+        # Handle skip attempts
+        if input_attempt < max_input_attempts
+            println()
+            println("⏰ This really helps the LinearSolve.jl community!")
+            println("   Your hardware's benchmark data improves algorithm selection for everyone.")
+            println("🤝 Please try again - it only takes 30 seconds.")
         end
     end
     
     println()
-    println("📊 Okay, continuing without telemetry. Results will be saved locally.")
-    println("💡 You can always run `export GITHUB_TOKEN=your_token` and restart Julia later.")
+    println("📊 Continuing without telemetry. Results will be saved locally.")
+    println("💡 You can set GITHUB_TOKEN environment variable and restart Julia later.")
+    
+    return nothing
+end
+
+"""
+    test_github_authentication(token::String)
+
+Test GitHub authentication with up to 3 attempts to handle connection warmup issues.
+Returns authentication object if successful, nothing otherwise.
+"""
+function test_github_authentication(token::String)
+    max_auth_attempts = 3
+    
+    println("🔍 Testing GitHub authentication...")
+    println("📏 Token length: $(length(token))")
+    flush(stdout)
+    
+    for auth_attempt in 1:max_auth_attempts
+        try
+            if auth_attempt == 1
+                println("🌐 Establishing connection to GitHub API...")
+            elseif auth_attempt == 2
+                println("🔄 Retrying connection (sometimes GitHub needs warmup)...")
+            else
+                println("🎯 Final authentication attempt...")
+            end
+            flush(stdout)
+            
+            # Add delay between attempts to handle timing issues
+            if auth_attempt > 1
+                sleep(0.5)
+            end
+            
+            # Test authentication
+            auth_result = GitHub.authenticate(token)
+            
+            # If we get here, authentication worked
+            println("✅ Authentication successful - your results will help everyone!")
+            flush(stdout)
+            return auth_result
+            
+        catch e
+            println("❌ Attempt $auth_attempt failed: $(typeof(e))")
+            if auth_attempt < max_auth_attempts
+                println("   Retrying in a moment...")
+            else
+                println("   All authentication attempts failed.")
+                # Show safe preview of token for debugging
+                if length(token) > 8
+                    token_preview = token[1:4] * "..." * token[end-3:end]
+                    println("🔍 Token preview: $token_preview")
+                end
+                println("💡 Please verify your token has 'Issues' read permission and try again.")
+            end
+            flush(stdout)
+        end
+    end
     
     return nothing
 end

@@ -71,17 +71,17 @@ end
 
 function defaultalg(A::Tridiagonal, b, assump::OperatorAssumptions{Bool})
     if assump.issq
-        DefaultLinearSolver(DefaultAlgorithmChoice.LUFactorization)
+        DirectLdiv!()
     else
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
     end
 end
 
 function defaultalg(A::SymTridiagonal, b, ::OperatorAssumptions{Bool})
-    DefaultLinearSolver(DefaultAlgorithmChoice.LDLtFactorization)
+    DirectLdiv!()
 end
 function defaultalg(A::Bidiagonal, b, ::OperatorAssumptions{Bool})
-    DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
+    DirectLdiv!()
 end
 function defaultalg(A::Factorization, b, ::OperatorAssumptions{Bool})
     DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)

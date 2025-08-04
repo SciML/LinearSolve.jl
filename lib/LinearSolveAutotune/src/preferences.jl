@@ -35,14 +35,25 @@ Handles both legacy and element type-specific preferences.
 function get_algorithm_preferences()
     prefs = Dict{String, String}()
 
-    # Get all LinearSolve preferences
-    all_prefs = Preferences.load_preferences(LinearSolve, "")
+    # Get all LinearSolve preferences by checking common preference patterns
+    # Since there's no direct way to get all preferences, we'll check for known patterns
+    common_patterns = [
+        # Element type + size range combinations
+        "Float64_0_128", "Float64_128_256", "Float64_256_512", "Float64_512plus",
+        "Float32_0_128", "Float32_128_256", "Float32_256_512", "Float32_512plus", 
+        "ComplexF64_0_128", "ComplexF64_128_256", "ComplexF64_256_512", "ComplexF64_512plus",
+        "ComplexF32_0_128", "ComplexF32_128_256", "ComplexF32_256_512", "ComplexF32_512plus",
+        "BigFloat_0_128", "BigFloat_128_256", "BigFloat_256_512", "BigFloat_512plus",
+        # Legacy patterns without element type
+        "0_128", "128_256", "256_512", "512plus"
+    ]
     
-    # Filter for algorithm preferences
-    for (key, value) in all_prefs
-        if startswith(key, "best_algorithm_") && key != "best_algorithm_"
+    for pattern in common_patterns
+        pref_key = "best_algorithm_$pattern"
+        value = Preferences.load_preference(LinearSolve, pref_key, nothing)
+        if value !== nothing
             # Convert back to human-readable key
-            readable_key = replace(key[16:end], "_" => "-", "plus" => "+")  # Remove "best_algorithm_" prefix
+            readable_key = replace(pattern, "_" => "-", "plus" => "+")
             prefs[readable_key] = value
         end
     end
@@ -59,18 +70,31 @@ Handles both legacy and element type-specific preferences.
 function clear_algorithm_preferences()
     @info "Clearing LinearSolve autotune preferences..."
 
-    # Get all LinearSolve preferences
-    all_prefs = Preferences.load_preferences(LinearSolve, "")
+    # Clear known preference patterns
+    common_patterns = [
+        # Element type + size range combinations
+        "Float64_0_128", "Float64_128_256", "Float64_256_512", "Float64_512plus",
+        "Float32_0_128", "Float32_128_256", "Float32_256_512", "Float32_512plus", 
+        "ComplexF64_0_128", "ComplexF64_128_256", "ComplexF64_256_512", "ComplexF64_512plus",
+        "ComplexF32_0_128", "ComplexF32_128_256", "ComplexF32_256_512", "ComplexF32_512plus",
+        "BigFloat_0_128", "BigFloat_128_256", "BigFloat_256_512", "BigFloat_512plus",
+        # Legacy patterns without element type
+        "0_128", "128_256", "256_512", "512plus"
+    ]
     
-    # Clear all algorithm-related preferences
-    for (key, value) in all_prefs
-        if startswith(key, "best_algorithm_")
-            Preferences.delete_preferences!(LinearSolve, key; force = true)
-            @info "Cleared preference: $key"
+    for pattern in common_patterns
+        pref_key = "best_algorithm_$pattern"
+        # Check if preference exists before trying to delete
+        if Preferences.has_preference(LinearSolve, pref_key)
+            Preferences.delete_preferences!(LinearSolve, pref_key; force = true)
+            @info "Cleared preference: $pref_key"
         end
     end
 
-    Preferences.delete_preferences!(LinearSolve, "autotune_timestamp"; force = true)
+    # Clear timestamp
+    if Preferences.has_preference(LinearSolve, "autotune_timestamp")
+        Preferences.delete_preferences!(LinearSolve, "autotune_timestamp"; force = true)
+    end
 
     @info "Preferences cleared from LinearSolve.jl."
 end

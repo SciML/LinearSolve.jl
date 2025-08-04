@@ -1,9 +1,0 @@
-[LinearSolve]
-autotune_timestamp = "2025-08-03T23:48:36.615"
-best_algorithm_0_128 = "TestAlg"
-
-[LinearSolveAutotune]
-autotune_timestamp = "2025-08-03T19:50:58.753"
-best_algorithm_0_128 = "LUFactorization"
-best_algorithm_128_256 = "LUFactorization"
-best_algorithm_256_512 = "LUFactorization"

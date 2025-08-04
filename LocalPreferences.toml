@@ -1,0 +1,5 @@
+[LinearSolve]
+autotune_timestamp = "2025-08-04T02:03:00.593"
+best_algorithm_BigFloat_256_512 = "GenericLUFactorization"
+best_algorithm_ComplexF64_128_256 = "AnotherAlgorithm"
+best_algorithm_Float64_0_128 = "NewTestAlgorithm"

@@ -1,11 +1,12 @@
 # Algorithm detection and creation functions
 
 """
-    get_available_algorithms()
+    get_available_algorithms(; skip_missing_algs::Bool = false)
 
 Returns a list of available LU factorization algorithms based on the system and loaded packages.
+If skip_missing_algs=false, errors when expected algorithms are missing; if true, warns instead.
 """
-function get_available_algorithms()
+function get_available_algorithms(; skip_missing_algs::Bool = false)
     algs = []
     alg_names = String[]
 
@@ -22,20 +23,38 @@ function get_available_algorithms()
         push!(alg_names, "MKLLUFactorization")
     end
 
-    # Apple Accelerate if available  
+    # Apple Accelerate if available (should be available on macOS)
     if LinearSolve.appleaccelerate_isavailable()
         push!(algs, AppleAccelerateLUFactorization())
         push!(alg_names, "AppleAccelerateLUFactorization")
+    else
+        # Check if we're on macOS and Apple Accelerate should be available
+        if Sys.isapple() && !skip_missing_algs
+            msg = "macOS system detected but Apple Accelerate not available. This is unexpected."
+            @warn msg
+        end
     end
 
-    # RecursiveFactorization if loaded
+    # RecursiveFactorization - should always be available as it's a hard dependency
     try
         if LinearSolve.userecursivefactorization(nothing)
             push!(algs, RFLUFactorization())
             push!(alg_names, "RFLUFactorization")
+        else
+            msg = "RFLUFactorization should be available (RecursiveFactorization.jl is a hard dependency)"
+            if skip_missing_algs
+                @warn msg
+            else
+                error(msg * ". Pass `skip_missing_algs=true` to continue with warning instead.")
+            end
         end
-    catch
-        # RFLUFactorization not available
+    catch e
+        msg = "RFLUFactorization failed to load: $e"
+        if skip_missing_algs
+            @warn msg
+        else
+            error(msg * ". Pass `skip_missing_algs=true` to continue with warning instead.")
+        end
     end
 
     # SimpleLU always available
@@ -46,11 +65,12 @@ function get_available_algorithms()
 end
 
 """
-    get_gpu_algorithms()
+    get_gpu_algorithms(; skip_missing_algs::Bool = false)
 
 Returns GPU-specific algorithms if GPU hardware and packages are available.
+If skip_missing_algs=false, errors when GPU hardware is detected but algorithms are missing; if true, warns instead.
 """
-function get_gpu_algorithms()
+function get_gpu_algorithms(; skip_missing_algs::Bool = false)
     gpu_algs = []
     gpu_names = String[]
 
@@ -59,8 +79,13 @@ function get_gpu_algorithms()
         try
             push!(gpu_algs, CudaOffloadFactorization())
             push!(gpu_names, "CudaOffloadFactorization")
-        catch
-            # CUDA extension not loaded
+        catch e
+            msg = "CUDA hardware detected but CudaOffloadFactorization not available: $e. Load CUDA.jl package."
+            if skip_missing_algs
+                @warn msg
+            else
+                error(msg * " Pass `skip_missing_algs=true` to continue with warning instead.")
+            end
         end
     end
 
@@ -69,8 +94,13 @@ function get_gpu_algorithms()
         try
             push!(gpu_algs, MetalLUFactorization())
             push!(gpu_names, "MetalLUFactorization")
-        catch
-            # Metal extension not loaded
+        catch e
+            msg = "Metal hardware detected but MetalLUFactorization not available: $e. Load Metal.jl package."
+            if skip_missing_algs
+                @warn msg
+            else
+                error(msg * " Pass `skip_missing_algs=true` to continue with warning instead.")
+            end
         end
     end
 

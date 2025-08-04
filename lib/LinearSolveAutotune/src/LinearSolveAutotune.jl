@@ -33,7 +33,8 @@ include("preferences.jl")
         set_preferences::Bool = true,
         samples::Int = 5,
         seconds::Float64 = 0.5,
-        eltypes = (Float32, Float64, ComplexF32, ComplexF64))
+        eltypes = (Float32, Float64, ComplexF32, ComplexF64),
+        skip_missing_algs::Bool = false)
 
 Run a comprehensive benchmark of all available LU factorization methods and optionally:
 
@@ -52,6 +53,7 @@ Run a comprehensive benchmark of all available LU factorization methods and opti
   - `samples::Int = 5`: Number of benchmark samples per algorithm/size
   - `seconds::Float64 = 0.5`: Maximum time per benchmark
   - `eltypes = (Float32, Float64, ComplexF32, ComplexF64)`: Element types to benchmark
+  - `skip_missing_algs::Bool = false`: If false, error when expected algorithms are missing; if true, warn instead
 
 # Returns
 
@@ -75,6 +77,9 @@ results = autotune_setup(eltypes = (Float64, ComplexF64))
 
 # Test with BigFloat (note: most BLAS algorithms will be excluded)
 results = autotune_setup(eltypes = (BigFloat,), telemetry = false)
+
+# Allow missing algorithms (useful for incomplete setups)
+results = autotune_setup(skip_missing_algs = true)
 ```
 """
 function autotune_setup(;
@@ -84,7 +89,8 @@ function autotune_setup(;
         set_preferences::Bool = true,
         samples::Int = 5,
         seconds::Float64 = 0.5,
-        eltypes = (Float32, Float64, ComplexF32, ComplexF64))
+        eltypes = (Float32, Float64, ComplexF32, ComplexF64),
+        skip_missing_algs::Bool = false)
     @info "Starting LinearSolve.jl autotune setup..."
     @info "Configuration: large_matrices=$large_matrices, telemetry=$telemetry, make_plot=$make_plot, set_preferences=$set_preferences"
     @info "Element types to benchmark: $(join(eltypes, ", "))"
@@ -104,11 +110,11 @@ function autotune_setup(;
     @info "System detected: $(system_info["os"]) $(system_info["arch"]) with $(system_info["num_cores"]) cores"
 
     # Get available algorithms
-    cpu_algs, cpu_names = get_available_algorithms()
+    cpu_algs, cpu_names = get_available_algorithms(; skip_missing_algs = skip_missing_algs)
     @info "Found $(length(cpu_algs)) CPU algorithms: $(join(cpu_names, ", "))"
 
     # Add GPU algorithms if available
-    gpu_algs, gpu_names = get_gpu_algorithms()
+    gpu_algs, gpu_names = get_gpu_algorithms(; skip_missing_algs = skip_missing_algs)
     if !isempty(gpu_algs)
         @info "Found $(length(gpu_algs)) GPU algorithms: $(join(gpu_names, ", "))"
     end

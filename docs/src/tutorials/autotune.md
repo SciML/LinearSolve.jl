@@ -94,6 +94,24 @@ results = autotune_setup(set_preferences = false)
 results = autotune_setup(make_plot = false)
 ```
 
+### Missing Algorithm Handling
+
+By default, autotune is assertive about finding all expected algorithms:
+
+```julia
+# Default behavior: error if expected algorithms are missing
+results = autotune_setup()  # Will error if RFLUFactorization missing
+
+# Allow missing algorithms (useful for incomplete setups)
+results = autotune_setup(skip_missing_algs = true)  # Will warn instead of error
+```
+
+**When algorithms might be missing:**
+- RFLUFactorization should always be available (hard dependency)
+- GPU algorithms require CUDA.jl or Metal.jl to be loaded
+- Apple Accelerate should work on macOS systems
+- MKL algorithms require MKL.jl package
+
 ## Understanding Algorithm Compatibility
 
 The autotuner automatically detects which algorithms work with which element types:

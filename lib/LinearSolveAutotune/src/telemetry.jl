@@ -1,6 +1,87 @@
 # Telemetry functionality for sharing benchmark results
 
 """
+    setup_github_authentication()
+
+Set up GitHub authentication for telemetry uploads.
+Returns authentication object if successful, nothing if user cancels.
+"""
+function setup_github_authentication()
+    # Check if GITHUB_TOKEN environment variable exists
+    if haskey(ENV, "GITHUB_TOKEN") && !isempty(ENV["GITHUB_TOKEN"])
+        try
+            auth = GitHub.authenticate(ENV["GITHUB_TOKEN"])
+            @info "✅ GitHub authentication successful using GITHUB_TOKEN environment variable"
+            return auth
+        catch e
+            @warn "❌ GITHUB_TOKEN exists but authentication failed: $e"
+            @info "Please check that your GITHUB_TOKEN is valid and has appropriate permissions"
+            return nothing
+        end
+    end
+    
+    # No environment variable - ask user to authenticate
+    println()
+    println("🔐 GitHub Authentication Required for Telemetry")
+    println("="^50)
+    println("To share benchmark results with the LinearSolve.jl community, you need to")
+    println("authenticate with GitHub. This helps improve algorithm selection for everyone!")
+    println()
+    println("Options:")
+    println("1. Set GITHUB_TOKEN environment variable (recommended for automation)")
+    println("2. Authenticate interactively now")
+    println("3. Skip telemetry (disable sharing)")
+    println()
+    
+    while true
+        print("Choose option (1/2/3): ")
+        choice = readline()
+        
+        if choice == "1"
+            println()
+            println("To set up GITHUB_TOKEN:")
+            println("1. Go to https://github.com/settings/tokens")
+            println("2. Generate a Personal Access Token with 'public_repo' scope")
+            println("3. Set environment variable: export GITHUB_TOKEN=your_token_here")
+            println("4. Restart Julia and run autotune again")
+            println()
+            println("⚠️  Continuing without telemetry for this session...")
+            return nothing
+            
+        elseif choice == "2"
+            println()
+            print("Enter your GitHub Personal Access Token: ")
+            token = readline()
+            
+            if isempty(token)
+                println("❌ No token provided. Skipping telemetry.")
+                return nothing
+            end
+            
+            try
+                # Set temporarily for this session
+                ENV["GITHUB_TOKEN"] = token
+                auth = GitHub.authenticate(token)
+                println("✅ Authentication successful! Token set for this session.")
+                return auth
+            catch e
+                println("❌ Authentication failed: $e")
+                println("Please check that your token is valid and has 'public_repo' scope.")
+                continue
+            end
+            
+        elseif choice == "3"
+            println("⚠️  Skipping telemetry. Results will not be shared with the community.")
+            return nothing
+            
+        else
+            println("❌ Invalid choice. Please enter 1, 2, or 3.")
+            continue
+        end
+    end
+end
+
+"""
     format_results_for_github(df::DataFrame, system_info::Dict, categories::Dict{String, String})
 
 Format benchmark results as a markdown table suitable for GitHub issues.
@@ -150,18 +231,29 @@ function format_detailed_results_markdown(df::DataFrame)
 end
 
 """
-    upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dict}; 
+    upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dict}, auth; 
                      repo="SciML/LinearSolve.jl", issue_number=669)
 
 Upload benchmark results to GitHub issue as a comment.
+Requires a pre-authenticated GitHub.jl auth object.
 """
-function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dict};
+function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dict}, auth;
         repo = "SciML/LinearSolve.jl", issue_number = 669)
-    @info "Preparing to upload results to GitHub issue #$issue_number in $repo"
+    
+    if auth === nothing
+        @info "⚠️  No GitHub authentication available. Saving results locally instead of uploading."
+        # Save locally as fallback
+        fallback_file = "autotune_results_$(replace(string(Dates.now()), ":" => "-")).md"
+        open(fallback_file, "w") do f
+            write(f, content)
+        end
+        @info "📁 Results saved locally to $fallback_file"
+        return
+    end
+    
+    @info "📤 Uploading results to GitHub issue #$issue_number in $repo"
 
     try
-        # Create GitHub authentication (requires GITHUB_TOKEN environment variable)
-        auth = GitHub.authenticate(ENV["GITHUB_TOKEN"])
 
         # Get the repository
         repo_obj = GitHub.repo(repo)
@@ -188,17 +280,17 @@ function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dic
         # Post the comment
         GitHub.create_comment(repo_obj, issue_number, comment_body, auth = auth)
 
-        @info "Successfully posted benchmark results to GitHub issue #$issue_number"
+        @info "✅ Successfully posted benchmark results to GitHub issue #$issue_number"
 
     catch e
-        @warn "Failed to upload to GitHub: $e"
-        @info "Make sure you have set the GITHUB_TOKEN environment variable with appropriate permissions."
+        @warn "❌ Failed to upload to GitHub: $e"
+        @info "💡 This could be due to network issues, repository permissions, or API limits."
 
         # Save locally as fallback
         fallback_file = "autotune_results_$(replace(string(Dates.now()), ":" => "-")).md"
         open(fallback_file, "w") do f
             write(f, content)
         end
-        @info "Results saved locally to $fallback_file"
+        @info "📁 Results saved locally to $fallback_file as backup"
     end
 end

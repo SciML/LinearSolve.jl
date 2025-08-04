@@ -306,6 +306,39 @@ By default, autotune results are shared with the LinearSolve.jl community to hel
 - Algorithm performance results
 - NO personal information or sensitive data
 
-You can disable this with `telemetry=false` if preferred.
+### GitHub Authentication for Telemetry
 
-This helps the community understand performance across different hardware configurations and improves the default algorithm selection for future users.
+When telemetry is enabled, you'll be prompted to authenticate with GitHub:
+
+```julia
+# This will prompt for GitHub authentication
+results = autotune_setup(telemetry = true)
+```
+
+You have three options:
+
+1. **Environment Variable (Recommended)**: Set `GITHUB_TOKEN` before running Julia:
+   ```bash
+   export GITHUB_TOKEN=your_personal_access_token
+   julia
+   ```
+
+2. **Interactive Authentication**: Enter your token when prompted during autotune
+
+3. **Skip Telemetry**: Choose to continue without sharing results
+
+To create a GitHub Personal Access Token:
+1. Go to [GitHub Settings > Tokens](https://github.com/settings/tokens)
+2. Generate a new token with `public_repo` scope
+3. Use it with the autotune process
+
+### Disabling Telemetry
+
+You can disable telemetry completely:
+
+```julia
+# No authentication required
+results = autotune_setup(telemetry = false)
+```
+
+This helps the community understand performance across different hardware configurations and improves the default algorithm selection for future users, but participation is entirely optional.

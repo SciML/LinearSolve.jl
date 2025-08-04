@@ -89,6 +89,16 @@ function autotune_setup(;
     @info "Configuration: large_matrices=$large_matrices, telemetry=$telemetry, make_plot=$make_plot, set_preferences=$set_preferences"
     @info "Element types to benchmark: $(join(eltypes, ", "))"
 
+    # Set up GitHub authentication early if telemetry is enabled
+    github_auth = nothing
+    if telemetry
+        @info "🔗 Checking GitHub authentication for telemetry..."
+        github_auth = setup_github_authentication()
+        if github_auth === nothing
+            @info "📊 Continuing with benchmarking (results will be saved locally)"
+        end
+    end
+
     # Get system information
     system_info = get_system_info()
     @info "System detected: $(system_info["os"]) $(system_info["arch"]) with $(system_info["num_cores"]) cores"
@@ -165,9 +175,9 @@ function autotune_setup(;
 
     # Upload telemetry if requested
     if telemetry && nrow(successful_results) > 0
-        @info "Preparing telemetry data for GitHub..."
+        @info "📤 Preparing telemetry data for sharing..."
         markdown_content = format_results_for_github(results_df, system_info, categories)
-        upload_to_github(markdown_content, plot_files)
+        upload_to_github(markdown_content, plot_files, github_auth)
     end
 
     @info "Autotune setup completed!"

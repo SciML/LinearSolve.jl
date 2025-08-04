@@ -31,28 +31,31 @@ include("preferences.jl")
         make_plot::Bool = true,
         set_preferences::Bool = true,
         samples::Int = 5,
-        seconds::Float64 = 0.5)
+        seconds::Float64 = 0.5,
+        eltypes = (Float32, Float64, ComplexF32, ComplexF64))
 
 Run a comprehensive benchmark of all available LU factorization methods and optionally:
 
-  - Create performance plots
-  - Upload results to GitHub telemetry
+  - Create performance plots for each element type
+  - Upload results to GitHub telemetry  
   - Set Preferences for optimal algorithm selection
   - Support both CPU and GPU algorithms based on hardware detection
+  - Test algorithm compatibility with different element types
 
 # Arguments
 
   - `large_matrices::Bool = false`: Include larger matrix sizes for GPU benchmarking
   - `telemetry::Bool = true`: Share results to GitHub issue for community data
-  - `make_plot::Bool = true`: Generate performance plots
+  - `make_plot::Bool = true`: Generate performance plots for each element type
   - `set_preferences::Bool = true`: Update LinearSolve preferences with optimal algorithms
   - `samples::Int = 5`: Number of benchmark samples per algorithm/size
   - `seconds::Float64 = 0.5`: Maximum time per benchmark
+  - `eltypes = (Float32, Float64, ComplexF32, ComplexF64)`: Element types to benchmark
 
 # Returns
 
-  - `DataFrame`: Detailed benchmark results with performance data
-  - `Plot`: Performance visualization (if `make_plot=true`)
+  - `DataFrame`: Detailed benchmark results with performance data for all element types
+  - `Dict` or `Plot`: Performance visualizations by element type (if `make_plot=true`)
 
 # Examples
 
@@ -60,14 +63,17 @@ Run a comprehensive benchmark of all available LU factorization methods and opti
 using LinearSolve
 using LinearSolveAutotune
 
-# Basic autotune with default settings
+# Basic autotune with default settings (4 element types)
 results = autotune_setup()
 
 # Custom autotune for GPU systems with larger matrices
 results = autotune_setup(large_matrices = true, samples = 10, seconds = 1.0)
 
-# Autotune without telemetry sharing
-results = autotune_setup(telemetry = false)
+# Autotune with only Float64 and ComplexF64
+results = autotune_setup(eltypes = (Float64, ComplexF64))
+
+# Test with BigFloat (note: most BLAS algorithms will be excluded)
+results = autotune_setup(eltypes = (BigFloat,), telemetry = false)
 ```
 """
 function autotune_setup(;
@@ -76,9 +82,11 @@ function autotune_setup(;
         make_plot::Bool = true,
         set_preferences::Bool = true,
         samples::Int = 5,
-        seconds::Float64 = 0.5)
+        seconds::Float64 = 0.5,
+        eltypes = (Float32, Float64, ComplexF32, ComplexF64))
     @info "Starting LinearSolve.jl autotune setup..."
     @info "Configuration: large_matrices=$large_matrices, telemetry=$telemetry, make_plot=$make_plot, set_preferences=$set_preferences"
+    @info "Element types to benchmark: $(join(eltypes, ", "))"
 
     # Get system information
     system_info = get_system_info()
@@ -108,7 +116,7 @@ function autotune_setup(;
 
     # Run benchmarks
     @info "Running benchmarks (this may take several minutes)..."
-    results_df = benchmark_algorithms(sizes, all_algs, all_names;
+    results_df = benchmark_algorithms(sizes, all_algs, all_names, eltypes;
         samples = samples, seconds = seconds, large_matrices = large_matrices)
 
     # Display results table
@@ -143,14 +151,14 @@ function autotune_setup(;
         set_algorithm_preferences(categories)
     end
 
-    # Create plot if requested
-    plot_obj = nothing
+    # Create plots if requested
+    plots_dict = nothing
     plot_files = nothing
     if make_plot
         @info "Creating performance plots..."
-        plot_obj = create_benchmark_plot(results_df)
-        if plot_obj !== nothing
-            plot_files = save_benchmark_plot(plot_obj)
+        plots_dict = create_benchmark_plots(results_df)
+        if !isempty(plots_dict)
+            plot_files = save_benchmark_plots(plots_dict)
         end
     end
 
@@ -163,9 +171,9 @@ function autotune_setup(;
 
     @info "Autotune setup completed!"
 
-    # Return results and plot
-    if make_plot && plot_obj !== nothing
-        return results_df, plot_obj
+    # Return results and plots
+    if make_plot && plots_dict !== nothing && !isempty(plots_dict)
+        return results_df, plots_dict
     else
         return results_df
     end

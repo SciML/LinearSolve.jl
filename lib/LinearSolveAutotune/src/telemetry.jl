@@ -58,7 +58,7 @@ end
 """
     format_categories_markdown(categories::Dict{String, String})
 
-Format the categorized results as markdown.
+Format the categorized results as markdown, organized by element type.
 """
 function format_categories_markdown(categories::Dict{String, String})
     if isempty(categories)
@@ -66,11 +66,38 @@ function format_categories_markdown(categories::Dict{String, String})
     end
 
     lines = String[]
-    push!(lines, "| Size Range | Best Algorithm |")
-    push!(lines, "|------------|----------------|")
+    
+    # Group categories by element type
+    eltype_categories = Dict{String, Dict{String, String}}()
+    
+    for (key, algorithm) in categories
+        # Parse key like "Float64_0-128" -> eltype="Float64", range="0-128"
+        if contains(key, "_")
+            eltype, range = split(key, "_", limit=2)
+            if !haskey(eltype_categories, eltype)
+                eltype_categories[eltype] = Dict{String, String}()
+            end
+            eltype_categories[eltype][range] = algorithm
+        else
+            # Fallback for backward compatibility
+            if !haskey(eltype_categories, "Mixed")
+                eltype_categories["Mixed"] = Dict{String, String}()
+            end
+            eltype_categories["Mixed"][key] = algorithm
+        end
+    end
+    
+    # Format each element type
+    for (eltype, ranges) in sort(eltype_categories)
+        push!(lines, "#### Recommendations for $eltype")
+        push!(lines, "")
+        push!(lines, "| Size Range | Best Algorithm |")
+        push!(lines, "|------------|----------------|")
 
-    for (range, algorithm) in sort(categories)
-        push!(lines, "| $range | $algorithm |")
+        for (range, algorithm) in sort(ranges)
+            push!(lines, "| $range | $algorithm |")
+        end
+        push!(lines, "")
     end
 
     return join(lines, "\n")
@@ -79,33 +106,56 @@ end
 """
     format_detailed_results_markdown(df::DataFrame)
 
-Format detailed benchmark results as a markdown table.
+Format detailed benchmark results as markdown tables, organized by element type.
 """
 function format_detailed_results_markdown(df::DataFrame)
-    # Create a summary table with average performance per algorithm
-    summary = combine(groupby(df, :algorithm), :gflops => mean => :avg_gflops, :gflops => std => :std_gflops)
-    sort!(summary, :avg_gflops, rev = true)
-
     lines = String[]
-    push!(lines, "| Algorithm | Avg GFLOPs | Std Dev |")
-    push!(lines, "|-----------|------------|---------|")
+    
+    # Get unique element types
+    eltypes = unique(df.eltype)
+    
+    for eltype in eltypes
+        push!(lines, "#### Results for $eltype")
+        push!(lines, "")
+        
+        # Filter results for this element type
+        eltype_df = filter(row -> row.eltype == eltype, df)
+        
+        if nrow(eltype_df) == 0
+            push!(lines, "No results for this element type.")
+            push!(lines, "")
+            continue
+        end
+        
+        # Create a summary table with average performance per algorithm for this element type
+        summary = combine(groupby(eltype_df, :algorithm), 
+                         :gflops => mean => :avg_gflops, 
+                         :gflops => std => :std_gflops,
+                         nrow => :num_tests)
+        sort!(summary, :avg_gflops, rev = true)
 
-    for row in eachrow(summary)
-        avg_str = @sprintf("%.2f", row.avg_gflops)
-        std_str = @sprintf("%.2f", row.std_gflops)
-        push!(lines, "| $(row.algorithm) | $avg_str | $std_str |")
+        push!(lines, "| Algorithm | Avg GFLOPs | Std Dev | Tests |")
+        push!(lines, "|-----------|------------|---------|-------|")
+
+        for row in eachrow(summary)
+            avg_str = @sprintf("%.2f", row.avg_gflops)
+            std_str = @sprintf("%.2f", row.std_gflops)
+            push!(lines, "| $(row.algorithm) | $avg_str | $std_str | $(row.num_tests) |")
+        end
+        
+        push!(lines, "")
     end
 
     return join(lines, "\n")
 end
 
 """
-    upload_to_github(content::String, plot_files::Union{Nothing, Tuple}; 
+    upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dict}; 
                      repo="SciML/LinearSolve.jl", issue_number=669)
 
 Upload benchmark results to GitHub issue as a comment.
 """
-function upload_to_github(content::String, plot_files::Union{Nothing, Tuple};
+function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dict};
         repo = "SciML/LinearSolve.jl", issue_number = 669)
     @info "Preparing to upload results to GitHub issue #$issue_number in $repo"
 
@@ -119,11 +169,20 @@ function upload_to_github(content::String, plot_files::Union{Nothing, Tuple};
         # Create the comment content
         comment_body = content
 
-        # If we have plot files, we would need to upload them as attachments
-        # GitHub API doesn't directly support image uploads in comments, so we'll just reference them
+        # Handle different plot file formats
         if plot_files !== nothing
-            png_file, pdf_file = plot_files
-            comment_body *= "\n\n**Note**: Benchmark plots have been generated locally as `$png_file` and `$pdf_file`."
+            if isa(plot_files, Tuple)
+                # Backward compatibility: single plot
+                png_file, pdf_file = plot_files
+                comment_body *= "\n\n**Note**: Benchmark plots have been generated locally as `$png_file` and `$pdf_file`."
+            elseif isa(plot_files, Dict)
+                # Multiple plots by element type
+                comment_body *= "\n\n**Note**: Benchmark plots have been generated locally:"
+                for (eltype, files) in plot_files
+                    png_file, pdf_file = files
+                    comment_body *= "\n- $eltype: `$png_file` and `$pdf_file`"
+                end
+            end
         end
 
         # Post the comment

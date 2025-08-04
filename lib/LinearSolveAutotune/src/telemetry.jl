@@ -20,32 +20,76 @@ function setup_github_authentication()
         end
     end
     
-    # No environment variable - provide setup instructions
+    # No environment variable - provide setup instructions and wait for token
+    attempts = 0
+    max_attempts = 3
+    
+    while attempts < max_attempts
+        println()
+        println("🚀 Help Improve LinearSolve.jl for Everyone!")
+        println("="^50)
+        println("Your benchmark results help the community by improving automatic")
+        println("algorithm selection across different hardware configurations.")
+        println()
+        println("📋 Quick GitHub Token Setup (takes 30 seconds):")
+        println()
+        println("1️⃣  Open: https://github.com/settings/tokens?type=beta")
+        println("2️⃣  Click 'Generate new token'")
+        println("3️⃣  Set:")
+        println("    • Name: 'LinearSolve Autotune'")
+        println("    • Expiration: 90 days")
+        println("    • Repository access: 'Public Repositories (read-only)'")
+        println("4️⃣  Click 'Generate token' and copy it")
+        println()
+        
+        print("🔑 Paste your GitHub token here (or press Enter to skip): ")
+        token = strip(readline())
+        
+        if !isempty(token)
+            try
+                # Test the token
+                ENV["GITHUB_TOKEN"] = token
+                auth = GitHub.authenticate(token)
+                println("✅ Perfect! Authentication successful - your results will help everyone!")
+                return auth
+            catch e
+                println("❌ Token authentication failed: $e")
+                println("💡 Make sure the token has 'public_repo' or 'Public Repositories' access")
+                delete!(ENV, "GITHUB_TOKEN")
+                attempts += 1
+                if attempts < max_attempts
+                    println("🔄 Let's try again...")
+                    continue
+                end
+            end
+        else
+            attempts += 1
+            if attempts < max_attempts
+                println()
+                println("⏰ Hold on! This really helps the LinearSolve.jl community.")
+                println("   Your hardware's benchmark data improves algorithm selection for everyone.")
+                println("   It only takes 30 seconds and makes LinearSolve.jl better for all users.")
+                println()
+                print("🤝 Please help the community - try setting up the token? (y/n): ")
+                response = strip(lowercase(readline()))
+                if response == "n" || response == "no"
+                    attempts += 1
+                    if attempts < max_attempts
+                        println("🙏 One more chance - the community really benefits from diverse hardware data!")
+                        continue
+                    end
+                else
+                    # Reset attempts if they want to try again
+                    attempts = 0
+                    continue
+                end
+            end
+        end
+    end
+    
     println()
-    println("🚀 Help Improve LinearSolve.jl for Everyone!")
-    println("="^50)
-    println("Your benchmark results help the community by improving automatic")
-    println("algorithm selection. Setting up GitHub authentication takes 30 seconds:")
-    println()
-    println("📋 Quick Setup (copy & paste these commands):")
-    println()
-    println("1️⃣  Create a GitHub token:")
-    println("   Open: https://github.com/settings/tokens?type=beta")
-    println("   • Click 'Generate new token'")
-    println("   • Name: 'LinearSolve Autotune'") 
-    println("   • Expiration: 90 days (or longer)")
-    println("   • Repository access: 'Public Repositories (read-only)'")
-    println("   • Click 'Generate token' and copy it")
-    println()
-    println("2️⃣  Set the token (paste your token after the =):")
-    println("   export GITHUB_TOKEN=paste_your_token_here")
-    println()
-    println("3️⃣  Restart Julia and run autotune again")
-    println()
-    println("That's it! Your results will automatically be shared to help everyone.")
-    println("="^50)
-    println()
-    println("⏭️  Continuing without telemetry for now (results saved locally)")
+    println("📊 Okay, continuing without telemetry. Results will be saved locally.")
+    println("💡 You can always run `export GITHUB_TOKEN=your_token` and restart Julia later.")
     
     return nothing
 end

@@ -308,30 +308,34 @@ By default, autotune results are shared with the LinearSolve.jl community to hel
 
 ### GitHub Authentication for Telemetry
 
-When telemetry is enabled, the system will check for GitHub authentication:
+When telemetry is enabled, the system will prompt you to set up GitHub authentication if not already configured:
 
 ```julia
-# This will show setup instructions if GITHUB_TOKEN not found
+# This will prompt for GitHub token setup if GITHUB_TOKEN not found
 results = autotune_setup(telemetry = true)
 ```
 
-**Quick Setup (30 seconds):**
+The system will wait for you to create and paste a GitHub token. This helps the community by sharing performance data across different hardware configurations.
 
-1. **Create GitHub Token**: Open [https://github.com/settings/tokens?type=beta](https://github.com/settings/tokens?type=beta)
-   - Click "Generate new token"
-   - Name: "LinearSolve Autotune"
-   - Expiration: 90 days (or longer)
-   - Repository access: "Public Repositories (read-only)"
-   - Generate and copy the token
+**Interactive Setup:**
+The autotune process will show step-by-step instructions and wait for you to:
+1. Create a GitHub token at the provided link
+2. Paste the token when prompted
+3. Proceed with benchmarking and automatic result sharing
 
-2. **Set Environment Variable**:
-   ```bash
-   export GITHUB_TOKEN=paste_your_token_here
-   ```
+**Alternative - Pre-setup Environment Variable**:
+```bash
+export GITHUB_TOKEN=your_token_here
+julia
+```
 
-3. **Restart Julia** and run autotune again
-
-That's it! Your results will automatically be shared to help the community.
+**Creating the GitHub Token:**
+1. Open [https://github.com/settings/tokens?type=beta](https://github.com/settings/tokens?type=beta)
+2. Click "Generate new token"
+3. Set name: "LinearSolve Autotune"
+4. Set expiration: 90 days
+5. Repository access: "Public Repositories (read-only)"
+6. Generate and copy the token
 
 ### Disabling Telemetry
 

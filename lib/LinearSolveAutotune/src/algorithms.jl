@@ -35,6 +35,41 @@ function get_available_algorithms(; skip_missing_algs::Bool = false)
         end
     end
 
+    # BLIS if available and hardware supports it
+    try
+        # Check if BLIS is loaded and BLISLUFactorization is available
+        if isdefined(LinearSolve, :BLISLUFactorization) && hasmethod(LinearSolve.BLISLUFactorization, ())
+            # Test if BLIS works on this hardware
+            try
+                test_alg = LinearSolve.BLISLUFactorization()
+                # Simple test to see if it can be created
+                push!(algs, test_alg)
+                push!(alg_names, "BLISLUFactorization")
+            catch e
+                msg = "BLISLUFactorization available but not supported on this hardware: $e"
+                if skip_missing_algs
+                    @warn msg
+                else
+                    @info msg  # BLIS hardware incompatibility is not an error, just info
+                end
+            end
+        else
+            msg = "BLIS.jl not loaded or BLISLUFactorization not available"
+            if skip_missing_algs
+                @warn msg
+            else
+                @info msg  # Not having BLIS is not an error
+            end
+        end
+    catch e
+        msg = "Error checking BLIS availability: $e"
+        if skip_missing_algs
+            @warn msg
+        else
+            @info msg
+        end
+    end
+
     # RecursiveFactorization - should always be available as it's a hard dependency
     try
         if LinearSolve.userecursivefactorization(nothing)

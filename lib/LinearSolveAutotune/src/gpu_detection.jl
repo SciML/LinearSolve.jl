@@ -155,6 +155,20 @@ function get_detailed_system_info()
     system_data["apple_accelerate_available"] = LinearSolve.appleaccelerate_isavailable()
     system_data["apple_accelerate_used"] = system_data["apple_accelerate_available"] && contains(lowercase(system_data["blas_vendor"]), "accelerate")
     
+    # BLIS availability check
+    system_data["blis_available"] = false
+    system_data["blis_used"] = false
+    try
+        # Check if BLIS is loaded and BLISLUFactorization is available
+        if isdefined(LinearSolve, :BLISLUFactorization) && hasmethod(LinearSolve.BLISLUFactorization, ())
+            system_data["blis_available"] = true
+            # Check if BLIS is actually being used (contains "blis" in BLAS vendor)
+            system_data["blis_used"] = contains(lowercase(system_data["blas_vendor"]), "blis")
+        end
+    catch
+        # If there's any error checking BLIS, leave as false
+    end
+    
     # GPU information
     system_data["cuda_available"] = is_cuda_available()
     system_data["metal_available"] = is_metal_available()
@@ -176,7 +190,12 @@ function get_detailed_system_info()
     
     # Environment information
     system_data["libm"] = Base.libm_name
-    system_data["libdl"] = Base.libdl_name
+    # libdl_name may not exist in all Julia versions
+    try
+        system_data["libdl"] = Base.libdl_name
+    catch
+        system_data["libdl"] = "unknown"
+    end
     
     # Memory information (if available)
     try

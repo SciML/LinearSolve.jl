@@ -71,7 +71,11 @@ end
 
 function defaultalg(A::Tridiagonal, b, assump::OperatorAssumptions{Bool})
     if assump.issq
-        DirectLdiv!()
+        @static if VERSION>=v"1.11"
+            DirectLdiv!()
+        else
+            DefaultLinearSolver(DefaultAlgorithmChoice.LUFactorization)
+        end
     else
         DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
     end

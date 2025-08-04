@@ -30,6 +30,7 @@ function setup_github_authentication()
         println("    • Name: 'LinearSolve Autotune'")
         println("    • Expiration: 90 days")
         println("    • Repository access: 'Public Repositories (read-only)'")
+        println("    • Permissions: Enable 'Contents: Read and write', 'Pull requests: Write', 'Forks: Write'")
         println("4️⃣  Click 'Generate token' and copy it")
         println()
         println("🔑 Paste your GitHub token here:")
@@ -401,6 +402,22 @@ function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dic
 
     catch e
         @warn "❌ Failed to create pull request: $e"
+        
+        # Try creating an issue as fallback if it's a permissions issue
+        if contains(string(e), "403") || contains(string(e), "permissions") || contains(string(e), "fork")
+            @info "💡 Attempting to create issue instead of PR due to permissions..."
+            try
+                issue_result = create_benchmark_issue(target_repo, fallback_repo, content, auth, system_info)
+                if issue_result !== nothing
+                    @info "✅ Created benchmark results issue: $(issue_result["html_url"])"
+                    @info "🔗 Your benchmark data has been shared with the community!"
+                    return
+                end
+            catch issue_error
+                @info "💡 Could not create issue either: $issue_error"
+            end
+        end
+        
         @info "💡 This could be due to network issues, repository permissions, or API limits."
 
         # Save locally as fallback
@@ -408,6 +425,62 @@ function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dic
         fallback_folder = "autotune_results_$(timestamp)"
         create_local_result_folder(fallback_folder, content, plot_files, results_df, system_info, categories)
         @info "📁 Results saved locally to $fallback_folder/ as backup"
+    end
+end
+
+"""
+    create_benchmark_issue(target_repo, fallback_repo, content, auth, system_info)
+
+Create a GitHub issue with benchmark results as a fallback when PR creation fails.
+"""
+function create_benchmark_issue(target_repo, fallback_repo, content, auth, system_info)
+    try
+        # Try target repository first, fallback if needed
+        actual_repo = target_repo
+        repo_obj = nothing
+        
+        try
+            repo_obj = GitHub.repo(target_repo, auth=auth)
+        catch
+            @info "📋 Using fallback repository for issue: $fallback_repo"
+            actual_repo = fallback_repo
+            repo_obj = GitHub.repo(fallback_repo, auth=auth)
+        end
+        
+        # Create issue title and body
+        cpu_name = get(system_info, "cpu_name", "unknown")
+        os_name = get(system_info, "os", "unknown")
+        timestamp = Dates.format(Dates.now(), "yyyy-mm-dd HH:MM")
+        
+        issue_title = "Benchmark Results: $cpu_name on $os_name ($timestamp)"
+        
+        issue_body = """
+# LinearSolve.jl Autotune Benchmark Results
+
+**Submitted via GitHub Issue** (PR creation failed due to token permissions)
+
+$content
+
+---
+
+**Note**: This was submitted as an issue because the GitHub token lacks fork creation permissions. 
+To enable PR creation, please create a token with 'Contents: Read and write', 'Pull requests: Write', and 'Forks: Write' permissions.
+
+🤖 *Generated automatically by LinearSolve.jl autotune system*
+"""
+        
+        # Create the issue
+        issue_result = GitHub.create_issue(repo_obj, 
+                                         title=issue_title,
+                                         body=issue_body,
+                                         auth=auth)
+        
+        @info "✅ Created benchmark results issue #$(issue_result.number)"
+        return issue_result
+        
+    catch e
+        @warn "Failed to create benchmark issue: $e"
+        return nothing
     end
 end
 
@@ -598,7 +671,14 @@ function create_results_pr(target_repo, fallback_repo, branch_name, folder_name,
                     error("Failed to access existing fork: $e2")
                 end
             else
-                error("Failed to create fork: $e")
+                if contains(string(e), "403") && contains(string(e), "Resource not accessible by personal access token")
+                    @warn "GitHub token lacks fork creation permissions. Please create a new token with 'Forks: Write' permission."
+                    @info "📋 Token setup guide: Go to https://github.com/settings/tokens?type=beta"
+                    @info "📋 Enable permissions: 'Contents: Read and write', 'Pull requests: Write', 'Forks: Write'"
+                    error("GitHub token permissions insufficient for fork creation")
+                else
+                    error("Failed to create fork: $e")
+                end
             end
         end
         

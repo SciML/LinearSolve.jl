@@ -9,7 +9,7 @@ Returns authentication object if successful, nothing if setup needed.
 function setup_github_authentication()
     # Check if GITHUB_TOKEN environment variable exists
     if haskey(ENV, "GITHUB_TOKEN") && !isempty(ENV["GITHUB_TOKEN"])
-        return test_github_authentication(ENV["GITHUB_TOKEN"])
+        return test_github_authentication(String(ENV["GITHUB_TOKEN"]))
     end
     
     # No environment variable - provide setup instructions and get token
@@ -32,17 +32,18 @@ function setup_github_authentication()
         println("    • Repository access: 'Public Repositories (read-only)'")
         println("4️⃣  Click 'Generate token' and copy it")
         println()
-        println("🔑 Paste your GitHub token here:")
+        println("🔑 Paste your GitHub token here (just the token, not as Julia code):")
         print("Token: ")
         flush(stdout)
         
-        # Get token input
+        # Get token input with better REPL handling
         token = ""
         try
             sleep(0.1)  # Small delay for I/O stability
-            token = strip(readline())
+            token = String(strip(readline()))  # Convert to String explicitly
         catch e
             println("❌ Input error: $e")
+            println("💡 Make sure to paste the token as a string, not Julia code")
             continue
         end
         
@@ -84,12 +85,12 @@ function setup_github_authentication()
 end
 
 """
-    test_github_authentication(token::String)
+    test_github_authentication(token::AbstractString)
 
 Test GitHub authentication with up to 3 attempts to handle connection warmup issues.
 Returns authentication object if successful, nothing otherwise.
 """
-function test_github_authentication(token::String)
+function test_github_authentication(token::AbstractString)
     max_auth_attempts = 3
     
     println("🔍 Testing GitHub authentication...")

@@ -40,6 +40,21 @@ using Random
             cpu_algs, cpu_names, ComplexF64)
         @test !isempty(compatible_algs_c64)
         
+        # Test BigFloat compatibility - should exclude BLAS algorithms but include pure Julia ones
+        compatible_algs_bf, compatible_names_bf = LinearSolveAutotune.filter_compatible_algorithms(
+            cpu_algs, cpu_names, BigFloat)
+        @test !isempty(compatible_algs_bf)
+        # Should not include LUFactorization (BLAS-dependent)
+        @test !("LUFactorization" in compatible_names_bf)
+        # Should include GenericLUFactorization (pure Julia)
+        @test "GenericLUFactorization" in compatible_names_bf
+        # Should include SimpleLUFactorization (pure Julia)
+        @test "SimpleLUFactorization" in compatible_names_bf
+        # Should include RFLUFactorization if available (pure Julia)
+        if "RFLUFactorization" in cpu_names
+            @test "RFLUFactorization" in compatible_names_bf
+        end
+        
         # Test individual algorithm compatibility
         for (alg, name) in zip(cpu_algs[1:min(3, end)], cpu_names[1:min(3, end)])
             result = LinearSolveAutotune.test_algorithm_compatibility(alg, Float64)

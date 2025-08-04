@@ -14,10 +14,10 @@ function test_algorithm_compatibility(alg, eltype::Type, test_size::Int = 4)
     # Define strict compatibility rules for BLAS-dependent algorithms
     if eltype in [BigFloat, BigInt, Rational{Int}, Complex{BigFloat}]
         # For arbitrary precision types, only allow pure Julia algorithms
-        if alg_name in ["LUFactorization", "MKLLUFactorization", "AppleAccelerateLUFactorization", "RFLUFactorization"]
+        if alg_name in ["LUFactorization", "MKLLUFactorization", "AppleAccelerateLUFactorization"]
             return false  # These rely on BLAS and shouldn't work with arbitrary precision
         end
-        # SimpleLUFactorization and GenericLUFactorization should work
+        # SimpleLUFactorization, GenericLUFactorization, and RFLUFactorization should work (pure Julia)
     elseif eltype in [Float16, Complex{Float16}]
         # Float16 might not be supported by all BLAS
         if alg_name in ["MKLLUFactorization", "AppleAccelerateLUFactorization"]

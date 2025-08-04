@@ -1,29 +1,31 @@
-# Preferences management for storing optimal algorithms
+# Preferences management for storing optimal algorithms in LinearSolve.jl
 
 """
     set_algorithm_preferences(categories::Dict{String, String})
 
 Set LinearSolve preferences based on the categorized benchmark results.
+These preferences are stored in the main LinearSolve.jl package.
 """
 function set_algorithm_preferences(categories::Dict{String, String})
     @info "Setting LinearSolve preferences based on benchmark results..."
 
     for (range, algorithm) in categories
         pref_key = "best_algorithm_$(replace(range, "+" => "plus", "-" => "_"))"
-        @set_preferences!(pref_key => algorithm)
-        @info "Set preference $pref_key = $algorithm"
+        # Set preferences in LinearSolve.jl, not LinearSolveAutotune
+        Preferences.set_preferences!(LinearSolve, pref_key => algorithm)
+        @info "Set preference $pref_key = $algorithm in LinearSolve.jl"
     end
 
     # Set a timestamp for when these preferences were created
-    @set_preferences!("autotune_timestamp" => string(Dates.now()))
+    Preferences.set_preferences!(LinearSolve, "autotune_timestamp" => string(Dates.now()))
 
-    @info "Preferences updated. You may need to restart Julia for changes to take effect."
+    @info "Preferences updated in LinearSolve.jl. You may need to restart Julia for changes to take effect."
 end
 
 """
     get_algorithm_preferences()
 
-Get the current algorithm preferences.
+Get the current algorithm preferences from LinearSolve.jl.
 """
 function get_algorithm_preferences()
     prefs = Dict{String, String}()
@@ -32,7 +34,8 @@ function get_algorithm_preferences()
 
     for range in ranges
         pref_key = "best_algorithm_$range"
-        value = @load_preference(pref_key, nothing)
+        # Load preferences from LinearSolve.jl
+        value = Preferences.load_preference(LinearSolve, pref_key, nothing)
         if value !== nothing
             # Convert back to human-readable range name
             readable_range = replace(range, "_" => "-", "plus" => "+")
@@ -46,7 +49,7 @@ end
 """
     clear_algorithm_preferences()
 
-Clear all autotune-related preferences.
+Clear all autotune-related preferences from LinearSolve.jl.
 """
 function clear_algorithm_preferences()
     @info "Clearing LinearSolve autotune preferences..."
@@ -55,34 +58,35 @@ function clear_algorithm_preferences()
 
     for range in ranges
         pref_key = "best_algorithm_$range"
-        @delete_preferences!(pref_key)
+        # Delete preferences from LinearSolve.jl
+        Preferences.delete_preferences!(LinearSolve, pref_key)
     end
 
-    @delete_preferences!("autotune_timestamp")
+    Preferences.delete_preferences!(LinearSolve, "autotune_timestamp")
 
-    @info "Preferences cleared."
+    @info "Preferences cleared from LinearSolve.jl."
 end
 
 """
     show_current_preferences()
 
-Display the current algorithm preferences in a readable format.
+Display the current algorithm preferences from LinearSolve.jl in a readable format.
 """
 function show_current_preferences()
     prefs = get_algorithm_preferences()
 
     if isempty(prefs)
-        println("No autotune preferences currently set.")
+        println("No autotune preferences currently set in LinearSolve.jl.")
         return
     end
 
-    println("Current LinearSolve autotune preferences:")
+    println("Current LinearSolve.jl autotune preferences:")
     println("="^50)
 
     for (range, algorithm) in sort(prefs)
         println("  Size range $range: $algorithm")
     end
 
-    timestamp = @load_preference("autotune_timestamp", "unknown")
+    timestamp = Preferences.load_preference(LinearSolve, "autotune_timestamp", "unknown")
     println("  Last updated: $timestamp")
 end

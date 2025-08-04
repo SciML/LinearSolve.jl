@@ -140,7 +140,13 @@ function get_detailed_system_info()
     
     # BLAS and linear algebra libraries
     system_data["blas_vendor"] = string(LinearAlgebra.BLAS.vendor())
-    system_data["lapack_vendor"] = string(LinearAlgebra.LAPACK.vendor())
+    # LAPACK vendor detection (safe for different Julia versions)
+    try
+        system_data["lapack_vendor"] = string(LinearAlgebra.LAPACK.vendor())
+    catch
+        # Fallback: LAPACK vendor often matches BLAS vendor
+        system_data["lapack_vendor"] = system_data["blas_vendor"]
+    end
     system_data["blas_num_threads"] = LinearAlgebra.BLAS.get_num_threads()
     
     # LinearSolve-specific package availability

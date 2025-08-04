@@ -2,6 +2,7 @@ module LinearSolveAutotune
 
 using LinearSolve
 using BenchmarkTools
+using CSV
 using DataFrames
 using PrettyTables
 using Preferences

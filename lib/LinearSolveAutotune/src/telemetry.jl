@@ -531,14 +531,134 @@ Create a pull request with the benchmark results.
 """
 function create_results_pr(target_repo, branch_name, folder_name, files, auth)
     try
-        # This is a simplified implementation - full PR creation is complex
-        # For now, let's just create a basic structure
-        @info "🚧 PR creation functionality is under development"
-        @info "📋 Would create PR with folder: $folder_name"
+        @info "🚧 Creating pull request with benchmark results..."
+        @info "📋 Target: $target_repo, Branch: $branch_name"
         @info "📋 Files to include: $(length(files)) files"
         
-        # Return a mock result to indicate success
-        return Dict("html_url" => "https://github.com/$target_repo/pull/1")
+        # Split the target repo name
+        repo_parts = split(target_repo, "/")
+        if length(repo_parts) != 2
+            error("Invalid repository format: $target_repo")
+        end
+        repo_owner, repo_name = repo_parts
+        
+        # Get the target repository
+        target_repo_obj = GitHub.repo(repo_owner * "/" * repo_name, auth=auth)
+        
+        # Get authenticated user to determine source repo
+        user = GitHub.whoami(auth=auth)
+        source_repo = user.login * "/" * repo_name
+        
+        # Try to get or create a fork
+        fork_repo_obj = nothing
+        try
+            fork_repo_obj = GitHub.repo(source_repo, auth=auth)
+            @info "📋 Using existing fork: $source_repo"
+        catch
+            @info "📋 Creating fork of $target_repo..."
+            fork_repo_obj = GitHub.fork(target_repo_obj, auth=auth)
+            # Wait a moment for fork to be ready
+            sleep(2)
+        end
+        
+        # Get the default branch (usually main)
+        default_branch = target_repo_obj.default_branch
+        
+        # Get the SHA of the default branch
+        main_branch_ref = GitHub.reference(fork_repo_obj, "heads/$default_branch", auth=auth)
+        base_sha = main_branch_ref.object["sha"]
+        
+        # Create new branch
+        try
+            GitHub.create_ref(fork_repo_obj, "refs/heads/$branch_name", base_sha, auth=auth)
+            @info "📋 Created new branch: $branch_name"
+        catch e
+            if contains(string(e), "Reference already exists")
+                @info "📋 Branch $branch_name already exists, updating..."
+                # Update existing branch to point to main
+                GitHub.update_ref(fork_repo_obj, "heads/$branch_name", base_sha, auth=auth)
+            else
+                rethrow(e)
+            end
+        end
+        
+        # Create all files in the repository
+        for (file_path, file_content) in files
+            try
+                # Try to get existing file to update it
+                existing_file = nothing
+                try
+                    existing_file = GitHub.file(fork_repo_obj, file_path, ref=branch_name, auth=auth)
+                catch
+                    # File doesn't exist, that's fine
+                end
+                
+                commit_message = if existing_file === nothing
+                    "Add $(basename(file_path)) for $folder_name"
+                else
+                    "Update $(basename(file_path)) for $folder_name"
+                end
+                
+                # Create or update the file
+                if isa(file_content, String)
+                    # Text content
+                    GitHub.create_file(fork_repo_obj, file_path, 
+                                     message=commit_message,
+                                     content=file_content,
+                                     branch=branch_name,
+                                     sha=existing_file === nothing ? nothing : existing_file.sha,
+                                     auth=auth)
+                else
+                    # Binary content (already base64 encoded)
+                    GitHub.create_file(fork_repo_obj, file_path,
+                                     message=commit_message, 
+                                     content=file_content,
+                                     branch=branch_name,
+                                     sha=existing_file === nothing ? nothing : existing_file.sha,
+                                     auth=auth)
+                end
+                
+                @info "📋 Created/updated: $file_path"
+            catch e
+                @warn "Failed to create file $file_path: $e"
+            end
+        end
+        
+        # Create pull request
+        pr_title = "Add benchmark results: $folder_name"
+        pr_body = """
+# LinearSolve.jl Benchmark Results
+
+Automated submission of benchmark results from the LinearSolve.jl autotune system.
+
+## System Information
+- **Folder**: `results/$folder_name`
+- **Files**: $(length(files)) files including CSV data, plots, and system info
+- **Timestamp**: $(Dates.now())
+
+## Contents
+- `results.csv` - Detailed benchmark performance data
+- `system_info.csv` - System and hardware configuration
+- `Project.toml` - Package versions used
+- `README.md` - Human-readable summary
+- `*.png` - Performance visualization plots
+
+## Automated Submission
+This PR was automatically created by the LinearSolve.jl autotune system.
+The benchmark data will help improve algorithm selection for the community.
+
+🤖 Generated by LinearSolve.jl autotune system
+"""
+        
+        pr_result = GitHub.create_pull_request(target_repo_obj, 
+                                             title=pr_title,
+                                             body=pr_body, 
+                                             head="$(user.login):$branch_name",
+                                             base=default_branch,
+                                             auth=auth)
+        
+        @info "✅ Successfully created pull request #$(pr_result.number)"
+        return pr_result
         
     catch e
         @warn "Failed to create pull request: $e"

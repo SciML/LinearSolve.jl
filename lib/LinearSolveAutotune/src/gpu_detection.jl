@@ -98,3 +98,100 @@ function get_system_info()
 
     return info
 end
+
+"""
+    get_detailed_system_info()
+
+Returns a comprehensive DataFrame with detailed system information suitable for CSV export.
+Includes versioninfo() details and hardware-specific information for analysis.
+"""
+function get_detailed_system_info()
+    # Basic system information
+    system_data = Dict{String, Any}()
+    
+    # Julia and system basics
+    system_data["timestamp"] = string(Dates.now())
+    system_data["julia_version"] = string(VERSION)
+    system_data["julia_commit"] = Base.GIT_VERSION_INFO.commit[1:10]  # Short commit hash
+    system_data["os_name"] = Sys.iswindows() ? "Windows" : Sys.islinux() ? "Linux" : Sys.isapple() ? "macOS" : "Other"
+    system_data["os_version"] = string(Sys.KERNEL)
+    system_data["architecture"] = string(Sys.ARCH)
+    system_data["cpu_cores"] = Sys.CPU_THREADS
+    system_data["julia_threads"] = Threads.nthreads()
+    system_data["word_size"] = Sys.WORD_SIZE
+    system_data["machine"] = Sys.MACHINE
+    
+    # CPU details
+    cpu_info = Sys.cpu_info()[1]
+    system_data["cpu_name"] = cpu_info.model
+    system_data["cpu_speed_mhz"] = cpu_info.speed
+    
+    # Categorize CPU vendor for easy analysis
+    cpu_name_lower = lowercase(system_data["cpu_name"])
+    if contains(cpu_name_lower, "intel")
+        system_data["cpu_vendor"] = "Intel"
+    elseif contains(cpu_name_lower, "amd")
+        system_data["cpu_vendor"] = "AMD"
+    elseif contains(cpu_name_lower, "apple") || contains(cpu_name_lower, "m1") || contains(cpu_name_lower, "m2") || contains(cpu_name_lower, "m3")
+        system_data["cpu_vendor"] = "Apple"
+    else
+        system_data["cpu_vendor"] = "Other"
+    end
+    
+    # BLAS and linear algebra libraries
+    system_data["blas_vendor"] = string(LinearAlgebra.BLAS.vendor())
+    system_data["lapack_vendor"] = string(LinearAlgebra.LAPACK.vendor())
+    system_data["blas_num_threads"] = LinearAlgebra.BLAS.get_num_threads()
+    
+    # LinearSolve-specific package availability
+    system_data["mkl_available"] = LinearSolve.usemkl
+    system_data["mkl_used"] = system_data["mkl_available"] && contains(lowercase(system_data["blas_vendor"]), "mkl")
+    system_data["apple_accelerate_available"] = LinearSolve.appleaccelerate_isavailable()
+    system_data["apple_accelerate_used"] = system_data["apple_accelerate_available"] && contains(lowercase(system_data["blas_vendor"]), "accelerate")
+    
+    # GPU information
+    system_data["cuda_available"] = is_cuda_available()
+    system_data["metal_available"] = is_metal_available()
+    
+    # Try to detect if CUDA/Metal packages are actually loaded
+    system_data["cuda_loaded"] = false
+    system_data["metal_loaded"] = false
+    try
+        # Check if CUDA algorithms are actually available
+        if system_data["cuda_available"]
+            system_data["cuda_loaded"] = isdefined(Main, :CUDA) || haskey(Base.loaded_modules, Base.PkgId(Base.UUID("052768ef-5323-5732-b1bb-66c8b64840ba"), "CUDA"))
+        end
+        if system_data["metal_available"]
+            system_data["metal_loaded"] = isdefined(Main, :Metal) || haskey(Base.loaded_modules, Base.PkgId(Base.UUID("dde4c033-4e86-420c-a63e-0dd931031962"), "Metal"))
+        end
+    catch
+        # If we can't detect, leave as false
+    end
+    
+    # Environment information
+    system_data["libm"] = Base.libm_name
+    system_data["libdl"] = Base.libdl_name
+    
+    # Memory information (if available)
+    try
+        if Sys.islinux()
+            meminfo = read(`cat /proc/meminfo`, String)
+            mem_match = match(r"MemTotal:\s*(\d+)\s*kB", meminfo)
+            if mem_match !== nothing
+                system_data["total_memory_gb"] = round(parse(Int, mem_match.captures[1]) / 1024 / 1024, digits=2)
+            else
+                system_data["total_memory_gb"] = missing
+            end
+        elseif Sys.isapple()
+            mem_bytes = parse(Int, read(`sysctl -n hw.memsize`, String))
+            system_data["total_memory_gb"] = round(mem_bytes / 1024^3, digits=2)
+        else
+            system_data["total_memory_gb"] = missing
+        end
+    catch
+        system_data["total_memory_gb"] = missing
+    end
+    
+    # Create DataFrame with single row
+    return DataFrame([system_data])
+end

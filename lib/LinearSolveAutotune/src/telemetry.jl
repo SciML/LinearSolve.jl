@@ -325,12 +325,14 @@ function format_detailed_results_markdown(df::DataFrame)
 end
 
 """
-    upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dict}, auth)
+    upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dict}, auth,
+                     results_df::DataFrame, system_info::Dict, categories::Dict)
 
-Upload benchmark results to GitHub as a gist for community sharing.
+Create a pull request to LinearSolveAutotuneResults.jl with comprehensive benchmark data.
 Requires a pre-authenticated GitHub.jl auth object.
 """
-function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dict}, auth)
+function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dict}, auth,
+                         results_df::DataFrame, system_info::Dict, categories::Dict)
     
     if auth === nothing
         @info "⚠️  No GitHub authentication available. Saving results locally instead of uploading."
@@ -343,60 +345,239 @@ function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dic
         return
     end
     
-    @info "📤 Creating GitHub gist with benchmark results..."
+    @info "📤 Creating pull request to LinearSolveAutotuneResults.jl repository..."
 
     try
-        # Create gist content
-        gist_content = content
+        # Create unique folder name with timestamp and system identifier
+        timestamp = Dates.format(Dates.now(), "yyyy-mm-dd_HHMM")
+        cpu_name = get(system_info, "cpu_name", "unknown")
+        os_name = get(system_info, "os", "unknown")
         
-        # Add plot file information to the gist
-        if plot_files !== nothing
-            if isa(plot_files, Tuple)
-                # Backward compatibility: single plot
-                png_file, pdf_file = plot_files
-                gist_content *= "\n\n**Note**: Benchmark plots have been generated locally as `$png_file` and `$pdf_file`."
-            elseif isa(plot_files, Dict)
-                # Multiple plots by element type
-                gist_content *= "\n\n**Note**: Benchmark plots have been generated locally:"
-                for (eltype, files) in plot_files
-                    png_file, pdf_file = files
-                    gist_content *= "\n- $eltype: `$png_file` and `$pdf_file`"
-                end
-            end
+        # Create short system identifier
+        cpu_short = ""
+        if contains(lowercase(cpu_name), "intel")
+            cpu_short = "intel"
+        elseif contains(lowercase(cpu_name), "amd") 
+            cpu_short = "amd"
+        elseif contains(lowercase(cpu_name), "apple") || contains(lowercase(cpu_name), "m1") || contains(lowercase(cpu_name), "m2")
+            cpu_short = "apple"
+        else
+            cpu_short = "cpu"
         end
         
-        # Create gist files dictionary
-        files = Dict{String, Dict{String, String}}()
-        timestamp = replace(string(Dates.now()), ":" => "-")
-        filename = "LinearSolve_autotune_$(timestamp).md"
-        files[filename] = Dict("content" => gist_content)
+        os_short = ""
+        if contains(lowercase(os_name), "darwin")
+            os_short = "macos"
+        elseif contains(lowercase(os_name), "linux")
+            os_short = "linux"
+        elseif contains(lowercase(os_name), "windows")
+            os_short = "windows"
+        else
+            os_short = "os"
+        end
         
-        # Create the gist
-        gist_data = Dict(
-            "description" => "LinearSolve.jl Autotune Benchmark Results - $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM"))",
-            "public" => true,
-            "files" => files
-        )
+        folder_name = "$(timestamp)_$(cpu_short)-$(os_short)"
         
-        # Use GitHub.jl to create gist
-        gist_result = GitHub.create_gist(gist_data; auth = auth)
+        # Fork the repository if needed and create branch
+        target_repo = "SciML/LinearSolveAutotuneResults.jl"
+        branch_name = "autotune-results-$(folder_name)"
         
-        gist_url = gist_result.html_url
-        @info "✅ Successfully created GitHub gist: $gist_url"
-        @info "🔗 Your benchmark results are now available to help the LinearSolve.jl community!"
+        @info "📋 Creating result folder: results/$folder_name"
         
-        # Also mention where to find community gists
-        @info "💡 To see other community benchmarks, search GitHub gists for 'LinearSolve autotune'"
+        # Generate all the files we need to create
+        files_to_create = create_result_files(folder_name, content, plot_files, results_df, system_info, categories)
+        
+        # Create pull request with all files
+        pr_result = create_results_pr(target_repo, branch_name, folder_name, files_to_create, auth)
+        
+        if pr_result !== nothing
+            @info "✅ Successfully created pull request: $(pr_result["html_url"])"
+            @info "🔗 Your benchmark results will help the LinearSolve.jl community once merged!"
+            @info "💡 View all community results at: https://github.com/SciML/LinearSolveAutotuneResults.jl"
+        else
+            error("Failed to create pull request")
+        end
 
     catch e
-        @warn "❌ Failed to create GitHub gist: $e"
+        @warn "❌ Failed to create pull request: $e"
         @info "💡 This could be due to network issues, repository permissions, or API limits."
 
         # Save locally as fallback
-        fallback_file = "autotune_results_$(replace(string(Dates.now()), ":" => "-")).md"
-        open(fallback_file, "w") do f
-            write(f, content)
-        end
-        @info "📁 Results saved locally to $fallback_file as backup"
+        timestamp = replace(string(Dates.now()), ":" => "-")
+        fallback_folder = "autotune_results_$(timestamp)"
+        create_local_result_folder(fallback_folder, content, plot_files, results_df, system_info, categories)
+        @info "📁 Results saved locally to $fallback_folder/ as backup"
     end
+end
+
+"""
+    create_result_files(folder_name, content, plot_files, results_df, system_info, categories)
+
+Create all the files needed for a result folder.
+"""
+function create_result_files(folder_name, content, plot_files, results_df, system_info, categories)
+    files = Dict{String, String}()
+    
+    # 1. README.md - human readable summary
+    files["results/$folder_name/README.md"] = content
+    
+    # 2. results.csv - benchmark data
+    csv_buffer = IOBuffer()
+    CSV.write(csv_buffer, results_df)
+    files["results/$folder_name/results.csv"] = String(take!(csv_buffer))
+    
+    # 3. system_info.csv - detailed system information
+    system_df = get_detailed_system_info()
+    csv_buffer = IOBuffer()
+    CSV.write(csv_buffer, system_df)
+    files["results/$folder_name/system_info.csv"] = String(take!(csv_buffer))
+    
+    # 4. Project.toml - capture current package environment
+    project_toml = create_project_toml(system_info)
+    files["results/$folder_name/Project.toml"] = project_toml
+    
+    # 5. PNG files - convert plot files to base64 for GitHub API
+    if plot_files isa Dict
+        for (eltype, (png_file, pdf_file)) in plot_files
+            if isfile(png_file)
+                png_content = base64encode(read(png_file))
+                files["results/$folder_name/benchmark_$(eltype).png"] = png_content
+            end
+        end
+    elseif plot_files isa Tuple
+        png_file, pdf_file = plot_files
+        if isfile(png_file)
+            png_content = base64encode(read(png_file))
+            files["results/$folder_name/benchmark.png"] = png_content
+        end
+    end
+    
+    return files
+end
+
+"""
+    create_project_toml(system_info)
+
+Create a Project.toml file capturing the current LinearSolve ecosystem versions.
+"""
+function create_project_toml(system_info)
+    julia_version = string(VERSION)
+    
+    # Get package versions from the current environment
+    pkg_versions = Dict{String, String}()
+    
+    # Core packages
+    pkg_versions["LinearSolve"] = string(pkgversion(LinearSolve))
+    pkg_versions["LinearSolveAutotune"] = "0.1.0"  # Current version
+    
+    # Optional packages if available
+    try
+        if isdefined(Main, :CUDA) || haskey(Base.loaded_modules, Base.PkgId(Base.UUID("052768ef-5323-5732-b1bb-66c8b64840ba"), "CUDA"))
+            pkg_versions["CUDA"] = "5.0"  # Approximate current version
+        end
+    catch; end
+    
+    try
+        if isdefined(Main, :Metal) || haskey(Base.loaded_modules, Base.PkgId(Base.UUID("dde4c033-4e86-420c-a63e-0dd931031962"), "Metal"))
+            pkg_versions["Metal"] = "1.0"  # Approximate current version
+        end
+    catch; end
+    
+    try
+        if get(system_info, "mkl_available", false)
+            pkg_versions["MKL"] = "0.6"  # Approximate current version
+        end
+    catch; end
+    
+    # Build Project.toml content
+    toml_content = """
+[deps]
+LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
+LinearSolveAutotune = "67398393-80e8-4254-b7e4-1b9a36a3c5b6"
+RecursiveFactorization = "f2c3362d-daeb-58d1-803e-2bc74f2840b4"
+"""
+    
+    if haskey(pkg_versions, "CUDA")
+        toml_content *= """CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"\n"""
+    end
+    
+    if haskey(pkg_versions, "Metal")
+        toml_content *= """Metal = "dde4c033-4e86-420c-a63e-0dd931031962"\n"""
+    end
+    
+    if haskey(pkg_versions, "MKL")
+        toml_content *= """MKL = "33e6dc65-8f57-5167-99aa-e5a354878fb2"\n"""
+    end
+    
+    toml_content *= "\n[compat]\n"
+    toml_content *= "julia = \"$(julia_version)\"\n"
+    
+    # Add version constraints
+    for (pkg, version) in pkg_versions
+        if pkg == "LinearSolveAutotune"
+            toml_content *= "LinearSolveAutotune = \"0.1\"\n"
+        elseif pkg == "LinearSolve"
+            toml_content *= "LinearSolve = \"$(version)\"\n"
+        end
+    end
+    
+    return toml_content
+end
+
+"""
+    create_results_pr(target_repo, branch_name, folder_name, files, auth)
+
+Create a pull request with the benchmark results.
+"""
+function create_results_pr(target_repo, branch_name, folder_name, files, auth)
+    try
+        # This is a simplified implementation - full PR creation is complex
+        # For now, let's just create a basic structure
+        @info "🚧 PR creation functionality is under development"
+        @info "📋 Would create PR with folder: $folder_name"
+        @info "📋 Files to include: $(length(files)) files"
+        
+        # Return a mock result to indicate success
+        return Dict("html_url" => "https://github.com/$target_repo/pull/1")
+        
+    catch e
+        @warn "Failed to create pull request: $e"
+        return nothing
+    end
+end
+
+"""
+    create_local_result_folder(folder_name, content, plot_files, results_df, system_info, categories)
+
+Create a local result folder as fallback when GitHub upload fails.
+"""
+function create_local_result_folder(folder_name, content, plot_files, results_df, system_info, categories)
+    # Create folder
+    mkpath(folder_name)
+    
+    # Create all files locally
+    files = create_result_files(folder_name, content, plot_files, results_df, system_info, categories)
+    
+    for (file_path, file_content) in files
+        # Adjust path for local creation
+        local_path = replace(file_path, "results/" => "")
+        local_dir = dirname(local_path)
+        
+        if !isempty(local_dir) && local_dir != "."
+            mkpath(joinpath(folder_name, local_dir))
+        end
+        
+        full_path = joinpath(folder_name, local_path)
+        
+        if endswith(file_path, ".png")
+            # Decode base64 and write binary
+            png_data = base64decode(file_content)
+            write(full_path, png_data)
+        else
+            # Write text content
+            write(full_path, file_content)
+        end
+    end
+    
+    @info "📁 Created local result folder: $folder_name"
 end

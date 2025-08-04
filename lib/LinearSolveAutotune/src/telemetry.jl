@@ -569,6 +569,10 @@ function create_results_pr(target_repo, fallback_repo, branch_name, folder_name,
         user = GitHub.whoami(auth=auth)
         source_repo = user.login * "/" * repo_name
         
+        # Get the default branch (usually main) - need this early for fork sync
+        default_branch = target_repo_obj.default_branch
+        @info "📋 Default branch: $default_branch"
+        
         # First, check if we need to create the target repository
         if actual_target_repo == fallback_repo
             @info "📋 Target repository doesn't exist, using fallback: $actual_target_repo"
@@ -576,31 +580,58 @@ function create_results_pr(target_repo, fallback_repo, branch_name, folder_name,
         
         # Always try to create a fork first (this ensures we have a fork to work with)
         fork_repo_obj = nothing
+        fork_existed = false
         try
-            @info "📋 Creating/updating fork of $actual_target_repo..."
+            @info "📋 Creating fork of $actual_target_repo..."
             fork_repo_obj = GitHub.fork(target_repo_obj, auth=auth)
-            @info "✅ Fork created/updated: $(user.login)/$repo_name"
-            # Wait a moment for fork to be ready
+            @info "✅ Fork created: $(user.login)/$repo_name"
+            # Wait a moment for new fork to be ready
             sleep(3)
         catch e
-            @info "📋 Fork may already exist, trying to access existing fork..."
-            try
-                fork_repo_obj = GitHub.repo(source_repo, auth=auth)
-                @info "✅ Using existing fork: $source_repo"
-            catch e2
-                error("Failed to create or access fork: $e2")
+            if contains(string(e), "already exists") || contains(string(e), "already forked")
+                @info "📋 Fork already exists, accessing existing fork..."
+                fork_existed = true
+                try
+                    fork_repo_obj = GitHub.repo(source_repo, auth=auth)
+                    @info "✅ Using existing fork: $source_repo"
+                catch e2
+                    error("Failed to access existing fork: $e2")
+                end
+            else
+                error("Failed to create fork: $e")
             end
         end
         
-        # Get the default branch (usually main)
-        default_branch = target_repo_obj.default_branch
-        @info "📋 Default branch: $default_branch"
+        # If fork already existed, sync it with upstream to ensure it's up to date
+        if fork_existed
+            @info "📋 Syncing existing fork with upstream..."
+            try
+                # Get the latest commit from upstream default branch
+                upstream_ref = GitHub.reference(target_repo_obj, "heads/$default_branch", auth=auth)
+                upstream_sha = upstream_ref.object["sha"]
+                
+                # Update the fork's default branch to match upstream
+                try
+                    GitHub.update_ref(fork_repo_obj, "heads/$default_branch", upstream_sha, auth=auth)
+                    @info "✅ Fork synced with upstream (SHA: $upstream_sha)"
+                catch sync_error
+                    @warn "Could not sync fork automatically: $sync_error"
+                    @info "📋 Proceeding with existing fork state..."
+                end
+                
+                # Small delay to ensure sync is complete
+                sleep(1)
+            catch e
+                @warn "Could not check upstream state: $e"
+                @info "📋 Proceeding with existing fork state..."
+            end
+        end
         
-        # Get the SHA of the default branch from the fork
+        # Get the SHA of the default branch from the fork (should be synced now)
         try
             main_branch_ref = GitHub.reference(fork_repo_obj, "heads/$default_branch", auth=auth)
             base_sha = main_branch_ref.object["sha"]
-            @info "📋 Base SHA: $base_sha"
+            @info "📋 Base SHA from fork: $base_sha"
         catch e
             # If the fork doesn't have the branch yet, get it from the target
             @info "📋 Getting base SHA from target repository..."

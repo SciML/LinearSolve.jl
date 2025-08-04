@@ -41,8 +41,9 @@ function setup_github_authentication()
         println("    • Repository access: 'Public Repositories (read-only)'")
         println("4️⃣  Click 'Generate token' and copy it")
         println()
-        
-        print("🔑 Paste your GitHub token here (or press Enter to skip): ")
+        println("🔑 Paste your GitHub token here (or press Enter to skip):")
+        print("Token: ")
+        flush(stdout)  # Ensure the prompt is displayed before reading
         token = strip(readline())
         
         if !isempty(token)
@@ -51,14 +52,17 @@ function setup_github_authentication()
                 ENV["GITHUB_TOKEN"] = token
                 auth = GitHub.authenticate(token)
                 println("✅ Perfect! Authentication successful - your results will help everyone!")
+                flush(stdout)  # Ensure success message is displayed
                 return auth
             catch e
                 println("❌ Token authentication failed: $e")
                 println("💡 Make sure the token has 'public_repo' or 'Public Repositories' access")
+                flush(stdout)  # Ensure error messages are displayed
                 delete!(ENV, "GITHUB_TOKEN")
                 attempts += 1
                 if attempts < max_attempts
                     println("🔄 Let's try again...")
+                    flush(stdout)
                     continue
                 end
             end
@@ -70,7 +74,9 @@ function setup_github_authentication()
                 println("   Your hardware's benchmark data improves algorithm selection for everyone.")
                 println("   It only takes 30 seconds and makes LinearSolve.jl better for all users.")
                 println()
-                print("🤝 Please help the community - try setting up the token? (y/n): ")
+                println("🤝 Please help the community - try setting up the token?")
+                print("Response (y/n): ")
+                flush(stdout)  # Ensure the prompt is displayed before reading
                 response = strip(lowercase(readline()))
                 if response == "n" || response == "no"
                     attempts += 1

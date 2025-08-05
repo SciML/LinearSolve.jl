@@ -462,8 +462,8 @@ provides high-performance factorization and solve capabilities.
     `Float64` element types with `Int32` indices.
 """
 struct CUSOLVERRFFactorization <: AbstractSparseFactorization
-    symbolic::Symbol = :RF
-    reuse_symbolic::Bool = true
+    symbolic::Symbol
+    reuse_symbolic::Bool
 
     function CUSOLVERRFFactorization(; symbolic::Symbol = :RF, reuse_symbolic::Bool = true)
         ext = Base.get_extension(@__MODULE__, :CUSOLVERRFFactorization)

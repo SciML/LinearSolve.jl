@@ -84,8 +84,5 @@ function LinearSolve.pattern_changed(rf::RFLU, A::CuSparseMatrixCSR)
     size(rf) != size(A) || nnz(rf.M) != nnz(A)
 end
 
-# Extension load check
-LinearSolve.cusolverrf_loaded(A::CuSparseMatrixCSR) = true
-LinearSolve.cusolverrf_loaded(A::SparseMatrixCSC{Float64}) = true
 
 end

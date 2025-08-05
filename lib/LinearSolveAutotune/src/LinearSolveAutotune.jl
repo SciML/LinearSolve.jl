@@ -2,7 +2,6 @@ module LinearSolveAutotune
 
 using LinearSolve
 using BenchmarkTools
-using CSV
 using DataFrames
 using PrettyTables
 using Preferences
@@ -76,7 +75,7 @@ include("preferences.jl")
 Run a comprehensive benchmark of all available LU factorization methods and optionally:
 
   - Create performance plots for each element type
-  - Upload results to GitHub telemetry  
+  - Create GitHub issue with telemetry data for community collection  
   - Set Preferences for optimal algorithm selection
   - Support both CPU and GPU algorithms based on hardware detection
   - Test algorithm compatibility with different element types
@@ -84,7 +83,7 @@ Run a comprehensive benchmark of all available LU factorization methods and opti
 # Arguments
 
   - `large_matrices::Bool = false`: Include larger matrix sizes for GPU benchmarking
-  - `telemetry::Bool = true`: Share results to GitHub issue for community data
+  - `telemetry::Bool = true`: Create GitHub issue with results for community data collection
   - `make_plot::Bool = true`: Generate performance plots for each element type
   - `set_preferences::Bool = true`: Update LinearSolve preferences with optimal algorithms
   - `samples::Int = 5`: Number of benchmark samples per algorithm/size
@@ -216,9 +215,9 @@ function autotune_setup(;
         end
     end
 
-    # Upload telemetry if requested
+    # Create GitHub issue with telemetry if requested
     if telemetry && nrow(successful_results) > 0
-        @info "📤 Preparing telemetry data for community sharing..."
+        @info "📤 Creating GitHub issue with benchmark data for community collection..."
         markdown_content = format_results_for_github(results_df, system_info, categories)
         upload_to_github(markdown_content, plot_files, github_auth, results_df, system_info, categories)
     end

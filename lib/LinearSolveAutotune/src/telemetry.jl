@@ -30,7 +30,7 @@ function setup_github_authentication()
         println("    • Name: 'LinearSolve Autotune'")
         println("    • Expiration: 90 days")
         println("    • Repository access: 'Public Repositories (read-only)'")
-        println("    • Permissions: Enable 'Contents: Read and write', 'Pull requests: Write', 'Forks: Write'")
+        println("    • Permissions: Enable 'Issues: Write'")
         println("4️⃣  Click 'Generate token' and copy it")
         println()
         println("🔑 Paste your GitHub token here:")
@@ -167,7 +167,7 @@ function test_github_authentication(token::AbstractString)
                     token_preview = token[1:4] * "..." * token[end-3:end]
                     println("🔍 Token preview: $token_preview")
                 end
-                println("💡 Please verify your token has 'Issues' read permission and try again.")
+                println("💡 Please verify your token has 'Issues: Write' permission and try again.")
             end
             flush(stdout)
         end
@@ -329,7 +329,7 @@ end
     upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dict}, auth,
                      results_df::DataFrame, system_info::Dict, categories::Dict)
 
-Create a pull request to LinearSolveAutotuneResults.jl with comprehensive benchmark data.
+Create a GitHub issue with benchmark results for community data collection.
 Requires a pre-authenticated GitHub.jl auth object.
 """
 function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dict}, auth,
@@ -346,106 +346,44 @@ function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dic
         return
     end
     
-    @info "📤 Creating pull request to LinearSolveAutotuneResults.jl repository..."
+    @info "📤 Creating GitHub issue with benchmark results for community data collection..."
 
     try
-        # Create unique folder name with timestamp and system identifier
-        timestamp = Dates.format(Dates.now(), "yyyy-mm-dd_HHMM")
-        cpu_name = get(system_info, "cpu_name", "unknown")
-        os_name = get(system_info, "os", "unknown")
+        # Create issue with benchmark data
+        target_repo = "SciML/LinearSolve.jl"
+        issue_result = create_benchmark_issue(target_repo, content, auth, system_info)
         
-        # Create short system identifier
-        cpu_short = ""
-        if contains(lowercase(cpu_name), "intel")
-            cpu_short = "intel"
-        elseif contains(lowercase(cpu_name), "amd") 
-            cpu_short = "amd"
-        elseif contains(lowercase(cpu_name), "apple") || contains(lowercase(cpu_name), "m1") || contains(lowercase(cpu_name), "m2")
-            cpu_short = "apple"
+        if issue_result !== nothing
+            @info "✅ Successfully created benchmark results issue: $(issue_result.html_url)"
+            @info "🔗 Your benchmark data has been shared with the LinearSolve.jl community!"
+            @info "💡 View all community benchmark data: https://github.com/SciML/LinearSolve.jl/issues?q=is%3Aissue+label%3Abenchmark-data"
         else
-            cpu_short = "cpu"
-        end
-        
-        os_short = ""
-        if contains(lowercase(os_name), "darwin")
-            os_short = "macos"
-        elseif contains(lowercase(os_name), "linux")
-            os_short = "linux"
-        elseif contains(lowercase(os_name), "windows")
-            os_short = "windows"
-        else
-            os_short = "os"
-        end
-        
-        folder_name = "$(timestamp)_$(cpu_short)-$(os_short)"
-        
-        # Fork the repository if needed and create branch
-        target_repo = "SciML/LinearSolveAutotuneResults.jl"
-        fallback_repo = "ChrisRackauckas-Claude/LinearSolveAutotuneResults.jl"
-        branch_name = "autotune-results-$(folder_name)"
-        
-        @info "📋 Creating result folder: results/$folder_name"
-        
-        # Generate all the files we need to create
-        files_to_create = create_result_files(folder_name, content, plot_files, results_df, system_info, categories)
-        
-        # Create pull request with all files
-        pr_result = create_results_pr(target_repo, fallback_repo, branch_name, folder_name, files_to_create, auth)
-        
-        if pr_result !== nothing
-            @info "✅ Successfully created pull request: $(pr_result["html_url"])"
-            @info "🔗 Your benchmark results will help the LinearSolve.jl community once merged!"
-            @info "💡 View all community results at: https://github.com/SciML/LinearSolveAutotuneResults.jl"
-        else
-            error("Failed to create pull request")
+            error("Failed to create GitHub issue")
         end
 
     catch e
-        @warn "❌ Failed to create pull request: $e"
-        
-        # Try creating an issue as fallback if it's a permissions issue
-        if contains(string(e), "403") || contains(string(e), "permissions") || contains(string(e), "fork")
-            @info "💡 Attempting to create issue instead of PR due to permissions..."
-            try
-                issue_result = create_benchmark_issue(target_repo, fallback_repo, content, auth, system_info)
-                if issue_result !== nothing
-                    @info "✅ Created benchmark results issue: $(issue_result["html_url"])"
-                    @info "🔗 Your benchmark data has been shared with the community!"
-                    return
-                end
-            catch issue_error
-                @info "💡 Could not create issue either: $issue_error"
-            end
-        end
-        
+        @warn "❌ Failed to create GitHub issue: $e"
         @info "💡 This could be due to network issues, repository permissions, or API limits."
 
         # Save locally as fallback
         timestamp = replace(string(Dates.now()), ":" => "-")
-        fallback_folder = "autotune_results_$(timestamp)"
-        create_local_result_folder(fallback_folder, content, plot_files, results_df, system_info, categories)
-        @info "📁 Results saved locally to $fallback_folder/ as backup"
+        fallback_file = "autotune_results_$(timestamp).md"
+        open(fallback_file, "w") do f
+            write(f, content)
+        end
+        @info "📁 Results saved locally to $fallback_file as backup"
     end
 end
 
 """
-    create_benchmark_issue(target_repo, fallback_repo, content, auth, system_info)
+    create_benchmark_issue(target_repo, content, auth, system_info)
 
-Create a GitHub issue with benchmark results as a fallback when PR creation fails.
+Create a GitHub issue with benchmark results using GitHub.create_issue().
 """
-function create_benchmark_issue(target_repo, fallback_repo, content, auth, system_info)
+function create_benchmark_issue(target_repo, content, auth, system_info)
     try
-        # Try target repository first, fallback if needed
-        actual_repo = target_repo
-        repo_obj = nothing
-        
-        try
-            repo_obj = GitHub.repo(target_repo, auth=auth)
-        catch
-            @info "📋 Using fallback repository for issue: $fallback_repo"
-            actual_repo = fallback_repo
-            repo_obj = GitHub.repo(fallback_repo, auth=auth)
-        end
+        # Get repository object
+        repo_obj = GitHub.repo(target_repo; auth=auth)
         
         # Create issue title and body
         cpu_name = get(system_info, "cpu_name", "unknown")
@@ -457,23 +395,26 @@ function create_benchmark_issue(target_repo, fallback_repo, content, auth, syste
         issue_body = """
 # LinearSolve.jl Autotune Benchmark Results
 
-**Submitted via GitHub Issue** (PR creation failed due to token permissions)
-
 $content
 
 ---
 
-**Note**: This was submitted as an issue because the GitHub token lacks fork creation permissions. 
-To enable PR creation, please create a token with 'Contents: Read and write', 'Pull requests: Write', and 'Forks: Write' permissions.
+## System Summary
+- **CPU:** $cpu_name
+- **OS:** $os_name  
+- **Timestamp:** $timestamp
 
 🤖 *Generated automatically by LinearSolve.jl autotune system*
 """
         
-        # Create the issue
-        issue_result = GitHub.create_issue(repo_obj, 
-                                         title=issue_title,
-                                         body=issue_body,
-                                         auth=auth)
+        # Create the issue with labels
+        issue_result = GitHub.create_issue(
+            repo_obj;
+            title=issue_title,
+            body=issue_body,
+            labels=["benchmark-data"],
+            auth=auth
+        )
         
         @info "✅ Created benchmark results issue #$(issue_result.number)"
         return issue_result
@@ -484,374 +425,3 @@ To enable PR creation, please create a token with 'Contents: Read and write', 'P
     end
 end
 
-"""
-    create_result_files(folder_name, content, plot_files, results_df, system_info, categories)
-
-Create all the files needed for a result folder.
-"""
-function create_result_files(folder_name, content, plot_files, results_df, system_info, categories)
-    files = Dict{String, String}()
-    
-    # 1. README.md - human readable summary
-    files["results/$folder_name/README.md"] = content
-    
-    # 2. results.csv - benchmark data
-    csv_buffer = IOBuffer()
-    CSV.write(csv_buffer, results_df)
-    files["results/$folder_name/results.csv"] = String(take!(csv_buffer))
-    
-    # 3. system_info.csv - detailed system information
-    system_df = get_detailed_system_info()
-    csv_buffer = IOBuffer()
-    CSV.write(csv_buffer, system_df)
-    files["results/$folder_name/system_info.csv"] = String(take!(csv_buffer))
-    
-    # 4. Project.toml - capture current package environment
-    project_toml = create_project_toml(system_info)
-    files["results/$folder_name/Project.toml"] = project_toml
-    
-    # 5. PNG files - convert plot files to base64 for GitHub API
-    if plot_files isa Dict
-        for (eltype, (png_file, pdf_file)) in plot_files
-            if isfile(png_file)
-                png_content = base64encode(read(png_file))
-                files["results/$folder_name/benchmark_$(eltype).png"] = png_content
-            end
-        end
-    elseif plot_files isa Tuple
-        png_file, pdf_file = plot_files
-        if isfile(png_file)
-            png_content = base64encode(read(png_file))
-            files["results/$folder_name/benchmark.png"] = png_content
-        end
-    end
-    
-    return files
-end
-
-"""
-    create_project_toml(system_info)
-
-Create a Project.toml file capturing the current LinearSolve ecosystem versions.
-"""
-function create_project_toml(system_info)
-    julia_version = string(VERSION)
-    
-    # Get package versions from the current environment
-    pkg_versions = Dict{String, String}()
-    
-    # Core packages
-    pkg_versions["LinearSolve"] = string(pkgversion(LinearSolve))
-    pkg_versions["LinearSolveAutotune"] = "0.1.0"  # Current version
-    
-    # Optional packages if available
-    try
-        if isdefined(Main, :CUDA) || haskey(Base.loaded_modules, Base.PkgId(Base.UUID("052768ef-5323-5732-b1bb-66c8b64840ba"), "CUDA"))
-            pkg_versions["CUDA"] = "5.0"  # Approximate current version
-        end
-    catch; end
-    
-    try
-        if isdefined(Main, :Metal) || haskey(Base.loaded_modules, Base.PkgId(Base.UUID("dde4c033-4e86-420c-a63e-0dd931031962"), "Metal"))
-            pkg_versions["Metal"] = "1.0"  # Approximate current version
-        end
-    catch; end
-    
-    try
-        if get(system_info, "mkl_available", false)
-            pkg_versions["MKL"] = "0.6"  # Approximate current version
-        end
-    catch; end
-    
-    # Build Project.toml content
-    toml_content = """
-[deps]
-LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
-LinearSolveAutotune = "67398393-80e8-4254-b7e4-1b9a36a3c5b6"
-RecursiveFactorization = "f2c3362d-daeb-58d1-803e-2bc74f2840b4"
-"""
-    
-    if haskey(pkg_versions, "CUDA")
-        toml_content *= """CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"\n"""
-    end
-    
-    if haskey(pkg_versions, "Metal")
-        toml_content *= """Metal = "dde4c033-4e86-420c-a63e-0dd931031962"\n"""
-    end
-    
-    if haskey(pkg_versions, "MKL")
-        toml_content *= """MKL = "33e6dc65-8f57-5167-99aa-e5a354878fb2"\n"""
-    end
-    
-    toml_content *= "\n[compat]\n"
-    toml_content *= "julia = \"$(julia_version)\"\n"
-    
-    # Add version constraints
-    for (pkg, version) in pkg_versions
-        if pkg == "LinearSolveAutotune"
-            toml_content *= "LinearSolveAutotune = \"0.1\"\n"
-        elseif pkg == "LinearSolve"
-            toml_content *= "LinearSolve = \"$(version)\"\n"
-        end
-    end
-    
-    return toml_content
-end
-
-"""
-    create_results_pr(target_repo, branch_name, folder_name, files, auth)
-
-Create a pull request with the benchmark results.
-"""
-function create_results_pr(target_repo, fallback_repo, branch_name, folder_name, files, auth)
-    try
-        @info "🚧 Creating pull request with benchmark results..."
-        @info "📋 Target: $target_repo, Branch: $branch_name"
-        @info "📋 Files to include: $(length(files)) files"
-        
-        # Try target repository first, fallback if it doesn't exist
-        actual_target_repo = target_repo
-        target_repo_obj = nothing
-        repo_owner = ""
-        repo_name = ""
-        
-        try
-            @info "📋 Trying primary target: $target_repo"
-            repo_parts = split(target_repo, "/")
-            if length(repo_parts) != 2
-                error("Invalid repository format: $target_repo")
-            end
-            repo_owner, repo_name = repo_parts
-            target_repo_obj = GitHub.repo(target_repo, auth=auth)
-            @info "✅ Primary target accessible: $target_repo"
-        catch e
-            @warn "Primary target $target_repo not accessible: $e"
-            @info "📋 Using fallback repository: $fallback_repo"
-            actual_target_repo = fallback_repo
-            
-            repo_parts = split(fallback_repo, "/")
-            if length(repo_parts) != 2
-                error("Invalid fallback repository format: $fallback_repo")
-            end
-            repo_owner, repo_name = repo_parts
-            target_repo_obj = GitHub.repo(fallback_repo, auth=auth)
-            @info "✅ Fallback target accessible: $fallback_repo"
-        end
-        
-        # Get authenticated user to determine source repo
-        user = GitHub.whoami(auth=auth)
-        source_repo = user.login * "/" * repo_name
-        
-        # Get the default branch (usually main) - need this early for fork sync
-        default_branch = target_repo_obj.default_branch
-        @info "📋 Default branch: $default_branch"
-        
-        # First, check if we need to create the target repository
-        if actual_target_repo == fallback_repo
-            @info "📋 Target repository doesn't exist, using fallback: $actual_target_repo"
-        end
-        
-        # Always try to create a fork first (this ensures we have a fork to work with)
-        fork_repo_obj = nothing
-        fork_existed = false
-        try
-            @info "📋 Creating fork of $actual_target_repo..."
-            fork_repo_obj = GitHub.create_fork(target_repo_obj, auth=auth)
-            @info "✅ Fork created: $(user.login)/$repo_name"
-            # Wait a moment for new fork to be ready
-            sleep(3)
-        catch e
-            if contains(string(e), "already exists") || contains(string(e), "already forked")
-                @info "📋 Fork already exists, accessing existing fork..."
-                fork_existed = true
-                try
-                    fork_repo_obj = GitHub.repo(source_repo, auth=auth)
-                    @info "✅ Using existing fork: $source_repo"
-                catch e2
-                    error("Failed to access existing fork: $e2")
-                end
-            else
-                if contains(string(e), "403") && contains(string(e), "Resource not accessible by personal access token")
-                    @warn "GitHub token lacks fork creation permissions. Please create a new token with 'Forks: Write' permission."
-                    @info "📋 Token setup guide: Go to https://github.com/settings/tokens?type=beta"
-                    @info "📋 Enable permissions: 'Contents: Read and write', 'Pull requests: Write', 'Forks: Write'"
-                    error("GitHub token permissions insufficient for fork creation")
-                else
-                    error("Failed to create fork: $e")
-                end
-            end
-        end
-        
-        # If fork already existed, sync it with upstream to ensure it's up to date
-        if fork_existed
-            @info "📋 Syncing existing fork with upstream..."
-            try
-                # Get the latest commit from upstream default branch
-                upstream_ref = GitHub.reference(target_repo_obj, "heads/$default_branch", auth=auth)
-                upstream_sha = upstream_ref.object["sha"]
-                
-                # Update the fork's default branch to match upstream
-                try
-                    GitHub.update_ref(fork_repo_obj, "heads/$default_branch", upstream_sha, auth=auth)
-                    @info "✅ Fork synced with upstream (SHA: $upstream_sha)"
-                catch sync_error
-                    @warn "Could not sync fork automatically: $sync_error"
-                    @info "📋 Proceeding with existing fork state..."
-                end
-                
-                # Small delay to ensure sync is complete
-                sleep(1)
-            catch e
-                @warn "Could not check upstream state: $e"
-                @info "📋 Proceeding with existing fork state..."
-            end
-        end
-        
-        # Get the SHA of the default branch from the fork (should be synced now)
-        try
-            main_branch_ref = GitHub.reference(fork_repo_obj, "heads/$default_branch", auth=auth)
-            base_sha = main_branch_ref.object["sha"]
-            @info "📋 Base SHA from fork: $base_sha"
-        catch e
-            # If the fork doesn't have the branch yet, get it from the target
-            @info "📋 Getting base SHA from target repository..."
-            main_branch_ref = GitHub.reference(target_repo_obj, "heads/$default_branch", auth=auth)
-            base_sha = main_branch_ref.object["sha"]
-            @info "📋 Base SHA from target: $base_sha"
-        end
-        
-        # Create new branch
-        try
-            GitHub.create_ref(fork_repo_obj, "refs/heads/$branch_name", base_sha, auth=auth)
-            @info "📋 Created new branch: $branch_name"
-        catch e
-            if contains(string(e), "Reference already exists")
-                @info "📋 Branch $branch_name already exists, updating..."
-                # Update existing branch to point to main
-                GitHub.update_ref(fork_repo_obj, "heads/$branch_name", base_sha, auth=auth)
-            else
-                rethrow(e)
-            end
-        end
-        
-        # Create all files in the repository
-        for (file_path, file_content) in files
-            try
-                # Try to get existing file to update it
-                existing_file = nothing
-                try
-                    existing_file = GitHub.file(fork_repo_obj, file_path, ref=branch_name, auth=auth)
-                catch
-                    # File doesn't exist, that's fine
-                end
-                
-                commit_message = if existing_file === nothing
-                    "Add $(basename(file_path)) for $folder_name"
-                else
-                    "Update $(basename(file_path)) for $folder_name"
-                end
-                
-                # Create or update the file
-                if isa(file_content, String)
-                    # Text content
-                    GitHub.create_file(fork_repo_obj, file_path, 
-                                     message=commit_message,
-                                     content=file_content,
-                                     branch=branch_name,
-                                     sha=existing_file === nothing ? nothing : existing_file.sha,
-                                     auth=auth)
-                else
-                    # Binary content (already base64 encoded)
-                    GitHub.create_file(fork_repo_obj, file_path,
-                                     message=commit_message, 
-                                     content=file_content,
-                                     branch=branch_name,
-                                     sha=existing_file === nothing ? nothing : existing_file.sha,
-                                     auth=auth)
-                end
-                
-                @info "📋 Created/updated: $file_path"
-            catch e
-                @warn "Failed to create file $file_path: $e"
-            end
-        end
-        
-        # Create pull request to the actual accessible repository
-        pr_title = "Add benchmark results: $folder_name"
-        pr_body = """
-# LinearSolve.jl Benchmark Results
-
-Automated submission of benchmark results from the LinearSolve.jl autotune system.
-
-## System Information
-- **Repository**: $actual_target_repo
-- **Folder**: `results/$folder_name`
-- **Files**: $(length(files)) files including CSV data, plots, and system info
-- **Timestamp**: $(Dates.now())
-
-## Contents
-- `results.csv` - Detailed benchmark performance data
-- `system_info.csv` - System and hardware configuration
-- `Project.toml` - Package versions used
-- `README.md` - Human-readable summary
-- `*.png` - Performance visualization plots
-
-## Automated Submission
-This PR was automatically created by the LinearSolve.jl autotune system.
-The benchmark data will help improve algorithm selection for the community.
-
-🤖 Generated by LinearSolve.jl autotune system
-"""
-        
-        @info "📋 Creating PR to $actual_target_repo from $(user.login):$branch_name to $default_branch"
-        pr_result = GitHub.create_pull_request(target_repo_obj, 
-                                             title=pr_title,
-                                             body=pr_body, 
-                                             head="$(user.login):$branch_name",
-                                             base=default_branch,
-                                             auth=auth)
-        
-        @info "✅ Successfully created pull request #$(pr_result.number)"
-        return pr_result
-        
-    catch e
-        @warn "Failed to create pull request: $e"
-        return nothing
-    end
-end
-
-"""
-    create_local_result_folder(folder_name, content, plot_files, results_df, system_info, categories)
-
-Create a local result folder as fallback when GitHub upload fails.
-"""
-function create_local_result_folder(folder_name, content, plot_files, results_df, system_info, categories)
-    # Create folder
-    mkpath(folder_name)
-    
-    # Create all files locally
-    files = create_result_files(folder_name, content, plot_files, results_df, system_info, categories)
-    
-    for (file_path, file_content) in files
-        # Adjust path for local creation
-        local_path = replace(file_path, "results/" => "")
-        local_dir = dirname(local_path)
-        
-        if !isempty(local_dir) && local_dir != "."
-            mkpath(joinpath(folder_name, local_dir))
-        end
-        
-        full_path = joinpath(folder_name, local_path)
-        
-        if endswith(file_path, ".png")
-            # Decode base64 and write binary
-            png_data = base64decode(file_content)
-            write(full_path, png_data)
-        else
-            # Write text content
-            write(full_path, file_content)
-        end
-    end
-    
-    @info "📁 Created local result folder: $folder_name"
-end

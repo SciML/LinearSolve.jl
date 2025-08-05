@@ -466,7 +466,7 @@ struct CUSOLVERRFFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool
 
     function CUSOLVERRFFactorization(; symbolic::Symbol = :RF, reuse_symbolic::Bool = true)
-        ext = Base.get_extension(@__MODULE__, :CUSOLVERRFFactorization)
+        ext = Base.get_extension(@__MODULE__, :LinearSolveCUSOLVERRFExt)
         if ext === nothing
             error("CUSOLVERRFFactorization requires that CUSOLVERRF.jl is loaded, i.e. `using CUSOLVERRF`")
         else

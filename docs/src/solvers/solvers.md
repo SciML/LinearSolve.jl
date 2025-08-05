@@ -48,7 +48,8 @@ When using CuSparseMatrixCSR arrays with CUDSS.jl loaded, `LUFactorization()` wi
 automatically use NVIDIA's cuDSS library. Alternatively, `CUSOLVERRFFactorization`
 provides access to NVIDIA's cusolverRF library. Both offer significant performance
 improvements for sparse systems on CUDA-capable GPUs and are particularly effective
-for large sparse matrices that can benefit from GPU parallelization.
+for large sparse matrices that can benefit from GPU parallelization. `CUDSS` is more
+for `Float32` while `CUSOLVERRFFactorization` is for `Float64`.
 
 While these sparse factorizations are based on implementations in other languages,
 and therefore constrained to standard number types (`Float64`,  `Float32` and

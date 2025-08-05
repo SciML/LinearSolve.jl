@@ -67,7 +67,8 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::LinearSolve.CUSOL
     u_gpu = cache.u isa CUDA.CuArray ? cache.u : CUDA.CuArray(cache.u)
     
     # Solve
-    ldiv!(u_gpu, F, b_gpu)
+    copyto!(u_gpu, b_gpu)
+    ldiv!(F, u_gpu)
     
     # Copy back to CPU if needed
     if !(cache.u isa CUDA.CuArray)

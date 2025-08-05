@@ -121,6 +121,30 @@ sol = LS.solve(prob, LS.LUFactorization())
     
     For now, CUDSS only supports CuSparseMatrixCSR type matrices.
 
+For high-performance sparse LU factorization on GPUs, you can also use CUSOLVERRF.jl:
+
+```julia
+using CUSOLVERRF
+sol = LS.solve(prob, LS.CUSOLVERRFFactorization())
+```
+
+CUSOLVERRF provides access to NVIDIA's cusolverRF library, which offers significant 
+performance improvements for sparse LU factorization on GPUs. It supports both 
+`:RF` (default) and `:KLU` symbolic factorization methods, and can reuse symbolic 
+factorization for matrices with the same sparsity pattern:
+
+```julia
+# Use KLU for symbolic factorization
+sol = LS.solve(prob, LS.CUSOLVERRFFactorization(symbolic = :KLU))
+
+# Reuse symbolic factorization for better performance
+sol = LS.solve(prob, LS.CUSOLVERRFFactorization(reuse_symbolic = true))
+```
+
+!!! note
+    
+    CUSOLVERRF only supports `Float64` element types with `Int32` indices.
+
 Note that `KrylovJL` methods also work with sparse GPU arrays:
 
 ```julia

@@ -409,10 +409,9 @@ $content
         
         # Create the issue with labels
         issue_result = GitHub.create_issue(
-            repo_obj;
+            repo_obj,
             title=issue_title,
             body=issue_body,
-            labels=["benchmark-data"],
             auth=auth
         )
         

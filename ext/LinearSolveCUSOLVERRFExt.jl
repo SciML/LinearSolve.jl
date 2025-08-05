@@ -1,9 +1,8 @@
 module LinearSolveCUSOLVERRFExt
 
 using LinearSolve: LinearSolve, @get_cacheval, pattern_changed, OperatorAssumptions
-using CUSOLVERRF: CUSOLVERRF, RFLU
+using CUSOLVERRF: CUSOLVERRF, RFLU, CUDA
 using SparseArrays: SparseArrays, SparseMatrixCSC, nnz
-using CUDA: CUDA
 using CUDA.CUSPARSE: CuSparseMatrixCSR
 using LinearAlgebra: LinearAlgebra, ldiv!, lu!
 using SciMLBase: SciMLBase, LinearProblem, ReturnCode

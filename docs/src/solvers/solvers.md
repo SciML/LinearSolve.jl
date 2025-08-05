@@ -43,10 +43,11 @@ For sparse LU-factorizations, `KLUFactorization` if there is less structure
 to the sparsity pattern and `UMFPACKFactorization` if there is more structure.
 Pardiso.jl's methods are also known to be very efficient sparse linear solvers.
 
-For GPU-accelerated sparse LU-factorizations, `CUSOLVERRFFactorization` provides
-access to NVIDIA's cusolverRF library, offering significant performance improvements
-for sparse systems on CUDA-capable GPUs. This is particularly effective for large
-sparse matrices that can benefit from GPU parallelization.
+For GPU-accelerated sparse LU-factorizations, both CUDSS.jl and CUSOLVERRF.jl provide
+high-performance options. CUDSS.jl offers a modern interface to NVIDIA's cuDSS library,
+while `CUSOLVERRFFactorization` provides access to NVIDIA's cusolverRF library. Both
+offer significant performance improvements for sparse systems on CUDA-capable GPUs and
+are particularly effective for large sparse matrices that can benefit from GPU parallelization.
 
 While these sparse factorizations are based on implementations in other languages,
 and therefore constrained to standard number types (`Float64`,  `Float32` and

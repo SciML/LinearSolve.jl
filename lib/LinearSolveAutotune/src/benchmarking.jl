@@ -12,17 +12,12 @@ function test_algorithm_compatibility(alg, eltype::Type, test_size::Int = 4)
     alg_name = string(typeof(alg).name.name)
     
     # Define strict compatibility rules for BLAS-dependent algorithms
-    if eltype in [BigFloat, BigInt, Rational{Int}, Complex{BigFloat}]
-        # For arbitrary precision types, only allow pure Julia algorithms
-        if alg_name in ["LUFactorization", "MKLLUFactorization", "AppleAccelerateLUFactorization"]
-            return false  # These rely on BLAS and shouldn't work with arbitrary precision
-        end
-        # SimpleLUFactorization, GenericLUFactorization, and RFLUFactorization should work (pure Julia)
-    elseif eltype in [Float16, Complex{Float16}]
-        # Float16 might not be supported by all BLAS
-        if alg_name in ["MKLLUFactorization", "AppleAccelerateLUFactorization"]
-            return false  # These might not support Float16
-        end
+    if !(eltype <: LinearAlgebra.BLAS.BlasFloat) && alg_name in ["BLISFactorization", "MKLLUFactorization", "AppleAccelerateLUFactorization"]
+        return false  # BLAS algorithms not compatible with non-standard types
+    end
+
+    if alg_name == "BLISLUFactorization" && Sys.isapple()
+        return false  # BLISLUFactorization has no Apple Silicon binary
     end
     
     # For standard types or algorithms that passed the strict check, test functionality

@@ -11,46 +11,18 @@ using LinearAlgebra
 using Printf
 using Dates
 using Base64
-using RecursiveFactorization  # Hard dependency to ensure RFLUFactorization is available
+
+# Hard dependency to ensure RFLUFactorization others solvers are available
+using RecursiveFactorization  
+using blis_jll
+using LAPACK_jll
+using CUDA
+using Metal
+
 
 # Optional dependencies for telemetry and plotting
 using GitHub
 using Plots
-
-# Load JLL packages when available for better library access
-const BLIS_JLL_AVAILABLE = Ref(false)
-const LAPACK_JLL_AVAILABLE = Ref(false)
-
-function __init__()
-    # Try to load JLL packages at runtime for enhanced BLIS support
-    try
-        # Check if BLIS_jll is available in the current environment
-        if haskey(Base.loaded_modules, Base.PkgId(Base.UUID("068f7417-6964-5086-9a5b-bc0c5b4f7fa6"), "BLIS_jll"))
-            BLIS_JLL_AVAILABLE[] = true
-            @info "BLIS_jll detected - enhanced BLIS library access available"
-        else
-            @eval using BLIS_jll
-            BLIS_JLL_AVAILABLE[] = true
-            @info "BLIS_jll loaded for enhanced BLIS library access"
-        end
-    catch
-        @debug "BLIS_jll not available, BLISLUFactorization may not work"
-    end
-    
-    try
-        # Check if LAPACK_jll is available in the current environment
-        if haskey(Base.loaded_modules, Base.PkgId(Base.UUID("51474c39-65e3-53ba-86ba-03b1b862ec14"), "LAPACK_jll"))
-            LAPACK_JLL_AVAILABLE[] = true
-            @info "LAPACK_jll detected - enhanced LAPACK library access available"
-        else
-            @eval using LAPACK_jll  
-            LAPACK_JLL_AVAILABLE[] = true
-            @info "LAPACK_jll loaded for enhanced LAPACK library access"
-        end
-    catch
-        @debug "LAPACK_jll not available, some BLIS functionality may be limited"
-    end
-end
 
 export autotune_setup
 
@@ -224,11 +196,13 @@ function autotune_setup(;
 
     @info "Autotune setup completed!"
 
+    sysinfo = get_detailed_system_info()
+
     # Return results and plots
     if make_plot && plots_dict !== nothing && !isempty(plots_dict)
-        return results_df, plots_dict
+        return results_df, sysinfo, plots_dict
     else
-        return results_df
+        return results_df, sysinfo, nothing
     end
 end
 

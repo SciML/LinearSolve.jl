@@ -17,6 +17,13 @@ function get_available_algorithms(; skip_missing_algs::Bool = false)
     push!(algs, GenericLUFactorization())
     push!(alg_names, "GenericLUFactorization")
 
+    if blis_jll.is_available()
+        push!(algs, LinearSolve.BLISLUFactorization())
+        push!(alg_names, "BLISLUFactorization")
+    else
+        @warn "blis.jll not available for this platform. BLISLUFactorization will not be included."
+    end
+
     # MKL if available
     if LinearSolve.usemkl
         push!(algs, MKLLUFactorization())
@@ -32,48 +39,6 @@ function get_available_algorithms(; skip_missing_algs::Bool = false)
         if Sys.isapple() && !skip_missing_algs
             msg = "macOS system detected but Apple Accelerate not available. This is unexpected."
             @warn msg
-        end
-    end
-
-    # BLIS if JLL packages are available and hardware supports it
-    try
-        # Check if BLIS_jll and LAPACK_jll are available, which enable BLISLUFactorization
-        blis_jll_available = haskey(Base.loaded_modules, Base.PkgId(Base.UUID("068f7417-6964-5086-9a5b-bc0c5b4f7fa6"), "BLIS_jll"))
-        lapack_jll_available = haskey(Base.loaded_modules, Base.PkgId(Base.UUID("51474c39-65e3-53ba-86ba-03b1b862ec14"), "LAPACK_jll"))
-        
-        if (blis_jll_available || lapack_jll_available) && isdefined(LinearSolve, :BLISLUFactorization) && hasmethod(LinearSolve.BLISLUFactorization, ())
-            # Test if BLIS works on this hardware
-            try
-                test_alg = LinearSolve.BLISLUFactorization()
-                # Simple test to see if it can be created
-                push!(algs, test_alg)
-                push!(alg_names, "BLISLUFactorization")
-            catch e
-                msg = "BLISLUFactorization available but not supported on this hardware: $e"
-                if skip_missing_algs
-                    @warn msg
-                else
-                    @info msg  # BLIS hardware incompatibility is not an error, just info
-                end
-            end
-        else
-            if blis_jll_available || lapack_jll_available
-                msg = "BLIS_jll/LAPACK_jll loaded but BLISLUFactorization not available in LinearSolve"
-            else
-                msg = "BLIS_jll and LAPACK_jll not loaded - BLISLUFactorization requires these JLL packages"
-            end
-            if skip_missing_algs
-                @warn msg
-            else
-                @info msg  # Not having BLIS JLL packages is not an error
-            end
-        end
-    catch e
-        msg = "Error checking BLIS JLL package availability: $e"
-        if skip_missing_algs
-            @warn msg
-        else
-            @info msg
         end
     end
 

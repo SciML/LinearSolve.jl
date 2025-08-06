@@ -17,7 +17,7 @@ using LinearSolve
 using LinearSolveAutotune
 
 # Run autotune with default settings
-results = autotune_setup()
+results, sysinfo, plots = autotune_setup()
 ```
 
 This will:
@@ -32,11 +32,11 @@ This will:
 The autotune process returns benchmark results and creates several outputs:
 
 ```julia
-# Basic usage returns just the DataFrame of results
-results = autotune_setup(make_plot=false)
+# Basic usage returns just the DataFrame of results and system information
+results, sysinfo, _ = autotune_setup(make_plot=false)
 
-# With plotting enabled, returns (DataFrame, Plots)
-results, plots = autotune_setup(make_plot=true)
+# With plotting enabled, returns (DataFrame, System Info, Plots)
+results, sysinfo, plots = autotune_setup(make_plot=true)
 
 # Examine the results
 println("Algorithms tested: ", unique(results.algorithm))
@@ -52,13 +52,13 @@ You can specify which element types to benchmark:
 
 ```julia
 # Test only Float64 and ComplexF64
-results = autotune_setup(eltypes = (Float64, ComplexF64))
+results, sysinfo, _ = autotune_setup(eltypes = (Float64, ComplexF64))
 
 # Test arbitrary precision types (excludes BLAS algorithms)
-results = autotune_setup(eltypes = (BigFloat,), telemetry = false)
+results, sysinfo, _ = autotune_setup(eltypes = (BigFloat,), telemetry = false)
 
 # Test high precision float
-results = autotune_setup(eltypes = (Float64, BigFloat))
+results, sysinfo, _ = autotune_setup(eltypes = (Float64, BigFloat))
 ```
 
 ### Matrix Sizes
@@ -67,10 +67,10 @@ Control the range of matrix sizes tested:
 
 ```julia
 # Default: small to medium matrices (4×4 to 500×500)
-results = autotune_setup(large_matrices = false)
+results, sysinfo, _ = autotune_setup(large_matrices = false)
 
 # Large matrices: includes sizes up to 10,000×10,000 (good for GPU systems)
-results = autotune_setup(large_matrices = true)
+results, sysinfo, _ = autotune_setup(large_matrices = true)
 ```
 
 ### Benchmark Quality vs Speed
@@ -79,10 +79,10 @@ Adjust the thoroughness of benchmarking:
 
 ```julia
 # Quick benchmark (fewer samples, less time per test)
-results = autotune_setup(samples = 1, seconds = 0.1)
+results, sysinfo, _ = autotune_setup(samples = 1, seconds = 0.1)
 
 # Thorough benchmark (more samples, more time per test)  
-results = autotune_setup(samples = 10, seconds = 2.0)
+results, sysinfo, _ = autotune_setup(samples = 10, seconds = 2.0)
 ```
 
 ### Privacy and Telemetry
@@ -105,13 +105,13 @@ However, if your system has privacy concerns or you prefer not to share data, yo
 
 ```julia
 # Disable telemetry (no data shared)
-results = autotune_setup(telemetry = false)
+results, sysinfo, _ = autotune_setup(telemetry = false)
 
 # Disable preference setting (just benchmark, don't change defaults)
-results = autotune_setup(set_preferences = false)
+results, sysinfo, _ = autotune_setup(set_preferences = false)
 
 # Disable plotting (faster, less output)
-results = autotune_setup(make_plot = false)
+results, sysinfo, _ = autotune_setup(make_plot = false)
 ```
 
 ### Missing Algorithm Handling
@@ -125,10 +125,10 @@ you can set `skip_missing_algs = true` to allow missing algorithms without faili
 
 ```julia
 # Default behavior: error if expected algorithms are missing
-results = autotune_setup()  # Will error if RFLUFactorization missing
+results, sysinfo, _ = autotune_setup()  # Will error if RFLUFactorization missing
 
 # Allow missing algorithms (useful for incomplete setups)
-results = autotune_setup(skip_missing_algs = true)  # Will warn instead of error
+results, sysinfo, _ = autotune_setup(skip_missing_algs = true)  # Will warn instead of error
 ```
 
 ## GPU Systems
@@ -137,7 +137,7 @@ On systems with CUDA or Metal GPU support, the autotuner will automatically dete
 
 ```julia
 # Enable large matrix testing for GPUs
-results = autotune_setup(large_matrices = true, samples = 3, seconds = 1.0)
+results, sysinfo, _ = autotune_setup(large_matrices = true, samples = 3, seconds = 1.0)
 ```
 
 GPU algorithms tested (when available):
@@ -152,7 +152,7 @@ GPU algorithms tested (when available):
 using DataFrames
 using Statistics
 
-results = autotune_setup(make_plot = false)
+results, sysinfo, _ = autotune_setup(make_plot = false)
 
 # Filter successful results
 successful = filter(row -> row.success, results)
@@ -170,7 +170,7 @@ println(summary)
 When `make_plot=true`, you get separate plots for each element type:
 
 ```julia
-results, plots = autotune_setup()
+results, sysinfo, plots = autotune_setup()
 
 # plots is a dictionary keyed by element type
 for (eltype, plot) in plots

@@ -305,11 +305,7 @@ function get_detailed_system_info()
     catch
         system_data["libdl"] = "unknown"
     end
-    
-    # JLL package availability for enhanced library access
-    system_data["blis_jll_available"] = LinearSolveAutotune.BLIS_JLL_AVAILABLE[]
-    system_data["lapack_jll_available"] = LinearSolveAutotune.LAPACK_JLL_AVAILABLE[]
-    
+
     # Memory information (if available)
     try
         if Sys.islinux()

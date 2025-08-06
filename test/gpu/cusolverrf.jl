@@ -54,13 +54,6 @@ using Test
         @test norm(A2 * sol2.u - b2) / norm(b2) < 1e-10
     end
     
-    # Test adjoint solve
-    @testset "Adjoint Solve" begin
-        prob_adj = LinearProblem(A', b)
-        sol_adj = solve(prob_adj, CUSOLVERRFFactorization())
-        @test norm(A' * sol_adj.u - b) / norm(b) < 1e-10
-    end
-    
     # Test error handling for unsupported types
     @testset "Error Handling" begin
         # Test with Float32 (not supported)

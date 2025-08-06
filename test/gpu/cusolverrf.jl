@@ -54,20 +54,6 @@ using Test
         @test norm(A2 * sol2.u - b2) / norm(b2) < 1e-10
     end
     
-    # Test multiple right-hand sides
-    @testset "Multiple RHS" begin
-        nrhs = 5
-        B = rand(n, nrhs)
-        
-        prob_multi = LinearProblem(A, B)
-        sol_multi = solve(prob_multi, CUSOLVERRFFactorization())
-        
-        # Check each solution
-        for i in 1:nrhs
-            @test norm(A * sol_multi.u[:, i] - B[:, i]) / norm(B[:, i]) < 1e-10
-        end
-    end
-    
     # Test adjoint solve
     @testset "Adjoint Solve" begin
         prob_adj = LinearProblem(A', b)

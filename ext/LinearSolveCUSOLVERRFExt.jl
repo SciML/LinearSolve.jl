@@ -31,9 +31,9 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::LinearSolve.CUSOL
     A = cache.A
     
     # Convert to appropriate GPU format if needed
-    if A isa SparseMatrixCSC
+    if A isa SparseMatrixCSC || A isa Adjoint{SparseMatrixCSC}
         A_gpu = CuSparseMatrixCSR(A)
-    elseif A isa CuSparseMatrixCSR
+    elseif A isa CuSparseMatrixCSR || A isa Adjoint{CuSparseMatrixCSR}
         A_gpu = A
     else
         error("CUSOLVERRFFactorization only supports SparseMatrixCSC or CuSparseMatrixCSR matrices")

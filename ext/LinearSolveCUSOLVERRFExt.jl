@@ -4,7 +4,7 @@ using LinearSolve: LinearSolve, @get_cacheval, pattern_changed, OperatorAssumpti
 using CUSOLVERRF: CUSOLVERRF, RFLU, CUDA
 using SparseArrays: SparseArrays, SparseMatrixCSC, nnz
 using CUSOLVERRF.CUDA.CUSPARSE: CuSparseMatrixCSR
-using LinearAlgebra: LinearAlgebra, ldiv!, lu!
+using LinearAlgebra: LinearAlgebra, Adjoint, ldiv!, lu!
 using SciMLBase: SciMLBase, LinearProblem, ReturnCode
 
 function LinearSolve.init_cacheval(alg::LinearSolve.CUSOLVERRFFactorization,

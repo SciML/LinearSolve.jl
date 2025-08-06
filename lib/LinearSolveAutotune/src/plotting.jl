@@ -39,7 +39,7 @@ function create_benchmark_plots(df::DataFrame; title_base = "LinearSolve.jl LU F
         p = plot(title = title,
             xlabel = "Matrix Size (N×N)",
             ylabel = "Performance (GFLOPs)",
-            legend = :outertopright,
+            legend = :topleft,
             dpi = 300)
 
         # Plot each algorithm for this element type

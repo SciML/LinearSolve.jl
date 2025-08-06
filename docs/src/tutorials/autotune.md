@@ -2,6 +2,12 @@
 
 LinearSolve.jl includes an automatic tuning system that benchmarks all available linear algebra algorithms on your specific hardware and automatically selects optimal algorithms for different problem sizes and data types. This tutorial will show you how to use the `LinearSolveAutotune` sublibrary to optimize your linear solve performance.
 
+!!! warn
+
+    This is still in development. At this point the tuning will not result in different settings
+    but it will run the benchmarking and create plots of the performance of the algorithms. A
+    future version will use the results to set preferences for the algorithms.
+
 ## Quick Start
 
 The simplest way to use the autotuner is to run it with default settings:
@@ -16,7 +22,7 @@ results = autotune_setup()
 
 This will:
 - Benchmark 4 element types: `Float32`, `Float64`, `ComplexF32`, `ComplexF64`
-- Test matrix sizes from small (4×4) to medium (500×500) 
+- Test matrix sizes from small (4×4), medium (500×500), to large (10,000×10,000)
 - Create performance plots for each element type
 - Set preferences for optimal algorithm selection
 - Share results with the community (if desired)
@@ -81,7 +87,21 @@ results = autotune_setup(samples = 10, seconds = 2.0)
 
 ### Privacy and Telemetry
 
-Control data sharing:
+!!! warn
+
+    Telemetry implementation is still in development.
+
+The telemetry featrure of LinearSolveAutotune allows sharing performance results 
+with the community to improve algorithm selection. Minimal data is collected, including:
+
+- System information (OS, CPU, core count)
+- Algorithm performance results 
+
+and shared via public GitHub. This helps the community understand performance across 
+different hardware configurations and further improve the default algorithm selection
+and research in improved algorithms.
+
+However, if your system has privacy concerns or you prefer not to share data, you can disable telemetry:
 
 ```julia
 # Disable telemetry (no data shared)
@@ -96,7 +116,12 @@ results = autotune_setup(make_plot = false)
 
 ### Missing Algorithm Handling
 
-By default, autotune is assertive about finding all expected algorithms:
+By default, autotune is assertive about finding all expected algorithms. This is because
+we want to ensure that all possible algorithms on a given hardware are tested in order for
+the autotuning histroy/telemetry to be as complete as possible. However, in some cases
+you may want to allow missing algorithms, such as when running on a system where the
+hardware may not have support due to driver versions or other issues. If that's the case,
+you can set `skip_missing_algs = true` to allow missing algorithms without failing the autotune setup:
 
 ```julia
 # Default behavior: error if expected algorithms are missing
@@ -105,31 +130,6 @@ results = autotune_setup()  # Will error if RFLUFactorization missing
 # Allow missing algorithms (useful for incomplete setups)
 results = autotune_setup(skip_missing_algs = true)  # Will warn instead of error
 ```
-
-**When algorithms might be missing:**
-- RFLUFactorization should always be available (hard dependency)
-- GPU algorithms require CUDA.jl or Metal.jl to be loaded
-- Apple Accelerate should work on macOS systems
-- MKL algorithms require MKL.jl package
-
-## Understanding Algorithm Compatibility
-
-The autotuner automatically detects which algorithms work with which element types:
-
-### Standard Types (Float32, Float64, ComplexF32, ComplexF64)
-- **LUFactorization**: Fast BLAS-based LU decomposition
-- **MKLLUFactorization**: Intel MKL optimized (if available)
-- **AppleAccelerateLUFactorization**: Apple Accelerate optimized (on macOS)
-- **RFLUFactorization**: Recursive factorization (cache-friendly)
-- **GenericLUFactorization**: Pure Julia implementation
-- **SimpleLUFactorization**: Simple pure Julia LU
-
-### Arbitrary Precision Types (BigFloat, Rational, etc.)
-Only pure Julia algorithms work:
-- **GenericLUFactorization**: ✅ Compatible
-- **RFLUFactorization**: ✅ Compatible  
-- **SimpleLUFactorization**: ✅ Compatible
-- **LUFactorization**: ❌ Excluded (requires BLAS)
 
 ## GPU Systems
 
@@ -176,6 +176,7 @@ results, plots = autotune_setup()
 for (eltype, plot) in plots
     println("Plot for $eltype available")
     # Plots are automatically saved as PNG and PDF files
+    display(plot)
 end
 ```
 
@@ -200,61 +201,11 @@ custom_categories = Dict(
 LinearSolveAutotune.set_algorithm_preferences(custom_categories)
 ```
 
-## Real-World Examples
-
-### High-Performance Computing
-
-```julia
-# For HPC clusters with large problems
-results = autotune_setup(
-    large_matrices = true,
-    samples = 5,
-    seconds = 1.0,
-    eltypes = (Float64, ComplexF64),
-    telemetry = false  # Privacy on shared systems
-)
-```
-
-### Workstation with GPU
-
-```julia
-# Comprehensive benchmark including GPU algorithms
-results = autotune_setup(
-    large_matrices = true,
-    samples = 3,
-    seconds = 0.5,
-    eltypes = (Float32, Float64, ComplexF32, ComplexF64)
-)
-```
-
-### Research with Arbitrary Precision
-
-```julia
-# Testing arbitrary precision arithmetic
-results = autotune_setup(
-    eltypes = (Float64, BigFloat),
-    samples = 2,
-    seconds = 0.2,  # BigFloat is slow
-    telemetry = false,
-    large_matrices = false
-)
-```
-
-### Quick Development Testing
-
-```julia
-# Fast benchmark for development/testing
-results = autotune_setup(
-    samples = 1,
-    seconds = 0.05,
-    eltypes = (Float64,),
-    make_plot = false,
-    telemetry = false,
-    set_preferences = false
-)
-```
-
 ## How Preferences Affect LinearSolve.jl
+
+!!! warn
+
+    Usage of autotune preferences is still in development.
 
 After running autotune, LinearSolve.jl will automatically use the optimal algorithms:
 
@@ -273,97 +224,3 @@ b_large = rand(300)
 prob_large = LinearProblem(A_large, b_large)
 sol_large = solve(prob_large)  # May use different algorithm
 ```
-
-## Best Practices
-
-1. **Run autotune once per system**: Results are system-specific and should be rerun when hardware changes.
-
-2. **Use appropriate matrix sizes**: Set `large_matrices=true` only if you regularly solve large systems.
-
-3. **Consider element types**: Only benchmark the types you actually use to save time.
-
-4. **Benchmark thoroughly for production**: Use higher `samples` and `seconds` values for production systems.
-
-5. **Respect privacy**: Disable telemetry on sensitive or proprietary systems.
-
-6. **Save results**: The DataFrame returned contains valuable performance data for analysis.
-
-## Troubleshooting
-
-### No Algorithms Available
-If you get "No algorithms found", ensure LinearSolve.jl is properly installed:
-```julia
-using Pkg
-Pkg.test("LinearSolve")
-```
-
-### GPU Algorithms Missing
-GPU algorithms require additional packages:
-```julia
-# For CUDA
-using CUDA, LinearSolve
-
-# For Metal (Apple Silicon)  
-using Metal, LinearSolve
-```
-
-### Preferences Not Applied
-Restart Julia after running autotune for preferences to take effect, or check:
-```julia
-LinearSolveAutotune.show_current_preferences()
-```
-
-### Slow BigFloat Performance
-This is expected - arbitrary precision arithmetic is much slower than hardware floating point. Consider using `DoubleFloats.jl` or `MultiFloats.jl` for better performance if extreme precision isn't required.
-
-## Community and Telemetry
-
-By default, autotune results are shared with the LinearSolve.jl community via public GitHub gists to help improve algorithm selection for everyone. The shared data includes:
-
-- System information (OS, CPU, core count, etc.)
-- Algorithm performance results
-- NO personal information or sensitive data
-
-Results are uploaded as public gists that can be easily searched and viewed by the community.
-
-### GitHub Authentication for Telemetry
-
-When telemetry is enabled, the system will prompt you to set up GitHub authentication if not already configured:
-
-```julia
-# This will prompt for GitHub token setup if GITHUB_TOKEN not found
-results = autotune_setup(telemetry = true)
-```
-
-The system will wait for you to create and paste a GitHub token. This helps the community by sharing performance data across different hardware configurations via easily discoverable GitHub gists.
-
-**Interactive Setup:**
-The autotune process will show step-by-step instructions and wait for you to:
-1. Create a GitHub token at the provided link
-2. Paste the token when prompted
-3. Proceed with benchmarking and automatic result sharing
-
-**Alternative - Pre-setup Environment Variable**:
-```bash
-export GITHUB_TOKEN=your_token_here
-julia
-```
-
-**Creating the GitHub Token:**
-1. Open [https://github.com/settings/tokens?type=beta](https://github.com/settings/tokens?type=beta)
-2. Click "Generate new token"
-3. Set name: "LinearSolve Autotune"
-4. Set expiration: 90 days
-5. Repository access: "Public Repositories (read-only)"
-6. Generate and copy the token
-
-### Disabling Telemetry
-
-You can disable telemetry completely:
-
-```julia
-# No authentication required
-results = autotune_setup(telemetry = false)
-```
-
-This helps the community understand performance across different hardware configurations and improves the default algorithm selection for future users, but participation is entirely optional.

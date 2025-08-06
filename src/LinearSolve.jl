@@ -211,7 +211,7 @@ for alg in (:LUFactorization, :FastLUFactorization, :SVDFactorization,
     :RFLUFactorization, :UMFPACKFactorization, :KLUFactorization, :SparspakFactorization,
     :DiagonalFactorization, :CholeskyFactorization, :BunchKaufmanFactorization,
     :CHOLMODFactorization, :LDLtFactorization, :AppleAccelerateLUFactorization,
-    :MKLLUFactorization, :MetalLUFactorization)
+    :MKLLUFactorization, :MetalLUFactorization, :CUSOLVERRFFactorization)
     @eval needs_square_A(::$(alg)) = true
 end
 
@@ -240,7 +240,8 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
        UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization,
        SparspakFactorization, DiagonalFactorization, CholeskyFactorization,
-       BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization
+       BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization,
+       CUSOLVERRFFactorization
 
 export LinearSolveFunction, DirectLdiv!
 

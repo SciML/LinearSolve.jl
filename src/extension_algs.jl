@@ -441,3 +441,36 @@ to avoid allocations and automatically offloads to the GPU.
 struct MetalLUFactorization <: AbstractFactorization end
 
 struct BLISLUFactorization <: AbstractFactorization end
+
+"""
+`CUSOLVERRFFactorization(; symbolic = :RF, reuse_symbolic = true)`
+
+A GPU-accelerated sparse LU factorization using NVIDIA's cusolverRF library.
+This solver is specifically designed for sparse matrices on CUDA GPUs and 
+provides high-performance factorization and solve capabilities.
+
+## Keyword Arguments
+
+  - `symbolic`: The symbolic factorization method to use. Options are:
+    - `:RF` (default): Use cusolverRF's built-in symbolic analysis
+    - `:KLU`: Use KLU for symbolic analysis
+  - `reuse_symbolic`: Whether to reuse the symbolic factorization when the 
+    sparsity pattern doesn't change (default: `true`)
+
+!!! note
+    This solver requires CUSOLVERRF.jl to be loaded and only supports 
+    `Float64` element types with `Int32` indices.
+"""
+struct CUSOLVERRFFactorization <: AbstractSparseFactorization
+    symbolic::Symbol
+    reuse_symbolic::Bool
+
+    function CUSOLVERRFFactorization(; symbolic::Symbol = :RF, reuse_symbolic::Bool = true)
+        ext = Base.get_extension(@__MODULE__, :LinearSolveCUSOLVERRFExt)
+        if ext === nothing
+            error("CUSOLVERRFFactorization requires that CUSOLVERRF.jl is loaded, i.e. `using CUSOLVERRF`")
+        else
+            return new{}(symbolic, reuse_symbolic)
+        end
+    end
+end

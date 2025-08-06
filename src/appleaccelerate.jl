@@ -34,6 +34,8 @@ function aa_getrf!(A::AbstractMatrix{<:ComplexF64};
         ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
         info = Ref{Cint}(),
         check = false)
+    __appleaccelerate_isavailable() || 
+        error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -54,6 +56,8 @@ function aa_getrf!(A::AbstractMatrix{<:ComplexF32};
         ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
         info = Ref{Cint}(),
         check = false)
+    __appleaccelerate_isavailable() || 
+        error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -74,6 +78,8 @@ function aa_getrf!(A::AbstractMatrix{<:Float64};
         ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
         info = Ref{Cint}(),
         check = false)
+    __appleaccelerate_isavailable() || 
+        error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -94,6 +100,8 @@ function aa_getrf!(A::AbstractMatrix{<:Float32};
         ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
         info = Ref{Cint}(),
         check = false)
+    __appleaccelerate_isavailable() || 
+        error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -116,6 +124,8 @@ function aa_getrs!(trans::AbstractChar,
         ipiv::AbstractVector{Cint},
         B::AbstractVecOrMat{<:ComplexF64};
         info = Ref{Cint}())
+    __appleaccelerate_isavailable() || 
+        error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -140,6 +150,8 @@ function aa_getrs!(trans::AbstractChar,
         ipiv::AbstractVector{Cint},
         B::AbstractVecOrMat{<:ComplexF32};
         info = Ref{Cint}())
+    __appleaccelerate_isavailable() || 
+        error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -165,6 +177,8 @@ function aa_getrs!(trans::AbstractChar,
         ipiv::AbstractVector{Cint},
         B::AbstractVecOrMat{<:Float64};
         info = Ref{Cint}())
+    __appleaccelerate_isavailable() || 
+        error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -190,6 +204,8 @@ function aa_getrs!(trans::AbstractChar,
         ipiv::AbstractVector{Cint},
         B::AbstractVecOrMat{<:Float32};
         info = Ref{Cint}())
+    __appleaccelerate_isavailable() || 
+        error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -236,6 +252,8 @@ end
 
 function SciMLBase.solve!(cache::LinearCache, alg::AppleAccelerateLUFactorization;
         kwargs...)
+    __appleaccelerate_isavailable() || 
+        error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh

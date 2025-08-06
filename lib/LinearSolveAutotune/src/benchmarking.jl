@@ -184,7 +184,7 @@ function get_benchmark_sizes(large_matrices::Bool = false)
             1200:200:2000, 2500:500:5000, 6000:1000:10000)
     else
         # Default sizes similar to existing benchmarks
-        return 4:8:500
+        return vcat(4:8:128, 150:50:500)
     end
 end
 

@@ -8,6 +8,25 @@ using ForwardDiff: Dual, Partials
 using SciMLBase
 using RecursiveArrayTools
 
+using LinearSolve: LUFactorization,
+                   QRFactorization,
+                   DiagonalFactorization,
+                   DirectLdiv!,
+                   SparspakFactorization,
+                   KLUFactorization,
+                   UMFPACKFactorization,
+                   KrylovJL,
+                   RFLUFactorization,
+                   LDLtFactorization,
+                   BunchKaufmanFactorization,
+                   CHOLMODFactorization,
+                   SVDFactorization,
+                   CholeskyFactorization,
+                   NormalCholeskyFactorization,
+                   AppleAccelerateLUFactorization,
+                   MKLLUFactorization,
+                   DefaultLinearSolver
+
 const DualLinearProblem = LinearProblem{
     <:Union{Number, <:AbstractArray, Nothing}, iip,
     <:Union{<:Dual{T, V, P}, <:AbstractArray{<:Dual{T, V, P}}},
@@ -41,7 +60,7 @@ DirectLdiv!,
 SparspakFactorization,
 KLUFactorization,
 UMFPACKFactorization,
-KrylovJL_GMRES,
+KrylovJL,
 RFLUFactorization,
 LDLtFactorization,
 BunchKaufmanFactorization,
@@ -51,9 +70,7 @@ CholeskyFactorization,
 NormalCholeskyFactorization,
 AppleAccelerateLUFactorization,
 MKLLUFactorization,
-QRFactorizationPivoted,
-KrylovJL_CRAIGMR,
-KrylovJL_LSMR}
+DefaultLinearSolver}
 
 LinearSolve.@concrete mutable struct DualLinearCache
     linear_cache

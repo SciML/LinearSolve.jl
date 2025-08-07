@@ -1,31 +1,12 @@
 module LinearSolveForwardDiffExt
 
 using LinearSolve
-using LinearSolve: SciMLLinearSolveAlgorithm
+using LinearSolve: SciMLLinearSolveAlgorithm, __init
 using LinearAlgebra
 using ForwardDiff
 using ForwardDiff: Dual, Partials
 using SciMLBase
 using RecursiveArrayTools
-
-using LinearSolve: LUFactorization,
-                   QRFactorization,
-                   DiagonalFactorization,
-                   DirectLdiv!,
-                   SparspakFactorization,
-                   KLUFactorization,
-                   UMFPACKFactorization,
-                   KrylovJL,
-                   RFLUFactorization,
-                   LDLtFactorization,
-                   BunchKaufmanFactorization,
-                   CHOLMODFactorization,
-                   SVDFactorization,
-                   CholeskyFactorization,
-                   NormalCholeskyFactorization,
-                   AppleAccelerateLUFactorization,
-                   MKLLUFactorization,
-                   DefaultLinearSolver
 
 const DualLinearProblem = LinearProblem{
     <:Union{Number, <:AbstractArray, Nothing}, iip,
@@ -52,25 +33,6 @@ const DualBLinearProblem = LinearProblem{
 
 const DualAbstractLinearProblem = Union{
     DualLinearProblem, DualALinearProblem, DualBLinearProblem}
-
-const acceptable_algs = Union{LUFactorization,
-QRFactorization,
-DiagonalFactorization,
-DirectLdiv!,
-SparspakFactorization,
-KLUFactorization,
-UMFPACKFactorization,
-KrylovJL,
-RFLUFactorization,
-LDLtFactorization,
-BunchKaufmanFactorization,
-CHOLMODFactorization,
-SVDFactorization,
-CholeskyFactorization,
-NormalCholeskyFactorization,
-AppleAccelerateLUFactorization,
-MKLLUFactorization,
-DefaultLinearSolver}
 
 LinearSolve.@concrete mutable struct DualLinearCache
     linear_cache
@@ -159,8 +121,17 @@ function linearsolve_dual_solution(u::AbstractArray, partials,
         zip(u, partials_list[i, :] for i in 1:length(partials_list.u[1])))
 end
 
-function SciMLBase.init(
-        prob::DualAbstractLinearProblem, alg::acceptable_algs,
+function SciMLBase.init(prob::DualAbstractLinearProblem, alg::SciMLLinearSolveAlgorithm, args...; kwargs...)
+    return __dual_init(prob, alg, args...; kwargs...)
+end
+
+# Opt out for GenericLUFactorization
+function SciMLBase.init(prob::DualAbstractLinearProblem, alg::GenericLUFactorization, args...; kwargs...)
+    return LinearSolve.__init(prob,alg, args...; kwargs...)
+end
+
+function __dual_init(
+        prob::DualAbstractLinearProblem, alg::SciMLLinearSolveAlgorithm,
         args...;
         alias = LinearAliasSpecifier(),
         abstol = LinearSolve.default_tol(real(eltype(prob.b))),

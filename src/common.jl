@@ -138,7 +138,7 @@ end
 __init_u0_from_Ab(::SMatrix{S1, S2}, b) where {S1, S2} = zeros(SVector{S2, eltype(b)})
 
 function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm, args...; kwargs...)
-    __init(prob, alg, args..., kwargs...)
+    __init(prob, alg, args...; kwargs...)
 end
 
 function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,

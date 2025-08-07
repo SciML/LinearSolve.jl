@@ -34,6 +34,27 @@ const DualBLinearProblem = LinearProblem{
 const DualAbstractLinearProblem = Union{
     DualLinearProblem, DualALinearProblem, DualBLinearProblem}
 
+Acceptable_algs = Union{LUFactorization,
+QRFactorization,
+DiagonalFactorization,
+DirectLdiv!,
+SparspakFactorization,
+KLUFactorization,
+UMFPACKFactorization,
+KrylovJL_GMRES,
+RFLUFactorization,
+LDLtFactorization,
+BunchKaufmanFactorization,
+CHOLMODFactorization,
+SVDFactorization,
+CholeskyFactorization,
+NormalCholeskyFactorization,
+AppleAccelerateLUFactorization,
+MKLLUFactorization,
+QRFactorizationPivoted,
+KrylovJL_CRAIGMR,
+KrylovJL_LSMR}
+
 LinearSolve.@concrete mutable struct DualLinearCache
     linear_cache
     dual_type
@@ -122,7 +143,7 @@ function linearsolve_dual_solution(u::AbstractArray, partials,
 end
 
 function SciMLBase.init(
-        prob::DualAbstractLinearProblem, alg::LinearSolve.SciMLLinearSolveAlgorithm,
+        prob::DualAbstractLinearProblem, alg::Acceptable_algs,
         args...;
         alias = LinearAliasSpecifier(),
         abstol = LinearSolve.default_tol(real(eltype(prob.b))),

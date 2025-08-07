@@ -53,7 +53,7 @@ const DualBLinearProblem = LinearProblem{
 const DualAbstractLinearProblem = Union{
     DualLinearProblem, DualALinearProblem, DualBLinearProblem}
 
-Acceptable_algs = Union{LUFactorization,
+const acceptable_algs = Union{LUFactorization,
 QRFactorization,
 DiagonalFactorization,
 DirectLdiv!,
@@ -160,7 +160,7 @@ function linearsolve_dual_solution(u::AbstractArray, partials,
 end
 
 function SciMLBase.init(
-        prob::DualAbstractLinearProblem, alg::Acceptable_algs,
+        prob::DualAbstractLinearProblem, alg::acceptable_algs,
         args...;
         alias = LinearAliasSpecifier(),
         abstol = LinearSolve.default_tol(real(eltype(prob.b))),

@@ -54,7 +54,7 @@ sol1.u
   1.8385599677530706
 =#
 
-linsolve = LinearSolve.set_b(linsolve, b2)
+LinearSolve.set_b!(linsolve, b2)
 sol2 = solve!(linsolve)
 
 sol2.u
@@ -66,8 +66,10 @@ sol2.u
  -0.4998342686003478
 =#
 
-linsolve = LinearSolve.set_b(linsolve, b2)
-sol2 = solve!(linsolve, IterativeSolversJL_GMRES()) # Switch to GMRES
+linsolve = init(prob, IterativeSolversJL_GMRES()) # Switch to GMRES
+LinearSolve.set_b!(linsolve, b2)
+
+sol2 = solve!(linsolve)
 sol2.u
 #=
 4-element Vector{Float64}:
@@ -78,7 +80,7 @@ sol2.u
 =#
 
 A2 = rand(n, n)
-linsolve = LinearSolve.set_A(linsolve, A2)
+LinearSolve.set_A!(linsolve, A2)
 sol3 = solve!(linsolve)
 
 sol3.u

@@ -11,6 +11,7 @@ using LinearAlgebra
 using Printf
 using Dates
 using Base64
+using ProgressMeter
 
 # Hard dependency to ensure RFLUFactorization others solvers are available
 using RecursiveFactorization  
@@ -24,7 +25,7 @@ using Metal
 using GitHub
 using Plots
 
-export autotune_setup, share_results
+export autotune_setup, share_results, AutotuneResults
 
 include("algorithms.jl")
 include("gpu_detection.jl")
@@ -33,9 +34,93 @@ include("plotting.jl")
 include("telemetry.jl")
 include("preferences.jl")
 
+# Define the AutotuneResults struct
+struct AutotuneResults
+    results_df::DataFrame
+    sysinfo::Dict
+    plots::Union{Nothing, Dict}
+end
+
+# Display method for AutotuneResults
+function Base.show(io::IO, results::AutotuneResults)
+    println(io, "="^60)
+    println(io, "LinearSolve.jl Autotune Results")
+    println(io, "="^60)
+    
+    # System info summary
+    println(io, "\n📊 System Information:")
+    println(io, "  • CPU: ", get(results.sysinfo, "cpu_name", "Unknown"))
+    println(io, "  • OS: ", get(results.sysinfo, "os", "Unknown"))
+    println(io, "  • Julia: ", get(results.sysinfo, "julia_version", "Unknown"))
+    println(io, "  • Threads: ", get(results.sysinfo, "num_threads", "Unknown"))
+    
+    # Results summary
+    successful_results = filter(row -> row.success, results.results_df)
+    if nrow(successful_results) > 0
+        println(io, "\n🏆 Top Performing Algorithms:")
+        summary = combine(groupby(successful_results, :algorithm),
+            :gflops => mean => :avg_gflops,
+            :gflops => maximum => :max_gflops,
+            nrow => :num_tests)
+        sort!(summary, :avg_gflops, rev = true)
+        
+        # Show top 5
+        for (i, row) in enumerate(eachrow(first(summary, 5)))
+            println(io, "  ", i, ". ", row.algorithm, ": ",
+                    @sprintf("%.2f GFLOPs avg", row.avg_gflops))
+        end
+    end
+    
+    # Element types tested
+    eltypes = unique(results.results_df.eltype)
+    println(io, "\n🔬 Element Types Tested: ", join(eltypes, ", "))
+    
+    # Matrix sizes tested
+    sizes = unique(results.results_df.size)
+    println(io, "📏 Matrix Sizes: ", minimum(sizes), "×", minimum(sizes), 
+            " to ", maximum(sizes), "×", maximum(sizes))
+    
+    # Call to action
+    println(io, "\n" * "="^60)
+    println(io, "💡 To share your results with the community, run:")
+    println(io, "   share_results(results)")
+    println(io, "\n📈 See community results at:")
+    println(io, "   https://github.com/SciML/LinearSolve.jl/issues/669")
+    println(io, "="^60)
+end
+
+# Plot method for AutotuneResults
+function Plots.plot(results::AutotuneResults; kwargs...)
+    if results.plots === nothing || isempty(results.plots)
+        @warn "No plots available in results. Run autotune_setup with make_plot=true"
+        return nothing
+    end
+    
+    # Create a composite plot from all element type plots
+    plot_list = []
+    for (eltype_name, p) in results.plots
+        push!(plot_list, p)
+    end
+    
+    # Create composite plot
+    n_plots = length(plot_list)
+    if n_plots == 1
+        return plot_list[1]
+    elseif n_plots == 2
+        return plot(plot_list..., layout=(1, 2), size=(1200, 500); kwargs...)
+    elseif n_plots <= 4
+        return plot(plot_list..., layout=(2, 2), size=(1200, 900); kwargs...)
+    else
+        ncols = ceil(Int, sqrt(n_plots))
+        nrows = ceil(Int, n_plots / ncols)
+        return plot(plot_list..., layout=(nrows, ncols), 
+                   size=(400*ncols, 400*nrows); kwargs...)
+    end
+end
+
 """
     autotune_setup(; 
-        sizes = [:small, :medium],
+        sizes = [:small, :medium, :large],
         make_plot::Bool = true,
         set_preferences::Bool = true,
         samples::Int = 5,
@@ -52,7 +137,7 @@ Run a comprehensive benchmark of all available LU factorization methods and opti
 
 # Arguments
 
-  - `sizes = [:small, :medium]`: Size categories to test. Options: :small (5-20), :medium (20-100), :large (100-1000), :big (10000-100000)
+  - `sizes = [:small, :medium, :large]`: Size categories to test. Options: :small (5-20), :medium (20-300), :large (300-1000), :big (10000-100000)
   - `make_plot::Bool = true`: Generate performance plots for each element type
   - `set_preferences::Bool = true`: Update LinearSolve preferences with optimal algorithms
   - `samples::Int = 5`: Number of benchmark samples per algorithm/size
@@ -62,9 +147,7 @@ Run a comprehensive benchmark of all available LU factorization methods and opti
 
 # Returns
 
-  - `DataFrame`: Detailed benchmark results with performance data for all element types
-  - `Dict`: System information about the benchmark environment
-  - `Dict` or `Plot`: Performance visualizations by element type (if `make_plot=true`)
+  - `AutotuneResults`: Object containing benchmark results, system info, and plots
 
 # Examples
 
@@ -72,21 +155,21 @@ Run a comprehensive benchmark of all available LU factorization methods and opti
 using LinearSolve
 using LinearSolveAutotune
 
-# Basic autotune with small and medium sizes
-results, sysinfo, plots = autotune_setup()
+# Basic autotune with default sizes
+results = autotune_setup()
 
 # Test all size ranges
-results, sysinfo, plots = autotune_setup(sizes = [:small, :medium, :large, :big])
+results = autotune_setup(sizes = [:small, :medium, :large, :big])
 
 # Large matrices only
-results, sysinfo, plots = autotune_setup(sizes = [:large, :big], samples = 10, seconds = 1.0)
+results = autotune_setup(sizes = [:large, :big], samples = 10, seconds = 1.0)
 
 # After running autotune, share results (requires gh CLI or GitHub token)
-share_results(results, sysinfo, plots)
+share_results(results)
 ```
 """
 function autotune_setup(;
-        sizes = [:small, :medium],
+        sizes = [:small, :medium, :large],
         make_plot::Bool = true,
         set_preferences::Bool = true,
         samples::Int = 5,
@@ -175,18 +258,12 @@ function autotune_setup(;
 
     sysinfo = get_detailed_system_info()
 
-    @info "To share your results with the community, run: share_results(results_df, sysinfo, plots_dict)"
-    
-    # Return results and plots
-    if make_plot && plots_dict !== nothing && !isempty(plots_dict)
-        return results_df, sysinfo, plots_dict
-    else
-        return results_df, sysinfo, nothing
-    end
+    # Return AutotuneResults object
+    return AutotuneResults(results_df, sysinfo, plots_dict)
 end
 
 """
-    share_results(results_df::DataFrame, sysinfo::Dict, plots_dict=nothing)
+    share_results(results::AutotuneResults)
 
 Share your benchmark results with the LinearSolve.jl community to help improve 
 automatic algorithm selection across different hardware configurations.
@@ -211,28 +288,27 @@ your results as a comment to the community benchmark collection issue.
 6. Run this function
 
 # Arguments
-- `results_df`: Benchmark results DataFrame from autotune_setup
-- `sysinfo`: System information Dict from autotune_setup
-- `plots_dict`: Optional plots dictionary from autotune_setup
+- `results`: AutotuneResults object from autotune_setup
 
 # Examples
 ```julia
 # Run benchmarks
-results, sysinfo, plots = autotune_setup()
+results = autotune_setup()
 
 # Share results with the community
-share_results(results, sysinfo, plots)
+share_results(results)
 ```
 """
-function share_results(results_df::DataFrame, sysinfo::Dict, plots_dict=nothing)
+function share_results(results::AutotuneResults)
     @info "📤 Preparing to share benchmark results with the community..."
     
-    # Get system info if not provided
-    system_info = if haskey(sysinfo, "os")
-        sysinfo
-    else
-        get_system_info()
-    end
+    # Extract from AutotuneResults
+    results_df = results.results_df
+    sysinfo = results.sysinfo
+    plots_dict = results.plots
+    
+    # Get system info
+    system_info = sysinfo
     
     # Categorize results
     categories = categorize_results(results_df)

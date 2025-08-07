@@ -1,5 +1,7 @@
 # Core benchmarking functionality
 
+using ProgressMeter
+
 """
     test_algorithm_compatibility(alg, eltype::Type, test_size::Int=4)
 
@@ -58,19 +60,12 @@ function filter_compatible_algorithms(algorithms, alg_names, eltype::Type)
     compatible_algs = []
     compatible_names = String[]
     
-    @info "Testing algorithm compatibility with $(eltype)..."
-    
     for (alg, name) in zip(algorithms, alg_names)
         if test_algorithm_compatibility(alg, eltype)
             push!(compatible_algs, alg)
             push!(compatible_names, name)
-            @debug "✓ $name compatible with $eltype"
-        else
-            @debug "✗ $name not compatible with $eltype"
         end
     end
-    
-    @info "Found $(length(compatible_algs))/$(length(algorithms)) algorithms compatible with $eltype"
     
     return compatible_algs, compatible_names
 end
@@ -83,7 +78,7 @@ Benchmark the given algorithms across different matrix sizes and element types.
 Returns a DataFrame with results including element type information.
 """
 function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
-        samples = 5, seconds = 0.5, sizes = [:small, :medium])
+        samples = 5, seconds = 0.5, sizes = [:small, :medium, :large])
 
     # Set benchmark parameters
     old_params = BenchmarkTools.DEFAULT_PARAMETERS
@@ -92,11 +87,21 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
 
     # Initialize results DataFrame
     results_data = []
+    
+    # Calculate total number of benchmarks for progress bar
+    total_benchmarks = 0
+    for eltype in eltypes
+        # Pre-filter to estimate the actual number
+        test_algs, _ = filter_compatible_algorithms(algorithms, alg_names, eltype)
+        total_benchmarks += length(matrix_sizes) * length(test_algs)
+    end
+    
+    # Create progress bar
+    progress = Progress(total_benchmarks, desc="Benchmarking: ", 
+                       barlen=50, showspeed=true)
 
     try
         for eltype in eltypes
-            @info "Benchmarking with element type: $eltype"
-            
             # Filter algorithms for this element type
             compatible_algs, compatible_names = filter_compatible_algorithms(algorithms, alg_names, eltype)
             
@@ -106,8 +111,6 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
             end
             
             for n in matrix_sizes
-                @info "Benchmarking $n × $n matrices with $eltype..."
-
                 # Create test problem with specified element type
                 rng = MersenneTwister(123)  # Consistent seed for reproducibility
                 A = rand(rng, eltype, n, n)
@@ -115,6 +118,10 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
                 u0 = rand(rng, eltype, n)
 
                 for (alg, name) in zip(compatible_algs, compatible_names)
+                    # Update progress description
+                    ProgressMeter.update!(progress, 
+                        description="Benchmarking $name on $(n)×$(n) $eltype matrix: ")
+                    
                     gflops = 0.0
                     success = true
                     error_msg = ""
@@ -142,7 +149,7 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
                     catch e
                         success = false
                         error_msg = string(e)
-                        @warn "Algorithm $name failed for size $n with $eltype: $error_msg"
+                        # Don't warn for each failure, just record it
                     end
 
                     # Store result with element type information
@@ -155,6 +162,9 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
                             success = success,
                             error = error_msg
                         ))
+                    
+                    # Update progress
+                    ProgressMeter.next!(progress)
                 end
             end
         end
@@ -174,8 +184,8 @@ Get the matrix sizes to benchmark based on the requested size categories.
 
 Size categories:
 - `:small` - 5:5:20 (for quick tests and small problems)
-- `:medium` - 20:20:100 (for typical problems)
-- `:large` - 100:100:1000 (for larger problems)
+- `:medium` - 20:20:100 and 100:50:300 (for typical problems)
+- `:large` - 300:100:1000 (for larger problems)
 - `:big` - 10000:1000:100000 (for very large/GPU problems)
 """
 function get_benchmark_sizes(size_categories::Vector{Symbol})
@@ -186,8 +196,9 @@ function get_benchmark_sizes(size_categories::Vector{Symbol})
             append!(sizes, 5:5:20)
         elseif category == :medium
             append!(sizes, 20:20:100)
+            append!(sizes, 100:50:300)
         elseif category == :large
-            append!(sizes, 100:100:1000)
+            append!(sizes, 300:100:1000)
         elseif category == :big
             append!(sizes, 10000:1000:100000)
         else

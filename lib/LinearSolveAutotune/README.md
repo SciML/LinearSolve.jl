@@ -7,11 +7,17 @@ Automatic benchmarking and tuning for LinearSolve.jl algorithms.
 ```julia
 using LinearSolve, LinearSolveAutotune
 
-# Run benchmarks with default settings (small and medium sizes)
-results, sysinfo, plots = autotune_setup()
+# Run benchmarks with default settings (small, medium, and large sizes)
+results = autotune_setup()
+
+# View a summary of results
+display(results)
+
+# Plot all benchmark results
+plot(results)
 
 # Share your results with the community (optional)
-share_results(results, sysinfo, plots)
+share_results(results)
 ```
 
 ## Features
@@ -28,8 +34,8 @@ share_results(results, sysinfo, plots)
 The package now uses flexible size categories instead of a binary large_matrices flag:
 
 - `:small` - Matrices from 5×5 to 20×20 (quick tests)
-- `:medium` - Matrices from 20×20 to 100×100 (typical problems)
-- `:large` - Matrices from 100×100 to 1000×1000 (larger problems)
+- `:medium` - Matrices from 20×20 to 300×300 (typical problems)
+- `:large` - Matrices from 300×300 to 1000×1000 (larger problems)
 - `:big` - Matrices from 10000×10000 to 100000×100000 (GPU/HPC)
 
 ## Usage Examples
@@ -37,22 +43,26 @@ The package now uses flexible size categories instead of a binary large_matrices
 ### Basic Benchmarking
 
 ```julia
-# Default: small and medium sizes
-results, sysinfo, plots = autotune_setup()
+# Default: small, medium, and large sizes
+results = autotune_setup()
 
 # Test all size ranges
-results, sysinfo, plots = autotune_setup(sizes = [:small, :medium, :large, :big])
+results = autotune_setup(sizes = [:small, :medium, :large, :big])
 
 # Large matrices only (for GPU systems)
-results, sysinfo, plots = autotune_setup(sizes = [:large, :big])
+results = autotune_setup(sizes = [:large, :big])
 
 # Custom configuration
-results, sysinfo, plots = autotune_setup(
+results = autotune_setup(
     sizes = [:medium, :large],
     samples = 10,
     seconds = 1.0,
     eltypes = (Float64, ComplexF64)
 )
+
+# View results and plot
+display(results)
+plot(results)
 ```
 
 ### Sharing Results
@@ -61,7 +71,7 @@ After running benchmarks, you can optionally share your results with the LinearS
 
 ```julia
 # Share your benchmark results
-share_results(results, sysinfo, plots)
+share_results(results)
 ```
 
 ## Setting Up GitHub Authentication
@@ -124,7 +134,7 @@ If you prefer using a token:
 
 ```julia
 autotune_setup(;
-    sizes = [:small, :medium],
+    sizes = [:small, :medium, :large],
     make_plot = true,
     set_preferences = true,
     samples = 5,
@@ -144,20 +154,16 @@ autotune_setup(;
 - `skip_missing_algs`: Continue if algorithms are missing
 
 **Returns:**
-- `results_df`: DataFrame with benchmark results
-- `sysinfo`: System information dictionary
-- `plots`: Performance plots (if `make_plot=true`)
+- `results`: AutotuneResults object containing benchmark data, system info, and plots
 
 ### `share_results`
 
 ```julia
-share_results(results_df, sysinfo, plots=nothing)
+share_results(results)
 ```
 
 **Parameters:**
-- `results_df`: Benchmark results from `autotune_setup`
-- `sysinfo`: System information from `autotune_setup`
-- `plots`: Optional plots from `autotune_setup`
+- `results`: AutotuneResults object from `autotune_setup`
 
 ## Contributing
 

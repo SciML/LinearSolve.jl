@@ -127,7 +127,7 @@ end
 
 # Opt out for GenericLUFactorization
 function SciMLBase.init(prob::DualAbstractLinearProblem, alg::GenericLUFactorization, args...; kwargs...)
-    return LinearSolve.__init(prob,alg, args...; kwargs...)
+    return __init(prob,alg, args...; kwargs...)
 end
 
 function __dual_init(

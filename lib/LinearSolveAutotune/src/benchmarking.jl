@@ -76,14 +76,14 @@ function filter_compatible_algorithms(algorithms, alg_names, eltype::Type)
 end
 
 """
-    benchmark_algorithms(sizes, algorithms, alg_names, eltypes; 
-                        samples=5, seconds=0.5, large_matrices=false)
+    benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes; 
+                        samples=5, seconds=0.5, sizes=[:small, :medium])
 
 Benchmark the given algorithms across different matrix sizes and element types.
 Returns a DataFrame with results including element type information.
 """
-function benchmark_algorithms(sizes, algorithms, alg_names, eltypes;
-        samples = 5, seconds = 0.5, large_matrices = false)
+function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
+        samples = 5, seconds = 0.5, sizes = [:small, :medium])
 
     # Set benchmark parameters
     old_params = BenchmarkTools.DEFAULT_PARAMETERS
@@ -105,7 +105,7 @@ function benchmark_algorithms(sizes, algorithms, alg_names, eltypes;
                 continue
             end
             
-            for n in sizes
+            for n in matrix_sizes
                 @info "Benchmarking $n × $n matrices with $eltype..."
 
                 # Create test problem with specified element type
@@ -168,19 +168,35 @@ function benchmark_algorithms(sizes, algorithms, alg_names, eltypes;
 end
 
 """
-    get_benchmark_sizes(large_matrices::Bool=false)
+    get_benchmark_sizes(size_categories::Vector{Symbol})
 
-Get the matrix sizes to benchmark based on the large_matrices flag.
+Get the matrix sizes to benchmark based on the requested size categories.
+
+Size categories:
+- `:small` - 5:5:20 (for quick tests and small problems)
+- `:medium` - 20:20:100 (for typical problems)
+- `:large` - 100:100:1000 (for larger problems)
+- `:big` - 10000:1000:100000 (for very large/GPU problems)
 """
-function get_benchmark_sizes(large_matrices::Bool = false)
-    if large_matrices
-        # For GPU benchmarking, include much larger sizes up to 10000
-        return vcat(4:8:128, 150:50:500, 600:100:1000,
-            1200:200:2000, 2500:500:5000, 6000:1000:10000)
-    else
-        # Default sizes similar to existing benchmarks
-        return vcat(4:8:128, 150:50:500)
+function get_benchmark_sizes(size_categories::Vector{Symbol})
+    sizes = Int[]
+    
+    for category in size_categories
+        if category == :small
+            append!(sizes, 5:5:20)
+        elseif category == :medium
+            append!(sizes, 20:20:100)
+        elseif category == :large
+            append!(sizes, 100:100:1000)
+        elseif category == :big
+            append!(sizes, 10000:1000:100000)
+        else
+            @warn "Unknown size category: $category. Skipping."
+        end
     end
+    
+    # Remove duplicates and sort
+    return sort(unique(sizes))
 end
 
 """

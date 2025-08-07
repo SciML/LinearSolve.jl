@@ -20,7 +20,7 @@ function setup_github_authentication()
                 end
             end
         catch e
-            @warn "An error occurred while checking `gh` CLI status. Falling back to token auth. Error: $e"
+            @debug "gh CLI check failed: $e"
         end
     end
 
@@ -28,66 +28,12 @@ function setup_github_authentication()
     if haskey(ENV, "GITHUB_TOKEN") && !isempty(ENV["GITHUB_TOKEN"])
         auth = test_github_authentication(String(ENV["GITHUB_TOKEN"]))
         if auth !== nothing
+            println("✅ Found GITHUB_TOKEN environment variable.")
             return (:token, auth)
         end
     end
 
-    # 3. No environment variable or gh cli - provide setup instructions and get token
-    max_input_attempts = 3
-
-    for input_attempt in 1:max_input_attempts
-        println()
-        println("🚀 Help Improve LinearSolve.jl for Everyone!")
-        println("="^50)
-        println("Your benchmark results help the community by improving automatic")
-        println("algorithm selection across different hardware configurations.")
-        println()
-        println("💡 Easiest method: install GitHub CLI (`gh`) and run `gh auth login`.")
-        println("   Alternatively, create a token with 'issues:write' scope.")
-        println()
-        println("📋 Quick GitHub Token Setup (if not using `gh`):")
-        println()
-        println("1️⃣  Open: https://github.com/settings/tokens/new?scopes=issues:write&description=LinearSolve.jl%20Telemetry")
-        println("2️⃣  Click 'Generate token' and copy it")
-        println()
-        println("🔑 Paste your GitHub token here:")
-        println("   (If it shows julia> prompt, just paste the token there and press Enter)")
-        print("Token: ")
-        flush(stdout)
-
-        # Get token input
-        token = ""
-        try
-            sleep(0.1)
-            token = String(strip(readline()))
-        catch e
-            println("❌ Input error: $e. Please try again.")
-            continue
-        end
-
-        if !isempty(token)
-            clean_token = strip(replace(token, r"[\r\n\t ]+" => ""))
-            if length(clean_token) < 10
-                println("❌ Token seems too short. Please check and try again.")
-                continue
-            end
-
-            ENV["GITHUB_TOKEN"] = clean_token
-            auth_result = test_github_authentication(clean_token)
-            if auth_result !== nothing
-                return (:token, auth_result)
-            end
-            delete!(ENV, "GITHUB_TOKEN")
-        end
-
-        if input_attempt < max_input_attempts
-            println("\n🤝 Please try again - it only takes 30 seconds and greatly helps the community.")
-        end
-    end
-
-    println("\n📊 Continuing without telemetry. Results will be saved locally.")
-    println("💡 You can set GITHUB_TOKEN or log in with `gh auth login` and restart Julia later.")
-
+    # 3. No authentication available - return nothing
     return (nothing, nothing)
 end
 

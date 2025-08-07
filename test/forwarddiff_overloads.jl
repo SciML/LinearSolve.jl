@@ -192,4 +192,4 @@ backslash_x_p = A \ b
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 
 prob = LinearProblem(A, b)
-@test init(prob, GenericLUFactorization()) isa LinearCache
+@test init(prob, GenericLUFactorization()) isa LinearSolve.LinearCache

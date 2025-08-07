@@ -54,7 +54,7 @@ sol1.u
   1.8385599677530706
 =#
 
-LinearSolve.set_b!(linsolve, b2)
+linsolve.b = b2
 sol2 = solve!(linsolve)
 
 sol2.u
@@ -67,7 +67,7 @@ sol2.u
 =#
 
 linsolve = init(prob, IterativeSolversJL_GMRES()) # Switch to GMRES
-LinearSolve.set_b!(linsolve, b2)
+linsolve.b = b2
 
 sol2 = solve!(linsolve)
 sol2.u
@@ -80,7 +80,7 @@ sol2.u
 =#
 
 A2 = rand(n, n)
-LinearSolve.set_A!(linsolve, A2)
+linsolve.A = A2
 sol3 = solve!(linsolve)
 
 sol3.u

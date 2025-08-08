@@ -25,8 +25,10 @@ Returns an authentication method indicator if successful, nothing if setup fails
 """
 function setup_github_authentication(; auto_login::Bool = true)
     # 1. Check for `gh` CLI (system or JLL)
+    gh_cmd = get_gh_command()
+    
+    # First check if already authenticated
     try
-        gh_cmd = get_gh_command()
         # Suppress output of gh auth status check
         if success(pipeline(`$gh_cmd auth status`; stdout=devnull, stderr=devnull))
             # Check if logged in to github.com
@@ -37,7 +39,7 @@ function setup_github_authentication(; auto_login::Bool = true)
             end
         end
     catch e
-        @debug "gh CLI check failed: $e"
+        @debug "gh CLI auth status check failed: $e"
     end
 
     # 2. Check for GITHUB_TOKEN environment variable
@@ -49,9 +51,8 @@ function setup_github_authentication(; auto_login::Bool = true)
         end
     end
 
-    # 3. If auto_login is enabled, offer to authenticate using gh (system or JLL)
+    # 3. If auto_login is enabled, offer to authenticate
     if auto_login
-        gh_cmd = get_gh_command()
         println("\n🔐 GitHub authentication not found.")
         println("   To share results with the community, authentication is required.")
         println("\nWould you like to authenticate with GitHub now? (y/n)")
@@ -64,7 +65,7 @@ function setup_github_authentication(; auto_login::Bool = true)
             println("   Please follow the prompts to complete authentication.\n")
             
             try
-                # Run gh auth login interactively using the wrapper command
+                # Run gh auth login interactively (using system gh or JLL)
                 run(`$gh_cmd auth login`)
                 
                 # Check if authentication succeeded

@@ -1,6 +1,7 @@
 module LinearSolvePardisoExt
 
 using Pardiso, LinearSolve
+using SciMLVerbosity: @SciMLMessage, verbosity_to_bool
 using SparseArrays
 using SparseArrays: nonzeros, rowvals, getcolptr
 using LinearSolve: PardisoJL, @unpack
@@ -20,7 +21,7 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
         maxiters::Int,
         abstol,
         reltol,
-        verbose::Bool,
+        verbose::LinearVerbosity,
         assumptions::LinearSolve.OperatorAssumptions)
     @unpack nprocs, solver_type, matrix_type, cache_analysis, iparm, dparm, vendor = alg
     A = convert(AbstractMatrix, A)
@@ -73,7 +74,10 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
             error("Number type not supported by Pardiso")
         end
     end
-    verbose && Pardiso.set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
+
+    if verbosity_to_bool(verbose.numerical.pardiso_verbosity)
+        Pardiso.set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
+    end
 
     #=
     Note: It is recommended to use IPARM(11)=1 (scaling) and IPARM(13)=1 (matchings) for

@@ -192,7 +192,7 @@ function format_categories_markdown(categories::Dict{String, String})
     eltype_categories = Dict{String, Dict{String, String}}()
     
     for (key, algorithm) in categories
-        # Parse key like "Float64_0-128" -> eltype="Float64", range="0-128"
+        # Parse key like "Float64_tiny (5-20)" -> eltype="Float64", range="tiny (5-20)"
         if contains(key, "_")
             eltype, range = split(key, "_", limit=2)
             if !haskey(eltype_categories, eltype)
@@ -208,6 +208,26 @@ function format_categories_markdown(categories::Dict{String, String})
         end
     end
     
+    # Define the proper order for size ranges
+    size_order = ["tiny (5-20)", "small (20-100)", "medium (100-300)", "large (300-1000)", "big (10000+)"]
+    
+    # Custom sort function for ranges
+    function sort_ranges(ranges_dict)
+        sorted_pairs = []
+        for size in size_order
+            if haskey(ranges_dict, size)
+                push!(sorted_pairs, (size, ranges_dict[size]))
+            end
+        end
+        # Add any other ranges not in our predefined order (for backward compatibility)
+        for (range, algo) in ranges_dict
+            if !(range in size_order)
+                push!(sorted_pairs, (range, algo))
+            end
+        end
+        return sorted_pairs
+    end
+    
     # Format each element type
     for (eltype, ranges) in sort(eltype_categories)
         push!(lines, "#### Recommendations for $eltype")
@@ -215,7 +235,7 @@ function format_categories_markdown(categories::Dict{String, String})
         push!(lines, "| Size Range | Best Algorithm |")
         push!(lines, "|------------|----------------|")
 
-        for (range, algorithm) in sort(ranges)
+        for (range, algorithm) in sort_ranges(ranges)
             push!(lines, "| $range | $algorithm |")
         end
         push!(lines, "")

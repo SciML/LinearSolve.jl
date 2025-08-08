@@ -24,6 +24,7 @@ using Metal
 
 # Optional dependencies for telemetry and plotting
 using GitHub
+using gh_cli_jll
 using Plots
 
 export autotune_setup, share_results, AutotuneResults, plot

@@ -85,6 +85,11 @@ function Base.show(io::IO, results::AutotuneResults)
     println(io, "   share_results(results)")
     println(io, "\n📈 See community results at:")
     println(io, "   https://github.com/SciML/LinearSolve.jl/issues/669")
+    println(io, "\n🚀 For comprehensive results, consider running:")
+    println(io, "   results_full = autotune_setup(")
+    println(io, "       sizes = [:tiny, :small, :medium, :large, :big],")
+    println(io, "       eltypes = (Float32, Float64, ComplexF32, ComplexF64)")
+    println(io, "   )")
     println(io, "="^60)
 end
 
@@ -244,7 +249,14 @@ function autotune_setup(;
 
     @info "Autotune setup completed!"
 
-    sysinfo = get_detailed_system_info()
+    sysinfo_df = get_detailed_system_info()
+    # Convert DataFrame to Dict for AutotuneResults
+    sysinfo = Dict{String, Any}()
+    if nrow(sysinfo_df) > 0
+        for col in names(sysinfo_df)
+            sysinfo[col] = sysinfo_df[1, col]
+        end
+    end
 
     # Return AutotuneResults object
     return AutotuneResults(results_df, sysinfo)

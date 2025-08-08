@@ -1,5 +1,7 @@
 # GPU hardware and package detection
 
+using CPUSummary
+
 """
     is_cuda_available()
 
@@ -76,10 +78,28 @@ function get_system_info()
 
     info["julia_version"] = string(VERSION)
     info["os"] = string(Sys.KERNEL)
+    info["os_name"] = Sys.iswindows() ? "Windows" : Sys.islinux() ? "Linux" : Sys.isapple() ? "macOS" : "Other"
     info["arch"] = string(Sys.ARCH)
-    info["cpu_name"] = Sys.cpu_info()[1].model
-    info["num_cores"] = Sys.CPU_THREADS
+    
+    # Use CPUSummary where available, fallback to Sys otherwise
+    try
+        info["cpu_name"] = string(Sys.CPU_NAME)
+    catch
+        info["cpu_name"] = "Unknown"
+    end
+    
+    # CPUSummary.num_cores() returns the physical cores (as Static.StaticInt)
+    info["num_cores"] = Int(CPUSummary.num_cores())
+    info["num_logical_cores"] = Sys.CPU_THREADS
     info["num_threads"] = Threads.nthreads()
+    
+    # BLAS threads
+    try
+        info["blas_num_threads"] = LinearAlgebra.BLAS.get_num_threads()
+    catch
+        info["blas_num_threads"] = 1
+    end
+    
     info["blas_vendor"] = string(LinearAlgebra.BLAS.vendor())
     info["has_cuda"] = is_cuda_available()
     info["has_metal"] = is_metal_available()
@@ -147,9 +167,15 @@ function get_detailed_system_info()
     end
     
     try
-        system_data["cpu_cores"] = Sys.CPU_THREADS
+        system_data["cpu_cores"] = Int(CPUSummary.num_cores())
     catch
         system_data["cpu_cores"] = "unknown"
+    end
+    
+    try
+        system_data["cpu_logical_cores"] = Sys.CPU_THREADS
+    catch
+        system_data["cpu_logical_cores"] = "unknown"
     end
     
     try
@@ -172,12 +198,16 @@ function get_detailed_system_info()
     
     # CPU details
     try
-        cpu_info = Sys.cpu_info()[1]
-        system_data["cpu_name"] = cpu_info.model
-        system_data["cpu_speed_mhz"] = cpu_info.speed
+        system_data["cpu_name"] = string(Sys.CPU_NAME)
     catch
         system_data["cpu_name"] = "unknown"
-        system_data["cpu_speed_mhz"] = "unknown"
+    end
+    
+    try
+        # Architecture info from Sys
+        system_data["cpu_architecture"] = string(Sys.ARCH)
+    catch
+        system_data["cpu_architecture"] = "unknown"
     end
     
     # Categorize CPU vendor for easy analysis

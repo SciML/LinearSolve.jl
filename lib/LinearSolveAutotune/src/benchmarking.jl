@@ -1,5 +1,7 @@
 # Core benchmarking functionality
 
+using ProgressMeter
+
 """
     test_algorithm_compatibility(alg, eltype::Type, test_size::Int=4)
 
@@ -58,32 +60,25 @@ function filter_compatible_algorithms(algorithms, alg_names, eltype::Type)
     compatible_algs = []
     compatible_names = String[]
     
-    @info "Testing algorithm compatibility with $(eltype)..."
-    
     for (alg, name) in zip(algorithms, alg_names)
         if test_algorithm_compatibility(alg, eltype)
             push!(compatible_algs, alg)
             push!(compatible_names, name)
-            @debug "✓ $name compatible with $eltype"
-        else
-            @debug "✗ $name not compatible with $eltype"
         end
     end
-    
-    @info "Found $(length(compatible_algs))/$(length(algorithms)) algorithms compatible with $eltype"
     
     return compatible_algs, compatible_names
 end
 
 """
-    benchmark_algorithms(sizes, algorithms, alg_names, eltypes; 
-                        samples=5, seconds=0.5, large_matrices=false)
+    benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes; 
+                        samples=5, seconds=0.5, sizes=[:small, :medium])
 
 Benchmark the given algorithms across different matrix sizes and element types.
 Returns a DataFrame with results including element type information.
 """
-function benchmark_algorithms(sizes, algorithms, alg_names, eltypes;
-        samples = 5, seconds = 0.5, large_matrices = false)
+function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
+        samples = 5, seconds = 0.5, sizes = [:tiny, :small, :medium, :large])
 
     # Set benchmark parameters
     old_params = BenchmarkTools.DEFAULT_PARAMETERS
@@ -92,11 +87,21 @@ function benchmark_algorithms(sizes, algorithms, alg_names, eltypes;
 
     # Initialize results DataFrame
     results_data = []
+    
+    # Calculate total number of benchmarks for progress bar
+    total_benchmarks = 0
+    for eltype in eltypes
+        # Pre-filter to estimate the actual number
+        test_algs, _ = filter_compatible_algorithms(algorithms, alg_names, eltype)
+        total_benchmarks += length(matrix_sizes) * length(test_algs)
+    end
+    
+    # Create progress bar
+    progress = Progress(total_benchmarks, desc="Benchmarking: ", 
+                       barlen=50, showspeed=true)
 
     try
         for eltype in eltypes
-            @info "Benchmarking with element type: $eltype"
-            
             # Filter algorithms for this element type
             compatible_algs, compatible_names = filter_compatible_algorithms(algorithms, alg_names, eltype)
             
@@ -105,9 +110,7 @@ function benchmark_algorithms(sizes, algorithms, alg_names, eltypes;
                 continue
             end
             
-            for n in sizes
-                @info "Benchmarking $n × $n matrices with $eltype..."
-
+            for n in matrix_sizes
                 # Create test problem with specified element type
                 rng = MersenneTwister(123)  # Consistent seed for reproducibility
                 A = rand(rng, eltype, n, n)
@@ -115,6 +118,10 @@ function benchmark_algorithms(sizes, algorithms, alg_names, eltypes;
                 u0 = rand(rng, eltype, n)
 
                 for (alg, name) in zip(compatible_algs, compatible_names)
+                    # Update progress description
+                    ProgressMeter.update!(progress, 
+                        desc="Benchmarking $name on $(n)×$(n) $eltype matrix: ")
+                    
                     gflops = 0.0
                     success = true
                     error_msg = ""
@@ -142,7 +149,7 @@ function benchmark_algorithms(sizes, algorithms, alg_names, eltypes;
                     catch e
                         success = false
                         error_msg = string(e)
-                        @warn "Algorithm $name failed for size $n with $eltype: $error_msg"
+                        # Don't warn for each failure, just record it
                     end
 
                     # Store result with element type information
@@ -155,6 +162,9 @@ function benchmark_algorithms(sizes, algorithms, alg_names, eltypes;
                             success = success,
                             error = error_msg
                         ))
+                    
+                    # Update progress
+                    ProgressMeter.next!(progress)
                 end
             end
         end
@@ -168,25 +178,45 @@ function benchmark_algorithms(sizes, algorithms, alg_names, eltypes;
 end
 
 """
-    get_benchmark_sizes(large_matrices::Bool=false)
+    get_benchmark_sizes(size_categories::Vector{Symbol})
 
-Get the matrix sizes to benchmark based on the large_matrices flag.
+Get the matrix sizes to benchmark based on the requested size categories.
+
+Size categories:
+- `:tiny` - 5:5:20 (for very small problems)
+- `:small` - 20:20:100 (for small problems)
+- `:medium` - 100:50:300 (for typical problems)
+- `:large` - 300:100:1000 (for larger problems)
+- `:big` - 10000:1000:100000 (for very large/GPU problems)
 """
-function get_benchmark_sizes(large_matrices::Bool = false)
-    if large_matrices
-        # For GPU benchmarking, include much larger sizes up to 10000
-        return vcat(4:8:128, 150:50:500, 600:100:1000,
-            1200:200:2000, 2500:500:5000, 6000:1000:10000)
-    else
-        # Default sizes similar to existing benchmarks
-        return vcat(4:8:128, 150:50:500)
+function get_benchmark_sizes(size_categories::Vector{Symbol})
+    sizes = Int[]
+    
+    for category in size_categories
+        if category == :tiny
+            append!(sizes, 5:5:20)
+        elseif category == :small
+            append!(sizes, 20:20:100)
+        elseif category == :medium
+            append!(sizes, 100:50:300)
+        elseif category == :large
+            append!(sizes, 300:100:1000)
+        elseif category == :big
+            append!(sizes, 10000:1000:100000)
+        else
+            @warn "Unknown size category: $category. Skipping."
+        end
     end
+    
+    # Remove duplicates and sort
+    return sort(unique(sizes))
 end
 
 """
     categorize_results(df::DataFrame)
 
 Categorize the benchmark results into size ranges and find the best algorithm for each range and element type.
+For complex types, avoids RFLUFactorization if possible due to known issues.
 """
 function categorize_results(df::DataFrame)
     # Filter successful results
@@ -230,13 +260,38 @@ function categorize_results(df::DataFrame)
 
             # Calculate average GFLOPs for each algorithm in this range
             avg_results = combine(groupby(range_df, :algorithm), :gflops => mean => :avg_gflops)
+            
+            # Sort by performance
+            sort!(avg_results, :avg_gflops, rev=true)
 
-            # Find the best algorithm
+            # Find the best algorithm (for complex types, avoid RFLU if possible)
             if nrow(avg_results) > 0
-                best_idx = argmax(avg_results.avg_gflops)
-                best_alg = avg_results.algorithm[best_idx]
+                best_alg = avg_results.algorithm[1]
+                
+                # For complex types, check if best is RFLU and we have alternatives
+                if (eltype == "ComplexF32" || eltype == "ComplexF64") && 
+                   (contains(best_alg, "RFLU") || contains(best_alg, "RecursiveFactorization"))
+                    
+                    # Look for the best non-RFLU algorithm
+                    for i in 2:nrow(avg_results)
+                        alt_alg = avg_results.algorithm[i]
+                        if !contains(alt_alg, "RFLU") && !contains(alt_alg, "RecursiveFactorization")
+                            # Check if performance difference is not too large (within 20%)
+                            perf_ratio = avg_results.avg_gflops[i] / avg_results.avg_gflops[1]
+                            if perf_ratio > 0.8
+                                @info "Using $alt_alg instead of $best_alg for $eltype at $range_name ($(round(100*perf_ratio, digits=1))% of RFLU performance) to avoid complex number issues"
+                                best_alg = alt_alg
+                                break
+                            else
+                                @warn "RFLUFactorization is best for $eltype at $range_name but has complex number issues. Alternative algorithms are >20% slower."
+                            end
+                        end
+                    end
+                end
+                
                 category_key = "$(eltype)_$(range_name)"
                 categories[category_key] = best_alg
+                best_idx = findfirst(==(best_alg), avg_results.algorithm)
                 @info "Best algorithm for $eltype size range $range_name: $best_alg ($(round(avg_results.avg_gflops[best_idx], digits=2)) GFLOPs avg)"
             end
         end

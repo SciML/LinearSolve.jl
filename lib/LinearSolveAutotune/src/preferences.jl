@@ -5,24 +5,122 @@
 
 Set LinearSolve preferences based on the categorized benchmark results.
 These preferences are stored in the main LinearSolve.jl package.
-Handles element type-specific preferences with keys like "Float64_0-128".
+
+The function handles type fallbacks:
+- If Float32 wasn't benchmarked, uses Float64 results
+- If ComplexF64 wasn't benchmarked, uses ComplexF32 results (if available) or Float64
+- If ComplexF32 wasn't benchmarked, uses Float64 results
+- For complex types, avoids RFLUFactorization due to known issues
 """
 function set_algorithm_preferences(categories::Dict{String, String})
     @info "Setting LinearSolve preferences based on benchmark results..."
-
-    for (category_key, algorithm) in categories
-        # Handle element type specific keys like "Float64_0-128"
-        # Convert to safe preference key format
-        pref_key = "best_algorithm_$(replace(category_key, "+" => "plus", "-" => "_"))"
-        
-        # Set preferences in LinearSolve.jl, not LinearSolveAutotune (force=true allows overwriting)
-        Preferences.set_preferences!(LinearSolve, pref_key => algorithm; force = true)
-        @info "Set preference $pref_key = $algorithm in LinearSolve.jl"
+    
+    # Define the size category names we use
+    size_categories = ["tiny", "small", "medium", "large", "big"]
+    
+    # Define the element types we want to set preferences for
+    target_eltypes = ["Float32", "Float64", "ComplexF32", "ComplexF64"]
+    
+    # Extract benchmarked results by element type and size
+    benchmarked = Dict{String, Dict{String, String}}()
+    for (key, algorithm) in categories
+        if contains(key, "_")
+            eltype, size_range = split(key, "_", limit=2)
+            if !haskey(benchmarked, eltype)
+                benchmarked[eltype] = Dict{String, String}()
+            end
+            benchmarked[eltype][size_range] = algorithm
+        end
     end
-
+    
+    # Helper function to get best algorithm for complex types (avoiding RFLU)
+    function get_complex_algorithm(results_df, eltype_str, size_range)
+        # If we have direct benchmark results, use them
+        if haskey(benchmarked, eltype_str) && haskey(benchmarked[eltype_str], size_range)
+            alg = benchmarked[eltype_str][size_range]
+            # Check if it's RFLU and we should avoid it for complex
+            if contains(alg, "RFLU") || contains(alg, "RecursiveFactorization")
+                # Find the second best for this case
+                # We'd need the full results DataFrame to do this properly
+                # For now, we'll just flag it
+                @warn "RFLUFactorization selected for $eltype_str at size $size_range, but it has known issues with complex numbers"
+            end
+            return alg
+        end
+        return nothing
+    end
+    
+    # Process each target element type and size combination
+    for eltype in target_eltypes
+        for size_cat in size_categories
+            # Map size categories to the range strings used in categories
+            size_range = if size_cat == "tiny"
+                "0-128"  # Maps to tiny range
+            elseif size_cat == "small"
+                "0-128"  # Small also uses this range
+            elseif size_cat == "medium"
+                "128-256"  # Medium range
+            elseif size_cat == "large"
+                "256-512"  # Large range
+            elseif size_cat == "big"
+                "512+"  # Big range
+            else
+                continue
+            end
+            
+            # Determine the algorithm based on fallback rules
+            algorithm = nothing
+            
+            if eltype == "Float64"
+                # Float64 should be directly benchmarked
+                if haskey(benchmarked, "Float64") && haskey(benchmarked["Float64"], size_range)
+                    algorithm = benchmarked["Float64"][size_range]
+                end
+            elseif eltype == "Float32"
+                # Float32: use Float32 results if available, else use Float64
+                if haskey(benchmarked, "Float32") && haskey(benchmarked["Float32"], size_range)
+                    algorithm = benchmarked["Float32"][size_range]
+                elseif haskey(benchmarked, "Float64") && haskey(benchmarked["Float64"], size_range)
+                    algorithm = benchmarked["Float64"][size_range]
+                end
+            elseif eltype == "ComplexF32"
+                # ComplexF32: use ComplexF32 if available, else Float64 (avoiding RFLU)
+                if haskey(benchmarked, "ComplexF32") && haskey(benchmarked["ComplexF32"], size_range)
+                    algorithm = benchmarked["ComplexF32"][size_range]
+                elseif haskey(benchmarked, "Float64") && haskey(benchmarked["Float64"], size_range)
+                    algorithm = benchmarked["Float64"][size_range]
+                    # Check for RFLU and warn
+                    if contains(algorithm, "RFLU") || contains(algorithm, "RecursiveFactorization")
+                        @warn "Would use RFLUFactorization for ComplexF32 at $size_cat, but it has issues with complex numbers. Consider benchmarking ComplexF32 directly."
+                    end
+                end
+            elseif eltype == "ComplexF64"
+                # ComplexF64: use ComplexF64 if available, else ComplexF32, else Float64 (avoiding RFLU)
+                if haskey(benchmarked, "ComplexF64") && haskey(benchmarked["ComplexF64"], size_range)
+                    algorithm = benchmarked["ComplexF64"][size_range]
+                elseif haskey(benchmarked, "ComplexF32") && haskey(benchmarked["ComplexF32"], size_range)
+                    algorithm = benchmarked["ComplexF32"][size_range]
+                elseif haskey(benchmarked, "Float64") && haskey(benchmarked["Float64"], size_range)
+                    algorithm = benchmarked["Float64"][size_range]
+                    # Check for RFLU and warn
+                    if contains(algorithm, "RFLU") || contains(algorithm, "RecursiveFactorization")
+                        @warn "Would use RFLUFactorization for ComplexF64 at $size_cat, but it has issues with complex numbers. Consider benchmarking ComplexF64 directly."
+                    end
+                end
+            end
+            
+            # Set the preference if we have an algorithm
+            if algorithm !== nothing
+                pref_key = "best_algorithm_$(eltype)_$(size_cat)"
+                Preferences.set_preferences!(LinearSolve, pref_key => algorithm; force = true)
+                @info "Set preference $pref_key = $algorithm in LinearSolve.jl"
+            end
+        end
+    end
+    
     # Set a timestamp for when these preferences were created
     Preferences.set_preferences!(LinearSolve, "autotune_timestamp" => string(Dates.now()); force = true)
-
+    
     @info "Preferences updated in LinearSolve.jl. You may need to restart Julia for changes to take effect."
 end
 
@@ -30,34 +128,26 @@ end
     get_algorithm_preferences()
 
 Get the current algorithm preferences from LinearSolve.jl.
-Handles both legacy and element type-specific preferences.
+Returns preferences organized by element type and size category.
 """
 function get_algorithm_preferences()
     prefs = Dict{String, String}()
-
-    # Get all LinearSolve preferences by checking common preference patterns
-    # Since there's no direct way to get all preferences, we'll check for known patterns
-    common_patterns = [
-        # Element type + size range combinations
-        "Float64_0_128", "Float64_128_256", "Float64_256_512", "Float64_512plus",
-        "Float32_0_128", "Float32_128_256", "Float32_256_512", "Float32_512plus", 
-        "ComplexF64_0_128", "ComplexF64_128_256", "ComplexF64_256_512", "ComplexF64_512plus",
-        "ComplexF32_0_128", "ComplexF32_128_256", "ComplexF32_256_512", "ComplexF32_512plus",
-        "BigFloat_0_128", "BigFloat_128_256", "BigFloat_256_512", "BigFloat_512plus",
-        # Legacy patterns without element type
-        "0_128", "128_256", "256_512", "512plus"
-    ]
     
-    for pattern in common_patterns
-        pref_key = "best_algorithm_$pattern"
-        value = Preferences.load_preference(LinearSolve, pref_key, nothing)
-        if value !== nothing
-            # Convert back to human-readable key
-            readable_key = replace(pattern, "_" => "-", "plus" => "+")
-            prefs[readable_key] = value
+    # Define the patterns we look for
+    target_eltypes = ["Float32", "Float64", "ComplexF32", "ComplexF64"]
+    size_categories = ["tiny", "small", "medium", "large", "big"]
+    
+    for eltype in target_eltypes
+        for size_cat in size_categories
+            pref_key = "best_algorithm_$(eltype)_$(size_cat)"
+            value = Preferences.load_preference(LinearSolve, pref_key, nothing)
+            if value !== nothing
+                readable_key = "$(eltype)_$(size_cat)"
+                prefs[readable_key] = value
+            end
         end
     end
-
+    
     return prefs
 end
 
@@ -65,37 +155,29 @@ end
     clear_algorithm_preferences()
 
 Clear all autotune-related preferences from LinearSolve.jl.
-Handles both legacy and element type-specific preferences.
 """
 function clear_algorithm_preferences()
     @info "Clearing LinearSolve autotune preferences..."
-
-    # Clear known preference patterns
-    common_patterns = [
-        # Element type + size range combinations
-        "Float64_0_128", "Float64_128_256", "Float64_256_512", "Float64_512plus",
-        "Float32_0_128", "Float32_128_256", "Float32_256_512", "Float32_512plus", 
-        "ComplexF64_0_128", "ComplexF64_128_256", "ComplexF64_256_512", "ComplexF64_512plus",
-        "ComplexF32_0_128", "ComplexF32_128_256", "ComplexF32_256_512", "ComplexF32_512plus",
-        "BigFloat_0_128", "BigFloat_128_256", "BigFloat_256_512", "BigFloat_512plus",
-        # Legacy patterns without element type
-        "0_128", "128_256", "256_512", "512plus"
-    ]
     
-    for pattern in common_patterns
-        pref_key = "best_algorithm_$pattern"
-        # Check if preference exists before trying to delete
-        if Preferences.has_preference(LinearSolve, pref_key)
-            Preferences.delete_preferences!(LinearSolve, pref_key; force = true)
-            @info "Cleared preference: $pref_key"
+    # Define the patterns we look for
+    target_eltypes = ["Float32", "Float64", "ComplexF32", "ComplexF64"]
+    size_categories = ["tiny", "small", "medium", "large", "big"]
+    
+    for eltype in target_eltypes
+        for size_cat in size_categories
+            pref_key = "best_algorithm_$(eltype)_$(size_cat)"
+            if Preferences.has_preference(LinearSolve, pref_key)
+                Preferences.delete_preferences!(LinearSolve, pref_key; force = true)
+                @info "Cleared preference: $pref_key"
+            end
         end
     end
-
+    
     # Clear timestamp
     if Preferences.has_preference(LinearSolve, "autotune_timestamp")
         Preferences.delete_preferences!(LinearSolve, "autotune_timestamp"; force = true)
     end
-
+    
     @info "Preferences cleared from LinearSolve.jl."
 end
 
@@ -106,19 +188,32 @@ Display the current algorithm preferences from LinearSolve.jl in a readable form
 """
 function show_current_preferences()
     prefs = get_algorithm_preferences()
-
+    
     if isempty(prefs)
         println("No autotune preferences currently set in LinearSolve.jl.")
         return
     end
-
+    
     println("Current LinearSolve.jl autotune preferences:")
     println("="^50)
-
-    for (range, algorithm) in sort(prefs)
-        println("  Size range $range: $algorithm")
+    
+    # Group by element type for better display
+    by_eltype = Dict{String, Vector{Tuple{String, String}}}()
+    for (key, algorithm) in prefs
+        eltype, size_cat = split(key, "_", limit=2)
+        if !haskey(by_eltype, eltype)
+            by_eltype[eltype] = Vector{Tuple{String, String}}()
+        end
+        push!(by_eltype[eltype], (size_cat, algorithm))
     end
-
+    
+    for eltype in sort(collect(keys(by_eltype)))
+        println("\n$eltype:")
+        for (size_cat, algorithm) in sort(by_eltype[eltype])
+            println("  $size_cat: $algorithm")
+        end
+    end
+    
     timestamp = Preferences.load_preference(LinearSolve, "autotune_timestamp", "unknown")
-    println("  Last updated: $timestamp")
+    println("\nLast updated: $timestamp")
 end

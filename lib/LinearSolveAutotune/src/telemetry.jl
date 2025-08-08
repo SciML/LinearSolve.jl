@@ -20,7 +20,7 @@ function setup_github_authentication()
                 end
             end
         catch e
-            @warn "An error occurred while checking `gh` CLI status. Falling back to token auth. Error: $e"
+            @debug "gh CLI check failed: $e"
         end
     end
 
@@ -28,66 +28,12 @@ function setup_github_authentication()
     if haskey(ENV, "GITHUB_TOKEN") && !isempty(ENV["GITHUB_TOKEN"])
         auth = test_github_authentication(String(ENV["GITHUB_TOKEN"]))
         if auth !== nothing
+            println("✅ Found GITHUB_TOKEN environment variable.")
             return (:token, auth)
         end
     end
 
-    # 3. No environment variable or gh cli - provide setup instructions and get token
-    max_input_attempts = 3
-
-    for input_attempt in 1:max_input_attempts
-        println()
-        println("🚀 Help Improve LinearSolve.jl for Everyone!")
-        println("="^50)
-        println("Your benchmark results help the community by improving automatic")
-        println("algorithm selection across different hardware configurations.")
-        println()
-        println("💡 Easiest method: install GitHub CLI (`gh`) and run `gh auth login`.")
-        println("   Alternatively, create a token with 'issues:write' scope.")
-        println()
-        println("📋 Quick GitHub Token Setup (if not using `gh`):")
-        println()
-        println("1️⃣  Open: https://github.com/settings/tokens/new?scopes=issues:write&description=LinearSolve.jl%20Telemetry")
-        println("2️⃣  Click 'Generate token' and copy it")
-        println()
-        println("🔑 Paste your GitHub token here:")
-        println("   (If it shows julia> prompt, just paste the token there and press Enter)")
-        print("Token: ")
-        flush(stdout)
-
-        # Get token input
-        token = ""
-        try
-            sleep(0.1)
-            token = String(strip(readline()))
-        catch e
-            println("❌ Input error: $e. Please try again.")
-            continue
-        end
-
-        if !isempty(token)
-            clean_token = strip(replace(token, r"[\r\n\t ]+" => ""))
-            if length(clean_token) < 10
-                println("❌ Token seems too short. Please check and try again.")
-                continue
-            end
-
-            ENV["GITHUB_TOKEN"] = clean_token
-            auth_result = test_github_authentication(clean_token)
-            if auth_result !== nothing
-                return (:token, auth_result)
-            end
-            delete!(ENV, "GITHUB_TOKEN")
-        end
-
-        if input_attempt < max_input_attempts
-            println("\n🤝 Please try again - it only takes 30 seconds and greatly helps the community.")
-        end
-    end
-
-    println("\n📊 Continuing without telemetry. Results will be saved locally.")
-    println("💡 You can set GITHUB_TOKEN or log in with `gh auth login` and restart Julia later.")
-
+    # 3. No authentication available - return nothing
     return (nothing, nothing)
 end
 
@@ -153,17 +99,25 @@ Format system information as markdown.
 """
 function format_system_info_markdown(system_info::Dict)
     lines = String[]
-    push!(lines, "- **Julia Version**: $(system_info["julia_version"])")
-    push!(lines, "- **OS**: $(system_info["os"])")
-    push!(lines, "- **Architecture**: $(system_info["arch"])")
-    push!(lines, "- **CPU**: $(system_info["cpu_name"])")
-    push!(lines, "- **Cores**: $(system_info["num_cores"])")
-    push!(lines, "- **Threads**: $(system_info["num_threads"])")
-    push!(lines, "- **BLAS**: $(system_info["blas_vendor"])")
-    push!(lines, "- **MKL Available**: $(system_info["mkl_available"])")
-    push!(lines, "- **Apple Accelerate Available**: $(system_info["apple_accelerate_available"])")
-    push!(lines, "- **CUDA Available**: $(system_info["has_cuda"])")
-    push!(lines, "- **Metal Available**: $(system_info["has_metal"])")
+    push!(lines, "- **Julia Version**: $(get(system_info, "julia_version", "unknown"))")
+    # Handle both "os" and "os_version" keys, with os_name for display
+    os_display = get(system_info, "os_name", "unknown")
+    os_kernel = get(system_info, "os_version", get(system_info, "os", "unknown"))
+    push!(lines, "- **OS**: $os_display ($os_kernel)")
+    # Handle both "arch" and "architecture" keys
+    push!(lines, "- **Architecture**: $(get(system_info, "architecture", get(system_info, "arch", "unknown")))")
+    push!(lines, "- **CPU**: $(get(system_info, "cpu_name", "unknown"))")
+    # Handle both "num_cores" and "cpu_cores" keys
+    push!(lines, "- **Cores**: $(get(system_info, "cpu_cores", get(system_info, "num_cores", "unknown")))")
+    # Handle both "num_threads" and "julia_threads" keys
+    push!(lines, "- **Threads**: $(get(system_info, "julia_threads", get(system_info, "num_threads", "unknown")))")
+    push!(lines, "- **BLAS**: $(get(system_info, "blas_vendor", "unknown"))")
+    push!(lines, "- **MKL Available**: $(get(system_info, "mkl_available", false))")
+    push!(lines, "- **Apple Accelerate Available**: $(get(system_info, "apple_accelerate_available", false))")
+    # Handle both "has_cuda" and "cuda_available" keys
+    push!(lines, "- **CUDA Available**: $(get(system_info, "cuda_available", get(system_info, "has_cuda", false)))")
+    # Handle both "has_metal" and "metal_available" keys
+    push!(lines, "- **Metal Available**: $(get(system_info, "metal_available", get(system_info, "has_metal", false)))")
 
     return join(lines, "\n")
 end
@@ -299,12 +253,13 @@ function format_detailed_results_markdown(df::DataFrame)
 end
 
 """
-    upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dict}, auth_info::Tuple,
+    upload_to_github(content::String, plot_files, auth_info::Tuple,
                      results_df::DataFrame, system_info::Dict, categories::Dict)
 
 Create a GitHub issue with benchmark results for community data collection.
+Note: plot_files parameter is kept for compatibility but not used.
 """
-function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dict}, auth_info::Tuple,
+function upload_to_github(content::String, plot_files, auth_info::Tuple,
                          results_df::DataFrame, system_info::Dict, categories::Dict)
     
     auth_method, auth_data = auth_info
@@ -326,53 +281,6 @@ function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dic
         target_repo = "SciML/LinearSolve.jl"
         issue_number = 669  # The existing issue for collecting autotune results
         
-        # First, upload plots to a gist if available
-        gist_url = nothing
-        raw_urls = Dict{String, String}()
-        plot_links = ""
-        
-        if plot_files !== nothing
-            @info "📊 Uploading plots to GitHub Gist..."
-            
-            # Get element type for labeling
-            eltype_str = if !isempty(results_df)
-                unique_eltypes = unique(results_df.eltype)
-                join(unique_eltypes, ", ")
-            else
-                "Mixed"
-            end
-            
-            if auth_method == :gh_cli
-                gist_url, raw_urls = upload_plots_to_gist_gh(plot_files, eltype_str)
-            elseif auth_method == :token
-                gist_url, raw_urls = upload_plots_to_gist(plot_files, auth_data, eltype_str)
-            end
-            
-            if gist_url !== nothing
-                # Add plot links section to the content
-                plot_links = """
-                
-                ### 📊 Benchmark Plots
-                
-                View all plots in the gist: [Benchmark Plots Gist]($gist_url)
-                
-                """
-                
-                # Embed PNG images directly in the markdown if we have raw URLs
-                for (name, url) in raw_urls
-                    if endswith(name, ".png")
-                        plot_links *= """
-                        #### $name
-                        ![$(name)]($url)
-                        
-                        """
-                    end
-                end
-                
-                plot_links *= "---\n"
-            end
-        end
-        
         # Construct comment body
         cpu_name = get(system_info, "cpu_name", "unknown")
         os_name = get(system_info, "os", "unknown")
@@ -380,7 +288,7 @@ function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dic
         
         comment_body = """
         ## Benchmark Results: $cpu_name on $os_name ($timestamp)
-        $plot_links
+        
         $content
 
         ---
@@ -404,9 +312,6 @@ function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dic
 
         if issue_url !== nothing
             @info "✅ Successfully added benchmark results to issue: $issue_url"
-            if gist_url !== nothing
-                @info "📊 Plots available at: $gist_url"
-            end
             @info "🔗 Your benchmark data has been shared with the LinearSolve.jl community!"
             @info "💡 View all community benchmark data: https://github.com/SciML/LinearSolve.jl/issues/669"
         else

@@ -177,16 +177,43 @@ GPU algorithms tested (when available):
 
 The autotuner includes a telemetry feature that allows you to share your benchmark results with the LinearSolve.jl community. This helps improve algorithm selection across different hardware configurations.
 
-### Setting Up GitHub Authentication
+### Automatic Authentication
 
-To share results, you need to authenticate with GitHub. There are two methods:
+**New in v2.0+**: LinearSolveAutotune now includes automatic authentication support! If you're not already authenticated, the system will offer to help you set up GitHub authentication when you run `share_results()`.
+
+```julia
+# Run benchmarks
+results = autotune_setup()
+
+# Share with the community - will prompt for authentication if needed
+share_results(results)
+```
+
+If you're not authenticated, you'll see:
+```
+🔐 GitHub authentication not found.
+   To share results with the community, authentication is required.
+
+Would you like to authenticate with GitHub now? (y/n)
+> 
+```
+
+Simply type `y` and follow the prompts to authenticate directly from Julia!
+
+### Manual Authentication Setup
+
+You can also set up authentication manually before sharing:
 
 #### Method 1: GitHub CLI (Recommended)
 
-1. **Install GitHub CLI**
+The GitHub CLI is the easiest way to authenticate. LinearSolveAutotune will automatically use the GitHub CLI if it's installed, or fall back to a bundled version if not.
+
+1. **Install GitHub CLI (Optional)**
    - macOS: `brew install gh`
    - Windows: `winget install --id GitHub.cli`
    - Linux: See [cli.github.com](https://cli.github.com/manual/installation)
+   
+   Note: If you don't have gh installed, LinearSolveAutotune includes a bundled version via `gh_cli_jll` that will be used automatically!
 
 2. **Authenticate**
    ```bash
@@ -212,28 +239,39 @@ To share results, you need to authenticate with GitHub. There are two methods:
 
 ### Sharing Your Results
 
-Once authenticated, sharing is simple:
+Once authenticated (either automatically or manually), sharing is simple:
 
 ```julia
 # Run benchmarks
 results = autotune_setup()
 
-# Share with the community
+# Share with the community (with automatic authentication prompt)
 share_results(results)
+
+# Or skip the authentication prompt if not authenticated
+share_results(results; auto_login = false)
 ```
 
 This will:
-1. Format your benchmark results as a markdown report
-2. Create performance plots if enabled
-3. Post the results as a comment to the [community benchmark collection issue](https://github.com/SciML/LinearSolve.jl/issues/669)
-4. Upload plots as GitHub Gists for easy viewing
+1. Check for existing GitHub authentication
+2. Offer to set up authentication if needed (unless `auto_login = false`)
+3. Format your benchmark results as a markdown report
+4. Post the results as a comment to the [community benchmark collection issue](https://github.com/SciML/LinearSolve.jl/issues/669)
+5. Save results locally if authentication is unavailable
+
+### No GitHub CLI Required!
+
+LinearSolveAutotune now includes `gh_cli_jll`, which provides a bundled version of the GitHub CLI. This means:
+- You don't need to install gh separately
+- Authentication works on all platforms
+- The system automatically uses your existing gh installation if available, or falls back to the bundled version
 
 !!! info "Privacy Note"
     - Sharing is completely optional
     - Only benchmark performance data and system specifications are shared
     - No personal information is collected
     - All shared data is publicly visible on GitHub
-    - If authentication fails, results are saved locally for manual sharing
+    - If authentication fails or is skipped, results are saved locally for manual sharing
 
 ## Working with Results
 

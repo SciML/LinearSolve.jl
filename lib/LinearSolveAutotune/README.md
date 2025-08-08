@@ -31,10 +31,11 @@ share_results(results)
 
 ## Size Categories
 
-The package now uses flexible size categories instead of a binary large_matrices flag:
+The package now uses flexible size categories:
 
-- `:small` - Matrices from 5×5 to 20×20 (quick tests)
-- `:medium` - Matrices from 20×20 to 300×300 (typical problems)
+- `:tiny` - Matrices from 5×5 to 20×20 (very small problems)
+- `:small` - Matrices from 20×20 to 100×100 (small problems)
+- `:medium` - Matrices from 100×100 to 300×300 (typical problems)
 - `:large` - Matrices from 300×300 to 1000×1000 (larger problems)
 - `:big` - Matrices from 10000×10000 to 100000×100000 (GPU/HPC)
 

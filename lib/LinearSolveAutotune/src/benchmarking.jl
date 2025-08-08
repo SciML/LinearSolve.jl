@@ -78,7 +78,7 @@ Benchmark the given algorithms across different matrix sizes and element types.
 Returns a DataFrame with results including element type information.
 """
 function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
-        samples = 5, seconds = 0.5, sizes = [:small, :medium, :large])
+        samples = 5, seconds = 0.5, sizes = [:tiny, :small, :medium, :large])
 
     # Set benchmark parameters
     old_params = BenchmarkTools.DEFAULT_PARAMETERS
@@ -183,8 +183,9 @@ end
 Get the matrix sizes to benchmark based on the requested size categories.
 
 Size categories:
-- `:small` - 5:5:20 (for quick tests and small problems)
-- `:medium` - 20:20:100 and 100:50:300 (for typical problems)
+- `:tiny` - 5:5:20 (for very small problems)
+- `:small` - 20:20:100 (for small problems)
+- `:medium` - 100:50:300 (for typical problems)
 - `:large` - 300:100:1000 (for larger problems)
 - `:big` - 10000:1000:100000 (for very large/GPU problems)
 """
@@ -192,10 +193,11 @@ function get_benchmark_sizes(size_categories::Vector{Symbol})
     sizes = Int[]
     
     for category in size_categories
-        if category == :small
+        if category == :tiny
             append!(sizes, 5:5:20)
-        elseif category == :medium
+        elseif category == :small
             append!(sizes, 20:20:100)
+        elseif category == :medium
             append!(sizes, 100:50:300)
         elseif category == :large
             append!(sizes, 300:100:1000)
@@ -214,6 +216,7 @@ end
     categorize_results(df::DataFrame)
 
 Categorize the benchmark results into size ranges and find the best algorithm for each range and element type.
+For complex types, avoids RFLUFactorization if possible due to known issues.
 """
 function categorize_results(df::DataFrame)
     # Filter successful results
@@ -257,13 +260,38 @@ function categorize_results(df::DataFrame)
 
             # Calculate average GFLOPs for each algorithm in this range
             avg_results = combine(groupby(range_df, :algorithm), :gflops => mean => :avg_gflops)
+            
+            # Sort by performance
+            sort!(avg_results, :avg_gflops, rev=true)
 
-            # Find the best algorithm
+            # Find the best algorithm (for complex types, avoid RFLU if possible)
             if nrow(avg_results) > 0
-                best_idx = argmax(avg_results.avg_gflops)
-                best_alg = avg_results.algorithm[best_idx]
+                best_alg = avg_results.algorithm[1]
+                
+                # For complex types, check if best is RFLU and we have alternatives
+                if (eltype == "ComplexF32" || eltype == "ComplexF64") && 
+                   (contains(best_alg, "RFLU") || contains(best_alg, "RecursiveFactorization"))
+                    
+                    # Look for the best non-RFLU algorithm
+                    for i in 2:nrow(avg_results)
+                        alt_alg = avg_results.algorithm[i]
+                        if !contains(alt_alg, "RFLU") && !contains(alt_alg, "RecursiveFactorization")
+                            # Check if performance difference is not too large (within 20%)
+                            perf_ratio = avg_results.avg_gflops[i] / avg_results.avg_gflops[1]
+                            if perf_ratio > 0.8
+                                @info "Using $alt_alg instead of $best_alg for $eltype at $range_name ($(round(100*perf_ratio, digits=1))% of RFLU performance) to avoid complex number issues"
+                                best_alg = alt_alg
+                                break
+                            else
+                                @warn "RFLUFactorization is best for $eltype at $range_name but has complex number issues. Alternative algorithms are >20% slower."
+                            end
+                        end
+                    end
+                end
+                
                 category_key = "$(eltype)_$(range_name)"
                 categories[category_key] = best_alg
+                best_idx = findfirst(==(best_alg), avg_results.algorithm)
                 @info "Best algorithm for $eltype size range $range_name: $best_alg ($(round(avg_results.avg_gflops[best_idx], digits=2)) GFLOPs avg)"
             end
         end

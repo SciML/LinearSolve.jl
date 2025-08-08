@@ -169,11 +169,11 @@ share_results(results)
 ```
 """
 function autotune_setup(;
-        sizes = [:small, :medium, :large],
+        sizes = [:tiny, :small, :medium, :large],
         set_preferences::Bool = true,
         samples::Int = 5,
         seconds::Float64 = 0.5,
-        eltypes = (Float32, Float64, ComplexF32, ComplexF64),
+        eltypes = (Float64,),
         skip_missing_algs::Bool = false)
     @info "Starting LinearSolve.jl autotune setup..."
     @info "Configuration: sizes=$sizes, set_preferences=$set_preferences"

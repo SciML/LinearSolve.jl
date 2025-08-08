@@ -1,7 +1,7 @@
 module LinearSolveForwardDiffExt
 
 using LinearSolve
-using LinearSolve: SciMLLinearSolveAlgorithm
+using LinearSolve: SciMLLinearSolveAlgorithm, __init
 using LinearAlgebra
 using ForwardDiff
 using ForwardDiff: Dual, Partials
@@ -121,8 +121,17 @@ function linearsolve_dual_solution(u::AbstractArray, partials,
         zip(u, partials_list[i, :] for i in 1:length(partials_list.u[1])))
 end
 
-function SciMLBase.init(
-        prob::DualAbstractLinearProblem, alg::LinearSolve.SciMLLinearSolveAlgorithm,
+function SciMLBase.init(prob::DualAbstractLinearProblem, alg::SciMLLinearSolveAlgorithm, args...; kwargs...)
+    return __dual_init(prob, alg, args...; kwargs...)
+end
+
+# Opt out for GenericLUFactorization
+function SciMLBase.init(prob::DualAbstractLinearProblem, alg::GenericLUFactorization, args...; kwargs...)
+    return __init(prob,alg, args...; kwargs...)
+end
+
+function __dual_init(
+        prob::DualAbstractLinearProblem, alg::SciMLLinearSolveAlgorithm,
         args...;
         alias = LinearAliasSpecifier(),
         abstol = LinearSolve.default_tol(real(eltype(prob.b))),

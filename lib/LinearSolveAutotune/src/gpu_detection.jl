@@ -88,8 +88,8 @@ function get_system_info()
         info["cpu_name"] = "Unknown"
     end
     
-    # CPUSummary.num_cores() returns the physical cores
-    info["num_cores"] = CPUSummary.num_cores()
+    # CPUSummary.num_cores() returns the physical cores (as Static.StaticInt)
+    info["num_cores"] = Int(CPUSummary.num_cores())
     info["num_logical_cores"] = Sys.CPU_THREADS
     info["num_threads"] = Threads.nthreads()
     
@@ -167,7 +167,7 @@ function get_detailed_system_info()
     end
     
     try
-        system_data["cpu_cores"] = CPUSummary.num_cores()
+        system_data["cpu_cores"] = Int(CPUSummary.num_cores())
     catch
         system_data["cpu_cores"] = "unknown"
     end

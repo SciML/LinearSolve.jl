@@ -17,12 +17,13 @@ function get_gh_command()
 end
 
 """
-    setup_github_authentication()
+    setup_github_authentication(; auto_login::Bool = true)
 
 Set up GitHub authentication for telemetry uploads.
+If auto_login is true and no authentication is found, will prompt to run gh auth login.
 Returns an authentication method indicator if successful, nothing if setup fails.
 """
-function setup_github_authentication()
+function setup_github_authentication(; auto_login::Bool = true)
     # 1. Check for `gh` CLI (system or JLL)
     try
         gh_cmd = get_gh_command()
@@ -48,7 +49,44 @@ function setup_github_authentication()
         end
     end
 
-    # 3. No authentication available - return nothing
+    # 3. If auto_login is enabled, offer to authenticate using gh (system or JLL)
+    if auto_login
+        gh_cmd = get_gh_command()
+        println("\n🔐 GitHub authentication not found.")
+        println("   To share results with the community, authentication is required.")
+        println("\nWould you like to authenticate with GitHub now? (y/n)")
+        print("> ")
+        response = readline()
+        
+        if lowercase(strip(response)) in ["y", "yes"]
+            println("\n📝 Starting GitHub authentication...")
+            println("   This will open your browser to authenticate with GitHub.")
+            println("   Please follow the prompts to complete authentication.\n")
+            
+            try
+                # Run gh auth login interactively using the wrapper command
+                run(`$gh_cmd auth login`)
+                
+                # Check if authentication succeeded
+                if success(pipeline(`$gh_cmd auth status`; stdout=devnull, stderr=devnull))
+                    auth_status_output = read(`$gh_cmd auth status`, String)
+                    if contains(auth_status_output, "Logged in to github.com")
+                        println("\n✅ Authentication successful! You can now share results.")
+                        return (:gh_cli, "GitHub CLI")
+                    end
+                end
+            catch e
+                println("\n❌ Authentication failed: $e")
+                println("   You can try again later or use a GitHub token instead.")
+            end
+        else
+            println("\n📝 Skipping authentication. You can authenticate later by:")
+            println("   1. Running: gh auth login")
+            println("   2. Or setting: ENV[\"GITHUB_TOKEN\"] = \"your_token\"")
+        end
+    end
+
+    # 4. No authentication available - return nothing
     return (nothing, nothing)
 end
 

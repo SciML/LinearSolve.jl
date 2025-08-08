@@ -61,17 +61,32 @@ using Random
     end
     
     @testset "Benchmark Size Generation" begin
-        # Test small benchmark sizes
-        small_sizes = LinearSolveAutotune.get_benchmark_sizes(false)
-        @test !isempty(small_sizes)
-        @test minimum(small_sizes) >= 4
-        @test maximum(small_sizes) <= 500
+        # Test new size categories
+        tiny_sizes = LinearSolveAutotune.get_benchmark_sizes([:tiny])
+        @test !isempty(tiny_sizes)
+        @test minimum(tiny_sizes) == 5
+        @test maximum(tiny_sizes) == 20
         
-        # Test large benchmark sizes
-        large_sizes = LinearSolveAutotune.get_benchmark_sizes(true)
+        small_sizes = LinearSolveAutotune.get_benchmark_sizes([:small])
+        @test !isempty(small_sizes)
+        @test minimum(small_sizes) == 20
+        @test maximum(small_sizes) == 100
+        
+        medium_sizes = LinearSolveAutotune.get_benchmark_sizes([:medium])
+        @test !isempty(medium_sizes)
+        @test minimum(medium_sizes) == 100
+        @test maximum(medium_sizes) == 300
+        
+        large_sizes = LinearSolveAutotune.get_benchmark_sizes([:large])
         @test !isempty(large_sizes)
-        @test minimum(large_sizes) >= 4
-        @test maximum(large_sizes) >= 2000
+        @test minimum(large_sizes) == 300
+        @test maximum(large_sizes) == 1000
+        
+        # Test combination
+        combined_sizes = LinearSolveAutotune.get_benchmark_sizes([:tiny, :small])
+        @test length(combined_sizes) == length(unique(combined_sizes))
+        @test minimum(combined_sizes) == 5
+        @test maximum(combined_sizes) == 100
     end
     
     @testset "Small Scale Benchmarking" begin
@@ -81,12 +96,12 @@ using Random
         # Use only first 2 algorithms and small sizes for fast testing
         test_algs = cpu_algs[1:min(2, end)]
         test_names = cpu_names[1:min(2, end)]
-        test_sizes = [4, 8]  # Very small sizes for fast testing
+        test_sizes = [5, 10]  # Very small sizes for fast testing
         test_eltypes = (Float64,)  # Single element type for speed
         
         results_df = LinearSolveAutotune.benchmark_algorithms(
             test_sizes, test_algs, test_names, test_eltypes;
-            samples = 1, seconds = 0.1)
+            samples = 1, seconds = 0.1, sizes = [:tiny])
         
         @test isa(results_df, DataFrame)
         @test nrow(results_df) > 0
@@ -188,7 +203,7 @@ using Random
     end
     
     @testset "Preference Management" begin
-        # Test setting and getting preferences
+        # Test setting and getting preferences with new format
         test_categories = Dict{String, String}(
             "Float64_0-128" => "TestAlg1",
             "Float64_128-256" => "TestAlg2",
@@ -206,11 +221,9 @@ using Random
         @test isa(retrieved_prefs, Dict{String, String})
         @test !isempty(retrieved_prefs)
         
-        # Verify we can retrieve what we set
-        for (key, value) in test_categories
-            @test_broken haskey(retrieved_prefs, key)
-            @test_broken retrieved_prefs[key] == value
-        end
+        # The new preference system uses different keys (eltype_sizecategory)
+        # so we just check that preferences were set
+        @test length(retrieved_prefs) > 0
         
         # Test clearing preferences
         LinearSolveAutotune.clear_algorithm_preferences()
@@ -218,50 +231,66 @@ using Random
         @test isempty(cleared_prefs)
     end
     
-    @testset "Integration Test - Mini Autotune" begin
+    @testset "AutotuneResults Type" begin
+        # Create mock data for AutotuneResults
+        mock_data = [
+            (size = 50, algorithm = "TestAlg1", eltype = "Float64", gflops = 10.0, success = true, error = ""),
+            (size = 100, algorithm = "TestAlg2", eltype = "Float64", gflops = 15.0, success = true, error = ""),
+        ]
+        
+        test_df = DataFrame(mock_data)
+        test_sysinfo = Dict("cpu_name" => "Test CPU", "os" => "TestOS", 
+                           "julia_version" => "1.0.0", "num_threads" => 4)
+        
+        results = AutotuneResults(test_df, test_sysinfo)
+        
+        @test isa(results, AutotuneResults)
+        @test results.results_df == test_df
+        @test results.sysinfo == test_sysinfo
+        
+        # Test that display works without error
+        io = IOBuffer()
+        show(io, results)
+        display_output = String(take!(io))
+        @test contains(display_output, "LinearSolve.jl Autotune Results")
+        @test contains(display_output, "Test CPU")
+    end
+    
+    @testset "Integration Test - Mini Autotune with New API" begin
         # Test the full autotune_setup function with minimal parameters
         # This is an integration test with very small scale to ensure everything works together
         
         # Skip telemetry and use minimal settings for testing
-        result, sysinfo, _ = LinearSolveAutotune.autotune_setup(
-            large_matrices = false,
-            telemetry = false,
-            make_plot = false,
+        result = LinearSolveAutotune.autotune_setup(
+            sizes = [:tiny],
             set_preferences = false,
             samples = 1,
             seconds = 0.1,
             eltypes = (Float64,)  # Single element type for speed
         )
         
-        @test isa(result, DataFrame)
-        @test nrow(result) > 0
-        @test hasproperty(result, :size)
-        @test hasproperty(result, :algorithm)
-        @test hasproperty(result, :eltype)
-        @test hasproperty(result, :gflops)
-        @test hasproperty(result, :success)
+        @test isa(result, AutotuneResults)
+        @test isa(result.results_df, DataFrame)
+        @test isa(result.sysinfo, Dict)
+        @test nrow(result.results_df) > 0
+        @test hasproperty(result.results_df, :size)
+        @test hasproperty(result.results_df, :algorithm)
+        @test hasproperty(result.results_df, :eltype)
+        @test hasproperty(result.results_df, :gflops)
+        @test hasproperty(result.results_df, :success)
         
         # Test with multiple element types
         result_multi = LinearSolveAutotune.autotune_setup(
-            large_matrices = false,
-            telemetry = false,
-            make_plot = true,  # Test plotting integration
+            sizes = [:tiny],
             set_preferences = false,
             samples = 1,
             seconds = 0.1,
             eltypes = (Float64, Float32)
         )
         
-        # Should return tuple of (DataFrame, Dataframe, Dict) when make_plot=true
-        @test isa(result_multi, Tuple)
-        @test length(result_multi) == 3
-        @test isa(result_multi[1], DataFrame)
-        @test isa(result_multi[2], DataFrame)
-        @test isa(result_multi[3], Dict)  # Plots dictionary
-        
-        df, plots = result_multi
+        @test isa(result_multi, AutotuneResults)
+        df = result_multi.results_df
         @test nrow(df) > 0
-        @test !isempty(plots)
         
         # Check that we have results for multiple element types
         eltypes_in_results = unique(df.eltype)

@@ -1,27 +1,42 @@
 # Telemetry functionality for sharing benchmark results
 
 """
+    get_gh_command()
+
+Get the gh command, preferring the system-installed version if available,
+falling back to the JLL-provided version.
+"""
+function get_gh_command()
+    # First check if gh is installed on the system
+    if !isnothing(Sys.which("gh"))
+        return `gh`
+    else
+        # Use the JLL-provided gh
+        return `$(gh_cli_jll.gh())`
+    end
+end
+
+"""
     setup_github_authentication()
 
 Set up GitHub authentication for telemetry uploads.
 Returns an authentication method indicator if successful, nothing if setup fails.
 """
 function setup_github_authentication()
-    # 1. Check for `gh` CLI
-    if !isnothing(Sys.which("gh"))
-        try
-            # Suppress output of gh auth status check
-            if success(pipeline(`gh auth status`; stdout=devnull, stderr=devnull))
-                # Check if logged in to github.com
-                auth_status_output = read(`gh auth status`, String)
-                if contains(auth_status_output, "Logged in to github.com")
-                    println("✅ Found active `gh` CLI session. Will use it for upload.")
-                    return (:gh_cli, "GitHub CLI")
-                end
+    # 1. Check for `gh` CLI (system or JLL)
+    try
+        gh_cmd = get_gh_command()
+        # Suppress output of gh auth status check
+        if success(pipeline(`$gh_cmd auth status`; stdout=devnull, stderr=devnull))
+            # Check if logged in to github.com
+            auth_status_output = read(`$gh_cmd auth status`, String)
+            if contains(auth_status_output, "Logged in to github.com")
+                println("✅ Found active `gh` CLI session. Will use it for upload.")
+                return (:gh_cli, "GitHub CLI")
             end
-        catch e
-            @debug "gh CLI check failed: $e"
         end
+    catch e
+        @debug "gh CLI check failed: $e"
     end
 
     # 2. Check for GITHUB_TOKEN environment variable
@@ -532,6 +547,7 @@ function upload_plots_to_gist_gh(plot_files::Union{Nothing, Tuple, Dict}, eltype
     end
     
     try
+        gh_cmd = get_gh_command()
         # Handle different plot_files formats
         files_to_upload = if isa(plot_files, Tuple)
             # Legacy format: (png_file, pdf_file)
@@ -585,7 +601,7 @@ The PNG images can be viewed directly in the browser. Click on any `.png` file a
         # Create initial gist with README
         out = Pipe()
         err = Pipe()
-        run(pipeline(`gh gist create -d $gist_desc -p $readme_file`, stdout=out, stderr=err))
+        run(pipeline(`$gh_cmd gist create -d $gist_desc -p $readme_file`, stdout=out, stderr=err))
         close(out.in)
         close(err.in)
         
@@ -603,7 +619,7 @@ The PNG images can be viewed directly in the browser. Click on any `.png` file a
         temp_dir = mktempdir()
         try
             # Clone the gist
-            run(`gh gist clone $gist_id $temp_dir`)
+            run(`$gh_cmd gist clone $gist_id $temp_dir`)
             
             # Copy all plot files to the gist directory
             for (name, filepath) in existing_files
@@ -622,7 +638,7 @@ The PNG images can be viewed directly in the browser. Click on any `.png` file a
             
             # Get username for constructing raw URLs
             username_out = Pipe()
-            run(pipeline(`gh api user --jq .login`, stdout=username_out))
+            run(pipeline(`$gh_cmd api user --jq .login`, stdout=username_out))
             close(username_out.in)
             username = strip(read(username_out, String))
             
@@ -673,13 +689,14 @@ function comment_on_issue_gh(target_repo, issue_number, body)
     err_str = ""
     out_str = ""
     try
+        gh_cmd = get_gh_command()
         # Use a temporary file for the body to avoid command line length limits
         mktemp() do path, io
             write(io, body)
             flush(io)
             
             # Construct and run the gh command
-            cmd = `gh issue comment $issue_number --repo $target_repo --body-file $path`
+            cmd = `$gh_cmd issue comment $issue_number --repo $target_repo --body-file $path`
             
             out = Pipe()
             err = Pipe()
@@ -725,13 +742,14 @@ function create_benchmark_issue_gh(target_repo, title, body)
     err_str = ""
     out_str = ""
     try
+        gh_cmd = get_gh_command()
         # Use a temporary file for the body to avoid command line length limits
         mktemp() do path, io
             write(io, body)
             flush(io)
             
             # Construct and run the gh command
-            cmd = `gh issue create --repo $target_repo --title $title --body-file $path --label benchmark-data`
+            cmd = `$gh_cmd issue create --repo $target_repo --title $title --body-file $path --label benchmark-data`
             
             out = Pipe()
             err = Pipe()

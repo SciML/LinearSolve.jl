@@ -47,12 +47,12 @@ function Base.show(io::IO, results::AutotuneResults)
     println(io, "LinearSolve.jl Autotune Results")
     println(io, "="^60)
     
-    # System info summary using CPUSummary
+    # System info summary
     println(io, "\n📊 System Information:")
     println(io, "  • CPU: ", get(results.sysinfo, "cpu_name", "Unknown"))
-    println(io, "  • OS: ", CPUSummary.os_name(), " (", get(results.sysinfo, "os", "Unknown"), ")")
+    println(io, "  • OS: ", get(results.sysinfo, "os_name", "Unknown"), " (", get(results.sysinfo, "os", "Unknown"), ")")
     println(io, "  • Julia: ", get(results.sysinfo, "julia_version", "Unknown"))
-    println(io, "  • Threads: ", CPUSummary.num_threads(), " (BLAS: ", CPUSummary.blas_num_threads(), ")")
+    println(io, "  • Threads: ", get(results.sysinfo, "num_threads", "Unknown"), " (BLAS: ", get(results.sysinfo, "blas_num_threads", "Unknown"), ")")
     
     # Results summary
     successful_results = filter(row -> row.success, results.results_df)

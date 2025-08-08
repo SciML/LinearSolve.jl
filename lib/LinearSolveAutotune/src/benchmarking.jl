@@ -229,12 +229,14 @@ function categorize_results(df::DataFrame)
 
     categories = Dict{String, String}()
 
-    # Define size ranges
+    # Define size ranges based on actual benchmark categories
+    # These align with the sizes defined in get_benchmark_sizes()
     ranges = [
-        ("0-128", 1:128),
-        ("128-256", 129:256),
-        ("256-512", 257:512),
-        ("512+", 513:10000)
+        ("tiny (5-20)", 5:20),
+        ("small (20-100)", 21:100),
+        ("medium (100-300)", 101:300),
+        ("large (300-1000)", 301:1000),
+        ("big (10000+)", 10000:typemax(Int))
     ]
 
     # Get unique element types

@@ -12,6 +12,7 @@ using Printf
 using Dates
 using Base64
 using ProgressMeter
+using CPUSummary
 
 # Hard dependency to ensure RFLUFactorization others solvers are available
 using RecursiveFactorization  
@@ -25,7 +26,7 @@ using Metal
 using GitHub
 using Plots
 
-export autotune_setup, share_results, AutotuneResults
+export autotune_setup, share_results, AutotuneResults, plot
 
 include("algorithms.jl")
 include("gpu_detection.jl")
@@ -46,12 +47,12 @@ function Base.show(io::IO, results::AutotuneResults)
     println(io, "LinearSolve.jl Autotune Results")
     println(io, "="^60)
     
-    # System info summary
+    # System info summary using CPUSummary
     println(io, "\n📊 System Information:")
     println(io, "  • CPU: ", get(results.sysinfo, "cpu_name", "Unknown"))
-    println(io, "  • OS: ", get(results.sysinfo, "os", "Unknown"))
+    println(io, "  • OS: ", CPUSummary.os_name(), " (", get(results.sysinfo, "os", "Unknown"), ")")
     println(io, "  • Julia: ", get(results.sysinfo, "julia_version", "Unknown"))
-    println(io, "  • Threads: ", get(results.sysinfo, "num_threads", "Unknown"))
+    println(io, "  • Threads: ", CPUSummary.num_threads(), " (BLAS: ", CPUSummary.blas_num_threads(), ")")
     
     # Results summary
     successful_results = filter(row -> row.success, results.results_df)
@@ -79,17 +80,17 @@ function Base.show(io::IO, results::AutotuneResults)
     println(io, "📏 Matrix Sizes: ", minimum(sizes), "×", minimum(sizes), 
             " to ", maximum(sizes), "×", maximum(sizes))
     
-    # Call to action
+    # Call to action - reordered
     println(io, "\n" * "="^60)
-    println(io, "💡 To share your results with the community, run:")
-    println(io, "   share_results(results)")
-    println(io, "\n📈 See community results at:")
-    println(io, "   https://github.com/SciML/LinearSolve.jl/issues/669")
-    println(io, "\n🚀 For comprehensive results, consider running:")
+    println(io, "🚀 For comprehensive results, consider running:")
     println(io, "   results_full = autotune_setup(")
     println(io, "       sizes = [:tiny, :small, :medium, :large, :big],")
     println(io, "       eltypes = (Float32, Float64, ComplexF32, ComplexF64)")
     println(io, "   )")
+    println(io, "\n📈 See community results at:")
+    println(io, "   https://github.com/SciML/LinearSolve.jl/issues/669")
+    println(io, "\n💡 To share your results with the community, run:")
+    println(io, "   share_results(results)")
     println(io, "="^60)
 end
 

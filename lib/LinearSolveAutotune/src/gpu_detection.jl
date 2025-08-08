@@ -1,5 +1,7 @@
 # GPU hardware and package detection
 
+using CPUSummary
+
 """
     is_cuda_available()
 
@@ -76,10 +78,13 @@ function get_system_info()
 
     info["julia_version"] = string(VERSION)
     info["os"] = string(Sys.KERNEL)
+    info["os_name"] = CPUSummary.os_name()
     info["arch"] = string(Sys.ARCH)
-    info["cpu_name"] = Sys.cpu_info()[1].model
-    info["num_cores"] = Sys.CPU_THREADS
-    info["num_threads"] = Threads.nthreads()
+    info["cpu_name"] = CPUSummary.cpu_name()
+    info["num_cores"] = CPUSummary.num_physical_cores()
+    info["num_logical_cores"] = CPUSummary.num_logical_cores()
+    info["num_threads"] = CPUSummary.num_threads()
+    info["blas_num_threads"] = CPUSummary.blas_num_threads()
     info["blas_vendor"] = string(LinearAlgebra.BLAS.vendor())
     info["has_cuda"] = is_cuda_available()
     info["has_metal"] = is_metal_available()
@@ -147,13 +152,19 @@ function get_detailed_system_info()
     end
     
     try
-        system_data["cpu_cores"] = Sys.CPU_THREADS
+        system_data["cpu_cores"] = CPUSummary.num_physical_cores()
     catch
         system_data["cpu_cores"] = "unknown"
     end
     
     try
-        system_data["julia_threads"] = Threads.nthreads()
+        system_data["cpu_logical_cores"] = CPUSummary.num_logical_cores()
+    catch
+        system_data["cpu_logical_cores"] = "unknown"
+    end
+    
+    try
+        system_data["julia_threads"] = CPUSummary.num_threads()
     catch
         system_data["julia_threads"] = "unknown"
     end
@@ -170,14 +181,18 @@ function get_detailed_system_info()
         system_data["machine"] = "unknown"
     end
     
-    # CPU details
+    # CPU details using CPUSummary
     try
-        cpu_info = Sys.cpu_info()[1]
-        system_data["cpu_name"] = cpu_info.model
-        system_data["cpu_speed_mhz"] = cpu_info.speed
+        system_data["cpu_name"] = CPUSummary.cpu_name()
     catch
         system_data["cpu_name"] = "unknown"
-        system_data["cpu_speed_mhz"] = "unknown"
+    end
+    
+    try
+        # CPUSummary provides more detailed info
+        system_data["cpu_architecture"] = CPUSummary.cpu_architecture()
+    catch
+        system_data["cpu_architecture"] = "unknown"
     end
     
     # Categorize CPU vendor for easy analysis
@@ -212,7 +227,7 @@ function get_detailed_system_info()
     end
     
     try
-        system_data["blas_num_threads"] = LinearAlgebra.BLAS.get_num_threads()
+        system_data["blas_num_threads"] = CPUSummary.blas_num_threads()
     catch
         system_data["blas_num_threads"] = "unknown"
     end

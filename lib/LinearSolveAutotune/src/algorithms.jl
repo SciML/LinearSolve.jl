@@ -25,7 +25,7 @@ function get_available_algorithms(; skip_missing_algs::Bool = false)
     end
 
     # MKL if available
-    if LinearSolve.usemkl
+    if mkl_jll.is_available()
         push!(algs, MKLLUFactorization())
         push!(alg_names, "MKLLUFactorization")
     end

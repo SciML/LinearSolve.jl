@@ -120,7 +120,7 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
                 for (alg, name) in zip(compatible_algs, compatible_names)
                     # Update progress description
                     ProgressMeter.update!(progress, 
-                        description="Benchmarking $name on $(n)×$(n) $eltype matrix: ")
+                        desc="Benchmarking $name on $(n)×$(n) $eltype matrix: ")
                     
                     gflops = 0.0
                     success = true

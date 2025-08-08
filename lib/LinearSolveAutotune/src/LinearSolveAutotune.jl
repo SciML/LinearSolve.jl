@@ -38,7 +38,6 @@ include("preferences.jl")
 struct AutotuneResults
     results_df::DataFrame
     sysinfo::Dict
-    plots::Union{Nothing, Dict}
 end
 
 # Display method for AutotuneResults
@@ -91,14 +90,17 @@ end
 
 # Plot method for AutotuneResults
 function Plots.plot(results::AutotuneResults; kwargs...)
-    if results.plots === nothing || isempty(results.plots)
-        @warn "No plots available in results. Run autotune_setup with make_plot=true"
+    # Generate plots from the results data
+    plots_dict = create_benchmark_plots(results.results_df)
+    
+    if plots_dict === nothing || isempty(plots_dict)
+        @warn "No data available for plotting"
         return nothing
     end
     
     # Create a composite plot from all element type plots
     plot_list = []
-    for (eltype_name, p) in results.plots
+    for (eltype_name, p) in plots_dict
         push!(plot_list, p)
     end
     
@@ -121,7 +123,6 @@ end
 """
     autotune_setup(; 
         sizes = [:small, :medium, :large],
-        make_plot::Bool = true,
         set_preferences::Bool = true,
         samples::Int = 5,
         seconds::Float64 = 0.5,
@@ -138,7 +139,6 @@ Run a comprehensive benchmark of all available LU factorization methods and opti
 # Arguments
 
   - `sizes = [:small, :medium, :large]`: Size categories to test. Options: :small (5-20), :medium (20-300), :large (300-1000), :big (10000-100000)
-  - `make_plot::Bool = true`: Generate performance plots for each element type
   - `set_preferences::Bool = true`: Update LinearSolve preferences with optimal algorithms
   - `samples::Int = 5`: Number of benchmark samples per algorithm/size
   - `seconds::Float64 = 0.5`: Maximum time per benchmark
@@ -170,14 +170,13 @@ share_results(results)
 """
 function autotune_setup(;
         sizes = [:small, :medium, :large],
-        make_plot::Bool = true,
         set_preferences::Bool = true,
         samples::Int = 5,
         seconds::Float64 = 0.5,
         eltypes = (Float32, Float64, ComplexF32, ComplexF64),
         skip_missing_algs::Bool = false)
     @info "Starting LinearSolve.jl autotune setup..."
-    @info "Configuration: sizes=$sizes, make_plot=$make_plot, set_preferences=$set_preferences"
+    @info "Configuration: sizes=$sizes, set_preferences=$set_preferences"
     @info "Element types to benchmark: $(join(eltypes, ", "))"
 
     # Get system information
@@ -243,23 +242,12 @@ function autotune_setup(;
         set_algorithm_preferences(categories)
     end
 
-    # Create plots if requested
-    plots_dict = nothing
-    plot_files = nothing
-    if make_plot
-        @info "Creating performance plots..."
-        plots_dict = create_benchmark_plots(results_df)
-        if !isempty(plots_dict)
-            plot_files = save_benchmark_plots(plots_dict)
-        end
-    end
-
     @info "Autotune setup completed!"
 
     sysinfo = get_detailed_system_info()
 
     # Return AutotuneResults object
-    return AutotuneResults(results_df, sysinfo, plots_dict)
+    return AutotuneResults(results_df, sysinfo)
 end
 
 """
@@ -305,7 +293,6 @@ function share_results(results::AutotuneResults)
     # Extract from AutotuneResults
     results_df = results.results_df
     sysinfo = results.sysinfo
-    plots_dict = results.plots
     
     # Get system info
     system_info = sysinfo
@@ -342,14 +329,8 @@ function share_results(results::AutotuneResults)
     # Format results
     markdown_content = format_results_for_github(results_df, system_info, categories)
     
-    # Process plots if available
-    plot_files = nothing
-    if plots_dict !== nothing && !isempty(plots_dict)
-        plot_files = save_benchmark_plots(plots_dict)
-    end
-    
-    # Upload to GitHub
-    upload_to_github(markdown_content, plot_files, github_auth, results_df, system_info, categories)
+    # Upload to GitHub (without plots)
+    upload_to_github(markdown_content, nothing, github_auth, results_df, system_info, categories)
     
     @info "✅ Thank you for contributing to the LinearSolve.jl community!"
 end

@@ -26,7 +26,7 @@ share_results(results)
 - **Multi-size Testing**: Flexible size categories from small to very large matrices
 - **Element Type Support**: Tests with Float32, Float64, ComplexF32, ComplexF64
 - **GPU Support**: Automatically detects and benchmarks GPU algorithms if available
-- **Performance Visualization**: Creates plots showing algorithm performance
+- **Performance Visualization**: Generate plots on demand with `plot(results)`
 - **Community Sharing**: Optional telemetry to help improve algorithm selection
 
 ## Size Categories
@@ -135,7 +135,6 @@ If you prefer using a token:
 ```julia
 autotune_setup(;
     sizes = [:small, :medium, :large],
-    make_plot = true,
     set_preferences = true,
     samples = 5,
     seconds = 0.5,
@@ -146,7 +145,6 @@ autotune_setup(;
 
 **Parameters:**
 - `sizes`: Vector of size categories to test
-- `make_plot`: Generate performance plots
 - `set_preferences`: Update LinearSolve preferences
 - `samples`: Number of benchmark samples per test
 - `seconds`: Maximum time per benchmark
@@ -154,7 +152,7 @@ autotune_setup(;
 - `skip_missing_algs`: Continue if algorithms are missing
 
 **Returns:**
-- `results`: AutotuneResults object containing benchmark data, system info, and plots
+- `results`: AutotuneResults object containing benchmark data and system info
 
 ### `share_results`
 

@@ -245,12 +245,13 @@ function format_detailed_results_markdown(df::DataFrame)
 end
 
 """
-    upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dict}, auth_info::Tuple,
+    upload_to_github(content::String, plot_files, auth_info::Tuple,
                      results_df::DataFrame, system_info::Dict, categories::Dict)
 
 Create a GitHub issue with benchmark results for community data collection.
+Note: plot_files parameter is kept for compatibility but not used.
 """
-function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dict}, auth_info::Tuple,
+function upload_to_github(content::String, plot_files, auth_info::Tuple,
                          results_df::DataFrame, system_info::Dict, categories::Dict)
     
     auth_method, auth_data = auth_info
@@ -272,53 +273,6 @@ function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dic
         target_repo = "SciML/LinearSolve.jl"
         issue_number = 669  # The existing issue for collecting autotune results
         
-        # First, upload plots to a gist if available
-        gist_url = nothing
-        raw_urls = Dict{String, String}()
-        plot_links = ""
-        
-        if plot_files !== nothing
-            @info "📊 Uploading plots to GitHub Gist..."
-            
-            # Get element type for labeling
-            eltype_str = if !isempty(results_df)
-                unique_eltypes = unique(results_df.eltype)
-                join(unique_eltypes, ", ")
-            else
-                "Mixed"
-            end
-            
-            if auth_method == :gh_cli
-                gist_url, raw_urls = upload_plots_to_gist_gh(plot_files, eltype_str)
-            elseif auth_method == :token
-                gist_url, raw_urls = upload_plots_to_gist(plot_files, auth_data, eltype_str)
-            end
-            
-            if gist_url !== nothing
-                # Add plot links section to the content
-                plot_links = """
-                
-                ### 📊 Benchmark Plots
-                
-                View all plots in the gist: [Benchmark Plots Gist]($gist_url)
-                
-                """
-                
-                # Embed PNG images directly in the markdown if we have raw URLs
-                for (name, url) in raw_urls
-                    if endswith(name, ".png")
-                        plot_links *= """
-                        #### $name
-                        ![$(name)]($url)
-                        
-                        """
-                    end
-                end
-                
-                plot_links *= "---\n"
-            end
-        end
-        
         # Construct comment body
         cpu_name = get(system_info, "cpu_name", "unknown")
         os_name = get(system_info, "os", "unknown")
@@ -326,7 +280,7 @@ function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dic
         
         comment_body = """
         ## Benchmark Results: $cpu_name on $os_name ($timestamp)
-        $plot_links
+        
         $content
 
         ---
@@ -350,9 +304,6 @@ function upload_to_github(content::String, plot_files::Union{Nothing, Tuple, Dic
 
         if issue_url !== nothing
             @info "✅ Successfully added benchmark results to issue: $issue_url"
-            if gist_url !== nothing
-                @info "📊 Plots available at: $gist_url"
-            end
             @info "🔗 Your benchmark data has been shared with the LinearSolve.jl community!"
             @info "💡 View all community benchmark data: https://github.com/SciML/LinearSolve.jl/issues/669"
         else

@@ -265,7 +265,7 @@ function autotune_setup(;
 end
 
 """
-    share_results(results::AutotuneResults)
+    share_results(results::AutotuneResults; auto_login::Bool = true)
 
 Share your benchmark results with the LinearSolve.jl community to help improve 
 automatic algorithm selection across different hardware configurations.
@@ -273,7 +273,17 @@ automatic algorithm selection across different hardware configurations.
 This function will authenticate with GitHub (using gh CLI or token) and post
 your results as a comment to the community benchmark collection issue.
 
-# Setup Instructions
+If authentication is not found and `auto_login` is true, the function will
+offer to run `gh auth login` interactively to set up authentication.
+
+# Arguments
+- `results`: AutotuneResults object from autotune_setup
+- `auto_login`: If true, prompts to authenticate if not already authenticated (default: true)
+
+# Authentication Methods
+
+## Automatic (New!)
+If gh is not authenticated, the function will offer to run authentication for you.
 
 ## Method 1: GitHub CLI (Recommended)
 1. Install GitHub CLI: https://cli.github.com/
@@ -289,19 +299,19 @@ your results as a comment to the community benchmark collection issue.
 5. Set environment variable: `ENV["GITHUB_TOKEN"] = "your_token_here"`
 6. Run this function
 
-# Arguments
-- `results`: AutotuneResults object from autotune_setup
-
 # Examples
 ```julia
 # Run benchmarks
 results = autotune_setup()
 
-# Share results with the community
+# Share results with automatic authentication prompt
 share_results(results)
+
+# Share results without authentication prompt
+share_results(results; auto_login = false)
 ```
 """
-function share_results(results::AutotuneResults)
+function share_results(results::AutotuneResults; auto_login::Bool = true)
     @info "📤 Preparing to share benchmark results with the community..."
     
     # Extract from AutotuneResults
@@ -314,20 +324,12 @@ function share_results(results::AutotuneResults)
     # Categorize results
     categories = categorize_results(results_df)
     
-    # Set up authentication
-    @info "🔗 Setting up GitHub authentication..."
-    @info "ℹ️  For setup instructions, see the documentation or visit:"
-    @info "    https://cli.github.com/ (for gh CLI)"
-    @info "    https://github.com/settings/tokens/new (for token)"
+    # Set up authentication (with auto-login prompt if enabled)
+    @info "🔗 Checking GitHub authentication..."
     
-    github_auth = setup_github_authentication()
+    github_auth = setup_github_authentication(; auto_login = auto_login)
     
     if github_auth === nothing || github_auth[1] === nothing
-        @warn "❌ GitHub authentication not available."
-        @info "📝 To share results, please set up authentication:"
-        @info "    Option 1: Install gh CLI and run: gh auth login"
-        @info "    Option 2: Create a GitHub token and set: ENV[\"GITHUB_TOKEN\"] = \"your_token\""
-        
         # Save results locally as fallback
         timestamp = replace(string(Dates.now()), ":" => "-")
         fallback_file = "autotune_results_$(timestamp).md"
@@ -336,7 +338,8 @@ function share_results(results::AutotuneResults)
             write(f, markdown_content)
         end
         @info "📁 Results saved locally to $fallback_file"
-        @info "    You can manually share this file on the issue tracker."
+        @info "    You can manually share this file on the issue tracker:"
+        @info "    https://github.com/SciML/LinearSolve.jl/issues/669"
         return
     end
     

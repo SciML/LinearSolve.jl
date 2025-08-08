@@ -99,17 +99,25 @@ Format system information as markdown.
 """
 function format_system_info_markdown(system_info::Dict)
     lines = String[]
-    push!(lines, "- **Julia Version**: $(system_info["julia_version"])")
-    push!(lines, "- **OS**: $(system_info["os"])")
-    push!(lines, "- **Architecture**: $(system_info["arch"])")
-    push!(lines, "- **CPU**: $(system_info["cpu_name"])")
-    push!(lines, "- **Cores**: $(system_info["num_cores"])")
-    push!(lines, "- **Threads**: $(system_info["num_threads"])")
-    push!(lines, "- **BLAS**: $(system_info["blas_vendor"])")
-    push!(lines, "- **MKL Available**: $(system_info["mkl_available"])")
-    push!(lines, "- **Apple Accelerate Available**: $(system_info["apple_accelerate_available"])")
-    push!(lines, "- **CUDA Available**: $(system_info["has_cuda"])")
-    push!(lines, "- **Metal Available**: $(system_info["has_metal"])")
+    push!(lines, "- **Julia Version**: $(get(system_info, "julia_version", "unknown"))")
+    # Handle both "os" and "os_version" keys, with os_name for display
+    os_display = get(system_info, "os_name", "unknown")
+    os_kernel = get(system_info, "os_version", get(system_info, "os", "unknown"))
+    push!(lines, "- **OS**: $os_display ($os_kernel)")
+    # Handle both "arch" and "architecture" keys
+    push!(lines, "- **Architecture**: $(get(system_info, "architecture", get(system_info, "arch", "unknown")))")
+    push!(lines, "- **CPU**: $(get(system_info, "cpu_name", "unknown"))")
+    # Handle both "num_cores" and "cpu_cores" keys
+    push!(lines, "- **Cores**: $(get(system_info, "cpu_cores", get(system_info, "num_cores", "unknown")))")
+    # Handle both "num_threads" and "julia_threads" keys
+    push!(lines, "- **Threads**: $(get(system_info, "julia_threads", get(system_info, "num_threads", "unknown")))")
+    push!(lines, "- **BLAS**: $(get(system_info, "blas_vendor", "unknown"))")
+    push!(lines, "- **MKL Available**: $(get(system_info, "mkl_available", false))")
+    push!(lines, "- **Apple Accelerate Available**: $(get(system_info, "apple_accelerate_available", false))")
+    # Handle both "has_cuda" and "cuda_available" keys
+    push!(lines, "- **CUDA Available**: $(get(system_info, "cuda_available", get(system_info, "has_cuda", false)))")
+    # Handle both "has_metal" and "metal_available" keys
+    push!(lines, "- **Metal Available**: $(get(system_info, "metal_available", get(system_info, "has_metal", false)))")
 
     return join(lines, "\n")
 end

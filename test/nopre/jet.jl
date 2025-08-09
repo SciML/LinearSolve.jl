@@ -29,73 +29,81 @@ prob_sparse_spd = LinearProblem(A_sparse_spd, b)
     JET.@test_opt solve(prob, GenericLUFactorization())
     JET.@test_opt solve(prob, DiagonalFactorization())
     JET.@test_opt solve(prob, SimpleLUFactorization())
-    
-    # Tests that currently fail - marked with @test_skip
-    @test_skip JET.@test_opt solve(prob, QRFactorization())
-    @test_skip JET.@test_opt solve(prob_spd, CholeskyFactorization())
-    @test_skip JET.@test_opt solve(prob_sym, LDLtFactorization())
-    @test_skip JET.@test_opt solve(prob, SVDFactorization())
-    @test_skip JET.@test_opt solve(prob_sym, BunchKaufmanFactorization())
-    @test_skip JET.@test_opt solve(prob, GenericFactorization())
     JET.@test_opt solve(prob_spd, NormalCholeskyFactorization())
     JET.@test_opt solve(prob, NormalBunchKaufmanFactorization())
+    
+    # TODO: Fix type stability issues in these solvers:
+    # - QRFactorization: runtime dispatch in LinearAlgebra.QRCompactWYQ
+    # - CholeskyFactorization: type instability issues
+    # - LDLtFactorization: type instability issues
+    # - SVDFactorization: type instability issues
+    # - BunchKaufmanFactorization: type instability issues
+    # - GenericFactorization: runtime dispatch in issuccess
+    
+    # Uncomment these once type stability is fixed:
+    # JET.@test_opt solve(prob, QRFactorization())
+    # JET.@test_opt solve(prob_spd, CholeskyFactorization())
+    # JET.@test_opt solve(prob_sym, LDLtFactorization())
+    # JET.@test_opt solve(prob, SVDFactorization())
+    # JET.@test_opt solve(prob_sym, BunchKaufmanFactorization())
+    # JET.@test_opt solve(prob, GenericFactorization())
 end
 
 @testset "JET Tests for Extension Factorizations" begin
     # RecursiveFactorization.jl extensions
     JET.@test_opt solve(prob, RFLUFactorization())
-    @test_skip JET.@test_opt solve(prob, FastLUFactorization())
-    @test_skip JET.@test_opt solve(prob, FastQRFactorization())
+    
+    # TODO: Fix type stability in FastLUFactorization and FastQRFactorization
+    # - FastLUFactorization: runtime dispatch in do_factorization
+    # - FastQRFactorization: type instability issues
+    
+    # Uncomment these once type stability is fixed:
+    # JET.@test_opt solve(prob, FastLUFactorization())
+    # JET.@test_opt solve(prob, FastQRFactorization())
     
     # Platform-specific factorizations (may not be available on all systems)
-    if @isdefined(MKLLUFactorization)
-        @test_skip JET.@test_opt solve(prob, MKLLUFactorization())
-    end
-    
-    if Sys.isapple() && @isdefined(AppleAccelerateLUFactorization)
-        @test_skip JET.@test_opt solve(prob, AppleAccelerateLUFactorization())
-    end
-    
-    # CUDA/Metal factorizations (only test if available)
-    # @test_skip JET.@test_opt solve(prob, CudaOffloadFactorization())
-    # @test_skip JET.@test_opt solve(prob, MetalLUFactorization())
-    # @test_skip JET.@test_opt solve(prob, BLISLUFactorization())
+    # These need conditional testing based on platform and availability
+    # if @isdefined(MKLLUFactorization)
+    #     JET.@test_opt solve(prob, MKLLUFactorization())
+    # end
+    # if Sys.isapple() && @isdefined(AppleAccelerateLUFactorization)
+    #     JET.@test_opt solve(prob, AppleAccelerateLUFactorization())
+    # end
 end
 
 @testset "JET Tests for Sparse Factorizations" begin
-    @test_skip JET.@test_opt solve(prob_sparse, UMFPACKFactorization())
-    @test_skip JET.@test_opt solve(prob_sparse, KLUFactorization())
-    @test_skip JET.@test_opt solve(prob_sparse_spd, CHOLMODFactorization())
-    @test_skip JET.@test_opt solve(prob_sparse, SparspakFactorization())
+    # TODO: Fix type stability issues in sparse factorizations
+    # All sparse factorizations currently have type instability issues
+    # that need to be addressed before enabling these tests
     
-    # PardisoJL (requires extension)
-    # @test_skip JET.@test_opt solve(prob_sparse, PardisoJL())
-    
-    # CUSOLVER (requires CUDA)
-    # @test_skip JET.@test_opt solve(prob_sparse, CUSOLVERRFFactorization())
+    # Uncomment these once type stability is fixed:
+    # JET.@test_opt solve(prob_sparse, UMFPACKFactorization())
+    # JET.@test_opt solve(prob_sparse, KLUFactorization())
+    # JET.@test_opt solve(prob_sparse_spd, CHOLMODFactorization())
+    # JET.@test_opt solve(prob_sparse, SparspakFactorization())
 end
 
 @testset "JET Tests for Krylov Methods" begin
-    # KrylovJL methods
-    @test_skip JET.@test_opt solve(prob, KrylovJL_GMRES())
-    @test_skip JET.@test_opt solve(prob_spd, KrylovJL_CG())
-    @test_skip JET.@test_opt solve(prob_sym, KrylovJL_MINRES())
-    @test_skip JET.@test_opt solve(prob, KrylovJL_BICGSTAB())
-    @test_skip JET.@test_opt solve(prob, KrylovJL_LSMR())
-    @test_skip JET.@test_opt solve(prob, KrylovJL_CRAIGMR())
-    @test_skip JET.@test_opt solve(prob_sym, KrylovJL_MINARES())
+    # TODO: Fix type stability issues in Krylov methods
+    # All Krylov methods currently have type instability issues
+    # that need to be addressed before enabling these tests
     
-    # SimpleGMRES
-    @test_skip JET.@test_opt solve(prob, SimpleGMRES())
-    
-    # Extension Krylov methods (require extensions)
-    # @test_skip JET.@test_opt solve(prob, KrylovKitJL_CG())
-    # @test_skip JET.@test_opt solve(prob, KrylovKitJL_GMRES())
-    # @test_skip JET.@test_opt solve(prob, IterativeSolversJL())
+    # Uncomment these once type stability is fixed:
+    # JET.@test_opt solve(prob, KrylovJL_GMRES())
+    # JET.@test_opt solve(prob_spd, KrylovJL_CG())
+    # JET.@test_opt solve(prob_sym, KrylovJL_MINRES())
+    # JET.@test_opt solve(prob, KrylovJL_BICGSTAB())
+    # JET.@test_opt solve(prob, KrylovJL_LSMR())
+    # JET.@test_opt solve(prob, KrylovJL_CRAIGMR())
+    # JET.@test_opt solve(prob_sym, KrylovJL_MINARES())
+    # JET.@test_opt solve(prob, SimpleGMRES())
 end
 
 @testset "JET Tests for Default Solver" begin
-    # Test the default solver selection
-    @test_skip JET.@test_opt solve(prob)
-    @test_skip JET.@test_opt solve(prob_sparse)
+    # TODO: Fix type stability in default solver selection
+    # The default solver selection has runtime dispatch issues
+    
+    # Uncomment these once type stability is fixed:
+    # JET.@test_opt solve(prob)
+    # JET.@test_opt solve(prob_sparse)
 end

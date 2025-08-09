@@ -29,6 +29,7 @@ if GROUP == "All" || GROUP == "NoPre" && isempty(VERSION.prerelease)
     @time @safetestset "Enzyme Derivative Rules" include("nopre/enzyme.jl")
     @time @safetestset "JET Tests" include("nopre/jet.jl")
     @time @safetestset "Static Arrays" include("nopre/static_arrays.jl")
+    @time @safetestset "Caching Allocation Tests" include("nopre/caching_allocation_tests.jl")
 end
 
 if GROUP == "DefaultsLoading"

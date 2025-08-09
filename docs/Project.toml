@@ -6,6 +6,6 @@ SciMLOperators = "c0aeaf25-5076-4817-a8d5-81caf7dfa961"
 
 [compat]
 Documenter = "1"
-LinearSolve = "1, 2, 3"
-LinearSolveAutotune = "0.1"
+LinearSolve = "3"
+LinearSolveAutotune = "1.1"
 SciMLOperators = "1"

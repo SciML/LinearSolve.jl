@@ -29,14 +29,15 @@ function setup_github_authentication(; auto_login::Bool = true)
     
     # First check if already authenticated
     try
-        # Suppress output of gh auth status check
-        if success(pipeline(`$gh_cmd auth status`; stdout=devnull, stderr=devnull))
-            # Check if logged in to github.com
-            auth_status_output = read(`$gh_cmd auth status`, String)
-            if contains(auth_status_output, "Logged in to github.com")
-                println("✅ Found active `gh` CLI session. Will use it for upload.")
-                return (:gh_cli, "GitHub CLI")
-            end
+        # gh auth status outputs to stderr, not stdout
+        io = IOBuffer()
+        run(pipeline(`$gh_cmd auth status`; stderr=io, stdout=devnull))
+        seekstart(io)
+        auth_status_output = read(io, String)
+        
+        if contains(auth_status_output, "Logged in to github.com")
+            println("✅ Found active `gh` CLI session. Will use it for upload.")
+            return (:gh_cli, "GitHub CLI")
         end
     catch e
         @debug "gh CLI auth status check failed: $e"
@@ -64,21 +65,66 @@ function setup_github_authentication(; auto_login::Bool = true)
             println("   This will open your browser to authenticate with GitHub.")
             println("   Please follow the prompts to complete authentication.\n")
             
+            # Run gh auth login - it may fail to open browser but still succeed
+            auth_login_success = false
             try
-                # Run gh auth login interactively (using system gh or JLL)
                 run(`$gh_cmd auth login`)
+                auth_login_success = true
+            catch e
+                # gh auth login might fail (e.g., can't open browser) but auth might still work
+                println("\n⚠️  gh auth login reported an issue: $e")
+                println("   Checking if authentication succeeded anyway...")
+            end
+            
+            # Always check auth status, even if gh auth login appeared to fail
+            # This handles cases where browser opening failed but user completed auth manually
+            try
+                # Small delay to ensure auth is fully processed
+                sleep(0.5)
                 
-                # Check if authentication succeeded
-                if success(pipeline(`$gh_cmd auth status`; stdout=devnull, stderr=devnull))
-                    auth_status_output = read(`$gh_cmd auth status`, String)
-                    if contains(auth_status_output, "Logged in to github.com")
-                        println("\n✅ Authentication successful! You can now share results.")
-                        return (:gh_cli, "GitHub CLI")
+                # Check current authentication status
+                auth_status_output = ""
+                try
+                    # gh auth status outputs to stderr, not stdout
+                    io = IOBuffer()
+                    run(pipeline(`$gh_cmd auth status`; stderr=io, stdout=devnull))
+                    seekstart(io)
+                    auth_status_output = read(io, String)
+                catch
+                    # If that fails, try capturing both streams
+                    try
+                        io = IOBuffer()
+                        run(pipeline(`$gh_cmd auth status`; stderr=io, stdout=io))
+                        seekstart(io)
+                        auth_status_output = read(io, String)
+                    catch
+                        # Last resort - assume failure
+                        auth_status_output = ""
                     end
                 end
+                
+                if contains(auth_status_output, "Logged in to github.com")
+                    println("\n✅ Authentication successful! You can now share results.")
+                    return (:gh_cli, "GitHub CLI")
+                elseif auth_login_success
+                    # gh auth login succeeded but we can't verify the status
+                    println("\n⚠️  Authentication may have succeeded but couldn't verify status.")
+                    println("   Attempting to use gh CLI anyway...")
+                    return (:gh_cli, "GitHub CLI")
+                else
+                    println("\n❌ Authentication verification failed.")
+                    println("   Output: ", auth_status_output)
+                end
             catch e
-                println("\n❌ Authentication failed: $e")
-                println("   You can try again later or use a GitHub token instead.")
+                if auth_login_success
+                    # gh auth login succeeded but status check failed - try anyway
+                    println("\n⚠️  Couldn't verify authentication status: $e")
+                    println("   gh auth login appeared successful, attempting to proceed...")
+                    return (:gh_cli, "GitHub CLI")
+                else
+                    println("\n❌ Authentication failed: $e")
+                    println("   You can try again later or use a GitHub token instead.")
+                end
             end
         else
             println("\n📝 Skipping authentication. You can authenticate later by:")

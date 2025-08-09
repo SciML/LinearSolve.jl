@@ -13,9 +13,13 @@ makedocs(sitename = "LinearSolve.jl",
     modules = [LinearSolve, LinearSolve.SciMLBase],
     clean = true, doctest = false, linkcheck = true,
     warnonly = [:docs_block, :missing_docs],
+    linkcheck_ignore = [
+        "https://cli.github.com/manual/installation"
+    ],
     format = Documenter.HTML(assets = ["assets/favicon.ico"],
         canonical = "https://docs.sciml.ai/LinearSolve/stable/"),
     pages = pages)
+
 
 deploydocs(;
     repo = "github.com/SciML/LinearSolve.jl",

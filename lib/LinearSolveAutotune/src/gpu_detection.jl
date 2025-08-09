@@ -1,6 +1,7 @@
 # GPU hardware and package detection
 
 using CPUSummary
+using Pkg
 
 """
     is_cuda_available()
@@ -116,7 +117,105 @@ function get_system_info()
         info["apple_accelerate_available"] = false
     end
 
+    # Add package versions
+    info["package_versions"] = get_package_versions()
+    
     return info
+end
+
+"""
+    get_package_versions()
+
+Get versions of LinearSolve-related packages and their dependencies.
+Returns a Dict with package names and versions.
+"""
+function get_package_versions()
+    versions = Dict{String, String}()
+    
+    # Get the current project's dependencies
+    deps = Pkg.dependencies()
+    
+    # List of packages we're interested in tracking
+    important_packages = [
+        "LinearSolve",
+        "LinearSolveAutotune",
+        "RecursiveFactorization",
+        "CUDA",
+        "Metal",
+        "MKL_jll",
+        "BLISBLAS",
+        "AppleAccelerate",
+        "SparseArrays",
+        "KLU",
+        "Pardiso",
+        "MKLPardiso",
+        "BandedMatrices",
+        "FastLapackInterface",
+        "HYPRE",
+        "IterativeSolvers",
+        "Krylov",
+        "KrylovKit",
+        "LinearAlgebra"
+    ]
+    
+    # Also track JLL packages for BLAS libraries
+    jll_packages = [
+        "MKL_jll",
+        "OpenBLAS_jll",
+        "OpenBLAS32_jll",
+        "blis_jll",
+        "LAPACK_jll",
+        "CompilerSupportLibraries_jll"
+    ]
+    
+    all_packages = union(important_packages, jll_packages)
+    
+    # Iterate through dependencies and collect versions
+    for (uuid, dep) in deps
+        if dep.name in all_packages
+            if dep.version !== nothing
+                versions[dep.name] = string(dep.version)
+            else
+                # Try to get version from the package itself if loaded
+                try
+                    pkg_module = Base.loaded_modules[Base.PkgId(uuid, dep.name)]
+                    if isdefined(pkg_module, :version)
+                        versions[dep.name] = string(pkg_module.version)
+                    else
+                        versions[dep.name] = "unknown"
+                    end
+                catch
+                    versions[dep.name] = "unknown"
+                end
+            end
+        end
+    end
+    
+    # Try to get Julia's LinearAlgebra stdlib version
+    try
+        versions["LinearAlgebra"] = string(VERSION)  # Stdlib version matches Julia
+    catch
+        versions["LinearAlgebra"] = "stdlib"
+    end
+    
+    # Get BLAS configuration info
+    try
+        blas_config = LinearAlgebra.BLAS.get_config()
+        if hasfield(typeof(blas_config), :loaded_libs)
+            for lib in blas_config.loaded_libs
+                if hasfield(typeof(lib), :libname)
+                    lib_name = basename(string(lib.libname))
+                    # Extract version info if available
+                    versions["BLAS_lib"] = lib_name
+                end
+            end
+        end
+    catch
+        # Fallback for older Julia versions
+        versions["BLAS_vendor"] = string(LinearAlgebra.BLAS.vendor())
+    end
+    
+    return versions
 end
 
 """

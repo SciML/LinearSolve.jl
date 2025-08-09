@@ -1,6 +1,7 @@
 # Core benchmarking functionality
 
 using ProgressMeter
+using LinearAlgebra
 
 """
     test_algorithm_compatibility(alg, eltype::Type, test_size::Int=4)
@@ -78,7 +79,8 @@ Benchmark the given algorithms across different matrix sizes and element types.
 Returns a DataFrame with results including element type information.
 """
 function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
-        samples = 5, seconds = 0.5, sizes = [:tiny, :small, :medium, :large])
+        samples = 5, seconds = 0.5, sizes = [:tiny, :small, :medium, :large],
+        check_correctness = true, correctness_tol = 1e-2)
 
     # Set benchmark parameters
     old_params = BenchmarkTools.DEFAULT_PARAMETERS
@@ -116,6 +118,18 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
                 A = rand(rng, eltype, n, n)
                 b = rand(rng, eltype, n)
                 u0 = rand(rng, eltype, n)
+                
+                # Compute reference solution with LUFactorization if correctness check is enabled
+                reference_solution = nothing
+                if check_correctness
+                    try
+                        ref_prob = LinearProblem(copy(A), copy(b); u0 = copy(u0))
+                        reference_solution = solve(ref_prob, LinearSolve.LUFactorization())
+                    catch e
+                        @warn "Failed to compute reference solution with LUFactorization for size $n, eltype $eltype: $e"
+                        check_correctness = false  # Disable for this size/type combination
+                    end
+                end
 
                 for (alg, name) in zip(compatible_algs, compatible_names)
                     # Update progress description
@@ -125,6 +139,7 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
                     gflops = 0.0
                     success = true
                     error_msg = ""
+                    passed_correctness = true
 
                     try
                         # Create the linear problem for this test
@@ -132,19 +147,37 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
                             u0 = copy(u0),
                             alias = LinearAliasSpecifier(alias_A = true, alias_b = true))
 
-                        # Warmup run
-                        solve(prob, alg)
+                        # Warmup run and correctness check
+                        warmup_sol = solve(prob, alg)
+                        
+                        # Check correctness if reference solution is available
+                        if check_correctness && reference_solution !== nothing
+                            # Compute relative error
+                            rel_error = norm(warmup_sol.u - reference_solution.u) / norm(reference_solution.u)
+                            
+                            if rel_error > correctness_tol
+                                passed_correctness = false
+                                @warn "Algorithm $name failed correctness check for size $n, eltype $eltype. " *
+                                      "Relative error: $(round(rel_error, sigdigits=3)) > tolerance: $correctness_tol. " *
+                                      "Algorithm will be excluded from results."
+                                success = false
+                                error_msg = "Failed correctness check (rel_error = $(round(rel_error, sigdigits=3)))"
+                            end
+                        end
+                        
+                        # Only benchmark if correctness check passed
+                        if passed_correctness
+                            # Actual benchmark
+                            bench = @benchmark solve($prob, $alg) setup=(prob = LinearProblem(
+                                copy($A), copy($b);
+                                u0 = copy($u0),
+                                alias = LinearAliasSpecifier(alias_A = true, alias_b = true)))
 
-                        # Actual benchmark
-                        bench = @benchmark solve($prob, $alg) setup=(prob = LinearProblem(
-                            copy($A), copy($b);
-                            u0 = copy($u0),
-                            alias = LinearAliasSpecifier(alias_A = true, alias_b = true)))
-
-                        # Calculate GFLOPs
-                        min_time_sec = minimum(bench.times) / 1e9
-                        flops = luflop(n, n)
-                        gflops = flops / min_time_sec / 1e9
+                            # Calculate GFLOPs
+                            min_time_sec = minimum(bench.times) / 1e9
+                            flops = luflop(n, n)
+                            gflops = flops / min_time_sec / 1e9
+                        end
 
                     catch e
                         success = false

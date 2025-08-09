@@ -172,6 +172,21 @@ function format_system_info_markdown(system_info::Dict)
     push!(lines, "- **CUDA Available**: $(get(system_info, "cuda_available", get(system_info, "has_cuda", false)))")
     # Handle both "has_metal" and "metal_available" keys
     push!(lines, "- **Metal Available**: $(get(system_info, "metal_available", get(system_info, "has_metal", false)))")
+    
+    # Add package versions section
+    if haskey(system_info, "package_versions")
+        push!(lines, "")
+        push!(lines, "### Package Versions")
+        pkg_versions = system_info["package_versions"]
+        
+        # Sort packages for consistent display
+        sorted_packages = sort(collect(keys(pkg_versions)))
+        
+        for pkg_name in sorted_packages
+            version = pkg_versions[pkg_name]
+            push!(lines, "- **$pkg_name**: $version")
+        end
+    end
 
     return join(lines, "\n")
 end

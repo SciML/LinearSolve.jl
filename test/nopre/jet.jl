@@ -32,96 +32,79 @@ prob_sparse_spd = LinearProblem(A_sparse_spd, b)
     JET.@test_opt solve(prob_spd, NormalCholeskyFactorization())
     JET.@test_opt solve(prob, NormalBunchKaufmanFactorization())
     
-    # The following tests are currently commented out due to type stability issues:
-    #
-    # QRFactorization - runtime dispatch in LinearAlgebra.QRCompactWYQ
-    # Issue: getproperty(F::QRCompactWY, d::Symbol) has runtime dispatch
-    # JET.@test_opt solve(prob, QRFactorization())
-    #
-    # CholeskyFactorization - type instability
-    # JET.@test_opt solve(prob_spd, CholeskyFactorization())
-    #
-    # LDLtFactorization - type instability  
-    # JET.@test_opt solve(prob_sym, LDLtFactorization())
-    #
-    # SVDFactorization - may pass on some Julia versions
-    # JET.@test_opt solve(prob, SVDFactorization())
-    #
-    # BunchKaufmanFactorization - type instability
-    # JET.@test_opt solve(prob_sym, BunchKaufmanFactorization())
-    #
-    # GenericFactorization - runtime dispatch in issuccess
-    # Issue: _notsuccessful(F::LU) and hasmethod checks cause runtime dispatch
-    # JET.@test_opt solve(prob, GenericFactorization())
+    # CholeskyFactorization and SVDFactorization now pass JET tests
+    JET.@test_opt solve(prob_spd, CholeskyFactorization())
+    JET.@test_opt solve(prob, SVDFactorization())
+    
+    # Tests with known type stability issues - marked as broken
+    JET.@test_opt solve(prob, QRFactorization()) broken=true
+    JET.@test_opt solve(prob_sym, LDLtFactorization()) broken=true
+    JET.@test_opt solve(prob_sym, BunchKaufmanFactorization()) broken=true
+    JET.@test_opt solve(prob, GenericFactorization()) broken=true
 end
 
 @testset "JET Tests for Extension Factorizations" begin
     # RecursiveFactorization.jl extensions
     JET.@test_opt solve(prob, RFLUFactorization())
     
-    # The following tests are currently commented out due to type stability issues:
-    #
-    # FastLUFactorization - runtime dispatch in do_factorization
-    # JET.@test_opt solve(prob, FastLUFactorization())
-    #
-    # FastQRFactorization - type instability
-    # JET.@test_opt solve(prob, FastQRFactorization())
-    #
-    # Platform-specific factorizations would go here if enabled:
-    # MKLLUFactorization, AppleAccelerateLUFactorization, etc.
+    # Tests with known type stability issues
+    JET.@test_opt solve(prob, FastLUFactorization()) broken=true
+    JET.@test_opt solve(prob, FastQRFactorization()) broken=true
+    
+    # Platform-specific factorizations (may not be available on all systems)
+    if @isdefined(MKLLUFactorization)
+        # MKLLUFactorization passes JET tests
+        JET.@test_opt solve(prob, MKLLUFactorization())
+    end
+    
+    if Sys.isapple() && @isdefined(AppleAccelerateLUFactorization)
+        JET.@test_opt solve(prob, AppleAccelerateLUFactorization()) broken=true
+    end
+    
+    # CUDA/Metal factorizations (only test if CUDA/Metal are loaded)
+    # CudaOffloadFactorization requires CUDA to be loaded, skip if not available
+    if @isdefined(MetalLUFactorization)
+        JET.@test_opt solve(prob, MetalLUFactorization()) broken=true
+    end
+    if @isdefined(BLISLUFactorization)
+        JET.@test_opt solve(prob, BLISLUFactorization()) broken=true
+    end
 end
 
 @testset "JET Tests for Sparse Factorizations" begin
-    # All sparse factorizations currently have type stability issues
-    # These tests are disabled until the issues are resolved:
-    #
-    # UMFPACKFactorization - type instability
-    # JET.@test_opt solve(prob_sparse, UMFPACKFactorization())
-    #
-    # KLUFactorization - type instability  
-    # JET.@test_opt solve(prob_sparse, KLUFactorization())
-    #
-    # CHOLMODFactorization - type instability
-    # JET.@test_opt solve(prob_sparse_spd, CHOLMODFactorization())
-    #
-    # SparspakFactorization - type instability
-    # JET.@test_opt solve(prob_sparse, SparspakFactorization())
+    JET.@test_opt solve(prob_sparse, UMFPACKFactorization()) broken=true
+    JET.@test_opt solve(prob_sparse, KLUFactorization()) broken=true
+    JET.@test_opt solve(prob_sparse_spd, CHOLMODFactorization()) broken=true
+    
+    # SparspakFactorization requires Sparspak to be loaded
+    # PardisoJL requires Pardiso to be loaded
+    # CUSOLVERRFFactorization requires CUSOLVERRF to be loaded
+    # These are tested in their respective extension test suites
 end
 
 @testset "JET Tests for Krylov Methods" begin
-    # All Krylov methods currently have type stability issues
-    # These tests are disabled until the issues are resolved:
-    #
-    # KrylovJL_GMRES - type instability
-    # JET.@test_opt solve(prob, KrylovJL_GMRES())
-    #
-    # KrylovJL_CG - type instability
-    # JET.@test_opt solve(prob_spd, KrylovJL_CG())
-    #
-    # KrylovJL_MINRES - type instability
-    # JET.@test_opt solve(prob_sym, KrylovJL_MINRES())
-    #
-    # KrylovJL_BICGSTAB - type instability
-    # JET.@test_opt solve(prob, KrylovJL_BICGSTAB())
-    #
-    # KrylovJL_LSMR - type instability
-    # JET.@test_opt solve(prob, KrylovJL_LSMR())
-    #
-    # KrylovJL_CRAIGMR - type instability
-    # JET.@test_opt solve(prob, KrylovJL_CRAIGMR())
-    #
-    # KrylovJL_MINARES - type instability
-    # JET.@test_opt solve(prob_sym, KrylovJL_MINARES())
-    #
-    # SimpleGMRES - type instability
-    # JET.@test_opt solve(prob, SimpleGMRES())
+    # KrylovJL methods that pass JET tests
+    JET.@test_opt solve(prob_spd, KrylovJL_CG())
+    JET.@test_opt solve(prob, KrylovJL_BICGSTAB())
+    JET.@test_opt solve(prob, KrylovJL_LSMR())
+    JET.@test_opt solve(prob, KrylovJL_CRAIGMR())
+    
+    # SimpleGMRES passes JET tests
+    JET.@test_opt solve(prob, SimpleGMRES())
+    
+    # KrylovJL methods with known type stability issues
+    JET.@test_opt solve(prob, KrylovJL_GMRES()) broken=true
+    JET.@test_opt solve(prob_sym, KrylovJL_MINRES()) broken=true
+    JET.@test_opt solve(prob_sym, KrylovJL_MINARES()) broken=true
+    
+    # Extension Krylov methods (require extensions)
+    # KrylovKitJL_CG, KrylovKitJL_GMRES require KrylovKit to be loaded
+    # IterativeSolversJL requires IterativeSolvers to be loaded
+    # These are tested in their respective extension test suites
 end
 
 @testset "JET Tests for Default Solver" begin
-    # Default solver selection has runtime dispatch issues
-    # These tests are disabled until the issues are resolved:
-    #
-    # Default solver - runtime dispatch in solver selection
-    # JET.@test_opt solve(prob)
-    # JET.@test_opt solve(prob_sparse)
+    # Test the default solver selection
+    JET.@test_opt solve(prob) broken=true
+    JET.@test_opt solve(prob_sparse) broken=true
 end

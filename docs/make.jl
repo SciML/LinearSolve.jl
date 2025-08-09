@@ -20,7 +20,6 @@ makedocs(sitename = "LinearSolve.jl",
         canonical = "https://docs.sciml.ai/LinearSolve/stable/"),
     pages = pages)
 
-
 deploydocs(;
     repo = "github.com/SciML/LinearSolve.jl",
     push_preview = true)

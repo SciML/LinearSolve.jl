@@ -17,8 +17,7 @@ function get_available_algorithms(; skip_missing_algs::Bool = false)
     push!(algs, GenericLUFactorization())
     push!(alg_names, "GenericLUFactorization")
 
-    # Disable BLiS for now
-    if false # blis_jll.is_available()
+    if blis_jll.is_available()
         push!(algs, LinearSolve.BLISLUFactorization())
         push!(alg_names, "BLISLUFactorization")
     else

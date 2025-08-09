@@ -187,7 +187,7 @@ Size categories:
 - `:small` - 20:20:100 (for small problems)
 - `:medium` - 100:50:300 (for typical problems)
 - `:large` - 300:100:1000 (for larger problems)
-- `:big` - 10000:1000:100000 (for very large/GPU problems)
+- `:big` - vcat(1000:2000:10000, 10000:5000:20000) (for very large/GPU problems)
 """
 function get_benchmark_sizes(size_categories::Vector{Symbol})
     sizes = Int[]
@@ -202,7 +202,7 @@ function get_benchmark_sizes(size_categories::Vector{Symbol})
         elseif category == :large
             append!(sizes, 300:100:1000)
         elseif category == :big
-            append!(sizes, 10000:1000:100000)
+            append!(sizes, vcat(1000:2000:10000, 10000:5000:20000))
         else
             @warn "Unknown size category: $category. Skipping."
         end
@@ -236,7 +236,7 @@ function categorize_results(df::DataFrame)
         ("small (20-100)", 21:100),
         ("medium (100-300)", 101:300),
         ("large (300-1000)", 301:1000),
-        ("big (10000+)", 10000:typemax(Int))
+        ("big (1000+)", 1000:typemax(Int))
     ]
 
     # Get unique element types

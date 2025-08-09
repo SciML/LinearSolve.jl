@@ -73,7 +73,7 @@ Control which matrix size ranges to test:
 # :small  - 20×20 to 100×100 (small problems)  
 # :medium - 100×100 to 300×300 (typical problems)
 # :large  - 300×300 to 1000×1000 (larger problems)
-# :big    - 10000×10000 to 100000×100000 (GPU/HPC scale)
+# :big    - 10000×1000 to 20000x20000 (GPU/HPC scale)
 
 # Default: test tiny through large
 results = autotune_setup()  # uses [:tiny, :small, :medium, :large]

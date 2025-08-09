@@ -408,8 +408,29 @@ function upload_to_github(content::String, plot_files, auth_info::Tuple,
         end
 
     catch e
-        @warn "❌ Failed to add comment to GitHub issue: $e"
-        @info "💡 This could be due to network issues, repository permissions, or API limits."
+        @error "❌ Failed to add comment to GitHub issue #$issue_number"
+        @error "    Repository: $target_repo"
+        @error "    Auth method: $auth_method"
+        @error "    Error type: $(typeof(e))"
+        @error "    Error message: $e"
+        
+        # Provide specific guidance based on error type
+        if occursin("403", string(e)) || occursin("forbidden", lowercase(string(e)))
+            @info "📝 This appears to be a permissions issue. Possible causes:"
+            @info "    1. You may not have write access to $target_repo"
+            @info "    2. Your token may lack the 'public_repo' or 'repo' scope"
+            @info "    3. The repository may have restricted commenting"
+            @info "    Try: gh auth status to check your authentication"
+        elseif occursin("404", string(e)) || occursin("not found", lowercase(string(e)))
+            @info "📝 Issue #$issue_number was not found. The issue may have been deleted or moved."
+        elseif occursin("401", string(e)) || occursin("unauthorized", lowercase(string(e)))
+            @info "📝 Authentication failed. Your token may have expired or been revoked."
+            @info "    Try: gh auth login to re-authenticate"
+        elseif occursin("rate limit", lowercase(string(e)))
+            @info "📝 GitHub API rate limit exceeded. Try again later."
+        else
+            @info "💡 This could be due to network issues, repository permissions, or API limits."
+        end
 
         # Save locally as fallback
         timestamp = replace(string(Dates.now()), ":" => "-")
@@ -418,6 +439,8 @@ function upload_to_github(content::String, plot_files, auth_info::Tuple,
             write(f, content)
         end
         @info "📁 Results saved locally to $fallback_file as backup"
+        @info "    You can manually share this file on the issue tracker:"
+        @info "    https://github.com/$target_repo/issues/$issue_number"
     end
 end
 
@@ -749,8 +772,11 @@ function comment_on_issue_api(target_repo, issue_number, body, auth)
         @info "✅ Added comment to issue #$(issue_number) via API"
         return "https://github.com/$(target_repo)/issues/$(issue_number)#issuecomment-$(comment.id)"
     catch e
-        @warn "Failed to add comment via API: $e"
-        return nothing
+        @debug "Failed to add comment via API"
+        @debug "    Error type: $(typeof(e))"
+        @debug "    Error details: $e"
+        # Re-throw to let the parent function handle and display the error
+        rethrow(e)
     end
 end
 
@@ -784,8 +810,21 @@ function comment_on_issue_gh(target_repo, issue_number, body)
             return "https://github.com/$(target_repo)/issues/$(issue_number)"
         end
     catch e
-        @warn "Failed to add comment via `gh` CLI: $e" out_str err_str
-        return nothing
+        @debug "Failed to add comment via gh CLI"
+        @debug "    Command output: $out_str"
+        @debug "    Command stderr: $err_str"
+        @debug "    Error type: $(typeof(e))"
+        @debug "    Error details: $e"
+        
+        # Create a more informative error message
+        error_msg = if !isempty(err_str)
+            "gh CLI error: $err_str"
+        else
+            "gh CLI command failed: $e"
+        end
+        
+        # Re-throw with more context
+        error(error_msg)
     end
 end
 

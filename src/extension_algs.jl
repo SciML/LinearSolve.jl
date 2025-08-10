@@ -82,6 +82,27 @@ struct CudaOffloadFactorization <: LinearSolve.AbstractFactorization
     end
 end
 
+"""
+`AMDGPUOffloadFactorization()`
+
+An offloading technique used to GPU-accelerate CPU-based computations on AMD GPUs.
+Requires a sufficiently large `A` to overcome the data transfer costs.
+
+!!! note
+
+    Using this solver requires adding the package AMDGPU.jl, i.e. `using AMDGPU`
+"""
+struct AMDGPUOffloadFactorization <: LinearSolve.AbstractFactorization
+    function AMDGPUOffloadFactorization()
+        ext = Base.get_extension(@__MODULE__, :LinearSolveAMDGPUExt)
+        if ext === nothing
+            error("AMDGPUOffloadFactorization requires that AMDGPU is loaded, i.e. `using AMDGPU`")
+        else
+            return new{}()
+        end
+    end
+end
+
 ## RFLUFactorization
 
 """

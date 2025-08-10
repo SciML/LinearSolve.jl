@@ -108,7 +108,7 @@ end
 `CudaOffloadFactorization()`
 
 !!! warning
-    This algorithm is deprecated. Use `CudaOffloadQRFactorization()` instead.
+    This algorithm is deprecated. Use `CudaOffloadLUFactorization` or `CudaOffloadQRFactorization()` instead.
 
 An offloading technique used to GPU-accelerate CPU-based computations.
 Requires a sufficiently large `A` to overcome the data transfer costs.

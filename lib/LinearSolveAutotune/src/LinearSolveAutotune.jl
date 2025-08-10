@@ -12,7 +12,7 @@ if MKL_jll.is_available()
     # The autotune results will determine the final preference setting
     current_pref = Preferences.load_preference(LINEARSOLVE_UUID, "LoadMKL_JLL", nothing)
     if current_pref !== true
-        Preferences.set_preferences!(LINEARSOLVE_UUID, "LoadMKL_JLL" => true; force = true)
+        Preferences.set_preferences!((LINEARSOLVE_UUID, "LinearSolve"), "LoadMKL_JLL" => true; force = true)
         @info "Temporarily setting LoadMKL_JLL=true for benchmarking (was $(current_pref))"
     end
 end

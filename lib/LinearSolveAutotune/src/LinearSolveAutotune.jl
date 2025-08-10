@@ -1,10 +1,26 @@
 module LinearSolveAutotune
 
+# Ensure MKL is available for benchmarking by setting the preference before loading LinearSolve
+using Preferences
+using MKL_jll
+
+# Set MKL preference to true for benchmarking if MKL is available
+# We need to use UUID instead of the module since LinearSolve isn't loaded yet
+const LINEARSOLVE_UUID = Base.UUID("7ed4a6bd-45f5-4d41-b270-4a48e9bafcae")
+if MKL_jll.is_available()
+    # Force load MKL for benchmarking to ensure we can test MKL algorithms
+    # The autotune results will determine the final preference setting
+    current_pref = Preferences.load_preference(LINEARSOLVE_UUID, "LoadMKL_JLL", nothing)
+    if current_pref !== true
+        Preferences.set_preferences!(LINEARSOLVE_UUID, "LoadMKL_JLL" => true; force = true)
+        @info "Temporarily setting LoadMKL_JLL=true for benchmarking (was $(current_pref))"
+    end
+end
+
 using LinearSolve
 using BenchmarkTools
 using DataFrames
 using PrettyTables
-using Preferences
 using Statistics
 using Random
 using LinearAlgebra
@@ -18,7 +34,6 @@ using CPUSummary
 using RecursiveFactorization  
 using blis_jll
 using LAPACK_jll
-using MKL_jll
 using CUDA
 using Metal
 
@@ -143,6 +158,12 @@ Run a comprehensive benchmark of all available LU factorization methods and opti
   - Set Preferences for optimal algorithm selection
   - Support both CPU and GPU algorithms based on hardware detection
   - Test algorithm compatibility with different element types
+  - Automatically manage MKL loading preference based on performance results
+
+!!! note "MKL Preference Management"
+    During benchmarking, MKL is temporarily enabled (if available) to test MKL algorithms.
+    After benchmarking, the LoadMKL_JLL preference is set based on whether MKL algorithms
+    performed best in any category. This optimizes startup time and memory usage.
 
 # Arguments
 

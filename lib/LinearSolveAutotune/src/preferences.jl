@@ -23,6 +23,8 @@ function set_algorithm_preferences(categories::Dict{String, String})
     
     # Extract benchmarked results by element type and size
     benchmarked = Dict{String, Dict{String, String}}()
+    mkl_is_best_somewhere = false  # Track if MKL wins any category
+    
     for (key, algorithm) in categories
         if contains(key, "_")
             eltype, size_range = split(key, "_", limit=2)
@@ -30,6 +32,12 @@ function set_algorithm_preferences(categories::Dict{String, String})
                 benchmarked[eltype] = Dict{String, String}()
             end
             benchmarked[eltype][size_range] = algorithm
+            
+            # Check if MKL algorithm is best for this category
+            if contains(algorithm, "MKL")
+                mkl_is_best_somewhere = true
+                @info "MKL algorithm ($algorithm) is best for $eltype at size $size_range"
+            end
         end
     end
     
@@ -118,6 +126,18 @@ function set_algorithm_preferences(categories::Dict{String, String})
         end
     end
     
+    # Set MKL preference based on whether it was best for any category
+    # If MKL wasn't best anywhere, disable it to avoid loading unnecessary dependencies
+    # Note: During benchmarking, MKL is temporarily enabled to test MKL algorithms
+    # This final preference setting determines whether MKL loads in normal usage
+    Preferences.set_preferences!(LinearSolve, "LoadMKL_JLL" => mkl_is_best_somewhere; force = true)
+    
+    if mkl_is_best_somewhere
+        @info "MKL was best in at least one category - setting LoadMKL_JLL preference to true"
+    else
+        @info "MKL was not best in any category - setting LoadMKL_JLL preference to false to avoid loading unnecessary dependencies"
+    end
+    
     # Set a timestamp for when these preferences were created
     Preferences.set_preferences!(LinearSolve, "autotune_timestamp" => string(Dates.now()); force = true)
     
@@ -178,6 +198,10 @@ function clear_algorithm_preferences()
         Preferences.delete_preferences!(LinearSolve, "autotune_timestamp"; force = true)
     end
     
+    # Clear MKL preference
+    Preferences.delete_preferences!(LinearSolve, "LoadMKL_JLL"; force = true)
+    @info "Cleared MKL preference"
+    
     @info "Preferences cleared from LinearSolve.jl."
 end
 
@@ -212,6 +236,12 @@ function show_current_preferences()
         for (size_cat, algorithm) in sort(by_eltype[eltype])
             println("  $size_cat: $algorithm")
         end
+    end
+    
+    # Show MKL preference
+    mkl_pref = Preferences.load_preference(LinearSolve, "LoadMKL_JLL", nothing)
+    if mkl_pref !== nothing
+        println("\nMKL Usage: $(mkl_pref ? "Enabled" : "Disabled")")
     end
     
     timestamp = Preferences.load_preference(LinearSolve, "autotune_timestamp", "unknown")

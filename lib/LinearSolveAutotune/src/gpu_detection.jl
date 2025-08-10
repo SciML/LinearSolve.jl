@@ -2,6 +2,7 @@
 
 using CPUSummary
 using Pkg
+using Statistics: mean
 
 """
     is_cuda_available()
@@ -82,11 +83,32 @@ function get_system_info()
     info["os_name"] = Sys.iswindows() ? "Windows" : Sys.islinux() ? "Linux" : Sys.isapple() ? "macOS" : "Other"
     info["arch"] = string(Sys.ARCH)
     
-    # Use CPUSummary where available, fallback to Sys otherwise
+    # Get detailed CPU information from Sys.cpu_info()
+    cpu_info = Sys.cpu_info()
+    if !isempty(cpu_info)
+        first_cpu = cpu_info[1]
+        info["cpu_model"] = first_cpu.model
+        info["cpu_speed_mhz"] = first_cpu.speed
+        
+        # Count unique CPU models (for heterogeneous systems)
+        cpu_models = unique([cpu.model for cpu in cpu_info])
+        if length(cpu_models) > 1
+            info["cpu_models"] = join(cpu_models, ", ")
+            info["heterogeneous_cpus"] = true
+        else
+            info["heterogeneous_cpus"] = false
+        end
+    else
+        info["cpu_model"] = "Unknown"
+        info["cpu_speed_mhz"] = 0
+    end
+    
+    # Legacy CPU name for backward compatibility
     try
         info["cpu_name"] = string(Sys.CPU_NAME)
     catch
-        info["cpu_name"] = "Unknown"
+        # Fallback to cpu_model if CPU_NAME not available
+        info["cpu_name"] = get(info, "cpu_model", "Unknown")
     end
     
     # CPUSummary.num_cores() returns the physical cores (as Static.StaticInt)
@@ -295,11 +317,45 @@ function get_detailed_system_info()
         system_data["machine"] = "unknown"
     end
     
-    # CPU details
+    # CPU details from Sys.cpu_info()
+    try
+        cpu_info = Sys.cpu_info()
+        if !isempty(cpu_info)
+            first_cpu = cpu_info[1]
+            system_data["cpu_model"] = first_cpu.model
+            system_data["cpu_speed_mhz"] = first_cpu.speed
+            
+            # Check for heterogeneous CPUs
+            cpu_models = unique([cpu.model for cpu in cpu_info])
+            if length(cpu_models) > 1
+                system_data["cpu_models"] = join(cpu_models, ", ")
+                system_data["heterogeneous_cpus"] = true
+            else
+                system_data["heterogeneous_cpus"] = false
+            end
+            
+            # Calculate average CPU speed if speeds vary
+            cpu_speeds = [cpu.speed for cpu in cpu_info]
+            if length(unique(cpu_speeds)) > 1
+                system_data["cpu_speed_avg_mhz"] = round(mean(cpu_speeds), digits=0)
+                system_data["cpu_speed_min_mhz"] = minimum(cpu_speeds)
+                system_data["cpu_speed_max_mhz"] = maximum(cpu_speeds)
+            end
+        else
+            system_data["cpu_model"] = "unknown"
+            system_data["cpu_speed_mhz"] = 0
+        end
+    catch
+        system_data["cpu_model"] = "unknown"
+        system_data["cpu_speed_mhz"] = 0
+    end
+    
+    # Legacy CPU name for backward compatibility
     try
         system_data["cpu_name"] = string(Sys.CPU_NAME)
     catch
-        system_data["cpu_name"] = "unknown"
+        # Fallback to cpu_model if available
+        system_data["cpu_name"] = get(system_data, "cpu_model", "unknown")
     end
     
     try

@@ -254,7 +254,10 @@ export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
 export SimpleGMRES
 
 export HYPREAlgorithm
-export CudaOffloadFactorization, AMDGPUOffloadLUFactorization, AMDGPUOffloadQRFactorization
+export CudaOffloadFactorization
+export CudaOffloadLUFactorization
+export CudaOffloadQRFactorization
+export AMDGPUOffloadLUFactorization, AMDGPUOffloadQRFactorization
 export MKLPardisoFactorize, MKLPardisoIterate
 export PanuaPardisoFactorize, PanuaPardisoIterate
 export PardisoJL

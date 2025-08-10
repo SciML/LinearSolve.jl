@@ -61,8 +61,54 @@ struct HYPREAlgorithm <: SciMLLinearSolveAlgorithm
     end
 end
 
+# Debug: About to define CudaOffloadLUFactorization
+"""
+`CudaOffloadLUFactorization()`
+
+An offloading technique used to GPU-accelerate CPU-based computations using LU factorization.
+Requires a sufficiently large `A` to overcome the data transfer costs.
+
+!!! note
+
+    Using this solver requires adding the package CUDA.jl, i.e. `using CUDA`
+"""
+struct CudaOffloadLUFactorization <: AbstractFactorization
+    function CudaOffloadLUFactorization()
+        ext = Base.get_extension(@__MODULE__, :LinearSolveCUDAExt)
+        if ext === nothing
+            error("CudaOffloadLUFactorization requires that CUDA is loaded, i.e. `using CUDA`")
+        else
+            return new()
+        end
+    end
+end
+
+"""
+`CudaOffloadQRFactorization()`
+
+An offloading technique used to GPU-accelerate CPU-based computations using QR factorization.
+Requires a sufficiently large `A` to overcome the data transfer costs.
+
+!!! note
+
+    Using this solver requires adding the package CUDA.jl, i.e. `using CUDA`
+"""
+struct CudaOffloadQRFactorization <: AbstractFactorization
+    function CudaOffloadQRFactorization()
+        ext = Base.get_extension(@__MODULE__, :LinearSolveCUDAExt)
+        if ext === nothing
+            error("CudaOffloadQRFactorization requires that CUDA is loaded, i.e. `using CUDA`")
+        else
+            return new()
+        end
+    end
+end
+
 """
 `CudaOffloadFactorization()`
+
+!!! warning
+    This algorithm is deprecated. Use `CudaOffloadLUFactorization` or `CudaOffloadQRFactorization()` instead.
 
 An offloading technique used to GPU-accelerate CPU-based computations.
 Requires a sufficiently large `A` to overcome the data transfer costs.
@@ -71,13 +117,14 @@ Requires a sufficiently large `A` to overcome the data transfer costs.
 
     Using this solver requires adding the package CUDA.jl, i.e. `using CUDA`
 """
-struct CudaOffloadFactorization <: LinearSolve.AbstractFactorization
+struct CudaOffloadFactorization <: AbstractFactorization
     function CudaOffloadFactorization()
+        Base.depwarn("`CudaOffloadFactorization` is deprecated, use `CudaOffloadLUFactorization` or `CudaOffloadQRFactorization` instead.", :CudaOffloadFactorization)
         ext = Base.get_extension(@__MODULE__, :LinearSolveCUDAExt)
         if ext === nothing
             error("CudaOffloadFactorization requires that CUDA is loaded, i.e. `using CUDA`")
         else
-            return new{}()
+            return new()
         end
     end
 end

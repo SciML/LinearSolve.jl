@@ -11,6 +11,8 @@ for alg in vcat(InteractiveUtils.subtypes(AbstractDenseFactorization),
     if !(alg in [
            DiagonalFactorization,
            CudaOffloadFactorization,
+           CudaOffloadLUFactorization,
+           CudaOffloadQRFactorization,
            CUSOLVERRFFactorization,
            AppleAccelerateLUFactorization,
            MetalLUFactorization

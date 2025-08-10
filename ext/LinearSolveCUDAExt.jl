@@ -5,7 +5,7 @@ using LinearSolve: LinearSolve, is_cusparse, defaultalg, cudss_loaded, DefaultLi
                    DefaultAlgorithmChoice, ALREADY_WARNED_CUDSS, LinearCache,
                    needs_concrete_A,
                    error_no_cudss_lu, init_cacheval, OperatorAssumptions,
-                   CudaOffloadFactorization,
+                   CudaOffloadFactorization, CudaOffloadLUFactorization, CudaOffloadQRFactorization,
                    SparspakFactorization, KLUFactorization, UMFPACKFactorization
 using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase, LinearSolve.ArrayInterface
 using SciMLBase: AbstractSciMLOperator
@@ -35,6 +35,48 @@ function LinearSolve.error_no_cudss_lu(A::CUDA.CUSPARSE.CuSparseMatrixCSR)
     nothing
 end
 
+function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadLUFactorization;
+        kwargs...)
+    if cache.isfresh
+        fact = lu(CUDA.CuArray(cache.A))
+        cache.cacheval = fact
+        cache.isfresh = false
+    end
+    y = Array(ldiv!(CUDA.CuArray(cache.u), cache.cacheval, CUDA.CuArray(cache.b)))
+    cache.u .= y
+    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+end
+
+function LinearSolve.init_cacheval(alg::CudaOffloadLUFactorization, A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+    T = eltype(A)
+    noUnitT = typeof(zero(T))
+    luT = LinearAlgebra.lutype(noUnitT)
+    ipiv = CuVector{Int32}(undef, 0)
+    info = zero(LinearAlgebra.BlasInt)
+    return LU{luT}(CuMatrix{Float64}(undef, 0, 0), ipiv, info)
+end
+
+function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadQRFactorization;
+        kwargs...)
+    if cache.isfresh
+        fact = qr(CUDA.CuArray(cache.A))
+        cache.cacheval = fact
+        cache.isfresh = false
+    end
+    y = Array(ldiv!(CUDA.CuArray(cache.u), cache.cacheval, CUDA.CuArray(cache.b)))
+    cache.u .= y
+    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+end
+
+function LinearSolve.init_cacheval(alg::CudaOffloadQRFactorization, A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+    qr(CUDA.CuArray(A))
+end
+
+# Keep the deprecated CudaOffloadFactorization working by forwarding to QR
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadFactorization;
         kwargs...)
     if cache.isfresh

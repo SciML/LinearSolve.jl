@@ -84,10 +84,10 @@ function get_gpu_algorithms(; skip_missing_algs::Bool = false)
     # CUDA algorithms
     if is_cuda_available()
         try
-            push!(gpu_algs, CudaOffloadFactorization())
-            push!(gpu_names, "CudaOffloadFactorization")
+            push!(gpu_algs, CudaOffloadLUFactorization())
+            push!(gpu_names, "CudaOffloadLUFactorization")
         catch e
-            msg = "CUDA hardware detected but CudaOffloadFactorization not available: $e. Load CUDA.jl package."
+            msg = "CUDA hardware detected but CudaOffloadLUFactorization not available: $e. Load CUDA.jl package."
             if skip_missing_algs
                 @warn msg
             else

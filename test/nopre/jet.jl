@@ -29,12 +29,12 @@ prob_sparse_spd = LinearProblem(A_sparse_spd, b)
     JET.@test_opt solve(prob, GenericLUFactorization())
     JET.@test_opt solve(prob, DiagonalFactorization())
     JET.@test_opt solve(prob, SimpleLUFactorization())
-    JET.@test_opt solve(prob_spd, NormalCholeskyFactorization()) broken=true
+    JET.@test_opt solve(prob_spd, NormalCholeskyFactorization())
     JET.@test_opt solve(prob, NormalBunchKaufmanFactorization())
     
     # CholeskyFactorization and SVDFactorization now pass JET tests
-    JET.@test_opt solve(prob_spd, CholeskyFactorization()) broken=true
-    JET.@test_opt solve(prob, SVDFactorization()) broken=true
+    JET.@test_opt solve(prob_spd, CholeskyFactorization())
+    JET.@test_opt solve(prob, SVDFactorization())
     
     # Tests with known type stability issues - marked as broken
     JET.@test_opt solve(prob, QRFactorization()) broken=true

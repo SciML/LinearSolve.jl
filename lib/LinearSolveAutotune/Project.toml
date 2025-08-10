@@ -1,7 +1,7 @@
 name = "LinearSolveAutotune"
 uuid = "67398393-80e8-4254-b7e4-1b9a36a3c5b6"
 authors = ["SciML"]
-version = "1.3.1"
+version = "1.3.2"
 
 [deps]
 Base64 = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
@@ -44,7 +44,7 @@ MKL_jll = "2025.2.0"
 Metal = "1"
 Pkg = "1"
 Plots = "1"
-Preferences = "1"
+Preferences = "1.5"
 PrettyTables = "2"
 Printf = "1"
 ProgressMeter = "1"

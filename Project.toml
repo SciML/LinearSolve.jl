@@ -28,9 +28,9 @@ StaticArraysCore = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 
 [weakdeps]
+AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
 BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
 BlockDiagonals = "0a1fb500-61f7-11e9-3c65-f5ef3456f9f0"
-blis_jll = "6136c539-28a5-5bf0-87cc-b183200dce32"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 CUDSS = "45b445bb-4962-46a0-9369-b4df9d0f772e"
 CUSOLVERRF = "a8cc9031-bad2-4722-94f5-40deabb4245c"
@@ -48,8 +48,10 @@ Pardiso = "46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2"
 RecursiveFactorization = "f2c3362d-daeb-58d1-803e-2bc74f2840b4"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Sparspak = "e56a9233-b9d6-4f03-8d0f-1825330902ac"
+blis_jll = "6136c539-28a5-5bf0-87cc-b183200dce32"
 
 [extensions]
+LinearSolveAMDGPUExt = "AMDGPU"
 LinearSolveBLISExt = ["blis_jll", "LAPACK_jll"]
 LinearSolveBandedMatricesExt = "BandedMatrices"
 LinearSolveBlockDiagonalsExt = "BlockDiagonals"
@@ -71,12 +73,12 @@ LinearSolveSparseArraysExt = "SparseArrays"
 LinearSolveSparspakExt = ["SparseArrays", "Sparspak"]
 
 [compat]
+AMDGPU = "1"
 AllocCheck = "0.2"
 Aqua = "0.8"
 ArrayInterface = "7.7"
 BandedMatrices = "1.5"
 BlockDiagonals = "0.2"
-blis_jll = "0.9.0"
 CUDA = "5"
 CUDSS = "0.4"
 CUSOLVERRF = "0.2.6"
@@ -126,6 +128,7 @@ StaticArraysCore = "1.4.2"
 Test = "1"
 UnPack = "1"
 Zygote = "0.7"
+blis_jll = "0.9.0"
 julia = "1.10"
 
 [extras]

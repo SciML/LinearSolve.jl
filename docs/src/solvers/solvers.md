@@ -23,12 +23,14 @@ use your base system BLAS which can be fast or slow depending on the hardware co
 
 For very large dense factorizations, offloading to the GPU can be preferred. Metal.jl can be used
 on Mac hardware to offload, and has a cutoff point of being faster at around size 20,000 x 20,000
-matrices (and only supports Float32). `CudaOffloadFactorization` can be more efficient at a
-much smaller cutoff, possibly around size 1,000 x 1,000 matrices, though this is highly dependent
-on the chosen GPU hardware. `CudaOffloadFactorization` requires a CUDA-compatible NVIDIA GPU.
+matrices (and only supports Float32). `CudaOffloadLUFactorization` and `CudaOffloadQRFactorization` 
+can be more efficient at a much smaller cutoff, possibly around size 1,000 x 1,000 matrices, though 
+this is highly dependent on the chosen GPU hardware. These algorithms require a CUDA-compatible NVIDIA GPU.
 CUDA offload supports Float64 but most consumer GPU hardware will be much faster on Float32
 (many are >32x faster for Float32 operations than Float64 operations) and thus for most hardware
-this is only recommended for Float32 matrices.
+this is only recommended for Float32 matrices. Choose `CudaOffloadLUFactorization` for better 
+performance on well-conditioned problems, or `CudaOffloadQRFactorization` for better numerical 
+stability on ill-conditioned problems.
 
 !!! note
     
@@ -232,9 +234,11 @@ The following are non-standard GPU factorization routines.
 
 !!! note
     
-    Using this solver requires adding the package CUDA.jl, i.e. `using CUDA`
+    Using these solvers requires adding the package CUDA.jl, i.e. `using CUDA`
 
 ```@docs
+CudaOffloadLUFactorization
+CudaOffloadQRFactorization
 CudaOffloadFactorization
 ```
 

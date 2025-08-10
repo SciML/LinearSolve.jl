@@ -40,9 +40,16 @@ This computation can be moved to the GPU by the following:
 
 ```julia
 using CUDA # Add the GPU library
-sol = LS.solve(prob, LS.CudaOffloadFactorization())
+sol = LS.solve(prob, LS.CudaOffloadLUFactorization())
 sol.u
 ```
+
+LinearSolve.jl provides two GPU offloading algorithms:
+- `CudaOffloadLUFactorization()` - Uses LU factorization (generally faster for well-conditioned problems)
+- `CudaOffloadQRFactorization()` - Uses QR factorization (more stable for ill-conditioned problems)
+
+!!! warning
+    The old `CudaOffloadFactorization()` is deprecated. Use `CudaOffloadLUFactorization()` or `CudaOffloadQRFactorization()` instead.
 
 ## GPUArray Interface
 

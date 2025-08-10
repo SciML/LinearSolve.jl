@@ -83,20 +83,41 @@ struct CudaOffloadFactorization <: LinearSolve.AbstractFactorization
 end
 
 """
-`AMDGPUOffloadFactorization()`
+`AMDGPUOffloadLUFactorization()`
 
-An offloading technique used to GPU-accelerate CPU-based computations on AMD GPUs.
+An offloading technique using LU factorization to GPU-accelerate CPU-based computations on AMD GPUs.
 Requires a sufficiently large `A` to overcome the data transfer costs.
 
 !!! note
 
     Using this solver requires adding the package AMDGPU.jl, i.e. `using AMDGPU`
 """
-struct AMDGPUOffloadFactorization <: LinearSolve.AbstractFactorization
-    function AMDGPUOffloadFactorization()
+struct AMDGPUOffloadLUFactorization <: LinearSolve.AbstractFactorization
+    function AMDGPUOffloadLUFactorization()
         ext = Base.get_extension(@__MODULE__, :LinearSolveAMDGPUExt)
         if ext === nothing
-            error("AMDGPUOffloadFactorization requires that AMDGPU is loaded, i.e. `using AMDGPU`")
+            error("AMDGPUOffloadLUFactorization requires that AMDGPU is loaded, i.e. `using AMDGPU`")
+        else
+            return new{}()
+        end
+    end
+end
+
+"""
+`AMDGPUOffloadQRFactorization()`
+
+An offloading technique using QR factorization to GPU-accelerate CPU-based computations on AMD GPUs.
+Requires a sufficiently large `A` to overcome the data transfer costs.
+
+!!! note
+
+    Using this solver requires adding the package AMDGPU.jl, i.e. `using AMDGPU`
+"""
+struct AMDGPUOffloadQRFactorization <: LinearSolve.AbstractFactorization
+    function AMDGPUOffloadQRFactorization()
+        ext = Base.get_extension(@__MODULE__, :LinearSolveAMDGPUExt)
+        if ext === nothing
+            error("AMDGPUOffloadQRFactorization requires that AMDGPU is loaded, i.e. `using AMDGPU`")
         else
             return new{}()
         end

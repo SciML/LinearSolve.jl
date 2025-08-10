@@ -84,11 +84,10 @@ LinearSolve.jl specifically tests with the following cases:
 
 !!! note
     
-
-Choosing the most specific matrix structure that matches your specific system will give you the most performance.
-Thus if your matrix is symmetric, specifically building with `Symmetric(A)` will be faster than simply using `A`,
-and will generally lead to better automatic linear solver choices. Note that you can also choose the type for `b`,
-but generally a dense vector will be the fastest here and many solvers will not support a sparse `b`.
+    Choosing the most specific matrix structure that matches your specific system will give you the most performance.
+    Thus if your matrix is symmetric, specifically building with `Symmetric(A)` will be faster than simply using `A`,
+    and will generally lead to better automatic linear solver choices. Note that you can also choose the type for `b`,
+    but generally a dense vector will be the fastest here and many solvers will not support a sparse `b`.
 
 ## Using Matrix-Free Operators via SciMLOperators.jl
 
@@ -160,7 +159,6 @@ mfopA * sol.u - b
 
 !!! note
     
-
-Note that not all methods can use a matrix-free operator. For example, `LS.LUFactorization()` requires a matrix. If you use an
-invalid method, you will get an error. The methods particularly from KrylovJL are the ones preferred for these cases
-(and are defaulted to).
+    Note that not all methods can use a matrix-free operator. For example, `LS.LUFactorization()` requires a matrix. If you use an
+    invalid method, you will get an error. The methods particularly from KrylovJL are the ones preferred for these cases
+    (and are defaulted to).

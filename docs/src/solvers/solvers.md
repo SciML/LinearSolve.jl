@@ -241,6 +241,19 @@ CudaOffloadLUFactorization
 CudaOffloadQRFactorization
 ```
 
+### AMDGPU.jl
+
+The following are GPU factorization routines for AMD GPUs using the ROCm stack.
+
+!!! note
+    
+    Using these solvers requires adding the package AMDGPU.jl, i.e. `using AMDGPU`
+
+```@docs
+AMDGPUOffloadLUFactorization
+AMDGPUOffloadQRFactorization
+```
+
 ### CUSOLVERRF.jl
 
 !!! note

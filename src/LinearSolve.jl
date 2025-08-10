@@ -257,6 +257,7 @@ export HYPREAlgorithm
 export CudaOffloadFactorization
 export CudaOffloadLUFactorization
 export CudaOffloadQRFactorization
+export AMDGPUOffloadLUFactorization, AMDGPUOffloadQRFactorization
 export MKLPardisoFactorize, MKLPardisoIterate
 export PanuaPardisoFactorize, PanuaPardisoIterate
 export PardisoJL

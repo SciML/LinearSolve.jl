@@ -236,6 +236,23 @@ function format_system_info_markdown(system_info::Dict)
     # Handle both "has_metal" and "metal_available" keys
     push!(lines, "- **Metal Available**: $(get(system_info, "metal_available", get(system_info, "has_metal", false)))")
     
+    # GPU Information
+    if haskey(system_info, "gpu_type")
+        push!(lines, "- **GPU Type**: $(system_info["gpu_type"])")
+        if haskey(system_info, "gpu_count")
+            push!(lines, "- **GPU Count**: $(system_info["gpu_count"])")
+        end
+        if haskey(system_info, "gpu_memory_gb")
+            push!(lines, "- **GPU Memory**: $(system_info["gpu_memory_gb"]) GB")
+        end
+        if haskey(system_info, "gpu_capability")
+            push!(lines, "- **CUDA Capability**: $(system_info["gpu_capability"])")
+        end
+        if haskey(system_info, "gpu_types")
+            push!(lines, "- **All GPU Types**: $(join(system_info["gpu_types"], ", "))")
+        end
+    end
+    
     # Add package versions section
     if haskey(system_info, "package_versions")
         push!(lines, "")

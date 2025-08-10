@@ -71,6 +71,126 @@ function is_metal_available()
 end
 
 """
+    get_cuda_gpu_info()
+
+Get information about CUDA GPU devices if available.
+Returns a Dict with GPU type, count, memory, and compute capability.
+"""
+function get_cuda_gpu_info()
+    gpu_info = Dict{String, Any}()
+    
+    # Check if CUDA extension is loaded
+    ext = Base.get_extension(LinearSolve, :LinearSolveCUDAExt)
+    if ext === nothing
+        return gpu_info
+    end
+    
+    try
+        # Get CUDA module from the extension
+        CUDA = ext.CUDA
+        
+        # Check if CUDA is functional
+        if !CUDA.functional()
+            return gpu_info
+        end
+        
+        # Get device information
+        devices = collect(CUDA.devices())
+        num_devices = length(devices)
+        
+        if num_devices > 0
+            gpu_info["gpu_count"] = num_devices
+            
+            # Get information from the first GPU
+            first_device = devices[1]
+            gpu_info["gpu_type"] = CUDA.name(first_device)
+            
+            # Convert memory from bytes to GB
+            total_mem_bytes = CUDA.totalmem(first_device)
+            gpu_info["gpu_memory_gb"] = round(total_mem_bytes / (1024^3), digits=2)
+            
+            # Get compute capability
+            capability = CUDA.capability(first_device)
+            gpu_info["gpu_capability"] = "$(capability.major).$(capability.minor)"
+            
+            # If multiple GPUs, list all types
+            if num_devices > 1
+                gpu_types = String[]
+                for dev in devices
+                    push!(gpu_types, CUDA.name(dev))
+                end
+                gpu_info["gpu_types"] = unique(gpu_types)
+            end
+        end
+    catch e
+        # If there's any error, return empty info
+        @debug "Error getting CUDA GPU info: $e"
+    end
+    
+    return gpu_info
+end
+
+"""
+    get_metal_gpu_info()
+
+Get information about Metal GPU devices if available.
+Returns a Dict with GPU type and count.
+"""
+function get_metal_gpu_info()
+    gpu_info = Dict{String, Any}()
+    
+    # Check if Metal extension is loaded
+    ext = Base.get_extension(LinearSolve, :LinearSolveMetalExt)
+    if ext === nothing
+        return gpu_info
+    end
+    
+    try
+        # Get Metal module from the extension
+        Metal = ext.Metal
+        
+        # Check if Metal is functional
+        if !Metal.functional()
+            return gpu_info
+        end
+        
+        # Get device information
+        # Metal typically has one device on Apple Silicon
+        gpu_info["gpu_count"] = 1
+        
+        # Determine GPU type based on system architecture
+        if Sys.ARCH == :aarch64
+            # Try to get more specific model information
+            cpu_model = ""
+            cpu_info = Sys.cpu_info()
+            if !isempty(cpu_info)
+                cpu_model = cpu_info[1].model
+            end
+            
+            # Infer GPU type from CPU model for Apple Silicon
+            if contains(lowercase(cpu_model), "m1")
+                gpu_info["gpu_type"] = "Apple M1 GPU"
+            elseif contains(lowercase(cpu_model), "m2")
+                gpu_info["gpu_type"] = "Apple M2 GPU"
+            elseif contains(lowercase(cpu_model), "m3")
+                gpu_info["gpu_type"] = "Apple M3 GPU"
+            elseif contains(lowercase(cpu_model), "m4")
+                gpu_info["gpu_type"] = "Apple M4 GPU"
+            else
+                gpu_info["gpu_type"] = "Apple Silicon GPU"
+            end
+        else
+            gpu_info["gpu_type"] = "Metal GPU"
+        end
+    catch e
+        # If there's any error, return empty info
+        @debug "Error getting Metal GPU info: $e"
+    end
+    
+    return gpu_info
+end
+
+"""
     get_system_info()
 
 Get system information for telemetry reporting.
@@ -126,6 +246,26 @@ function get_system_info()
     info["blas_vendor"] = string(LinearAlgebra.BLAS.vendor())
     info["has_cuda"] = is_cuda_available()
     info["has_metal"] = is_metal_available()
+    
+    # Get GPU information if CUDA is available
+    if info["has_cuda"]
+        gpu_info = get_cuda_gpu_info()
+        if !isempty(gpu_info)
+            info["gpu_type"] = gpu_info["gpu_type"]
+            info["gpu_count"] = gpu_info["gpu_count"]
+            info["gpu_memory_gb"] = gpu_info["gpu_memory_gb"]
+            info["gpu_capability"] = gpu_info["gpu_capability"]
+        end
+    end
+    
+    # Get GPU information if Metal is available
+    if info["has_metal"]
+        metal_info = get_metal_gpu_info()
+        if !isempty(metal_info)
+            info["gpu_type"] = metal_info["gpu_type"]
+            info["gpu_count"] = metal_info["gpu_count"]
+        end
+    end
 
     if MKL_jll.is_available()
         info["mkl_available"] = true
@@ -460,6 +600,26 @@ function get_detailed_system_info()
         system_data["metal_available"] = is_metal_available()
     catch
         system_data["metal_available"] = false
+    end
+    
+    # Get detailed GPU information if available
+    if system_data["cuda_available"]
+        gpu_info = get_cuda_gpu_info()
+        if !isempty(gpu_info)
+            system_data["gpu_type"] = gpu_info["gpu_type"]
+            system_data["gpu_count"] = gpu_info["gpu_count"]
+            system_data["gpu_memory_gb"] = gpu_info["gpu_memory_gb"]
+            system_data["gpu_capability"] = gpu_info["gpu_capability"]
+            if haskey(gpu_info, "gpu_types")
+                system_data["gpu_types"] = join(gpu_info["gpu_types"], ", ")
+            end
+        end
+    elseif system_data["metal_available"]
+        metal_info = get_metal_gpu_info()
+        if !isempty(metal_info)
+            system_data["gpu_type"] = metal_info["gpu_type"]
+            system_data["gpu_count"] = metal_info["gpu_count"]
+        end
     end
     
     # Try to detect if CUDA/Metal packages are actually loaded

@@ -66,7 +66,13 @@ function Base.show(io::IO, results::AutotuneResults)
     
     # System info summary
     println(io, "\n📊 System Information:")
-    println(io, "  • CPU: ", get(results.sysinfo, "cpu_name", "Unknown"))
+    # Use cpu_model if available, otherwise fall back to cpu_name
+    cpu_display = get(results.sysinfo, "cpu_model", get(results.sysinfo, "cpu_name", "Unknown"))
+    println(io, "  • CPU: ", cpu_display)
+    cpu_speed = get(results.sysinfo, "cpu_speed_mhz", 0)
+    if cpu_speed > 0
+        println(io, "  • Speed: ", cpu_speed, " MHz")
+    end
     println(io, "  • OS: ", get(results.sysinfo, "os_name", "Unknown"), " (", get(results.sysinfo, "os", "Unknown"), ")")
     println(io, "  • Julia: ", get(results.sysinfo, "julia_version", "Unknown"))
     println(io, "  • Threads: ", get(results.sysinfo, "num_threads", "Unknown"), " (BLAS: ", get(results.sysinfo, "blas_num_threads", "Unknown"), ")")

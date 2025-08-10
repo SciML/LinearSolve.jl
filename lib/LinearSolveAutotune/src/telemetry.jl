@@ -206,7 +206,24 @@ function format_system_info_markdown(system_info::Dict)
     push!(lines, "- **OS**: $os_display ($os_kernel)")
     # Handle both "arch" and "architecture" keys
     push!(lines, "- **Architecture**: $(get(system_info, "architecture", get(system_info, "arch", "unknown")))")
-    push!(lines, "- **CPU**: $(get(system_info, "cpu_name", "unknown"))")
+    
+    # Enhanced CPU information
+    cpu_model = get(system_info, "cpu_model", nothing)
+    if cpu_model !== nothing && cpu_model != "unknown"
+        push!(lines, "- **CPU Model**: $cpu_model")
+        cpu_speed = get(system_info, "cpu_speed_mhz", 0)
+        if cpu_speed > 0
+            push!(lines, "- **CPU Speed**: $(cpu_speed) MHz")
+        end
+        # Show if heterogeneous CPUs detected
+        if get(system_info, "heterogeneous_cpus", false)
+            push!(lines, "- **CPU Models**: $(get(system_info, "cpu_models", ""))")
+        end
+    else
+        # Fallback to legacy CPU name
+        push!(lines, "- **CPU**: $(get(system_info, "cpu_name", "unknown"))")
+    end
+    
     # Handle both "num_cores" and "cpu_cores" keys
     push!(lines, "- **Cores**: $(get(system_info, "cpu_cores", get(system_info, "num_cores", "unknown")))")
     # Handle both "num_threads" and "julia_threads" keys
@@ -416,20 +433,20 @@ function upload_to_github(content::String, plot_files, auth_info::Tuple,
         target_repo = "SciML/LinearSolve.jl"
         issue_number = 669  # The existing issue for collecting autotune results
         
-        # Construct comment body
-        cpu_name = get(system_info, "cpu_name", "unknown")
+        # Construct comment body - use cpu_model if available for more specific info
+        cpu_display = get(system_info, "cpu_model", get(system_info, "cpu_name", "unknown"))
         os_name = get(system_info, "os", "unknown")
         timestamp = Dates.format(Dates.now(), "yyyy-mm-dd HH:MM")
         
         comment_body = """
-        ## Benchmark Results: $cpu_name on $os_name ($timestamp)
+        ## Benchmark Results: $cpu_display on $os_name ($timestamp)
         
         $content
 
         ---
 
         ### System Summary
-        - **CPU:** $cpu_name
+        - **CPU:** $cpu_display
         - **OS:** $os_name  
         - **Timestamp:** $timestamp
 

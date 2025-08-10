@@ -348,7 +348,7 @@ function get_detailed_system_info()
     
     # LinearSolve-specific package availability
     try
-        system_data["mkl_available"] = LinearSolve.usemkl
+        system_data["mkl_available"] = MKL_jll.is_available()
     catch
         system_data["mkl_available"] = false
     end

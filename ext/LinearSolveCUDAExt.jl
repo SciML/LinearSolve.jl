@@ -53,7 +53,7 @@ function LinearSolve.init_cacheval(alg::CudaOffloadLUFactorization, A, b, u, Pl,
     T = eltype(A)
     noUnitT = typeof(zero(T))
     luT = LinearAlgebra.lutype(noUnitT)
-    ipiv = Vector{Int32}(undef, 0)
+    ipiv = CuVector{Int32}(undef, 0)
     info = zero(LinearAlgebra.BlasInt)
     return LU{luT}(CuMatrix{Float64}(undef, 0, 0), ipiv, info)
 end

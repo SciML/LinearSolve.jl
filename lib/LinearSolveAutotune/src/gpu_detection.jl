@@ -105,7 +105,7 @@ function get_system_info()
     info["has_cuda"] = is_cuda_available()
     info["has_metal"] = is_metal_available()
 
-    if LinearSolve.usemkl
+    if MKL_jll.is_available()
         info["mkl_available"] = true
     else
         info["mkl_available"] = false

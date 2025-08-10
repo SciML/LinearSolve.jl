@@ -128,6 +128,8 @@ function set_algorithm_preferences(categories::Dict{String, String})
     
     # Set MKL preference based on whether it was best for any category
     # If MKL wasn't best anywhere, disable it to avoid loading unnecessary dependencies
+    # Note: During benchmarking, MKL is temporarily enabled to test MKL algorithms
+    # This final preference setting determines whether MKL loads in normal usage
     Preferences.set_preferences!(LinearSolve, "LoadMKL_JLL" => mkl_is_best_somewhere; force = true)
     
     if mkl_is_best_somewhere

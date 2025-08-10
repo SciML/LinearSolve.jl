@@ -239,7 +239,6 @@ The following are non-standard GPU factorization routines.
 ```@docs
 CudaOffloadLUFactorization
 CudaOffloadQRFactorization
-CudaOffloadFactorization
 ```
 
 ### CUSOLVERRF.jl

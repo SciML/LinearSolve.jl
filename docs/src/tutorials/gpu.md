@@ -39,8 +39,18 @@ sol.u
 This computation can be moved to the GPU by the following:
 
 ```julia
-using CUDA # Add the GPU library
-sol = LS.solve(prob, LS.CudaOffloadFactorization())
+using CUDA # Add the GPU library for NVIDIA GPUs
+sol = LS.solve(prob, LS.CudaOffloadLUFactorization())
+sol.u
+```
+
+For AMD GPUs, you can use the AMDGPU.jl package:
+
+```julia
+using AMDGPU # Add the GPU library for AMD GPUs
+sol = LS.solve(prob, LS.AMDGPUOffloadLUFactorization())  # LU factorization
+# or
+sol = LS.solve(prob, LS.AMDGPUOffloadQRFactorization())  # QR factorization
 sol.u
 ```
 

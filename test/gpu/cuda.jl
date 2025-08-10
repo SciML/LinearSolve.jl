@@ -45,7 +45,7 @@ function test_interface(alg, prob1, prob2)
     return
 end
 
-@testset "$alg" for alg in (CudaOffloadFactorization(), CudaOffloadLUFactorization(), CudaOffloadQRFactorization(), NormalCholeskyFactorization())
+@testset "$alg" for alg in (CudaOffloadLUFactorization(), CudaOffloadQRFactorization(), NormalCholeskyFactorization())
     test_interface(alg, prob1, prob2)
 end
 

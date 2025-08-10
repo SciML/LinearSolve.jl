@@ -1,10 +1,13 @@
 module LinearSolveAutotune
 
+# Note: MKL preference should be set before loading LinearSolve for optimal performance
+# The autotune system will write the appropriate preference based on benchmark results
+using Preferences
+using MKL_jll
 using LinearSolve
 using BenchmarkTools
 using DataFrames
 using PrettyTables
-using Preferences
 using Statistics
 using Random
 using LinearAlgebra
@@ -18,7 +21,6 @@ using CPUSummary
 using RecursiveFactorization  
 using blis_jll
 using LAPACK_jll
-using MKL_jll
 using CUDA
 using Metal
 

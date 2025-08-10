@@ -119,7 +119,7 @@ Requires a sufficiently large `A` to overcome the data transfer costs.
 """
 struct CudaOffloadFactorization <: AbstractFactorization
     function CudaOffloadFactorization()
-        Base.depwarn("`CudaOffloadFactorization` is deprecated, use `CudaOffloadQRFactorization` instead.", :CudaOffloadFactorization)
+        Base.depwarn("`CudaOffloadFactorization` is deprecated, use `CudaOffloadLUFactorization` or `CudaOffloadQRFactorization` instead.", :CudaOffloadFactorization)
         ext = Base.get_extension(@__MODULE__, :LinearSolveCUDAExt)
         if ext === nothing
             error("CudaOffloadFactorization requires that CUDA is loaded, i.e. `using CUDA`")

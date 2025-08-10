@@ -67,14 +67,11 @@ function setup_github_authentication(; auto_login::Bool = true)
             try
                 # Run gh auth login interactively (using system gh or JLL)
                 run(`$gh_cmd auth login`)
-                
-                # Check if authentication succeeded
-                if success(pipeline(`$gh_cmd auth status`; stdout=devnull, stderr=devnull))
-                    auth_status_output = read(`$gh_cmd auth status`, String)
-                    if contains(auth_status_output, "Logged in to github.com")
-                        println("\n✅ Authentication successful! You can now share results.")
-                        return (:gh_cli, "GitHub CLI")
-                    end
+                sleep(1)
+                auth_status_output = read(`$gh_cmd auth status`, String)
+                if contains(auth_status_output, "Logged in to github.com")
+                    println("\n✅ Authentication successful! You can now share results.")
+                    return (:gh_cli, "GitHub CLI")
                 end
             catch e
                 println("\n❌ Authentication failed: $e")

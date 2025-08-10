@@ -50,7 +50,12 @@ end
 function LinearSolve.init_cacheval(alg::CudaOffloadLUFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
-    ArrayInterface.lu_instance(A)
+    T = eltype(A)
+    noUnitT = typeof(zero(T))
+    luT = LinearAlgebra.lutype(noUnitT)
+    ipiv = Vector{Int32}(undef, 0)
+    info = zero(LinearAlgebra.BlasInt)
+    return LU{luT}(CuMatrix{Float64}(undef, 0, 0), ipiv, info)
 end
 
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadQRFactorization;

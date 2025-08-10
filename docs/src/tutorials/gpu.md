@@ -40,7 +40,7 @@ This computation can be moved to the GPU by the following:
 
 ```julia
 using CUDA # Add the GPU library for NVIDIA GPUs
-sol = LS.solve(prob, LS.CudaOffloadFactorization())
+sol = LS.solve(prob, LS.CudaOffloadLUFactorization())
 sol.u
 ```
 

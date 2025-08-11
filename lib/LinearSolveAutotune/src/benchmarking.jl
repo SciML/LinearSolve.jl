@@ -73,14 +73,19 @@ end
 
 """
     benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes; 
-                        samples=5, seconds=0.5, sizes=[:small, :medium])
+                        samples=5, seconds=0.5, sizes=[:small, :medium],
+                        maxtime=100.0)
 
 Benchmark the given algorithms across different matrix sizes and element types.
 Returns a DataFrame with results including element type information.
+
+# Arguments
+- `maxtime::Float64 = 100.0`: Maximum time in seconds for each algorithm test (including accuracy check). 
+  If the accuracy check exceeds this time, the run is skipped and recorded as NaN.
 """
 function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
         samples = 5, seconds = 0.5, sizes = [:tiny, :small, :medium, :large],
-        check_correctness = true, correctness_tol = 1e0)
+        check_correctness = true, correctness_tol = 1e0, maxtime = 100.0)
 
     # Set benchmark parameters
     old_params = BenchmarkTools.DEFAULT_PARAMETERS
@@ -136,10 +141,11 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
                     ProgressMeter.update!(progress, 
                         desc="Benchmarking $name on $(n)×$(n) $eltype matrix: ")
                     
-                    gflops = 0.0
+                    gflops = NaN  # Use NaN for timed out runs
                     success = true
                     error_msg = ""
                     passed_correctness = true
+                    timed_out = false
 
                     try
                         # Create the linear problem for this test
@@ -147,41 +153,78 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
                             u0 = copy(u0),
                             alias = LinearAliasSpecifier(alias_A = true, alias_b = true))
 
-                        # Warmup run and correctness check
-                        warmup_sol = solve(prob, alg)
+                        # Time the warmup run and correctness check
+                        start_time = time()
                         
-                        # Check correctness if reference solution is available
-                        if check_correctness && reference_solution !== nothing
-                            # Compute relative error
-                            rel_error = norm(warmup_sol.u - reference_solution.u) / norm(reference_solution.u)
-                            
-                            if rel_error > correctness_tol
-                                passed_correctness = false
-                                @warn "Algorithm $name failed correctness check for size $n, eltype $eltype. " *
-                                      "Relative error: $(round(rel_error, sigdigits=3)) > tolerance: $correctness_tol. " *
-                                      "Algorithm will be excluded from results."
-                                success = false
-                                error_msg = "Failed correctness check (rel_error = $(round(rel_error, sigdigits=3)))"
-                            end
+                        # Warmup run and correctness check with timeout
+                        warmup_task = @async begin
+                            solve(prob, alg)
                         end
                         
-                        # Only benchmark if correctness check passed
-                        if passed_correctness
-                            # Actual benchmark
-                            bench = @benchmark solve($prob, $alg) setup=(prob = LinearProblem(
-                                copy($A), copy($b);
-                                u0 = copy($u0),
-                                alias = LinearAliasSpecifier(alias_A = true, alias_b = true)))
+                        # Wait for warmup to complete or timeout
+                        warmup_sol = nothing
+                        timeout_wait = maxtime
+                        while !istaskdone(warmup_task) && (time() - start_time) < timeout_wait
+                            sleep(0.1)
+                        end
+                        
+                        if !istaskdone(warmup_task)
+                            # Task timed out
+                            timed_out = true
+                            @warn "Algorithm $name timed out (exceeded $(maxtime)s) for size $n, eltype $eltype. Recording as NaN."
+                            success = false
+                            error_msg = "Timed out (exceeded $(maxtime)s)"
+                            gflops = NaN
+                        else
+                            # Get the result
+                            warmup_sol = fetch(warmup_task)
+                            elapsed_time = time() - start_time
+                            
+                            # Check correctness if reference solution is available
+                            if check_correctness && reference_solution !== nothing
+                                # Compute relative error
+                                rel_error = norm(warmup_sol.u - reference_solution.u) / norm(reference_solution.u)
+                                
+                                if rel_error > correctness_tol
+                                    passed_correctness = false
+                                    @warn "Algorithm $name failed correctness check for size $n, eltype $eltype. " *
+                                          "Relative error: $(round(rel_error, sigdigits=3)) > tolerance: $correctness_tol. " *
+                                          "Algorithm will be excluded from results."
+                                    success = false
+                                    error_msg = "Failed correctness check (rel_error = $(round(rel_error, sigdigits=3)))"
+                                    gflops = 0.0
+                                end
+                            end
+                            
+                            # Only benchmark if correctness check passed and we have time remaining
+                            if passed_correctness && !timed_out
+                                # Check if we have enough time remaining for benchmarking
+                                # Allow at least 2x the warmup time for benchmarking
+                                remaining_time = maxtime - elapsed_time
+                                if remaining_time < 2 * elapsed_time
+                                    @warn "Algorithm $name: insufficient time remaining for benchmarking (warmup took $(round(elapsed_time, digits=2))s). Recording as NaN."
+                                    gflops = NaN
+                                    success = false
+                                    error_msg = "Insufficient time for benchmarking"
+                                else
+                                    # Actual benchmark
+                                    bench = @benchmark solve($prob, $alg) setup=(prob = LinearProblem(
+                                        copy($A), copy($b);
+                                        u0 = copy($u0),
+                                        alias = LinearAliasSpecifier(alias_A = true, alias_b = true)))
 
-                            # Calculate GFLOPs
-                            min_time_sec = minimum(bench.times) / 1e9
-                            flops = luflop(n, n)
-                            gflops = flops / min_time_sec / 1e9
+                                    # Calculate GFLOPs
+                                    min_time_sec = minimum(bench.times) / 1e9
+                                    flops = luflop(n, n)
+                                    gflops = flops / min_time_sec / 1e9
+                                end
+                            end
                         end
 
                     catch e
                         success = false
                         error_msg = string(e)
+                        gflops = 0.0
                         # Don't warn for each failure, just record it
                     end
 

@@ -132,6 +132,37 @@ results = autotune_setup(
 )
 ```
 
+### Time Limits for Algorithm Tests
+
+Control the maximum time allowed for each algorithm test (including accuracy check):
+
+```julia
+# Default: 100 seconds maximum per algorithm test
+results = autotune_setup()  # maxtime = 100.0
+
+# Quick timeout for fast exploration
+results = autotune_setup(maxtime = 10.0)
+
+# Extended timeout for slow algorithms or large matrices
+results = autotune_setup(
+    maxtime = 300.0,  # 5 minutes per test
+    sizes = [:large, :big]
+)
+
+# Conservative timeout for production benchmarking
+results = autotune_setup(
+    maxtime = 200.0,
+    samples = 10,
+    seconds = 2.0
+)
+```
+
+When an algorithm exceeds the `maxtime` limit:
+- The test is skipped to prevent hanging
+- The result is recorded as `NaN` in the benchmark data
+- A warning is displayed indicating the timeout
+- The benchmark continues with the next algorithm
+
 ### Missing Algorithm Handling
 
 By default, autotune expects all algorithms to be available to ensure complete benchmarking. You can relax this requirement:

@@ -158,7 +158,8 @@ end
         seconds::Float64 = 0.5,
         eltypes = (Float32, Float64, ComplexF32, ComplexF64),
         skip_missing_algs::Bool = false,
-        include_fastlapack::Bool = false)
+        include_fastlapack::Bool = false,
+        maxtime::Float64 = 100.0)
 
 Run a comprehensive benchmark of all available LU factorization methods and optionally:
 
@@ -182,6 +183,8 @@ Run a comprehensive benchmark of all available LU factorization methods and opti
   - `eltypes = (Float32, Float64, ComplexF32, ComplexF64)`: Element types to benchmark
   - `skip_missing_algs::Bool = false`: If false, error when expected algorithms are missing; if true, warn instead
   - `include_fastlapack::Bool = false`: If true, includes FastLUFactorization in benchmarks
+  - `maxtime::Float64 = 100.0`: Maximum time in seconds for each algorithm test (including accuracy check). 
+    If exceeded, the run is skipped and recorded as NaN
 
 # Returns
 
@@ -216,7 +219,8 @@ function autotune_setup(;
         seconds::Float64 = 0.5,
         eltypes = (Float64,),
         skip_missing_algs::Bool = false,
-        include_fastlapack::Bool = false)
+        include_fastlapack::Bool = false,
+        maxtime::Float64 = 100.0)
     @info "Starting LinearSolve.jl autotune setup..."
     @info "Configuration: sizes=$sizes, set_preferences=$set_preferences"
     @info "Element types to benchmark: $(join(eltypes, ", "))"
@@ -249,8 +253,9 @@ function autotune_setup(;
 
     # Run benchmarks
     @info "Running benchmarks (this may take several minutes)..."
+    @info "Maximum time per algorithm test: $(maxtime)s"
     results_df = benchmark_algorithms(matrix_sizes, all_algs, all_names, eltypes;
-        samples = samples, seconds = seconds, sizes = sizes)
+        samples = samples, seconds = seconds, sizes = sizes, maxtime = maxtime)
 
     # Display results table
     successful_results = filter(row -> row.success, results_df)

@@ -36,6 +36,7 @@ using blis_jll
 using LAPACK_jll
 using CUDA
 using Metal
+using FastLapackInterface
 
 
 # Optional dependencies for telemetry and plotting
@@ -156,7 +157,8 @@ end
         samples::Int = 5,
         seconds::Float64 = 0.5,
         eltypes = (Float32, Float64, ComplexF32, ComplexF64),
-        skip_missing_algs::Bool = false)
+        skip_missing_algs::Bool = false,
+        include_fastlapack::Bool = false)
 
 Run a comprehensive benchmark of all available LU factorization methods and optionally:
 
@@ -179,6 +181,7 @@ Run a comprehensive benchmark of all available LU factorization methods and opti
   - `seconds::Float64 = 0.5`: Maximum time per benchmark
   - `eltypes = (Float32, Float64, ComplexF32, ComplexF64)`: Element types to benchmark
   - `skip_missing_algs::Bool = false`: If false, error when expected algorithms are missing; if true, warn instead
+  - `include_fastlapack::Bool = false`: If true, includes FastLUFactorization in benchmarks
 
 # Returns
 
@@ -199,6 +202,9 @@ results = autotune_setup(sizes = [:small, :medium, :large, :big])
 # Large matrices only
 results = autotune_setup(sizes = [:large, :big], samples = 10, seconds = 1.0)
 
+# Include FastLapackInterface.jl algorithms
+results = autotune_setup(include_fastlapack = true)
+
 # After running autotune, share results (requires gh CLI or GitHub token)
 share_results(results)
 ```
@@ -209,7 +215,8 @@ function autotune_setup(;
         samples::Int = 5,
         seconds::Float64 = 0.5,
         eltypes = (Float64,),
-        skip_missing_algs::Bool = false)
+        skip_missing_algs::Bool = false,
+        include_fastlapack::Bool = false)
     @info "Starting LinearSolve.jl autotune setup..."
     @info "Configuration: sizes=$sizes, set_preferences=$set_preferences"
     @info "Element types to benchmark: $(join(eltypes, ", "))"
@@ -219,7 +226,7 @@ function autotune_setup(;
     @info "System detected: $(system_info["os"]) $(system_info["arch"]) with $(system_info["num_cores"]) cores"
 
     # Get available algorithms
-    cpu_algs, cpu_names = get_available_algorithms(; skip_missing_algs = skip_missing_algs)
+    cpu_algs, cpu_names = get_available_algorithms(; skip_missing_algs = skip_missing_algs, include_fastlapack = include_fastlapack)
     @info "Found $(length(cpu_algs)) CPU algorithms: $(join(cpu_names, ", "))"
 
     # Add GPU algorithms if available

@@ -1,12 +1,13 @@
 # Algorithm detection and creation functions
 
 """
-    get_available_algorithms(; skip_missing_algs::Bool = false)
+    get_available_algorithms(; skip_missing_algs::Bool = false, include_fastlapack::Bool = false)
 
 Returns a list of available LU factorization algorithms based on the system and loaded packages.
 If skip_missing_algs=false, errors when expected algorithms are missing; if true, warns instead.
+If include_fastlapack=true, includes FastLUFactorization in benchmarks.
 """
-function get_available_algorithms(; skip_missing_algs::Bool = false)
+function get_available_algorithms(; skip_missing_algs::Bool = false, include_fastlapack::Bool = false)
     algs = []
     alg_names = String[]
 
@@ -67,6 +68,12 @@ function get_available_algorithms(; skip_missing_algs::Bool = false)
     # SimpleLU always available
     push!(algs, SimpleLUFactorization())
     push!(alg_names, "SimpleLUFactorization")
+
+    # FastLapackInterface LU if requested (always available as dependency)
+    if include_fastlapack
+        push!(algs, FastLUFactorization())
+        push!(alg_names, "FastLUFactorization")
+    end
 
     return algs, alg_names
 end

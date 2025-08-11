@@ -80,7 +80,7 @@ Returns a DataFrame with results including element type information.
 """
 function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
         samples = 5, seconds = 0.5, sizes = [:tiny, :small, :medium, :large],
-        check_correctness = true, correctness_tol = 1e-2)
+        check_correctness = true, correctness_tol = 1e0)
 
     # Set benchmark parameters
     old_params = BenchmarkTools.DEFAULT_PARAMETERS

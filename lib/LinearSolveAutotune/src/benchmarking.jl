@@ -254,7 +254,7 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
                     catch e
                         success = false
                         error_msg = string(e)
-                        gflops = 0.0
+                        gflops = NaN
                         # Don't warn for each failure, just record it
                     end
 

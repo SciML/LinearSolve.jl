@@ -78,13 +78,13 @@ function Base.show(io::IO, results::AutotuneResults)
     println(io, "  • Julia: ", get(results.sysinfo, "julia_version", "Unknown"))
     println(io, "  • Threads: ", get(results.sysinfo, "num_threads", "Unknown"), " (BLAS: ", get(results.sysinfo, "blas_num_threads", "Unknown"), ")")
     
-    # Results summary
-    successful_results = filter(row -> row.success, results.results_df)
+    # Results summary - filter out NaN values
+    successful_results = filter(row -> row.success && !isnan(row.gflops), results.results_df)
     if nrow(successful_results) > 0
         println(io, "\n🏆 Top Performing Algorithms:")
         summary = combine(groupby(successful_results, :algorithm),
-            :gflops => mean => :avg_gflops,
-            :gflops => maximum => :max_gflops,
+            :gflops => (x -> mean(filter(!isnan, x))) => :avg_gflops,
+            :gflops => (x -> maximum(filter(!isnan, x))) => :max_gflops,
             nrow => :num_tests)
         sort!(summary, :avg_gflops, rev = true)
         
@@ -103,6 +103,12 @@ function Base.show(io::IO, results::AutotuneResults)
     sizes = unique(results.results_df.size)
     println(io, "📏 Matrix Sizes: ", minimum(sizes), "×", minimum(sizes), 
             " to ", maximum(sizes), "×", maximum(sizes))
+    
+    # Report timeouts if any
+    timeout_results = filter(row -> isnan(row.gflops), results.results_df)
+    if nrow(timeout_results) > 0
+        println(io, "⏱️  Timed Out: ", nrow(timeout_results), " tests exceeded time limit")
+    end
     
     # Call to action - reordered
     println(io, "\n" * "="^60)
@@ -158,7 +164,8 @@ end
         seconds::Float64 = 0.5,
         eltypes = (Float32, Float64, ComplexF32, ComplexF64),
         skip_missing_algs::Bool = false,
-        include_fastlapack::Bool = false)
+        include_fastlapack::Bool = false,
+        maxtime::Float64 = 100.0)
 
 Run a comprehensive benchmark of all available LU factorization methods and optionally:
 
@@ -182,6 +189,8 @@ Run a comprehensive benchmark of all available LU factorization methods and opti
   - `eltypes = (Float32, Float64, ComplexF32, ComplexF64)`: Element types to benchmark
   - `skip_missing_algs::Bool = false`: If false, error when expected algorithms are missing; if true, warn instead
   - `include_fastlapack::Bool = false`: If true, includes FastLUFactorization in benchmarks
+  - `maxtime::Float64 = 100.0`: Maximum time in seconds for each algorithm test (including accuracy check). 
+    If exceeded, the run is skipped and recorded as NaN
 
 # Returns
 
@@ -216,7 +225,8 @@ function autotune_setup(;
         seconds::Float64 = 0.5,
         eltypes = (Float64,),
         skip_missing_algs::Bool = false,
-        include_fastlapack::Bool = false)
+        include_fastlapack::Bool = false,
+        maxtime::Float64 = 100.0)
     @info "Starting LinearSolve.jl autotune setup..."
     @info "Configuration: sizes=$sizes, set_preferences=$set_preferences"
     @info "Element types to benchmark: $(join(eltypes, ", "))"
@@ -249,18 +259,25 @@ function autotune_setup(;
 
     # Run benchmarks
     @info "Running benchmarks (this may take several minutes)..."
+    @info "Maximum time per algorithm test: $(maxtime)s"
     results_df = benchmark_algorithms(matrix_sizes, all_algs, all_names, eltypes;
-        samples = samples, seconds = seconds, sizes = sizes)
+        samples = samples, seconds = seconds, sizes = sizes, maxtime = maxtime)
 
-    # Display results table
-    successful_results = filter(row -> row.success, results_df)
+    # Display results table - filter out NaN values
+    successful_results = filter(row -> row.success && !isnan(row.gflops), results_df)
+    timeout_results = filter(row -> isnan(row.gflops), results_df)
+    
+    if nrow(timeout_results) > 0
+        @info "$(nrow(timeout_results)) tests timed out (exceeded $(maxtime)s limit)"
+    end
+    
     if nrow(successful_results) > 0
         @info "Benchmark completed successfully!"
 
-        # Create summary table for display
+        # Create summary table for display - handle NaN values
         summary = combine(groupby(successful_results, :algorithm),
-            :gflops => mean => :avg_gflops,
-            :gflops => maximum => :max_gflops,
+            :gflops => (x -> mean(filter(!isnan, x))) => :avg_gflops,
+            :gflops => (x -> maximum(filter(!isnan, x))) => :max_gflops,
             nrow => :num_tests)
         sort!(summary, :avg_gflops, rev = true)
 

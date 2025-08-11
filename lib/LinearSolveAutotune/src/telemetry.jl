@@ -365,9 +365,10 @@ function format_detailed_results_markdown(df::DataFrame)
         end
         
         # Create a summary table with average performance per algorithm for this element type
+        # Filter out NaN values when computing statistics
         summary = combine(groupby(eltype_df, :algorithm), 
-                         :gflops => mean => :avg_gflops, 
-                         :gflops => std => :std_gflops,
+                         :gflops => (x -> mean(filter(!isnan, x))) => :avg_gflops, 
+                         :gflops => (x -> std(filter(!isnan, x))) => :std_gflops,
                          nrow => :num_tests)
         sort!(summary, :avg_gflops, rev = true)
 

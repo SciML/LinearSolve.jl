@@ -156,28 +156,58 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
                         # Time the warmup run and correctness check
                         start_time = time()
                         
+                        # Create a channel for communication between tasks
+                        result_channel = Channel(1)
+                        
                         # Warmup run and correctness check with timeout
                         warmup_task = @async begin
-                            solve(prob, alg)
+                            try
+                                result = solve(prob, alg)
+                                put!(result_channel, result)
+                            catch e
+                                put!(result_channel, e)
+                            end
                         end
                         
-                        # Wait for warmup to complete or timeout
+                        # Timer task to enforce timeout
+                        timer_task = @async begin
+                            sleep(maxtime)
+                            if !istaskdone(warmup_task)
+                                try
+                                    Base.throwto(warmup_task, InterruptException())
+                                catch
+                                    # Task might be in non-interruptible state
+                                end
+                                put!(result_channel, :timeout)
+                            end
+                        end
+                        
+                        # Wait for result or timeout
                         warmup_sol = nothing
-                        timeout_wait = maxtime
-                        while !istaskdone(warmup_task) && (time() - start_time) < timeout_wait
-                            sleep(0.1)
+                        result = take!(result_channel)
+                        
+                        # Clean up timer task if still running
+                        if !istaskdone(timer_task)
+                            try
+                                Base.throwto(timer_task, InterruptException())
+                            catch
+                                # Timer task might have already finished
+                            end
                         end
                         
-                        if !istaskdone(warmup_task)
+                        if result === :timeout
                             # Task timed out
                             timed_out = true
                             @warn "Algorithm $name timed out (exceeded $(maxtime)s) for size $n, eltype $eltype. Recording as NaN."
                             success = false
                             error_msg = "Timed out (exceeded $(maxtime)s)"
                             gflops = NaN
+                        elseif result isa Exception
+                            # Task threw an error
+                            throw(result)
                         else
-                            # Get the result
-                            warmup_sol = fetch(warmup_task)
+                            # Successful completion
+                            warmup_sol = result
                             elapsed_time = time() - start_time
                             
                             # Check correctness if reference solution is available

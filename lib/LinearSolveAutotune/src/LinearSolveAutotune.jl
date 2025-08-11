@@ -36,6 +36,7 @@ using blis_jll
 using LAPACK_jll
 using CUDA
 using Metal
+using FastLapackInterface
 
 
 # Optional dependencies for telemetry and plotting
@@ -180,7 +181,7 @@ Run a comprehensive benchmark of all available LU factorization methods and opti
   - `seconds::Float64 = 0.5`: Maximum time per benchmark
   - `eltypes = (Float32, Float64, ComplexF32, ComplexF64)`: Element types to benchmark
   - `skip_missing_algs::Bool = false`: If false, error when expected algorithms are missing; if true, warn instead
-  - `include_fastlapack::Bool = false`: If true and FastLapackInterface.jl is loaded, includes FastLUFactorization in benchmarks
+  - `include_fastlapack::Bool = false`: If true, includes FastLUFactorization in benchmarks
 
 # Returns
 
@@ -201,8 +202,7 @@ results = autotune_setup(sizes = [:small, :medium, :large, :big])
 # Large matrices only
 results = autotune_setup(sizes = [:large, :big], samples = 10, seconds = 1.0)
 
-# Include FastLapackInterface.jl algorithms if available
-using FastLapackInterface
+# Include FastLapackInterface.jl algorithms
 results = autotune_setup(include_fastlapack = true)
 
 # After running autotune, share results (requires gh CLI or GitHub token)

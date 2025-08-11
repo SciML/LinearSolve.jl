@@ -156,58 +156,66 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
                         # Time the warmup run and correctness check
                         start_time = time()
                         
-                        # Create a channel for communication between tasks
-                        result_channel = Channel(1)
-                        
-                        # Warmup run and correctness check with timeout
-                        warmup_task = @async begin
-                            try
-                                result = solve(prob, alg)
-                                put!(result_channel, result)
-                            catch e
-                                put!(result_channel, e)
-                            end
-                        end
-                        
-                        # Timer task to enforce timeout
-                        timer_task = @async begin
-                            sleep(maxtime)
-                            if !istaskdone(warmup_task)
-                                try
-                                    Base.throwto(warmup_task, InterruptException())
-                                catch
-                                    # Task might be in non-interruptible state
-                                end
-                                put!(result_channel, :timeout)
-                            end
-                        end
-                        
-                        # Wait for result or timeout
+                        # Warmup run and correctness check with simple timeout
                         warmup_sol = nothing
-                        result = take!(result_channel)
+                        timed_out_flag = false
                         
-                        # Clean up timer task if still running
-                        if !istaskdone(timer_task)
-                            try
-                                Base.throwto(timer_task, InterruptException())
-                            catch
-                                # Timer task might have already finished
+                        # Try to run with a timeout - simpler approach without async
+                        try
+                            # Create a task for the solve
+                            done_channel = Channel(1)
+                            error_channel = Channel(1)
+                            
+                            warmup_task = @async begin
+                                try
+                                    result = solve(prob, alg)
+                                    put!(done_channel, result)
+                                catch e
+                                    put!(error_channel, e)
+                                end
+                            end
+                            
+                            # Wait for completion or timeout
+                            timeout_occurred = false
+                            result = nothing
+                            
+                            # Use timedwait which is more reliable than manual polling
+                            wait_result = timedwait(() -> istaskdone(warmup_task), maxtime)
+                            
+                            if wait_result === :timed_out
+                                timeout_occurred = true
+                                timed_out_flag = true
+                                # Don't try to kill the task - just mark it as timed out
+                                # The task will continue running in background but we move on
+                            else
+                                # Task completed - get the result
+                                if isready(done_channel)
+                                    warmup_sol = take!(done_channel)
+                                elseif isready(error_channel)
+                                    throw(take!(error_channel))
+                                end
+                            end
+                            
+                            # Close channels to prevent resource leaks
+                            close(done_channel)
+                            close(error_channel)
+                            
+                        catch e
+                            # If an error occurred during solve, re-throw it
+                            if !timed_out_flag
+                                throw(e)
                             end
                         end
                         
-                        if result === :timeout
+                        if timed_out_flag
                             # Task timed out
                             timed_out = true
                             @warn "Algorithm $name timed out (exceeded $(maxtime)s) for size $n, eltype $eltype. Recording as NaN."
                             success = false
                             error_msg = "Timed out (exceeded $(maxtime)s)"
                             gflops = NaN
-                        elseif result isa Exception
-                            # Task threw an error
-                            throw(result)
                         else
                             # Successful completion
-                            warmup_sol = result
                             elapsed_time = time() - start_time
                             
                             # Check correctness if reference solution is available

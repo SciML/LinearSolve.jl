@@ -44,7 +44,7 @@ function create_benchmark_plots(df::DataFrame; title_base = "LinearSolve.jl LU F
 
         # Plot each algorithm for this element type
         for alg in algorithms
-            alg_df = filter(row -> row.algorithm == alg, eltype_df)
+            alg_df = filter(row -> row.algorithm == alg && !isnan(row.gflops), eltype_df)
             if nrow(alg_df) > 0
                 # Sort by size for proper line plotting
                 sort!(alg_df, :size)

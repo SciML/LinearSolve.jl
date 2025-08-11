@@ -325,8 +325,8 @@ Categorize the benchmark results into size ranges and find the best algorithm fo
 For complex types, avoids RFLUFactorization if possible due to known issues.
 """
 function categorize_results(df::DataFrame)
-    # Filter successful results
-    successful_df = filter(row -> row.success, df)
+    # Filter successful results and exclude NaN values
+    successful_df = filter(row -> row.success && !isnan(row.gflops), df)
 
     if nrow(successful_df) == 0
         @warn "No successful benchmark results found!"
@@ -366,8 +366,9 @@ function categorize_results(df::DataFrame)
                 continue
             end
 
-            # Calculate average GFLOPs for each algorithm in this range
-            avg_results = combine(groupby(range_df, :algorithm), :gflops => mean => :avg_gflops)
+            # Calculate average GFLOPs for each algorithm in this range, excluding NaN values
+            avg_results = combine(groupby(range_df, :algorithm), 
+                :gflops => (x -> mean(filter(!isnan, x))) => :avg_gflops)
             
             # Sort by performance
             sort!(avg_results, :avg_gflops, rev=true)

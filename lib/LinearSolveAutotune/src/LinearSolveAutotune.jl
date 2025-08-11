@@ -78,13 +78,13 @@ function Base.show(io::IO, results::AutotuneResults)
     println(io, "  • Julia: ", get(results.sysinfo, "julia_version", "Unknown"))
     println(io, "  • Threads: ", get(results.sysinfo, "num_threads", "Unknown"), " (BLAS: ", get(results.sysinfo, "blas_num_threads", "Unknown"), ")")
     
-    # Results summary
-    successful_results = filter(row -> row.success, results.results_df)
+    # Results summary - filter out NaN values
+    successful_results = filter(row -> row.success && !isnan(row.gflops), results.results_df)
     if nrow(successful_results) > 0
         println(io, "\n🏆 Top Performing Algorithms:")
         summary = combine(groupby(successful_results, :algorithm),
-            :gflops => mean => :avg_gflops,
-            :gflops => maximum => :max_gflops,
+            :gflops => (x -> mean(filter(!isnan, x))) => :avg_gflops,
+            :gflops => (x -> maximum(filter(!isnan, x))) => :max_gflops,
             nrow => :num_tests)
         sort!(summary, :avg_gflops, rev = true)
         
@@ -103,6 +103,12 @@ function Base.show(io::IO, results::AutotuneResults)
     sizes = unique(results.results_df.size)
     println(io, "📏 Matrix Sizes: ", minimum(sizes), "×", minimum(sizes), 
             " to ", maximum(sizes), "×", maximum(sizes))
+    
+    # Report timeouts if any
+    timeout_results = filter(row -> isnan(row.gflops), results.results_df)
+    if nrow(timeout_results) > 0
+        println(io, "⏱️  Timed Out: ", nrow(timeout_results), " tests exceeded time limit")
+    end
     
     # Call to action - reordered
     println(io, "\n" * "="^60)
@@ -257,15 +263,21 @@ function autotune_setup(;
     results_df = benchmark_algorithms(matrix_sizes, all_algs, all_names, eltypes;
         samples = samples, seconds = seconds, sizes = sizes, maxtime = maxtime)
 
-    # Display results table
-    successful_results = filter(row -> row.success, results_df)
+    # Display results table - filter out NaN values
+    successful_results = filter(row -> row.success && !isnan(row.gflops), results_df)
+    timeout_results = filter(row -> isnan(row.gflops), results_df)
+    
+    if nrow(timeout_results) > 0
+        @info "$(nrow(timeout_results)) tests timed out (exceeded $(maxtime)s limit)"
+    end
+    
     if nrow(successful_results) > 0
         @info "Benchmark completed successfully!"
 
-        # Create summary table for display
+        # Create summary table for display - handle NaN values
         summary = combine(groupby(successful_results, :algorithm),
-            :gflops => mean => :avg_gflops,
-            :gflops => maximum => :max_gflops,
+            :gflops => (x -> mean(filter(!isnan, x))) => :avg_gflops,
+            :gflops => (x -> maximum(filter(!isnan, x))) => :max_gflops,
             nrow => :num_tests)
         sort!(summary, :avg_gflops, rev = true)
 

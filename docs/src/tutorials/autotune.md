@@ -73,7 +73,7 @@ Control which matrix size ranges to test:
 # :small  - 20×20 to 100×100 (small problems)  
 # :medium - 100×100 to 300×300 (typical problems)
 # :large  - 300×300 to 1000×1000 (larger problems)
-# :big    - 10000×1000 to 20000x20000 (GPU/HPC scale)
+# :big    - 1000×1000 to 15000×15000 (GPU/HPC scale, capped at 15000 for stability)
 
 # Default: test tiny through large
 results = autotune_setup()  # uses [:tiny, :small, :medium, :large]
@@ -161,7 +161,10 @@ When an algorithm exceeds the `maxtime` limit:
 - The test is skipped to prevent hanging
 - The result is recorded as `NaN` in the benchmark data
 - A warning is displayed indicating the timeout
+- **The algorithm is automatically excluded from all larger matrix sizes** to save time
 - The benchmark continues with the next algorithm
+
+This intelligent timeout handling ensures that slow algorithms don't waste time on progressively larger matrices once they've proven too slow on smaller ones.
 
 ### Missing Algorithm Handling
 

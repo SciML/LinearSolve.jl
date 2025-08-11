@@ -95,6 +95,9 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
     # Initialize results DataFrame
     results_data = []
     
+    # Track algorithms that have timed out (per element type)
+    timed_out_algorithms = Dict{String, Set{String}}()  # eltype => Set of algorithm names
+    
     # Calculate total number of benchmarks for progress bar
     total_benchmarks = 0
     for eltype in eltypes
@@ -109,6 +112,9 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
 
     try
         for eltype in eltypes
+            # Initialize timed out set for this element type
+            timed_out_algorithms[string(eltype)] = Set{String}()
+            
             # Filter algorithms for this element type
             compatible_algs, compatible_names = filter_compatible_algorithms(algorithms, alg_names, eltype)
             
@@ -137,6 +143,23 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
                 end
 
                 for (alg, name) in zip(compatible_algs, compatible_names)
+                    # Skip this algorithm if it has already timed out for this element type
+                    if name in timed_out_algorithms[string(eltype)]
+                        # Still need to update progress bar
+                        ProgressMeter.next!(progress)
+                        # Record as skipped due to previous timeout
+                        push!(results_data,
+                            (
+                                size = n,
+                                algorithm = name,
+                                eltype = string(eltype),
+                                gflops = NaN,
+                                success = false,
+                                error = "Skipped: timed out on smaller matrix"
+                            ))
+                        continue
+                    end
+                    
                     # Update progress description
                     ProgressMeter.update!(progress, 
                         desc="Benchmarking $name on $(n)×$(n) $eltype matrix: ")
@@ -210,7 +233,9 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
                         if timed_out_flag
                             # Task timed out
                             timed_out = true
-                            @warn "Algorithm $name timed out (exceeded $(maxtime)s) for size $n, eltype $eltype. Recording as NaN."
+                            # Add to timed out set so it's skipped for larger matrices
+                            push!(timed_out_algorithms[string(eltype)], name)
+                            @warn "Algorithm $name timed out (exceeded $(maxtime)s) for size $n, eltype $eltype. Will skip for larger matrices."
                             success = false
                             error_msg = "Timed out (exceeded $(maxtime)s)"
                             gflops = NaN
@@ -301,7 +326,7 @@ Size categories:
 - `:small` - 20:20:100 (for small problems)
 - `:medium` - 100:50:300 (for typical problems)
 - `:large` - 300:100:1000 (for larger problems)
-- `:big` - vcat(1000:2000:10000, 10000:5000:20000) (for very large/GPU problems)
+- `:big` - vcat(1000:2000:10000, 10000:5000:15000) (for very large/GPU problems, capped at 15000)
 """
 function get_benchmark_sizes(size_categories::Vector{Symbol})
     sizes = Int[]
@@ -316,7 +341,7 @@ function get_benchmark_sizes(size_categories::Vector{Symbol})
         elseif category == :large
             append!(sizes, 300:100:1000)
         elseif category == :big
-            append!(sizes, vcat(1000:2000:10000, 10000:5000:20000))
+            append!(sizes, vcat(1000:2000:10000, 10000:5000:15000))  # Capped at 15000
         else
             @warn "Unknown size category: $category. Skipping."
         end

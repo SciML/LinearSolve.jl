@@ -182,7 +182,7 @@ Run a comprehensive benchmark of all available LU factorization methods and opti
 
 # Arguments
 
-  - `sizes = [:small, :medium, :large]`: Size categories to test. Options: :small (5-20), :medium (20-300), :large (300-1000), :big (10000-100000)
+  - `sizes = [:small, :medium, :large]`: Size categories to test. Options: :tiny (5-20), :small (20-100), :medium (100-300), :large (300-1000), :big (1000-15000)
   - `set_preferences::Bool = true`: Update LinearSolve preferences with optimal algorithms
   - `samples::Int = 5`: Number of benchmark samples per algorithm/size
   - `seconds::Float64 = 0.5`: Maximum time per benchmark
@@ -265,10 +265,17 @@ function autotune_setup(;
 
     # Display results table - filter out NaN values
     successful_results = filter(row -> row.success && !isnan(row.gflops), results_df)
-    timeout_results = filter(row -> isnan(row.gflops), results_df)
+    timeout_results = filter(row -> isnan(row.gflops) && !contains(get(row, :error, ""), "Skipped"), results_df)
+    skipped_results = filter(row -> contains(get(row, :error, ""), "Skipped"), results_df)
     
     if nrow(timeout_results) > 0
         @info "$(nrow(timeout_results)) tests timed out (exceeded $(maxtime)s limit)"
+    end
+    
+    if nrow(skipped_results) > 0
+        # Count unique algorithms that were skipped
+        skipped_algs = unique([row.algorithm for row in eachrow(skipped_results)])
+        @info "$(length(skipped_algs)) algorithms skipped for larger matrices after timing out"
     end
     
     if nrow(successful_results) > 0

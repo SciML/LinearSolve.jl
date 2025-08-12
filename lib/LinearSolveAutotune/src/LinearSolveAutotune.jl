@@ -104,10 +104,10 @@ function Base.show(io::IO, results::AutotuneResults)
     println(io, "📏 Matrix Sizes: ", minimum(sizes), "×", minimum(sizes), 
             " to ", maximum(sizes), "×", maximum(sizes))
     
-    # Report timeouts if any
-    timeout_results = filter(row -> isnan(row.gflops), results.results_df)
-    if nrow(timeout_results) > 0
-        println(io, "⏱️  Timed Out: ", nrow(timeout_results), " tests exceeded time limit")
+    # Report tests that exceeded maxtime if any
+    exceeded_results = filter(row -> isnan(row.gflops) && contains(get(row, :error, ""), "Exceeded maxtime"), results.results_df)
+    if nrow(exceeded_results) > 0
+        println(io, "⏱️  Exceeded maxtime: ", nrow(exceeded_results), " tests exceeded time limit")
     end
     
     # Call to action - reordered
@@ -265,17 +265,17 @@ function autotune_setup(;
 
     # Display results table - filter out NaN values
     successful_results = filter(row -> row.success && !isnan(row.gflops), results_df)
-    timeout_results = filter(row -> isnan(row.gflops) && !contains(get(row, :error, ""), "Skipped"), results_df)
+    exceeded_maxtime_results = filter(row -> isnan(row.gflops) && contains(get(row, :error, ""), "Exceeded maxtime"), results_df)
     skipped_results = filter(row -> contains(get(row, :error, ""), "Skipped"), results_df)
     
-    if nrow(timeout_results) > 0
-        @info "$(nrow(timeout_results)) tests timed out (exceeded $(maxtime)s limit)"
+    if nrow(exceeded_maxtime_results) > 0
+        @info "$(nrow(exceeded_maxtime_results)) tests exceeded maxtime limit ($(maxtime)s)"
     end
     
     if nrow(skipped_results) > 0
         # Count unique algorithms that were skipped
         skipped_algs = unique([row.algorithm for row in eachrow(skipped_results)])
-        @info "$(length(skipped_algs)) algorithms skipped for larger matrices after timing out"
+        @info "$(length(skipped_algs)) algorithms skipped for larger matrices after exceeding maxtime"
     end
     
     if nrow(successful_results) > 0

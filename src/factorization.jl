@@ -1162,8 +1162,8 @@ end
 
 """
     CliqueTreesFactorization(
-        alg = CliqueTrees.DEFAULT_ELIMINATION_ALGORITHM,
-        snd = CliqueTrees.DEFAULT_SUPERNODE_TYPE,
+        alg = nothing,
+        snd = nothing,
         reuse_symbolic = true,
     )
 
@@ -1175,6 +1175,22 @@ struct CliqueTreesFactorization{A, S} <: AbstractSparseFactorization
     alg::A
     snd::S
     reuse_symbolic::Bool
+
+    function CliqueTreesFactorization(;
+            alg::A = nothing,
+            snd::S = nothing,
+            reuse_symbolic = true,
+            throwerror = true,
+        ) where {A, S}
+
+        ext = Base.get_extension(@__MODULE__, :LinearSolveCliqueTreesExt)
+
+        if throwerror && isnothing(ext)
+            error("CliqueTreesFactorization requires that CliqueTrees is loaded, i.e. `using CliqueTrees`")
+        else
+            new{A, S}(alg, snd, reuse_symbolic)
+        end
+    end
 end
 
 function init_cacheval(::CliqueTreesFactorization, ::Union{AbstractMatrix, Nothing, AbstractSciMLOperator}, b, u, Pl, Pr,

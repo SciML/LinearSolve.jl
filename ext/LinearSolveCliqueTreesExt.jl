@@ -1,22 +1,29 @@
 module LinearSolveCliqueTreesExt
 
-using CliqueTrees: EliminationAlgorithm, SupernodeType, DEFAULT_ELIMINATION_ALGORITHM,
-    DEFAULT_SUPERNODE_TYPE, symbolic, cholinit, lininit, cholesky!, linsolve!
+using CliqueTrees: symbolic, cholinit, lininit, cholesky!, linsolve!
 using LinearSolve
 using SparseArrays
 
-function LinearSolve.CliqueTreesFactorization(;
-        alg::A=DEFAULT_ELIMINATION_ALGORITHM,
-        snd::S=DEFAULT_SUPERNODE_TYPE, 
-        reuse_symbolic::Bool=true,
-    ) where {A <: EliminationAlgorithm, S <: SupernodeType}
-    return CliqueTreesFactorization{A, S}(alg, snd, reuse_symbolic)
+function _symbolic(A::AbstractMatrix, alg::CliqueTreesFactorization)
+    return symbolic(A; alg=alg.alg, snd=alg.snd)
+end
+
+function _symbolic(A::AbstractMatrix, alg::CliqueTreesFactorization{Nothing})
+    return symbolic(A; snd=alg.snd)
+end
+
+function _symbolic(A::AbstractMatrix, alg::CliqueTreesFactorization{<:Any, Nothing})
+    return symbolic(A; alg=alg.alg)
+end
+
+function _symbolic(A::AbstractMatrix, alg::CliqueTreesFactorization{Nothing, Nothing})
+    return symbolic(A)
 end
 
 function LinearSolve.init_cacheval(
     alg::CliqueTreesFactorization, A::AbstractMatrix, b, u, Pl, Pr, maxiters::Int, abstol,
     reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    symbfact = symbolic(A; alg=alg.alg, snd=alg.snd)
+    symbfact = _symbolic(A, alg)
     cholfact, cholwork = cholinit(A, symbfact)
     linwork = lininit(1, cholfact)
     return (cholfact, cholwork, linwork)
@@ -29,7 +36,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CliqueTreesFactor
 
     if cache.isfresh
         if isnothing(cache.cacheval) || !alg.reuse_symbolic
-            symbfact = symbolic(A; alg=alg.alg, snd=alg.snd)
+            symbfact = _symbolic(A, alg)
             cholfact, cholwork = cholinit(A, symbfact)
             linwork = lininit(1, cholfact)
             cache.cacheval = (cholfact, cholwork, linwork)

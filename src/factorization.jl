@@ -1166,6 +1166,10 @@ end
         snd = CliqueTrees.DEFAULT_SUPERNODE_TYPE,
         reuse_symbolic = true,
     )
+
+The sparse Cholesky factorization algorithm implemented in CliqueTrees.jl.
+The implementation is pure-Julia and accepts arbitrary numeric types. It is
+somewhat slower than CHOLMOD.
 """
 struct CliqueTreesFactorization{A, S} <: AbstractSparseFactorization
     alg::A

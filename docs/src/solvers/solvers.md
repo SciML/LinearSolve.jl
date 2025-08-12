@@ -177,6 +177,16 @@ UMFPACKFactorization
 SparspakFactorization
 ```
 
+### CliqueTrees.jl
+
+!!! note
+    
+    Using this solver requires adding the package CliqueTrees.jl, i.e. `using CliqueTrees`
+
+```@docs
+CliqueTreesFactorization
+```
+
 ### Krylov.jl
 
 ```@docs

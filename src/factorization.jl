@@ -1158,6 +1158,31 @@ function init_cacheval(::SparspakFactorization, ::StaticArray, b, u, Pl, Pr,
     nothing
 end
 
+## CliqueTreesFactorization is here since it's MIT licensed, not GPL
+
+"""
+    CliqueTreesFactorization(
+        alg = CliqueTrees.DEFAULT_ELIMINATION_ALGORITHM,
+        snd = CliqueTrees.DEFAULT_SUPERNODE_TYPE,
+        reuse_symbolic = true,
+    )
+"""
+struct CliqueTreesFactorization{A, S} <: AbstractSparseFactorization
+    alg::A
+    snd::S
+    reuse_symbolic::Bool
+end
+
+function init_cacheval(::CliqueTreesFactorization, ::Union{AbstractMatrix, Nothing, AbstractSciMLOperator}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function init_cacheval(::CliqueTreesFactorization, ::StaticArray, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
 for alg in vcat(InteractiveUtils.subtypes(AbstractDenseFactorization),
     InteractiveUtils.subtypes(AbstractSparseFactorization))
     @eval function init_cacheval(alg::$alg, A::MatrixOperator, b, u, Pl, Pr,

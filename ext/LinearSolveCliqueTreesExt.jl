@@ -3,6 +3,7 @@ module LinearSolveCliqueTreesExt
 using CliqueTrees: EliminationAlgorithm, SupernodeType, DEFAULT_ELIMINATION_ALGORITHM,
     DEFAULT_SUPERNODE_TYPE, symbolic, cholinit, lininit, cholesky!, linsolve!
 using LinearSolve
+using SparseArrays
 
 function LinearSolve.CliqueTreesFactorization(;
         alg::A=DEFAULT_ELIMINATION_ALGORITHM,
@@ -45,7 +46,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CliqueTreesFactor
 end
 
 LinearSolve.PrecompileTools.@compile_workload begin
-    A = [
+    A = sparse([
         3 1 0 0 0 0 0 0
         1 3 1 0 0 2 0 0
         0 1 3 1 0 1 2 1
@@ -54,11 +55,10 @@ LinearSolve.PrecompileTools.@compile_workload begin
         0 2 1 0 1 3 0 0
         0 0 2 0 1 0 3 1
         0 0 1 0 0 0 1 3
-    ];
+    ])
 
     b = rand(8)
     prob = LinearProblem(A, b)
-    sol = solve(prob) # in case cliquetrees is used as default
     sol = solve(prob, CliqueTreesFactorization())
 end
 

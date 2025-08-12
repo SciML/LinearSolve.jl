@@ -73,7 +73,7 @@ LinearSolveSparseArraysExt = "SparseArrays"
 LinearSolveSparspakExt = ["SparseArrays", "Sparspak"]
 
 [compat]
-AMDGPU = "1"
+AMDGPU = "1, 2"
 AllocCheck = "0.2"
 Aqua = "0.8"
 ArrayInterface = "7.7"

@@ -34,19 +34,6 @@ const DualBLinearProblem = LinearProblem{
 const DualAbstractLinearProblem = Union{
     DualLinearProblem, DualALinearProblem, DualBLinearProblem}
 
-# LinearSolve.@concrete mutable struct DualLinearCache
-#     linear_cache
-#     dual_type
-
-#     partials_A
-#     partials_b
-#     partials_u
-
-#     dual_A
-#     dual_b
-#     dual_u
-# end
-
 LinearSolve.@concrete mutable struct DualLinearCache{DT <: Dual}
     linear_cache
 
@@ -124,12 +111,6 @@ function linearsolve_dual_solution(
         u::Number, partials, cache::DualLinearCache{DT}) where {DT}
     return DT(u, partials)
 end
-
-# function linearsolve_dual_solution(u::Number, partials,
-#         dual_type::Type{<:Dual{T, V, P}}) where {T, V, P}
-#     # Handle single-level duals
-#     return dual_type(u, partials)
-# end
 
 function linearsolve_dual_solution(u::AbstractArray, partials,
         cache::DualLinearCache{DT}) where {DT}

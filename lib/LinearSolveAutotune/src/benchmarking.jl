@@ -148,6 +148,7 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
                     if haskey(blocked_algorithms[string(eltype)], name)
                         max_allowed_size = blocked_algorithms[string(eltype)][name]
                         if n > max_allowed_size
+                            @warn "Algorithm $name skipped for size $n (exceeded maxtime on size $max_allowed_size matrix)"
                             # Still need to update progress bar
                             ProgressMeter.next!(progress)
                             # Record as skipped due to exceeding maxtime on smaller matrix

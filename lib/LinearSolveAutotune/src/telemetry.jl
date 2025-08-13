@@ -449,7 +449,7 @@ function upload_to_github(content::String, plot_files, auth_info::Tuple,
 
     try
         target_repo = "SciML/LinearSolve.jl"
-        issue_number = 669  # The existing issue for collecting autotune results
+        issue_number = 725  # The existing issue for collecting autotune results
         
         # Construct comment body - use cpu_model if available for more specific info
         cpu_display = get(system_info, "cpu_model", get(system_info, "cpu_name", "unknown"))
@@ -471,7 +471,7 @@ function upload_to_github(content::String, plot_files, auth_info::Tuple,
         🤖 *Generated automatically by LinearSolve.jl autotune system*
         """
 
-        @info "📝 Adding comment to issue #669..."
+        @info "📝 Adding comment to issue #725..."
         
         issue_url = nothing
         if auth_method == :gh_cli

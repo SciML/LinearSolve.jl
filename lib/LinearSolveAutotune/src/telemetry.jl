@@ -483,7 +483,7 @@ function upload_to_github(content::String, plot_files, auth_info::Tuple,
         if issue_url !== nothing
             @info "✅ Successfully added benchmark results to issue: $issue_url"
             @info "🔗 Your benchmark data has been shared with the LinearSolve.jl community!"
-            @info "💡 View all community benchmark data: https://github.com/SciML/LinearSolve.jl/issues/669"
+            @info "💡 View all community benchmark data: https://github.com/SciML/LinearSolve.jl/issues/725"
         else
             error("Failed to add comment to GitHub issue")
         end

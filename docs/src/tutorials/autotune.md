@@ -290,7 +290,7 @@ This will:
 1. Check for existing GitHub authentication
 2. Offer to set up authentication if needed (unless `auto_login = false`)
 3. Format your benchmark results as a markdown report
-4. Post the results as a comment to the [community benchmark collection issue](https://github.com/SciML/LinearSolve.jl/issues/669)
+4. Post the results as a comment to the [community benchmark collection issue](https://github.com/SciML/LinearSolve.jl/issues/725)
 5. Save results locally if authentication is unavailable
 
 ### No GitHub CLI Required!

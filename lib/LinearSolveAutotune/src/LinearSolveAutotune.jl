@@ -118,7 +118,7 @@ function Base.show(io::IO, results::AutotuneResults)
     println(io, "       eltypes = (Float32, Float64, ComplexF32, ComplexF64)")
     println(io, "   )")
     println(io, "\n📈 See community results at:")
-    println(io, "   https://github.com/SciML/LinearSolve.jl/issues/669")
+    println(io, "   https://github.com/SciML/LinearSolve.jl/issues/725")
     println(io, "\n💡 To share your results with the community, run:")
     println(io, "   share_results(results)")
     println(io, "="^60)
@@ -398,7 +398,7 @@ function share_results(results::AutotuneResults; auto_login::Bool = true)
         end
         @info "📁 Results saved locally to $fallback_file"
         @info "    You can manually share this file on the issue tracker:"
-        @info "    https://github.com/SciML/LinearSolve.jl/issues/669"
+        @info "    https://github.com/SciML/LinearSolve.jl/issues/725"
         return
     end
     

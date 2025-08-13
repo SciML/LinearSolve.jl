@@ -54,7 +54,13 @@ function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwa
     primal_b = copy(cache.linear_cache.b)
     uu = sol.u
 
-    primal_sol = deepcopy(sol)
+    primal_sol = (;
+        u = recursivecopy(sol.u),
+        resid = recursivecopy(sol.resid),
+        retcode = recursivecopy(sol.retcode),
+        iters = recursivecopy(sol.iters),
+        stats = recursivecopy(sol.stats)
+    )
 
     # Solves Dual partials separately 
     ∂_A = cache.partials_A

@@ -4,7 +4,7 @@ using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
                    @get_cacheval, CHOLMODFactorization, GenericFactorization,
                    GenericLUFactorization,
                    KLUFactorization, LUFactorization, NormalCholeskyFactorization,
-                   OperatorAssumptions,
+                   OperatorAssumptions, LinearVerbosity,
                    QRFactorization, RFLUFactorization, UMFPACKFactorization, solve
 using ArrayInterface: ArrayInterface
 using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!, QR

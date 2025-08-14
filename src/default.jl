@@ -262,12 +262,44 @@ Fast path when no preferences are set.
     return _get_tuned_algorithm_impl(target_eltype, size_category)
 end
 
-# Type-specialized implementation for optimal performance
-@inline _get_tuned_algorithm_impl(::Type{Float32}, size_category::Symbol) = getproperty(AUTOTUNE_PREFS.Float32, size_category)
-@inline _get_tuned_algorithm_impl(::Type{Float64}, size_category::Symbol) = getproperty(AUTOTUNE_PREFS.Float64, size_category)
-@inline _get_tuned_algorithm_impl(::Type{ComplexF32}, size_category::Symbol) = getproperty(AUTOTUNE_PREFS.ComplexF32, size_category)
-@inline _get_tuned_algorithm_impl(::Type{ComplexF64}, size_category::Symbol) = getproperty(AUTOTUNE_PREFS.ComplexF64, size_category)
+# Type-specialized implementation with availability checking and fallback logic
+@inline function _get_tuned_algorithm_impl(::Type{Float32}, size_category::Symbol)
+    prefs = getproperty(AUTOTUNE_PREFS.Float32, size_category)
+    return _choose_available_algorithm(prefs)
+end
+
+@inline function _get_tuned_algorithm_impl(::Type{Float64}, size_category::Symbol)
+    prefs = getproperty(AUTOTUNE_PREFS.Float64, size_category)
+    return _choose_available_algorithm(prefs)
+end
+
+@inline function _get_tuned_algorithm_impl(::Type{ComplexF32}, size_category::Symbol)
+    prefs = getproperty(AUTOTUNE_PREFS.ComplexF32, size_category)
+    return _choose_available_algorithm(prefs)
+end
+
+@inline function _get_tuned_algorithm_impl(::Type{ComplexF64}, size_category::Symbol)
+    prefs = getproperty(AUTOTUNE_PREFS.ComplexF64, size_category)
+    return _choose_available_algorithm(prefs)
+end
+
 @inline _get_tuned_algorithm_impl(::Type, ::Symbol) = nothing  # Fallback for other types
+
+# Helper function to choose available algorithm with fallback logic
+@inline function _choose_available_algorithm(prefs)
+    # Try the best algorithm first
+    if prefs.best !== nothing && is_algorithm_available(prefs.best)
+        return prefs.best
+    end
+    
+    # Fall back to always-loaded algorithm if best is not available
+    if prefs.fallback !== nothing && is_algorithm_available(prefs.fallback)
+        return prefs.fallback
+    end
+    
+    # No tuned algorithms available
+    return nothing
+end
 
 # Convenience method for when A is nothing - delegate to main implementation
 @inline get_tuned_algorithm(::Type{Nothing}, ::Type{eltype_b}, matrix_size::Integer) where {eltype_b} = 

@@ -323,30 +323,79 @@ function _string_to_algorithm_choice(algorithm_name::Union{String, Nothing})
 end
 
 # Load autotune preferences as constants for each element type and size category
+# Support both best overall algorithm and best always-loaded algorithm as fallback
 const AUTOTUNE_PREFS = (
     Float32 = (
-        small = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float32_small", nothing)),
-        medium = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float32_medium", nothing)),
-        large = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float32_large", nothing)),
-        big = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float32_big", nothing))
+        small = (
+            best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float32_small", nothing)),
+            fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_Float32_small", nothing))
+        ),
+        medium = (
+            best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float32_medium", nothing)),
+            fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_Float32_medium", nothing))
+        ),
+        large = (
+            best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float32_large", nothing)),
+            fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_Float32_large", nothing))
+        ),
+        big = (
+            best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float32_big", nothing)),
+            fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_Float32_big", nothing))
+        )
     ),
     Float64 = (
-        small = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float64_small", nothing)),
-        medium = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float64_medium", nothing)),
-        large = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float64_large", nothing)),
-        big = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float64_big", nothing))
+        small = (
+            best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float64_small", nothing)),
+            fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_Float64_small", nothing))
+        ),
+        medium = (
+            best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float64_medium", nothing)),
+            fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_Float64_medium", nothing))
+        ),
+        large = (
+            best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float64_large", nothing)),
+            fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_Float64_large", nothing))
+        ),
+        big = (
+            best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float64_big", nothing)),
+            fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_Float64_big", nothing))
+        )
     ),
     ComplexF32 = (
-        small = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF32_small", nothing)),
-        medium = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF32_medium", nothing)),
-        large = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF32_large", nothing)),
-        big = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF32_big", nothing))
+        small = (
+            best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF32_small", nothing)),
+            fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_ComplexF32_small", nothing))
+        ),
+        medium = (
+            best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF32_medium", nothing)),
+            fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_ComplexF32_medium", nothing))
+        ),
+        large = (
+            best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF32_large", nothing)),
+            fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_ComplexF32_large", nothing))
+        ),
+        big = (
+            best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF32_big", nothing)),
+            fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_ComplexF32_big", nothing))
+        )
     ),
     ComplexF64 = (
-        small = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF64_small", nothing)),
-        medium = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF64_medium", nothing)),
-        large = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF64_large", nothing)),
-        big = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF64_big", nothing))
+        small = (
+            best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF64_small", nothing)),
+            fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_ComplexF64_small", nothing))
+        ),
+        medium = (
+            best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF64_medium", nothing)),
+            fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_ComplexF64_medium", nothing))
+        ),
+        large = (
+            best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF64_large", nothing)),
+            fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_ComplexF64_large", nothing))
+        ),
+        big = (
+            best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF64_big", nothing)),
+            fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_ComplexF64_big", nothing))
+        )
     )
 )
 
@@ -355,7 +404,7 @@ const AUTOTUNE_PREFS_SET = let
     any_set = false
     for type_prefs in (AUTOTUNE_PREFS.Float32, AUTOTUNE_PREFS.Float64, AUTOTUNE_PREFS.ComplexF32, AUTOTUNE_PREFS.ComplexF64)
         for size_pref in (type_prefs.small, type_prefs.medium, type_prefs.large, type_prefs.big)
-            if size_pref !== nothing
+            if size_pref.best !== nothing || size_pref.fallback !== nothing
                 any_set = true
                 break
             end
@@ -363,6 +412,33 @@ const AUTOTUNE_PREFS_SET = let
         any_set && break
     end
     any_set
+end
+
+# Algorithm availability checking functions
+"""
+    is_algorithm_available(alg::DefaultAlgorithmChoice.T)
+
+Check if the given algorithm is currently available (extensions loaded, etc.).
+"""
+function is_algorithm_available(alg::DefaultAlgorithmChoice.T)
+    if alg === DefaultAlgorithmChoice.LUFactorization
+        return true  # Always available
+    elseif alg === DefaultAlgorithmChoice.GenericLUFactorization
+        return true  # Always available
+    elseif alg === DefaultAlgorithmChoice.MKLLUFactorization
+        return usemkl  # Available if MKL is loaded
+    elseif alg === DefaultAlgorithmChoice.AppleAccelerateLUFactorization
+        return appleaccelerate_isavailable()  # Available on macOS with Accelerate
+    elseif alg === DefaultAlgorithmChoice.RFLUFactorization
+        return userecursivefactorization(nothing)  # Requires RecursiveFactorization extension
+    else
+        # For extension-dependent algorithms not explicitly handled above,
+        # we cannot easily check availability without trying to use them.
+        # For now, assume they're not available in the default selection.
+        # This includes FastLU, BLIS, CUDA, Metal, etc. which would require
+        # specific extension checks.
+        return false
+    end
 end
 
 """

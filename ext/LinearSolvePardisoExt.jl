@@ -4,7 +4,7 @@ using Pardiso, LinearSolve
 using SparseArrays
 using SparseArrays: nonzeros, rowvals, getcolptr
 using LinearSolve: PardisoJL, @unpack
-
+using SciMLLogging: @SciMLMessage, verbosity_to_bool
 using LinearSolve.SciMLBase
 
 LinearSolve.needs_concrete_A(alg::PardisoJL) = true
@@ -73,7 +73,10 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
             error("Number type not supported by Pardiso")
         end
     end
-    verbose && Pardiso.set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
+    
+    if verbosity_to_bool(verbose.numerical.pardiso_verbosity)
+        Pardiso.set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
+    end
 
     #=
     Note: It is recommended to use IPARM(11)=1 (scaling) and IPARM(13)=1 (matchings) for

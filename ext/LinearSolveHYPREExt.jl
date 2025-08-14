@@ -65,7 +65,7 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
                              eltype(prob.A)),
         # TODO: Implement length() for HYPREVector in HYPRE.jl?
         maxiters::Int = prob.b isa HYPREVector ? 1000 : length(prob.b),
-        verbose::LinearVerbosity = false,
+        verbose = LinearVerbosity(Verbosity.None()),
         Pl = LinearAlgebra.I,
         Pr = LinearAlgebra.I,
         assumptions = OperatorAssumptions(),

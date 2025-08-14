@@ -1,5 +1,44 @@
 ## From https://github.com/JuliaGNI/SimpleSolvers.jl/blob/master/src/linear/lu_solver.jl
 
+"""
+    LUSolver{T}
+
+A mutable workspace for performing LU factorization and solving linear systems.
+This struct maintains all necessary arrays and state information for the 
+factorization and solve phases, allowing for efficient reuse when solving
+multiple systems with the same matrix structure.
+
+## Fields
+- `n::Int`: Dimension of the square matrix
+- `A::Matrix{T}`: Working copy of the matrix to be factorized (modified in-place)
+- `b::Vector{T}`: Right-hand side vector storage
+- `x::Vector{T}`: Solution vector storage  
+- `pivots::Vector{Int}`: Pivot indices from the factorization
+- `perms::Vector{Int}`: Permutation vector tracking row exchanges
+- `info::Int`: Status information (0 = success, >0 indicates singularity)
+
+## Constructor
+```julia
+LUSolver{T}(n)  # Create solver for n×n matrix with element type T
+```
+
+## Usage
+The solver is typically created from a matrix using the convenience constructors:
+```julia
+solver = LUSolver(A)        # From matrix A
+solver = LUSolver(A, b)     # From matrix A and RHS b
+```
+
+Then factorized and solved:
+```julia
+simplelu_factorize!(solver)    # Perform LU factorization
+simplelu_solve!(solver)        # Solve for the stored RHS
+```
+
+## Notes
+This is a pure Julia implementation primarily for educational purposes and
+small matrices. For production use, prefer optimized LAPACK-based factorizations.
+"""
 mutable struct LUSolver{T}
     n::Int
     A::Matrix{T}
@@ -114,13 +153,49 @@ end
 ### Wrapper
 
 """
-`SimpleLUFactorization(pivot::Bool = true)`
+    SimpleLUFactorization(pivot::Bool = true)
 
-A simple LU-factorization implementation without BLAS. Fast for small matrices.
+A pure Julia LU factorization implementation without BLAS dependencies.
+This solver is optimized for small matrices and situations where BLAS 
+is not available or desirable.
 
-## Positional Arguments
+## Constructor Arguments
+- `pivot::Bool = true`: Whether to perform partial pivoting for numerical stability.
+  Set to `false` for slightly better performance at the cost of stability.
 
-  - pivot::Bool: whether to perform pivoting. Defaults to `true`
+## Features
+- Pure Julia implementation (no BLAS dependencies)
+- Partial pivoting support for numerical stability
+- In-place matrix modification for memory efficiency  
+- Fast for small matrices (typically < 100×100)
+- Educational value for understanding LU factorization
+
+## Performance Characteristics
+- Optimal for small dense matrices
+- No overhead from BLAS calls
+- Linear scaling with problem size (O(n³) operations)
+- Memory efficient due to in-place operations
+
+## Use Cases
+- Small matrices where BLAS overhead is significant
+- Systems without optimized BLAS libraries
+- Educational and prototyping purposes
+- Embedded systems with memory constraints
+
+## Example
+```julia
+# Stable version with pivoting (default)
+alg1 = SimpleLUFactorization()
+# Faster version without pivoting
+alg2 = SimpleLUFactorization(false)
+
+prob = LinearProblem(A, b)
+sol = solve(prob, alg1)
+```
+
+## Notes
+For larger matrices (> 100×100), consider using BLAS-based factorizations 
+like `LUFactorization()` for better performance.
 """
 struct SimpleLUFactorization <: AbstractFactorization
     pivot::Bool

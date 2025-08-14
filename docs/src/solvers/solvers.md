@@ -135,6 +135,8 @@ LinearSolve.jl contains some linear solvers built in for specialized cases.
 SimpleLUFactorization
 DiagonalFactorization
 SimpleGMRES
+DirectLdiv!
+LinearSolveFunction
 ```
 
 ### FastLapackInterface.jl

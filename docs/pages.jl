@@ -8,12 +8,14 @@ pages = ["index.md",
         "tutorials/gpu.md",
         "tutorials/autotune.md"],
     "Basics" => Any["basics/LinearProblem.md",
+        "basics/algorithm_selection.md",
         "basics/common_solver_opts.md",
         "basics/OperatorAssumptions.md",
         "basics/Preconditioners.md",
         "basics/FAQ.md"],
     "Solvers" => Any["solvers/solvers.md"],
-    "Advanced" => Any["advanced/developing.md"
-                      "advanced/custom.md"],
+    "Advanced" => Any["advanced/developing.md",
+                      "advanced/custom.md",
+                      "advanced/internal_api.md"],
     "Release Notes" => "release_notes.md"
 ]

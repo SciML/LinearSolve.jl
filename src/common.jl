@@ -324,6 +324,18 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         deepcopy(A)
     end
 
+    if verbose isa Bool
+        #@warn "Using `true` or `false` for `verbose` is being deprecated. Please use a `LinearVerbosity` type to specify verbosity settings.
+        # For details see the verbosity section of the common solver options documentation page."
+        if verbose
+            verbose = LinearVerbosity()
+        else
+            verbose = LinearVerbosity(Verbosity.None())
+        end
+    elseif verbose isa Verbosity.Type
+        verbose = LinearVerbosity(verbose)
+    end
+
     b = if issparsematrix(b) && !(A isa Diagonal)
         Array(b) # the solution to a linear solve will always be dense!
     elseif alias_b || b isa SVector

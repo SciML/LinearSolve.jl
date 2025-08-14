@@ -2,6 +2,7 @@ module LinearSolveKrylovKitExt
 
 using LinearSolve, KrylovKit, LinearAlgebra
 using LinearSolve: LinearCache, DEFAULT_PRECS
+using SciMLLogging: Verbosity, verbosity_to_int
 
 function LinearSolve.KrylovKitJL(args...;
         KrylovAlg = KrylovKit.GMRES, gmres_restart = 0,
@@ -25,7 +26,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovKitJL; kwargs...)
     atol = float(cache.abstol)
     rtol = float(cache.reltol)
     maxiter = cache.maxiters
-    verbosity = cache.verbose ? 1 : 0
+    verbosity = verbosity_to_int(cache.verbose.numerical.KrylovKit_verbosity)
     krylovdim = (alg.gmres_restart == 0) ? min(20, size(cache.A, 1)) : alg.gmres_restart
 
     kwargs = (atol = atol, rtol = rtol, maxiter = maxiter, verbosity = verbosity,

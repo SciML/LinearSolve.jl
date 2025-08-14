@@ -174,13 +174,42 @@ end
 ## RFLUFactorization
 
 """
-`RFLUFactorization()`
+    RFLUFactorization{P, T}(; pivot = Val(true), thread = Val(true))
 
-A fast pure Julia LU-factorization implementation
-using RecursiveFactorization.jl. This is by far the fastest LU-factorization
-implementation, usually outperforming OpenBLAS and MKL for smaller matrices
-(<500x500), but currently optimized only for Base `Array` with `Float32` or `Float64`.
-Additional optimization for complex matrices is in the works.
+A fast pure Julia LU-factorization implementation using RecursiveFactorization.jl. 
+This is by far the fastest LU-factorization implementation, usually outperforming 
+OpenBLAS and MKL for smaller matrices (<500x500), but currently optimized only for 
+Base `Array` with `Float32` or `Float64`. Additional optimization for complex matrices 
+is in the works.
+
+## Type Parameters
+- `P`: Pivoting strategy as `Val{Bool}`. `Val{true}` enables partial pivoting for stability.
+- `T`: Threading strategy as `Val{Bool}`. `Val{true}` enables multi-threading for performance.
+
+## Constructor Arguments
+- `pivot = Val(true)`: Enable partial pivoting. Set to `Val{false}` to disable for speed 
+  at the cost of numerical stability.
+- `thread = Val(true)`: Enable multi-threading. Set to `Val{false}` for single-threaded 
+  execution.
+- `throwerror = true`: Whether to throw an error if RecursiveFactorization.jl is not loaded.
+
+## Performance Notes
+- Fastest for dense matrices with dimensions roughly < 500×500
+- Optimized specifically for Float32 and Float64 element types
+- Recursive blocking strategy provides excellent cache performance
+- Multi-threading can provide significant speedups on multi-core systems
+
+## Requirements
+Using this solver requires that RecursiveFactorization.jl is loaded: `using RecursiveFactorization`
+
+## Example
+```julia
+using RecursiveFactorization
+# Fast, stable (with pivoting)
+alg1 = RFLUFactorization()
+# Fastest (no pivoting), less stable
+alg2 = RFLUFactorization(pivot=Val(false))  
+```
 """
 struct RFLUFactorization{P, T} <: AbstractDenseFactorization
     function RFLUFactorization(::Val{P}, ::Val{T}; throwerror = true) where {P, T}
@@ -200,17 +229,78 @@ end
 # But I'm not sure it makes sense as a GenericFactorization
 # since it just uses `LAPACK.getrf!`.
 """
-`FastLUFactorization()`
+    FastLUFactorization()
 
-The FastLapackInterface.jl version of the LU factorization. Notably,
-this version does not allow for choice of pivoting method.
+A high-performance LU factorization using the FastLapackInterface.jl package.
+This provides an optimized interface to LAPACK routines with reduced overhead
+compared to the standard LinearAlgebra LAPACK wrappers.
+
+## Features
+- Reduced function call overhead compared to standard LAPACK wrappers
+- Optimized for performance-critical applications
+- Uses partial pivoting (no choice of pivoting method available)
+- Suitable for dense matrices where maximum performance is required
+
+## Limitations
+- Does not allow customization of pivoting strategy (always uses partial pivoting)
+- Requires FastLapackInterface.jl to be loaded
+- Limited to dense matrix types supported by LAPACK
+
+## Requirements
+Using this solver requires that FastLapackInterface.jl is loaded: `using FastLapackInterface`
+
+## Performance Notes
+This factorization is optimized for cases where the overhead of standard LAPACK
+function calls becomes significant, typically for moderate-sized dense matrices
+or when performing many factorizations.
+
+## Example
+```julia
+using FastLapackInterface
+alg = FastLUFactorization()
+sol = solve(prob, alg)
+```
 """
 struct FastLUFactorization <: AbstractDenseFactorization end
 
 """
-`FastQRFactorization()`
+    FastQRFactorization{P}(; pivot = ColumnNorm(), blocksize = 36)
 
-The FastLapackInterface.jl version of the QR factorization.
+A high-performance QR factorization using the FastLapackInterface.jl package.
+This provides an optimized interface to LAPACK QR routines with reduced overhead
+compared to the standard LinearAlgebra LAPACK wrappers.
+
+## Type Parameters
+- `P`: The type of pivoting strategy used
+
+## Fields
+- `pivot::P`: Pivoting strategy (e.g., `ColumnNorm()` for column pivoting, `nothing` for no pivoting)
+- `blocksize::Int`: Block size for the blocked QR algorithm (default: 36)
+
+## Features
+- Reduced function call overhead compared to standard LAPACK wrappers
+- Supports various pivoting strategies for numerical stability
+- Configurable block size for optimal performance
+- Suitable for dense matrices, especially overdetermined systems
+
+## Performance Notes
+The block size can be tuned for optimal performance depending on matrix size and architecture.
+The default value of 36 is generally good for most cases, but experimentation may be beneficial
+for specific applications.
+
+## Requirements
+Using this solver requires that FastLapackInterface.jl is loaded: `using FastLapackInterface`
+
+## Example
+```julia
+using FastLapackInterface
+# QR with column pivoting
+alg1 = FastQRFactorization()  
+# QR without pivoting for speed
+alg2 = FastQRFactorization(pivot=nothing)
+# Custom block size
+alg3 = FastQRFactorization(blocksize=64)
+```
 """
 struct FastQRFactorization{P} <: AbstractDenseFactorization
     pivot::P

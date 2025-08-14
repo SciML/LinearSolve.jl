@@ -454,7 +454,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::Nothing,
 end
 
 function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
-        verbose::Bool, assump::OperatorAssumptions)
+        verbose::LinearVerbosity, assump::OperatorAssumptions)
     init_cacheval(defaultalg(A, b, assump), A, b, u, Pl, Pr, maxiters, abstol, reltol,
         verbose,
         assump)
@@ -465,7 +465,7 @@ cache.cacheval = NamedTuple(LUFactorization = cache of LUFactorization, ...)
 """
 @generated function init_cacheval(alg::DefaultLinearSolver, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol,
-        verbose::Bool, assump::OperatorAssumptions)
+        verbose::LinearVerbosity, assump::OperatorAssumptions)
     caches = map(first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))) do alg
         if alg === :KrylovJL_GMRES || alg === :KrylovJL_CRAIGMR || alg === :KrylovJL_LSMR
             quote

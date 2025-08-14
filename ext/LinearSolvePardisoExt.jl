@@ -20,7 +20,7 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
         maxiters::Int,
         abstol,
         reltol,
-        verbose::Bool,
+        verbose::LinearVerbosity,
         assumptions::LinearSolve.OperatorAssumptions)
     @unpack nprocs, solver_type, matrix_type, cache_analysis, iparm, dparm, vendor = alg
     A = convert(AbstractMatrix, A)

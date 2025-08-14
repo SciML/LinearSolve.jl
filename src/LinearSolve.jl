@@ -282,16 +282,30 @@ end
 function _string_to_algorithm_choice(algorithm_name::Union{String, Nothing})
     algorithm_name === nothing && return nothing
     
+    # Core LU algorithms from LinearSolveAutotune
     if algorithm_name == "LUFactorization"
         return DefaultAlgorithmChoice.LUFactorization
+    elseif algorithm_name == "GenericLUFactorization"
+        return DefaultAlgorithmChoice.GenericLUFactorization
     elseif algorithm_name == "RFLUFactorization" || algorithm_name == "RecursiveFactorization"
         return DefaultAlgorithmChoice.RFLUFactorization
     elseif algorithm_name == "MKLLUFactorization"
         return DefaultAlgorithmChoice.MKLLUFactorization
     elseif algorithm_name == "AppleAccelerateLUFactorization"
         return DefaultAlgorithmChoice.AppleAccelerateLUFactorization
-    elseif algorithm_name == "GenericLUFactorization"
-        return DefaultAlgorithmChoice.GenericLUFactorization
+    elseif algorithm_name == "SimpleLUFactorization"
+        return DefaultAlgorithmChoice.LUFactorization  # Map to standard LU
+    elseif algorithm_name == "FastLUFactorization"
+        return DefaultAlgorithmChoice.LUFactorization  # Map to standard LU (FastLapack extension)
+    elseif algorithm_name == "BLISLUFactorization"
+        return DefaultAlgorithmChoice.LUFactorization  # Map to standard LU (BLIS extension)
+    elseif algorithm_name == "CudaOffloadLUFactorization"
+        return DefaultAlgorithmChoice.LUFactorization  # Map to standard LU (CUDA extension)
+    elseif algorithm_name == "MetalLUFactorization"
+        return DefaultAlgorithmChoice.LUFactorization  # Map to standard LU (Metal extension)
+    elseif algorithm_name == "AMDGPUOffloadLUFactorization"
+        return DefaultAlgorithmChoice.LUFactorization  # Map to standard LU (AMDGPU extension)
+    # Non-LU algorithms (not typically tuned in default selection but support for completeness)
     elseif algorithm_name == "QRFactorization"
         return DefaultAlgorithmChoice.QRFactorization
     elseif algorithm_name == "CholeskyFactorization"
@@ -335,6 +349,21 @@ const AUTOTUNE_PREFS = (
         big = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF64_big", nothing))
     )
 )
+
+# Fast path: check if any autotune preferences are actually set
+const AUTOTUNE_PREFS_SET = let
+    any_set = false
+    for type_prefs in (AUTOTUNE_PREFS.Float32, AUTOTUNE_PREFS.Float64, AUTOTUNE_PREFS.ComplexF32, AUTOTUNE_PREFS.ComplexF64)
+        for size_pref in (type_prefs.small, type_prefs.medium, type_prefs.large, type_prefs.big)
+            if size_pref !== nothing
+                any_set = true
+                break
+            end
+        end
+        any_set && break
+    end
+    any_set
+end
 
 """
     DefaultLinearSolver(;safetyfallback=true)

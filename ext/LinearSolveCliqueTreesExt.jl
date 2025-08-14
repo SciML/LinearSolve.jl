@@ -22,7 +22,7 @@ end
 
 function LinearSolve.init_cacheval(
     alg::CliqueTreesFactorization, A::AbstractMatrix, b, u, Pl, Pr, maxiters::Int, abstol,
-    reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    reltol, verbose::LinearVerbosity, assumptions::OperatorAssumptions)
     symbfact = _symbolic(A, alg)
     cholfact, cholwork = cholinit(A, symbfact)
     linwork = lininit(1, cholfact)

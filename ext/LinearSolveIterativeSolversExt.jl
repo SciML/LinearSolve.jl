@@ -47,7 +47,7 @@ LinearSolve.default_alias_b(::IterativeSolversJL, ::Any, ::Any) = true
 function LinearSolve.init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, maxiters::Int,
         abstol,
         reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
+        verbose::LinearVerbosity, assumptions::OperatorAssumptions)
     restart = (alg.gmres_restart == 0) ? min(20, size(A, 1)) : alg.gmres_restart
     s = :idrs_s in keys(alg.kwargs) ? alg.kwargs.idrs_s : 4 # shadow space
 

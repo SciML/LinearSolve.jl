@@ -16,7 +16,7 @@ default_alias_A(::MetalLUFactorization, ::Any, ::Any) = false
 default_alias_b(::MetalLUFactorization, ::Any, ::Any) = false
 
 function LinearSolve.init_cacheval(alg::MetalLUFactorization, A::AbstractArray, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
+        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
         assumptions::OperatorAssumptions)
     ArrayInterface.lu_instance(convert(AbstractMatrix, A))
 end

@@ -166,7 +166,9 @@ Format benchmark results as a markdown table suitable for GitHub issues.
 """
 function format_results_for_github(df::DataFrame, system_info::Dict, categories::Dict{
         String, String})
-    # Filter successful results
+    # Include all results, both successful and failed (with NaN values)
+    # This shows what algorithms were attempted, making it clear what was tested
+    all_results_df = df
     successful_df = filter(row -> row.success, df)
 
     if nrow(successful_df) == 0
@@ -180,7 +182,7 @@ function format_results_for_github(df::DataFrame, system_info::Dict, categories:
 $(format_categories_markdown(categories))
 
 ### Detailed Results
-$(format_detailed_results_markdown(successful_df))
+$(format_detailed_results_markdown(all_results_df))
 
 ### System Information
 $(format_system_info_markdown(system_info))
@@ -365,22 +367,29 @@ function format_detailed_results_markdown(df::DataFrame)
         end
         
         # Create a summary table with average performance per algorithm for this element type
-        # Filter out NaN values when computing statistics
+        # Include statistics that account for NaN values
         summary = combine(groupby(eltype_df, :algorithm), 
-                         :gflops => (x -> mean(filter(!isnan, x))) => :avg_gflops, 
-                         :gflops => (x -> std(filter(!isnan, x))) => :std_gflops,
-                         nrow => :num_tests)
+                         :gflops => (x -> begin
+                             valid_vals = filter(!isnan, x)
+                             length(valid_vals) > 0 ? mean(valid_vals) : NaN
+                         end) => :avg_gflops, 
+                         :gflops => (x -> begin
+                             valid_vals = filter(!isnan, x)
+                             length(valid_vals) > 1 ? std(valid_vals) : NaN
+                         end) => :std_gflops,
+                         :gflops => (x -> count(!isnan, x)) => :successful_tests,
+                         nrow => :total_tests)
         sort!(summary, :avg_gflops, rev = true)
 
         push!(lines, "##### Summary Statistics")
         push!(lines, "")
-        push!(lines, "| Algorithm | Avg GFLOPs | Std Dev | Tests |")
-        push!(lines, "|-----------|------------|---------|-------|")
+        push!(lines, "| Algorithm | Avg GFLOPs | Std Dev | Success/Total |")
+        push!(lines, "|-----------|------------|---------|---------------|")
 
         for row in eachrow(summary)
-            avg_str = @sprintf("%.2f", row.avg_gflops)
-            std_str = @sprintf("%.2f", row.std_gflops)
-            push!(lines, "| $(row.algorithm) | $avg_str | $std_str | $(row.num_tests) |")
+            avg_str = isnan(row.avg_gflops) ? "NaN" : @sprintf("%.2f", row.avg_gflops)
+            std_str = isnan(row.std_gflops) ? "NaN" : @sprintf("%.2f", row.std_gflops)
+            push!(lines, "| $(row.algorithm) | $avg_str | $std_str | $(row.successful_tests)/$(row.total_tests) |")
         end
         
         push!(lines, "")
@@ -407,7 +416,13 @@ function format_detailed_results_markdown(df::DataFrame)
             push!(lines, "|-------------|--------|--------|")
             
             for row in eachrow(algo_df)
-                gflops_str = row.success ? @sprintf("%.3f", row.gflops) : "N/A"
+                gflops_str = if row.success
+                    @sprintf("%.3f", row.gflops)
+                elseif isnan(row.gflops)
+                    "NaN"
+                else
+                    string(row.gflops)
+                end
                 status = row.success ? "✅ Success" : "❌ Failed"
                 push!(lines, "| $(row.size) | $gflops_str | $status |")
             end

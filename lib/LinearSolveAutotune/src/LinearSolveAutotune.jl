@@ -78,7 +78,8 @@ function Base.show(io::IO, results::AutotuneResults)
     println(io, "  • Julia: ", get(results.sysinfo, "julia_version", "Unknown"))
     println(io, "  • Threads: ", get(results.sysinfo, "num_threads", "Unknown"), " (BLAS: ", get(results.sysinfo, "blas_num_threads", "Unknown"), ")")
     
-    # Results summary - filter out NaN values
+    # Results summary - include all results to show what was attempted
+    all_results = results.results_df
     successful_results = filter(row -> row.success && !isnan(row.gflops), results.results_df)
     if nrow(successful_results) > 0
         println(io, "\n🏆 Top Performing Algorithms:")
@@ -93,6 +94,13 @@ function Base.show(io::IO, results::AutotuneResults)
             println(io, "  ", i, ". ", row.algorithm, ": ",
                     @sprintf("%.2f GFLOPs avg", row.avg_gflops))
         end
+    end
+    
+    # Show algorithms that had failures/timeouts to make it clear what was attempted
+    failed_results = filter(row -> !row.success, all_results)
+    if nrow(failed_results) > 0
+        failed_algs = unique(failed_results.algorithm)
+        println(io, "\n⚠️  Algorithms with failures/timeouts: ", join(failed_algs, ", "))
     end
     
     # Element types tested
@@ -263,7 +271,8 @@ function autotune_setup(;
     results_df = benchmark_algorithms(matrix_sizes, all_algs, all_names, eltypes;
         samples = samples, seconds = seconds, sizes = sizes, maxtime = maxtime)
 
-    # Display results table - filter out NaN values
+    # Display results table - show all results including NaN values to indicate what was tested
+    all_results = results_df
     successful_results = filter(row -> row.success && !isnan(row.gflops), results_df)
     exceeded_maxtime_results = filter(row -> isnan(row.gflops) && contains(get(row, :error, ""), "Exceeded maxtime"), results_df)
     skipped_results = filter(row -> contains(get(row, :error, ""), "Skipped"), results_df)
@@ -281,22 +290,53 @@ function autotune_setup(;
     if nrow(successful_results) > 0
         @info "Benchmark completed successfully!"
 
-        # Create summary table for display - handle NaN values
-        summary = combine(groupby(successful_results, :algorithm),
-            :gflops => (x -> mean(filter(!isnan, x))) => :avg_gflops,
-            :gflops => (x -> maximum(filter(!isnan, x))) => :max_gflops,
-            nrow => :num_tests)
-        sort!(summary, :avg_gflops, rev = true)
+        # Create summary table for display - include algorithms with NaN values to show what was tested
+        # Create summary for all algorithms tested (not just successful ones)
+        full_summary = combine(groupby(all_results, :algorithm),
+            :gflops => (x -> begin
+                valid_vals = filter(!isnan, x)
+                length(valid_vals) > 0 ? mean(valid_vals) : NaN
+            end) => :avg_gflops,
+            :gflops => (x -> begin
+                valid_vals = filter(!isnan, x)
+                length(valid_vals) > 0 ? maximum(valid_vals) : NaN
+            end) => :max_gflops,
+            :success => (x -> count(x)) => :successful_tests,
+            nrow => :total_tests)
+        
+        # Sort by average GFLOPs, putting NaN values at the end
+        sort!(full_summary, [:avg_gflops], rev = true, lt = (a, b) -> begin
+            if isnan(a) && isnan(b)
+                return false
+            elseif isnan(a)
+                return false
+            elseif isnan(b)
+                return true
+            else
+                return a < b
+            end
+        end)
 
         println("\n" * "="^60)
-        println("BENCHMARK RESULTS SUMMARY")
+        println("BENCHMARK RESULTS SUMMARY (including failed attempts)")
         println("="^60)
-        pretty_table(summary,
-            header = ["Algorithm", "Avg GFLOPs", "Max GFLOPs", "Tests"],
-            formatters = ft_printf("%.2f", [2, 3]),
+        pretty_table(full_summary,
+            header = ["Algorithm", "Avg GFLOPs", "Max GFLOPs", "Success", "Total"],
+            formatters = (v, i, j) -> begin
+                if j in [2, 3] && isa(v, Float64)
+                    return isnan(v) ? "NaN" : @sprintf("%.2f", v)
+                else
+                    return v
+                end
+            end,
             crop = :none)
     else
         @warn "No successful benchmark results!"
+        # Still show what was attempted
+        if nrow(all_results) > 0
+            failed_algs = unique(all_results.algorithm)
+            @info "Algorithms tested (all failed): $(join(failed_algs, ", "))"
+        end
         return results_df, nothing
     end
 

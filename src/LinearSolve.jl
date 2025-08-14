@@ -362,6 +362,7 @@ const BLASELTYPES = Union{Float32, Float64, ComplexF32, ComplexF64}
 
 function defaultalg_symbol end
 
+include("verbosity.jl")
 include("generic_lufact.jl")
 include("common.jl")
 include("extension_algs.jl")
@@ -501,5 +502,8 @@ export MetalOffload32MixedLUFactorization
 export OperatorAssumptions, OperatorCondition
 
 export LinearSolveAdjoint
+
+export LinearVerbosity, LinearErrorControlVerbosity, LinearPerformanceVerbosity,
+       LinearNumericalVerbosity
 
 end

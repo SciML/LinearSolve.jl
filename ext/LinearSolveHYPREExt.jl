@@ -112,6 +112,18 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
         alias_b = aliases.alias_b
     end
 
+    if verbose isa Bool
+        #@warn "Using `true` or `false` for `verbose` is being deprecated. Please use a `LinearVerbosity` type to specify verbosity settings.
+        # For details see the verbosity section of the common solver options documentation page."
+        if verbose
+            verbose = LinearVerbosity()
+        else
+            verbose = LinearVerbosity(Verbosity.None())
+        end
+    elseif verbose isa Verbosity.Type
+        verbose = LinearVerbosity(verbose)
+    end
+
     A = A isa HYPREMatrix ? A : HYPREMatrix(A)
     b = b isa HYPREVector ? b : HYPREVector(b)
     u0 = u0 isa HYPREVector ? u0 : (u0 === nothing ? nothing : HYPREVector(u0))

@@ -236,61 +236,36 @@ userecursivefactorization(A) = false
 """
     get_tuned_algorithm(eltype_A, eltype_b, matrix_size)
 
-Check if autotune preferences exist and return the appropriate algorithm
-based on element type and matrix size. Returns `nothing` if no preference exists.
+Get the tuned algorithm preference for the given element type and matrix size.
+Returns `nothing` if no preference exists. Uses preloaded constants for efficiency.
 """
-function get_tuned_algorithm(eltype_A, eltype_b, matrix_size)
+@inline function get_tuned_algorithm(eltype_A, eltype_b, matrix_size)
     # Determine the element type to use for preference lookup
-    target_eltype = if eltype_A !== nothing
-        string(eltype_A)
-    else
-        string(eltype_b)
-    end
+    target_eltype = eltype_A !== nothing ? eltype_A : eltype_b
     
     # Determine size category based on matrix size
     size_category = if matrix_size <= 128
-        "small"
+        :small
     elseif matrix_size <= 256
-        "medium"
+        :medium
     elseif matrix_size <= 512
-        "large"
+        :large
     else
-        "big"
+        :big
     end
     
-    # Try to load the preference
-    pref_key = "best_algorithm_$(target_eltype)_$(size_category)"
-    algorithm_name = Preferences.@load_preference(pref_key, nothing)
-    
-    if algorithm_name !== nothing
-        # Convert algorithm name string to DefaultAlgorithmChoice enum
-        if algorithm_name == "LUFactorization"
-            return DefaultAlgorithmChoice.LUFactorization
-        elseif algorithm_name == "RFLUFactorization" || algorithm_name == "RecursiveFactorization"
-            return DefaultAlgorithmChoice.RFLUFactorization
-        elseif algorithm_name == "MKLLUFactorization"
-            return DefaultAlgorithmChoice.MKLLUFactorization
-        elseif algorithm_name == "AppleAccelerateLUFactorization"
-            return DefaultAlgorithmChoice.AppleAccelerateLUFactorization
-        elseif algorithm_name == "GenericLUFactorization"
-            return DefaultAlgorithmChoice.GenericLUFactorization
-        elseif algorithm_name == "QRFactorization"
-            return DefaultAlgorithmChoice.QRFactorization
-        elseif algorithm_name == "CholeskyFactorization"
-            return DefaultAlgorithmChoice.CholeskyFactorization
-        elseif algorithm_name == "SVDFactorization"
-            return DefaultAlgorithmChoice.SVDFactorization
-        elseif algorithm_name == "BunchKaufmanFactorization"
-            return DefaultAlgorithmChoice.BunchKaufmanFactorization
-        elseif algorithm_name == "LDLtFactorization"
-            return DefaultAlgorithmChoice.LDLtFactorization
-        else
-            @warn "Unknown algorithm preference: $algorithm_name, falling back to heuristics"
-            return nothing
-        end
+    # Look up the tuned algorithm from preloaded constants
+    if target_eltype === Float32
+        return getproperty(AUTOTUNE_PREFS.Float32, size_category)
+    elseif target_eltype === Float64
+        return getproperty(AUTOTUNE_PREFS.Float64, size_category)
+    elseif target_eltype === ComplexF32
+        return getproperty(AUTOTUNE_PREFS.ComplexF32, size_category)
+    elseif target_eltype === ComplexF64
+        return getproperty(AUTOTUNE_PREFS.ComplexF64, size_category)
+    else
+        return nothing
     end
-    
-    return nothing
 end
 
 # Allows A === nothing as a stand-in for dense matrix

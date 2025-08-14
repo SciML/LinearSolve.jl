@@ -58,6 +58,7 @@ else
     const usemkl = false
 end
 
+
 @reexport using SciMLBase
 
 """
@@ -275,6 +276,65 @@ EnumX.@enumx DefaultAlgorithmChoice begin
     KrylovJL_CRAIGMR
     KrylovJL_LSMR
 end
+
+# Autotune preference constants - loaded once at package import time
+# Helper function to convert algorithm name string to DefaultAlgorithmChoice enum
+function _string_to_algorithm_choice(algorithm_name::Union{String, Nothing})
+    algorithm_name === nothing && return nothing
+    
+    if algorithm_name == "LUFactorization"
+        return DefaultAlgorithmChoice.LUFactorization
+    elseif algorithm_name == "RFLUFactorization" || algorithm_name == "RecursiveFactorization"
+        return DefaultAlgorithmChoice.RFLUFactorization
+    elseif algorithm_name == "MKLLUFactorization"
+        return DefaultAlgorithmChoice.MKLLUFactorization
+    elseif algorithm_name == "AppleAccelerateLUFactorization"
+        return DefaultAlgorithmChoice.AppleAccelerateLUFactorization
+    elseif algorithm_name == "GenericLUFactorization"
+        return DefaultAlgorithmChoice.GenericLUFactorization
+    elseif algorithm_name == "QRFactorization"
+        return DefaultAlgorithmChoice.QRFactorization
+    elseif algorithm_name == "CholeskyFactorization"
+        return DefaultAlgorithmChoice.CholeskyFactorization
+    elseif algorithm_name == "SVDFactorization"
+        return DefaultAlgorithmChoice.SVDFactorization
+    elseif algorithm_name == "BunchKaufmanFactorization"
+        return DefaultAlgorithmChoice.BunchKaufmanFactorization
+    elseif algorithm_name == "LDLtFactorization"
+        return DefaultAlgorithmChoice.LDLtFactorization
+    else
+        @warn "Unknown algorithm preference: $algorithm_name, falling back to heuristics"
+        return nothing
+    end
+end
+
+# Load autotune preferences as constants for each element type and size category
+const AUTOTUNE_PREFS = (
+    Float32 = (
+        small = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float32_small", nothing)),
+        medium = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float32_medium", nothing)),
+        large = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float32_large", nothing)),
+        big = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float32_big", nothing))
+    ),
+    Float64 = (
+        small = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float64_small", nothing)),
+        medium = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float64_medium", nothing)),
+        large = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float64_large", nothing)),
+        big = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float64_big", nothing))
+    ),
+    ComplexF32 = (
+        small = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF32_small", nothing)),
+        medium = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF32_medium", nothing)),
+        large = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF32_large", nothing)),
+        big = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF32_big", nothing))
+    ),
+    ComplexF64 = (
+        small = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF64_small", nothing)),
+        medium = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF64_medium", nothing)),
+        large = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF64_large", nothing)),
+        big = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF64_big", nothing))
+    )
+)
 
 """
     DefaultLinearSolver(;safetyfallback=true)

@@ -3,6 +3,7 @@ module LinearSolveIterativeSolversExt
 using LinearSolve, LinearAlgebra
 using LinearSolve: LinearCache, DEFAULT_PRECS
 import LinearSolve: IterativeSolversJL
+using SciMLLogging: @SciMLMessage, Verbosity
 
 using IterativeSolvers
 
@@ -56,7 +57,8 @@ function LinearSolve.init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, max
 
     iterable = if alg.generate_iterator === IterativeSolvers.cg_iterator!
         !LinearSolve._isidentity_struct(Pr) &&
-            @warn "$(alg.generate_iterator) doesn't support right preconditioning"
+            @SciMLMessage("$(alg.generate_iterator) doesn't support right preconditioning",
+                verbose, :no_right_preconditioning, :performance)
         alg.generate_iterator(u, A, b, Pl;
             kwargs...)
     elseif alg.generate_iterator === IterativeSolvers.gmres_iterable!
@@ -64,7 +66,8 @@ function LinearSolve.init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, max
             kwargs...)
     elseif alg.generate_iterator === IterativeSolvers.idrs_iterable!
         !!LinearSolve._isidentity_struct(Pr) &&
-            @warn "$(alg.generate_iterator) doesn't support right preconditioning"
+            @SciMLMessage("$(alg.generate_iterator) doesn't support right preconditioning",
+                verbose, :no_right_preconditioning, :performance)
         history = IterativeSolvers.ConvergenceHistory(partial = true)
         history[:abstol] = abstol
         history[:reltol] = reltol
@@ -72,7 +75,8 @@ function LinearSolve.init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, max
             alg.kwargs...)
     elseif alg.generate_iterator === IterativeSolvers.bicgstabl_iterator!
         !!LinearSolve._isidentity_struct(Pr) &&
-            @warn "$(alg.generate_iterator) doesn't support right preconditioning"
+            @SciMLMessage("$(alg.generate_iterator) doesn't support right preconditioning",
+                verbose, :no_right_preconditioning, :performance)
         alg.generate_iterator(u, A, b, alg.args...; Pl = Pl,
             abstol = abstol, reltol = reltol,
             max_mv_products = maxiters * 2,
@@ -103,14 +107,15 @@ function SciMLBase.solve!(cache::LinearCache, alg::IterativeSolversJL; kwargs...
     end
     purge_history!(cache.cacheval, cache.u, cache.b)
 
-    cache.verbose && println("Using IterativeSolvers.$(alg.generate_iterator)")
+    @SciMLMessage("Using IterativeSolvers.$(alg.generate_iterator)",
+        cache.verbose, :using_IterativeSolvers, :numerical)
     i = 0
     for iter in enumerate(cache.cacheval)
         i += 1
-        cache.verbose && println("Iter: $(iter[1]), residual: $(iter[2])")
+        @SciMLMessage("Iter: $(iter[1]), residual: $(iter[2])",
+            cache.verbose, :IterativeSolvers_iterations, :numerical)
         # TODO inject callbacks KSP into solve! cb!(cache.cacheval)
     end
-    cache.verbose && println()
 
     resid = cache.cacheval isa IterativeSolvers.IDRSIterable ? cache.cacheval.R :
             cache.cacheval.residual

@@ -161,3 +161,45 @@ sol = solve(prob, LinearSolveFunction(my_custom_solver))
 ```
 
 See the [Custom Linear Solvers](@ref custom) section for more details.
+
+## Tuned Algorithm Selection
+
+LinearSolve.jl includes a sophisticated preference system that can be tuned using LinearSolveAutotune for optimal performance on your specific hardware:
+
+```julia
+using LinearSolve
+using LinearSolveAutotune
+
+# Run autotune to benchmark algorithms and set preferences
+results = autotune_setup(set_preferences = true)
+
+# View what algorithms are now being chosen
+show_algorithm_choices()
+```
+
+The system automatically sets preferences for:
+- **Different matrix sizes**: tiny (≤20), small (21-100), medium (101-300), large (301-1000), big (>1000)
+- **Different element types**: Float32, Float64, ComplexF32, ComplexF64
+- **Dual preferences**: Best overall algorithm + best always-available fallback
+
+### Viewing Algorithm Choices
+
+Use `show_algorithm_choices()` to see what algorithms are currently being selected:
+
+```julia
+using LinearSolve
+show_algorithm_choices()
+```
+
+This shows:
+- Current autotune preferences (if set)
+- Algorithm choices for each size category
+- System information (available extensions)
+- Element type behavior
+
+### Preference System Benefits
+
+- **Automatic optimization**: Uses the fastest algorithms found by benchmarking
+- **Intelligent fallbacks**: Falls back to always-available algorithms when extensions aren't loaded
+- **Size-specific tuning**: Different algorithms optimized for different matrix sizes
+- **Type-specific tuning**: Optimized algorithm selection for different numeric types

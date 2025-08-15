@@ -2,8 +2,7 @@
 
 LinearSolve.jl includes an automatic tuning system that benchmarks all available linear algebra algorithms on your specific hardware and automatically selects optimal algorithms for different problem sizes and data types. This tutorial will show you how to use the `LinearSolveAutotune` sublibrary to optimize your linear solve performance.
 
-!!! warn
-    The autotuning system is under active development. While benchmarking and result sharing are fully functional, automatic preference setting for algorithm selection is still being refined.
+The autotuning system provides comprehensive benchmarking and automatic algorithm selection optimization for your specific hardware.
 
 ## Quick Start
 
@@ -418,32 +417,45 @@ for config in configs
 end
 ```
 
+## Algorithm Selection Analysis
+
+You can analyze what algorithms are currently being chosen for different matrix sizes:
+
+```julia
+using LinearSolve
+
+# Show current algorithm choices and preferences
+show_algorithm_choices()
+```
+
+This displays:
+- Current autotune preferences (if any are set)
+- Algorithm choices for representative sizes in each category  
+- Element type behavior
+- System information (MKL, Apple Accelerate, RecursiveFactorization status)
+
 ## Preferences Integration
 
-!!! warn
-    Automatic preference setting is still under development and may not affect algorithm selection in the current version.
-
-The autotuner can set preferences that LinearSolve.jl will use for automatic algorithm selection:
+The autotuner sets preferences that LinearSolve.jl uses for automatic algorithm selection:
 
 ```julia
 using LinearSolveAutotune
 
-# View current preferences (if any)
-LinearSolveAutotune.show_current_preferences()
-
 # Run autotune and set preferences
 results = autotune_setup(set_preferences = true)
 
-# Clear all autotune preferences
-LinearSolveAutotune.clear_algorithm_preferences()
+# View what algorithms are now being chosen
+using LinearSolve
+show_algorithm_choices()
 
-# Manually set custom preferences
-custom_categories = Dict(
-    "Float64_0-128" => "RFLUFactorization",
-    "Float64_128-256" => "LUFactorization"
-)
-LinearSolveAutotune.set_algorithm_preferences(custom_categories)
+# View current preferences
+LinearSolveAutotune.show_current_preferences()
+
+# Clear all autotune preferences if needed
+LinearSolveAutotune.clear_algorithm_preferences()
 ```
+
+After running autotune with `set_preferences = true`, LinearSolve.jl will automatically use the fastest algorithms found for each matrix size and element type, with intelligent fallbacks when extensions are not available.
 
 ## Troubleshooting
 

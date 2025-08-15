@@ -30,7 +30,29 @@ The automatic algorithm selection is one of LinearSolve.jl's key features:
 
 ```@docs
 LinearSolve.defaultalg
+LinearSolve.get_tuned_algorithm
+LinearSolve.is_algorithm_available
+LinearSolve.show_algorithm_choices
 ```
+
+### Preference System Internals
+
+The dual preference system provides intelligent algorithm selection with fallbacks:
+
+- **`get_tuned_algorithm`**: Retrieves tuned algorithm preferences based on matrix size and element type
+- **`is_algorithm_available`**: Checks if a specific algorithm is currently available (extensions loaded)
+- **`show_algorithm_choices`**: Analysis function to display current algorithm choices and preferences
+
+The system categorizes matrix sizes as:
+- **tiny**: ≤20 elements
+- **small**: 21-100 elements  
+- **medium**: 101-300 elements
+- **large**: 301-1000 elements
+- **big**: >1000 elements
+
+For each category and element type, preferences store both:
+- `best_algorithm_{type}_{size}`: Overall fastest algorithm
+- `best_always_loaded_{type}_{size}`: Fastest always-available algorithm (fallback)
 
 ## Trait Functions
 

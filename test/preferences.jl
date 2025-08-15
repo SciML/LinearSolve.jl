@@ -66,22 +66,18 @@ using Preferences
         b = rand(Float64, 150)
         prob = LinearProblem(A, b)
         
-        # Try to load FastLapackInterface - it may or may not be available
+        # Try to load FastLapackInterface and test FastLUFactorization
         try
             @eval using FastLapackInterface
             
-            # If FastLapack loads successfully, test that FastLU works
-            try
-                sol_fast = solve(prob, FastLUFactorization())
-                @test sol_fast.retcode == ReturnCode.Success
-                @test norm(A * sol_fast.u - b) < 1e-8
-                println("✅ FastLUFactorization successfully works with extension loaded")
-            catch e
-                println("⚠️  FastLUFactorization not fully functional: ", e)
-            end
+            # Test that FastLUFactorization works - only print if it fails
+            sol_fast = solve(prob, FastLUFactorization())
+            @test sol_fast.retcode == ReturnCode.Success
+            @test norm(A * sol_fast.u - b) < 1e-8
+            # Success - no print needed
             
         catch e
-            println("ℹ️  FastLapackInterface not available in this environment: ", e)
+            println("⚠️  FastLapackInterface/FastLUFactorization not available: ", e)
         end
         
         # Test algorithm choice - should work regardless of FastLapack availability
@@ -104,22 +100,20 @@ using Preferences
         b = rand(Float64, 150)
         prob = LinearProblem(A, b)
         
-        # Try to load RecursiveFactorization - should be available as it's a dependency
+        # Try to load RecursiveFactorization and test RFLUFactorization
         try
             @eval using RecursiveFactorization
             
-            # Test that RFLUFactorization works
+            # Test that RFLUFactorization works - only print if it fails
             if LinearSolve.userecursivefactorization(A)
                 sol_rf = solve(prob, RFLUFactorization())
                 @test sol_rf.retcode == ReturnCode.Success
                 @test norm(A * sol_rf.u - b) < 1e-8
-                println("✅ RFLUFactorization successfully works with extension loaded")
-            else
-                println("ℹ️  RFLUFactorization not enabled for this matrix type")
+                # Success - no print needed
             end
             
         catch e
-            println("⚠️  RecursiveFactorization loading issue: ", e)
+            println("⚠️  RecursiveFactorization/RFLUFactorization not available: ", e)
         end
         
         # Test algorithm choice with RecursiveFactorization available
@@ -165,13 +159,13 @@ using Preferences
             println("✅ AppleAccelerateLUFactorization confirmed working")
         end
         
-        # Test RFLUFactorization if available (from existing dependencies)
+        # Test RFLUFactorization if extension is loaded (requires RecursiveFactorization.jl)
         if LinearSolve.userecursivefactorization(A)
             try
                 sol_rf = solve(prob, RFLUFactorization())
                 @test sol_rf.retcode == ReturnCode.Success
                 @test norm(A * sol_rf.u - b) < 1e-8
-                println("✅ RFLUFactorization confirmed working")
+                # Success - no print needed (RFLUFactorization is extension-dependent)
             catch e
                 println("⚠️  RFLUFactorization issue: ", e)
             end

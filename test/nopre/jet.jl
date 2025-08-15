@@ -1,4 +1,4 @@
-using LinearSolve, RecursiveFactorization, LinearAlgebra, SparseArrays, Test
+using LinearSolve, ForwardDiff, RecursiveFactorization, LinearAlgebra, SparseArrays, Test
 using JET
 
 # Dense problem setup
@@ -21,6 +21,18 @@ prob_sparse = LinearProblem(A_sparse, b)
 # Sparse SPD for CHOLMODFactorization
 A_sparse_spd = sparse(A_spd)
 prob_sparse_spd = LinearProblem(A_sparse_spd, b)
+
+# Dual problem set up 
+function h(p)
+    (A = [p[1] p[2]+1 p[2]^3;
+          3*p[1] p[1]+5 p[2] * p[1]-4;
+          p[2]^2 9*p[1] p[2]],
+        b = [p[1] + 1, p[2] * 2, p[1]^2])
+end
+
+A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+
+dual_prob = LinearProblem(A, b)
 
 @testset "JET Tests for Dense Factorizations" begin
     # Working tests - these pass JET optimization checks
@@ -108,4 +120,12 @@ end
     # Test the default solver selection
     JET.@test_opt solve(prob) broken=true
     JET.@test_opt solve(prob_sparse) broken=true
+end
+
+@testset "JET Tests for creating Dual solutions" begin
+    # Make sure there's no runtime dispatch when making solutions of Dual problems
+    dual_cache = init(prob)
+    ext = Base.get_extension(LinearSolve, :LinearSolveForwardDiffExt)
+    JET.@test_opt ext.linearsolve_dual_solution(
+        [1.0, 1.0, 1.0], [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], cache)
 end

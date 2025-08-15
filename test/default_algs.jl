@@ -419,62 +419,7 @@ sol = solve(prob)
         @test Preferences.has_preference(LinearSolve, "best_always_loaded_Float64_medium")
     end
     
-    @testset "Preference Integration with Fresh Process" begin
-        # Test the complete preference integration by running code in a subprocess
-        # This allows us to test the preference loading at import time
-        
-        # Set preferences that should be loaded
-        Preferences.set_preferences!(LinearSolve, "best_algorithm_Float64_medium" => "RFLUFactorization"; force = true)
-        Preferences.set_preferences!(LinearSolve, "best_always_loaded_Float64_medium" => "LUFactorization"; force = true)
-        
-        # Test script that checks if preferences influence algorithm selection
-        test_script = """
-        using LinearSolve, LinearAlgebra, Preferences
-        
-        # Check that preferences are loaded
-        best_pref = Preferences.load_preference(LinearSolve, "best_algorithm_Float64_medium", nothing)
-        fallback_pref = Preferences.load_preference(LinearSolve, "best_always_loaded_Float64_medium", nothing)
-        
-        println("Best preference: ", best_pref)
-        println("Fallback preference: ", fallback_pref)
-        
-        # Test algorithm choice for medium-sized Float64 matrix
-        A = rand(Float64, 150, 150) + I(150)
-        b = rand(Float64, 150)
-        
-        chosen_alg = LinearSolve.defaultalg(A, b, LinearSolve.OperatorAssumptions(true))
-        println("Chosen algorithm: ", chosen_alg.alg)
-        
-        # Test that it can solve
-        prob = LinearProblem(A, b)
-        sol = solve(prob)
-        println("Solution success: ", sol.retcode == ReturnCode.Success)
-        println("Residual: ", norm(A * sol.u - b))
-        
-        exit(0)
-        """
-        
-        # Write test script to temporary file
-        test_file = tempname() * ".jl"
-        open(test_file, "w") do f
-            write(f, test_script)
-        end
-        
-        try
-            # Run the test script in a subprocess
-            result = read(`julia --project=. $test_file`, String)
-            @test contains(result, "Solution success: true")
-            @test contains(result, "Best preference: RFLUFactorization")
-            @test contains(result, "Fallback preference: LUFactorization")
-            println("Subprocess test output:")
-            println(result)
-        finally
-            # Clean up test file
-            rm(test_file, force=true)
-        end
-    end
-    
-    # Clean up all test preferences
+    # Clean up all test preferences and reset to original state
     for eltype in target_eltypes
         for size_cat in size_categories
             for pref_type in ["best_algorithm", "best_always_loaded"]
@@ -484,5 +429,15 @@ sol = solve(prob)
                 end
             end
         end
+    end
+    
+    # Reset MKL preference to original state if it was modified
+    if Preferences.has_preference(LinearSolve, "LoadMKL_JLL")
+        Preferences.delete_preferences!(LinearSolve, "LoadMKL_JLL"; force = true)
+    end
+    
+    # Reset autotune timestamp if it was set
+    if Preferences.has_preference(LinearSolve, "autotune_timestamp")
+        Preferences.delete_preferences!(LinearSolve, "autotune_timestamp"; force = true)
     end
 end

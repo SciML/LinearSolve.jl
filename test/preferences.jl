@@ -82,7 +82,7 @@ using Preferences
         
         # Test algorithm choice - should work regardless of FastLapack availability
         chosen_alg_test = LinearSolve.defaultalg(A, b, LinearSolve.OperatorAssumptions(true))
-        println("✅ Algorithm chosen (FastLapack test): ", chosen_alg_test.alg)
+        # No need to print algorithm choice unless there's an issue
         
         sol_default = solve(prob)
         @test sol_default.retcode == ReturnCode.Success
@@ -118,7 +118,7 @@ using Preferences
         
         # Test algorithm choice with RecursiveFactorization available
         chosen_alg_with_rf = LinearSolve.defaultalg(A, b, LinearSolve.OperatorAssumptions(true))
-        println("✅ Algorithm chosen (RecursiveFactorization test): ", chosen_alg_with_rf.alg)
+        # No need to print algorithm choice unless there's an issue
         
         sol_default_rf = solve(prob)
         @test sol_default_rf.retcode == ReturnCode.Success

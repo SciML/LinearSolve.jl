@@ -41,6 +41,10 @@ if GROUP == "LinearSolveAutotune"
     Pkg.test(GROUP, julia_args=["--check-bounds=auto", "--compiled-modules=yes", "--depwarn=yes"], force_latest_compatible_version=false, allow_reresolve=true)
 end
 
+if GROUP == "Preferences"
+    @time @safetestset "Dual Preference System Integration" include("preferences.jl")
+end
+
 if GROUP == "LinearSolveCUDA"
     Pkg.activate("gpu")
     Pkg.develop(PackageSpec(path = dirname(@__DIR__)))

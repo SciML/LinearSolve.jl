@@ -273,6 +273,130 @@ sol = solve(prob)
         end
     end
     
+    @testset "Actual Algorithm Choice Verification" begin
+        # Test that the right solver is actually chosen based on the implemented logic
+        # This verifies the algorithm selection behavior that will use preferences
+        
+        # Test scenario 1: Tiny matrix override (should always choose GenericLU regardless of preferences)
+        A_tiny = rand(Float64, 8, 8) + I(8)  # length(b) <= 10 triggers override
+        b_tiny = rand(Float64, 8)
+        
+        chosen_alg_tiny = LinearSolve.defaultalg(A_tiny, b_tiny, LinearSolve.OperatorAssumptions(true))
+        @test chosen_alg_tiny.alg === LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
+        
+        # Test that tiny problems work correctly
+        prob_tiny = LinearProblem(A_tiny, b_tiny)
+        sol_tiny = solve(prob_tiny)
+        @test sol_tiny.retcode == ReturnCode.Success
+        @test norm(A_tiny * sol_tiny.u - b_tiny) < 1e-10
+        
+        # Test scenario 2: Medium-sized matrix (should use tuned algorithm logic or fallback to heuristics)
+        A_medium = rand(Float64, 150, 150) + I(150)
+        b_medium = rand(Float64, 150)
+        
+        chosen_alg_medium = LinearSolve.defaultalg(A_medium, b_medium, LinearSolve.OperatorAssumptions(true))
+        @test isa(chosen_alg_medium, LinearSolve.DefaultLinearSolver)
+        @test chosen_alg_medium.alg isa LinearSolve.DefaultAlgorithmChoice.T
+        
+        # The chosen algorithm should be one of the expected defaults when no preferences set
+        expected_choices = [
+            LinearSolve.DefaultAlgorithmChoice.RFLUFactorization,
+            LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization, 
+            LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization,
+            LinearSolve.DefaultAlgorithmChoice.LUFactorization
+        ]
+        @test chosen_alg_medium.alg in expected_choices
+        
+        # Test that the chosen algorithm can solve the problem
+        prob_medium = LinearProblem(A_medium, b_medium)
+        sol_medium = solve(prob_medium)
+        @test sol_medium.retcode == ReturnCode.Success
+        @test norm(A_medium * sol_medium.u - b_medium) < 1e-8
+        
+        # Test scenario 3: Large matrix behavior
+        A_large = rand(Float64, 600, 600) + I(600)
+        b_large = rand(Float64, 600)
+        
+        chosen_alg_large = LinearSolve.defaultalg(A_large, b_large, LinearSolve.OperatorAssumptions(true))
+        @test isa(chosen_alg_large, LinearSolve.DefaultLinearSolver)
+        
+        # For large matrices, should typically choose MKL, AppleAccelerate, or standard LU
+        large_expected_choices = [
+            LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization,
+            LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization, 
+            LinearSolve.DefaultAlgorithmChoice.LUFactorization
+        ]
+        @test chosen_alg_large.alg in large_expected_choices
+        
+        # Verify the large problem can be solved
+        prob_large = LinearProblem(A_large, b_large)
+        sol_large = solve(prob_large)
+        @test sol_large.retcode == ReturnCode.Success
+        @test norm(A_large * sol_large.u - b_large) < 1e-8
+        
+        # Test scenario 4: Different element types
+        # Test Float32 medium
+        A_f32 = rand(Float32, 150, 150) + I(150)
+        b_f32 = rand(Float32, 150)
+        
+        chosen_alg_f32 = LinearSolve.defaultalg(A_f32, b_f32, LinearSolve.OperatorAssumptions(true))
+        @test isa(chosen_alg_f32, LinearSolve.DefaultLinearSolver)
+        @test chosen_alg_f32.alg in expected_choices
+        
+        prob_f32 = LinearProblem(A_f32, b_f32)
+        sol_f32 = solve(prob_f32)
+        @test sol_f32.retcode == ReturnCode.Success
+        @test norm(A_f32 * sol_f32.u - b_f32) < 1e-6
+        
+        # Test ComplexF64 medium 
+        A_c64 = rand(ComplexF64, 100, 100) + I(100)
+        b_c64 = rand(ComplexF64, 100)
+        
+        chosen_alg_c64 = LinearSolve.defaultalg(A_c64, b_c64, LinearSolve.OperatorAssumptions(true))
+        @test isa(chosen_alg_c64, LinearSolve.DefaultLinearSolver)
+        
+        prob_c64 = LinearProblem(A_c64, b_c64)
+        sol_c64 = solve(prob_c64)
+        @test sol_c64.retcode == ReturnCode.Success
+        @test norm(A_c64 * sol_c64.u - b_c64) < 1e-8
+    end
+    
+    @testset "Size Category Logic Verification" begin
+        # Test that the size categorization logic matches expectations
+        
+        # Test the size boundaries that determine algorithm choice
+        size_test_cases = [
+            (5, LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization),    # Tiny override
+            (10, LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization),   # Tiny override  
+            (50, nothing),   # Medium - depends on system/preferences
+            (150, nothing),  # Medium - depends on system/preferences
+            (300, nothing),  # Large - depends on system/preferences
+            (600, nothing)   # Large - depends on system/preferences
+        ]
+        
+        for (size, expected_alg) in size_test_cases
+            A = rand(Float64, size, size) + I(size)
+            b = rand(Float64, size)
+            
+            chosen_alg = LinearSolve.defaultalg(A, b, LinearSolve.OperatorAssumptions(true))
+            
+            if expected_alg !== nothing
+                # For tiny matrices, should always get GenericLUFactorization
+                @test chosen_alg.alg === expected_alg
+            else
+                # For larger matrices, should get a reasonable choice
+                @test isa(chosen_alg, LinearSolve.DefaultLinearSolver)
+                @test chosen_alg.alg isa LinearSolve.DefaultAlgorithmChoice.T
+            end
+            
+            # Test that all choices can solve problems
+            prob = LinearProblem(A, b)
+            sol = solve(prob)
+            @test sol.retcode == ReturnCode.Success
+            @test norm(A * sol.u - b) < (size <= 10 ? 1e-12 : 1e-8)
+        end
+    end
+    
     @testset "Preference System Robustness" begin
         # Test that default solver remains robust with invalid preferences
         
@@ -293,6 +417,61 @@ sol = solve(prob)
         # Test that preference infrastructure doesn't break default behavior
         @test Preferences.has_preference(LinearSolve, "best_algorithm_Float64_medium")
         @test Preferences.has_preference(LinearSolve, "best_always_loaded_Float64_medium")
+    end
+    
+    @testset "Preference Integration with Fresh Process" begin
+        # Test the complete preference integration by running code in a subprocess
+        # This allows us to test the preference loading at import time
+        
+        # Set preferences that should be loaded
+        Preferences.set_preferences!(LinearSolve, "best_algorithm_Float64_medium" => "RFLUFactorization"; force = true)
+        Preferences.set_preferences!(LinearSolve, "best_always_loaded_Float64_medium" => "LUFactorization"; force = true)
+        
+        # Test script that checks if preferences influence algorithm selection
+        test_script = """
+        using LinearSolve, LinearAlgebra, Preferences
+        
+        # Check that preferences are loaded
+        best_pref = Preferences.load_preference(LinearSolve, "best_algorithm_Float64_medium", nothing)
+        fallback_pref = Preferences.load_preference(LinearSolve, "best_always_loaded_Float64_medium", nothing)
+        
+        println("Best preference: ", best_pref)
+        println("Fallback preference: ", fallback_pref)
+        
+        # Test algorithm choice for medium-sized Float64 matrix
+        A = rand(Float64, 150, 150) + I(150)
+        b = rand(Float64, 150)
+        
+        chosen_alg = LinearSolve.defaultalg(A, b, LinearSolve.OperatorAssumptions(true))
+        println("Chosen algorithm: ", chosen_alg.alg)
+        
+        # Test that it can solve
+        prob = LinearProblem(A, b)
+        sol = solve(prob)
+        println("Solution success: ", sol.retcode == ReturnCode.Success)
+        println("Residual: ", norm(A * sol.u - b))
+        
+        exit(0)
+        """
+        
+        # Write test script to temporary file
+        test_file = tempname() * ".jl"
+        open(test_file, "w") do f
+            write(f, test_script)
+        end
+        
+        try
+            # Run the test script in a subprocess
+            result = read(`julia --project=. $test_file`, String)
+            @test contains(result, "Solution success: true")
+            @test contains(result, "Best preference: RFLUFactorization")
+            @test contains(result, "Fallback preference: LUFactorization")
+            println("Subprocess test output:")
+            println(result)
+        finally
+            # Clean up test file
+            rm(test_file, force=true)
+        end
     end
     
     # Clean up all test preferences

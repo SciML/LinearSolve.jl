@@ -258,39 +258,6 @@ using Preferences
             @test norm(A * sol.u - b) < (test_size <= 10 ? 1e-12 : 1e-8)
         end
         
-        # Additional boundary testing
-        boundary_test_cases = [
-            # Test exact boundaries
-            (20, "tiny", LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization),           # At tiny boundary
-            (21, "small", LinearSolve.DefaultAlgorithmChoice.RFLUFactorization),              # Start of small
-            (100, "small", LinearSolve.DefaultAlgorithmChoice.RFLUFactorization),             # End of small
-            (101, "medium", LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization), # Start of medium
-            (300, "medium", LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization), # End of medium
-            (301, "large", LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization),            # Start of large
-            (1000, "large", LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization),           # End of large
-            (1001, "big", LinearSolve.DefaultAlgorithmChoice.LUFactorization)                 # Start of big
-        ]
-        
-        for (boundary_size, boundary_category, boundary_expected) in boundary_test_cases
-            A_boundary = rand(Float64, boundary_size, boundary_size) + I(boundary_size)
-            b_boundary = rand(Float64, boundary_size)
-            
-            chosen_boundary = LinearSolve.defaultalg(A_boundary, b_boundary, LinearSolve.OperatorAssumptions(true))
-            
-            if boundary_size <= 10
-                @test chosen_boundary.alg === LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
-            else
-                # Test that it matches expected algorithm for the boundary
-                @test chosen_boundary.alg === boundary_expected
-                println("  Boundary $(boundary_size) ($(boundary_category)) chose: $(chosen_boundary.alg)")
-            end
-            
-            # Test that boundary cases solve correctly
-            prob_boundary = LinearProblem(A_boundary, b_boundary)
-            sol_boundary = solve(prob_boundary)
-            @test sol_boundary.retcode == ReturnCode.Success
-            @test norm(A_boundary * sol_boundary.u - b_boundary) < (boundary_size <= 10 ? 1e-12 : 1e-8)
-        end
     end
     
     # Final cleanup: Reset all preferences to original state

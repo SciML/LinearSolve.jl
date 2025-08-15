@@ -321,7 +321,7 @@ using Preferences
         size_algorithm_map = [
             ("tiny", "GenericLUFactorization"),
             ("small", "RFLUFactorization"), 
-            ("medium", "FastLUFactorization"),
+            ("medium", "AppleAccelerateLUFactorization"),
             ("large", "MKLLUFactorization"),
             ("big", "LUFactorization")
         ]
@@ -333,12 +333,11 @@ using Preferences
         end
         
         # Test sizes that should land in each category
-        # Note: FastLUFactorization maps to LUFactorization in DefaultAlgorithmChoice
         test_cases = [
             # (test_size, expected_category, expected_algorithm)
             (15, "tiny", LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization),
             (80, "small", LinearSolve.DefaultAlgorithmChoice.RFLUFactorization),
-            (200, "medium", LinearSolve.DefaultAlgorithmChoice.LUFactorization),  # FastLU maps to LU
+            (200, "medium", LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization),
             (500, "large", LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization),
             (1500, "big", LinearSolve.DefaultAlgorithmChoice.LUFactorization)
         ]
@@ -356,8 +355,7 @@ using Preferences
                 @test chosen_alg.alg === LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
                 println("  ✅ Tiny override correctly chose GenericLU")
             else
-                # For larger matrices, test that it chooses the expected algorithm
-                # NOTE: When preference system is fully active, this should match expected_algorithm
+                # Test that it chooses the expected algorithm when preference system is active
                 @test chosen_alg.alg === expected_algorithm || isa(chosen_alg, LinearSolve.DefaultLinearSolver)
                 println("  ✅ Size $(test_size) chose: $(chosen_alg.alg) (expected: $(expected_algorithm))")
             end
@@ -370,17 +368,16 @@ using Preferences
         end
         
         # Additional boundary testing
-        # Note: FastLUFactorization maps to LUFactorization in DefaultAlgorithmChoice
         boundary_test_cases = [
             # Test exact boundaries
-            (20, "tiny", LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization),   # At tiny boundary
-            (21, "small", LinearSolve.DefaultAlgorithmChoice.RFLUFactorization),      # Start of small
-            (100, "small", LinearSolve.DefaultAlgorithmChoice.RFLUFactorization),     # End of small
-            (101, "medium", LinearSolve.DefaultAlgorithmChoice.LUFactorization),      # Start of medium (FastLU→LU)
-            (300, "medium", LinearSolve.DefaultAlgorithmChoice.LUFactorization),      # End of medium (FastLU→LU)
-            (301, "large", LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization),    # Start of large
-            (1000, "large", LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization),   # End of large
-            (1001, "big", LinearSolve.DefaultAlgorithmChoice.LUFactorization)         # Start of big
+            (20, "tiny", LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization),           # At tiny boundary
+            (21, "small", LinearSolve.DefaultAlgorithmChoice.RFLUFactorization),              # Start of small
+            (100, "small", LinearSolve.DefaultAlgorithmChoice.RFLUFactorization),             # End of small
+            (101, "medium", LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization), # Start of medium
+            (300, "medium", LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization), # End of medium
+            (301, "large", LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization),            # Start of large
+            (1000, "large", LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization),           # End of large
+            (1001, "big", LinearSolve.DefaultAlgorithmChoice.LUFactorization)                 # Start of big
         ]
         
         for (boundary_size, boundary_category, boundary_expected) in boundary_test_cases

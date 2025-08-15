@@ -305,17 +305,6 @@ function _string_to_algorithm_choice(algorithm_name::Union{String, Nothing})
         return DefaultAlgorithmChoice.LUFactorization  # Map to standard LU (Metal extension)
     elseif algorithm_name == "AMDGPUOffloadLUFactorization"
         return DefaultAlgorithmChoice.LUFactorization  # Map to standard LU (AMDGPU extension)
-    # Non-LU algorithms (not typically tuned in default selection but support for completeness)
-    elseif algorithm_name == "QRFactorization"
-        return DefaultAlgorithmChoice.QRFactorization
-    elseif algorithm_name == "CholeskyFactorization"
-        return DefaultAlgorithmChoice.CholeskyFactorization
-    elseif algorithm_name == "SVDFactorization"
-        return DefaultAlgorithmChoice.SVDFactorization
-    elseif algorithm_name == "BunchKaufmanFactorization"
-        return DefaultAlgorithmChoice.BunchKaufmanFactorization
-    elseif algorithm_name == "LDLtFactorization"
-        return DefaultAlgorithmChoice.LDLtFactorization
     else
         @warn "Unknown algorithm preference: $algorithm_name, falling back to heuristics"
         return nothing

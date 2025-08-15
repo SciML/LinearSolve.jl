@@ -479,6 +479,7 @@ include("simplelu.jl")
 include("simplegmres.jl")
 include("iterative_wrappers.jl")
 include("preconditioners.jl")
+include("analysis.jl")
 include("solve_function.jl")
 include("default.jl")
 include("init.jl")
@@ -560,7 +561,7 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization,
        CUSOLVERRFFactorization, CliqueTreesFactorization
 
-export LinearSolveFunction, DirectLdiv!
+export LinearSolveFunction, DirectLdiv!, show_algorithm_choices
 
 export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
        KrylovJL_BICGSTAB, KrylovJL_LSMR, KrylovJL_CRAIGMR,

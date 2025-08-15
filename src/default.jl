@@ -247,12 +247,14 @@ Fast path when no preferences are set.
     # Determine the element type to use for preference lookup
     target_eltype = eltype_A !== Nothing ? eltype_A : eltype_b
     
-    # Determine size category based on matrix size
-    size_category = if matrix_size <= 128
+    # Determine size category based on matrix size (matching LinearSolveAutotune categories)
+    size_category = if matrix_size <= 20
+        :tiny
+    elseif matrix_size <= 100
         :small
-    elseif matrix_size <= 256
+    elseif matrix_size <= 300
         :medium
-    elseif matrix_size <= 512
+    elseif matrix_size <= 1000
         :large
     else
         :big

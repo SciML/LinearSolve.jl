@@ -326,6 +326,10 @@ end
 # Support both best overall algorithm and best always-loaded algorithm as fallback
 const AUTOTUNE_PREFS = (
     Float32 = (
+        tiny = (
+            best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float32_tiny", nothing)),
+            fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_Float32_tiny", nothing))
+        ),
         small = (
             best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float32_small", nothing)),
             fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_Float32_small", nothing))
@@ -344,6 +348,10 @@ const AUTOTUNE_PREFS = (
         )
     ),
     Float64 = (
+        tiny = (
+            best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float64_tiny", nothing)),
+            fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_Float64_tiny", nothing))
+        ),
         small = (
             best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_Float64_small", nothing)),
             fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_Float64_small", nothing))
@@ -362,6 +370,10 @@ const AUTOTUNE_PREFS = (
         )
     ),
     ComplexF32 = (
+        tiny = (
+            best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF32_tiny", nothing)),
+            fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_ComplexF32_tiny", nothing))
+        ),
         small = (
             best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF32_small", nothing)),
             fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_ComplexF32_small", nothing))
@@ -380,6 +392,10 @@ const AUTOTUNE_PREFS = (
         )
     ),
     ComplexF64 = (
+        tiny = (
+            best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF64_tiny", nothing)),
+            fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_ComplexF64_tiny", nothing))
+        ),
         small = (
             best = _string_to_algorithm_choice(Preferences.@load_preference("best_algorithm_ComplexF64_small", nothing)),
             fallback = _string_to_algorithm_choice(Preferences.@load_preference("best_always_loaded_ComplexF64_small", nothing))
@@ -403,7 +419,7 @@ const AUTOTUNE_PREFS = (
 const AUTOTUNE_PREFS_SET = let
     any_set = false
     for type_prefs in (AUTOTUNE_PREFS.Float32, AUTOTUNE_PREFS.Float64, AUTOTUNE_PREFS.ComplexF32, AUTOTUNE_PREFS.ComplexF64)
-        for size_pref in (type_prefs.small, type_prefs.medium, type_prefs.large, type_prefs.big)
+        for size_pref in (type_prefs.tiny, type_prefs.small, type_prefs.medium, type_prefs.large, type_prefs.big)
             if size_pref.best !== nothing || size_pref.fallback !== nothing
                 any_set = true
                 break

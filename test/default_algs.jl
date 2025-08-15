@@ -170,3 +170,140 @@ sol = solve(prob,
 
 sol = solve(prob)
 @test sol.u ≈ svd(A)\b
+
+# Test that dual preference system integration works correctly
+@testset "Autotune Dual Preference System Integration" begin
+    using Preferences
+    
+    # Clear any existing preferences
+    target_eltypes = ["Float32", "Float64", "ComplexF32", "ComplexF64"]
+    size_categories = ["tiny", "small", "medium", "large", "big"]
+    
+    for eltype in target_eltypes
+        for size_cat in size_categories
+            for pref_type in ["best_algorithm", "best_always_loaded"]
+                pref_key = "$(pref_type)_$(eltype)_$(size_cat)"
+                if Preferences.has_preference(LinearSolve, pref_key)
+                    Preferences.delete_preferences!(LinearSolve, pref_key; force = true)
+                end
+            end
+        end
+    end
+    
+    @testset "Dual Preference Storage and Retrieval" begin
+        # Test that we can store and retrieve both types of preferences
+        Preferences.set_preferences!(LinearSolve, "best_algorithm_Float64_medium" => "RFLUFactorization"; force = true)
+        Preferences.set_preferences!(LinearSolve, "best_always_loaded_Float64_medium" => "MKLLUFactorization"; force = true)
+        
+        # Verify preference storage is correct
+        @test Preferences.load_preference(LinearSolve, "best_algorithm_Float64_medium", nothing) == "RFLUFactorization"
+        @test Preferences.load_preference(LinearSolve, "best_always_loaded_Float64_medium", nothing) == "MKLLUFactorization"
+        
+        # Test with different element types and sizes
+        Preferences.set_preferences!(LinearSolve, "best_algorithm_Float32_small" => "LUFactorization"; force = true)
+        Preferences.set_preferences!(LinearSolve, "best_always_loaded_Float32_small" => "LUFactorization"; force = true)
+        
+        @test Preferences.load_preference(LinearSolve, "best_algorithm_Float32_small", nothing) == "LUFactorization"
+        @test Preferences.load_preference(LinearSolve, "best_always_loaded_Float32_small", nothing) == "LUFactorization"
+    end
+    
+    @testset "Default Algorithm Selection with Dual Preferences" begin
+        # Test that default solver works correctly when preferences are set
+        # This verifies the infrastructure is ready for the preference integration
+        
+        test_scenarios = [
+            (Float64, 150, "RFLUFactorization", "LUFactorization"),    # medium size
+            (Float32, 80, "LUFactorization", "LUFactorization"),       # small size  
+            (ComplexF64, 100, "LUFactorization", "LUFactorization")    # small size, conservative
+        ]
+        
+        for (eltype, matrix_size, best_alg, fallback_alg) in test_scenarios
+            # Determine size category for preferences
+            size_category = if matrix_size <= 128
+                "small"
+            elseif matrix_size <= 256  
+                "medium"
+            elseif matrix_size <= 512
+                "large"
+            else
+                "big"
+            end
+            
+            # Set preferences for this scenario
+            eltype_str = string(eltype)
+            Preferences.set_preferences!(LinearSolve, "best_algorithm_$(eltype_str)_$(size_category)" => best_alg; force = true)
+            Preferences.set_preferences!(LinearSolve, "best_always_loaded_$(eltype_str)_$(size_category)" => fallback_alg; force = true)
+            
+            # Verify preferences are stored correctly
+            @test Preferences.has_preference(LinearSolve, "best_algorithm_$(eltype_str)_$(size_category)")
+            @test Preferences.has_preference(LinearSolve, "best_always_loaded_$(eltype_str)_$(size_category)")
+            
+            stored_best = Preferences.load_preference(LinearSolve, "best_algorithm_$(eltype_str)_$(size_category)", nothing)
+            stored_fallback = Preferences.load_preference(LinearSolve, "best_always_loaded_$(eltype_str)_$(size_category)", nothing)
+            
+            @test stored_best == best_alg
+            @test stored_fallback == fallback_alg
+            
+            # Create test problem and verify it can be solved
+            A = rand(eltype, matrix_size, matrix_size) + I(matrix_size)
+            b = rand(eltype, matrix_size)
+            prob = LinearProblem(A, b)
+            
+            # Test that default solver works (infrastructure ready for preference integration)
+            sol = solve(prob)
+            @test sol.retcode == ReturnCode.Success
+            @test norm(A * sol.u - b) < (eltype <: AbstractFloat ? 1e-6 : 1e-8)
+            
+            # Test that preferred algorithms work individually
+            if best_alg == "LUFactorization"
+                sol_best = solve(prob, LUFactorization())
+                @test sol_best.retcode == ReturnCode.Success
+                @test norm(A * sol_best.u - b) < (eltype <: AbstractFloat ? 1e-6 : 1e-8)
+            elseif best_alg == "RFLUFactorization" && LinearSolve.userecursivefactorization(A)
+                sol_best = solve(prob, RFLUFactorization())
+                @test sol_best.retcode == ReturnCode.Success
+                @test norm(A * sol_best.u - b) < (eltype <: AbstractFloat ? 1e-6 : 1e-8)
+            end
+            
+            if fallback_alg == "LUFactorization"
+                sol_fallback = solve(prob, LUFactorization())
+                @test sol_fallback.retcode == ReturnCode.Success
+                @test norm(A * sol_fallback.u - b) < (eltype <: AbstractFloat ? 1e-6 : 1e-8)
+            end
+        end
+    end
+    
+    @testset "Preference System Robustness" begin
+        # Test that default solver remains robust with invalid preferences
+        
+        # Set invalid preferences
+        Preferences.set_preferences!(LinearSolve, "best_algorithm_Float64_medium" => "NonExistentAlgorithm"; force = true)
+        Preferences.set_preferences!(LinearSolve, "best_always_loaded_Float64_medium" => "AnotherNonExistentAlgorithm"; force = true)
+        
+        # Create test problem
+        A = rand(Float64, 150, 150) + I(150)
+        b = rand(Float64, 150)
+        prob = LinearProblem(A, b)
+        
+        # Should still solve successfully using existing heuristics
+        sol = solve(prob)
+        @test sol.retcode == ReturnCode.Success
+        @test norm(A * sol.u - b) < 1e-8
+        
+        # Test that preference infrastructure doesn't break default behavior
+        @test Preferences.has_preference(LinearSolve, "best_algorithm_Float64_medium")
+        @test Preferences.has_preference(LinearSolve, "best_always_loaded_Float64_medium")
+    end
+    
+    # Clean up all test preferences
+    for eltype in target_eltypes
+        for size_cat in size_categories
+            for pref_type in ["best_algorithm", "best_always_loaded"]
+                pref_key = "$(pref_type)_$(eltype)_$(size_cat)"
+                if Preferences.has_preference(LinearSolve, pref_key)
+                    Preferences.delete_preferences!(LinearSolve, pref_key; force = true)
+                end
+            end
+        end
+    end
+end

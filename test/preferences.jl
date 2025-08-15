@@ -88,8 +88,7 @@ using Preferences
         if fastlapack_loaded
             # If FastLapack loaded correctly and preferences are active, should choose FastLU
             # NOTE: This test documents expected behavior when preference system is fully active
-            @test chosen_alg_test.alg === LinearSolve.DefaultAlgorithmChoice.FastLUFactorization ||
-                  isa(chosen_alg_test, LinearSolve.DefaultLinearSolver)  # Fallback for current state
+            @test chosen_alg_test.alg === LinearSolve.DefaultAlgorithmChoice.FastLUFactorization
         else
             @test isa(chosen_alg_test, LinearSolve.DefaultLinearSolver)
         end
@@ -134,8 +133,7 @@ using Preferences
         if recursive_loaded
             # If RecursiveFactorization loaded correctly and preferences are active, should choose RFLU
             # NOTE: This test documents expected behavior when preference system is fully active
-            @test chosen_alg_with_rf.alg === LinearSolve.DefaultAlgorithmChoice.RFLUFactorization ||
-                  isa(chosen_alg_with_rf, LinearSolve.DefaultLinearSolver)  # Fallback for current state
+            @test chosen_alg_with_rf.alg === LinearSolve.DefaultAlgorithmChoice.RFLUFactorization
         else
             @test isa(chosen_alg_with_rf, LinearSolve.DefaultLinearSolver)
         end

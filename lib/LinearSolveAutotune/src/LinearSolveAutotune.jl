@@ -345,7 +345,7 @@ function autotune_setup(;
 
     # Set preferences if requested
     if set_preferences && !isempty(categories)
-        set_algorithm_preferences(categories)
+        set_algorithm_preferences(categories, results_df)
     end
 
     @info "Autotune setup completed!"

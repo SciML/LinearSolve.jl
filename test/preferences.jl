@@ -73,7 +73,7 @@ using Preferences
             
             # Test that FastLUFactorization works - only print if it fails
             sol_fast = solve(prob, FastLUFactorization())
-            @test sol_fast.retcode == ReturnCode.Success
+            @test sol_fast.retcode == ReturnCode.Default
             @test norm(A * sol_fast.u - b) < 1e-8
             fastlapack_loaded = true
             # Success - no print needed

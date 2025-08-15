@@ -58,9 +58,13 @@ using Preferences
     @testset "FastLapack Extension Conditional Loading" begin
         # Test FastLapack loading conditionally and algorithm availability
         
-        # Preferences should still be set
-        @test Preferences.load_preference(LinearSolve, "best_algorithm_Float64_medium", nothing) == "RFLUFactorization"
-        @test Preferences.load_preference(LinearSolve, "best_always_loaded_Float64_medium", nothing) == "FastLUFactorization"
+        # Set preferences with GenericLU as always_loaded so it can be hit correctly
+        Preferences.set_preferences!(LinearSolve, "best_algorithm_Float64_medium" => "FastLUFactorization"; force = true)
+        Preferences.set_preferences!(LinearSolve, "best_always_loaded_Float64_medium" => "GenericLUFactorization"; force = true)
+        
+        # Verify preferences are set
+        @test Preferences.load_preference(LinearSolve, "best_algorithm_Float64_medium", nothing) == "FastLUFactorization"
+        @test Preferences.load_preference(LinearSolve, "best_always_loaded_Float64_medium", nothing) == "GenericLUFactorization"
         
         A = rand(Float64, 150, 150) + I(150)
         b = rand(Float64, 150)

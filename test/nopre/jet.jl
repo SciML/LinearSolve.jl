@@ -139,5 +139,5 @@ end
     dual_cache = init(prob)
     ext = Base.get_extension(LinearSolve, :LinearSolveForwardDiffExt)
     JET.@test_opt ext.linearsolve_dual_solution(
-        [1.0, 1.0, 1.0], [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], cache)
+        [1.0, 1.0, 1.0], [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dual_cache )
 end

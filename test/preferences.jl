@@ -190,116 +190,7 @@ using Preferences
         end
     end
     
-    @testset "Preference-Based Algorithm Selection Simulation" begin
-        # Simulate what should happen when preference system is fully active
-        
-        # Test different preference combinations
-        test_scenarios = [
-            ("RFLUFactorization", "FastLUFactorization", "RF available, FastLU fallback"),
-            ("FastLUFactorization", "LUFactorization", "FastLU best, LU fallback"),
-            ("NonExistentAlgorithm", "FastLUFactorization", "Invalid best, FastLU fallback"),
-            ("NonExistentAlgorithm", "NonExistentAlgorithm", "Both invalid, use heuristics")
-        ]
-        
-        A = rand(Float64, 150, 150) + I(150)
-        b = rand(Float64, 150)
-        prob = LinearProblem(A, b)
-        
-        for (best_alg, fallback_alg, description) in test_scenarios
-            println("Testing scenario: ", description)
-            
-            # Set preferences for this scenario
-            Preferences.set_preferences!(LinearSolve, "best_algorithm_Float64_medium" => best_alg; force = true)
-            Preferences.set_preferences!(LinearSolve, "best_always_loaded_Float64_medium" => fallback_alg; force = true)
-            
-            # Test that system remains robust
-            chosen_alg = LinearSolve.defaultalg(A, b, LinearSolve.OperatorAssumptions(true))
-            @test isa(chosen_alg, LinearSolve.DefaultLinearSolver)
-            
-            sol = solve(prob)
-            @test sol.retcode == ReturnCode.Success
-            @test norm(A * sol.u - b) < 1e-8
-            
-            println("  Chosen algorithm: ", chosen_alg.alg)
-        end
-    end
     
-    @testset "Size Category Boundary Verification with FastLapack" begin
-        # Test that size boundaries match LinearSolveAutotune categories exactly
-        # Use FastLapack as a test case since it's slow and normally never chosen
-        
-        # Define the correct size boundaries (matching LinearSolveAutotune)
-        size_boundaries = [
-            # (test_size, expected_category, boundary_description)
-            (15, "tiny", "within tiny range (≤20)"),
-            (20, "tiny", "at tiny boundary (=20)"),
-            (21, "small", "start of small range (=21)"), 
-            (80, "small", "within small range (21-100)"),
-            (100, "small", "at small boundary (=100)"),
-            (101, "medium", "start of medium range (=101)"),
-            (200, "medium", "within medium range (101-300)"),
-            (300, "medium", "at medium boundary (=300)"),
-            (301, "large", "start of large range (=301)"),
-            (500, "large", "within large range (301-1000)"),
-            (1000, "large", "at large boundary (=1000)"),
-            (1001, "big", "start of big range (>1000)")
-        ]
-        
-        for (test_size, expected_category, description) in size_boundaries
-            println("Testing size $(test_size): $(description)")
-            
-            # Clear all preferences first
-            for eltype in target_eltypes
-                for size_cat in size_categories
-                    for pref_type in ["best_algorithm", "best_always_loaded"]
-                        pref_key = "$(pref_type)_$(eltype)_$(size_cat)"
-                        if Preferences.has_preference(LinearSolve, pref_key)
-                            Preferences.delete_preferences!(LinearSolve, pref_key; force = true)
-                        end
-                    end
-                end
-            end
-            
-            # Set FastLapack as best for ONLY the expected category
-            Preferences.set_preferences!(LinearSolve, "best_algorithm_Float64_$(expected_category)" => "FastLUFactorization"; force = true)
-            Preferences.set_preferences!(LinearSolve, "best_always_loaded_Float64_$(expected_category)" => "FastLUFactorization"; force = true)
-            
-            # Set LUFactorization as default for all OTHER categories
-            for other_category in size_categories
-                if other_category != expected_category
-                    Preferences.set_preferences!(LinearSolve, "best_algorithm_Float64_$(other_category)" => "LUFactorization"; force = true)
-                    Preferences.set_preferences!(LinearSolve, "best_always_loaded_Float64_$(other_category)" => "LUFactorization"; force = true)
-                end
-            end
-            
-            # Create test problem of the specific size
-            A = rand(Float64, test_size, test_size) + I(test_size)
-            b = rand(Float64, test_size)
-            
-            # Check algorithm choice
-            chosen_alg = LinearSolve.defaultalg(A, b, LinearSolve.OperatorAssumptions(true))
-            
-            if test_size <= 10
-                # Tiny override should always choose GenericLU regardless of preferences
-                @test chosen_alg.alg === LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
-                println("  ✅ Correctly overrode to GenericLU for tiny matrix (≤10)")
-            else
-                # For larger matrices, verify the algorithm selection logic
-                @test isa(chosen_alg, LinearSolve.DefaultLinearSolver)
-                println("  ✅ Chose: $(chosen_alg.alg) for $(expected_category) category")
-                
-                # NOTE: Since AUTOTUNE_PREFS are loaded at compile time, this test verifies
-                # the infrastructure. In a real scenario with preferences loaded at package import,
-                # the algorithm should match the preference for the correct size category.
-            end
-            
-            # Test that the problem can be solved
-            prob = LinearProblem(A, b)
-            sol = solve(prob)
-            @test sol.retcode == ReturnCode.Success
-            @test norm(A * sol.u - b) < (test_size <= 10 ? 1e-12 : 1e-8)
-        end
-    end
     
     @testset "Different Algorithm for Every Size Category Test" begin
         # Test with different algorithm preferences for every size category
@@ -356,7 +247,7 @@ using Preferences
                 println("  ✅ Tiny override correctly chose GenericLU")
             else
                 # Test that it chooses the expected algorithm when preference system is active
-                @test chosen_alg.alg === expected_algorithm || isa(chosen_alg, LinearSolve.DefaultLinearSolver)
+                @test chosen_alg.alg === expected_algorithm
                 println("  ✅ Size $(test_size) chose: $(chosen_alg.alg) (expected: $(expected_algorithm))")
             end
             
@@ -390,7 +281,7 @@ using Preferences
                 @test chosen_boundary.alg === LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
             else
                 # Test that it matches expected algorithm for the boundary
-                @test chosen_boundary.alg === boundary_expected || isa(chosen_boundary, LinearSolve.DefaultLinearSolver)
+                @test chosen_boundary.alg === boundary_expected
                 println("  Boundary $(boundary_size) ($(boundary_category)) chose: $(chosen_boundary.alg)")
             end
             

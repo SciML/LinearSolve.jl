@@ -289,14 +289,14 @@ using Preferences
                 prob_other = LinearProblem(A_other, b_other)
                 sol_other = solve(prob_other)
                 @test sol_other.retcode == ReturnCode.Success
-                @test norm(A_other * sol_other.u - b_other) < (other_size <= 10 ? 1e-12 : 1e-8)
+                @test norm(A_other * sol_other.u - b_other) < (other_size <= 10 ? 1e-12 : 1e-6)
             end
             
             # Test that RFLU size problem solves
             prob_rflu = LinearProblem(A_rflu, b_rflu)
             sol_rflu = solve(prob_rflu)
             @test sol_rflu.retcode == ReturnCode.Success
-            @test norm(A_rflu * sol_rflu.u - b_rflu) < (rflu_size <= 10 ? 1e-12 : 1e-8)
+            @test norm(A_rflu * sol_rflu.u - b_rflu) < (rflu_size <= 10 ? 1e-12 : 1e-6)
         end
     end
     

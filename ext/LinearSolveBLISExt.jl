@@ -204,13 +204,13 @@ const PREALLOCATED_BLIS_LU = begin
 end
 
 function LinearSolve.init_cacheval(alg::BLISLUFactorization, A, b, u, Pl, Pr,
-    maxiters::Int, abstol, reltol, verbose::Bool,
+    maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
     assumptions::OperatorAssumptions)
     PREALLOCATED_BLIS_LU
 end
 
 function LinearSolve.init_cacheval(alg::BLISLUFactorization, A::AbstractMatrix{<:Union{Float32,ComplexF32,ComplexF64}}, b, u, Pl, Pr,
-    maxiters::Int, abstol, reltol, verbose::Bool,
+    maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
     assumptions::OperatorAssumptions)
     A = rand(eltype(A), 0, 0)
     ArrayInterface.lu_instance(A), Ref{BlasInt}()

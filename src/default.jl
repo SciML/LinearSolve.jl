@@ -292,43 +292,7 @@ end
 
 @inline _get_tuned_algorithm_impl(::Type, ::Symbol) = nothing  # Fallback for other types
 
-# Runtime preference checking for testing
-function _get_tuned_algorithm_runtime(target_eltype::Type, size_category::Symbol)
-    eltype_str = string(target_eltype)
-    size_str = string(size_category)
-    
-    # Load preferences at runtime
-    best_pref = Preferences.load_preference(LinearSolve, "best_algorithm_$(eltype_str)_$(size_str)", nothing)
-    fallback_pref = Preferences.load_preference(LinearSolve, "best_always_loaded_$(eltype_str)_$(size_str)", nothing)
-    
-    if best_pref !== nothing || fallback_pref !== nothing
-        # Convert to algorithm choices
-        best_alg = LinearSolve._string_to_algorithm_choice(best_pref)
-        fallback_alg = LinearSolve._string_to_algorithm_choice(fallback_pref)
-        
-        # Create preference structure
-        prefs = (best = best_alg, fallback = fallback_alg)
-        return LinearSolve._choose_available_algorithm(prefs)
-    end
-    
-    return nothing
-end
 
-# Helper function to choose available algorithm with fallback logic
-@inline function _choose_available_algorithm(prefs)
-    # Try the best algorithm first
-    if prefs.best !== nothing && is_algorithm_available(prefs.best)
-        return prefs.best
-    end
-    
-    # Fall back to always-loaded algorithm if best is not available
-    if prefs.fallback !== nothing && is_algorithm_available(prefs.fallback)
-        return prefs.fallback
-    end
-    
-    # No tuned algorithms available
-    return nothing
-end
 
 # Convenience method for when A is nothing - delegate to main implementation
 @inline get_tuned_algorithm(::Type{Nothing}, ::Type{eltype_b}, matrix_size::Integer) where {eltype_b} = 

@@ -233,6 +233,66 @@ end
 
 userecursivefactorization(A) = false
 
+"""
+    get_tuned_algorithm(::Type{eltype_A}, ::Type{eltype_b}, matrix_size) where {eltype_A, eltype_b}
+
+Get the tuned algorithm preference for the given element type and matrix size.
+Returns `nothing` if no preference exists. Uses preloaded constants for efficiency.
+Fast path when no preferences are set.
+"""
+@inline function get_tuned_algorithm(::Type{eltype_A}, ::Type{eltype_b}, matrix_size::Integer) where {eltype_A, eltype_b}
+    # Determine the element type to use for preference lookup
+    target_eltype = eltype_A !== Nothing ? eltype_A : eltype_b
+    
+    # Determine size category based on matrix size (matching LinearSolveAutotune categories)
+    size_category = if matrix_size <= 20
+        :tiny
+    elseif matrix_size <= 100
+        :small
+    elseif matrix_size <= 300
+        :medium
+    elseif matrix_size <= 1000
+        :large
+    else
+        :big
+    end
+    
+    # Fast path: if no preferences are set, return nothing immediately
+    AUTOTUNE_PREFS_SET || return nothing
+    
+    # Look up the tuned algorithm from preloaded constants with type specialization
+    return _get_tuned_algorithm_impl(target_eltype, size_category)
+end
+
+# Type-specialized implementation with availability checking and fallback logic
+@inline function _get_tuned_algorithm_impl(::Type{Float32}, size_category::Symbol)
+    prefs = getproperty(AUTOTUNE_PREFS.Float32, size_category)
+    return _choose_available_algorithm(prefs)
+end
+
+@inline function _get_tuned_algorithm_impl(::Type{Float64}, size_category::Symbol)
+    prefs = getproperty(AUTOTUNE_PREFS.Float64, size_category)
+    return _choose_available_algorithm(prefs)
+end
+
+@inline function _get_tuned_algorithm_impl(::Type{ComplexF32}, size_category::Symbol)
+    prefs = getproperty(AUTOTUNE_PREFS.ComplexF32, size_category)
+    return _choose_available_algorithm(prefs)
+end
+
+@inline function _get_tuned_algorithm_impl(::Type{ComplexF64}, size_category::Symbol)
+    prefs = getproperty(AUTOTUNE_PREFS.ComplexF64, size_category)
+    return _choose_available_algorithm(prefs)
+end
+
+@inline _get_tuned_algorithm_impl(::Type, ::Symbol) = nothing  # Fallback for other types
+
+
+
+# Convenience method for when A is nothing - delegate to main implementation
+@inline get_tuned_algorithm(::Type{Nothing}, ::Type{eltype_b}, matrix_size::Integer) where {eltype_b} = 
+    get_tuned_algorithm(eltype_b, eltype_b, matrix_size)
+
 # Allows A === nothing as a stand-in for dense matrix
 function defaultalg(A, b, assump::OperatorAssumptions{Bool})
     alg = if assump.issq
@@ -245,24 +305,35 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
                ArrayInterface.can_setindex(b) &&
                (__conditioning(assump) === OperatorCondition.IllConditioned ||
                 __conditioning(assump) === OperatorCondition.WellConditioned)
+                
+                # Small matrix override - always use GenericLUFactorization for tiny problems
                 if length(b) <= 10
                     DefaultAlgorithmChoice.GenericLUFactorization
-                elseif appleaccelerate_isavailable() && b isa Array &&
-                       eltype(b) <: Union{Float32, Float64, ComplexF32, ComplexF64}
-                    DefaultAlgorithmChoice.AppleAccelerateLUFactorization
-                elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500) ||
-                        (usemkl && length(b) <= 200)) &&
-                       (A === nothing ? eltype(b) <: Union{Float32, Float64} :
-                        eltype(A) <: Union{Float32, Float64}) &&
-                       userecursivefactorization(A)
-                    DefaultAlgorithmChoice.RFLUFactorization
-                    #elseif A === nothing || A isa Matrix
-                    #    alg = FastLUFactorization()
-                elseif usemkl && b isa Array &&
-                       eltype(b) <: Union{Float32, Float64, ComplexF32, ComplexF64}
-                    DefaultAlgorithmChoice.MKLLUFactorization
                 else
-                    DefaultAlgorithmChoice.LUFactorization
+                    # Check if autotune preferences exist for larger matrices
+                    matrix_size = length(b)
+                    eltype_A = A === nothing ? Nothing : eltype(A)
+                    tuned_alg = get_tuned_algorithm(eltype_A, eltype(b), matrix_size)
+                    
+                    if tuned_alg !== nothing
+                        tuned_alg
+                    elseif appleaccelerate_isavailable() && b isa Array &&
+                           eltype(b) <: Union{Float32, Float64, ComplexF32, ComplexF64}
+                        DefaultAlgorithmChoice.AppleAccelerateLUFactorization
+                    elseif (length(b) <= 100 || (isopenblas() && length(b) <= 500) ||
+                            (usemkl && length(b) <= 200)) &&
+                           (A === nothing ? eltype(b) <: Union{Float32, Float64} :
+                            eltype(A) <: Union{Float32, Float64}) &&
+                           userecursivefactorization(A)
+                        DefaultAlgorithmChoice.RFLUFactorization
+                        #elseif A === nothing || A isa Matrix
+                        #    alg = FastLUFactorization()
+                    elseif usemkl && b isa Array &&
+                           eltype(b) <: Union{Float32, Float64, ComplexF32, ComplexF64}
+                        DefaultAlgorithmChoice.MKLLUFactorization
+                    else
+                        DefaultAlgorithmChoice.LUFactorization
+                    end
                 end
             elseif __conditioning(assump) === OperatorCondition.VeryIllConditioned
                 DefaultAlgorithmChoice.QRFactorization

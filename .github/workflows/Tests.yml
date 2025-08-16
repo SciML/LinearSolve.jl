@@ -37,6 +37,7 @@ jobs:
           - "LinearSolvePardiso"
           - "NoPre"
           - "LinearSolveAutotune"
+          - "Preferences"
         os:
           - ubuntu-latest
           - macos-latest

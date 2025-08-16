@@ -58,6 +58,7 @@ else
     const usemkl = false
 end
 
+
 @reexport using SciMLBase
 
 """
@@ -276,6 +277,35 @@ EnumX.@enumx DefaultAlgorithmChoice begin
     KrylovJL_LSMR
 end
 
+# Autotune preference constants - loaded once at package import time
+
+# Algorithm availability checking functions
+"""
+    is_algorithm_available(alg::DefaultAlgorithmChoice.T)
+
+Check if the given algorithm is currently available (extensions loaded, etc.).
+"""
+function is_algorithm_available(alg::DefaultAlgorithmChoice.T)
+    if alg === DefaultAlgorithmChoice.LUFactorization
+        return true  # Always available
+    elseif alg === DefaultAlgorithmChoice.GenericLUFactorization
+        return true  # Always available
+    elseif alg === DefaultAlgorithmChoice.MKLLUFactorization
+        return usemkl  # Available if MKL is loaded
+    elseif alg === DefaultAlgorithmChoice.AppleAccelerateLUFactorization
+        return appleaccelerate_isavailable()  # Available on macOS with Accelerate
+    elseif alg === DefaultAlgorithmChoice.RFLUFactorization
+        return userecursivefactorization(nothing)  # Requires RecursiveFactorization extension
+    else
+        # For extension-dependent algorithms not explicitly handled above,
+        # we cannot easily check availability without trying to use them.
+        # For now, assume they're not available in the default selection.
+        # This includes FastLU, BLIS, CUDA, Metal, etc. which would require
+        # specific extension checks.
+        return false
+    end
+end
+
 """
     DefaultLinearSolver(;safetyfallback=true)
 
@@ -309,6 +339,7 @@ include("simplelu.jl")
 include("simplegmres.jl")
 include("iterative_wrappers.jl")
 include("preconditioners.jl")
+include("preferences.jl")
 include("solve_function.jl")
 include("default.jl")
 include("init.jl")
@@ -390,7 +421,7 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization,
        CUSOLVERRFFactorization, CliqueTreesFactorization
 
-export LinearSolveFunction, DirectLdiv!
+export LinearSolveFunction, DirectLdiv!, show_algorithm_choices
 
 export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
        KrylovJL_BICGSTAB, KrylovJL_LSMR, KrylovJL_CRAIGMR,

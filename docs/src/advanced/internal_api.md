@@ -30,7 +30,76 @@ The automatic algorithm selection is one of LinearSolve.jl's key features:
 
 ```@docs
 LinearSolve.defaultalg
+LinearSolve.get_tuned_algorithm
+LinearSolve.is_algorithm_available
+LinearSolve.show_algorithm_choices
+LinearSolve.make_preferences_dynamic!
 ```
+
+### Preference System Architecture
+
+The dual preference system provides intelligent algorithm selection with comprehensive fallbacks:
+
+#### **Core Functions**
+- **`get_tuned_algorithm`**: Retrieves tuned algorithm preferences based on matrix size and element type
+- **`is_algorithm_available`**: Checks if a specific algorithm is currently available (extensions loaded)  
+- **`show_algorithm_choices`**: Analysis function displaying algorithm choices for all element types
+- **`make_preferences_dynamic!`**: Testing function that enables runtime preference checking
+
+#### **Size Categorization**
+The system categorizes matrix sizes to match LinearSolveAutotune benchmarking:
+- **tiny**: ≤20 elements (matrices ≤10 always override to GenericLU)
+- **small**: 21-100 elements  
+- **medium**: 101-300 elements
+- **large**: 301-1000 elements
+- **big**: >1000 elements
+
+#### **Dual Preference Structure**
+For each category and element type (Float32, Float64, ComplexF32, ComplexF64):
+- `best_algorithm_{type}_{size}`: Overall fastest algorithm from autotune
+- `best_always_loaded_{type}_{size}`: Fastest always-available algorithm (fallback)
+
+#### **Preference File Organization**
+All preference-related functionality is consolidated in `src/preferences.jl`:
+
+**Compile-Time Constants**:
+- `AUTOTUNE_PREFS`: Preference structure loaded at package import
+- `AUTOTUNE_PREFS_SET`: Fast path check for whether any preferences are set
+- `_string_to_algorithm_choice`: Mapping from preference strings to algorithm enums
+
+**Runtime Functions**:
+- `_get_tuned_algorithm_runtime`: Dynamic preference checking for testing
+- `_choose_available_algorithm`: Algorithm availability and fallback logic
+- `show_algorithm_choices`: Comprehensive analysis and display function
+
+**Testing Infrastructure**:
+- `make_preferences_dynamic!`: Eval-based function redefinition for testing
+- Enables runtime preference verification without affecting production performance
+
+#### **Testing Mode Operation**
+The testing system uses an elegant eval-based approach:
+```julia
+# Production: Uses compile-time constants (maximum performance)
+get_tuned_algorithm(Float64, Float64, 200)  # → Uses AUTOTUNE_PREFS constants
+
+# Testing: Redefines function to use runtime checking
+make_preferences_dynamic!()
+get_tuned_algorithm(Float64, Float64, 200)  # → Uses runtime preference loading
+```
+
+This approach maintains type stability and inference while enabling comprehensive testing.
+
+#### **Algorithm Support Scope**
+The preference system focuses exclusively on LU algorithms for dense matrices:
+
+**Supported LU Algorithms**:
+- `LUFactorization`, `GenericLUFactorization`, `RFLUFactorization`
+- `MKLLUFactorization`, `AppleAccelerateLUFactorization`
+- `SimpleLUFactorization`, `FastLUFactorization` (both map to LU)
+- GPU LU variants (CUDA, Metal, AMDGPU - all map to LU)
+
+**Non-LU algorithms** (QR, Cholesky, SVD, etc.) are not included in the preference system
+as they serve different use cases and are not typically the focus of dense matrix autotune optimization.
 
 ## Trait Functions
 

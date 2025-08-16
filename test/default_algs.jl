@@ -170,3 +170,4 @@ sol = solve(prob,
 
 sol = solve(prob)
 @test sol.u ≈ svd(A)\b
+

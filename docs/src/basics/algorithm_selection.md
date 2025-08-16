@@ -191,11 +191,22 @@ using LinearSolve
 show_algorithm_choices()
 ```
 
-This shows:
-- Current autotune preferences (if set)
-- Algorithm choices for each size category
-- System information (available extensions)
-- Element type behavior
+This shows a comprehensive analysis:
+- Current autotune preferences for all element types (if set)
+- Algorithm choices for all element types across all size categories
+- Side-by-side comparison showing Float32, Float64, ComplexF32, ComplexF64 behavior
+- System information (available extensions: MKL, Apple Accelerate, RecursiveFactorization)
+
+Example output:
+```
+📊 Default Algorithm Choices:
+Size       Category    Float32            Float64            ComplexF32         ComplexF64
+8×8        tiny        GenericLUFactorization GenericLUFactorization GenericLUFactorization GenericLUFactorization
+50×50      small       MKLLUFactorization MKLLUFactorization MKLLUFactorization MKLLUFactorization
+200×200    medium      MKLLUFactorization GenericLUFactorization MKLLUFactorization MKLLUFactorization
+```
+
+When preferences are set, you can see exactly how they affect algorithm choice across different element types.
 
 ### Preference System Benefits
 

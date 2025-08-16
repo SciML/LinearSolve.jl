@@ -429,10 +429,18 @@ show_algorithm_choices()
 ```
 
 This displays:
-- Current autotune preferences (if any are set)
-- Algorithm choices for representative sizes in each category  
-- Element type behavior
+- Current autotune preferences for all element types (if any are set)
+- Algorithm choices for all element types across representative sizes in each category  
+- Comprehensive element type behavior (Float32, Float64, ComplexF32, ComplexF64)
 - System information (MKL, Apple Accelerate, RecursiveFactorization status)
+
+The output shows a clear table format:
+```
+📊 Default Algorithm Choices:
+Size       Category    Float32            Float64            ComplexF32         ComplexF64
+8×8        tiny        GenericLUFactorization GenericLUFactorization GenericLUFactorization GenericLUFactorization
+200×200    medium      MKLLUFactorization MKLLUFactorization MKLLUFactorization MKLLUFactorization
+```
 
 ## Preferences Integration
 

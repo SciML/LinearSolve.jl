@@ -257,11 +257,6 @@ Fast path when no preferences are set.
         :big
     end
     
-    # For testing: check preferences directly at runtime
-    if isdefined(LinearSolve, :TESTING_MODE) && LinearSolve.TESTING_MODE[]
-        return _get_tuned_algorithm_runtime(target_eltype, size_category)
-    end
-    
     # Fast path: if no preferences are set, return nothing immediately
     AUTOTUNE_PREFS_SET || return nothing
     

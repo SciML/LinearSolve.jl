@@ -93,8 +93,8 @@ using Preferences
         chosen_alg_test = LinearSolve.defaultalg(A, b, LinearSolve.OperatorAssumptions(true))
         
         if fastlapack_loaded
-            # If FastLapack loaded correctly and preferences are active, should choose FastLU
-            @test chosen_alg_test.alg === LinearSolve.DefaultAlgorithmChoice.FastLUFactorization
+            # If FastLapack loaded correctly and preferences are active, should choose LU (FastLU maps to LU)
+            @test chosen_alg_test.alg === LinearSolve.DefaultAlgorithmChoice.LUFactorization
         else
             # Should choose GenericLUFactorization (always_loaded preference)
             @test chosen_alg_test.alg === LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
@@ -106,14 +106,28 @@ using Preferences
     end
     
     @testset "RecursiveFactorization Extension Conditional Loading" begin
-        # Test RecursiveFactorization loading conditionally
+        # Clear all preferences first for this test
+        for eltype in target_eltypes
+            for size_cat in size_categories
+                for pref_type in ["best_algorithm", "best_always_loaded"]
+                    pref_key = "$(pref_type)_$(eltype)_$(size_cat)"
+                    if Preferences.has_preference(LinearSolve, pref_key)
+                        Preferences.delete_preferences!(LinearSolve, pref_key; force = true)
+                    end
+                end
+            end
+        end
         
-        # Preferences should still be set: RF as best, FastLU as always_loaded
-        @test Preferences.load_preference(LinearSolve, "best_algorithm_Float64_medium", nothing) == "RFLUFactorization"
-        @test Preferences.load_preference(LinearSolve, "best_always_loaded_Float64_medium", nothing) == "FastLUFactorization"
+        # Set preferences for this test: RF as best, LU as always_loaded
+        Preferences.set_preferences!(LinearSolve, "best_algorithm_Float64_small" => "RFLUFactorization"; force = true)
+        Preferences.set_preferences!(LinearSolve, "best_always_loaded_Float64_small" => "LUFactorization"; force = true)
         
-        A = rand(Float64, 150, 150) + I(150)
-        b = rand(Float64, 150)
+        # Verify preferences are set
+        @test Preferences.load_preference(LinearSolve, "best_algorithm_Float64_small", nothing) == "RFLUFactorization"
+        @test Preferences.load_preference(LinearSolve, "best_always_loaded_Float64_small", nothing) == "LUFactorization"
+        
+        A = rand(Float64, 80, 80) + I(80)  # Small category (21-100)
+        b = rand(Float64, 80)
         prob = LinearProblem(A, b)
         
         # Try to load RecursiveFactorization and test RFLUFactorization

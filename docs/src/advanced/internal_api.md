@@ -33,6 +33,7 @@ LinearSolve.defaultalg
 LinearSolve.get_tuned_algorithm
 LinearSolve.is_algorithm_available
 LinearSolve.show_algorithm_choices
+LinearSolve.reset_defaults!
 ```
 
 ### Preference System Internals

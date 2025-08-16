@@ -86,15 +86,18 @@ using Preferences
             println("⚠️  FastLapackInterface/FastLUFactorization not available: ", e)
         end
         
+        # Reset defaults to pick up the new preferences for testing
+        LinearSolve.reset_defaults!()
+        
         # Test algorithm choice
         chosen_alg_test = LinearSolve.defaultalg(A, b, LinearSolve.OperatorAssumptions(true))
         
         if fastlapack_loaded
             # If FastLapack loaded correctly and preferences are active, should choose FastLU
-            # NOTE: This test documents expected behavior when preference system is fully active
             @test chosen_alg_test.alg === LinearSolve.DefaultAlgorithmChoice.FastLUFactorization
         else
-            @test isa(chosen_alg_test, LinearSolve.DefaultLinearSolver)
+            # Should choose GenericLUFactorization (always_loaded preference)
+            @test chosen_alg_test.alg === LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
         end
         
         sol_default = solve(prob)
@@ -131,15 +134,18 @@ using Preferences
             println("⚠️  RecursiveFactorization/RFLUFactorization not available: ", e)
         end
         
+        # Reset defaults to pick up the new preferences for testing  
+        LinearSolve.reset_defaults!()
+        
         # Test algorithm choice with RecursiveFactorization available
         chosen_alg_with_rf = LinearSolve.defaultalg(A, b, LinearSolve.OperatorAssumptions(true))
         
         if recursive_loaded
             # If RecursiveFactorization loaded correctly and preferences are active, should choose RFLU
-            # NOTE: This test documents expected behavior when preference system is fully active
             @test chosen_alg_with_rf.alg === LinearSolve.DefaultAlgorithmChoice.RFLUFactorization
         else
-            @test isa(chosen_alg_with_rf, LinearSolve.DefaultLinearSolver)
+            # Should choose LUFactorization (always_loaded preference)
+            @test chosen_alg_with_rf.alg === LinearSolve.DefaultAlgorithmChoice.LUFactorization
         end
         
         sol_default_rf = solve(prob)
@@ -226,6 +232,9 @@ using Preferences
             Preferences.set_preferences!(LinearSolve, "best_algorithm_Float64_$(size_cat)" => algorithm; force = true)
             Preferences.set_preferences!(LinearSolve, "best_always_loaded_Float64_$(size_cat)" => algorithm; force = true)
         end
+        
+        # Reset defaults to pick up the new preferences for testing
+        LinearSolve.reset_defaults!()
         
         # Test sizes that should land in each category
         test_cases = [

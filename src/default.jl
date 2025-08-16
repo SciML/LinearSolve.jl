@@ -241,9 +241,6 @@ Returns `nothing` if no preference exists. Uses preloaded constants for efficien
 Fast path when no preferences are set.
 """
 @inline function get_tuned_algorithm(::Type{eltype_A}, ::Type{eltype_b}, matrix_size::Integer) where {eltype_A, eltype_b}
-    # Fast path: if no preferences are set, return nothing immediately
-    AUTOTUNE_PREFS_SET || return nothing
-    
     # Determine the element type to use for preference lookup
     target_eltype = eltype_A !== Nothing ? eltype_A : eltype_b
     
@@ -260,32 +257,62 @@ Fast path when no preferences are set.
         :big
     end
     
+    # For testing: check preferences directly at runtime
+    if isdefined(LinearSolve, :TESTING_MODE) && LinearSolve.TESTING_MODE[]
+        return _get_tuned_algorithm_runtime(target_eltype, size_category)
+    end
+    
+    # Fast path: if no preferences are set, return nothing immediately
+    LinearSolve.CURRENT_AUTOTUNE_PREFS_SET[] || return nothing
+    
     # Look up the tuned algorithm from preloaded constants with type specialization
     return _get_tuned_algorithm_impl(target_eltype, size_category)
 end
 
 # Type-specialized implementation with availability checking and fallback logic
 @inline function _get_tuned_algorithm_impl(::Type{Float32}, size_category::Symbol)
-    prefs = getproperty(AUTOTUNE_PREFS.Float32, size_category)
+    prefs = getproperty(LinearSolve.CURRENT_AUTOTUNE_PREFS[].Float32, size_category)
     return _choose_available_algorithm(prefs)
 end
 
 @inline function _get_tuned_algorithm_impl(::Type{Float64}, size_category::Symbol)
-    prefs = getproperty(AUTOTUNE_PREFS.Float64, size_category)
+    prefs = getproperty(LinearSolve.CURRENT_AUTOTUNE_PREFS[].Float64, size_category)
     return _choose_available_algorithm(prefs)
 end
 
 @inline function _get_tuned_algorithm_impl(::Type{ComplexF32}, size_category::Symbol)
-    prefs = getproperty(AUTOTUNE_PREFS.ComplexF32, size_category)
+    prefs = getproperty(LinearSolve.CURRENT_AUTOTUNE_PREFS[].ComplexF32, size_category)
     return _choose_available_algorithm(prefs)
 end
 
 @inline function _get_tuned_algorithm_impl(::Type{ComplexF64}, size_category::Symbol)
-    prefs = getproperty(AUTOTUNE_PREFS.ComplexF64, size_category)
+    prefs = getproperty(LinearSolve.CURRENT_AUTOTUNE_PREFS[].ComplexF64, size_category)
     return _choose_available_algorithm(prefs)
 end
 
 @inline _get_tuned_algorithm_impl(::Type, ::Symbol) = nothing  # Fallback for other types
+
+# Runtime preference checking for testing
+function _get_tuned_algorithm_runtime(target_eltype::Type, size_category::Symbol)
+    eltype_str = string(target_eltype)
+    size_str = string(size_category)
+    
+    # Load preferences at runtime
+    best_pref = Preferences.load_preference(LinearSolve, "best_algorithm_$(eltype_str)_$(size_str)", nothing)
+    fallback_pref = Preferences.load_preference(LinearSolve, "best_always_loaded_$(eltype_str)_$(size_str)", nothing)
+    
+    if best_pref !== nothing || fallback_pref !== nothing
+        # Convert to algorithm choices
+        best_alg = LinearSolve._string_to_algorithm_choice(best_pref)
+        fallback_alg = LinearSolve._string_to_algorithm_choice(fallback_pref)
+        
+        # Create preference structure
+        prefs = (best = best_alg, fallback = fallback_alg)
+        return LinearSolve._choose_available_algorithm(prefs)
+    end
+    
+    return nothing
+end
 
 # Helper function to choose available algorithm with fallback logic
 @inline function _choose_available_algorithm(prefs)

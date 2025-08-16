@@ -419,6 +419,31 @@ const AUTOTUNE_PREFS_SET = let
     any_set
 end
 
+# Global variables for testing - can be updated by reset_defaults!
+const CURRENT_AUTOTUNE_PREFS = Ref(AUTOTUNE_PREFS)
+const CURRENT_AUTOTUNE_PREFS_SET = Ref(AUTOTUNE_PREFS_SET)
+
+"""
+    reset_defaults!()
+
+**Internal function for testing only.** Rebuilds the preference globals
+to reflect currently set preferences. This allows tests to verify that the
+preference system works correctly by setting preferences and then rebuilding
+the globals to simulate a fresh package load.
+
+!!! warning "Testing Only"
+    This function is only intended for internal testing purposes. It modifies
+    global state and should never be used in production code.
+"""
+# Testing mode flag
+const TESTING_MODE = Ref(false)
+
+function reset_defaults!()
+    # Enable testing mode to use runtime preference checking
+    TESTING_MODE[] = true
+    return nothing
+end
+
 # Algorithm availability checking functions
 """
     is_algorithm_available(alg::DefaultAlgorithmChoice.T)

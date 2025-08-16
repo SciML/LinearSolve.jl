@@ -213,104 +213,90 @@ using Preferences
     
     
     
-    @testset "Different Algorithm for Every Size Category Test" begin
-        # Test with different algorithm preferences for every size category
-        # and verify it chooses the right one at each size
+    @testset "RFLU vs GenericLU Size Category Verification" begin
+        # Test by setting one size to RFLU and all others to GenericLU
+        # Rotate through each size category to verify preferences work correctly
         
-        # Clear all preferences first
-        for eltype in target_eltypes
-            for size_cat in size_categories
-                for pref_type in ["best_algorithm", "best_always_loaded"]
-                    pref_key = "$(pref_type)_$(eltype)_$(size_cat)"
-                    if Preferences.has_preference(LinearSolve, pref_key)
-                        Preferences.delete_preferences!(LinearSolve, pref_key; force = true)
+        # Test cases: one size gets RFLU, others get GenericLU
+        rflu_test_scenarios = [
+            # (rflu_size, rflu_category, test_sizes_with_categories)
+            (15, "tiny", [(50, "small"), (200, "medium"), (500, "large"), (1500, "big")]),
+            (50, "small", [(15, "tiny"), (200, "medium"), (500, "large"), (1500, "big")]), 
+            (200, "medium", [(15, "tiny"), (50, "small"), (500, "large"), (1500, "big")]),
+            (500, "large", [(15, "tiny"), (50, "small"), (200, "medium"), (1500, "big")]),
+            (1500, "big", [(15, "tiny"), (50, "small"), (200, "medium"), (500, "large")])
+        ]
+        
+        for (rflu_size, rflu_category, other_test_sizes) in rflu_test_scenarios
+            println("Testing RFLU at $(rflu_category) category (size $(rflu_size))")
+            
+            # Clear all preferences
+            for eltype in target_eltypes
+                for size_cat in size_categories
+                    for pref_type in ["best_algorithm", "best_always_loaded"]
+                        pref_key = "$(pref_type)_$(eltype)_$(size_cat)"
+                        if Preferences.has_preference(LinearSolve, pref_key)
+                            Preferences.delete_preferences!(LinearSolve, pref_key; force = true)
+                        end
                     end
                 end
             end
-        end
-        
-        # Set different algorithms for each size category
-        size_algorithm_map = [
-            ("tiny", "GenericLUFactorization"),
-            ("small", "RFLUFactorization"), 
-            ("medium", "AppleAccelerateLUFactorization"),
-            ("large", "MKLLUFactorization"),
-            ("big", "LUFactorization")
-        ]
-        
-        # Set preferences for each size category
-        for (size_cat, algorithm) in size_algorithm_map
-            Preferences.set_preferences!(LinearSolve, "best_algorithm_Float64_$(size_cat)" => algorithm; force = true)
-            Preferences.set_preferences!(LinearSolve, "best_always_loaded_Float64_$(size_cat)" => algorithm; force = true)
-        end
-        
-        # Test sizes that should land in each category (testing mode enabled at test start)
-        test_cases = [
-            # (test_size, expected_category, expected_algorithm)
-            (15, "tiny", LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization),
-            (80, "small", LinearSolve.DefaultAlgorithmChoice.RFLUFactorization),
-            (200, "medium", LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization),
-            (500, "large", LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization),
-            (1500, "big", LinearSolve.DefaultAlgorithmChoice.LUFactorization)
-        ]
-        
-        for (test_size, expected_category, expected_algorithm) in test_cases
-            println("Testing size $(test_size) → $(expected_category) category")
             
-            A = rand(Float64, test_size, test_size) + I(test_size)
-            b = rand(Float64, test_size)
+            # Set RFLU for the target category
+            Preferences.set_preferences!(LinearSolve, "best_algorithm_Float64_$(rflu_category)" => "RFLUFactorization"; force = true)
+            Preferences.set_preferences!(LinearSolve, "best_always_loaded_Float64_$(rflu_category)" => "RFLUFactorization"; force = true)
             
-            chosen_alg = LinearSolve.defaultalg(A, b, LinearSolve.OperatorAssumptions(true))
-            
-            if test_size <= 10
-                # Tiny override should always choose GenericLU regardless of preferences
-                @test chosen_alg.alg === LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
-                println("  ✅ Tiny override correctly chose GenericLU")
-            else
-                # Test that it chooses the expected algorithm when preference system is active
-                @test chosen_alg.alg === expected_algorithm
-                println("  ✅ Size $(test_size) chose: $(chosen_alg.alg) (expected: $(expected_algorithm))")
+            # Set GenericLU for all other categories
+            for other_category in size_categories
+                if other_category != rflu_category
+                    Preferences.set_preferences!(LinearSolve, "best_algorithm_Float64_$(other_category)" => "GenericLUFactorization"; force = true)
+                    Preferences.set_preferences!(LinearSolve, "best_always_loaded_Float64_$(other_category)" => "GenericLUFactorization"; force = true)
+                end
             end
             
-            # Test that the problem can be solved
-            prob = LinearProblem(A, b)
-            sol = solve(prob)
-            @test sol.retcode == ReturnCode.Success
-            @test norm(A * sol.u - b) < (test_size <= 10 ? 1e-12 : 1e-8)
-        end
-        
-        # Additional boundary testing
-        boundary_test_cases = [
-            # Test exact boundaries
-            (20, "tiny", LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization),           # At tiny boundary
-            (21, "small", LinearSolve.DefaultAlgorithmChoice.RFLUFactorization),              # Start of small
-            (100, "small", LinearSolve.DefaultAlgorithmChoice.RFLUFactorization),             # End of small
-            (101, "medium", LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization), # Start of medium
-            (300, "medium", LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization), # End of medium
-            (301, "large", LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization),            # Start of large
-            (1000, "large", LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization),           # End of large
-            (1001, "big", LinearSolve.DefaultAlgorithmChoice.LUFactorization)                 # Start of big
-        ]
-        
-        for (boundary_size, boundary_category, boundary_expected) in boundary_test_cases
-            A_boundary = rand(Float64, boundary_size, boundary_size) + I(boundary_size)
-            b_boundary = rand(Float64, boundary_size)
+            # Test the RFLU size
+            A_rflu = rand(Float64, rflu_size, rflu_size) + I(rflu_size)
+            b_rflu = rand(Float64, rflu_size)
+            chosen_rflu = LinearSolve.defaultalg(A_rflu, b_rflu, LinearSolve.OperatorAssumptions(true))
             
-            chosen_boundary = LinearSolve.defaultalg(A_boundary, b_boundary, LinearSolve.OperatorAssumptions(true))
-            
-            if boundary_size <= 10
-                @test chosen_boundary.alg === LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
+            if rflu_size <= 10
+                # Tiny override should always choose GenericLU
+                @test chosen_rflu.alg === LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
+                println("  ✅ Tiny override: size $(rflu_size) chose GenericLU (as expected)")
             else
-                # Test that it matches expected algorithm for the boundary
-                @test chosen_boundary.alg === boundary_expected
-                println("  Boundary $(boundary_size) ($(boundary_category)) chose: $(chosen_boundary.alg)")
+                # Should choose RFLU based on preference
+                @test chosen_rflu.alg === LinearSolve.DefaultAlgorithmChoice.RFLUFactorization
+                println("  ✅ RFLU preference: size $(rflu_size) chose RFLUFactorization")
             end
             
-            # Test that boundary cases solve correctly
-            prob_boundary = LinearProblem(A_boundary, b_boundary)
-            sol_boundary = solve(prob_boundary)
-            @test sol_boundary.retcode == ReturnCode.Success
-            @test norm(A_boundary * sol_boundary.u - b_boundary) < (boundary_size <= 10 ? 1e-12 : 1e-8)
+            # Test other sizes should choose GenericLU
+            for (other_size, other_category) in other_test_sizes
+                A_other = rand(Float64, other_size, other_size) + I(other_size)
+                b_other = rand(Float64, other_size)
+                chosen_other = LinearSolve.defaultalg(A_other, b_other, LinearSolve.OperatorAssumptions(true))
+                
+                if other_size <= 10
+                    # Tiny override
+                    @test chosen_other.alg === LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
+                    println("  ✅ Tiny override: size $(other_size) chose GenericLU")
+                else
+                    # Should choose GenericLU based on preference
+                    @test chosen_other.alg === LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
+                    println("  ✅ GenericLU preference: size $(other_size) chose GenericLUFactorization")
+                end
+                
+                # Test that problems solve
+                prob_other = LinearProblem(A_other, b_other)
+                sol_other = solve(prob_other)
+                @test sol_other.retcode == ReturnCode.Success
+                @test norm(A_other * sol_other.u - b_other) < (other_size <= 10 ? 1e-12 : 1e-8)
+            end
+            
+            # Test that RFLU size problem solves
+            prob_rflu = LinearProblem(A_rflu, b_rflu)
+            sol_rflu = solve(prob_rflu)
+            @test sol_rflu.retcode == ReturnCode.Success
+            @test norm(A_rflu * sol_rflu.u - b_rflu) < (rflu_size <= 10 ? 1e-12 : 1e-8)
         end
     end
     

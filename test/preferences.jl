@@ -2,6 +2,9 @@ using LinearSolve, LinearAlgebra, Test
 using Preferences
 
 @testset "Dual Preference System Integration Tests" begin
+    # Enable testing mode for preference system verification
+    LinearSolve.reset_defaults!()
+    
     # Clear any existing preferences to start clean
     target_eltypes = ["Float32", "Float64", "ComplexF32", "ComplexF64"]
     size_categories = ["tiny", "small", "medium", "large", "big"]
@@ -86,10 +89,7 @@ using Preferences
             println("⚠️  FastLapackInterface/FastLUFactorization not available: ", e)
         end
         
-        # Reset defaults to pick up the new preferences for testing
-        LinearSolve.reset_defaults!()
-        
-        # Test algorithm choice
+        # Test algorithm choice (testing mode enabled at test start)
         chosen_alg_test = LinearSolve.defaultalg(A, b, LinearSolve.OperatorAssumptions(true))
         
         if fastlapack_loaded
@@ -134,10 +134,7 @@ using Preferences
             println("⚠️  RecursiveFactorization/RFLUFactorization not available: ", e)
         end
         
-        # Reset defaults to pick up the new preferences for testing  
-        LinearSolve.reset_defaults!()
-        
-        # Test algorithm choice with RecursiveFactorization available
+        # Test algorithm choice with RecursiveFactorization available (testing mode enabled at test start)
         chosen_alg_with_rf = LinearSolve.defaultalg(A, b, LinearSolve.OperatorAssumptions(true))
         
         if recursive_loaded
@@ -233,10 +230,7 @@ using Preferences
             Preferences.set_preferences!(LinearSolve, "best_always_loaded_Float64_$(size_cat)" => algorithm; force = true)
         end
         
-        # Reset defaults to pick up the new preferences for testing
-        LinearSolve.reset_defaults!()
-        
-        # Test sizes that should land in each category
+        # Test sizes that should land in each category (testing mode enabled at test start)
         test_cases = [
             # (test_size, expected_category, expected_algorithm)
             (15, "tiny", LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization),

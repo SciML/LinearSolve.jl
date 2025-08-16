@@ -125,6 +125,14 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
             b)
     end
 
+    # Add finalizer to release Pardiso internal memory when solver is garbage collected
+    finalizer(solver) do s
+        Pardiso.set_phase!(s, Pardiso.RELEASE_ALL)
+        Pardiso.pardiso(s, eltype(b)[],
+            SparseMatrixCSC(0, 0, Int32[1], Int32[], eltype(A)[]),
+            eltype(b)[])
+    end
+
     return solver
 end
 
@@ -144,8 +152,5 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::PardisoJL; kwargs
         SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)), b)
     return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
 end
-
-# Add finalizer to release memory
-# Pardiso.set_phase!(cache.cacheval, Pardiso.RELEASE_ALL)
 
 end

@@ -419,9 +419,6 @@ const AUTOTUNE_PREFS_SET = let
     any_set
 end
 
-# Global variables for testing - can be updated by reset_defaults!
-const CURRENT_AUTOTUNE_PREFS = Ref(AUTOTUNE_PREFS)
-const CURRENT_AUTOTUNE_PREFS_SET = Ref(AUTOTUNE_PREFS_SET)
 
 """
     reset_defaults!()

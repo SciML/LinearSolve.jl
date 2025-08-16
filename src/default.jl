@@ -263,7 +263,7 @@ Fast path when no preferences are set.
     end
     
     # Fast path: if no preferences are set, return nothing immediately
-    LinearSolve.CURRENT_AUTOTUNE_PREFS_SET[] || return nothing
+    AUTOTUNE_PREFS_SET || return nothing
     
     # Look up the tuned algorithm from preloaded constants with type specialization
     return _get_tuned_algorithm_impl(target_eltype, size_category)
@@ -271,22 +271,22 @@ end
 
 # Type-specialized implementation with availability checking and fallback logic
 @inline function _get_tuned_algorithm_impl(::Type{Float32}, size_category::Symbol)
-    prefs = getproperty(LinearSolve.CURRENT_AUTOTUNE_PREFS[].Float32, size_category)
+    prefs = getproperty(AUTOTUNE_PREFS.Float32, size_category)
     return _choose_available_algorithm(prefs)
 end
 
 @inline function _get_tuned_algorithm_impl(::Type{Float64}, size_category::Symbol)
-    prefs = getproperty(LinearSolve.CURRENT_AUTOTUNE_PREFS[].Float64, size_category)
+    prefs = getproperty(AUTOTUNE_PREFS.Float64, size_category)
     return _choose_available_algorithm(prefs)
 end
 
 @inline function _get_tuned_algorithm_impl(::Type{ComplexF32}, size_category::Symbol)
-    prefs = getproperty(LinearSolve.CURRENT_AUTOTUNE_PREFS[].ComplexF32, size_category)
+    prefs = getproperty(AUTOTUNE_PREFS.ComplexF32, size_category)
     return _choose_available_algorithm(prefs)
 end
 
 @inline function _get_tuned_algorithm_impl(::Type{ComplexF64}, size_category::Symbol)
-    prefs = getproperty(LinearSolve.CURRENT_AUTOTUNE_PREFS[].ComplexF64, size_category)
+    prefs = getproperty(AUTOTUNE_PREFS.ComplexF64, size_category)
     return _choose_available_algorithm(prefs)
 end
 

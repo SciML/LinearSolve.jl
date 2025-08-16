@@ -11,12 +11,12 @@ function show_algorithm_choices()
     println("LinearSolve.jl Algorithm Choice Analysis")
     println("="^60)
     
-    # Show current preferences
+    # Show current preferences for all element types
     println("📋 Current Preferences:")
     println("-"^60)
     
     any_prefs_set = false
-    for eltype in ["Float64"]  # Focus on Float64
+    for eltype in ["Float32", "Float64", "ComplexF32", "ComplexF64"]
         for size_cat in ["tiny", "small", "medium", "large", "big"]
             best_pref = Preferences.load_preference(LinearSolve, "best_algorithm_$(eltype)_$(size_cat)", nothing)
             fallback_pref = Preferences.load_preference(LinearSolve, "best_always_loaded_$(eltype)_$(size_cat)", nothing)
@@ -38,11 +38,11 @@ function show_algorithm_choices()
         println("No autotune preferences currently set.")
     end
     
-    # Show algorithm choices for one representative size per category
-    println("\n📊 Default Algorithm Choices (Float64):")
-    println("-"^60)
-    println("Size       Category    Chosen Algorithm")
-    println("-"^60)
+    # Show algorithm choices for all element types and all sizes
+    println("\n📊 Default Algorithm Choices:")
+    println("-"^80)
+    println("Size       Category    Float32            Float64            ComplexF32         ComplexF64")
+    println("-"^80)
     
     # One representative size per category
     test_cases = [
@@ -54,39 +54,19 @@ function show_algorithm_choices()
     ]
     
     for (size, expected_category) in test_cases
-        # Create test problem
-        A = rand(Float64, size, size) + I(size)
-        b = rand(Float64, size)
-        
-        # Get algorithm choice
-        chosen_alg = defaultalg(A, b, OperatorAssumptions(true))
-        
         size_str = lpad("$(size)×$(size)", 10)
         cat_str = rpad(expected_category, 11)
-        alg_str = string(chosen_alg.alg)
         
-        println("$(size_str) $(cat_str) $(alg_str)")
-    end
-    
-    # Show different element types for medium size
-    println("\n📊 Element Type Choices (200×200):")
-    println("-"^60)
-    println("Element Type    Chosen Algorithm")
-    println("-"^60)
-    
-    test_eltypes = [Float32, Float64, ComplexF32, ComplexF64]
-    test_size = 200  # Medium category
-    
-    for eltype in test_eltypes
-        A = rand(eltype, test_size, test_size) + I(test_size)
-        b = rand(eltype, test_size)
+        # Get algorithm choice for each element type
+        alg_choices = []
+        for eltype in [Float32, Float64, ComplexF32, ComplexF64]
+            A = rand(eltype, size, size) + I(size)
+            b = rand(eltype, size)
+            chosen_alg = defaultalg(A, b, OperatorAssumptions(true))
+            push!(alg_choices, rpad(string(chosen_alg.alg), 18))
+        end
         
-        chosen_alg = defaultalg(A, b, OperatorAssumptions(true))
-        
-        type_str = rpad(string(eltype), 15)
-        alg_str = string(chosen_alg.alg)
-        
-        println("$(type_str) $(alg_str)")
+        println("$(size_str) $(cat_str) $(alg_choices[1]) $(alg_choices[2]) $(alg_choices[3]) $(alg_choices[4])")
     end
     
     # Show system information

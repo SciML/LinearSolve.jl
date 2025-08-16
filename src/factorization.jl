@@ -1203,6 +1203,23 @@ function init_cacheval(::CliqueTreesFactorization, ::StaticArray, b, u, Pl, Pr,
     nothing
 end
 
+# Fallback init_cacheval for extension-based algorithms when extensions aren't loaded
+# These return nothing since the actual implementations are in the extensions
+function init_cacheval(::BLISLUFactorization, A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function init_cacheval(::CudaOffloadLUFactorization, A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function init_cacheval(::MetalLUFactorization, A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
 for alg in vcat(InteractiveUtils.subtypes(AbstractDenseFactorization),
     InteractiveUtils.subtypes(AbstractSparseFactorization))
     @eval function init_cacheval(alg::$alg, A::MatrixOperator, b, u, Pl, Pr,

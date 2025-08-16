@@ -143,21 +143,19 @@ const AUTOTUNE_PREFS_SET = let
     any_set
 end
 
-# Testing mode flag
-const TESTING_MODE = Ref(false)
 
 """
-    reset_defaults!()
+    make_preferences_dynamic!()
 
-**Internal function for testing only.** Enables testing mode where preferences
-are checked at runtime instead of using compile-time constants. This allows
-tests to verify that the preference system works correctly.
+**Internal function for testing only.** Makes preferences dynamic by redefining
+get_tuned_algorithm to check preferences at runtime instead of using compile-time
+constants. This allows tests to verify that the preference system works correctly.
 
 !!! warning "Testing Only"
     This function is only intended for internal testing purposes. It modifies
     global state and should never be used in production code.
 """
-function reset_defaults!()
+function make_preferences_dynamic!()
     # Redefine get_tuned_algorithm to use runtime preference checking for testing
     @eval function get_tuned_algorithm(::Type{eltype_A}, ::Type{eltype_b}, matrix_size::Integer) where {eltype_A, eltype_b}
         # Determine the element type to use for preference lookup

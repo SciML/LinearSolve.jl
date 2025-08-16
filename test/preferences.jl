@@ -2,8 +2,8 @@ using LinearSolve, LinearAlgebra, Test
 using Preferences
 
 @testset "Dual Preference System Integration Tests" begin
-    # Enable testing mode for preference system verification
-    LinearSolve.reset_defaults!()
+    # Make preferences dynamic for testing verification
+    LinearSolve.make_preferences_dynamic!()
     
     # Clear any existing preferences to start clean
     target_eltypes = ["Float32", "Float64", "ComplexF32", "ComplexF64"]

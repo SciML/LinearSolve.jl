@@ -35,13 +35,27 @@ end
     alg2 = LinearSolve.CudaOffloadLUFactorization(throwerror=false)
     @test alg2 isa LinearSolve.CudaOffloadLUFactorization
     
-    alg3 = LinearSolve.MetalLUFactorization(throwerror=false)
-    @test alg3 isa LinearSolve.MetalLUFactorization
+    # Metal is only available on Apple platforms
+    if Sys.isapple()
+        alg3 = LinearSolve.MetalLUFactorization(throwerror=false)
+        @test alg3 isa LinearSolve.MetalLUFactorization
+    else
+        # On non-Apple platforms, it should still not error with throwerror=false
+        alg3 = LinearSolve.MetalLUFactorization(throwerror=false)
+        @test alg3 isa LinearSolve.MetalLUFactorization
+    end
     
     # These should throw errors with throwerror=true (default)
     @test_throws ErrorException LinearSolve.BLISLUFactorization()
     @test_throws ErrorException LinearSolve.CudaOffloadLUFactorization()
-    @test_throws ErrorException LinearSolve.MetalLUFactorization()
+    
+    # Metal error message depends on platform
+    if Sys.isapple()
+        @test_throws ErrorException LinearSolve.MetalLUFactorization()
+    else
+        # On non-Apple platforms, should error with platform message
+        @test_throws ErrorException LinearSolve.MetalLUFactorization()
+    end
 end
 
 # Test that preferences system recognizes the new algorithms

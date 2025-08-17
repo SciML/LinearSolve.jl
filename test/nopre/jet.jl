@@ -63,7 +63,8 @@ end
     
     # CUDA/Metal factorizations (only test if CUDA/Metal are loaded)
     # CudaOffloadFactorization requires CUDA to be loaded, skip if not available
-    if @isdefined(MetalLUFactorization)
+    # Metal is only available on Apple platforms
+    if Sys.isapple() && @isdefined(MetalLUFactorization)
         JET.@test_opt solve(prob, MetalLUFactorization()) broken=true
     end
     if @isdefined(BLISLUFactorization)

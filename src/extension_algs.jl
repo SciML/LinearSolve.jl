@@ -633,11 +633,19 @@ sol = solve(prob, alg)
 """
 struct MetalLUFactorization <: AbstractFactorization 
     function MetalLUFactorization(; throwerror = true)
-        ext = Base.get_extension(@__MODULE__, :LinearSolveMetalExt)
-        if ext === nothing && throwerror
-            error("MetalLUFactorization requires that Metal.jl is loaded, i.e. `using Metal`")
+        @static if !Sys.isapple()
+            if throwerror
+                error("MetalLUFactorization is only available on Apple platforms")
+            else
+                return new()
+            end
         else
-            return new()
+            ext = Base.get_extension(@__MODULE__, :LinearSolveMetalExt)
+            if ext === nothing && throwerror
+                error("MetalLUFactorization requires that Metal.jl is loaded, i.e. `using Metal`")
+            else
+                return new()
+            end
         end
     end
 end

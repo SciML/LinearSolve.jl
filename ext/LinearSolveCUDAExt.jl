@@ -38,11 +38,13 @@ end
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadLUFactorization;
         kwargs...)
     if cache.isfresh
+        cacheval = LinearSolve.@get_cacheval(cache, :CudaOffloadLUFactorization)
         fact = lu(CUDA.CuArray(cache.A))
         cache.cacheval = fact
         cache.isfresh = false
     end
-    y = Array(ldiv!(CUDA.CuArray(cache.u), cache.cacheval, CUDA.CuArray(cache.b)))
+    fact = LinearSolve.@get_cacheval(cache, :CudaOffloadLUFactorization)
+    y = Array(ldiv!(CUDA.CuArray(cache.u), fact, CUDA.CuArray(cache.b)))
     cache.u .= y
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end

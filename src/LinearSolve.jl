@@ -275,6 +275,9 @@ EnumX.@enumx DefaultAlgorithmChoice begin
     QRFactorizationPivoted
     KrylovJL_CRAIGMR
     KrylovJL_LSMR
+    BLISLUFactorization
+    CudaOffloadLUFactorization
+    MetalLUFactorization
 end
 
 # Autotune preference constants - loaded once at package import time
@@ -296,12 +299,17 @@ function is_algorithm_available(alg::DefaultAlgorithmChoice.T)
         return appleaccelerate_isavailable()  # Available on macOS with Accelerate
     elseif alg === DefaultAlgorithmChoice.RFLUFactorization
         return userecursivefactorization(nothing)  # Requires RecursiveFactorization extension
+    elseif alg === DefaultAlgorithmChoice.BLISLUFactorization
+        return useblis()  # Available if BLIS extension is loaded
+    elseif alg === DefaultAlgorithmChoice.CudaOffloadLUFactorization
+        return usecuda()  # Available if CUDA extension is loaded
+    elseif alg === DefaultAlgorithmChoice.MetalLUFactorization
+        return usemetal()  # Available if Metal extension is loaded
     else
         # For extension-dependent algorithms not explicitly handled above,
         # we cannot easily check availability without trying to use them.
         # For now, assume they're not available in the default selection.
-        # This includes FastLU, BLIS, CUDA, Metal, etc. which would require
-        # specific extension checks.
+        # This includes other extensions that might be added in the future.
         return false
     end
 end
@@ -398,6 +406,17 @@ isopenblas() = IS_OPENBLAS[]
 
 const HAS_APPLE_ACCELERATE = Ref(false)
 appleaccelerate_isavailable() = HAS_APPLE_ACCELERATE[]
+
+# Extension availability checking functions
+useblis() = Base.get_extension(@__MODULE__, :LinearSolveBLISExt) !== nothing
+usecuda() = Base.get_extension(@__MODULE__, :LinearSolveCUDAExt) !== nothing
+
+# Metal is only available on Apple platforms
+@static if !Sys.isapple()
+    usemetal() = false
+else
+    usemetal() = Base.get_extension(@__MODULE__, :LinearSolveMetalExt) !== nothing
+end
 
 PrecompileTools.@compile_workload begin
     A = rand(4, 4)

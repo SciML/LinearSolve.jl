@@ -73,9 +73,9 @@ Requires a sufficiently large `A` to overcome the data transfer costs.
     Using this solver requires adding the package CUDA.jl, i.e. `using CUDA`
 """
 struct CudaOffloadLUFactorization <: AbstractFactorization
-    function CudaOffloadLUFactorization()
+    function CudaOffloadLUFactorization(; throwerror = true)
         ext = Base.get_extension(@__MODULE__, :LinearSolveCUDAExt)
-        if ext === nothing
+        if ext === nothing && throwerror
             error("CudaOffloadLUFactorization requires that CUDA is loaded, i.e. `using CUDA`")
         else
             return new()
@@ -610,16 +610,78 @@ A wrapper over the IterativeSolvers.jl MINRES.
 function IterativeSolversJL_MINRES end
 
 """
+    MetalLUFactorization()
+
+A wrapper over Apple's Metal GPU library for LU factorization. Direct calls to Metal 
+in a way that pre-allocates workspace to avoid allocations and automatically offloads 
+to the GPU. This solver is optimized for Metal-capable Apple Silicon Macs.
+
+## Requirements
+Using this solver requires that Metal.jl is loaded: `using Metal`
+
+## Performance Notes
+- Most efficient for large dense matrices where GPU acceleration benefits outweigh transfer costs
+- Automatically manages GPU memory and transfers
+- Particularly effective on Apple Silicon Macs with unified memory
+
+## Example
 ```julia
-MetalLUFactorization()
+using Metal
+alg = MetalLUFactorization()
+sol = solve(prob, alg)
 ```
-
-A wrapper over Apple's Metal GPU library. Direct calls to Metal in a way that pre-allocates workspace
-to avoid allocations and automatically offloads to the GPU.
 """
-struct MetalLUFactorization <: AbstractFactorization end
+struct MetalLUFactorization <: AbstractFactorization 
+    function MetalLUFactorization(; throwerror = true)
+        @static if !Sys.isapple()
+            if throwerror
+                error("MetalLUFactorization is only available on Apple platforms")
+            else
+                return new()
+            end
+        else
+            ext = Base.get_extension(@__MODULE__, :LinearSolveMetalExt)
+            if ext === nothing && throwerror
+                error("MetalLUFactorization requires that Metal.jl is loaded, i.e. `using Metal`")
+            else
+                return new()
+            end
+        end
+    end
+end
 
-struct BLISLUFactorization <: AbstractFactorization end
+"""
+    BLISLUFactorization()
+
+An LU factorization implementation using the BLIS (BLAS-like Library Instantiation Software) 
+framework. BLIS provides high-performance dense linear algebra kernels optimized for various 
+CPU architectures.
+
+## Requirements
+Using this solver requires that blis_jll is available and the BLIS extension is loaded.
+The solver will be automatically available when conditions are met.
+
+## Performance Notes
+- Optimized for modern CPU architectures with BLIS-specific optimizations
+- May provide better performance than standard BLAS on certain processors
+- Best suited for dense matrices with Float32, Float64, ComplexF32, or ComplexF64 elements
+
+## Example
+```julia
+alg = BLISLUFactorization()
+sol = solve(prob, alg)
+```
+"""
+struct BLISLUFactorization <: AbstractFactorization 
+    function BLISLUFactorization(; throwerror = true)
+        ext = Base.get_extension(@__MODULE__, :LinearSolveBLISExt)
+        if ext === nothing && throwerror
+            error("BLISLUFactorization requires that the BLIS extension is loaded and blis_jll is available")
+        else
+            return new()
+        end
+    end
+end
 
 """
 `CUSOLVERRFFactorization(; symbolic = :RF, reuse_symbolic = true)`

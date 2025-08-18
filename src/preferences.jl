@@ -22,11 +22,11 @@ function _string_to_algorithm_choice(algorithm_name::Union{String, Nothing})
     elseif algorithm_name == "FastLUFactorization"
         return DefaultAlgorithmChoice.LUFactorization  # Map to standard LU (FastLapack extension)
     elseif algorithm_name == "BLISLUFactorization"
-        return DefaultAlgorithmChoice.LUFactorization  # Map to standard LU (BLIS extension)
+        return DefaultAlgorithmChoice.BLISLUFactorization  # Now supported as a separate choice
     elseif algorithm_name == "CudaOffloadLUFactorization"
-        return DefaultAlgorithmChoice.LUFactorization  # Map to standard LU (CUDA extension)
+        return DefaultAlgorithmChoice.CudaOffloadLUFactorization  # Now supported as a separate choice
     elseif algorithm_name == "MetalLUFactorization"
-        return DefaultAlgorithmChoice.LUFactorization  # Map to standard LU (Metal extension)
+        return DefaultAlgorithmChoice.MetalLUFactorization  # Now supported as a separate choice
     elseif algorithm_name == "AMDGPUOffloadLUFactorization"
         return DefaultAlgorithmChoice.LUFactorization  # Map to standard LU (AMDGPU extension)
     else

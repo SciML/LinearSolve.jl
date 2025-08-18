@@ -1,6 +1,6 @@
 needs_concrete_A(alg::DefaultLinearSolver) = true
 mutable struct DefaultLinearSolverInit{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12,
-    T13, T14, T15, T16, T17, T18, T19, T20, T21}
+    T13, T14, T15, T16, T17, T18, T19, T20, T21, T22, T23, T24}
     LUFactorization::T1
     QRFactorization::T2
     DiagonalFactorization::T3
@@ -22,6 +22,9 @@ mutable struct DefaultLinearSolverInit{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, 
     QRFactorizationPivoted::T19
     KrylovJL_CRAIGMR::T20
     KrylovJL_LSMR::T21
+    BLISLUFactorization::T22
+    CudaOffloadLUFactorization::T23
+    MetalLUFactorization::T24
 end
 
 @generated function __setfield!(cache::DefaultLinearSolverInit, alg::DefaultLinearSolver, v)
@@ -422,6 +425,12 @@ function algchoice_to_alg(alg::Symbol)
         KrylovJL_CRAIGMR()
     elseif alg === :KrylovJL_LSMR
         KrylovJL_LSMR()
+    elseif alg === :BLISLUFactorization
+        BLISLUFactorization(throwerror = false)
+    elseif alg === :CudaOffloadLUFactorization
+        CudaOffloadLUFactorization(throwerror = false)
+    elseif alg === :MetalLUFactorization
+        MetalLUFactorization(throwerror = false)
     else
         error("Algorithm choice symbol $alg not allowed in the default")
     end
@@ -524,6 +533,66 @@ end
             newex = quote
                 if !userecursivefactorization(nothing)
                     error("Default algorithm calling solve on RecursiveFactorization without the package being loaded. This shouldn't happen.")
+                end
+
+                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
+                if sol.retcode === ReturnCode.Failure && alg.safetyfallback
+                    ## TODO: Add verbosity logging here about using the fallback
+                    sol = SciMLBase.solve!(
+                        cache, QRFactorization(ColumnNorm()), args...; kwargs...)
+                    SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
+                        retcode = sol.retcode,
+                        iters = sol.iters, stats = sol.stats)
+                else
+                    SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
+                        retcode = sol.retcode,
+                        iters = sol.iters, stats = sol.stats)
+                end
+            end
+        elseif alg == Symbol(DefaultAlgorithmChoice.BLISLUFactorization)
+            newex = quote
+                if !useblis()
+                    error("Default algorithm calling solve on BLISLUFactorization without the extension being loaded. This shouldn't happen.")
+                end
+
+                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
+                if sol.retcode === ReturnCode.Failure && alg.safetyfallback
+                    ## TODO: Add verbosity logging here about using the fallback
+                    sol = SciMLBase.solve!(
+                        cache, QRFactorization(ColumnNorm()), args...; kwargs...)
+                    SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
+                        retcode = sol.retcode,
+                        iters = sol.iters, stats = sol.stats)
+                else
+                    SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
+                        retcode = sol.retcode,
+                        iters = sol.iters, stats = sol.stats)
+                end
+            end
+        elseif alg == Symbol(DefaultAlgorithmChoice.CudaOffloadLUFactorization)
+            newex = quote
+                if !usecuda()
+                    error("Default algorithm calling solve on CudaOffloadLUFactorization without CUDA.jl being loaded. This shouldn't happen.")
+                end
+
+                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
+                if sol.retcode === ReturnCode.Failure && alg.safetyfallback
+                    ## TODO: Add verbosity logging here about using the fallback
+                    sol = SciMLBase.solve!(
+                        cache, QRFactorization(ColumnNorm()), args...; kwargs...)
+                    SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
+                        retcode = sol.retcode,
+                        iters = sol.iters, stats = sol.stats)
+                else
+                    SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
+                        retcode = sol.retcode,
+                        iters = sol.iters, stats = sol.stats)
+                end
+            end
+        elseif alg == Symbol(DefaultAlgorithmChoice.MetalLUFactorization)
+            newex = quote
+                if !usemetal()
+                    error("Default algorithm calling solve on MetalLUFactorization without Metal.jl being loaded. This shouldn't happen.")
                 end
 
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)

@@ -259,6 +259,13 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
                     SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                         nonzeros(A)),
                     check = false)
+            elseif cacheval === nothing || cacheval === PREALLOCATED_KLU ||
+                   length(nonzeros(A)) != length(cacheval.nzval)
+                # Create new factorization if cacheval is uninitialized or size mismatch
+                fact = KLU.klu(
+                    SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
+                        nonzeros(A)),
+                    check = false)
             else
                 fact = KLU.klu!(cacheval, nonzeros(A), check = false)
             end

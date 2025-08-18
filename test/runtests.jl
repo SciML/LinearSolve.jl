@@ -17,6 +17,7 @@ if GROUP == "All" || GROUP == "Core"
     @time @safetestset "Adjoint Sensitivity" include("adjoint.jl")
     @time @safetestset "ForwardDiff Overloads" include("forwarddiff_overloads.jl")
     @time @safetestset "Traits" include("traits.jl")
+    @time @safetestset "Verbosity" include("verbosity.jl")
     @time @safetestset "BandedMatrices" include("banded.jl")
 end
 

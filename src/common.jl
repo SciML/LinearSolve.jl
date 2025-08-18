@@ -89,7 +89,7 @@ solving and caching of factorizations and intermediate results.
 - `abstol::Ttol`: Absolute tolerance for iterative solvers.
 - `reltol::Ttol`: Relative tolerance for iterative solvers.
 - `maxiters::Int`: Maximum number of iterations for iterative solvers.
-- `verbose::Bool`: Whether to print verbose output during solving.
+- `verbose::LinearVerbosity`: Whether to print verbose output during solving.
 - `assumptions::OperatorAssumptions{issq}`: Assumptions about the operator properties.
 - `sensealg::S`: Sensitivity analysis algorithm for automatic differentiation.
 

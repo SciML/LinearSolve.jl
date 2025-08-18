@@ -9,14 +9,21 @@ const linear_defaults = Dict{Symbol, Verbosity.Type}(
     :KrylovKit_verbosity => Verbosity.Warn(),
     :KrylovJL_verbosity => Verbosity.None(),
     :HYPRE_verbosity => Verbosity.Level(1),
-    :pardiso_verbosity => Verbosity.None()
+    :pardiso_verbosity => Verbosity.None(),
+    :blas_errors => Verbosity.Warn(),
+    :blas_info => Verbosity.None(),
+    :blas_success => Verbosity.None(),
+    :blas_invalid_args => Verbosity.Error(),
+    :blas_timing => Verbosity.None()
 )
 mutable struct LinearErrorControlVerbosity
     default_lu_fallback::Verbosity.Type
+    blas_invalid_args::Verbosity.Type
 
     function LinearErrorControlVerbosity(;
-            default_lu_fallback = linear_defaults[:default_lu_fallback])
-        new(default_lu_fallback)
+            default_lu_fallback = linear_defaults[:default_lu_fallback],
+            blas_invalid_args = linear_defaults[:blas_invalid_args])
+        new(default_lu_fallback, blas_invalid_args)
     end
 
     function LinearErrorControlVerbosity(verbose::Verbosity.Type)
@@ -44,10 +51,12 @@ end
 
 mutable struct LinearPerformanceVerbosity
     no_right_preconditioning::Verbosity.Type
+    blas_timing::Verbosity.Type
 
     function LinearPerformanceVerbosity(;
-            no_right_preconditioning = linear_defaults[:no_right_preconditioning])
-        new(no_right_preconditioning)
+            no_right_preconditioning = linear_defaults[:no_right_preconditioning],
+            blas_timing = linear_defaults[:blas_timing])
+        new(no_right_preconditioning, blas_timing)
     end
 
     function LinearPerformanceVerbosity(verbose::Verbosity.Type)
@@ -80,6 +89,9 @@ mutable struct LinearNumericalVerbosity
     KrylovJL_verbosity::Verbosity.Type
     HYPRE_verbosity::Verbosity.Type
     pardiso_verbosity::Verbosity.Type
+    blas_errors::Verbosity.Type
+    blas_info::Verbosity.Type
+    blas_success::Verbosity.Type
 
     function LinearNumericalVerbosity(;
             using_IterativeSolvers = linear_defaults[:using_IterativeSolvers],
@@ -87,9 +99,13 @@ mutable struct LinearNumericalVerbosity
             KrylovKit_verbosity = linear_defaults[:KrylovKit_verbosity],
             KrylovJL_verbosity = linear_defaults[:KrylovJL_verbosity],
             HYPRE_verbosity = linear_defaults[:HYPRE_verbosity],
-            pardiso_verbosity = linear_defaults[:pardiso_verbosity])
+            pardiso_verbosity = linear_defaults[:pardiso_verbosity],
+            blas_errors = linear_defaults[:blas_errors],
+            blas_info = linear_defaults[:blas_info],
+            blas_success = linear_defaults[:blas_success])
         new(using_IterativeSolvers, IterativeSolvers_iterations,
-            KrylovKit_verbosity, KrylovJL_verbosity, HYPRE_verbosity, pardiso_verbosity)
+            KrylovKit_verbosity, KrylovJL_verbosity, HYPRE_verbosity, pardiso_verbosity,
+            blas_errors, blas_info, blas_success)
     end
 
     function LinearNumericalVerbosity(verbose::Verbosity.Type)

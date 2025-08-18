@@ -9,8 +9,11 @@ using LinearSolve
 using LinearAlgebra: BlasInt, LU
 using LinearAlgebra.LAPACK: require_one_based_indexing, chkfinite, chkstride1, 
                             @blasfunc, chkargsok
-using LinearSolve: ArrayInterface, BLISLUFactorization, @get_cacheval, LinearCache, SciMLBase
+using LinearSolve: ArrayInterface, BLISLUFactorization, @get_cacheval, LinearCache, SciMLBase,
+                   interpret_blas_code, log_blas_info, get_blas_operation_info, 
+                   time_blas_operation, check_and_log_lapack_result, LinearVerbosity
 using SciMLBase: ReturnCode
+using SciMLLogging: Verbosity
 
 const global libblis = blis_jll.blis
 const global liblapack = LAPACK_jll.liblapack
@@ -220,11 +223,29 @@ function SciMLBase.solve!(cache::LinearCache, alg::BLISLUFactorization;
     kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
+    verbose = cache.verbose
+    
     if cache.isfresh
         cacheval = @get_cacheval(cache, :BLISLUFactorization)
-        res = getrf!(A; ipiv = cacheval[1].ipiv, info = cacheval[2])
+        
+        # Get additional operation info for logging
+        op_info = get_blas_operation_info(:dgetrf, A, cache.b)
+        
+        # Time the BLAS operation if verbosity requires it
+        res = time_blas_operation(:dgetrf, verbose) do
+            getrf!(A; ipiv = cacheval[1].ipiv, info = cacheval[2])
+        end
+        
         fact = LU(res[1:3]...), res[4]
         cache.cacheval = fact
+        
+        # Log BLAS return code with detailed interpretation
+        info_value = res[3]
+        if info_value != 0
+            log_blas_info(:dgetrf, info_value, verbose; extra_context=op_info)
+        elseif isa(verbose.numerical.blas_success, Verbosity.Info)
+            @info "BLAS LU factorization (dgetrf) completed successfully" op_info
+        end
 
         if !LinearAlgebra.issuccess(fact[1])
             return SciMLBase.build_linear_solution(
@@ -236,13 +257,22 @@ function SciMLBase.solve!(cache::LinearCache, alg::BLISLUFactorization;
     A, info = @get_cacheval(cache, :BLISLUFactorization)
     require_one_based_indexing(cache.u, cache.b)
     m, n = size(A, 1), size(A, 2)
-    if m > n
-        Bc = copy(cache.b)
-        getrs!('N', A.factors, A.ipiv, Bc; info)
-        copyto!(cache.u, 1, Bc, 1, n)
-    else
-        copyto!(cache.u, cache.b)
-        getrs!('N', A.factors, A.ipiv, cache.u; info)
+    
+    # Time the solve operation
+    solve_result = time_blas_operation(:dgetrs, verbose) do
+        if m > n
+            Bc = copy(cache.b)
+            getrs!('N', A.factors, A.ipiv, Bc; info)
+            copyto!(cache.u, 1, Bc, 1, n)
+        else
+            copyto!(cache.u, cache.b)
+            getrs!('N', A.factors, A.ipiv, cache.u; info)
+        end
+    end
+    
+    # Log solve operation result if there was an error
+    if info[] != 0
+        log_blas_info(:dgetrs, info[], verbose)
     end
 
     SciMLBase.build_linear_solution(alg, cache.u, nothing, cache; retcode = ReturnCode.Success)

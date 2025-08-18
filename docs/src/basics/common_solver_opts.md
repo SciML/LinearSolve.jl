@@ -108,10 +108,62 @@ sol = solve(prob; verbose=verbose)
 #### Verbosity Levels
 ##### Error Control Settings
 - default_lu_fallback: Controls messages when falling back to LU factorization (default: Warn)
+- blas_invalid_args: Controls messages when BLAS/LAPACK receives invalid arguments (default: Error)
 ##### Performance Settings
 - no_right_preconditioning: Controls messages when right preconditioning is not used (default: Warn)
+- blas_timing: Controls performance timing messages for BLAS/LAPACK operations (default: None)
 ##### Numerical Settings
 - using_IterativeSolvers: Controls messages when using the IterativeSolvers.jl package (default: Warn)
 - IterativeSolvers_iterations: Controls messages about iteration counts from IterativeSolvers.jl (default: Warn)
 - KrylovKit_verbosity: Controls messages from the KrylovKit.jl package (default: Warn)
 - KrylovJL_verbosity: Controls verbosity of the KrylovJL.jl package (default: None)
+- blas_errors: Controls messages for BLAS/LAPACK errors like singular matrices (default: Warn)
+- blas_info: Controls informational messages from BLAS/LAPACK operations (default: None)
+- blas_success: Controls success messages from BLAS/LAPACK operations (default: None)
+
+### BLAS/LAPACK Return Code Interpretation
+
+LinearSolve.jl now provides detailed interpretation of BLAS/LAPACK return codes (info parameter) to help diagnose numerical issues. When BLAS/LAPACK operations encounter problems, the logging system will provide human-readable explanations based on the specific return code and operation.
+
+#### Common BLAS/LAPACK Return Codes
+
+- **info = 0**: Operation completed successfully
+- **info < 0**: Argument -info had an illegal value (e.g., wrong dimensions, invalid parameters)
+- **info > 0**: Operation-specific issues:
+  - **LU factorization (getrf)**: U(info,info) is exactly zero, matrix is singular
+  - **Cholesky factorization (potrf)**: Leading minor of order info is not positive definite
+  - **QR factorization (geqrf)**: Numerical issues with Householder reflector info
+  - **SVD (gesdd/gesvd)**: Algorithm failed to converge, info off-diagonal elements did not converge
+  - **Eigenvalue computation (syev/heev)**: info off-diagonal elements did not converge to zero
+  - **Bunch-Kaufman (sytrf/hetrf)**: D(info,info) is exactly zero, matrix is singular
+
+#### Example Usage with Enhanced BLAS Logging
+
+```julia
+using LinearSolve
+
+# Enable detailed BLAS error logging
+verbose = LinearVerbosity(
+    blas_errors = Verbosity.Info(),  # Show detailed error interpretations
+    blas_timing = Verbosity.Info(),  # Show performance metrics
+    blas_info = Verbosity.Info()     # Show all BLAS operation details
+)
+
+# Solve a potentially singular system
+A = [1.0 2.0; 2.0 4.0]  # Singular matrix
+b = [1.0, 2.0]
+prob = LinearProblem(A, b)
+sol = solve(prob, LUFactorization(); verbose=verbose)
+
+# The logging will show:
+# - BLAS/LAPACK dgetrf: Matrix is singular
+# - Details: U(2,2) is exactly zero. The factorization has been completed, but U is singular
+# - Return code (info): 2
+# - Additional context: matrix size, condition number, memory usage
+```
+
+The enhanced logging also provides:
+- Matrix properties (size, type, condition number when feasible)
+- Memory usage estimates
+- Performance timing for BLAS operations (when blas_timing is enabled)
+- Detailed context for debugging numerical issues

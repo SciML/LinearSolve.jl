@@ -1206,17 +1206,17 @@ end
 # Fallback init_cacheval for extension-based algorithms when extensions aren't loaded
 # These return nothing since the actual implementations are in the extensions
 function init_cacheval(::BLISLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+        maxiters::Int, abstol, reltol, verbose::LinearVerbosity, assumptions::OperatorAssumptions)
     nothing
 end
 
 function init_cacheval(::CudaOffloadLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+        maxiters::Int, abstol, reltol, verbose::LinearVerbosity, assumptions::OperatorAssumptions)
     nothing
 end
 
 function init_cacheval(::MetalLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+        maxiters::Int, abstol, reltol, verbose::LinearVerbosity, assumptions::OperatorAssumptions)
     nothing
 end
 

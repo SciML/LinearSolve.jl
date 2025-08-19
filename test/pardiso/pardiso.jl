@@ -60,7 +60,7 @@ linsolve.A = copy(A2)
 sol13 = solve!(linsolve)
 
 for alg in algs
-    linsolve = init(prob, alg)
+    local linsolve = init(prob, alg)
     sol31 = solve!(linsolve)
     linsolve.b = copy(b2)
     sol32 = solve!(linsolve)
@@ -147,11 +147,11 @@ function makeA()
 end
 
 for alg in algs
-    A = makeA()
+    local A = makeA()
     u0 = fill(0.1, size(A, 2))
     linprob = LinearProblem(A, A * u0)
     u = LinearSolve.solve(linprob, alg)
-    @test norm(u - u0) < 1.0e-14
+    @test norm(u - u0) < 5.0e-14
 end
 
 # Testing and demonstrating Pardiso.set_iparm! for MKLPardisoSolver

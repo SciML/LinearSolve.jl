@@ -1210,10 +1210,6 @@ function init_cacheval(::BLISLUFactorization, A, b, u, Pl, Pr,
     nothing
 end
 
-function init_cacheval(::CudaOffloadLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::LinearVerbosity, assumptions::OperatorAssumptions)
-    nothing
-end
 
 function init_cacheval(::MetalLUFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::LinearVerbosity, assumptions::OperatorAssumptions)

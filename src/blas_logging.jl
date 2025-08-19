@@ -190,11 +190,12 @@ end
 
 # Extended information for specific BLAS operations
 """
-    get_blas_operation_info(func::Symbol, A, b=nothing)
+    get_blas_operation_info(func::Symbol, A, b=nothing; compute_condition=false)
 
 Get additional information about a BLAS operation for enhanced logging.
+Set compute_condition=true to include condition number computation (may be expensive).
 """
-function get_blas_operation_info(func::Symbol, A, b=nothing)
+function get_blas_operation_info(func::Symbol, A, b=nothing; compute_condition=false)
     info = Dict{Symbol,Any}()
     
     # Matrix properties
@@ -202,8 +203,8 @@ function get_blas_operation_info(func::Symbol, A, b=nothing)
     info[:matrix_type] = typeof(A)
     info[:element_type] = eltype(A)
     
-    # Condition number (if not too expensive)
-    if size(A, 1) <= 1000 && size(A, 1) == size(A, 2)
+    # Condition number (only if explicitly requested)
+    if compute_condition && size(A, 1) == size(A, 2)
         try
             info[:condition_number] = cond(A)
         catch
@@ -224,44 +225,3 @@ function get_blas_operation_info(func::Symbol, A, b=nothing)
     return info
 end
 
-# Performance timing for BLAS operations
-mutable struct BLASTimingInfo
-    operation::Symbol
-    start_time::Float64
-    end_time::Float64
-    allocated_bytes::Int
-    gc_time::Float64
-end
-
-"""
-    time_blas_operation(f::Function, func::Symbol, verbose::LinearVerbosity)
-
-Time a BLAS operation and log performance information based on verbosity.
-"""
-function time_blas_operation(f::Function, func::Symbol, verbose::LinearVerbosity)
-    if verbose.performance.blas_timing isa Verbosity.None
-        return f()
-    end
-    
-    # Measure performance
-    stats = @timed f()
-    result = stats.value
-    
-    # Log timing information
-    if verbose.performance.blas_timing isa Verbosity.Info ||
-       verbose.performance.blas_timing isa Verbosity.Warn
-        timing_msg = format_timing_message(func, stats)
-        log_with_verbosity(verbose.performance.blas_timing, timing_msg, :performance)
-    end
-    
-    return result
-end
-
-function format_timing_message(func::Symbol, stats)
-    parts = String[]
-    push!(parts, "BLAS/LAPACK $func performance:")
-    push!(parts, "  Time: $(round(stats.time, sigdigits=3)) seconds")
-    push!(parts, "  Allocations: $(round(stats.bytes / 1024^2, digits=2)) MB")
-    push!(parts, "  GC time: $(round(stats.gctime, sigdigits=3)) seconds")
-    return join(parts, "\n")
-end

@@ -11,7 +11,7 @@ using LinearAlgebra.LAPACK: require_one_based_indexing, chkfinite, chkstride1,
                             @blasfunc, chkargsok
 using LinearSolve: ArrayInterface, BLISLUFactorization, @get_cacheval, LinearCache, SciMLBase,
                    interpret_blas_code, log_blas_info, get_blas_operation_info, 
-                   time_blas_operation, check_and_log_lapack_result, LinearVerbosity
+                   check_and_log_lapack_result, LinearVerbosity
 using SciMLBase: ReturnCode
 using SciMLLogging: Verbosity
 
@@ -228,22 +228,23 @@ function SciMLBase.solve!(cache::LinearCache, alg::BLISLUFactorization;
     if cache.isfresh
         cacheval = @get_cacheval(cache, :BLISLUFactorization)
         
-        # Get additional operation info for logging
-        op_info = get_blas_operation_info(:dgetrf, A, cache.b)
-        
-        # Time the BLAS operation if verbosity requires it
-        res = time_blas_operation(:dgetrf, verbose) do
-            getrf!(A; ipiv = cacheval[1].ipiv, info = cacheval[2])
-        end
+        # Perform the factorization
+        res = getrf!(A; ipiv = cacheval[1].ipiv, info = cacheval[2])
         
         fact = LU(res[1:3]...), res[4]
         cache.cacheval = fact
         
-        # Log BLAS return code with detailed interpretation
+        # Log BLAS return code with detailed interpretation if logging is enabled
         info_value = res[3]
         if info_value != 0
-            log_blas_info(:dgetrf, info_value, verbose; extra_context=op_info)
-        elseif isa(verbose.numerical.blas_success, Verbosity.Info)
+            # Only get operation info if we need to log
+            if !(verbose.numerical.blas_errors isa Verbosity.None)
+                op_info = get_blas_operation_info(:dgetrf, A, cache.b)
+                log_blas_info(:dgetrf, info_value, verbose; extra_context=op_info)
+            end
+        elseif !(verbose.numerical.blas_success isa Verbosity.None)
+            # Only get operation info if we need to log success
+            op_info = get_blas_operation_info(:dgetrf, A, cache.b)
             @info "BLAS LU factorization (dgetrf) completed successfully" op_info
         end
 
@@ -258,20 +259,18 @@ function SciMLBase.solve!(cache::LinearCache, alg::BLISLUFactorization;
     require_one_based_indexing(cache.u, cache.b)
     m, n = size(A, 1), size(A, 2)
     
-    # Time the solve operation
-    solve_result = time_blas_operation(:dgetrs, verbose) do
-        if m > n
-            Bc = copy(cache.b)
-            getrs!('N', A.factors, A.ipiv, Bc; info)
-            copyto!(cache.u, 1, Bc, 1, n)
-        else
-            copyto!(cache.u, cache.b)
-            getrs!('N', A.factors, A.ipiv, cache.u; info)
-        end
+    # Perform the solve
+    if m > n
+        Bc = copy(cache.b)
+        getrs!('N', A.factors, A.ipiv, Bc; info)
+        copyto!(cache.u, 1, Bc, 1, n)
+    else
+        copyto!(cache.u, cache.b)
+        getrs!('N', A.factors, A.ipiv, cache.u; info)
     end
     
     # Log solve operation result if there was an error
-    if info[] != 0
+    if info[] != 0 && !(verbose.numerical.blas_errors isa Verbosity.None)
         log_blas_info(:dgetrs, info[], verbose)
     end
 

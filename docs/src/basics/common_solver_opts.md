@@ -111,7 +111,6 @@ sol = solve(prob; verbose=verbose)
 - blas_invalid_args: Controls messages when BLAS/LAPACK receives invalid arguments (default: Error)
 ##### Performance Settings
 - no_right_preconditioning: Controls messages when right preconditioning is not used (default: Warn)
-- blas_timing: Controls performance timing messages for BLAS/LAPACK operations (default: None)
 ##### Numerical Settings
 - using_IterativeSolvers: Controls messages when using the IterativeSolvers.jl package (default: Warn)
 - IterativeSolvers_iterations: Controls messages about iteration counts from IterativeSolvers.jl (default: Warn)
@@ -145,7 +144,6 @@ using LinearSolve
 # Enable detailed BLAS error logging
 verbose = LinearVerbosity(
     blas_errors = Verbosity.Info(),  # Show detailed error interpretations
-    blas_timing = Verbosity.Info(),  # Show performance metrics
     blas_info = Verbosity.Info()     # Show all BLAS operation details
 )
 
@@ -163,7 +161,7 @@ sol = solve(prob, LUFactorization(); verbose=verbose)
 ```
 
 The enhanced logging also provides:
-- Matrix properties (size, type, condition number when feasible)
+- Matrix properties (size, type, element type)
 - Memory usage estimates
-- Performance timing for BLAS operations (when blas_timing is enabled)
 - Detailed context for debugging numerical issues
+- Optional condition number computation (can be enabled via compute_condition parameter)

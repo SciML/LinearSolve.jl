@@ -13,8 +13,7 @@ const linear_defaults = Dict{Symbol, Verbosity.Type}(
     :blas_errors => Verbosity.Warn(),
     :blas_info => Verbosity.None(),
     :blas_success => Verbosity.None(),
-    :blas_invalid_args => Verbosity.Error(),
-    :blas_timing => Verbosity.None()
+    :blas_invalid_args => Verbosity.Error()
 )
 mutable struct LinearErrorControlVerbosity
     default_lu_fallback::Verbosity.Type
@@ -51,12 +50,10 @@ end
 
 mutable struct LinearPerformanceVerbosity
     no_right_preconditioning::Verbosity.Type
-    blas_timing::Verbosity.Type
 
     function LinearPerformanceVerbosity(;
-            no_right_preconditioning = linear_defaults[:no_right_preconditioning],
-            blas_timing = linear_defaults[:blas_timing])
-        new(no_right_preconditioning, blas_timing)
+            no_right_preconditioning = linear_defaults[:no_right_preconditioning])
+        new(no_right_preconditioning)
     end
 
     function LinearPerformanceVerbosity(verbose::Verbosity.Type)

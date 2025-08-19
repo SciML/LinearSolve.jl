@@ -33,15 +33,19 @@ using SciMLLogging: Verbosity
     end
     
     @testset "BLAS Operation Info" begin
-        # Test getting operation info
+        # Test getting operation info without condition number
         A = rand(10, 10)
         b = rand(10)
         info = LinearSolve.get_blas_operation_info(:dgetrf, A, b)
         
         @test info[:matrix_size] == (10, 10)
         @test info[:element_type] == Float64
-        @test haskey(info, :condition_number)
+        @test !haskey(info, :condition_number)  # Should not compute by default
         @test info[:memory_usage_MB] >= 0  # Memory can be 0 for very small matrices
+        
+        # Test with condition number computation enabled
+        info_with_cond = LinearSolve.get_blas_operation_info(:dgetrf, A, b; compute_condition=true)
+        @test haskey(info_with_cond, :condition_number)
     end
     
     @testset "Verbosity Integration" begin
@@ -64,7 +68,6 @@ using SciMLLogging: Verbosity
         # Test with all logging enabled
         verbose_all = LinearVerbosity(
             blas_errors = Verbosity.Info(),
-            blas_timing = Verbosity.Info(),
             blas_info = Verbosity.Info()
         )
         
@@ -98,17 +101,3 @@ using SciMLLogging: Verbosity
     end
 end
 
-@testset "BLAS Timing" begin
-    # Simple test of timing functionality
-    A = rand(100, 100)
-    b = rand(100)
-    
-    verbose = LinearVerbosity(
-        blas_timing = Verbosity.Info()
-    )
-    
-    # Test that timing doesn't break the solve
-    prob = LinearProblem(A, b)
-    sol = solve(prob, LUFactorization(); verbose=verbose)
-    @test sol.retcode == ReturnCode.Success
-end

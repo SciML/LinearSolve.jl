@@ -1,13 +1,16 @@
 module LinearSolveCUDAExt
 
 using CUDA
+using CUDA: CuVector, CuMatrix
 using LinearSolve: LinearSolve, is_cusparse, defaultalg, cudss_loaded, DefaultLinearSolver,
                    DefaultAlgorithmChoice, ALREADY_WARNED_CUDSS, LinearCache,
                    needs_concrete_A,
                    error_no_cudss_lu, init_cacheval, OperatorAssumptions,
                    CudaOffloadFactorization, CudaOffloadLUFactorization, CudaOffloadQRFactorization,
-                   SparspakFactorization, KLUFactorization, UMFPACKFactorization
+                   SparspakFactorization, KLUFactorization, UMFPACKFactorization,
+                   LinearVerbosity
 using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase, LinearSolve.ArrayInterface
+using LinearAlgebra: LU
 using SciMLBase: AbstractSciMLOperator
 
 function LinearSolve.is_cusparse(A::Union{

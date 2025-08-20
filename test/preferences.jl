@@ -190,6 +190,12 @@ using Preferences
             println("✅ MKLLUFactorization confirmed working")
         end
         
+        # Test OpenBLAS (always available as a dependency)
+        sol_openblas = solve(prob, OpenBLASLUFactorization())
+        @test sol_openblas.retcode == ReturnCode.Success
+        @test norm(A * sol_openblas.u - b) < 1e-8
+        println("✅ OpenBLASLUFactorization confirmed working")
+        
         # Test Apple Accelerate if available
         if LinearSolve.appleaccelerate_isavailable()
             sol_apple = solve(prob, AppleAccelerateLUFactorization())

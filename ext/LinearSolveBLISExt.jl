@@ -13,7 +13,7 @@ using LinearSolve: ArrayInterface, BLISLUFactorization, @get_cacheval, LinearCac
                    interpret_blas_code, log_blas_info, get_blas_operation_info, 
                    check_and_log_lapack_result, LinearVerbosity
 using SciMLBase: ReturnCode
-using SciMLLogging: Verbosity, @SciMLMessage, verbosity_to_int
+using SciMLLogging: Verbosity, @SciMLMessage
 
 const global libblis = blis_jll.blis
 const global liblapack = LAPACK_jll.liblapack
@@ -238,11 +238,11 @@ function SciMLBase.solve!(cache::LinearCache, alg::BLISLUFactorization;
         info_value = res[3]
         if info_value != 0
             # Only get operation info if we need to log
-            if verbosity_to_int(verbose.numerical.blas_errors) > 0
+            if verbose.numerical.blas_errors !== Verbosity.None()
                 op_info = get_blas_operation_info(:dgetrf, A, cache.b, verbose)
                 log_blas_info(:dgetrf, info_value, verbose; extra_context=op_info)
             end
-        elseif verbosity_to_int(verbose.numerical.blas_success) > 0
+        elseif verbose.numerical.blas_success !== Verbosity.None()
             # Only get operation info if we need to log success
             op_info = get_blas_operation_info(:dgetrf, A, cache.b, verbose)
             success_msg = "BLAS LU factorization (dgetrf) completed successfully for $(op_info[:matrix_size]) matrix"
@@ -271,7 +271,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::BLISLUFactorization;
     end
     
     # Log solve operation result if there was an error
-    if info[] != 0 && verbosity_to_int(verbose.numerical.blas_errors) > 0
+    if info[] != 0 && verbose.numerical.blas_errors !== Verbosity.None()
         log_blas_info(:dgetrs, info[], verbose)
     end
 

@@ -1,6 +1,6 @@
 # BLAS and LAPACK Return Code Interpretation
 
-using SciMLLogging: Verbosity, @match, @SciMLMessage, verbosity_to_int
+using SciMLLogging: Verbosity, @match, @SciMLMessage
 using LinearAlgebra: cond
 
 """
@@ -160,7 +160,7 @@ function check_and_log_lapack_result(func::Symbol, result, verbose::LinearVerbos
     
     if info != 0
         log_blas_info(func, info, verbose; extra_context=extra_context)
-    elseif verbosity_to_int(verbose.numerical.blas_success) > 0
+    elseif verbose.numerical.blas_success !== Verbosity.None()
         success_msg = "BLAS/LAPACK $func completed successfully"
         @SciMLMessage(success_msg, verbose.numerical.blas_success, :blas_success, :numerical)
     end
@@ -184,7 +184,7 @@ function get_blas_operation_info(func::Symbol, A, b, verbose::LinearVerbosity)
     info[:element_type] = eltype(A)
     
     # Condition number (based on verbosity setting)
-    should_compute_cond = verbosity_to_int(verbose.numerical.condition_number) > 0
+    should_compute_cond = verbose.numerical.condition_number !== Verbosity.None()
     if should_compute_cond && size(A, 1) == size(A, 2)
         try
             cond_num = cond(A)

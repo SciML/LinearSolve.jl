@@ -59,6 +59,8 @@ else
     const usemkl = false
 end
 
+using OpenBLAS_jll
+
 
 @reexport using SciMLBase
 
@@ -345,6 +347,7 @@ include("extension_algs.jl")
 include("factorization.jl")
 include("appleaccelerate.jl")
 include("mkl.jl")
+include("openblas.jl")
 include("simplelu.jl")
 include("simplegmres.jl")
 include("iterative_wrappers.jl")
@@ -461,6 +464,7 @@ export MKLPardisoFactorize, MKLPardisoIterate
 export PanuaPardisoFactorize, PanuaPardisoIterate
 export PardisoJL
 export MKLLUFactorization
+export OpenBLASLUFactorization
 export AppleAccelerateLUFactorization
 export MetalLUFactorization
 

@@ -14,6 +14,7 @@ to avoid allocations and does not require libblastrampoline.
 """
 struct AppleAccelerateLUFactorization <: AbstractFactorization end
 
+
 @static if !Sys.isapple()
     __appleaccelerate_isavailable() = false
 else
@@ -279,6 +280,87 @@ function SciMLBase.solve!(cache::LinearCache, alg::AppleAccelerateLUFactorizatio
     else
         copyto!(cache.u, cache.b)
         aa_getrs!('N', A.factors, A.ipiv, cache.u; info)
+    end
+
+    SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache; retcode = ReturnCode.Success)
+end
+
+# Mixed precision AppleAccelerate implementation
+default_alias_A(::AppleAccelerate32MixedLUFactorization, ::Any, ::Any) = false
+default_alias_b(::AppleAccelerate32MixedLUFactorization, ::Any, ::Any) = false
+
+const PREALLOCATED_APPLE32_LU = begin
+    A = rand(Float32, 0, 0)
+    luinst = ArrayInterface.lu_instance(A)
+    LU(luinst.factors, similar(A, Cint, 0), luinst.info), Ref{Cint}()
+end
+
+function LinearSolve.init_cacheval(alg::AppleAccelerate32MixedLUFactorization, A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
+        assumptions::OperatorAssumptions)
+    # Pre-allocate appropriate 32-bit arrays based on input type
+    if eltype(A) <: Complex
+        A_32 = rand(ComplexF32, 0, 0)
+    else
+        A_32 = rand(Float32, 0, 0)
+    end
+    luinst = ArrayInterface.lu_instance(A_32)
+    LU(luinst.factors, similar(A_32, Cint, 0), luinst.info), Ref{Cint}()
+end
+
+function SciMLBase.solve!(cache::LinearCache, alg::AppleAccelerate32MixedLUFactorization;
+        kwargs...)
+    __appleaccelerate_isavailable() || 
+        error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
+    A = cache.A
+    A = convert(AbstractMatrix, A)
+    
+    # Check if we have complex numbers
+    iscomplex = eltype(A) <: Complex
+    
+    if cache.isfresh
+        cacheval = @get_cacheval(cache, :AppleAccelerate32MixedLUFactorization)
+        # Convert to appropriate 32-bit type for factorization
+        if iscomplex
+            A_f32 = ComplexF32.(A)
+        else
+            A_f32 = Float32.(A)
+        end
+        res = aa_getrf!(A_f32; ipiv = cacheval[1].ipiv, info = cacheval[2])
+        fact = LU(res[1:3]...), res[4]
+        cache.cacheval = fact
+
+        if !LinearAlgebra.issuccess(fact[1])
+            return SciMLBase.build_linear_solution(
+                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
+        end
+        cache.isfresh = false
+    end
+
+    A_lu, info = @get_cacheval(cache, :AppleAccelerate32MixedLUFactorization)
+    require_one_based_indexing(cache.u, cache.b)
+    m, n = size(A_lu, 1), size(A_lu, 2)
+    
+    # Convert b to appropriate 32-bit type for solving
+    if iscomplex
+        b_f32 = ComplexF32.(cache.b)
+    else
+        b_f32 = Float32.(cache.b)
+    end
+    
+    if m > n
+        Bc = copy(b_f32)
+        aa_getrs!('N', A_lu.factors, A_lu.ipiv, Bc; info)
+        # Convert back to original precision
+        T = eltype(cache.u)
+        cache.u .= T.(Bc[1:n])
+    else
+        u_f32 = copy(b_f32)
+        aa_getrs!('N', A_lu.factors, A_lu.ipiv, u_f32; info)
+        # Convert back to original precision
+        T = eltype(cache.u)
+        cache.u .= T.(u_f32)
     end
 
     SciMLBase.build_linear_solution(

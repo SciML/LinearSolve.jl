@@ -84,6 +84,35 @@ struct CudaOffloadLUFactorization <: AbstractFactorization
 end
 
 """
+`CUDAOffload32MixedLUFactorization()`
+
+A mixed precision GPU-accelerated LU factorization that converts matrices to Float32 
+before offloading to CUDA GPU for factorization, then converts back for the solve.
+This can provide speedups when the reduced precision is acceptable and memory 
+bandwidth is a bottleneck.
+
+## Performance Notes
+- Converts Float64 matrices to Float32 for GPU factorization
+- Can be significantly faster for large matrices where memory bandwidth is limiting
+- May have reduced accuracy compared to full precision methods
+- Most beneficial when the condition number of the matrix is moderate
+
+!!! note
+
+    Using this solver requires adding the package CUDA.jl, i.e. `using CUDA`
+"""
+struct CUDAOffload32MixedLUFactorization <: AbstractFactorization
+    function CUDAOffload32MixedLUFactorization(; throwerror = true)
+        ext = Base.get_extension(@__MODULE__, :LinearSolveCUDAExt)
+        if ext === nothing && throwerror
+            error("CUDAOffload32MixedLUFactorization requires that CUDA is loaded, i.e. `using CUDA`")
+        else
+            return new()
+        end
+    end
+end
+
+"""
 `CudaOffloadQRFactorization()`
 
 An offloading technique used to GPU-accelerate CPU-based computations using QR factorization.
@@ -651,6 +680,48 @@ struct MetalLUFactorization <: AbstractFactorization
 end
 
 """
+    MetalOffload32MixedLUFactorization()
+
+A mixed precision Metal GPU-accelerated LU factorization that converts matrices to Float32
+before offloading to Metal GPU for factorization, then converts back for the solve.
+This can provide speedups on Apple Silicon when reduced precision is acceptable.
+
+## Performance Notes
+- Converts Float64 matrices to Float32 for GPU factorization
+- Can be significantly faster for large matrices where memory bandwidth is limiting
+- Particularly effective on Apple Silicon Macs with unified memory architecture
+- May have reduced accuracy compared to full precision methods
+
+## Requirements
+Using this solver requires that Metal.jl is loaded: `using Metal`
+
+## Example
+```julia
+using Metal
+alg = MetalOffload32MixedLUFactorization()
+sol = solve(prob, alg)
+```
+"""
+struct MetalOffload32MixedLUFactorization <: AbstractFactorization
+    function MetalOffload32MixedLUFactorization(; throwerror = true)
+        @static if !Sys.isapple()
+            if throwerror
+                error("MetalOffload32MixedLUFactorization is only available on Apple platforms")
+            else
+                return new()
+            end
+        else
+            ext = Base.get_extension(@__MODULE__, :LinearSolveMetalExt)
+            if ext === nothing && throwerror
+                error("MetalOffload32MixedLUFactorization requires that Metal.jl is loaded, i.e. `using Metal`")
+            else
+                return new()
+            end
+        end
+    end
+end
+
+"""
     BLISLUFactorization()
 
 An LU factorization implementation using the BLIS (BLAS-like Library Instantiation Software) 
@@ -715,3 +786,51 @@ struct CUSOLVERRFFactorization <: AbstractSparseFactorization
         end
     end
 end
+
+"""
+    MKL32MixedLUFactorization()
+
+A mixed precision LU factorization using Intel MKL that performs factorization in Float32
+precision while maintaining Float64 interface. This can provide significant speedups
+for large matrices when reduced precision is acceptable.
+
+## Performance Notes
+- Converts Float64 matrices to Float32 for factorization
+- Uses optimized MKL routines for the factorization
+- Can be 2x faster than full precision for memory-bandwidth limited problems
+- May have reduced accuracy compared to full Float64 precision
+
+## Requirements
+This solver requires MKL to be available through MKL_jll.
+
+## Example
+```julia
+alg = MKL32MixedLUFactorization()
+sol = solve(prob, alg)
+```
+"""
+struct MKL32MixedLUFactorization <: AbstractFactorization end
+
+"""
+    AppleAccelerate32MixedLUFactorization()
+
+A mixed precision LU factorization using Apple's Accelerate framework that performs
+factorization in Float32 precision while maintaining Float64 interface. This can
+provide significant speedups on Apple hardware when reduced precision is acceptable.
+
+## Performance Notes
+- Converts Float64 matrices to Float32 for factorization
+- Uses optimized Accelerate routines for the factorization
+- Particularly effective on Apple Silicon with unified memory
+- May have reduced accuracy compared to full Float64 precision
+
+## Requirements
+This solver is only available on Apple platforms and requires the Accelerate framework.
+
+## Example
+```julia
+alg = AppleAccelerate32MixedLUFactorization()
+sol = solve(prob, alg)
+```
+"""
+struct AppleAccelerate32MixedLUFactorization <: AbstractFactorization end

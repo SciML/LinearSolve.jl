@@ -20,7 +20,7 @@ for alg in vcat(InteractiveUtils.subtypes(AbstractDenseFactorization),
        (!(alg == AppleAccelerateLUFactorization) ||
         LinearSolve.appleaccelerate_isavailable()) &&
        (!(alg == MKLLUFactorization) || LinearSolve.usemkl) &&
-       (!(alg == OpenBLASLUFactorization) || true)  # OpenBLAS is always available as a dependency
+       (!(alg == OpenBLASLUFactorization) || LinearSolve.useopenblas)
         A = [1.0 2.0; 3.0 4.0]
         alg in [KLUFactorization, UMFPACKFactorization, SparspakFactorization] &&
             (A = sparse(A))

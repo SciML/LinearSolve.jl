@@ -1,5 +1,3 @@
-using Libdl
-
 """
 ```julia
 MKLLUFactorization()
@@ -10,30 +8,12 @@ to avoid allocations and does not require libblastrampoline.
 """
 struct MKLLUFactorization <: AbstractFactorization end
 
-# Check if MKL is available and can be loaded
+# Check if MKL is available
 function __mkl_isavailable()
     if !@isdefined(MKL_jll)
         return false
     end
-    if !MKL_jll.is_available()
-        return false
-    end
-    # Try to load the library and check for required symbols
-    try
-        mkl_hdl = Libdl.dlopen(MKL_jll.libmkl_rt)
-        if mkl_hdl == C_NULL
-            return false
-        end
-        # Check for a required symbol
-        if Libdl.dlsym_e(mkl_hdl, "dgetrf_") == C_NULL
-            Libdl.dlclose(mkl_hdl)
-            return false
-        end
-        Libdl.dlclose(mkl_hdl)
-        return true
-    catch
-        return false
-    end
+    return MKL_jll.is_available()
 end
 
 function getrf!(A::AbstractMatrix{<:ComplexF64};

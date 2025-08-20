@@ -1,5 +1,3 @@
-using Libdl
-
 """
 ```julia
 OpenBLASLUFactorization()
@@ -35,30 +33,12 @@ sol = solve(prob, OpenBLASLUFactorization())
 """
 struct OpenBLASLUFactorization <: AbstractFactorization end
 
-# Check if OpenBLAS is available and can be loaded
+# Check if OpenBLAS is available
 function __openblas_isavailable()
     if !@isdefined(OpenBLAS_jll)
         return false
     end
-    if !OpenBLAS_jll.is_available()
-        return false
-    end
-    # Try to load the library and check for required symbols
-    try
-        openblas_hdl = Libdl.dlopen(OpenBLAS_jll.libopenblas)
-        if openblas_hdl == C_NULL
-            return false
-        end
-        # Check for a required symbol
-        if Libdl.dlsym_e(openblas_hdl, "dgetrf_") == C_NULL
-            Libdl.dlclose(openblas_hdl)
-            return false
-        end
-        Libdl.dlclose(openblas_hdl)
-        return true
-    catch
-        return false
-    end
+    return OpenBLAS_jll.is_available()
 end
 
 function openblas_getrf!(A::AbstractMatrix{<:ComplexF64};

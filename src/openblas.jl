@@ -3,22 +3,22 @@
 OpenBLASLUFactorization()
 ```
 
-A direct wrapper over OpenBLAS's LU factorization (`getrf!` and `getrs!`). 
-This solver makes direct calls to OpenBLAS_jll without going through Julia's 
+A direct wrapper over OpenBLAS's LU factorization (`getrf!` and `getrs!`).
+This solver makes direct calls to OpenBLAS_jll without going through Julia's
 libblastrampoline, which can provide performance benefits in certain configurations.
 
 ## Performance Characteristics
 
-- Pre-allocates workspace to avoid allocations during solving
-- Makes direct `ccall`s to OpenBLAS routines
-- Can be faster than `LUFactorization` when OpenBLAS is well-optimized for the hardware
-- Supports `Float32`, `Float64`, `ComplexF32`, and `ComplexF64` element types
+  - Pre-allocates workspace to avoid allocations during solving
+  - Makes direct `ccall`s to OpenBLAS routines
+  - Can be faster than `LUFactorization` when OpenBLAS is well-optimized for the hardware
+  - Supports `Float32`, `Float64`, `ComplexF32`, and `ComplexF64` element types
 
 ## When to Use
 
-- When you want to ensure OpenBLAS is used regardless of the system BLAS configuration
-- When benchmarking shows better performance than `LUFactorization` on your specific hardware
-- When you need consistent behavior across different systems (always uses OpenBLAS)
+  - When you want to ensure OpenBLAS is used regardless of the system BLAS configuration
+  - When benchmarking shows better performance than `LUFactorization` on your specific hardware
+  - When you need consistent behavior across different systems (always uses OpenBLAS)
 
 ## Example
 
@@ -36,85 +36,85 @@ struct OpenBLASLUFactorization <: AbstractFactorization end
 module OpenBLASLU
 
 using LinearAlgebra
-using LinearAlgebra: BlasInt, LU, require_one_based_indexing, checksquare
-using LinearAlgebra.LAPACK: chkfinite, chkstride1, @blasfunc, chkargsok, chktrans, chklapackerror
+using LinearAlgebra.LAPACK: chkfinite, chkstride1, @blasfunc, chkargsok, chktrans,
+                            chklapackerror
 using OpenBLAS_jll
 
 function getrf!(A::AbstractMatrix{<:ComplexF64};
-        ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
-        info = Ref{BlasInt}(),
+        ipiv = similar(A, LinearAlgebra.BlasInt, min(size(A, 1), size(A, 2))),
+        info = Ref{LinearAlgebra.BlasInt}(),
         check = false)
-    require_one_based_indexing(A)
+    LinearAlgebra.require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
     m, n = size(A)
     lda = max(1, stride(A, 2))
     if isempty(ipiv)
-        ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
+        ipiv = similar(A, LinearAlgebra.BlasInt, min(size(A, 1), size(A, 2)))
     end
     ccall((@blasfunc(zgetrf_), OpenBLAS_jll.libopenblas), Cvoid,
-        (Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64},
-            Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
+        (Ref{LinearAlgebra.BlasInt}, Ref{LinearAlgebra.BlasInt}, Ptr{ComplexF64},
+            Ref{LinearAlgebra.BlasInt}, Ptr{LinearAlgebra.BlasInt}, Ptr{LinearAlgebra.BlasInt}),
         m, n, A, lda, ipiv, info)
     chkargsok(info[])
     A, ipiv, info[], info #Error code is stored in LU factorization type
 end
 
 function getrf!(A::AbstractMatrix{<:ComplexF32};
-        ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
-        info = Ref{BlasInt}(),
+        ipiv = similar(A, LinearAlgebra.BlasInt, min(size(A, 1), size(A, 2))),
+        info = Ref{LinearAlgebra.BlasInt}(),
         check = false)
-    require_one_based_indexing(A)
+    LinearAlgebra.require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
     m, n = size(A)
     lda = max(1, stride(A, 2))
     if isempty(ipiv)
-        ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
+        ipiv = similar(A, LinearAlgebra.BlasInt, min(size(A, 1), size(A, 2)))
     end
     ccall((@blasfunc(cgetrf_), OpenBLAS_jll.libopenblas), Cvoid,
-        (Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32},
-            Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
+        (Ref{LinearAlgebra.BlasInt}, Ref{LinearAlgebra.BlasInt}, Ptr{ComplexF32},
+            Ref{LinearAlgebra.BlasInt}, Ptr{LinearAlgebra.BlasInt}, Ptr{LinearAlgebra.BlasInt}),
         m, n, A, lda, ipiv, info)
     chkargsok(info[])
     A, ipiv, info[], info #Error code is stored in LU factorization type
 end
 
 function getrf!(A::AbstractMatrix{<:Float64};
-        ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
-        info = Ref{BlasInt}(),
+        ipiv = similar(A, LinearAlgebra.BlasInt, min(size(A, 1), size(A, 2))),
+        info = Ref{LinearAlgebra.BlasInt}(),
         check = false)
-    require_one_based_indexing(A)
+    LinearAlgebra.require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
     m, n = size(A)
     lda = max(1, stride(A, 2))
     if isempty(ipiv)
-        ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
+        ipiv = similar(A, LinearAlgebra.BlasInt, min(size(A, 1), size(A, 2)))
     end
     ccall((@blasfunc(dgetrf_), OpenBLAS_jll.libopenblas), Cvoid,
-        (Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64},
-            Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
+        (Ref{LinearAlgebra.BlasInt}, Ref{LinearAlgebra.BlasInt}, Ptr{Float64},
+            Ref{LinearAlgebra.BlasInt}, Ptr{LinearAlgebra.BlasInt}, Ptr{LinearAlgebra.BlasInt}),
         m, n, A, lda, ipiv, info)
     chkargsok(info[])
     A, ipiv, info[], info #Error code is stored in LU factorization type
 end
 
 function getrf!(A::AbstractMatrix{<:Float32};
-        ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
-        info = Ref{BlasInt}(),
+        ipiv = similar(A, LinearAlgebra.BlasInt, min(size(A, 1), size(A, 2))),
+        info = Ref{LinearAlgebra.BlasInt}(),
         check = false)
-    require_one_based_indexing(A)
+    LinearAlgebra.require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
     m, n = size(A)
     lda = max(1, stride(A, 2))
     if isempty(ipiv)
-        ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
+        ipiv = similar(A, LinearAlgebra.BlasInt, min(size(A, 1), size(A, 2)))
     end
     ccall((@blasfunc(sgetrf_), OpenBLAS_jll.libopenblas), Cvoid,
-        (Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32},
-            Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
+        (Ref{LinearAlgebra.BlasInt}, Ref{LinearAlgebra.BlasInt}, Ptr{Float32},
+            Ref{LinearAlgebra.BlasInt}, Ptr{LinearAlgebra.BlasInt}, Ptr{LinearAlgebra.BlasInt}),
         m, n, A, lda, ipiv, info)
     chkargsok(info[])
     A, ipiv, info[], info #Error code is stored in LU factorization type
@@ -122,10 +122,10 @@ end
 
 function getrs!(trans::AbstractChar,
         A::AbstractMatrix{<:ComplexF64},
-        ipiv::AbstractVector{BlasInt},
+        ipiv::AbstractVector{LinearAlgebra.BlasInt},
         B::AbstractVecOrMat{<:ComplexF64};
-        info = Ref{BlasInt}())
-    require_one_based_indexing(A, ipiv, B)
+        info = Ref{LinearAlgebra.BlasInt}())
+    LinearAlgebra.require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
     n = LinearAlgebra.checksquare(A)
@@ -137,20 +137,22 @@ function getrs!(trans::AbstractChar,
     end
     nrhs = size(B, 2)
     ccall((@blasfunc(zgetrs_), OpenBLAS_jll.libopenblas), Cvoid,
-        (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt},
-            Ptr{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
+        (Ref{UInt8}, Ref{LinearAlgebra.BlasInt}, Ref{LinearAlgebra.BlasInt},
+            Ptr{ComplexF64}, Ref{LinearAlgebra.BlasInt},
+            Ptr{LinearAlgebra.BlasInt}, Ptr{ComplexF64}, Ref{LinearAlgebra.BlasInt},
+            Ptr{LinearAlgebra.BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
         1)
-    LinearAlgebra.LAPACK.chklapackerror(BlasInt(info[]))
+    LinearAlgebra.LAPACK.chklapackerror(LinearAlgebra.BlasInt(info[]))
     B
 end
 
 function getrs!(trans::AbstractChar,
         A::AbstractMatrix{<:ComplexF32},
-        ipiv::AbstractVector{BlasInt},
+        ipiv::AbstractVector{LinearAlgebra.BlasInt},
         B::AbstractVecOrMat{<:ComplexF32};
-        info = Ref{BlasInt}())
-    require_one_based_indexing(A, ipiv, B)
+        info = Ref{LinearAlgebra.BlasInt}())
+    LinearAlgebra.require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
     n = LinearAlgebra.checksquare(A)
@@ -162,20 +164,22 @@ function getrs!(trans::AbstractChar,
     end
     nrhs = size(B, 2)
     ccall((@blasfunc(cgetrs_), OpenBLAS_jll.libopenblas), Cvoid,
-        (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt},
-            Ptr{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
+        (Ref{UInt8}, Ref{LinearAlgebra.BlasInt}, Ref{LinearAlgebra.BlasInt},
+            Ptr{ComplexF32}, Ref{LinearAlgebra.BlasInt},
+            Ptr{LinearAlgebra.BlasInt}, Ptr{ComplexF32}, Ref{LinearAlgebra.BlasInt},
+            Ptr{LinearAlgebra.BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
         1)
-    LinearAlgebra.LAPACK.chklapackerror(BlasInt(info[]))
+    LinearAlgebra.LAPACK.chklapackerror(LinearAlgebra.BlasInt(info[]))
     B
 end
 
 function getrs!(trans::AbstractChar,
         A::AbstractMatrix{<:Float64},
-        ipiv::AbstractVector{BlasInt},
+        ipiv::AbstractVector{LinearAlgebra.BlasInt},
         B::AbstractVecOrMat{<:Float64};
-        info = Ref{BlasInt}())
-    require_one_based_indexing(A, ipiv, B)
+        info = Ref{LinearAlgebra.BlasInt}())
+    LinearAlgebra.require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
     n = LinearAlgebra.checksquare(A)
@@ -187,20 +191,21 @@ function getrs!(trans::AbstractChar,
     end
     nrhs = size(B, 2)
     ccall((@blasfunc(dgetrs_), OpenBLAS_jll.libopenblas), Cvoid,
-        (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64}, Ref{BlasInt},
-            Ptr{BlasInt}, Ptr{Float64}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
+        (Ref{UInt8}, Ref{LinearAlgebra.BlasInt}, Ref{LinearAlgebra.BlasInt},
+            Ptr{Float64}, Ref{LinearAlgebra.BlasInt},
+            Ptr{LinearAlgebra.BlasInt}, Ptr{Float64}, Ref{LinearAlgebra.BlasInt}, Ptr{LinearAlgebra.BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
         1)
-    LinearAlgebra.LAPACK.chklapackerror(BlasInt(info[]))
+    LinearAlgebra.LAPACK.chklapackerror(LinearAlgebra.BlasInt(info[]))
     B
 end
 
 function getrs!(trans::AbstractChar,
         A::AbstractMatrix{<:Float32},
-        ipiv::AbstractVector{BlasInt},
+        ipiv::AbstractVector{LinearAlgebra.BlasInt},
         B::AbstractVecOrMat{<:Float32};
-        info = Ref{BlasInt}())
-    require_one_based_indexing(A, ipiv, B)
+        info = Ref{LinearAlgebra.BlasInt}())
+    LinearAlgebra.require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
     n = LinearAlgebra.checksquare(A)
@@ -212,11 +217,12 @@ function getrs!(trans::AbstractChar,
     end
     nrhs = size(B, 2)
     ccall((@blasfunc(sgetrs_), OpenBLAS_jll.libopenblas), Cvoid,
-        (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32}, Ref{BlasInt},
-            Ptr{BlasInt}, Ptr{Float32}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
+        (Ref{UInt8}, Ref{LinearAlgebra.BlasInt}, Ref{LinearAlgebra.BlasInt},
+            Ptr{Float32}, Ref{LinearAlgebra.BlasInt},
+            Ptr{LinearAlgebra.BlasInt}, Ptr{Float32}, Ref{LinearAlgebra.BlasInt}, Ptr{LinearAlgebra.BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
         1)
-    LinearAlgebra.LAPACK.chklapackerror(BlasInt(info[]))
+    LinearAlgebra.LAPACK.chklapackerror(LinearAlgebra.BlasInt(info[]))
     B
 end
 
@@ -227,7 +233,7 @@ default_alias_b(::OpenBLASLUFactorization, ::Any, ::Any) = false
 
 const PREALLOCATED_OPENBLAS_LU = begin
     A = rand(0, 0)
-    luinst = ArrayInterface.lu_instance(A), Ref{BlasInt}()
+    luinst = ArrayInterface.lu_instance(A), Ref{LinearAlgebra.BlasInt}()
 end
 
 function LinearSolve.init_cacheval(alg::OpenBLASLUFactorization, A, b, u, Pl, Pr,
@@ -241,7 +247,7 @@ function LinearSolve.init_cacheval(alg::OpenBLASLUFactorization,
         maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
         assumptions::OperatorAssumptions)
     A = rand(eltype(A), 0, 0)
-    ArrayInterface.lu_instance(A), Ref{BlasInt}()
+    ArrayInterface.lu_instance(A), Ref{LinearAlgebra.BlasInt}()
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::OpenBLASLUFactorization;
@@ -251,7 +257,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::OpenBLASLUFactorization;
     if cache.isfresh
         cacheval = @get_cacheval(cache, :OpenBLASLUFactorization)
         res = OpenBLASLU.getrf!(A; ipiv = cacheval[1].ipiv, info = cacheval[2])
-        fact = LU(res[1:3]...), res[4]
+        fact = LinearAlgebra.LU(res[1:3]...), res[4]
         cache.cacheval = fact
 
         if !LinearAlgebra.issuccess(fact[1])
@@ -262,7 +268,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::OpenBLASLUFactorization;
     end
 
     A, info = @get_cacheval(cache, :OpenBLASLUFactorization)
-    require_one_based_indexing(cache.u, cache.b)
+    LinearAlgebra.require_one_based_indexing(cache.u, cache.b)
     m, n = size(A, 1), size(A, 2)
     if m > n
         Bc = copy(cache.b)
@@ -273,5 +279,6 @@ function SciMLBase.solve!(cache::LinearCache, alg::OpenBLASLUFactorization;
         OpenBLASLU.getrs!('N', A.factors, A.ipiv, cache.u; info)
     end
 
-    SciMLBase.build_linear_solution(alg, cache.u, nothing, cache; retcode = ReturnCode.Success)
+    SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache; retcode = ReturnCode.Success)
 end

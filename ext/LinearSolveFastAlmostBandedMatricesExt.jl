@@ -3,7 +3,7 @@ module LinearSolveFastAlmostBandedMatricesExt
 using FastAlmostBandedMatrices, LinearAlgebra, LinearSolve
 import LinearSolve: defaultalg,
                     do_factorization, init_cacheval, DefaultLinearSolver,
-                    DefaultAlgorithmChoice
+                    DefaultAlgorithmChoice, LinearVerbosity
 
 function defaultalg(A::AlmostBandedMatrix, b, oa::OperatorAssumptions{Bool})
     if oa.issq

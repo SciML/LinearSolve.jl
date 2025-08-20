@@ -60,7 +60,7 @@ else
 end
 
 # OpenBLAS_jll is a standard library, always available
-using OpenBLAS_jll
+using OpenBLAS_jll: OpenBLAS_jll
 const useopenblas = OpenBLAS_jll.is_available()
 
 

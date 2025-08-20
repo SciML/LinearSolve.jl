@@ -1,3 +1,5 @@
+using Libdl
+
 """
 ```julia
 OpenBLASLUFactorization()
@@ -33,12 +35,38 @@ sol = solve(prob, OpenBLASLUFactorization())
 """
 struct OpenBLASLUFactorization <: AbstractFactorization end
 
-# OpenBLAS methods - OpenBLAS_jll is always available as a standard library
+# Check if OpenBLAS is available and can be loaded
+function __openblas_isavailable()
+    if !@isdefined(OpenBLAS_jll)
+        return false
+    end
+    if !OpenBLAS_jll.is_available()
+        return false
+    end
+    # Try to load the library and check for required symbols
+    try
+        openblas_hdl = Libdl.dlopen(OpenBLAS_jll.libopenblas)
+        if openblas_hdl == C_NULL
+            return false
+        end
+        # Check for a required symbol
+        if Libdl.dlsym_e(openblas_hdl, "dgetrf_") == C_NULL
+            Libdl.dlclose(openblas_hdl)
+            return false
+        end
+        Libdl.dlclose(openblas_hdl)
+        return true
+    catch
+        return false
+    end
+end
 
 function openblas_getrf!(A::AbstractMatrix{<:ComplexF64};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
         info = Ref{BlasInt}(),
         check = false)
+    __openblas_isavailable() || 
+        error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -59,6 +87,8 @@ function openblas_getrf!(A::AbstractMatrix{<:ComplexF32};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
         info = Ref{BlasInt}(),
         check = false)
+    __openblas_isavailable() || 
+        error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -79,6 +109,8 @@ function openblas_getrf!(A::AbstractMatrix{<:Float64};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
         info = Ref{BlasInt}(),
         check = false)
+    __openblas_isavailable() || 
+        error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -99,6 +131,8 @@ function openblas_getrf!(A::AbstractMatrix{<:Float32};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
         info = Ref{BlasInt}(),
         check = false)
+    __openblas_isavailable() || 
+        error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -120,6 +154,8 @@ function openblas_getrs!(trans::AbstractChar,
         ipiv::AbstractVector{BlasInt},
         B::AbstractVecOrMat{<:ComplexF64};
         info = Ref{BlasInt}())
+    __openblas_isavailable() || 
+        error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -145,6 +181,8 @@ function openblas_getrs!(trans::AbstractChar,
         ipiv::AbstractVector{BlasInt},
         B::AbstractVecOrMat{<:ComplexF32};
         info = Ref{BlasInt}())
+    __openblas_isavailable() || 
+        error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -170,6 +208,8 @@ function openblas_getrs!(trans::AbstractChar,
         ipiv::AbstractVector{BlasInt},
         B::AbstractVecOrMat{<:Float64};
         info = Ref{BlasInt}())
+    __openblas_isavailable() || 
+        error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -195,6 +235,8 @@ function openblas_getrs!(trans::AbstractChar,
         ipiv::AbstractVector{BlasInt},
         B::AbstractVecOrMat{<:Float32};
         info = Ref{BlasInt}())
+    __openblas_isavailable() || 
+        error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -239,6 +281,8 @@ end
 
 function SciMLBase.solve!(cache::LinearCache, alg::OpenBLASLUFactorization;
         kwargs...)
+    __openblas_isavailable() || 
+        error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh

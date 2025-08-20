@@ -1,3 +1,5 @@
+using Libdl
+
 """
 ```julia
 MKLLUFactorization()
@@ -8,11 +10,38 @@ to avoid allocations and does not require libblastrampoline.
 """
 struct MKLLUFactorization <: AbstractFactorization end
 
+# Check if MKL is available and can be loaded
+function __mkl_isavailable()
+    if !@isdefined(MKL_jll)
+        return false
+    end
+    if !MKL_jll.is_available()
+        return false
+    end
+    # Try to load the library and check for required symbols
+    try
+        mkl_hdl = Libdl.dlopen(MKL_jll.libmkl_rt)
+        if mkl_hdl == C_NULL
+            return false
+        end
+        # Check for a required symbol
+        if Libdl.dlsym_e(mkl_hdl, "dgetrf_") == C_NULL
+            Libdl.dlclose(mkl_hdl)
+            return false
+        end
+        Libdl.dlclose(mkl_hdl)
+        return true
+    catch
+        return false
+    end
+end
 
 function getrf!(A::AbstractMatrix{<:ComplexF64};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
         info = Ref{BlasInt}(),
         check = false)
+    __mkl_isavailable() || 
+        error("Error, MKL binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -33,6 +62,8 @@ function getrf!(A::AbstractMatrix{<:ComplexF32};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
         info = Ref{BlasInt}(),
         check = false)
+    __mkl_isavailable() || 
+        error("Error, MKL binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -53,6 +84,8 @@ function getrf!(A::AbstractMatrix{<:Float64};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
         info = Ref{BlasInt}(),
         check = false)
+    __mkl_isavailable() || 
+        error("Error, MKL binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -73,6 +106,8 @@ function getrf!(A::AbstractMatrix{<:Float32};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
         info = Ref{BlasInt}(),
         check = false)
+    __mkl_isavailable() || 
+        error("Error, MKL binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -94,6 +129,8 @@ function getrs!(trans::AbstractChar,
         ipiv::AbstractVector{BlasInt},
         B::AbstractVecOrMat{<:ComplexF64};
         info = Ref{BlasInt}())
+    __mkl_isavailable() || 
+        error("Error, MKL binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -119,6 +156,8 @@ function getrs!(trans::AbstractChar,
         ipiv::AbstractVector{BlasInt},
         B::AbstractVecOrMat{<:ComplexF32};
         info = Ref{BlasInt}())
+    __mkl_isavailable() || 
+        error("Error, MKL binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -144,6 +183,8 @@ function getrs!(trans::AbstractChar,
         ipiv::AbstractVector{BlasInt},
         B::AbstractVecOrMat{<:Float64};
         info = Ref{BlasInt}())
+    __mkl_isavailable() || 
+        error("Error, MKL binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -169,6 +210,8 @@ function getrs!(trans::AbstractChar,
         ipiv::AbstractVector{BlasInt},
         B::AbstractVecOrMat{<:Float32};
         info = Ref{BlasInt}())
+    __mkl_isavailable() || 
+        error("Error, MKL binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -213,6 +256,8 @@ end
 
 function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
         kwargs...)
+    __mkl_isavailable() || 
+        error("Error, MKL binary is missing but solve is being called. Report this issue")
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
@@ -266,6 +311,8 @@ end
 
 function SciMLBase.solve!(cache::LinearCache, alg::MKL32MixedLUFactorization;
         kwargs...)
+    __mkl_isavailable() || 
+        error("Error, MKL binary is missing but solve is being called. Report this issue")
     A = cache.A
     A = convert(AbstractMatrix, A)
     

@@ -1,6 +1,7 @@
 module LinearSolveSparspakExt
 
 using LinearSolve, LinearAlgebra
+using LinearSolve: LinearVerbosity
 using Sparspak
 using Sparspak.SparseCSCInterface.SparseArrays
 using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr

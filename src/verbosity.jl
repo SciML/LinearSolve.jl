@@ -13,7 +13,8 @@ const linear_defaults = Dict{Symbol, Verbosity.Type}(
     :blas_errors => Verbosity.Warn(),
     :blas_info => Verbosity.None(),
     :blas_success => Verbosity.None(),
-    :blas_invalid_args => Verbosity.Error()
+    :blas_invalid_args => Verbosity.Error(),
+    :condition_number => Verbosity.None()
 )
 mutable struct LinearErrorControlVerbosity
     default_lu_fallback::Verbosity.Type
@@ -89,6 +90,7 @@ mutable struct LinearNumericalVerbosity
     blas_errors::Verbosity.Type
     blas_info::Verbosity.Type
     blas_success::Verbosity.Type
+    condition_number::Verbosity.Type
 
     function LinearNumericalVerbosity(;
             using_IterativeSolvers = linear_defaults[:using_IterativeSolvers],
@@ -99,10 +101,11 @@ mutable struct LinearNumericalVerbosity
             pardiso_verbosity = linear_defaults[:pardiso_verbosity],
             blas_errors = linear_defaults[:blas_errors],
             blas_info = linear_defaults[:blas_info],
-            blas_success = linear_defaults[:blas_success])
+            blas_success = linear_defaults[:blas_success],
+            condition_number = linear_defaults[:condition_number])
         new(using_IterativeSolvers, IterativeSolvers_iterations,
             KrylovKit_verbosity, KrylovJL_verbosity, HYPRE_verbosity, pardiso_verbosity,
-            blas_errors, blas_info, blas_success)
+            blas_errors, blas_info, blas_success, condition_number)
     end
 
     function LinearNumericalVerbosity(verbose::Verbosity.Type)

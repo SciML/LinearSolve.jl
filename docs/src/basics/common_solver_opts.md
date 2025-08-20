@@ -119,6 +119,7 @@ sol = solve(prob; verbose=verbose)
 - blas_errors: Controls messages for BLAS/LAPACK errors like singular matrices (default: Warn)
 - blas_info: Controls informational messages from BLAS/LAPACK operations (default: None)
 - blas_success: Controls success messages from BLAS/LAPACK operations (default: None)
+- condition_number: Controls computation and logging of matrix condition numbers (default: None)
 
 ### BLAS/LAPACK Return Code Interpretation
 
@@ -141,10 +142,11 @@ LinearSolve.jl now provides detailed interpretation of BLAS/LAPACK return codes 
 ```julia
 using LinearSolve
 
-# Enable detailed BLAS error logging
+# Enable detailed BLAS error logging with condition numbers
 verbose = LinearVerbosity(
-    blas_errors = Verbosity.Info(),  # Show detailed error interpretations
-    blas_info = Verbosity.Info()     # Show all BLAS operation details
+    blas_errors = Verbosity.Info(),     # Show detailed error interpretations
+    blas_info = Verbosity.Info(),       # Show all BLAS operation details
+    condition_number = Verbosity.Info() # Compute and log condition numbers
 )
 
 # Solve a potentially singular system
@@ -164,4 +166,4 @@ The enhanced logging also provides:
 - Matrix properties (size, type, element type)
 - Memory usage estimates
 - Detailed context for debugging numerical issues
-- Optional condition number computation (can be enabled via compute_condition parameter)
+- Condition number computation controlled by the condition_number verbosity setting

@@ -13,7 +13,7 @@ using LinearSolve: ArrayInterface, BLISLUFactorization, @get_cacheval, LinearCac
                    interpret_blas_code, log_blas_info, get_blas_operation_info, 
                    check_and_log_lapack_result, LinearVerbosity
 using SciMLBase: ReturnCode
-using SciMLLogging: Verbosity
+using SciMLLogging: Verbosity, @SciMLMessage, verbosity_to_int
 
 const global libblis = blis_jll.blis
 const global liblapack = LAPACK_jll.liblapack
@@ -238,14 +238,15 @@ function SciMLBase.solve!(cache::LinearCache, alg::BLISLUFactorization;
         info_value = res[3]
         if info_value != 0
             # Only get operation info if we need to log
-            if !(verbose.numerical.blas_errors isa Verbosity.None)
-                op_info = get_blas_operation_info(:dgetrf, A, cache.b)
+            if verbosity_to_int(verbose.numerical.blas_errors) > 0
+                op_info = get_blas_operation_info(:dgetrf, A, cache.b, verbose)
                 log_blas_info(:dgetrf, info_value, verbose; extra_context=op_info)
             end
-        elseif !(verbose.numerical.blas_success isa Verbosity.None)
+        elseif verbosity_to_int(verbose.numerical.blas_success) > 0
             # Only get operation info if we need to log success
-            op_info = get_blas_operation_info(:dgetrf, A, cache.b)
-            @info "BLAS LU factorization (dgetrf) completed successfully" op_info
+            op_info = get_blas_operation_info(:dgetrf, A, cache.b, verbose)
+            success_msg = "BLAS LU factorization (dgetrf) completed successfully for $(op_info[:matrix_size]) matrix"
+            @SciMLMessage(success_msg, verbose.numerical.blas_success, :blas_success, :numerical)
         end
 
         if !LinearAlgebra.issuccess(fact[1])
@@ -270,7 +271,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::BLISLUFactorization;
     end
     
     # Log solve operation result if there was an error
-    if info[] != 0 && !(verbose.numerical.blas_errors isa Verbosity.None)
+    if info[] != 0 && verbosity_to_int(verbose.numerical.blas_errors) > 0
         log_blas_info(:dgetrs, info[], verbose)
     end
 

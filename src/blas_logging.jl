@@ -1,6 +1,7 @@
 # BLAS and LAPACK Return Code Interpretation
 
-using SciMLLogging: Verbosity, @match
+using SciMLLogging: Verbosity, @match, @SciMLMessage, verbosity_to_int
+using LinearAlgebra: cond
 
 """
     interpret_blas_code(func::Symbol, info::Integer)
@@ -112,52 +113,30 @@ function log_blas_info(func::Symbol, info::Integer, verbose::LinearVerbosity;
         verbose.numerical.blas_info
     end
     
-    # Format the log message
-    log_msg = format_blas_log_message(func, info, category, message, details, extra_context)
+    # Build structured message components
+    msg_main = "BLAS/LAPACK $func: $message"
+    msg_details = !isempty(details) ? details : nothing
+    msg_info = info
     
-    # Log based on verbosity level
-    log_with_verbosity(verbosity_field, log_msg, category)
-end
-
-function format_blas_log_message(func::Symbol, info::Integer, category::Symbol,
-                                message::String, details::String, 
-                                extra_context::Dict{Symbol,Any})
-    msg_parts = String[]
-    
-    # Main message
-    push!(msg_parts, "BLAS/LAPACK $func: $message")
-    
-    # Add details if present
-    if !isempty(details)
-        push!(msg_parts, "  Details: $details")
-    end
-    
-    # Add return code
-    push!(msg_parts, "  Return code (info): $info")
-    
-    # Add extra context if provided
-    if !isempty(extra_context)
-        for (key, value) in extra_context
-            push!(msg_parts, "  $(key): $value")
+    # Build complete message with all details
+    full_msg = if !isempty(extra_context) || msg_details !== nothing
+        parts = String[msg_main]
+        if msg_details !== nothing
+            push!(parts, "Details: $msg_details")
         end
-    end
-    
-    return join(msg_parts, "\n")
-end
-
-function log_with_verbosity(verbosity::Verbosity.Type, message::String, category::Symbol)
-    @match verbosity begin
-        Verbosity.None() => nothing
-        Verbosity.Info() => @info message
-        Verbosity.Warn() => @warn message
-        Verbosity.Error() => error(message)
-        Verbosity.Level(n) => begin
-            if n >= 1
-                @info message
+        push!(parts, "Return code (info): $msg_info")
+        if !isempty(extra_context)
+            for (key, value) in extra_context
+                push!(parts, "$key: $value")
             end
         end
-        _ => @warn message
+        join(parts, "\n  ")
+    else
+        "$msg_main (info=$msg_info)"
     end
+    
+    # Use proper @SciMLMessage syntax
+    @SciMLMessage(full_msg, verbosity_field, :blas_return_code, :numerical)
 end
 
 """
@@ -190,12 +169,12 @@ end
 
 # Extended information for specific BLAS operations
 """
-    get_blas_operation_info(func::Symbol, A, b=nothing; compute_condition=false)
+    get_blas_operation_info(func::Symbol, A, b, verbose::LinearVerbosity)
 
 Get additional information about a BLAS operation for enhanced logging.
-Set compute_condition=true to include condition number computation (may be expensive).
+Condition number is computed based on the condition_number verbosity setting.
 """
-function get_blas_operation_info(func::Symbol, A, b=nothing; compute_condition=false)
+function get_blas_operation_info(func::Symbol, A, b, verbose::LinearVerbosity)
     info = Dict{Symbol,Any}()
     
     # Matrix properties
@@ -203,10 +182,16 @@ function get_blas_operation_info(func::Symbol, A, b=nothing; compute_condition=f
     info[:matrix_type] = typeof(A)
     info[:element_type] = eltype(A)
     
-    # Condition number (only if explicitly requested)
-    if compute_condition && size(A, 1) == size(A, 2)
+    # Condition number (based on verbosity setting)
+    should_compute_cond = verbosity_to_int(verbose.numerical.condition_number) > 0
+    if should_compute_cond && size(A, 1) == size(A, 2)
         try
-            info[:condition_number] = cond(A)
+            cond_num = cond(A)
+            info[:condition_number] = cond_num
+            
+            # Log the condition number if enabled  
+            cond_msg = "Matrix condition number: $(round(cond_num, sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in $func"
+            @SciMLMessage(cond_msg, verbose.numerical.condition_number, :condition_number, :numerical)
         catch
             # Skip if condition number computation fails
         end

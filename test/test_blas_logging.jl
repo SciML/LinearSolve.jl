@@ -36,15 +36,19 @@ using SciMLLogging: Verbosity
         # Test getting operation info without condition number
         A = rand(10, 10)
         b = rand(10)
-        info = LinearSolve.get_blas_operation_info(:dgetrf, A, b)
+        
+        # Test with condition_number disabled (default)
+        verbose_no_cond = LinearVerbosity(condition_number = Verbosity.None())
+        info = LinearSolve.get_blas_operation_info(:dgetrf, A, b, verbose_no_cond)
         
         @test info[:matrix_size] == (10, 10)
         @test info[:element_type] == Float64
         @test !haskey(info, :condition_number)  # Should not compute by default
         @test info[:memory_usage_MB] >= 0  # Memory can be 0 for very small matrices
         
-        # Test with condition number computation enabled
-        info_with_cond = LinearSolve.get_blas_operation_info(:dgetrf, A, b; compute_condition=true)
+        # Test with condition number computation enabled via verbosity
+        verbose_with_cond = LinearVerbosity(condition_number = Verbosity.Info())
+        info_with_cond = LinearSolve.get_blas_operation_info(:dgetrf, A, b, verbose_with_cond)
         @test haskey(info_with_cond, :condition_number)
     end
     

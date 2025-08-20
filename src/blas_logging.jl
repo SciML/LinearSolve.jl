@@ -160,8 +160,9 @@ function check_and_log_lapack_result(func::Symbol, result, verbose::LinearVerbos
     
     if info != 0
         log_blas_info(func, info, verbose; extra_context=extra_context)
-    elseif verbose.numerical.blas_success isa Verbosity.Info
-        @info "BLAS/LAPACK $func completed successfully"
+    elseif verbosity_to_int(verbose.numerical.blas_success) > 0
+        success_msg = "BLAS/LAPACK $func completed successfully"
+        @SciMLMessage(success_msg, verbose.numerical.blas_success, :blas_success, :numerical)
     end
     
     return info == 0

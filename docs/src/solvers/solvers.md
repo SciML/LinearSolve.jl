@@ -42,7 +42,7 @@ while maintaining Float64 interfaces. These methods are particularly effective f
 - Hardware with good Float32 performance
 
 Available mixed precision solvers:
-- `MKL32MixedLUFactorization` - Intel CPUs with MKL
+- `MKL32MixedLUFactorization` - CPUs with MKL
 - `AppleAccelerate32MixedLUFactorization` - Apple CPUs with Accelerate
 - `CUDAOffload32MixedLUFactorization` - NVIDIA GPUs with CUDA
 - `MetalOffload32MixedLUFactorization` - Apple GPUs with Metal

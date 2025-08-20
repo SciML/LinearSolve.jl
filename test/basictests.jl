@@ -287,6 +287,11 @@ end
         push!(test_algs, MKLLUFactorization())
     end
 
+    # Test OpenBLAS if available
+    if LinearSolve.useopenblas
+        push!(test_algs, OpenBLASLUFactorization())
+    end
+
     # Test BLIS if extension is available
     if Base.get_extension(LinearSolve, :LinearSolveBLISExt) !== nothing
         push!(test_algs, BLISLUFactorization())

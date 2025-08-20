@@ -59,6 +59,14 @@ else
     const usemkl = false
 end
 
+# OpenBLAS_jll is a standard library, but allow users to disable it via preferences
+if Preferences.@load_preference("LoadOpenBLAS_JLL", true)
+    using OpenBLAS_jll: OpenBLAS_jll
+    const useopenblas = OpenBLAS_jll.is_available()
+else
+    const useopenblas = false
+end
+
 
 @reexport using SciMLBase
 
@@ -345,6 +353,7 @@ include("extension_algs.jl")
 include("factorization.jl")
 include("appleaccelerate.jl")
 include("mkl.jl")
+include("openblas.jl")
 include("simplelu.jl")
 include("simplegmres.jl")
 include("iterative_wrappers.jl")
@@ -462,6 +471,7 @@ export MKLPardisoFactorize, MKLPardisoIterate
 export PanuaPardisoFactorize, PanuaPardisoIterate
 export PardisoJL
 export MKLLUFactorization
+export OpenBLASLUFactorization
 export MKL32MixedLUFactorization
 export AppleAccelerateLUFactorization
 export AppleAccelerate32MixedLUFactorization

@@ -34,6 +34,24 @@ this is only recommended for Float32 matrices. Choose `CudaOffloadLUFactorizatio
 performance on well-conditioned problems, or `CudaOffloadQRFactorization` for better numerical 
 stability on ill-conditioned problems.
 
+#### Mixed Precision Methods
+
+For large well-conditioned problems where memory bandwidth is the bottleneck, mixed precision 
+methods can provide significant speedups (up to 2x) by performing the factorization in Float32 
+while maintaining Float64 interfaces. These methods are particularly effective for:
+- Large dense matrices (> 1000x1000)
+- Well-conditioned problems (condition number < 10^4)
+- Hardware with good Float32 performance
+
+Available mixed precision solvers:
+- `MKL32MixedLUFactorization` - CPUs with MKL
+- `AppleAccelerate32MixedLUFactorization` - Apple CPUs with Accelerate
+- `CUDAOffload32MixedLUFactorization` - NVIDIA GPUs with CUDA
+- `MetalOffload32MixedLUFactorization` - Apple GPUs with Metal
+
+These methods automatically handle the precision conversion, making them easy drop-in replacements
+when reduced precision is acceptable for the factorization step.
+
 !!! note
     
     Performance details for dense LU-factorizations can be highly dependent on the hardware configuration.
@@ -207,6 +225,7 @@ KrylovJL
 
 ```@docs
 MKLLUFactorization
+MKL32MixedLUFactorization
 ```
 
 ### OpenBLAS
@@ -223,6 +242,7 @@ OpenBLASLUFactorization
 
 ```@docs
 AppleAccelerateLUFactorization
+AppleAccelerate32MixedLUFactorization
 ```
 
 ### Metal.jl
@@ -233,6 +253,7 @@ AppleAccelerateLUFactorization
 
 ```@docs
 MetalLUFactorization
+MetalOffload32MixedLUFactorization
 ```
 
 ### Pardiso.jl
@@ -259,6 +280,7 @@ The following are non-standard GPU factorization routines.
 ```@docs
 CudaOffloadLUFactorization
 CudaOffloadQRFactorization
+CUDAOffload32MixedLUFactorization
 ```
 
 ### AMDGPU.jl

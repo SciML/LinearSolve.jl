@@ -459,14 +459,18 @@ export HYPREAlgorithm
 export CudaOffloadFactorization
 export CudaOffloadLUFactorization
 export CudaOffloadQRFactorization
+export CUDAOffload32MixedLUFactorization
 export AMDGPUOffloadLUFactorization, AMDGPUOffloadQRFactorization
 export MKLPardisoFactorize, MKLPardisoIterate
 export PanuaPardisoFactorize, PanuaPardisoIterate
 export PardisoJL
 export MKLLUFactorization
 export OpenBLASLUFactorization
+export MKL32MixedLUFactorization
 export AppleAccelerateLUFactorization
+export AppleAccelerate32MixedLUFactorization
 export MetalLUFactorization
+export MetalOffload32MixedLUFactorization
 
 export OperatorAssumptions, OperatorCondition
 

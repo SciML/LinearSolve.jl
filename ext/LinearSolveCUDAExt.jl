@@ -7,6 +7,7 @@ using LinearSolve: LinearSolve, is_cusparse, defaultalg, cudss_loaded, DefaultLi
                    needs_concrete_A,
                    error_no_cudss_lu, init_cacheval, OperatorAssumptions,
                    CudaOffloadFactorization, CudaOffloadLUFactorization, CudaOffloadQRFactorization,
+                   CUDAOffload32MixedLUFactorization,
                    SparspakFactorization, KLUFactorization, UMFPACKFactorization,
                    LinearVerbosity
 using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase, LinearSolve.ArrayInterface
@@ -52,7 +53,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadLUFact
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
-function LinearSolve.init_cacheval(alg::CudaOffloadLUFactorization, A, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(alg::CudaOffloadLUFactorization, A::AbstractArray, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
         assumptions::OperatorAssumptions)
     T = eltype(A)
@@ -94,7 +95,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadFactor
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
-function LinearSolve.init_cacheval(alg::CudaOffloadFactorization, A, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(alg::CudaOffloadFactorization, A::AbstractArray, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
         assumptions::OperatorAssumptions)
     qr(CUDA.CuArray(A))
@@ -116,6 +117,42 @@ function LinearSolve.init_cacheval(
         ::UMFPACKFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
         Pl, Pr, maxiters::Int, abstol, reltol, verbose::LinearVerbosity, assumptions::OperatorAssumptions)
     nothing
+end
+
+# Mixed precision CUDA LU implementation
+function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CUDAOffload32MixedLUFactorization;
+        kwargs...)
+    if cache.isfresh
+        cacheval = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
+        # Convert to Float32 for factorization
+        A_f32 = Float32.(cache.A)
+        fact = lu(CUDA.CuArray(A_f32))
+        cache.cacheval = fact
+        cache.isfresh = false
+    end
+    fact = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
+    # Convert b to Float32, solve, then convert back to original precision
+    b_f32 = Float32.(cache.b)
+    u_f32 = CUDA.CuArray(b_f32)
+    y_f32 = ldiv!(u_f32, fact, CUDA.CuArray(b_f32))
+    # Convert back to original precision
+    y = Array(y_f32)
+    T = eltype(cache.u)
+    cache.u .= T.(y)
+    SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
+end
+
+function LinearSolve.init_cacheval(alg::CUDAOffload32MixedLUFactorization, A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
+        assumptions::OperatorAssumptions)
+    # Pre-allocate with Float32 arrays
+    A_f32 = Float32.(A)
+    T = eltype(A_f32)
+    noUnitT = typeof(zero(T))
+    luT = LinearAlgebra.lutype(noUnitT)
+    ipiv = CuVector{Int32}(undef, 0)
+    info = zero(LinearAlgebra.BlasInt)
+    return LU{luT}(CuMatrix{Float32}(undef, 0, 0), ipiv, info)
 end
 
 end

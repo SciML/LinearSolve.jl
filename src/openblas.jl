@@ -34,11 +34,10 @@ sol = solve(prob, OpenBLASLUFactorization())
 struct OpenBLASLUFactorization <: AbstractFactorization end
 
 # Check if OpenBLAS is available
-function __openblas_isavailable()
-    if !@isdefined(OpenBLAS_jll)
-        return false
-    end
-    return OpenBLAS_jll.is_available()
+@static if !@isdefined(OpenBLAS_jll)
+    __openblas_isavailable() = false
+else
+    __openblas_isavailable() = OpenBLAS_jll.is_available()
 end
 
 function openblas_getrf!(A::AbstractMatrix{<:ComplexF64};

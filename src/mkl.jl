@@ -9,11 +9,10 @@ to avoid allocations and does not require libblastrampoline.
 struct MKLLUFactorization <: AbstractFactorization end
 
 # Check if MKL is available
-function __mkl_isavailable()
-    if !@isdefined(MKL_jll)
-        return false
-    end
-    return MKL_jll.is_available()
+@static if !@isdefined(MKL_jll)
+    __mkl_isavailable() = false
+else
+    __mkl_isavailable() = MKL_jll.is_available()
 end
 
 function getrf!(A::AbstractMatrix{<:ComplexF64};

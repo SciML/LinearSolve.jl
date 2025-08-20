@@ -15,7 +15,6 @@ using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, Bunc
                      cholesky, cholesky!, diagind, dot, inv, ldiv!, ldlt!, lu, lu!, mul!,
                      norm,
                      qr, qr!, svd, svd!
-using LazyArrays: @~, BroadcastArray
 using SciMLBase: SciMLBase, LinearAliasSpecifier, AbstractSciMLOperator,
                  init, solve!, reinit!, solve, ReturnCode, LinearProblem
 using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator,

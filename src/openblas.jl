@@ -3,8 +3,33 @@
 OpenBLASLUFactorization()
 ```
 
-A wrapper over OpenBLAS. Direct calls to OpenBLAS in a way that pre-allocates workspace
-to avoid allocations and does not require libblastrampoline.
+A direct wrapper over OpenBLAS's LU factorization (`getrf!` and `getrs!`). 
+This solver makes direct calls to OpenBLAS_jll without going through Julia's 
+libblastrampoline, which can provide performance benefits in certain configurations.
+
+## Performance Characteristics
+
+- Pre-allocates workspace to avoid allocations during solving
+- Makes direct `ccall`s to OpenBLAS routines
+- Can be faster than `LUFactorization` when OpenBLAS is well-optimized for the hardware
+- Supports `Float32`, `Float64`, `ComplexF32`, and `ComplexF64` element types
+
+## When to Use
+
+- When you want to ensure OpenBLAS is used regardless of the system BLAS configuration
+- When benchmarking shows better performance than `LUFactorization` on your specific hardware
+- When you need consistent behavior across different systems (always uses OpenBLAS)
+
+## Example
+
+```julia
+using LinearSolve, LinearAlgebra
+
+A = rand(100, 100)
+b = rand(100)
+prob = LinearProblem(A, b)
+sol = solve(prob, OpenBLASLUFactorization())
+```
 """
 struct OpenBLASLUFactorization <: AbstractFactorization end
 

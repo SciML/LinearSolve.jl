@@ -59,9 +59,13 @@ else
     const usemkl = false
 end
 
-# OpenBLAS_jll is a standard library, always available
-using OpenBLAS_jll: OpenBLAS_jll
-const useopenblas = OpenBLAS_jll.is_available()
+# OpenBLAS_jll is a standard library, but allow users to disable it via preferences
+if Preferences.@load_preference("LoadOpenBLAS_JLL", true)
+    using OpenBLAS_jll: OpenBLAS_jll
+    const useopenblas = OpenBLAS_jll.is_available()
+else
+    const useopenblas = false
+end
 
 
 @reexport using SciMLBase

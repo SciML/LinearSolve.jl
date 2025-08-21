@@ -265,9 +265,9 @@ end
 A = [1.0 2.0; 3.0 4.0]
 b = [1.0, 2.0]
 u = zero(b)
-dA = deepcopy(A)
-db = deepcopy(b)
-du = deepcopy(u)
+dA = copy(A)
+db = copy(b)
+du = copy(u)
 Enzyme.autodiff(Reverse, testls, Duplicated(A, dA), Duplicated(b, db), Duplicated(u, du))
 
 function testls(A, b, u)
@@ -281,9 +281,9 @@ end
 A = [1.0 2.0; 3.0 4.0]
 b = [1.0, 2.0]
 u = zero(b)
-dA2 = deepcopy(A)
-db2 = deepcopy(b)
-du2 = deepcopy(u)
+dA2 = copy(A)
+db2 = copy(b)
+du2 = copy(u)
 Enzyme.autodiff(Reverse, testls, Duplicated(A, dA2), Duplicated(b, db2), Duplicated(u, du2))
 
 @test dA == dA2

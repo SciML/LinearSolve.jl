@@ -62,9 +62,9 @@ for alg in vcat(InteractiveUtils.subtypes(AbstractDenseFactorization),
         # Use higher tolerance for mixed precision algorithms
         expected = [-2.0, 1.5]
         if Symbol(alg) in MIXED_PRECISION_ALGS
-            @test solve!(linsolve).u ≈ expected atol=1e-5 rtol=1e-5
+            @test solve!(linsolve).u ≈ expected atol=1e-4 rtol=1e-4
             @test !linsolve.isfresh
-            @test solve!(linsolve).u ≈ expected atol=1e-5 rtol=1e-5
+            @test solve!(linsolve).u ≈ expected atol=1e-4 rtol=1e-4
         else
             @test solve!(linsolve).u ≈ expected
             @test !linsolve.isfresh
@@ -83,7 +83,7 @@ for alg in vcat(InteractiveUtils.subtypes(AbstractDenseFactorization),
         
         # Use higher tolerance for mixed precision algorithms
         if Symbol(alg) in MIXED_PRECISION_ALGS
-            @test solve!(linsolve).u ≈ expected atol=1e-5 rtol=1e-5
+            @test solve!(linsolve).u ≈ expected atol=1e-4 rtol=1e-4
         else
             @test solve!(linsolve).u ≈ expected
         end

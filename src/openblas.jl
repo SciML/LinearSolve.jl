@@ -44,7 +44,7 @@ function openblas_getrf!(A::AbstractMatrix{<:ComplexF64};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
         info = Ref{BlasInt}(),
         check = false)
-    __openblas_isavailable() || 
+    __openblas_isavailable() ||
         error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
@@ -66,7 +66,7 @@ function openblas_getrf!(A::AbstractMatrix{<:ComplexF32};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
         info = Ref{BlasInt}(),
         check = false)
-    __openblas_isavailable() || 
+    __openblas_isavailable() ||
         error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
@@ -88,7 +88,7 @@ function openblas_getrf!(A::AbstractMatrix{<:Float64};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
         info = Ref{BlasInt}(),
         check = false)
-    __openblas_isavailable() || 
+    __openblas_isavailable() ||
         error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
@@ -110,7 +110,7 @@ function openblas_getrf!(A::AbstractMatrix{<:Float32};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
         info = Ref{BlasInt}(),
         check = false)
-    __openblas_isavailable() || 
+    __openblas_isavailable() ||
         error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
@@ -133,7 +133,7 @@ function openblas_getrs!(trans::AbstractChar,
         ipiv::AbstractVector{BlasInt},
         B::AbstractVecOrMat{<:ComplexF64};
         info = Ref{BlasInt}())
-    __openblas_isavailable() || 
+    __openblas_isavailable() ||
         error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
@@ -160,7 +160,7 @@ function openblas_getrs!(trans::AbstractChar,
         ipiv::AbstractVector{BlasInt},
         B::AbstractVecOrMat{<:ComplexF32};
         info = Ref{BlasInt}())
-    __openblas_isavailable() || 
+    __openblas_isavailable() ||
         error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
@@ -187,7 +187,7 @@ function openblas_getrs!(trans::AbstractChar,
         ipiv::AbstractVector{BlasInt},
         B::AbstractVecOrMat{<:Float64};
         info = Ref{BlasInt}())
-    __openblas_isavailable() || 
+    __openblas_isavailable() ||
         error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
@@ -214,7 +214,7 @@ function openblas_getrs!(trans::AbstractChar,
         ipiv::AbstractVector{BlasInt},
         B::AbstractVecOrMat{<:Float32};
         info = Ref{BlasInt}())
-    __openblas_isavailable() || 
+    __openblas_isavailable() ||
         error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
@@ -260,7 +260,7 @@ end
 
 function SciMLBase.solve!(cache::LinearCache, alg::OpenBLASLUFactorization;
         kwargs...)
-    __openblas_isavailable() || 
+    __openblas_isavailable() ||
         error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     A = cache.A
     A = convert(AbstractMatrix, A)
@@ -287,6 +287,85 @@ function SciMLBase.solve!(cache::LinearCache, alg::OpenBLASLUFactorization;
     else
         copyto!(cache.u, cache.b)
         openblas_getrs!('N', A.factors, A.ipiv, cache.u; info)
+    end
+
+    SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache; retcode = ReturnCode.Success)
+end
+
+# Mixed precision OpenBLAS implementation
+default_alias_A(::OpenBLAS32MixedLUFactorization, ::Any, ::Any) = false
+default_alias_b(::OpenBLAS32MixedLUFactorization, ::Any, ::Any) = false
+
+const PREALLOCATED_OPENBLAS32_LU = begin
+    A = rand(Float32, 0, 0)
+    luinst = ArrayInterface.lu_instance(A), Ref{BlasInt}()
+end
+
+function LinearSolve.init_cacheval(alg::OpenBLAS32MixedLUFactorization, A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
+        assumptions::OperatorAssumptions)
+    # Pre-allocate appropriate 32-bit arrays based on input type
+    if eltype(A) <: Complex
+        A_32 = rand(ComplexF32, 0, 0)
+    else
+        A_32 = rand(Float32, 0, 0)
+    end
+    ArrayInterface.lu_instance(A_32), Ref{BlasInt}()
+end
+
+function SciMLBase.solve!(cache::LinearCache, alg::OpenBLAS32MixedLUFactorization;
+        kwargs...)
+    __openblas_isavailable() ||
+        error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
+    A = cache.A
+    A = convert(AbstractMatrix, A)
+
+    # Check if we have complex numbers
+    iscomplex = eltype(A) <: Complex
+
+    if cache.isfresh
+        cacheval = @get_cacheval(cache, :OpenBLAS32MixedLUFactorization)
+        # Convert to appropriate 32-bit type for factorization
+        if iscomplex
+            A_f32 = ComplexF32.(A)
+        else
+            A_f32 = Float32.(A)
+        end
+        res = openblas_getrf!(A_f32; ipiv = cacheval[1].ipiv, info = cacheval[2])
+        fact = LU(res[1:3]...), res[4]
+        cache.cacheval = fact
+
+        if !LinearAlgebra.issuccess(fact[1])
+            return SciMLBase.build_linear_solution(
+                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
+        end
+        cache.isfresh = false
+    end
+
+    A_lu, info = @get_cacheval(cache, :OpenBLAS32MixedLUFactorization)
+    require_one_based_indexing(cache.u, cache.b)
+    m, n = size(A_lu, 1), size(A_lu, 2)
+
+    # Convert b to appropriate 32-bit type for solving
+    if iscomplex
+        b_f32 = ComplexF32.(cache.b)
+    else
+        b_f32 = Float32.(cache.b)
+    end
+
+    if m > n
+        Bc = copy(b_f32)
+        openblas_getrs!('N', A_lu.factors, A_lu.ipiv, Bc; info)
+        # Convert back to original precision
+        T = eltype(cache.u)
+        cache.u .= T.(Bc[1:n])
+    else
+        u_f32 = copy(b_f32)
+        openblas_getrs!('N', A_lu.factors, A_lu.ipiv, u_f32; info)
+        # Convert back to original precision
+        T = eltype(cache.u)
+        cache.u .= T.(u_f32)
     end
 
     SciMLBase.build_linear_solution(

@@ -470,9 +470,11 @@ export PanuaPardisoFactorize, PanuaPardisoIterate
 export PardisoJL
 export MKLLUFactorization
 export OpenBLASLUFactorization
+export OpenBLAS32MixedLUFactorization
 export MKL32MixedLUFactorization
 export AppleAccelerateLUFactorization
 export AppleAccelerate32MixedLUFactorization
+export RF32MixedLUFactorization
 export MetalLUFactorization
 export MetalOffload32MixedLUFactorization
 

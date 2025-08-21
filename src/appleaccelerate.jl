@@ -33,7 +33,7 @@ function aa_getrf!(A::AbstractMatrix{<:ComplexF64};
         ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
         info = Ref{Cint}(),
         check = false)
-    __appleaccelerate_isavailable() || 
+    __appleaccelerate_isavailable() ||
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
@@ -55,7 +55,7 @@ function aa_getrf!(A::AbstractMatrix{<:ComplexF32};
         ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
         info = Ref{Cint}(),
         check = false)
-    __appleaccelerate_isavailable() || 
+    __appleaccelerate_isavailable() ||
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
@@ -77,7 +77,7 @@ function aa_getrf!(A::AbstractMatrix{<:Float64};
         ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
         info = Ref{Cint}(),
         check = false)
-    __appleaccelerate_isavailable() || 
+    __appleaccelerate_isavailable() ||
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
@@ -99,7 +99,7 @@ function aa_getrf!(A::AbstractMatrix{<:Float32};
         ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
         info = Ref{Cint}(),
         check = false)
-    __appleaccelerate_isavailable() || 
+    __appleaccelerate_isavailable() ||
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
@@ -123,7 +123,7 @@ function aa_getrs!(trans::AbstractChar,
         ipiv::AbstractVector{Cint},
         B::AbstractVecOrMat{<:ComplexF64};
         info = Ref{Cint}())
-    __appleaccelerate_isavailable() || 
+    __appleaccelerate_isavailable() ||
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
@@ -149,7 +149,7 @@ function aa_getrs!(trans::AbstractChar,
         ipiv::AbstractVector{Cint},
         B::AbstractVecOrMat{<:ComplexF32};
         info = Ref{Cint}())
-    __appleaccelerate_isavailable() || 
+    __appleaccelerate_isavailable() ||
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
@@ -176,7 +176,7 @@ function aa_getrs!(trans::AbstractChar,
         ipiv::AbstractVector{Cint},
         B::AbstractVecOrMat{<:Float64};
         info = Ref{Cint}())
-    __appleaccelerate_isavailable() || 
+    __appleaccelerate_isavailable() ||
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
@@ -203,7 +203,7 @@ function aa_getrs!(trans::AbstractChar,
         ipiv::AbstractVector{Cint},
         B::AbstractVecOrMat{<:Float32};
         info = Ref{Cint}())
-    __appleaccelerate_isavailable() || 
+    __appleaccelerate_isavailable() ||
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
@@ -251,7 +251,7 @@ end
 
 function SciMLBase.solve!(cache::LinearCache, alg::AppleAccelerateLUFactorization;
         kwargs...)
-    __appleaccelerate_isavailable() || 
+    __appleaccelerate_isavailable() ||
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
     A = cache.A
     A = convert(AbstractMatrix, A)
@@ -309,14 +309,14 @@ end
 
 function SciMLBase.solve!(cache::LinearCache, alg::AppleAccelerate32MixedLUFactorization;
         kwargs...)
-    __appleaccelerate_isavailable() || 
+    __appleaccelerate_isavailable() ||
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
     A = cache.A
     A = convert(AbstractMatrix, A)
-    
+
     # Check if we have complex numbers
     iscomplex = eltype(A) <: Complex
-    
+
     if cache.isfresh
         cacheval = @get_cacheval(cache, :AppleAccelerate32MixedLUFactorization)
         # Convert to appropriate 32-bit type for factorization
@@ -339,14 +339,14 @@ function SciMLBase.solve!(cache::LinearCache, alg::AppleAccelerate32MixedLUFacto
     A_lu, info = @get_cacheval(cache, :AppleAccelerate32MixedLUFactorization)
     require_one_based_indexing(cache.u, cache.b)
     m, n = size(A_lu, 1), size(A_lu, 2)
-    
+
     # Convert b to appropriate 32-bit type for solving
     if iscomplex
         b_f32 = ComplexF32.(cache.b)
     else
         b_f32 = Float32.(cache.b)
     end
-    
+
     if m > n
         Bc = copy(b_f32)
         aa_getrs!('N', A_lu.factors, A_lu.ipiv, Bc; info)

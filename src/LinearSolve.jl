@@ -66,14 +66,13 @@ else
     const useopenblas = false
 end
 
-
 @reexport using SciMLBase
 
 """
     SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm
 
 The root abstract type for all linear solver algorithms in LinearSolve.jl.
-All concrete linear solver implementations should inherit from one of the 
+All concrete linear solver implementations should inherit from one of the
 specialized subtypes rather than directly from this type.
 
 This type integrates with the SciMLBase ecosystem, providing a consistent
@@ -91,18 +90,21 @@ matrices (e.g., `A = LU`, `A = QR`, `A = LDL'`) and then solve the system
 using forward/backward substitution.
 
 ## Characteristics
-- Requires concrete matrix representation (`needs_concrete_A() = true`)
-- Typically efficient for multiple solves with the same matrix
-- Generally provides high accuracy for well-conditioned problems
-- Memory requirements depend on the specific factorization type
+
+  - Requires concrete matrix representation (`needs_concrete_A() = true`)
+  - Typically efficient for multiple solves with the same matrix
+  - Generally provides high accuracy for well-conditioned problems
+  - Memory requirements depend on the specific factorization type
 
 ## Subtypes
-- `AbstractDenseFactorization`: For dense matrix factorizations
-- `AbstractSparseFactorization`: For sparse matrix factorizations
+
+  - `AbstractDenseFactorization`: For dense matrix factorizations
+  - `AbstractSparseFactorization`: For sparse matrix factorizations
 
 ## Examples of concrete subtypes
-- `LUFactorization`, `QRFactorization`, `CholeskyFactorization`
-- `UMFPACKFactorization`, `KLUFactorization`
+
+  - `LUFactorization`, `QRFactorization`, `CholeskyFactorization`
+  - `UMFPACKFactorization`, `KLUFactorization`
 """
 abstract type AbstractFactorization <: SciMLLinearSolveAlgorithm end
 
@@ -110,20 +112,22 @@ abstract type AbstractFactorization <: SciMLLinearSolveAlgorithm end
     AbstractSparseFactorization <: AbstractFactorization
 
 Abstract type for factorization-based linear solvers optimized for sparse matrices.
-These algorithms take advantage of sparsity patterns to reduce memory usage and 
+These algorithms take advantage of sparsity patterns to reduce memory usage and
 computational cost compared to dense factorizations.
 
-## Characteristics  
-- Optimized for matrices with many zero entries
-- Often use specialized pivoting strategies to preserve sparsity
-- May reorder rows/columns to minimize fill-in during factorization
-- Typically more memory-efficient than dense methods for sparse problems
+## Characteristics
+
+  - Optimized for matrices with many zero entries
+  - Often use specialized pivoting strategies to preserve sparsity
+  - May reorder rows/columns to minimize fill-in during factorization
+  - Typically more memory-efficient than dense methods for sparse problems
 
 ## Examples of concrete subtypes
-- `UMFPACKFactorization`: General sparse LU with partial pivoting
-- `KLUFactorization`: Sparse LU optimized for circuit simulation
-- `CHOLMODFactorization`: Sparse Cholesky for positive definite systems
-- `SparspakFactorization`: Envelope/profile method for sparse systems
+
+  - `UMFPACKFactorization`: General sparse LU with partial pivoting
+  - `KLUFactorization`: Sparse LU optimized for circuit simulation
+  - `CHOLMODFactorization`: Sparse Cholesky for positive definite systems
+  - `SparspakFactorization`: Envelope/profile method for sparse systems
 """
 abstract type AbstractSparseFactorization <: AbstractFactorization end
 
@@ -135,16 +139,18 @@ These algorithms assume the matrix has no particular sparsity structure and use
 dense linear algebra routines (typically from BLAS/LAPACK) for optimal performance.
 
 ## Characteristics
-- Optimized for matrices with few zeros or no sparsity structure  
-- Leverage highly optimized BLAS/LAPACK routines when available
-- Generally provide excellent performance for moderately-sized dense problems
-- Memory usage scales as O(n²) with matrix size
 
-## Examples of concrete subtypes  
-- `LUFactorization`: Dense LU with partial pivoting (via LAPACK)
-- `QRFactorization`: Dense QR factorization for overdetermined systems
-- `CholeskyFactorization`: Dense Cholesky for symmetric positive definite matrices
-- `BunchKaufmanFactorization`: For symmetric indefinite matrices
+  - Optimized for matrices with few zeros or no sparsity structure
+  - Leverage highly optimized BLAS/LAPACK routines when available
+  - Generally provide excellent performance for moderately-sized dense problems
+  - Memory usage scales as O(n²) with matrix size
+
+## Examples of concrete subtypes
+
+  - `LUFactorization`: Dense LU with partial pivoting (via LAPACK)
+  - `QRFactorization`: Dense QR factorization for overdetermined systems
+  - `CholeskyFactorization`: Dense Cholesky for symmetric positive definite matrices
+  - `BunchKaufmanFactorization`: For symmetric indefinite matrices
 """
 abstract type AbstractDenseFactorization <: AbstractFactorization end
 
@@ -156,23 +162,26 @@ These algorithms solve linear systems by iteratively building an approximation
 from a sequence of Krylov subspaces, without requiring explicit matrix factorization.
 
 ## Characteristics
-- Does not require concrete matrix representation (`needs_concrete_A() = false`)
-- Only needs matrix-vector products `A*v` (can work with operators/functions)
-- Memory usage typically O(n) or O(kn) where k << n
-- Convergence depends on matrix properties (condition number, eigenvalue distribution)
-- Often benefits significantly from preconditioning
+
+  - Does not require concrete matrix representation (`needs_concrete_A() = false`)
+  - Only needs matrix-vector products `A*v` (can work with operators/functions)
+  - Memory usage typically O(n) or O(kn) where k << n
+  - Convergence depends on matrix properties (condition number, eigenvalue distribution)
+  - Often benefits significantly from preconditioning
 
 ## Advantages
-- Low memory requirements for large sparse systems
-- Can handle matrix-free operators (functions that compute `A*v`)
-- Often the only feasible approach for very large systems
-- Can exploit matrix structure through specialized operators
+
+  - Low memory requirements for large sparse systems
+  - Can handle matrix-free operators (functions that compute `A*v`)
+  - Often the only feasible approach for very large systems
+  - Can exploit matrix structure through specialized operators
 
 ## Examples of concrete subtypes
-- `GMRESIteration`: Generalized Minimal Residual method
-- `CGIteration`: Conjugate Gradient (for symmetric positive definite systems)  
-- `BiCGStabLIteration`: Bi-Conjugate Gradient Stabilized
-- Wrapped external iterative solvers (KrylovKit.jl, IterativeSolvers.jl)
+
+  - `GMRESIteration`: Generalized Minimal Residual method
+  - `CGIteration`: Conjugate Gradient (for symmetric positive definite systems)
+  - `BiCGStabLIteration`: Bi-Conjugate Gradient Stabilized
+  - Wrapped external iterative solvers (KrylovKit.jl, IterativeSolvers.jl)
 """
 abstract type AbstractKrylovSubspaceMethod <: SciMLLinearSolveAlgorithm end
 
@@ -183,15 +192,17 @@ Abstract type for linear solvers that wrap custom solving functions or
 provide direct interfaces to specific solve methods. These provide flexibility
 for integrating custom algorithms or simple solve strategies.
 
-## Characteristics  
-- Does not require concrete matrix representation (`needs_concrete_A() = false`)
-- Provides maximum flexibility for custom solving strategies
-- Can wrap external solver libraries or implement specialized algorithms
-- Performance and stability depend entirely on the wrapped implementation
+## Characteristics
+
+  - Does not require concrete matrix representation (`needs_concrete_A() = false`)
+  - Provides maximum flexibility for custom solving strategies
+  - Can wrap external solver libraries or implement specialized algorithms
+  - Performance and stability depend entirely on the wrapped implementation
 
 ## Examples of concrete subtypes
-- `LinearSolveFunction`: Wraps arbitrary user-defined solve functions
-- `DirectLdiv!`: Direct application of the `\\` operator
+
+  - `LinearSolveFunction`: Wraps arbitrary user-defined solve functions
+  - `DirectLdiv!`: Direct application of the `\\` operator
 """
 abstract type AbstractSolveFunction <: SciMLLinearSolveAlgorithm end
 
@@ -204,22 +215,27 @@ Trait function that determines whether a linear solver algorithm requires
 a concrete matrix representation or can work with abstract operators.
 
 ## Arguments
-- `alg`: A linear solver algorithm instance
+
+  - `alg`: A linear solver algorithm instance
 
 ## Returns
-- `true`: Algorithm requires a concrete matrix (e.g., for factorization)
-- `false`: Algorithm can work with abstract operators (e.g., matrix-free methods)
+
+  - `true`: Algorithm requires a concrete matrix (e.g., for factorization)
+  - `false`: Algorithm can work with abstract operators (e.g., matrix-free methods)
 
 ## Usage
+
 This trait is used internally by LinearSolve.jl to optimize algorithm dispatch
 and determine when matrix operators need to be converted to concrete arrays.
 
 ## Algorithm-Specific Behavior
-- `AbstractFactorization`: `true` (needs explicit matrix entries for factorization)
-- `AbstractKrylovSubspaceMethod`: `false` (only needs matrix-vector products)
-- `AbstractSolveFunction`: `false` (depends on the wrapped function's requirements)
+
+  - `AbstractFactorization`: `true` (needs explicit matrix entries for factorization)
+  - `AbstractKrylovSubspaceMethod`: `false` (only needs matrix-vector products)
+  - `AbstractSolveFunction`: `false` (depends on the wrapped function's requirements)
 
 ## Example
+
 ```julia
 needs_concrete_A(LUFactorization())  # true
 needs_concrete_A(GMRESIteration())   # false

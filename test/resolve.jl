@@ -4,15 +4,11 @@ using LinearSolve: AbstractDenseFactorization, AbstractSparseFactorization,
                    AMDGPUOffloadLUFactorization, AMDGPUOffloadQRFactorization,
                    SparspakFactorization
 
-# Define mixed precision algorithms that need higher tolerance
-const MIXED_PRECISION_ALGS = [
-    :MKL32MixedLUFactorization,
-    :AppleAccelerate32MixedLUFactorization,
-    :OpenBLAS32MixedLUFactorization,
-    :RF32MixedLUFactorization,
-    :CUDAOffload32MixedLUFactorization,
-    :MetalOffload32MixedLUFactorization
-]
+# Function to check if an algorithm is mixed precision
+function is_mixed_precision_alg(alg)
+    alg_name = string(alg)
+    return contains(alg_name, "32Mixed") || contains(alg_name, "Mixed32")
+end
 
 for alg in vcat(InteractiveUtils.subtypes(AbstractDenseFactorization),
     InteractiveUtils.subtypes(AbstractSparseFactorization))
@@ -61,7 +57,7 @@ for alg in vcat(InteractiveUtils.subtypes(AbstractDenseFactorization),
         
         # Use higher tolerance for mixed precision algorithms
         expected = [-2.0, 1.5]
-        if Symbol(alg) in MIXED_PRECISION_ALGS
+        if is_mixed_precision_alg(alg)
             @test solve!(linsolve).u ≈ expected atol=1e-4 rtol=1e-4
             @test !linsolve.isfresh
             @test solve!(linsolve).u ≈ expected atol=1e-4 rtol=1e-4
@@ -82,7 +78,7 @@ for alg in vcat(InteractiveUtils.subtypes(AbstractDenseFactorization),
         @test linsolve.isfresh
         
         # Use higher tolerance for mixed precision algorithms
-        if Symbol(alg) in MIXED_PRECISION_ALGS
+        if is_mixed_precision_alg(alg)
             @test solve!(linsolve).u ≈ expected atol=1e-4 rtol=1e-4
         else
             @test solve!(linsolve).u ≈ expected

@@ -1,5 +1,0 @@
-[deps]
-FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
-ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
-RecursiveFactorization = "f2c3362d-daeb-58d1-803e-2bc74f2840b4"
-Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"

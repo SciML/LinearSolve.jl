@@ -51,7 +51,8 @@ function LinearSolve.init_cacheval(alg::RF32MixedLUFactorization{P, T}, A, b, u,
         A_32 = rand(Float32, 0, 0)
     end
     luinst = ArrayInterface.lu_instance(A_32)
-    luinst
+    ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
+    (luinst, ipiv)
 end
 
 function SciMLBase.solve!(
@@ -63,6 +64,7 @@ function SciMLBase.solve!(
     # Check if we have complex numbers
     iscomplex = eltype(A) <: Complex
 
+    fact, ipiv = LinearSolve.@get_cacheval(cache, :RF32MixedLUFactorization)
     if cache.isfresh
         # Convert to appropriate 32-bit type for factorization
         if iscomplex
@@ -71,11 +73,13 @@ function SciMLBase.solve!(
             A_f32 = Float32.(A)
         end
 
-        # Allocate pivot vector for the factorization
-        ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A_f32)...))
+        # Ensure ipiv is the right size
+        if length(ipiv) != min(size(A_f32)...)
+            ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A_f32)...))
+        end
 
         fact = RecursiveFactorization.lu!(A_f32, ipiv, Val(P), Val(T), check = false)
-        cache.cacheval = fact
+        cache.cacheval = (fact, ipiv)
 
         if !LinearAlgebra.issuccess(fact)
             return SciMLBase.build_linear_solution(
@@ -85,8 +89,9 @@ function SciMLBase.solve!(
         cache.isfresh = false
     end
 
-    fact = LinearSolve.@get_cacheval(cache, :RF32MixedLUFactorization)
-
+    # Get the factorization from the cache
+    fact_cached = LinearSolve.@get_cacheval(cache, :RF32MixedLUFactorization)[1]
+    
     # Convert b to appropriate 32-bit type for solving
     if iscomplex
         b_f32 = ComplexF32.(cache.b)
@@ -97,7 +102,7 @@ function SciMLBase.solve!(
     end
 
     # Solve in 32-bit precision
-    ldiv!(u_f32, fact, b_f32)
+    ldiv!(u_f32, fact_cached, b_f32)
 
     # Convert back to original precision
     T_orig = eltype(cache.u)

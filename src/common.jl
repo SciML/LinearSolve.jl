@@ -330,7 +330,7 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         if verbose
             verbose = LinearVerbosity()
         else
-            verbose = LinearVerbosity(Verbosity.None())
+            verbose = LinearVerbosity{false}(nothing, nothing, nothing)
         end
     elseif verbose isa Verbosity.Type
         verbose = LinearVerbosity(verbose)

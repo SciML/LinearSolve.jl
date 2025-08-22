@@ -3,7 +3,7 @@ module LinearSolveBandedMatricesExt
 using BandedMatrices, LinearAlgebra, LinearSolve
 import LinearSolve: defaultalg,
                     do_factorization, init_cacheval, DefaultLinearSolver,
-                    DefaultAlgorithmChoice
+                    DefaultAlgorithmChoice, LinearVerbosity
 
 # Defaults for BandedMatrices
 function defaultalg(A::BandedMatrix, b, oa::OperatorAssumptions{Bool})

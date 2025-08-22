@@ -1,6 +1,7 @@
 module LinearSolveFastLapackInterfaceExt
 
 using LinearSolve, LinearAlgebra
+using LinearSolve: LinearVerbosity
 using FastLapackInterface
 
 struct WorkspaceAndFactors{W, F}

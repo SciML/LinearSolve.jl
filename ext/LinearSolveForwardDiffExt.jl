@@ -1,13 +1,12 @@
 module LinearSolveForwardDiffExt
 
 using LinearSolve
-using LinearSolve: SciMLLinearSolveAlgorithm, __init, LinearVerbosity
+using LinearSolve: SciMLLinearSolveAlgorithm, __init
 using LinearAlgebra
 using ForwardDiff
 using ForwardDiff: Dual, Partials
 using SciMLBase
 using RecursiveArrayTools
-using SciMLLogging: Verbosity
 
 const DualLinearProblem = LinearProblem{
     <:Union{Number, <:AbstractArray, Nothing}, iip,
@@ -137,7 +136,7 @@ function __dual_init(
         abstol = LinearSolve.default_tol(real(eltype(prob.b))),
         reltol = LinearSolve.default_tol(real(eltype(prob.b))),
         maxiters::Int = length(prob.b),
-        verbose = LinearVerbosity(Verbosity.None()),
+        verbose::Bool = false,
         Pl = nothing,
         Pr = nothing,
         assumptions = OperatorAssumptions(issquare(prob.A)),

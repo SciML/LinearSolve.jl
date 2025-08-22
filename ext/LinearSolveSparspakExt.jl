@@ -13,14 +13,14 @@ function LinearSolve.init_cacheval(
         ::SparspakFactorization, A::SparseMatrixCSC{Float64, Int}, b, u, Pl,
         Pr, maxiters::Int, abstol,
         reltol,
-        verbose::LinearVerbosity, assumptions::OperatorAssumptions)
+        verbose::Bool, assumptions::OperatorAssumptions)
     PREALLOCATED_SPARSEPAK
 end
 
 function LinearSolve.init_cacheval(
         ::SparspakFactorization, A::AbstractSparseMatrixCSC{Tv, Ti}, b, u, Pl, Pr, maxiters::Int, abstol,
         reltol,
-        verbose::LinearVerbosity, assumptions::OperatorAssumptions) where {Tv, Ti}
+        verbose::Bool, assumptions::OperatorAssumptions) where {Tv, Ti}
     if size(A, 1) == size(A, 2)
         A = convert(AbstractMatrix, A)
         if A isa SparseArrays.AbstractSparseArray

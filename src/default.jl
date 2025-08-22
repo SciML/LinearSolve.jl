@@ -454,7 +454,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::Nothing,
 end
 
 function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
-        verbose::LinearVerbosity, assump::OperatorAssumptions)
+        verbose::Bool, assump::OperatorAssumptions)
     init_cacheval(defaultalg(A, b, assump), A, b, u, Pl, Pr, maxiters, abstol, reltol,
         verbose,
         assump)
@@ -465,7 +465,7 @@ cache.cacheval = NamedTuple(LUFactorization = cache of LUFactorization, ...)
 """
 @generated function init_cacheval(alg::DefaultLinearSolver, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol,
-        verbose::LinearVerbosity, assump::OperatorAssumptions)
+        verbose::Bool, assump::OperatorAssumptions)
     caches = map(first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))) do alg
         if alg === :KrylovJL_GMRES || alg === :KrylovJL_CRAIGMR || alg === :KrylovJL_LSMR
             quote
@@ -517,8 +517,7 @@ end
             newex = quote
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
-                    @SciMLMessage("LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.", 
-                        cache.verbose, :default_lu_fallback, :error_control)
+                    ## TODO: Add verbosity logging here about using the fallback
                     sol = SciMLBase.solve!(
                         cache, QRFactorization(ColumnNorm()), args...; kwargs...)
                     SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
@@ -538,8 +537,7 @@ end
 
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
-                    @SciMLMessage("LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.",
-                        cache.verbose, :default_lu_fallback, :error_control)
+                    ## TODO: Add verbosity logging here about using the fallback
                     sol = SciMLBase.solve!(
                         cache, QRFactorization(ColumnNorm()), args...; kwargs...)
                     SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
@@ -559,8 +557,7 @@ end
 
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
-                    @SciMLMessage("LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.",
-                        cache.verbose, :default_lu_fallback, :error_control)
+                    ## TODO: Add verbosity logging here about using the fallback
                     sol = SciMLBase.solve!(
                         cache, QRFactorization(ColumnNorm()), args...; kwargs...)
                     SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
@@ -580,8 +577,7 @@ end
 
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
-                    @SciMLMessage("LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.",
-                        cache.verbose, :default_lu_fallback, :error_control)
+                    ## TODO: Add verbosity logging here about using the fallback
                     sol = SciMLBase.solve!(
                         cache, QRFactorization(ColumnNorm()), args...; kwargs...)
                     SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
@@ -601,8 +597,7 @@ end
 
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
-                    @SciMLMessage("LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.",
-                        cache.verbose, :default_lu_fallback, :error_control)
+                    ## TODO: Add verbosity logging here about using the fallback
                     sol = SciMLBase.solve!(
                         cache, QRFactorization(ColumnNorm()), args...; kwargs...)
                     SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;

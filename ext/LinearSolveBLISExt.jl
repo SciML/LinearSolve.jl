@@ -9,7 +9,7 @@ using LinearSolve
 using LinearAlgebra: BlasInt, LU
 using LinearAlgebra.LAPACK: require_one_based_indexing, chkfinite, chkstride1, 
                             @blasfunc, chkargsok
-using LinearSolve: ArrayInterface, BLISLUFactorization, @get_cacheval, LinearCache, SciMLBase
+using LinearSolve: ArrayInterface, BLISLUFactorization, @get_cacheval, LinearCache, SciMLBase, LinearVerbosity
 using SciMLBase: ReturnCode
 
 const global libblis = blis_jll.blis

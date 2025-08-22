@@ -14,20 +14,18 @@ to avoid allocations and does not require libblastrampoline.
 """
 struct AppleAccelerateLUFactorization <: AbstractFactorization end
 
-
+# To make Enzyme happy, this has to be static
 @static if !Sys.isapple()
+    const AA_IS_AVAILABLE = false
     __appleaccelerate_isavailable() = false
 else
-    function __appleaccelerate_isavailable()
-        libacc_hdl = Libdl.dlopen_e(libacc)
-        if libacc_hdl == C_NULL
-            return false
-        end
-
-        if dlsym_e(libacc_hdl, "dgetrf_") == C_NULL
-            return false
-        end
-        return true
+    @static if Libdl.dlopen_e(libacc) == C_NULL
+        __appleaccelerate_isavailable() = false
+    end
+    @static if dlsym_e(Libdl.dlopen_e(libacc), "dgetrf_") == C_NULL
+        __appleaccelerate_isavailable() = false
+    else
+        __appleaccelerate_isavailable() = true
     end
 end
 

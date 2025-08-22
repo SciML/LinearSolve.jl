@@ -1,6 +1,6 @@
 module LinearSolveCUSOLVERRFExt
 
-using LinearSolve: LinearSolve, @get_cacheval, pattern_changed, OperatorAssumptions, LinearVerbosity
+using LinearSolve: LinearSolve, @get_cacheval, pattern_changed, OperatorAssumptions
 using CUSOLVERRF: CUSOLVERRF, RFLU, CUDA
 using SparseArrays: SparseArrays, SparseMatrixCSC, nnz
 using CUSOLVERRF.CUDA.CUSPARSE: CuSparseMatrixCSR
@@ -10,7 +10,7 @@ using SciMLBase: SciMLBase, LinearProblem, ReturnCode
 function LinearSolve.init_cacheval(alg::LinearSolve.CUSOLVERRFFactorization,
         A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol,
-        verbose::LinearVerbosity, assumptions::OperatorAssumptions)
+        verbose::Bool, assumptions::OperatorAssumptions)
     nothing
 end
 
@@ -18,7 +18,7 @@ function LinearSolve.init_cacheval(alg::LinearSolve.CUSOLVERRFFactorization,
         A::Union{CuSparseMatrixCSR{Float64, Int32}, SparseMatrixCSC{Float64, <:Integer}}, 
         b, u, Pl, Pr,
         maxiters::Int, abstol, reltol,
-        verbose::LinearVerbosity, assumptions::OperatorAssumptions)
+        verbose::Bool, assumptions::OperatorAssumptions)
     # Create initial factorization with appropriate options
     nrhs = b isa AbstractMatrix ? size(b, 2) : 1
     symbolic = alg.symbolic

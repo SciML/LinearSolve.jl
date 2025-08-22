@@ -1,7 +1,6 @@
 module LinearSolveFastLapackInterfaceExt
 
 using LinearSolve, LinearAlgebra
-using LinearSolve: LinearVerbosity
 using FastLapackInterface
 
 struct WorkspaceAndFactors{W, F}
@@ -10,7 +9,7 @@ struct WorkspaceAndFactors{W, F}
 end
 
 function LinearSolve.init_cacheval(::FastLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
+        maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     ws = LUWs(A)
     return WorkspaceAndFactors(
@@ -37,7 +36,7 @@ end
 
 function LinearSolve.init_cacheval(
         alg::FastQRFactorization{NoPivot}, A::AbstractMatrix, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
+        maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     ws = QRWYWs(A; blocksize = alg.blocksize)
     return WorkspaceAndFactors(ws,
@@ -45,7 +44,7 @@ function LinearSolve.init_cacheval(
 end
 function LinearSolve.init_cacheval(
         ::FastQRFactorization{ColumnNorm}, A::AbstractMatrix, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
+        maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     ws = QRpWs(A)
     return WorkspaceAndFactors(ws,
@@ -53,10 +52,10 @@ function LinearSolve.init_cacheval(
 end
 
 function LinearSolve.init_cacheval(alg::FastQRFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
+        maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     return init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
+        maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
 end
 

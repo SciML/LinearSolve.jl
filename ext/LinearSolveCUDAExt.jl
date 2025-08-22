@@ -1,17 +1,14 @@
 module LinearSolveCUDAExt
 
 using CUDA
-using CUDA: CuVector, CuMatrix
 using LinearSolve: LinearSolve, is_cusparse, defaultalg, cudss_loaded, DefaultLinearSolver,
                    DefaultAlgorithmChoice, ALREADY_WARNED_CUDSS, LinearCache,
                    needs_concrete_A,
                    error_no_cudss_lu, init_cacheval, OperatorAssumptions,
                    CudaOffloadFactorization, CudaOffloadLUFactorization, CudaOffloadQRFactorization,
                    CUDAOffload32MixedLUFactorization,
-                   SparspakFactorization, KLUFactorization, UMFPACKFactorization,
-                   LinearVerbosity
+                   SparspakFactorization, KLUFactorization, UMFPACKFactorization
 using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase, LinearSolve.ArrayInterface
-using LinearAlgebra: LU
 using SciMLBase: AbstractSciMLOperator
 
 function LinearSolve.is_cusparse(A::Union{
@@ -54,7 +51,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadLUFact
 end
 
 function LinearSolve.init_cacheval(alg::CudaOffloadLUFactorization, A::AbstractArray, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
+        maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     T = eltype(A)
     noUnitT = typeof(zero(T))
@@ -77,7 +74,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadQRFact
 end
 
 function LinearSolve.init_cacheval(alg::CudaOffloadQRFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
+        maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     qr(CUDA.CuArray(A))
 end
@@ -96,26 +93,26 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadFactor
 end
 
 function LinearSolve.init_cacheval(alg::CudaOffloadFactorization, A::AbstractArray, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
+        maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     qr(CUDA.CuArray(A))
 end
 
 function LinearSolve.init_cacheval(
         ::SparspakFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
-        Pl, Pr, maxiters::Int, abstol, reltol, verbose::LinearVerbosity, assumptions::OperatorAssumptions)
+        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     nothing
 end
 
 function LinearSolve.init_cacheval(
         ::KLUFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
-        Pl, Pr, maxiters::Int, abstol, reltol, verbose::LinearVerbosity, assumptions::OperatorAssumptions)
+        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     nothing
 end
 
 function LinearSolve.init_cacheval(
         ::UMFPACKFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
-        Pl, Pr, maxiters::Int, abstol, reltol, verbose::LinearVerbosity, assumptions::OperatorAssumptions)
+        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     nothing
 end
 
@@ -143,7 +140,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CUDAOffload32Mixe
 end
 
 function LinearSolve.init_cacheval(alg::CUDAOffload32MixedLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
+        maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     # Pre-allocate with Float32 arrays
     A_f32 = Float32.(A)

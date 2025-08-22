@@ -1,7 +1,7 @@
 module LinearSolveCliqueTreesExt
 
 using CliqueTrees: symbolic, cholinit, lininit, cholesky!, linsolve!
-using LinearSolve
+using LinearSolve: LinearSolve, LinearVerbosity
 using SparseArrays
 
 function _symbolic(A::AbstractMatrix, alg::CliqueTreesFactorization)

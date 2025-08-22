@@ -2,7 +2,7 @@ module LinearSolveRecursiveFactorizationExt
 
 using LinearSolve: LinearSolve, userecursivefactorization, LinearCache, @get_cacheval,
                    RFLUFactorization, RF32MixedLUFactorization, default_alias_A,
-                   default_alias_b
+                   default_alias_b, LinearVerbosity
 using LinearSolve.LinearAlgebra, LinearSolve.ArrayInterface, RecursiveFactorization
 using SciMLBase: SciMLBase, ReturnCode
 

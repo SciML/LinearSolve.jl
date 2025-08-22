@@ -42,7 +42,7 @@ const PREALLOCATED_RF32_LU = begin
 end
 
 function LinearSolve.init_cacheval(alg::RF32MixedLUFactorization{P, T}, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::LinearSolve.LinearVerbosity,
+        maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::LinearSolve.OperatorAssumptions) where {P, T}
     # Pre-allocate appropriate 32-bit arrays based on input type
     if eltype(A) <: Complex

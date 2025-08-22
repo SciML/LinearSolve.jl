@@ -1,7 +1,8 @@
 module LinearSolveRecursiveFactorizationExt
 
 using LinearSolve: LinearSolve, userecursivefactorization, LinearCache, @get_cacheval,
-                   RFLUFactorization
+                   RFLUFactorization, RF32MixedLUFactorization, default_alias_A,
+                   default_alias_b
 using LinearSolve.LinearAlgebra, LinearSolve.ArrayInterface, RecursiveFactorization
 using SciMLBase: SciMLBase, ReturnCode
 
@@ -28,6 +29,87 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::RFLUFactorization
     end
     y = ldiv!(cache.u, LinearSolve.@get_cacheval(cache, :RFLUFactorization)[1], cache.b)
     SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
+end
+
+# Mixed precision RecursiveFactorization implementation
+LinearSolve.default_alias_A(::RF32MixedLUFactorization, ::Any, ::Any) = false
+LinearSolve.default_alias_b(::RF32MixedLUFactorization, ::Any, ::Any) = false
+
+const PREALLOCATED_RF32_LU = begin
+    A = rand(Float32, 0, 0)
+    luinst = ArrayInterface.lu_instance(A)
+    (luinst, Vector{LinearAlgebra.BlasInt}(undef, 0))
+end
+
+function LinearSolve.init_cacheval(alg::RF32MixedLUFactorization{P, T}, A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::LinearSolve.OperatorAssumptions) where {P, T}
+    # Pre-allocate appropriate 32-bit arrays based on input type
+    if eltype(A) <: Complex
+        A_32 = rand(ComplexF32, 0, 0)
+    else
+        A_32 = rand(Float32, 0, 0)
+    end
+    luinst = ArrayInterface.lu_instance(A_32)
+    ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
+    (luinst, ipiv)
+end
+
+function SciMLBase.solve!(
+        cache::LinearSolve.LinearCache, alg::RF32MixedLUFactorization{P, T};
+        kwargs...) where {P, T}
+    A = cache.A
+    A = convert(AbstractMatrix, A)
+
+    # Check if we have complex numbers
+    iscomplex = eltype(A) <: Complex
+
+    fact, ipiv = LinearSolve.@get_cacheval(cache, :RF32MixedLUFactorization)
+    if cache.isfresh
+        # Convert to appropriate 32-bit type for factorization
+        if iscomplex
+            A_f32 = ComplexF32.(A)
+        else
+            A_f32 = Float32.(A)
+        end
+
+        # Ensure ipiv is the right size
+        if length(ipiv) != min(size(A_f32)...)
+            ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A_f32)...))
+        end
+
+        fact = RecursiveFactorization.lu!(A_f32, ipiv, Val(P), Val(T), check = false)
+        cache.cacheval = (fact, ipiv)
+
+        if !LinearAlgebra.issuccess(fact)
+            return SciMLBase.build_linear_solution(
+                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
+        end
+
+        cache.isfresh = false
+    end
+
+    # Get the factorization from the cache
+    fact_cached = LinearSolve.@get_cacheval(cache, :RF32MixedLUFactorization)[1]
+    
+    # Convert b to appropriate 32-bit type for solving
+    if iscomplex
+        b_f32 = ComplexF32.(cache.b)
+        u_f32 = similar(b_f32)
+    else
+        b_f32 = Float32.(cache.b)
+        u_f32 = similar(b_f32)
+    end
+
+    # Solve in 32-bit precision
+    ldiv!(u_f32, fact_cached, b_f32)
+
+    # Convert back to original precision
+    T_orig = eltype(cache.u)
+    cache.u .= T_orig.(u_f32)
+
+    SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache; retcode = ReturnCode.Success)
 end
 
 end

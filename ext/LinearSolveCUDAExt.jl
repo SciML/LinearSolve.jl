@@ -7,7 +7,7 @@ using LinearSolve: LinearSolve, is_cusparse, defaultalg, cudss_loaded, DefaultLi
                    error_no_cudss_lu, init_cacheval, OperatorAssumptions,
                    CudaOffloadFactorization, CudaOffloadLUFactorization, CudaOffloadQRFactorization,
                    CUDAOffload32MixedLUFactorization,
-                   SparspakFactorization, KLUFactorization, UMFPACKFactorization
+                   SparspakFactorization, KLUFactorization, UMFPACKFactorization, LinearVerbosity
 using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase, LinearSolve.ArrayInterface
 using SciMLBase: AbstractSciMLOperator
 

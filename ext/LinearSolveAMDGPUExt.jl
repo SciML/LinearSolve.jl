@@ -2,7 +2,7 @@ module LinearSolveAMDGPUExt
 
 using AMDGPU
 using LinearSolve: LinearSolve, LinearCache, AMDGPUOffloadLUFactorization,
-                   AMDGPUOffloadQRFactorization, init_cacheval, OperatorAssumptions
+                   AMDGPUOffloadQRFactorization, init_cacheval, OperatorAssumptions, LinearVerbosity
 using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase
 
 # LU Factorization

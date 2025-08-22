@@ -277,7 +277,7 @@ const PREALLOCATED_MKL32_LU = begin
 end
 
 function LinearSolve.init_cacheval(alg::MKL32MixedLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
+        maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     # Pre-allocate appropriate 32-bit arrays based on input type
     if eltype(A) <: Complex

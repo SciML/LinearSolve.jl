@@ -1,7 +1,7 @@
 module LinearSolveIterativeSolversExt
 
 using LinearSolve, LinearAlgebra
-using LinearSolve: LinearCache, DEFAULT_PRECS, LinearVerbosity
+using LinearSolve: LinearCache, DEFAULT_PRECS
 import LinearSolve: IterativeSolversJL
 
 using IterativeSolvers

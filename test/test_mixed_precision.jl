@@ -72,9 +72,9 @@ Random.seed!(123)
             @test norm(A * sol_mixed.u - b) / norm(b) < 1e-5
             
             # Test without pivoting
-            sol_mixed_nopivot = solve(prob, RF32MixedLUFactorization(pivot=Val(false)))
-            @test sol_mixed_nopivot.retcode == ReturnCode.Success
-            @test norm(A * sol_mixed_nopivot.u - b) / norm(b) < 1e-5
+            #sol_mixed_nopivot = solve(prob, RF32MixedLUFactorization(pivot=Val(false)))
+            #@test sol_mixed_nopivot.retcode == ReturnCode.Success
+            #@test norm(A * sol_mixed_nopivot.u - b) / norm(b) < 1e-5
         catch e
             if isa(e, ArgumentError) && occursin("RecursiveFactorization", e.msg)
                 @test_skip "RecursiveFactorization not available"

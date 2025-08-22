@@ -172,7 +172,7 @@ function create_solver(alg::HYPREAlgorithm, cache::LinearCache)
     solver = create_solver(alg.solver, comm)
 
     # Construct solver options
-    verbose = verbosity_to_int(cache.verbose.numerical.HYPRE_verbosity)
+    verbose = isnothing(cache.verbose.numerical) ? 0 : verbosity_to_int(cache.verbose.numerical.HYPRE_verbosity)
     solver_options = (;
         AbsoluteTol = cache.abstol,
         MaxIter = cache.maxiters,

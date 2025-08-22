@@ -293,7 +293,7 @@ const PREALLOCATED_APPLE32_LU = begin
 end
 
 function LinearSolve.init_cacheval(alg::AppleAccelerate32MixedLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
+        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
         assumptions::OperatorAssumptions)
     # Pre-allocate appropriate 32-bit arrays based on input type
     m, n = size(A)

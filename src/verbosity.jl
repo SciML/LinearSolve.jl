@@ -116,9 +116,9 @@ mutable struct LinearNumericalVerbosity
 end
 
 struct LinearVerbosity{T} <: AbstractVerbositySpecifier{T}
-    error_control::LinearErrorControlVerbosity
-    performance::LinearPerformanceVerbosity
-    numerical::LinearNumericalVerbosity
+    error_control::Union{LinearErrorControlVerbosity, Nothing}
+    performance::Union{LinearPerformanceVerbosity, Nothing}
+    numerical::Union{LinearNumericalVerbosity, Nothing}
 end
 
 function LinearVerbosity(verbose::Verbosity.Type)
@@ -129,10 +129,7 @@ function LinearVerbosity(verbose::Verbosity.Type)
             LinearNumericalVerbosity(Verbosity.Default())
         )
 
-        Verbosity.None() => LinearVerbosity{false}(
-            LinearErrorControlVerbosity(Verbosity.None()),
-            LinearPerformanceVerbosity(Verbosity.None()),
-            LinearNumericalVerbosity(Verbosity.None()))
+        Verbosity.None() => LinearVerbosity{false}(nothing, nothing, nothing)
 
         Verbosity.All() => LinearVerbosity{true}(
             LinearErrorControlVerbosity(Verbosity.Info()),

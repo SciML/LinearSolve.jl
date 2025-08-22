@@ -34,7 +34,7 @@ default_alias_A(::MetalOffload32MixedLUFactorization, ::Any, ::Any) = false
 default_alias_b(::MetalOffload32MixedLUFactorization, ::Any, ::Any) = false
 
 function LinearSolve.init_cacheval(alg::MetalOffload32MixedLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
+        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
         assumptions::OperatorAssumptions)
     # Pre-allocate with Float32 arrays
     A_f32 = Float32.(convert(AbstractMatrix, A))

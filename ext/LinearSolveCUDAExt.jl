@@ -140,7 +140,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CUDAOffload32Mixe
 end
 
 function LinearSolve.init_cacheval(alg::CUDAOffload32MixedLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
+        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
         assumptions::OperatorAssumptions)
     # Pre-allocate with Float32 arrays
     A_f32 = Float32.(A)

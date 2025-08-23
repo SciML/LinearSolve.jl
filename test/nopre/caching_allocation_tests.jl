@@ -1,6 +1,8 @@
 using LinearSolve, LinearAlgebra, SparseArrays, Test, StableRNGs
 using AllocCheck
-using LinearSolve: AbstractDenseFactorization, AbstractSparseFactorization
+using LinearSolve: AbstractDenseFactorization, AbstractSparseFactorization,
+                   MKL32MixedLUFactorization, OpenBLAS32MixedLUFactorization,
+                   AppleAccelerate32MixedLUFactorization, RF32MixedLUFactorization
 using InteractiveUtils
 
 rng = StableRNG(123)
@@ -56,8 +58,10 @@ rng = StableRNG(123)
             end
             
             # Mixed precision methods need looser tolerance
-            # Check if algorithm name contains "32Mixed"
-            is_mixed_precision = occursin("32Mixed", string(typeof(alg)))
+            is_mixed_precision = alg isa Union{MKL32MixedLUFactorization, 
+                                                OpenBLAS32MixedLUFactorization,
+                                                AppleAccelerate32MixedLUFactorization,
+                                                RF32MixedLUFactorization}
             tol = is_mixed_precision ? 1e-5 : 1e-10
             
             # Initialize the cache

@@ -120,36 +120,41 @@ end
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CUDAOffload32MixedLUFactorization;
         kwargs...)
     if cache.isfresh
-        cacheval = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
-        # Convert to Float32 for factorization
-        A_f32 = Float32.(cache.A)
-        fact = lu(CUDA.CuArray(A_f32))
-        cache.cacheval = fact
+        fact, A_gpu_f32, b_gpu_f32, u_gpu_f32, T32, Torig = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
+        # Convert to Float32 for factorization using cached type
+        A_f32 = T32.(cache.A)
+        copyto!(A_gpu_f32, A_f32)
+        fact = lu(A_gpu_f32)
+        cache.cacheval = (fact, A_gpu_f32, b_gpu_f32, u_gpu_f32, T32, Torig)
         cache.isfresh = false
     end
-    fact = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
+    fact, A_gpu_f32, b_gpu_f32, u_gpu_f32, T32, Torig = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
     # Convert b to Float32, solve, then convert back to original precision
-    b_f32 = Float32.(cache.b)
-    u_f32 = CUDA.CuArray(b_f32)
-    y_f32 = ldiv!(u_f32, fact, CUDA.CuArray(b_f32))
+    b_f32 = T32.(cache.b)
+    copyto!(b_gpu_f32, b_f32)
+    ldiv!(u_gpu_f32, fact, b_gpu_f32)
     # Convert back to original precision
-    y = Array(y_f32)
-    T = eltype(cache.u)
-    cache.u .= T.(y)
+    y = Array(u_gpu_f32)
+    cache.u .= Torig.(y)
     SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
 end
 
 function LinearSolve.init_cacheval(alg::CUDAOffload32MixedLUFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
-    # Pre-allocate with Float32 arrays
-    A_f32 = Float32.(A)
-    T = eltype(A_f32)
-    noUnitT = typeof(zero(T))
+    # Pre-allocate with Float32 arrays and cache types
+    m, n = size(A)
+    T32 = eltype(A) <: Complex ? ComplexF32 : Float32
+    Torig = eltype(u)
+    noUnitT = typeof(zero(T32))
     luT = LinearAlgebra.lutype(noUnitT)
-    ipiv = CuVector{Int32}(undef, 0)
+    ipiv = CuVector{Int32}(undef, min(m, n))
     info = zero(LinearAlgebra.BlasInt)
-    return LU{luT}(CuMatrix{Float32}(undef, 0, 0), ipiv, info)
+    fact = LU{luT}(CuMatrix{T32}(undef, m, n), ipiv, info)
+    A_gpu_f32 = CuMatrix{T32}(undef, m, n)
+    b_gpu_f32 = CuVector{T32}(undef, size(b, 1))
+    u_gpu_f32 = CuVector{T32}(undef, size(u, 1))
+    return (fact, A_gpu_f32, b_gpu_f32, u_gpu_f32, T32, Torig)
 end
 
 end

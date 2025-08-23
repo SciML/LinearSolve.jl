@@ -281,12 +281,15 @@ function LinearSolve.init_cacheval(alg::MKL32MixedLUFactorization, A, b, u, Pl, 
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     # Pre-allocate appropriate 32-bit arrays based on input type
-    if eltype(A) <: Complex
-        A_32 = rand(ComplexF32, 0, 0)
-    else
-        A_32 = rand(Float32, 0, 0)
-    end
-    ArrayInterface.lu_instance(A_32), Ref{BlasInt}()
+    m, n = size(A)
+    T32 = eltype(A) <: Complex ? ComplexF32 : Float32
+    Torig = eltype(u)
+    A_32 = similar(A, T32)
+    b_32 = similar(b, T32)
+    u_32 = similar(u, T32)
+    luinst = ArrayInterface.lu_instance(rand(T32, 0, 0))
+    # Return tuple with pre-allocated arrays and cached types
+    (luinst, Ref{BlasInt}(), A_32, b_32, u_32, T32, Torig)
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::MKL32MixedLUFactorization;
@@ -296,19 +299,13 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKL32MixedLUFactorization;
     A = cache.A
     A = convert(AbstractMatrix, A)
 
-    # Check if we have complex numbers
-    iscomplex = eltype(A) <: Complex
-
     if cache.isfresh
-        cacheval = @get_cacheval(cache, :MKL32MixedLUFactorization)
-        # Convert to appropriate 32-bit type for factorization
-        if iscomplex
-            A_f32 = ComplexF32.(A)
-        else
-            A_f32 = Float32.(A)
-        end
-        res = getrf!(A_f32; ipiv = cacheval[1].ipiv, info = cacheval[2])
-        fact = LU(res[1:3]...), res[4]
+        # Get pre-allocated arrays from cacheval
+        luinst, info, A_32, b_32, u_32, T32, Torig = @get_cacheval(cache, :MKL32MixedLUFactorization)
+        # Copy A to pre-allocated 32-bit array using cached type
+        A_32 .= T32.(A)
+        res = getrf!(A_32; ipiv = luinst.ipiv, info = info)
+        fact = (LU(res[1:3]...), res[4], A_32, b_32, u_32, T32, Torig)
         cache.cacheval = fact
 
         if !LinearAlgebra.issuccess(fact[1])
@@ -318,29 +315,22 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKL32MixedLUFactorization;
         cache.isfresh = false
     end
 
-    A_lu, info = @get_cacheval(cache, :MKL32MixedLUFactorization)
+    A_lu, info, A_32, b_32, u_32, T32, Torig = @get_cacheval(cache, :MKL32MixedLUFactorization)
     require_one_based_indexing(cache.u, cache.b)
     m, n = size(A_lu, 1), size(A_lu, 2)
 
-    # Convert b to appropriate 32-bit type for solving
-    if iscomplex
-        b_f32 = ComplexF32.(cache.b)
-    else
-        b_f32 = Float32.(cache.b)
-    end
+    # Copy b to pre-allocated 32-bit array using cached type
+    b_32 .= T32.(cache.b)
 
     if m > n
-        Bc = copy(b_f32)
-        getrs!('N', A_lu.factors, A_lu.ipiv, Bc; info)
-        # Convert back to original precision
-        T = eltype(cache.u)
-        cache.u .= T.(Bc[1:n])
+        getrs!('N', A_lu.factors, A_lu.ipiv, b_32; info)
+        # Convert back to original precision using cached type
+        cache.u[1:n] .= Torig.(b_32[1:n])
     else
-        u_f32 = copy(b_f32)
-        getrs!('N', A_lu.factors, A_lu.ipiv, u_f32; info)
-        # Convert back to original precision
-        T = eltype(cache.u)
-        cache.u .= T.(u_f32)
+        copyto!(u_32, b_32)
+        getrs!('N', A_lu.factors, A_lu.ipiv, u_32; info)
+        # Convert back to original precision using cached type
+        cache.u .= Torig.(u_32)
     end
 
     SciMLBase.build_linear_solution(

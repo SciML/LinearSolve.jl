@@ -120,15 +120,21 @@ end
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CUDAOffload32MixedLUFactorization;
         kwargs...)
     if cache.isfresh
-        fact, A_gpu_f32, b_gpu_f32, u_gpu_f32, T32, Torig = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
-        # Convert to Float32 for factorization using cached type
+        fact, A_gpu_f32, b_gpu_f32, u_gpu_f32 = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
+        # Compute 32-bit type on demand and convert
+        T32 = eltype(cache.A) <: Complex ? ComplexF32 : Float32
         A_f32 = T32.(cache.A)
         copyto!(A_gpu_f32, A_f32)
         fact = lu(A_gpu_f32)
-        cache.cacheval = (fact, A_gpu_f32, b_gpu_f32, u_gpu_f32, T32, Torig)
+        cache.cacheval = (fact, A_gpu_f32, b_gpu_f32, u_gpu_f32)
         cache.isfresh = false
     end
-    fact, A_gpu_f32, b_gpu_f32, u_gpu_f32, T32, Torig = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
+    fact, A_gpu_f32, b_gpu_f32, u_gpu_f32 = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
+    
+    # Compute types on demand for conversions
+    T32 = eltype(cache.A) <: Complex ? ComplexF32 : Float32
+    Torig = eltype(cache.u)
+    
     # Convert b to Float32, solve, then convert back to original precision
     b_f32 = T32.(cache.b)
     copyto!(b_gpu_f32, b_f32)
@@ -142,10 +148,9 @@ end
 function LinearSolve.init_cacheval(alg::CUDAOffload32MixedLUFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
-    # Pre-allocate with Float32 arrays and cache types
+    # Pre-allocate with Float32 arrays
     m, n = size(A)
     T32 = eltype(A) <: Complex ? ComplexF32 : Float32
-    Torig = eltype(u)
     noUnitT = typeof(zero(T32))
     luT = LinearAlgebra.lutype(noUnitT)
     ipiv = CuVector{Int32}(undef, min(m, n))
@@ -154,7 +159,7 @@ function LinearSolve.init_cacheval(alg::CUDAOffload32MixedLUFactorization, A, b,
     A_gpu_f32 = CuMatrix{T32}(undef, m, n)
     b_gpu_f32 = CuVector{T32}(undef, size(b, 1))
     u_gpu_f32 = CuVector{T32}(undef, size(u, 1))
-    return (fact, A_gpu_f32, b_gpu_f32, u_gpu_f32, T32, Torig)
+    return (fact, A_gpu_f32, b_gpu_f32, u_gpu_f32)
 end
 
 end

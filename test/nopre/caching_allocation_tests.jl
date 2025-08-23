@@ -15,7 +15,7 @@ rng = StableRNG(123)
     b3 = rand(rng, n)
     
     # Test major dense factorization algorithms
-    dense_algs = [
+    dense_algs = Any[
         LUFactorization(),
         QRFactorization(),
         CholeskyFactorization(),
@@ -24,6 +24,23 @@ rng = StableRNG(123)
         NormalCholeskyFactorization(),
         DiagonalFactorization()
     ]
+    
+    # Add mixed precision methods if available
+    if LinearSolve.usemkl
+        push!(dense_algs, MKL32MixedLUFactorization())
+    end
+    if LinearSolve.useopenblas
+        push!(dense_algs, OpenBLAS32MixedLUFactorization())
+    end
+    if Sys.isapple() && LinearSolve.appleaccelerate_isavailable()
+        push!(dense_algs, AppleAccelerate32MixedLUFactorization())
+    end
+    # Test RF32Mixed only if RecursiveFactorization is available
+    try
+        using RecursiveFactorization
+        push!(dense_algs, RF32MixedLUFactorization())
+    catch
+    end
     
     for alg in dense_algs
         @testset "$(typeof(alg))" begin

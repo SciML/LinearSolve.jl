@@ -809,7 +809,7 @@ alg = MKL32MixedLUFactorization()
 sol = solve(prob, alg)
 ```
 """
-struct MKL32MixedLUFactorization <: AbstractFactorization end
+struct MKL32MixedLUFactorization <: AbstractDenseFactorization end
 
 """
     AppleAccelerate32MixedLUFactorization()
@@ -833,7 +833,7 @@ alg = AppleAccelerate32MixedLUFactorization()
 sol = solve(prob, alg)
 ```
 """
-struct AppleAccelerate32MixedLUFactorization <: AbstractFactorization end
+struct AppleAccelerate32MixedLUFactorization <: AbstractDenseFactorization end
 
 """
     OpenBLAS32MixedLUFactorization()
@@ -857,7 +857,7 @@ alg = OpenBLAS32MixedLUFactorization()
 sol = solve(prob, alg)
 ```
 """
-struct OpenBLAS32MixedLUFactorization <: AbstractFactorization end
+struct OpenBLAS32MixedLUFactorization <: AbstractDenseFactorization end
 
 """
     RF32MixedLUFactorization{P, T}(; pivot = Val(true), thread = Val(true))

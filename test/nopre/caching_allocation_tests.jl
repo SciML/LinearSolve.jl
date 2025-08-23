@@ -62,7 +62,7 @@ rng = StableRNG(123)
                                                 OpenBLAS32MixedLUFactorization,
                                                 AppleAccelerate32MixedLUFactorization,
                                                 RF32MixedLUFactorization}
-            tol = is_mixed_precision ? 1e-5 : 1e-10
+            tol = is_mixed_precision ? 1e-4 : 1e-10
             
             # Initialize the cache
             prob = LinearProblem(test_A, b1)

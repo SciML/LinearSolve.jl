@@ -1,6 +1,8 @@
 using LinearSolve, LinearAlgebra, SparseArrays, Test, StableRNGs
 using AllocCheck
-using LinearSolve: AbstractDenseFactorization, AbstractSparseFactorization
+using LinearSolve: AbstractDenseFactorization, AbstractSparseFactorization,
+                   MKL32MixedLUFactorization, OpenBLAS32MixedLUFactorization,
+                   AppleAccelerate32MixedLUFactorization, RF32MixedLUFactorization
 using InteractiveUtils
 
 rng = StableRNG(123)
@@ -55,13 +57,20 @@ rng = StableRNG(123)
                 A
             end
             
+            # Mixed precision methods need looser tolerance
+            is_mixed_precision = alg isa Union{MKL32MixedLUFactorization, 
+                                                OpenBLAS32MixedLUFactorization,
+                                                AppleAccelerate32MixedLUFactorization,
+                                                RF32MixedLUFactorization}
+            tol = is_mixed_precision ? 1e-5 : 1e-10
+            
             # Initialize the cache
             prob = LinearProblem(test_A, b1)
             cache = init(prob, alg)
             
             # First solve - this will create the factorization
             sol1 = solve!(cache)
-            @test norm(test_A * sol1.u - b1) < 1e-10
+            @test norm(test_A * sol1.u - b1) < tol
             
             # Define the allocation-free solve function
             function solve_with_new_b!(cache, new_b)
@@ -79,11 +88,11 @@ rng = StableRNG(123)
             # Run the allocation test
             try
                 @test_nowarn solve_no_alloc!(cache, b2)
-                @test norm(test_A * cache.u - b2) < 1e-10
+                @test norm(test_A * cache.u - b2) < tol
                 
                 # Test one more time with different b
                 @test_nowarn solve_no_alloc!(cache, b3)
-                @test norm(test_A * cache.u - b3) < 1e-10
+                @test norm(test_A * cache.u - b3) < tol
             catch e
                 # Some algorithms might still allocate in certain Julia versions
                 @test_broken false

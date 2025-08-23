@@ -37,8 +37,21 @@ function LinearSolve.init_cacheval(alg::MetalOffload32MixedLUFactorization, A, b
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     # Pre-allocate with Float32 arrays
-    A_f32 = Float32.(convert(AbstractMatrix, A))
-    ArrayInterface.lu_instance(A_f32)
+    m, n = size(A)
+    if eltype(A) <: Complex
+        T = ComplexF32
+    else
+        T = Float32
+    end
+    A_f32 = similar(A, T)
+    b_f32 = similar(b, T)
+    u_f32 = similar(u, T)
+    luinst = ArrayInterface.lu_instance(rand(T, 0, 0))
+    # Pre-allocate Metal arrays
+    A_mtl = MtlArray{T}(undef, m, n)
+    b_mtl = MtlVector{T}(undef, size(b, 1))
+    u_mtl = MtlVector{T}(undef, size(u, 1))
+    return (luinst, A_f32, b_f32, u_f32, A_mtl, b_mtl, u_mtl)
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::MetalOffload32MixedLUFactorization;
@@ -46,27 +59,30 @@ function SciMLBase.solve!(cache::LinearCache, alg::MetalOffload32MixedLUFactoriz
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
-        cacheval = @get_cacheval(cache, :MetalOffload32MixedLUFactorization)
-        # Convert to Float32 for factorization
-        A_f32 = Float32.(A)
-        res = lu(MtlArray(A_f32))
-        # Store factorization on CPU with converted types
-        cache.cacheval = LU(Array(res.factors), Array{Int}(res.ipiv), res.info)
+        luinst, A_f32, b_f32, u_f32, A_mtl, b_mtl, u_mtl = @get_cacheval(cache, :MetalOffload32MixedLUFactorization)
+        # Convert to appropriate 32-bit type for factorization
+        T = eltype(A_f32)
+        A_f32 .= T.(A)
+        copyto!(A_mtl, A_f32)
+        res = lu(A_mtl)
+        # Store factorization and pre-allocated arrays
+        fact = LU(Array(res.factors), Array{Int}(res.ipiv), res.info)
+        cache.cacheval = (fact, A_f32, b_f32, u_f32, A_mtl, b_mtl, u_mtl)
         cache.isfresh = false
     end
     
-    fact = @get_cacheval(cache, :MetalOffload32MixedLUFactorization)
-    # Convert b to Float32 for solving
-    b_f32 = Float32.(cache.b)
-    u_f32 = similar(b_f32)
+    fact, A_f32, b_f32, u_f32, A_mtl, b_mtl, u_mtl = @get_cacheval(cache, :MetalOffload32MixedLUFactorization)
+    # Convert b to 32-bit for solving
+    T = eltype(b_f32)
+    b_f32 .= T.(cache.b)
     
     # Create a temporary Float32 LU factorization for solving
-    fact_f32 = LU(Float32.(fact.factors), fact.ipiv, fact.info)
+    fact_f32 = LU(T.(fact.factors), fact.ipiv, fact.info)
     ldiv!(u_f32, fact_f32, b_f32)
     
     # Convert back to original precision
-    T = eltype(cache.u)
-    cache.u .= T.(u_f32)
+    T_orig = eltype(cache.u)
+    cache.u .= T_orig.(u_f32)
     SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
 end
 

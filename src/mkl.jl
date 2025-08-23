@@ -283,13 +283,12 @@ function LinearSolve.init_cacheval(alg::MKL32MixedLUFactorization, A, b, u, Pl, 
     # Pre-allocate appropriate 32-bit arrays based on input type
     m, n = size(A)
     T32 = eltype(A) <: Complex ? ComplexF32 : Float32
-    Torig = eltype(u)
     A_32 = similar(A, T32)
     b_32 = similar(b, T32)
     u_32 = similar(u, T32)
     luinst = ArrayInterface.lu_instance(rand(T32, 0, 0))
-    # Return tuple with pre-allocated arrays and cached types
-    (luinst, Ref{BlasInt}(), A_32, b_32, u_32, T32, Torig)
+    # Return tuple with pre-allocated arrays
+    (luinst, Ref{BlasInt}(), A_32, b_32, u_32)
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::MKL32MixedLUFactorization;
@@ -301,11 +300,12 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKL32MixedLUFactorization;
 
     if cache.isfresh
         # Get pre-allocated arrays from cacheval
-        luinst, info, A_32, b_32, u_32, T32, Torig = @get_cacheval(cache, :MKL32MixedLUFactorization)
-        # Copy A to pre-allocated 32-bit array using cached type
+        luinst, info, A_32, b_32, u_32 = @get_cacheval(cache, :MKL32MixedLUFactorization)
+        # Compute 32-bit type on demand and copy A
+        T32 = eltype(A) <: Complex ? ComplexF32 : Float32
         A_32 .= T32.(A)
         res = getrf!(A_32; ipiv = luinst.ipiv, info = info)
-        fact = (LU(res[1:3]...), res[4], A_32, b_32, u_32, T32, Torig)
+        fact = (LU(res[1:3]...), res[4], A_32, b_32, u_32)
         cache.cacheval = fact
 
         if !LinearAlgebra.issuccess(fact[1])
@@ -315,21 +315,25 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKL32MixedLUFactorization;
         cache.isfresh = false
     end
 
-    A_lu, info, A_32, b_32, u_32, T32, Torig = @get_cacheval(cache, :MKL32MixedLUFactorization)
+    A_lu, info, A_32, b_32, u_32 = @get_cacheval(cache, :MKL32MixedLUFactorization)
     require_one_based_indexing(cache.u, cache.b)
     m, n = size(A_lu, 1), size(A_lu, 2)
 
-    # Copy b to pre-allocated 32-bit array using cached type
+    # Compute types on demand for conversions
+    T32 = eltype(A) <: Complex ? ComplexF32 : Float32
+    Torig = eltype(cache.u)
+    
+    # Copy b to pre-allocated 32-bit array
     b_32 .= T32.(cache.b)
 
     if m > n
         getrs!('N', A_lu.factors, A_lu.ipiv, b_32; info)
-        # Convert back to original precision using cached type
+        # Convert back to original precision
         cache.u[1:n] .= Torig.(b_32[1:n])
     else
         copyto!(u_32, b_32)
         getrs!('N', A_lu.factors, A_lu.ipiv, u_32; info)
-        # Convert back to original precision using cached type
+        # Convert back to original precision
         cache.u .= Torig.(u_32)
     end
 

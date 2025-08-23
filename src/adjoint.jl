@@ -84,7 +84,7 @@ function CRC.rrule(::typeof(SciMLBase.solve), prob::LinearProblem,
         end
 
         tu = adjoint(sol.u)
-        ∂A = BroadcastArray(@~ .-(λ .* tu))
+        ∂A = .-(λ .* tu)
         ∂b = λ
         ∂prob = LinearProblem(∂A, ∂b, ∂∅)
 

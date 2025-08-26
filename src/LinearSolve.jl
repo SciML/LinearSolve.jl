@@ -174,7 +174,7 @@ end
 
         y = _ldiv!(cache.u, @get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
             cache.b)
-        return SciMLBase.build_linear_solution(alg, y, nothing, cache)
+        return SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
     end
 end
 
@@ -196,7 +196,7 @@ for kralg in (Krylov.lsmr!, Krylov.craigmr!)
 end
 for alg in (:LUFactorization, :FastLUFactorization, :SVDFactorization,
     :GenericFactorization, :GenericLUFactorization, :SimpleLUFactorization,
-    :RFLUFactorization, :UMFPACKFactorization, :KLUFactorization, :SparspakFactorization,
+    :RFLUFactorization, :ButterflyFactorization, :UMFPACKFactorization, :KLUFactorization, :SparspakFactorization,
     :DiagonalFactorization, :CholeskyFactorization, :BunchKaufmanFactorization,
     :CHOLMODFactorization, :LDLtFactorization, :AppleAccelerateLUFactorization,
     :MKLLUFactorization, :MetalLUFactorization)
@@ -223,7 +223,7 @@ error_no_cudss_lu(A) = nothing
 cudss_loaded(A) = false
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
-       GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
+       GenericLUFactorization, SimpleLUFactorization, RFLUFactorization, ButterflyFactorization,
        NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
        UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization,
        SparspakFactorization, DiagonalFactorization, CholeskyFactorization,

@@ -107,6 +107,28 @@ function RFLUFactorization(; pivot = Val(true), thread = Val(true), throwerror =
     RFLUFactorization(pivot, thread; throwerror)
 end
 
+"""
+`ButterflyFactorization()`
+
+A fast pure Julia LU-factorization implementation
+using RecursiveFactorization.jl. This approach utilizes a butterly 
+factorization approach rather than pivoting. 
+"""
+struct ButterflyFactorization{T} <: AbstractDenseFactorization
+    function ButterflyFactorization(::Val{T}; throwerror = true) where {T}
+        if !userecursivefactorization(nothing)
+            throwerror &&
+                error("ButterflyFactorization requires that RecursiveFactorization.jl is loaded, i.e. `using RecursiveFactorization`")
+        end
+        new{T}()
+    end
+end
+
+function ButterflyFactorization(; thread = Val(true), throwerror = true)
+    ButterflyFactorization(thread; throwerror)
+end
+
+
 # There's no options like pivot here.
 # But I'm not sure it makes sense as a GenericFactorization
 # since it just uses `LAPACK.getrf!`.

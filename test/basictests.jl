@@ -679,3 +679,34 @@ end
     u = solve!(cache)
     @test norm(u - u0, Inf) < 1.0e-8
 end
+
+@testset "ParallelSolves" begin
+    n=1000
+    @info "ParallelSolves: Threads.nthreads()=$(Threads.nthreads())"
+    A_sparse = 10I - sprand(n, n, 0.01)
+    B = [rand(n), rand(n)]
+    U = [A_sparse \ B[i] for i in 1:2]
+    sol = similar(U)
+
+    Threads.@threads for i in 1:2
+        sol[i] = solve(LinearProblem(A_sparse, B[i]), UMFPACKFactorization())
+    end
+
+    for i in 1:2
+        @test sol[i] ≈ U[i]
+    end
+    
+    Threads.@threads for i in 1:2
+        sol[i] = solve(LinearProblem(A_sparse, B[i]), KLUFactorization())
+    end
+    for i in 1:2
+        @test sol[i] ≈ U[i]
+    end
+
+    Threads.@threads for i in 1:2
+        sol[i] = solve(LinearProblem(A_sparse, B[i]), SparspakFactorization())
+    end
+    for i in 1:2
+        @test sol[i] ≈ U[i]
+    end
+end

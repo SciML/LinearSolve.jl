@@ -15,9 +15,18 @@ function test_algorithm_compatibility(alg, eltype::Type, test_size::Int = 4)
     alg_name = string(typeof(alg).name.name)
 
     # Define strict compatibility rules for BLAS-dependent algorithms
+    # Standard BLAS algorithms that rely on LinearAlgebra.BLAS interface
     if !(eltype <: LinearAlgebra.BLAS.BlasFloat) && alg_name in [
-        "BLISFactorization", "MKLLUFactorization", "AppleAccelerateLUFactorization"]
-        return false  # BLAS algorithms not compatible with non-standard types
+        "LUFactorization", "QRFactorization", "CHOLMODFactorization"]
+        return false  # Standard BLAS algorithms not compatible with non-standard types
+    end
+
+    # Manual BLAS wrappers with explicit method signatures for specific types only
+    # These bypass Julia's BLAS interface and have hardcoded ccall signatures
+    if alg_name in [
+        "BLISLUFactorization", "MKLLUFactorization", "AppleAccelerateLUFactorization"] &&
+       !(eltype in [Float32, Float64, ComplexF32, ComplexF64])
+        return false  # Manual BLAS wrappers only have methods for Float32/64, ComplexF32/64
     end
 
     if alg_name == "BLISLUFactorization" && Sys.isapple()

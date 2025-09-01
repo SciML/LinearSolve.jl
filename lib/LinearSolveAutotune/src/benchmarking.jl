@@ -110,8 +110,7 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
     progress = Progress(total_benchmarks, desc="Benchmarking: ", 
                        barlen=50, showspeed=true)
 
-    try
-        for eltype in eltypes
+    for eltype in eltypes
             # Initialize blocked algorithms dict for this element type
             blocked_algorithms[string(eltype)] = Dict{String, Int}()
             
@@ -233,10 +232,13 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
                                     error_msg = "Insufficient time for benchmarking"
                                 else
                                     # Actual benchmark
-                                    bench = @benchmark solve($prob, $alg) setup=(prob = LinearProblem(
+                                    # Create benchmark with custom parameters
+                                    bench_params = BenchmarkTools.Parameters(;seconds=seconds, samples=samples)
+                                    b = @benchmarkable solve($prob, $alg) setup=(prob = LinearProblem(
                                         copy($A), copy($b);
                                         u0 = copy($u0),
-                                        alias = LinearAliasSpecifier(alias_A = true, alias_b = true))) seconds=$seconds samples=$samples
+                                        alias = LinearAliasSpecifier(alias_A = true, alias_b = true)))
+                                    bench = BenchmarkTools.run(b, bench_params)
 
                                     # Calculate GFLOPs
                                     min_time_sec = minimum(bench.times) / 1e9
@@ -268,8 +270,7 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
                     ProgressMeter.next!(progress)
                 end
             end
-        end
-
+    end
 
     return DataFrame(results_data)
 end

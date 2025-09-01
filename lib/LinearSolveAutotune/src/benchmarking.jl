@@ -87,10 +87,9 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
         samples = 5, seconds = 0.5, sizes = [:tiny, :small, :medium, :large],
         check_correctness = true, correctness_tol = 1e0, maxtime = 100.0)
 
-    # Set benchmark parameters
-    old_params = BenchmarkTools.DEFAULT_PARAMETERS
-    BenchmarkTools.DEFAULT_PARAMETERS.seconds = seconds
-    BenchmarkTools.DEFAULT_PARAMETERS.samples = samples
+    # Note: We pass benchmark parameters directly to @benchmark instead of 
+    # modifying BenchmarkTools.DEFAULT_PARAMETERS to avoid const assignment 
+    # errors in Julia 1.12+
 
     # Initialize results DataFrame
     results_data = []
@@ -237,7 +236,7 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
                                     bench = @benchmark solve($prob, $alg) setup=(prob = LinearProblem(
                                         copy($A), copy($b);
                                         u0 = copy($u0),
-                                        alias = LinearAliasSpecifier(alias_A = true, alias_b = true)))
+                                        alias = LinearAliasSpecifier(alias_A = true, alias_b = true))) seconds=$seconds samples=$samples
 
                                     # Calculate GFLOPs
                                     min_time_sec = minimum(bench.times) / 1e9
@@ -271,10 +270,6 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
             end
         end
 
-    finally
-        # Restore original benchmark parameters
-        BenchmarkTools.DEFAULT_PARAMETERS = old_params
-    end
 
     return DataFrame(results_data)
 end

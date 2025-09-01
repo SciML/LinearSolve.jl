@@ -24,10 +24,24 @@ function test_algorithm_compatibility(alg, eltype::Type, test_size::Int = 4)
         return false  # BLISLUFactorization has no Apple Silicon binary
     end
 
-    # Metal algorithms only support Float32 - prevent Float16 usage to avoid segfaults
-    if alg_name in ["MetalLUFactorization", "MetalOffload32MixedLUFactorization"] &&
-       eltype == Float16
+    # GPU algorithms with limited Float16 support - prevent usage to avoid segfaults/errors
+
+    # Metal algorithms: Only MetalLUFactorization has issues with Float16, mixed precision should work
+    if alg_name == "MetalLUFactorization" && eltype == Float16
         return false  # Metal Performance Shaders only support Float32, not Float16
+    end
+
+    # CUDA algorithms: Direct GPU algorithms don't support Float16, but mixed precision should work
+    if alg_name in [
+        "CudaOffloadLUFactorization", "CudaOffloadQRFactorization", "CudaOffloadFactorization"] &&
+       eltype == Float16
+        return false  # cuSOLVER factorization routines don't support Float16
+    end
+
+    # AMD GPU algorithms: Direct GPU factorization doesn't support Float16
+    if alg_name in ["AMDGPUOffloadLUFactorization", "AMDGPUOffloadQRFactorization"] &&
+       eltype == Float16
+        return false  # rocSOLVER factorization Float16 support is limited
     end
 
     # For standard types or algorithms that passed the strict check, test functionality

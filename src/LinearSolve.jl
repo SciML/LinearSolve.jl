@@ -434,7 +434,10 @@ appleaccelerate_isavailable() = HAS_APPLE_ACCELERATE[]
 
 # Extension availability checking functions
 useblis() = Base.get_extension(@__MODULE__, :LinearSolveBLISExt) !== nothing
-usecuda() = Base.get_extension(@__MODULE__, :LinearSolveCUDAExt) !== nothing
+function usecuda()
+   ext = Base.get_extension(@__MODULE__, :LinearSolveCUDAExt)
+   !isnothing(ext) && ext.CUDA.functional()
+end
 
 # Metal is only available on Apple platforms
 @static if !Sys.isapple()

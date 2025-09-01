@@ -4,13 +4,13 @@ using Metal, LinearSolve
 using LinearAlgebra, SciMLBase
 using SciMLBase: AbstractSciMLOperator
 using LinearSolve: ArrayInterface, MKLLUFactorization, MetalOffload32MixedLUFactorization, 
-                   @get_cacheval, LinearCache, SciMLBase, OperatorAssumptions
+                   @get_cacheval, LinearCache, SciMLBase, OperatorAssumptions, LinearVerbosity
 
 default_alias_A(::MetalLUFactorization, ::Any, ::Any) = false
 default_alias_b(::MetalLUFactorization, ::Any, ::Any) = false
 
 function LinearSolve.init_cacheval(alg::MetalLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
+        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
         assumptions::OperatorAssumptions)
     ArrayInterface.lu_instance(convert(AbstractMatrix, A))
 end
@@ -34,7 +34,7 @@ default_alias_A(::MetalOffload32MixedLUFactorization, ::Any, ::Any) = false
 default_alias_b(::MetalOffload32MixedLUFactorization, ::Any, ::Any) = false
 
 function LinearSolve.init_cacheval(alg::MetalOffload32MixedLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
+        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
         assumptions::OperatorAssumptions)
     # Pre-allocate with Float32 arrays
     m, n = size(A)

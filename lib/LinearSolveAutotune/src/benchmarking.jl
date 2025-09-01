@@ -24,7 +24,8 @@ function test_algorithm_compatibility(alg, eltype::Type, test_size::Int = 4)
     # Manual BLAS wrappers with explicit method signatures for specific types only
     # These bypass Julia's BLAS interface and have hardcoded ccall signatures
     if alg_name in [
-        "BLISLUFactorization", "MKLLUFactorization", "AppleAccelerateLUFactorization"] &&
+        "BLISLUFactorization", "MKLLUFactorization", "AppleAccelerateLUFactorization",
+        "OpenBLASLUFactorization"] &&
        !(eltype in [Float32, Float64, ComplexF32, ComplexF64])
         return false  # Manual BLAS wrappers only have methods for Float32/64, ComplexF32/64
     end

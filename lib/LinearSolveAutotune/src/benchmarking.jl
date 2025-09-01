@@ -44,6 +44,23 @@ function test_algorithm_compatibility(alg, eltype::Type, test_size::Int = 4)
         return false  # rocSOLVER factorization Float16 support is limited
     end
 
+    # Sparse factorization algorithms: Most don't support Float16
+    if alg_name in ["UMFPACKFactorization", "KLUFactorization"] && eltype == Float16
+        return false  # SuiteSparse UMFPACK/KLU don't support Float16
+    end
+
+    # PARDISO algorithms: Only support single/double precision
+    if alg_name in ["MKLPardisoFactorize", "MKLPardisoIterate",
+        "PanuaPardisoFactorize", "PanuaPardisoIterate", "PardisoJL"] &&
+       eltype == Float16
+        return false  # PARDISO only supports Float32/Float64
+    end
+
+    # CUSOLVERRF: Specifically requires Float64/Int32
+    if alg_name == "CUSOLVERRFFactorization" && eltype == Float16
+        return false  # cuSOLVERRF requires Float64
+    end
+
     # For standard types or algorithms that passed the strict check, test functionality
     try
         # Create a small test problem with the specified element type

@@ -57,16 +57,30 @@ function EnzymeRules.forward(
             return nothing
         end
     end
+    # Forward differentiation for Krylov methods
+    # For y = A⁻¹b, we have dy/dt = A⁻¹(db/dt - dA/dt * y)
     if linsolve.val.alg isa LinearSolve.AbstractKrylovSubspaceMethod
-        error("Algorithm $(_linsolve.alg) is currently not supported by Enzyme rules on LinearSolve.jl. Please open an issue on LinearSolve.jl detailing which algorithm is missing the adjoint handling")
+        # Compute dA * res to get the contribution from dA
+        dA_times_res = linsolve.dval.A * res.u
+        # Create the RHS: db - dA * res
+        new_b = linsolve.dval.b - dA_times_res
+        # Create a new linear problem with the original A and the new RHS
+        forward_prob = LinearSolve.LinearProblem(linsolve.val.A, new_b)
+        # Solve using the same algorithm and create result with same structure as res
+        forward_sol = solve(forward_prob, linsolve.val.alg;
+            abstol = linsolve.val.abstol,
+            reltol = linsolve.val.reltol,
+            verbose = linsolve.val.verbose)
+        dres = deepcopy(res)
+        dres.u .= forward_sol.u
+    else
+        res = deepcopy(res)  # Without this copy, the next solve will end up mutating the result
+
+        b = linsolve.val.b
+        linsolve.val.b = linsolve.dval.b - linsolve.dval.A * res.u
+        dres = func.val(linsolve.val; kwargs...)
+        linsolve.val.b = b
     end
-
-    res = deepcopy(res)  # Without this copy, the next solve will end up mutating the result
-
-    b = linsolve.val.b
-    linsolve.val.b = linsolve.dval.b - linsolve.dval.A * res.u
-    dres = func.val(linsolve.val; kwargs...)
-    linsolve.val.b = b
 
     if EnzymeRules.needs_primal(config) && EnzymeRules.needs_shadow(config)
         return Duplicated(res, dres)

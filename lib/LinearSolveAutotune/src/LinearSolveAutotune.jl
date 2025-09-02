@@ -3,6 +3,7 @@ module LinearSolveAutotune
 # Ensure MKL is available for benchmarking by setting the preference before loading LinearSolve
 using Preferences
 using MKL_jll
+using OpenBLAS_jll
 
 # Set MKL preference to true for benchmarking if MKL is available
 # We need to use UUID instead of the module since LinearSolve isn't loaded yet

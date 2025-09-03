@@ -979,9 +979,9 @@ version = "1.11.0"
 
 [[deps.LinearSolve]]
 deps = ["ArrayInterface", "ChainRulesCore", "ConcreteStructs", "DocStringExtensions", "EnumX", "GPUArraysCore", "InteractiveUtils", "Krylov", "LazyArrays", "Libdl", "LinearAlgebra", "MKL_jll", "Markdown", "OpenBLAS_jll", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLOperators", "Setfield", "StaticArraysCore", "UnPack"]
-path = "/home/runner/work/LinearSolve.jl/LinearSolve.jl"
+path = "/home/chrisrackauckas/github-runners/deepsea3-23/_work/LinearSolve.jl/LinearSolve.jl"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
-version = "3.39.0"
+version = "3.39.1"
 
     [deps.LinearSolve.extensions]
     LinearSolveAMDGPUExt = "AMDGPU"
@@ -1031,10 +1031,10 @@ version = "3.39.0"
     blis_jll = "6136c539-28a5-5bf0-87cc-b183200dce32"
 
 [[deps.LinearSolveAutotune]]
-deps = ["Base64", "BenchmarkTools", "CPUSummary", "CUDA", "DataFrames", "Dates", "FastLapackInterface", "GitHub", "LAPACK_jll", "LinearAlgebra", "LinearSolve", "MKL_jll", "Metal", "Pkg", "Plots", "Preferences", "PrettyTables", "Printf", "ProgressMeter", "Random", "RecursiveFactorization", "Statistics", "Test", "blis_jll", "gh_cli_jll"]
-git-tree-sha1 = "bb145f5a2837fcf995309479f7ecaa6e6167d0ef"
+deps = ["Base64", "BenchmarkTools", "CPUSummary", "CUDA", "DataFrames", "Dates", "FastLapackInterface", "GitHub", "LAPACK_jll", "LinearAlgebra", "LinearSolve", "MKL_jll", "Metal", "OpenBLAS_jll", "Pkg", "Plots", "Preferences", "PrettyTables", "Printf", "ProgressMeter", "Random", "RecursiveFactorization", "Statistics", "Test", "blis_jll", "gh_cli_jll"]
+git-tree-sha1 = "94daa82e7745426e039151d7d85b29c14e74b1d7"
 uuid = "67398393-80e8-4254-b7e4-1b9a36a3c5b6"
-version = "1.8.0"
+version = "1.9.0"
 
 [[deps.LogExpFunctions]]
 deps = ["DocStringExtensions", "IrrationalConstants", "LinearAlgebra"]
@@ -1512,9 +1512,9 @@ version = "0.6.43"
 
 [[deps.SciMLBase]]
 deps = ["ADTypes", "Accessors", "Adapt", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "Moshi", "PreallocationTools", "PrecompileTools", "Preferences", "Printf", "RecipesBase", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SciMLOperators", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface"]
-git-tree-sha1 = "8fb66de06c21a4dfb5d08bb59f37dc597e4b0f9e"
+git-tree-sha1 = "c6a1d810a34d342a73b3b39ebf67788ee608b735"
 uuid = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
-version = "2.115.0"
+version = "2.116.0"
 
     [deps.SciMLBase.extensions]
     SciMLBaseChainRulesCoreExt = "ChainRulesCore"
@@ -1522,6 +1522,7 @@ version = "2.115.0"
     SciMLBaseForwardDiffExt = "ForwardDiff"
     SciMLBaseMLStyleExt = "MLStyle"
     SciMLBaseMakieExt = "Makie"
+    SciMLBaseMeasurementsExt = "Measurements"
     SciMLBaseMonteCarloMeasurementsExt = "MonteCarloMeasurements"
     SciMLBaseMooncakeExt = "Mooncake"
     SciMLBasePartialFunctionsExt = "PartialFunctions"

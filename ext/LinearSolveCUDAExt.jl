@@ -53,6 +53,11 @@ end
 function LinearSolve.init_cacheval(alg::CudaOffloadLUFactorization, A::AbstractArray, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
+    # Check if CUDA is functional before creating CUDA arrays
+    if !CUDA.functional()
+        return nothing
+    end
+    
     T = eltype(A)
     noUnitT = typeof(zero(T))
     luT = LinearAlgebra.lutype(noUnitT)
@@ -76,6 +81,11 @@ end
 function LinearSolve.init_cacheval(alg::CudaOffloadQRFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
+    # Check if CUDA is functional before creating CUDA arrays
+    if !CUDA.functional()
+        return nothing
+    end
+    
     qr(CUDA.CuArray(A))
 end
 

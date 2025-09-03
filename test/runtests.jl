@@ -18,6 +18,7 @@ if GROUP == "All" || GROUP == "Core"
     @time @safetestset "ForwardDiff Overloads" include("forwarddiff_overloads.jl")
     @time @safetestset "Traits" include("traits.jl")
     @time @safetestset "BandedMatrices" include("banded.jl")
+    @time @safetestset "Issue #771: AutoTune Failures" include("test_issue_771_autotune_failures.jl")
 end
 
 # Don't run Enzyme tests on prerelease

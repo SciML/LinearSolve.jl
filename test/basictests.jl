@@ -290,7 +290,7 @@ end
         
         # Test that default algorithm uses LDLtFactorization for SymTridiagonal
         default_alg = LinearSolve.defaultalg(A_tri, b, OperatorAssumptions(true))
-        @test default_alg isa DefaultLinearSolver
+        @test default_alg isa LinearSolve.DefaultLinearSolver
         @test default_alg.alg == LinearSolve.DefaultAlgorithmChoice.LDLtFactorization
         
         # Test that the factorization is cached and reused

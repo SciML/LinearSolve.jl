@@ -1,7 +1,7 @@
 name = "LinearSolveAutotune"
 uuid = "67398393-80e8-4254-b7e4-1b9a36a3c5b6"
 authors = ["SciML"]
-version = "1.9.0"
+version = "1.10.0"
 
 [sources]
 LinearSolve = {path = "../.."}
@@ -45,7 +45,7 @@ FastLapackInterface = "2"
 GitHub = "5"
 LAPACK_jll = "3"
 LinearAlgebra = "1"
-LinearSolve = "3"
+LinearSolve = "3.39.2"
 MKL_jll = "2025.2.0"
 Metal = "1"
 OpenBLAS_jll = "0.3"

@@ -215,15 +215,15 @@ version = "5.8.3"
 
 [[deps.CUDA_Compiler_jll]]
 deps = ["Artifacts", "CUDA_Driver_jll", "CUDA_Runtime_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "TOML"]
-git-tree-sha1 = "364b9e74288455271aca84ba46fe4cec01f06b1e"
+git-tree-sha1 = "329f947fd13bc83e8eb83d3020271b594d568a79"
 uuid = "d1e2174e-dfdc-576e-b43e-73b79eb1aca8"
-version = "0.2.0+2"
+version = "0.2.0+3"
 
 [[deps.CUDA_Driver_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "12621de83838b5ce6a185050db5a184f4540679b"
+git-tree-sha1 = "da180687151a8a69d3c783c6f0a576e71c6de369"
 uuid = "4ee394cb-3365-5eb0-8335-949819d2adfc"
-version = "13.0.0+0"
+version = "13.0.0+1"
 
 [[deps.CUDA_Runtime_Discovery]]
 deps = ["Libdl"]
@@ -565,9 +565,15 @@ version = "3.4.0+2"
 
 [[deps.GPUArrays]]
 deps = ["Adapt", "GPUArraysCore", "KernelAbstractions", "LLVM", "LinearAlgebra", "Printf", "Random", "Reexport", "ScopedValues", "Serialization", "Statistics"]
-git-tree-sha1 = "be941842a40b6daac98496994ea69054ba4c5144"
+git-tree-sha1 = "0b6c695edc49ed61dfa322639354ff5a6e2c9a32"
 uuid = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7"
-version = "11.2.3"
+version = "11.2.4"
+
+    [deps.GPUArrays.extensions]
+    JLD2Ext = "JLD2"
+
+    [deps.GPUArrays.weakdeps]
+    JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 
 [[deps.GPUArraysCore]]
 deps = ["Adapt"]
@@ -979,7 +985,7 @@ version = "1.11.0"
 
 [[deps.LinearSolve]]
 deps = ["ArrayInterface", "ChainRulesCore", "ConcreteStructs", "DocStringExtensions", "EnumX", "GPUArraysCore", "InteractiveUtils", "Krylov", "LazyArrays", "Libdl", "LinearAlgebra", "MKL_jll", "Markdown", "OpenBLAS_jll", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLOperators", "Setfield", "StaticArraysCore", "UnPack"]
-path = "/home/runner/work/LinearSolve.jl/LinearSolve.jl"
+path = "/home/chrisrackauckas/github-runners/demeter4-2/_work/LinearSolve.jl/LinearSolve.jl"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 version = "3.39.2"
 
@@ -1032,9 +1038,9 @@ version = "3.39.2"
 
 [[deps.LinearSolveAutotune]]
 deps = ["Base64", "BenchmarkTools", "CPUSummary", "CUDA", "DataFrames", "Dates", "FastLapackInterface", "GitHub", "LAPACK_jll", "LinearAlgebra", "LinearSolve", "MKL_jll", "Metal", "OpenBLAS_jll", "Pkg", "Plots", "Preferences", "PrettyTables", "Printf", "ProgressMeter", "Random", "RecursiveFactorization", "Statistics", "Test", "blis_jll", "gh_cli_jll"]
-git-tree-sha1 = "94daa82e7745426e039151d7d85b29c14e74b1d7"
+git-tree-sha1 = "47651518d7bccf1369e7c75048d5888533fcbb2f"
 uuid = "67398393-80e8-4254-b7e4-1b9a36a3c5b6"
-version = "1.9.0"
+version = "1.10.0"
 
 [[deps.LogExpFunctions]]
 deps = ["DocStringExtensions", "IrrationalConstants", "LinearAlgebra"]
@@ -1512,9 +1518,9 @@ version = "0.6.43"
 
 [[deps.SciMLBase]]
 deps = ["ADTypes", "Accessors", "Adapt", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "Moshi", "PreallocationTools", "PrecompileTools", "Preferences", "Printf", "RecipesBase", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SciMLOperators", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface"]
-git-tree-sha1 = "c6a1d810a34d342a73b3b39ebf67788ee608b735"
+git-tree-sha1 = "22fe9959fcca0e0d03d21dd6c62a66f119454e49"
 uuid = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
-version = "2.116.0"
+version = "2.116.2"
 
     [deps.SciMLBase.extensions]
     SciMLBaseChainRulesCoreExt = "ChainRulesCore"

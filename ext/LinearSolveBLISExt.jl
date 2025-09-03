@@ -203,7 +203,7 @@ const PREALLOCATED_BLIS_LU = begin
     luinst = ArrayInterface.lu_instance(A), Ref{BlasInt}()
 end
 
-function LinearSolve.init_cacheval(alg::BLISLUFactorization, A, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(alg::BLISLUFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
     PREALLOCATED_BLIS_LU

@@ -275,6 +275,37 @@ end
         # ws sizes.
     end
 
+    @testset "SymTridiagonal with LDLtFactorization" begin
+        # Test that LDLtFactorization works correctly with SymTridiagonal
+        # and that the default algorithm correctly selects it
+        k = 100
+        ρ = 0.95
+        A_tri = SymTridiagonal(ones(k) .+ ρ^2, -ρ * ones(k-1))
+        b = rand(k)
+        
+        # Test with explicit LDLtFactorization
+        prob_tri = LinearProblem(A_tri, b)
+        sol = solve(prob_tri, LDLtFactorization())
+        @test A_tri * sol.u ≈ b
+        
+        # Test that default algorithm uses LDLtFactorization for SymTridiagonal
+        default_alg = LinearSolve.defaultalg(A_tri, b, OperatorAssumptions(true))
+        @test default_alg isa LinearSolve.DefaultLinearSolver
+        @test default_alg.alg == LinearSolve.DefaultAlgorithmChoice.LDLtFactorization
+        
+        # Test that the factorization is cached and reused
+        cache = init(prob_tri, LDLtFactorization())
+        sol1 = solve!(cache)
+        @test A_tri * sol1.u ≈ b
+        @test !cache.isfresh  # Cache should not be fresh after first solve
+        
+        # Solve again with same matrix to ensure cache is reused
+        cache.b = rand(k)  # Change RHS
+        sol2 = solve!(cache)
+        @test A_tri * sol2.u ≈ cache.b
+        @test !cache.isfresh  # Cache should still not be fresh
+    end
+
     test_algs = [
         LUFactorization(),
         QRFactorization(),

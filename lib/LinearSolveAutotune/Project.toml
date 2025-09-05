@@ -1,7 +1,7 @@
 name = "LinearSolveAutotune"
 uuid = "67398393-80e8-4254-b7e4-1b9a36a3c5b6"
 authors = ["SciML"]
-version = "1.10.0"
+version = "1.10.1"
 
 [sources]
 LinearSolve = {path = "../.."}

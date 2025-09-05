@@ -285,11 +285,11 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
                                     # Actual benchmark
                                     # Create benchmark with custom parameters
                                     bench_params = BenchmarkTools.Parameters(;seconds=seconds, samples=samples)
-                                    b = @benchmarkable solve($prob, $alg) setup=(prob = LinearProblem(
+                                    _bench = @benchmarkable solve($prob, $alg) setup=(prob = LinearProblem(
                                         copy($A), copy($b);
                                         u0 = copy($u0),
                                         alias = LinearAliasSpecifier(alias_A = true, alias_b = true)))
-                                    bench = BenchmarkTools.run(b, bench_params)
+                                    bench = BenchmarkTools.run(_bench, bench_params)
 
                                     # Calculate GFLOPs
                                     min_time_sec = minimum(bench.times) / 1e9

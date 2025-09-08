@@ -41,6 +41,14 @@ LinearSolve.@concrete mutable struct DualLinearCache{DT}
     partials_b
     partials_u
 
+    # Cached lists of partials to avoid repeated allocations
+    partials_A_list
+    partials_b_list
+
+    # Cached intermediate values for calculations
+    Auu_list
+    rhs_list
+
     dual_A
     dual_b
     dual_u
@@ -49,7 +57,7 @@ end
 function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwargs...)
     # Solve the primal problem
     dual_u0 = copy(cache.linear_cache.u)
-    sol = solve!(cache.linear_cache, alg, args...; kwargs...)
+    sol = solve!(cache.linear_cache, alg, args...; kwargs...)  
     primal_b = copy(cache.linear_cache.b)
     uu = sol.u
 
@@ -65,7 +73,9 @@ function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwa
     ∂_A = cache.partials_A
     ∂_b = cache.partials_b
 
-    rhs_list = xp_linsolve_rhs(uu, ∂_A, ∂_b)
+    xp_linsolve_rhs!(uu, ∂_A, ∂_b, cache)
+
+    rhs_list = cache.rhs_list
 
     cache.linear_cache.u = dual_u0
     # We can reuse the linear cache, because the same factorization will work for the partials.
@@ -82,29 +92,64 @@ function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwa
     primal_sol, partial_sols
 end
 
-function xp_linsolve_rhs(uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}},
-        ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}})
-    A_list = partials_to_list(∂_A)
-    b_list = partials_to_list(∂_b)
+function xp_linsolve_rhs!(uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}},
+        ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}}, cache::DualLinearCache)
 
-    Auu = [A * uu for A in A_list]
+    # Update cached partials lists
+    update_partials_list!(∂_A, cache.partials_A_list)
+    update_partials_list!(∂_b, cache.partials_b_list)
 
-    return b_list .- Auu
+    A_list = cache.partials_A_list
+    b_list = cache.partials_b_list
+
+    # Compute A*uu products using cached storage
+    for i in eachindex(A_list)
+        mul!(cache.Auu_list[i], A_list[i], uu)
+    end
+
+    # Compute rhs using cached storage
+    for i in eachindex(b_list)
+        cache.rhs_list[i] .= b_list[i] .- cache.Auu_list[i]
+    end
+
+    return cache.rhs_list
 end
 
-function xp_linsolve_rhs(
-        uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}}, ∂_b::Nothing)
-    A_list = partials_to_list(∂_A)
+function xp_linsolve_rhs!(
+        uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}},
+        ∂_b::Nothing, cache::DualLinearCache)
 
-    Auu = [A * uu for A in A_list]
+    # Update cached partials list for A
+    update_partials_list!(∂_A, cache.partials_A_list)
+    A_list = cache.partials_A_list
 
-    return -Auu
+    # Compute A*uu products using cached storage
+    for i in eachindex(A_list)
+        mul!(cache.Auu_list[i], A_list[i], uu)
+    end
+
+    # Compute rhs using cached storage (negative of A*uu)
+    for i in eachindex(A_list)
+        cache.rhs_list[i] .= .-cache.Auu_list[i]
+    end
+
+    return cache.rhs_list
 end
 
-function xp_linsolve_rhs(
-        uu, ∂_A::Nothing, ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}})
-    b_list = partials_to_list(∂_b)
-    b_list
+function xp_linsolve_rhs!(
+        uu, ∂_A::Nothing, ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}},
+        cache::DualLinearCache)
+
+    # Update cached partials list for b
+    update_partials_list!(∂_b, cache.partials_b_list)
+    b_list = cache.partials_b_list
+
+    # Copy b_list to rhs_list
+    for i in eachindex(b_list)
+        cache.rhs_list[i] .= b_list[i]
+    end
+
+    return cache.rhs_list
 end
 
 function linearsolve_dual_solution(
@@ -126,7 +171,7 @@ end
 
 # Opt out for GenericLUFactorization
 function SciMLBase.init(prob::DualAbstractLinearProblem, alg::GenericLUFactorization, args...; kwargs...)
-    return __init(prob,alg, args...; kwargs...)
+    return __init(prob, alg, args...; kwargs...)
 end
 
 function __dual_init(
@@ -166,8 +211,39 @@ function __dual_init(
         alias = alias, abstol = abstol, reltol = reltol,
         maxiters = maxiters, verbose = verbose, Pl = Pl, Pr = Pr, assumptions = assumptions,
         sensealg = sensealg, u0 = new_u0, kwargs...)
-    return DualLinearCache{dual_type}(non_partial_cache, ∂_A, ∂_b,
-        !isnothing(∂_b) ? zero.(∂_b) : ∂_b, A, b, zeros(dual_type, length(b)))
+
+    # Initialize caches for partials lists and intermediate calculations
+    partials_A_list = !isnothing(∂_A) ? partials_to_list(∂_A) : nothing
+    partials_b_list = !isnothing(∂_b) ? partials_to_list(∂_b) : nothing
+
+    # Determine size and type for Auu_list and rhs_list
+    n_partials = 0
+    if !isnothing(partials_A_list)
+        n_partials = length(partials_A_list)
+        Auu_list = [similar(non_partial_cache.b) for _ in 1:n_partials]
+        rhs_list = [similar(non_partial_cache.b) for _ in 1:n_partials]
+    elseif !isnothing(partials_b_list)
+        n_partials = length(partials_b_list)
+        Auu_list = nothing
+        rhs_list = [similar(non_partial_cache.b) for _ in 1:n_partials]
+    else
+        Auu_list = nothing
+        rhs_list = nothing
+    end
+
+    return DualLinearCache{dual_type}(
+        non_partial_cache,
+        ∂_A,
+        ∂_b,
+        !isnothing(∂_b) ? zero.(∂_b) : ∂_b,
+        partials_A_list,
+        partials_b_list,
+        Auu_list,
+        rhs_list,
+        A,
+        b,
+        zeros(dual_type, length(b))
+    )
 end
 
 function SciMLBase.solve!(cache::DualLinearCache, args...; kwargs...)
@@ -247,7 +323,43 @@ partial_vals(x) = nothing
 nodual_value(x) = x
 nodual_value(x::Dual{T, V, P}) where {T, V <: AbstractFloat, P} = ForwardDiff.value(x)
 nodual_value(x::Dual{T, V, P}) where {T, V <: Dual, P} = x.value  # Keep the inner dual intact
-nodual_value(x::AbstractArray{<:Dual}) = map(nodual_value, x)
+
+function nodual_value(x::AbstractArray{<:Dual})
+    # Create a similar array with the appropriate element type
+    T = typeof(nodual_value(first(x)))
+    result = similar(x, T)
+
+    # Fill the result array with values
+    for i in eachindex(x)
+        result[i] = nodual_value(x[i])
+    end
+
+    return result
+end
+
+function update_partials_list!(partial_matrix::AbstractVector{T}, list_cache) where {T}
+    p = eachindex(first(partial_matrix))
+    for i in p
+        for j in eachindex(partial_matrix)
+            list_cache[i][j] = partial_matrix[j][i]
+        end
+    end
+    return list_cache
+end
+
+function update_partials_list!(partial_matrix, list_cache)
+    p = length(first(partial_matrix))
+    m, n = size(partial_matrix)
+
+    for k in 1:p
+        for i in 1:m
+            for j in 1:n
+                list_cache[k][i, j] = partial_matrix[i, j][k]
+            end
+        end
+    end
+    return list_cache
+end
 
 function partials_to_list(partial_matrix::AbstractVector{T}) where {T}
     p = eachindex(first(partial_matrix))

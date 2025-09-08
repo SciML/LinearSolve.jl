@@ -22,7 +22,7 @@ if GROUP == "All" || GROUP == "Core"
 end
 
 # Don't run Enzyme tests on prerelease
-if GROUP == "All" || GROUP == "NoPre" && isempty(VERSION.prerelease)
+if GROUP == "NoPre" && isempty(VERSION.prerelease)
     Pkg.activate("nopre")
     Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
     Pkg.instantiate()

@@ -136,8 +136,8 @@ end
 
 @testset "JET Tests for creating Dual solutions" begin
     # Make sure there's no runtime dispatch when making solutions of Dual problems
-    dual_cache = init(prob)
+    dual_cache = init(dual_prob)
     ext = Base.get_extension(LinearSolve, :LinearSolveForwardDiffExt)
     JET.@test_opt ext.linearsolve_dual_solution(
-        [1.0, 1.0, 1.0], [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dual_cache )
+        [1.0, 1.0, 1.0], [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dual_cache)
 end

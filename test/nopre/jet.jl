@@ -141,3 +141,9 @@ end
     JET.@test_opt ext.linearsolve_dual_solution(
         [1.0, 1.0, 1.0], [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dual_cache)
 end
+
+@testset "JET Tests for default algs with DualLinear Problems" begin
+    alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization)
+    JET.@test_opt init(dual_prob, alg)
+    JET.@test_opt init(dual_prob)
+end

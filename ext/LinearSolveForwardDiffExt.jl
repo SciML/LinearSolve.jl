@@ -34,7 +34,7 @@ const DualBLinearProblem = LinearProblem{
 const DualAbstractLinearProblem = Union{
     DualLinearProblem, DualALinearProblem, DualBLinearProblem}
 
-LinearSolve.@concrete mutable struct DualLinearCache{DT <: Dual}
+LinearSolve.@concrete mutable struct DualLinearCache{DT}
     linear_cache
 
     partials_A
@@ -113,10 +113,10 @@ function linearsolve_dual_solution(
 end
 
 function linearsolve_dual_solution(u::AbstractArray, partials,
-        cache::DualLinearCache{DT}) where {DT}
+        cache::DualLinearCache{DT}) where {T, V, N, DT <: Dual{T,V,N}}
     # Handle single-level duals for arrays
     partials_list = RecursiveArrayTools.VectorOfArray(partials)
-    return map(((uᵢ, pᵢ),) -> DT(uᵢ, Partials(Tuple(pᵢ))),
+    return map(((uᵢ, pᵢ),) -> DT(uᵢ, Partials{N,V}(NTuple{N,V}(pᵢ))),
         zip(u, partials_list[i, :] for i in 1:length(partials_list.u[1])))
 end
 

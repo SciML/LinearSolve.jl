@@ -48,6 +48,8 @@ LinearSolve.@concrete mutable struct DualLinearCache{DT}
     # Cached intermediate values for calculations
     Auu_list
     rhs_list
+    dual_u0_cache
+    primal_b_cache
 
     dual_A
     dual_b
@@ -56,9 +58,10 @@ end
 
 function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwargs...)
     # Solve the primal problem
-    dual_u0 = copy(cache.linear_cache.u)
+    cache.dual_u0_cache .= cache.linear_cache.u
     sol = solve!(cache.linear_cache, alg, args...; kwargs...)  
-    primal_b = copy(cache.linear_cache.b)
+
+    cache.primal_b_cache .= cache.linear_cache.b
     uu = sol.u
 
     primal_sol = (;
@@ -77,15 +80,15 @@ function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwa
 
     rhs_list = cache.rhs_list
 
-    cache.linear_cache.u = dual_u0
+    cache.linear_cache.u .= cache.dual_u0_cache
     # We can reuse the linear cache, because the same factorization will work for the partials.
     for i in eachindex(rhs_list)
-        cache.linear_cache.b = rhs_list[i]
-        rhs_list[i] = copy(solve!(cache.linear_cache, alg, args...; kwargs...).u)
+        cache.linear_cache.b .= rhs_list[i]
+        rhs_list[i] .= solve!(cache.linear_cache, alg, args...; kwargs...).u
     end
 
     # Reset to the original `b` and `u`, users will expect that `b` doesn't change if they don't tell it to
-    cache.linear_cache.b = primal_b
+    cache.linear_cache.b .= cache.primal_b_cache
 
     partial_sols = rhs_list
 
@@ -240,6 +243,8 @@ function __dual_init(
         partials_b_list,
         Auu_list,
         rhs_list,
+        similar(new_b),
+        similar(new_b),
         A,
         b,
         zeros(dual_type, length(b))

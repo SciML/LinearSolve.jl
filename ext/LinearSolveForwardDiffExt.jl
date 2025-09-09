@@ -1,7 +1,7 @@
 module LinearSolveForwardDiffExt
 
 using LinearSolve
-using LinearSolve: SciMLLinearSolveAlgorithm, __init
+using LinearSolve: SciMLLinearSolveAlgorithm, __init, DefaultLinearSolver, DefaultAlgorithmChoice, defaultalg
 using LinearAlgebra
 using ForwardDiff
 using ForwardDiff: Dual, Partials
@@ -194,6 +194,24 @@ end
 # Opt out for GenericLUFactorization
 function SciMLBase.init(prob::DualAbstractLinearProblem, alg::GenericLUFactorization, args...; kwargs...)
     return __init(prob, alg, args...; kwargs...)
+end
+
+function SciMLBase.init(prob::DualAbstractLinearProblem, alg::DefaultLinearSolver, args...; kwargs...)
+    if alg.alg === DefaultAlgorithmChoice.GenericLUFactorization
+        return __init(prob, alg, args...; kwargs...)
+    else
+        return __dual_init(prob, alg, args...; kwargs...)
+    end
+end
+
+function SciMLBase.init(prob::DualAbstractLinearProblem, alg::Nothing,
+        args...;
+        assumptions = OperatorAssumptions(issquare(prob.A)),
+        kwargs...)
+    new_A = nodual_value(prob.A)
+    new_b = nodual_value(prob.b)
+    SciMLBase.init(
+        prob, defaultalg(new_A, new_b, assumptions), args...; assumptions, kwargs...)
 end
 
 function __dual_init(

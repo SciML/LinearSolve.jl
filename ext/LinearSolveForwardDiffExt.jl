@@ -243,9 +243,6 @@ function __dual_init(
         dual_type = get_dual_type(prob.b)
     end
 
-    alg isa LinearSolve.DefaultLinearSolver ?
-    real_alg = LinearSolve.defaultalg(primal_prob.A, primal_prob.b) : real_alg = alg
-
     non_partial_cache = init(
         primal_prob, real_alg, assumptions, args...;
         alias = alias, abstol = abstol, reltol = reltol,

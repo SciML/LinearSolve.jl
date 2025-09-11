@@ -55,7 +55,7 @@ LinearSolve.@concrete mutable struct DualLinearCache{DT}
     dual_u
 end
 
-function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwargs...)
+function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kwargs...)
     # Solve the primal problem
     cache.dual_u0_cache .= cache.linear_cache.u
     sol = solve!(cache.linear_cache, alg, args...; kwargs...)  
@@ -63,13 +63,8 @@ function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwa
     cache.primal_b_cache .= cache.linear_cache.b
     uu = sol.u
 
-    primal_sol = (;
-        u = recursivecopy(sol.u),
-        resid = recursivecopy(sol.resid),
-        retcode = recursivecopy(sol.retcode),
-        iters = recursivecopy(sol.iters),
-        stats = recursivecopy(sol.stats)
-    )
+    # Store solution metadata without copying - we'll return this
+    primal_sol = sol
 
     # Solves Dual partials separately 
     ∂_A = cache.partials_A
@@ -89,9 +84,7 @@ function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwa
     # Reset to the original `b` and `u`, users will expect that `b` doesn't change if they don't tell it to
     cache.linear_cache.b .= cache.primal_b_cache
 
-    partial_sols = rhs_list
-
-    primal_sol, partial_sols
+    return primal_sol
 end
 
 function xp_linsolve_rhs!(uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}},
@@ -153,8 +146,8 @@ end
 function linearsolve_dual_solution(u::AbstractArray, partials,
         cache::DualLinearCache{DT}) where {T, V, N, DT <: Dual{T,V,N}}
     # Optimized in-place version that reuses cache.dual_u
-    linearsolve_dual_solution!(cache.dual_u, u, partials)
-    return cache.dual_u
+    linearsolve_dual_solution!(getfield(cache, :dual_u), u, partials)
+    return getfield(cache, :dual_u)
 end
 
 function linearsolve_dual_solution!(dual_u::AbstractArray{DT}, u::AbstractArray, partials) where {T, V, N, DT <: Dual{T,V,N}}
@@ -254,23 +247,22 @@ function __dual_init(
 end
 
 function SciMLBase.solve!(cache::DualLinearCache, args...; kwargs...)
-    solve!(cache, cache.alg, args...; kwargs...)
+    solve!(cache, getfield(cache, :linear_cache).alg, args...; kwargs...)
 end
 
 function SciMLBase.solve!(
         cache::DualLinearCache{DT}, alg::SciMLLinearSolveAlgorithm, args...; kwargs...) where {DT <: ForwardDiff.Dual}
-    sol,
-    partials = linearsolve_forwarddiff_solve(
-        cache::DualLinearCache, cache.alg, args...; kwargs...)
-    dual_sol = linearsolve_dual_solution(sol.u, partials, cache)
+    primal_sol = linearsolve_forwarddiff_solve!(
+        cache::DualLinearCache, getfield(cache, :linear_cache).alg, args...; kwargs...)
+    dual_sol = linearsolve_dual_solution(getfield(cache,:linear_cache).u, getfield(cache, :rhs_list), cache)
 
     # For scalars, we still need to assign since cache.dual_u might not be pre-allocated
-    if !(cache.dual_u isa AbstractArray)
-        cache.dual_u = dual_sol
+    if !(getfield(cache, :dual_u) isa AbstractArray)
+        setfield!(cache, :dual_u, dual_sol)
     end
 
     return SciMLBase.build_linear_solution(
-        cache.alg, cache.dual_u, sol.resid, cache; sol.retcode, sol.iters, sol.stats
+        getfield(cache, :linear_cache).alg, getfield(cache, :dual_u), primal_sol.resid, cache; primal_sol.retcode, primal_sol.iters, primal_sol.stats
     )
 end
 

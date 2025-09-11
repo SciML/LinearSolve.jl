@@ -46,7 +46,6 @@ LinearSolve.@concrete mutable struct DualLinearCache{DT}
     partials_b_list
 
     # Cached intermediate values for calculations
-    Auu_list
     rhs_list
     dual_u0_cache
     primal_b_cache
@@ -105,14 +104,10 @@ function xp_linsolve_rhs!(uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partial
     A_list = cache.partials_A_list
     b_list = cache.partials_b_list
 
-    # Compute A*uu products using cached storage
-    for i in eachindex(A_list)
-        mul!(cache.Auu_list[i], A_list[i], uu)
-    end
-
-    # Compute rhs using cached storage
+    # Compute rhs = b - A*uu using five-argument mul!
     for i in eachindex(b_list)
-        cache.rhs_list[i] .= b_list[i] .- cache.Auu_list[i]
+        cache.rhs_list[i] .= b_list[i]
+        mul!(cache.rhs_list[i], A_list[i], uu, -1, 1)
     end
 
     return cache.rhs_list
@@ -126,14 +121,9 @@ function xp_linsolve_rhs!(
     update_partials_list!(∂_A, cache.partials_A_list)
     A_list = cache.partials_A_list
 
-    # Compute A*uu products using cached storage
+    # Compute rhs = -A*uu using five-argument mul!
     for i in eachindex(A_list)
-        mul!(cache.Auu_list[i], A_list[i], uu)
-    end
-
-    # Compute rhs using cached storage (negative of A*uu)
-    for i in eachindex(A_list)
-        cache.rhs_list[i] .= .-cache.Auu_list[i]
+        mul!(cache.rhs_list[i], A_list[i], uu, -1, 0)
     end
 
     return cache.rhs_list
@@ -162,10 +152,26 @@ end
 
 function linearsolve_dual_solution(u::AbstractArray, partials,
         cache::DualLinearCache{DT}) where {T, V, N, DT <: Dual{T,V,N}}
-    # Handle single-level duals for arrays
-    partials_list = RecursiveArrayTools.VectorOfArray(partials)
-    return map(((uᵢ, pᵢ),) -> DT(uᵢ, Partials{N,V}(NTuple{N,V}(pᵢ))),
-        zip(u, partials_list[i, :] for i in 1:length(partials_list.u[1])))
+    # Optimized in-place version that reuses cache.dual_u
+    linearsolve_dual_solution!(cache.dual_u, u, partials)
+    return cache.dual_u
+end
+
+function linearsolve_dual_solution!(dual_u::AbstractArray{DT}, u::AbstractArray, partials) where {T, V, N, DT <: Dual{T,V,N}}
+    # Direct in-place construction of dual numbers without temporary allocations
+    n_partials = length(partials)
+    
+    for i in eachindex(u, dual_u)
+        # Extract partials for this element directly
+        partial_vals = ntuple(Val(N)) do j
+            V(partials[j][i])
+        end
+        
+        # Construct dual number in-place
+        dual_u[i] = DT(u[i], Partials{N,V}(partial_vals))
+    end
+    
+    return dual_u
 end
 
 function SciMLBase.init(prob::DualAbstractLinearProblem, alg::SciMLLinearSolveAlgorithm, args...; kwargs...)
@@ -219,18 +225,15 @@ function __dual_init(
     partials_A_list = !isnothing(∂_A) ? partials_to_list(∂_A) : nothing
     partials_b_list = !isnothing(∂_b) ? partials_to_list(∂_b) : nothing
 
-    # Determine size and type for Auu_list and rhs_list
+    # Determine size and type for rhs_list
     n_partials = 0
     if !isnothing(partials_A_list)
         n_partials = length(partials_A_list)
-        Auu_list = [similar(non_partial_cache.b) for _ in 1:n_partials]
         rhs_list = [similar(non_partial_cache.b) for _ in 1:n_partials]
     elseif !isnothing(partials_b_list)
         n_partials = length(partials_b_list)
-        Auu_list = nothing
         rhs_list = [similar(non_partial_cache.b) for _ in 1:n_partials]
     else
-        Auu_list = nothing
         rhs_list = nothing
     end
 
@@ -241,7 +244,6 @@ function __dual_init(
         !isnothing(∂_b) ? zero.(∂_b) : ∂_b,
         partials_A_list,
         partials_b_list,
-        Auu_list,
         rhs_list,
         similar(new_b),
         similar(new_b),
@@ -262,14 +264,13 @@ function SciMLBase.solve!(
         cache::DualLinearCache, cache.alg, args...; kwargs...)
     dual_sol = linearsolve_dual_solution(sol.u, partials, cache)
 
-    if cache.dual_u isa AbstractArray
-        cache.dual_u[:] = dual_sol
-    else
+    # For scalars, we still need to assign since cache.dual_u might not be pre-allocated
+    if !(cache.dual_u isa AbstractArray)
         cache.dual_u = dual_sol
     end
 
     return SciMLBase.build_linear_solution(
-        cache.alg, dual_sol, sol.resid, cache; sol.retcode, sol.iters, sol.stats
+        cache.alg, cache.dual_u, sol.resid, cache; sol.retcode, sol.iters, sol.stats
     )
 end
 

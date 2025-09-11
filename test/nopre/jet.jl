@@ -144,6 +144,7 @@ end
 
 @testset "JET Tests for default algs with DualLinear Problems" begin
     # Test for Default alg choosing for DualLinear Problems
+    # These should both produce a LinearCache
     alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization)
     JET.@test_opt init(dual_prob, alg) broken = true
     JET.@test_opt init(dual_prob) broken = true

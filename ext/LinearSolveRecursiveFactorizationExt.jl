@@ -1,7 +1,6 @@
 module LinearSolveRecursiveFactorizationExt
 
 using LinearSolve
-using SparseArrays
 using LinearSolve.LinearAlgebra, LinearSolve.ArrayInterface, RecursiveFactorization
 
 LinearSolve.userecursivefactorization(A::Union{Nothing, AbstractMatrix}) = true
@@ -34,11 +33,13 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::ButterflyFactoriz
     A = convert(AbstractMatrix, A)
     b = cache.b
     M, N = size(A)
+    U, V, F = cache.cacheval
     if cache.isfresh
         @assert M==N "A must be square"
-        U, V, F = RecursiveFactorization.🦋workspace(A)
+        U, V, F = RecursiveFactorization.🦋workspace(A, U, V)
         cache.cacheval = (U, V, F)
         cache.isfresh = false
+        b = [b; rand(4 - M % 4)]
     end
     U, V, F = cache.cacheval
     #sol = U * b_ext
@@ -47,7 +48,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::ButterflyFactoriz
     #sol *= V
     sol = V * (F \ (U * b))    
     #sol = V * (TriangularSolve.ldiv!(UpperTriangular(F.U), TriangularSolve.ldiv!(LowerTriangular(F.L), U * b)))
-    SciMLBase.build_linear_solution(alg, sol, nothing, cache)
+    SciMLBase.build_linear_solution(alg, sol[1:M], nothing, cache)
 end
 
 function LinearSolve.init_cacheval(alg::ButterflyFactorization, A, b, u, Pl, Pr, maxiters::Int,

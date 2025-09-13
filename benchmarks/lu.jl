@@ -24,7 +24,7 @@ end
 algs = [
     LUFactorization(),
     RFLUFactorization(),
-    MKLLUFactorization(),
+    #MKLLUFactorization(),
     ButterflyFactorization(; thread)
 ]
 

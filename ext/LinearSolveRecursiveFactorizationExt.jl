@@ -33,29 +33,22 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::ButterflyFactoriz
     A = convert(AbstractMatrix, A)
     b = cache.b
     M, N = size(A)
-    U, V, F = cache.cacheval
+    B, U, V = cache.cacheval[1], cache.cacheval[2], cache.cacheval[3]
     if cache.isfresh
         @assert M==N "A must be square"
-        U, V, F = RecursiveFactorization.🦋workspace(A, U, V)
-        cache.cacheval = (U, V, F)
+        U, V, F = RecursiveFactorization.🦋workspace(A, B, U, V)
+        cache.cacheval = (B, U, V, F)
         cache.isfresh = false
         b = [b; rand(4 - M % 4)]
     end
-    U, V, F = cache.cacheval
-    #sol = U * b_ext
-    #TriangularSolve.rdiv!(sol, A_ext, F.U, Val(false))
-    #TriangularSolve.ldiv!(sol, A_ext, F.L, Val(false))
-    #sol *= V
+    B, U, V, F = cache.cacheval
     sol = V * (F \ (U * b))    
-    #sol = V * (TriangularSolve.ldiv!(UpperTriangular(F.U), TriangularSolve.ldiv!(LowerTriangular(F.L), U * b)))
-    SciMLBase.build_linear_solution(alg, sol[1:M], nothing, cache)
+   SciMLBase.build_linear_solution(alg, sol[1:M], nothing, cache)
 end
 
 function LinearSolve.init_cacheval(alg::ButterflyFactorization, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    #A, b, (RecursiveFactorization.SparseBandedMatrix{typeof(A[1,1])}(undef, 1, 1))', RecursiveFactorization.SparseBandedMatrix{typeof(A[1,1])}(undef, 1, 1), RecursiveFactorization.lu!(rand(1, 1), Val(false))
-    #A, b, (spzeros(1, 1))', spzeros(1,1), RecursiveFactorization.lu!(rand(1, 1), Val(false))
-    A', A, RecursiveFactorization.lu!(rand(1, 1), Val(false))
+    A, A', A, RecursiveFactorization.lu!(rand(1, 1), Val(false))
 end
 
 end

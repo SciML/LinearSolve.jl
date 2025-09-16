@@ -79,7 +79,13 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
     cache.linear_cache.u .= cache.dual_u0_cache
     # We can reuse the linear cache, because the same factorization will work for the partials.
     for i in eachindex(rhs_list)
-        cache.linear_cache.b = copy(rhs_list[i])
+        if cache.linear_cache isa DualLinearCache
+            # For nested duals, assign directly to partials_b
+            cache.linear_cache.b = copy(rhs_list[i])
+        else
+            # For regular linear cache, use broadcasting assignment
+            cache.linear_cache.b .= rhs_list[i]
+        end
         rhs_list[i] .= solve!(cache.linear_cache, alg, args...; kwargs...).u
     end
 

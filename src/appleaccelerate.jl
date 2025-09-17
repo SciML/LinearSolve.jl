@@ -1,5 +1,4 @@
 using LinearAlgebra
-using Libdl
 
 # For now, only use BLAS from Accelerate (that is to say, vecLib)
 const global libacc = "/System/Library/Frameworks/Accelerate.framework/Accelerate"
@@ -19,10 +18,9 @@ struct AppleAccelerateLUFactorization <: AbstractFactorization end
     const AA_IS_AVAILABLE = false
     __appleaccelerate_isavailable() = false
 else
-    @static if Libdl.dlopen_e(libacc) == C_NULL
+    @static if Libdl.dlopen(libacc; throw_error = false) === nothing
         __appleaccelerate_isavailable() = false
-    end
-    @static if dlsym_e(Libdl.dlopen_e(libacc), "dgetrf_") == C_NULL
+    elseif Libdl.dlsym(Libdl.dlopen(libacc), "dgetrf_"; throw_error = false) === nothing
         __appleaccelerate_isavailable() = false
     else
         __appleaccelerate_isavailable() = true

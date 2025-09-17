@@ -28,7 +28,7 @@ using EnumX: EnumX, @enumx
 using Markdown: Markdown, @doc_str
 using ChainRulesCore: ChainRulesCore, NoTangent
 using Reexport: Reexport, @reexport
-using Libdl: Libdl, dlsym_e
+using Libdl: Libdl
 import InteractiveUtils
 import RecursiveArrayTools
 

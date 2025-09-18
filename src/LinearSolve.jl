@@ -433,18 +433,9 @@ const HAS_APPLE_ACCELERATE = Ref(false)
 appleaccelerate_isavailable() = HAS_APPLE_ACCELERATE[]
 
 # Extension availability checking functions
-useblis() = Base.get_extension(@__MODULE__, :LinearSolveBLISExt) !== nothing
-function usecuda()
-   ext = Base.get_extension(@__MODULE__, :LinearSolveCUDAExt)
-   !isnothing(ext) && ext.CUDA.functional()
-end
-
-# Metal is only available on Apple platforms
-@static if !Sys.isapple()
-    usemetal() = false
-else
-    usemetal() = Base.get_extension(@__MODULE__, :LinearSolveMetalExt) !== nothing
-end
+useblis() = false
+usecuda() = false
+usemetal() = false
 
 PrecompileTools.@compile_workload begin
     A = rand(4, 4)

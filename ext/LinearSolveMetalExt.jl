@@ -6,6 +6,12 @@ using SciMLBase: AbstractSciMLOperator
 using LinearSolve: ArrayInterface, MKLLUFactorization, MetalOffload32MixedLUFactorization, 
                    @get_cacheval, LinearCache, SciMLBase, OperatorAssumptions
 
+@static if Sys.isapple()
+
+LinearSolve.usemetal() = true
+
+end
+
 default_alias_A(::MetalLUFactorization, ::Any, ::Any) = false
 default_alias_b(::MetalLUFactorization, ::Any, ::Any) = false
 

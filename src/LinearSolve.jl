@@ -42,8 +42,11 @@ const CRC = ChainRulesCore
 @static if Sys.ARCH === :x86_64 || Sys.ARCH === :i686
     if Preferences.@load_preference("LoadMKL_JLL",
         !occursin("EPYC", Sys.cpu_info()[1].model))
+        # MKL_jll < 2022.2 doesn't support the mixed LP64 and ILP64 interfaces that we make use of in LinearSolve
+        # In particular, the `_64` APIs do not exist
+        # https://www.intel.com/content/www/us/en/developer/articles/release-notes/onemkl-release-notes-2022.html
         using MKL_jll
-        const usemkl = MKL_jll.is_available()
+        const usemkl = MKL_jll.is_available() && pkgversion(MKL_jll) >= v"2022.2"
     else
         const usemkl = false
     end

@@ -33,22 +33,24 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::ButterflyFactoriz
     A = convert(AbstractMatrix, A)
     b = cache.b
     M, N = size(A)
-    B, U, V = cache.cacheval[1], cache.cacheval[2], cache.cacheval[3]
+    B, U, V = cache.cacheval[2], cache.cacheval[3], cache.cacheval[4]
     if cache.isfresh
         @assert M==N "A must be square"
         U, V, F = RecursiveFactorization.🦋workspace(A, B, U, V)
-        cache.cacheval = (B, U, V, F)
+        cache.cacheval = (A, B, U, V, F)
         cache.isfresh = false
-        b = [b; rand(4 - M % 4)]
+        if (M % 4 != 0)
+            b = [b; rand(4 - M % 4)]
+        end
     end
-    B, U, V, F = cache.cacheval
+    A, B, U, V, F = cache.cacheval
     sol = V * (F \ (U * b))    
    SciMLBase.build_linear_solution(alg, sol[1:M], nothing, cache)
 end
 
 function LinearSolve.init_cacheval(alg::ButterflyFactorization, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    A, A', A, RecursiveFactorization.lu!(rand(1, 1), Val(false))
+    A, A, A', A, RecursiveFactorization.lu!(rand(1, 1), Val(false))
 end
 
 end

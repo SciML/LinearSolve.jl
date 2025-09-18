@@ -3,7 +3,6 @@ using LinearAlgebra, LinearSolve, MKL_jll
 using RecursiveFactorization
 
 nc = min(Int(VectorizationBase.num_cores()), Threads.nthreads())
-BLAS.set_num_threads(nc)
 BenchmarkTools.DEFAULT_PARAMETERS.seconds = 0.5
 thread = Val(true)
 
@@ -23,11 +22,13 @@ end
 
 algs = [
     LUFactorization(),
+    GenericLUFactorization(),
     RFLUFactorization(),
-    #MKLLUFactorization(),
-    ButterflyFactorization(; thread)
+    MKLLUFactorization(),
+    FastLUFactorization(),
+    SimpleLUFactorization(),
+    ButterflyFactorization()
 ]
-
 res = [Float64[] for i in 1:length(algs)]
 ns = 20:20:500
 for i in 1:length(ns)
@@ -66,3 +67,4 @@ p
 
 savefig("lubench.png")
 savefig("lubench.pdf")
+

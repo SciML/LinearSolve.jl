@@ -4,7 +4,6 @@ using RecursiveFactorization
 
 nc = min(Int(VectorizationBase.num_cores()), Threads.nthreads())
 BenchmarkTools.DEFAULT_PARAMETERS.seconds = 0.5
-thread = Val(true)
 
 function luflop(m, n = m; innerflop = 2)
     sum(1:min(m, n)) do k
@@ -30,7 +29,7 @@ algs = [
     ButterflyFactorization()
 ]
 res = [Float64[] for i in 1:length(algs)]
-ns = 20:20:500
+ns = 4:8:500
 for i in 1:length(ns)
     n = ns[i]
     @info "$n × $n"

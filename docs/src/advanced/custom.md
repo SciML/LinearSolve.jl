@@ -4,12 +4,13 @@ Julia users are building a wide variety of applications in the SciML ecosystem,
 often requiring problem-specific handling of their linear solves. As existing solvers in `LinearSolve.jl` may not
 be optimally suited for novel applications, it is essential for the linear solve
 interface to be easily extendable by users. To that end, the linear solve algorithm
-`LinearSolveFunction()` accepts a user-defined function for handling the solve. A
+`LS.LinearSolveFunction()` accepts a user-defined function for handling the solve. A
 user can pass in their custom linear solve function, say `my_linsolve`, to
-`LinearSolveFunction()`. A contrived example of solving a linear system with a custom solver is below.
+`LS.LinearSolveFunction()`. A contrived example of solving a linear system with a custom solver is below.
 
 ```@example advanced1
-using LinearSolve, LinearAlgebra
+import LinearSolve as LS
+import LinearAlgebra as LA
 
 function my_linsolve(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true, kwargs...)
     if verbose == true
@@ -19,9 +20,9 @@ function my_linsolve(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true, kwarg
     return u
 end
 
-prob = LinearProblem(Diagonal(rand(4)), rand(4))
-alg = LinearSolveFunction(my_linsolve)
-sol = solve(prob, alg)
+prob = LS.LinearProblem(LA.Diagonal(rand(4)), rand(4))
+alg = LS.LinearSolveFunction(my_linsolve)
+sol = LS.solve(prob, alg)
 sol.u
 ```
 
@@ -50,7 +51,7 @@ function my_linsolve!(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true, kwar
     return u
 end
 
-alg = LinearSolveFunction(my_linsolve!)
-sol = solve(prob, alg)
+alg = LS.LinearSolveFunction(my_linsolve!)
+sol = LS.solve(prob, alg)
 sol.u
 ```

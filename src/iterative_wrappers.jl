@@ -328,6 +328,6 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
         cache.u = convert(typeof(cache.u), cacheval.x)
     end
 
-    return SciMLBase.build_linear_solution(alg, cache.u, resid, cache;
+    return SciMLBase.build_linear_solution(alg, cache.u, Ref(resid), cache;
         iters = stats.niter, retcode, stats)
 end

@@ -4,10 +4,9 @@ const LONGER_TESTS = false
 
 const GROUP = get(ENV, "GROUP", "All")
 
-const HAS_EXTENSIONS = isdefined(Base, :get_extension)
+const HAS_EXTENSIONS = true
 
 if GROUP == "All" || GROUP == "Core"
-    @time @safetestset "Quality Assurance" include("qa.jl")
     @time @safetestset "Basic Tests" include("basictests.jl")
     @time @safetestset "Return codes" include("retcodes.jl")
     @time @safetestset "Re-solve" include("resolve.jl")
@@ -16,17 +15,35 @@ if GROUP == "All" || GROUP == "Core"
     @time @safetestset "SparseVector b Tests" include("sparse_vector.jl")
     @time @safetestset "Default Alg Tests" include("default_algs.jl")
     @time @safetestset "Adjoint Sensitivity" include("adjoint.jl")
+    @time @safetestset "ForwardDiff Overloads" include("forwarddiff_overloads.jl")
     @time @safetestset "Traits" include("traits.jl")
     @time @safetestset "BandedMatrices" include("banded.jl")
-    @time @safetestset "Static Arrays" include("static_arrays.jl")
+    @time @safetestset "Mixed Precision" include("test_mixed_precision.jl")
 end
 
-if GROUP == "All" || GROUP == "Enzyme"
-    @time @safetestset "Enzyme Derivative Rules" include("enzyme.jl")
+# Don't run Enzyme tests on prerelease
+if GROUP == "NoPre" && isempty(VERSION.prerelease)
+    Pkg.activate("nopre")
+    Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
+    Pkg.instantiate()
+    @time @safetestset "Quality Assurance" include("qa.jl")
+    @time @safetestset "Enzyme Derivative Rules" include("nopre/enzyme.jl")
+    @time @safetestset "JET Tests" include("nopre/jet.jl")
+    @time @safetestset "Static Arrays" include("nopre/static_arrays.jl")
+    @time @safetestset "Caching Allocation Tests" include("nopre/caching_allocation_tests.jl")
 end
 
 if GROUP == "DefaultsLoading"
-    @time @safetestset "Enzyme Derivative Rules" include("defaults_loading.jl")
+    @time @safetestset "Defaults Loading Tests" include("defaults_loading.jl")
+end
+
+if GROUP == "LinearSolveAutotune"
+    Pkg.activate(joinpath(dirname(@__DIR__), "lib", GROUP))
+    Pkg.test(GROUP, julia_args=["--check-bounds=auto", "--compiled-modules=yes", "--depwarn=yes"], force_latest_compatible_version=false, allow_reresolve=true)
+end
+
+if GROUP == "Preferences"
+    @time @safetestset "Dual Preference System Integration" include("preferences.jl")
 end
 
 if GROUP == "LinearSolveCUDA"

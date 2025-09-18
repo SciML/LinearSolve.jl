@@ -3,10 +3,9 @@ module LinearSolvePardisoExt
 using Pardiso, LinearSolve
 using SparseArrays
 using SparseArrays: nonzeros, rowvals, getcolptr
-using LinearSolve: PardisoJL
+using LinearSolve: PardisoJL, @unpack
 
 using LinearSolve.SciMLBase
-using LinearSolve.UnPack
 
 LinearSolve.needs_concrete_A(alg::PardisoJL) = true
 

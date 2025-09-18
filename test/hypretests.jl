@@ -87,7 +87,7 @@ function test_interface(alg; kw...)
 
         # Solve prob directly (without cache)
         y = solve(prob, alg; cache_kwargs..., Pl = HYPRE.BoomerAMG)
-        @test A * to_array(y.u)≈b atol=atol rtol=rtol
+        @test A*to_array(y.u)≈b atol=atol rtol=rtol
         @test y.iters > 0
         @test y.resid < rtol
 
@@ -99,7 +99,7 @@ function test_interface(alg; kw...)
         cache = y.cache
         @test cache.isfresh == cache.cacheval.isfresh_A ==
               cache.cacheval.isfresh_b == cache.cacheval.isfresh_u == false
-        @test A * to_array(y.u)≈b atol=atol rtol=rtol
+        @test A*to_array(y.u)≈b atol=atol rtol=rtol
 
         # Update A
         cache.A = A
@@ -109,7 +109,7 @@ function test_interface(alg; kw...)
         cache = y.cache
         @test cache.isfresh == cache.cacheval.isfresh_A ==
               cache.cacheval.isfresh_b == cache.cacheval.isfresh_u == false
-        @test A * to_array(y.u)≈b atol=atol rtol=rtol
+        @test A*to_array(y.u)≈b atol=atol rtol=rtol
 
         # Update b
         b2 = 2 * to_array(b)
@@ -123,7 +123,7 @@ function test_interface(alg; kw...)
         cache = y.cache
         @test cache.isfresh == cache.cacheval.isfresh_A ==
               cache.cacheval.isfresh_b == cache.cacheval.isfresh_u == false
-        @test A * to_array(y.u)≈to_array(b2) atol=atol rtol=rtol
+        @test A*to_array(y.u)≈to_array(b2) atol=atol rtol=rtol
     end
     return
 end

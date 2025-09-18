@@ -1,6 +1,6 @@
 # [Linear System Solvers](@id linearsystemsolvers)
 
-`solve(prob::LinearProblem,alg;kwargs)`
+`LS.solve(prob::LS.LinearProblem,alg;kwargs)`
 
 Solves for ``Au=b`` in the problem defined by `prob` using the algorithm
 `alg`. If no algorithm is given, a default algorithm will be chosen.
@@ -11,24 +11,46 @@ Solves for ``Au=b`` in the problem defined by `prob` using the algorithm
 
 The default algorithm `nothing` is good for picking an algorithm that will work,
 but one may need to change this to receive more performance or precision. If
-more precision is necessary, `QRFactorization()` and `SVDFactorization()` are
+more precision is necessary, `LS.QRFactorization()` and `LS.SVDFactorization()` are
 the best choices, with SVD being the slowest but most precise.
 
 For efficiency, `RFLUFactorization` is the fastest for dense LU-factorizations until around
 150x150 matrices, though this can be dependent on the exact details of the hardware. After this
 point, `MKLLUFactorization` is usually faster on most hardware. Note that on Mac computers
-that `AppleAccelerateLUFactorization` is generally always the fastest. `LUFactorization` will
-use your base system BLAS which can be fast or slow depending on the hardware configuration.
-`SimpleLUFactorization` will be fast only on very small matrices but can cut down on compile times.
+that `AppleAccelerateLUFactorization` is generally always the fastest. `OpenBLASLUFactorization` 
+provides direct OpenBLAS calls without going through libblastrampoline and can be faster than 
+`LUFactorization` in some configurations. `LUFactorization` will use your base system BLAS which 
+can be fast or slow depending on the hardware configuration. `SimpleLUFactorization` will be fast 
+only on very small matrices but can cut down on compile times.
 
 For very large dense factorizations, offloading to the GPU can be preferred. Metal.jl can be used
 on Mac hardware to offload, and has a cutoff point of being faster at around size 20,000 x 20,000
-matrices (and only supports Float32). `CudaOffloadFactorization` can be more efficient at a
-much smaller cutoff, possibly around size 1,000 x 1,000 matrices, though this is highly dependent
-on the chosen GPU hardware. `CudaOffloadFactorization` requires a CUDA-compatible NVIDIA GPU.
+matrices (and only supports Float32). `CudaOffloadLUFactorization` and `CudaOffloadQRFactorization` 
+can be more efficient at a much smaller cutoff, possibly around size 1,000 x 1,000 matrices, though 
+this is highly dependent on the chosen GPU hardware. These algorithms require a CUDA-compatible NVIDIA GPU.
 CUDA offload supports Float64 but most consumer GPU hardware will be much faster on Float32
 (many are >32x faster for Float32 operations than Float64 operations) and thus for most hardware
-this is only recommended for Float32 matrices.
+this is only recommended for Float32 matrices. Choose `CudaOffloadLUFactorization` for better 
+performance on well-conditioned problems, or `CudaOffloadQRFactorization` for better numerical 
+stability on ill-conditioned problems.
+
+#### Mixed Precision Methods
+
+For large well-conditioned problems where memory bandwidth is the bottleneck, mixed precision 
+methods can provide significant speedups (up to 2x) by performing the factorization in Float32 
+while maintaining Float64 interfaces. These methods are particularly effective for:
+- Large dense matrices (> 1000x1000)
+- Well-conditioned problems (condition number < 10^4)
+- Hardware with good Float32 performance
+
+Available mixed precision solvers:
+- `MKL32MixedLUFactorization` - CPUs with MKL
+- `AppleAccelerate32MixedLUFactorization` - Apple CPUs with Accelerate
+- `CUDAOffload32MixedLUFactorization` - NVIDIA GPUs with CUDA
+- `MetalOffload32MixedLUFactorization` - Apple GPUs with Metal
+
+These methods automatically handle the precision conversion, making them easy drop-in replacements
+when reduced precision is acceptable for the factorization step.
 
 !!! note
     
@@ -42,6 +64,14 @@ this is only recommended for Float32 matrices.
 For sparse LU-factorizations, `KLUFactorization` if there is less structure
 to the sparsity pattern and `UMFPACKFactorization` if there is more structure.
 Pardiso.jl's methods are also known to be very efficient sparse linear solvers.
+
+For GPU-accelerated sparse LU-factorizations, there are two high-performance options.
+When using CuSparseMatrixCSR arrays with CUDSS.jl loaded, `LUFactorization()` will
+automatically use NVIDIA's cuDSS library. Alternatively, `CUSOLVERRFFactorization`
+provides access to NVIDIA's cusolverRF library. Both offer significant performance
+improvements for sparse systems on CUDA-capable GPUs and are particularly effective
+for large sparse matrices that can benefit from GPU parallelization. `CUDSS` is more
+for `Float32` while `CUSOLVERRFFactorization` is for `Float64`.
 
 While these sparse factorizations are based on implementations in other languages,
 and therefore constrained to standard number types (`Float64`,  `Float32` and
@@ -59,7 +89,7 @@ has, for example if positive definite then `Krylov_CG()`, but if no good propert
 use `Krylov_GMRES()`.
 
 Finally, a user can pass a custom function for handling the linear solve using
-`LinearSolveFunction()` if existing solvers are not optimally suited for their application.
+`LS.LinearSolveFunction()` if existing solvers are not optimally suited for their application.
 The interface is detailed [here](@ref custom).
 
 ### Lazy SciMLOperators
@@ -81,6 +111,12 @@ use `Krylov_GMRES()`.
     batch size.
 
 ## Full List of Methods
+
+### Polyalgorithms
+
+```@docs
+LinearSolve.DefaultLinearSolver
+```
 
 ### RecursiveFactorization.jl
 
@@ -119,6 +155,8 @@ LinearSolve.jl contains some linear solvers built in for specialized cases.
 SimpleLUFactorization
 DiagonalFactorization
 SimpleGMRES
+DirectLdiv!
+LinearSolveFunction
 ```
 
 ### FastLapackInterface.jl
@@ -161,6 +199,16 @@ UMFPACKFactorization
 SparspakFactorization
 ```
 
+### CliqueTrees.jl
+
+!!! note
+    
+    Using this solver requires adding the package CliqueTrees.jl, i.e. `using CliqueTrees`
+
+```@docs
+CliqueTreesFactorization
+```
+
 ### Krylov.jl
 
 ```@docs
@@ -177,6 +225,13 @@ KrylovJL
 
 ```@docs
 MKLLUFactorization
+MKL32MixedLUFactorization
+```
+
+### OpenBLAS
+
+```@docs
+OpenBLASLUFactorization
 ```
 
 ### AppleAccelerate.jl
@@ -187,6 +242,7 @@ MKLLUFactorization
 
 ```@docs
 AppleAccelerateLUFactorization
+AppleAccelerate32MixedLUFactorization
 ```
 
 ### Metal.jl
@@ -197,6 +253,7 @@ AppleAccelerateLUFactorization
 
 ```@docs
 MetalLUFactorization
+MetalOffload32MixedLUFactorization
 ```
 
 ### Pardiso.jl
@@ -213,15 +270,40 @@ LinearSolve.PardisoJL
 
 ### CUDA.jl
 
-Note that `CuArrays` are supported by `GenericFactorization` in the “normal” way.
+Note that `CuArrays` are supported by `GenericFactorization` in the "normal" way.
 The following are non-standard GPU factorization routines.
 
 !!! note
     
-    Using this solver requires adding the package CUDA.jl, i.e. `using CUDA`
+    Using these solvers requires adding the package CUDA.jl, i.e. `using CUDA`
 
 ```@docs
-CudaOffloadFactorization
+CudaOffloadLUFactorization
+CudaOffloadQRFactorization
+CUDAOffload32MixedLUFactorization
+```
+
+### AMDGPU.jl
+
+The following are GPU factorization routines for AMD GPUs using the ROCm stack.
+
+!!! note
+    
+    Using these solvers requires adding the package AMDGPU.jl, i.e. `using AMDGPU`
+
+```@docs
+AMDGPUOffloadLUFactorization
+AMDGPUOffloadQRFactorization
+```
+
+### CUSOLVERRF.jl
+
+!!! note
+    
+    Using this solver requires adding the package CUSOLVERRF.jl, i.e. `using CUSOLVERRF`
+
+```@docs
+CUSOLVERRFFactorization
 ```
 
 ### IterativeSolvers.jl

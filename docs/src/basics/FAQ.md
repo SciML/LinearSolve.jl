@@ -26,7 +26,7 @@ the performance to the expected state, please open an issue and we will improve 
 This is addressed in the [JuliaCon 2022 video](https://www.youtube.com/watch?v=JWI34_w-yYw&t=182s). This happens in
 a few ways:
 
- 1. The Fortran/C code that NumPy/SciPy uses is actually slow. It's [OpenBLAS](https://github.com/xianyi/OpenBLAS),
+ 1. The Fortran/C code that NumPy/SciPy uses is actually slow. It's [OpenBLAS](https://github.com/OpenMathLib/OpenBLAS),
     a library developed in part by the Julia Lab back in 2012 as a fast open source BLAS implementation. Many
     open source environments now use this build, including many R distributions. However, the Julia Lab has greatly
     improved its ability to generate optimized SIMD in platform-specific ways. This, and improved multithreading support
@@ -50,17 +50,18 @@ Thus, in order to use a vector tolerance `weights`, one can mathematically
 hack the system via the following formulation:
 
 ```@example FAQPrec
-using LinearSolve, LinearAlgebra
+import LinearSolve as LS
+import LinearAlgebra as LA
 
 n = 2
 A = rand(n, n)
 b = rand(n)
 
 weights = [1e-1, 1]
-precs = Returns((LinearSolve.InvPreconditioner(Diagonal(weights)), Diagonal(weights)))
+precs = Returns((LS.InvPreconditioner(LA.Diagonal(weights)), LA.Diagonal(weights)))
 
-prob = LinearProblem(A, b)
-sol = solve(prob, KrylovJL_GMRES(precs))
+prob = LS.LinearProblem(A, b)
+sol = LS.solve(prob, LS.KrylovJL_GMRES(precs))
 
 sol.u
 ```
@@ -70,18 +71,19 @@ can use `ComposePreconditioner` to apply the preconditioner after the applicatio
 of the weights like as follows:
 
 ```@example FAQ2
-using LinearSolve, LinearAlgebra
+import LinearSolve as LS
+import LinearAlgebra as LA
 
 n = 4
 A = rand(n, n)
 b = rand(n)
 
 weights = rand(n)
-realprec = lu(rand(n, n)) # some random preconditioner
-Pl = LinearSolve.ComposePreconditioner(LinearSolve.InvPreconditioner(Diagonal(weights)),
+realprec = LA.lu(rand(n, n)) # some random preconditioner
+Pl = LS.ComposePreconditioner(LS.InvPreconditioner(LA.Diagonal(weights)),
     realprec)
-Pr = Diagonal(weights)
+Pr = LA.Diagonal(weights)
 
-prob = LinearProblem(A, b)
-sol = solve(prob, KrylovJL_GMRES(precs = Returns((Pl, Pr))))
+prob = LS.LinearProblem(A, b)
+sol = LS.solve(prob, LS.KrylovJL_GMRES(precs = Returns((Pl, Pr))))
 ```

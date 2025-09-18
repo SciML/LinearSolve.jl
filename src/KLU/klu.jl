@@ -1,15 +1,21 @@
 module KLU
 
-using SparseArrays
-using SparseArrays: SparseMatrixCSC
+using SparseArrays: SparseArrays, SparseMatrixCSC
 import SparseArrays: nnz
 
 export klu, klu!
 
 const libklu = :libklu
+const libsuitesparseconfig = :libsuitesparseconfig
+using Base: Ptr, Cvoid, Cint, Cdouble, Cchar, Csize_t
 include("wrappers.jl")
 
-import Base: (\), size, getproperty, setproperty!, propertynames, show
+import Base: (\), size, getproperty, setproperty!, propertynames, show,
+             copy, eachindex, view, sortperm, unsafe_load, zeros, convert, eltype,
+             length, parent, stride, finalizer, Complex, complex, imag, real, map!,
+             summary, println, oneunit, sizeof, isdefined, setfield!, getfield,
+             OutOfMemoryError, ArgumentError, OverflowError, ErrorException,
+             DimensionMismatch
 
 # Convert from 1-based to 0-based indices
 function decrement!(A::AbstractArray{T}) where {T <: Integer}
@@ -29,7 +35,8 @@ function increment!(A::AbstractArray{T}) where {T <: Integer}
 end
 increment(A::AbstractArray{<:Integer}) = increment!(copy(A))
 
-using LinearAlgebra
+using LinearAlgebra: LinearAlgebra, ldiv!, Adjoint, Transpose, Factorization
+import LinearAlgebra: issuccess
 
 const AdjointFact = isdefined(LinearAlgebra, :AdjointFactorization) ?
                     LinearAlgebra.AdjointFactorization : Adjoint
@@ -160,6 +167,7 @@ function _free_symbolic(K::AbstractKLUFactorization{Tv, Ti}) where {Ti <: KLUITy
 end
 
 for Ti in KLUIndexTypes, Tv in KLUValueTypes
+
     klufree = _klu_name("free_numeric", Tv, Ti)
     ptr = _klu_name("numeric", :Float64, Ti)
     @eval begin
@@ -212,6 +220,7 @@ end
 # Certain sets of inputs must be non-null *together*:
 # [Lp, Li, Lx], [Up, Ui, Ux], [Fp, Fi, Fx]
 for Tv in KLUValueTypes, Ti in KLUIndexTypes
+
     extract = _klu_name("extract", Tv, Ti)
     sort = _klu_name("sort", Tv, Ti)
     if Tv === :ComplexF64
@@ -430,6 +439,7 @@ function klu_analyze!(K::KLUFactorization{Tv, Ti}, P::Vector{Ti},
 end
 
 for Tv in KLUValueTypes, Ti in KLUIndexTypes
+
     factor = _klu_name("factor", Tv, Ti)
     @eval begin
         function klu_factor!(
@@ -458,6 +468,7 @@ for Tv in KLUValueTypes, Ti in KLUIndexTypes
 end
 
 for Tv in KLUValueTypes, Ti in KLUIndexTypes
+
     rgrowth = _klu_name("rgrowth", Tv, Ti)
     rcond = _klu_name("rcond", Tv, Ti)
     condest = _klu_name("condest", Tv, Ti)
@@ -633,6 +644,7 @@ See also: [`klu`](@ref)
 klu!
 
 for Tv in KLUValueTypes, Ti in KLUIndexTypes
+
     refactor = _klu_name("refactor", Tv, Ti)
     @eval begin
         function klu!(K::KLUFactorization{$Tv, $Ti}, nzval::Vector{$Tv};
@@ -670,8 +682,8 @@ function klu!(K::KLUFactorization{U}, S::SparseMatrixCSC{U};
     # what should happen here when check = false? This is not really a KLU error code.
     K.colptr == S.colptr && K.rowval == S.rowval ||
         (decrement!(K.colptr);
-        decrement!(K.rowval);
-        throw(ArgumentError("The pattern of the original matrix must match the pattern of the refactor."))
+            decrement!(K.rowval);
+            throw(ArgumentError("The pattern of the original matrix must match the pattern of the refactor."))
         )
     decrement!(K.colptr)
     decrement!(K.rowval)
@@ -704,6 +716,7 @@ This function overwrites `B` with the solution `X`, for a new solution vector `X
 """
 solve!
 for Tv in KLUValueTypes, Ti in KLUIndexTypes
+
     solve = _klu_name("solve", Tv, Ti)
     @eval begin
         function solve!(klu::AbstractKLUFactorization{$Tv, $Ti},
@@ -720,6 +733,7 @@ for Tv in KLUValueTypes, Ti in KLUIndexTypes
 end
 
 for Tv in KLUValueTypes, Ti in KLUIndexTypes
+
     tsolve = _klu_name("tsolve", Tv, Ti)
     if Tv === :ComplexF64
         call = :($tsolve(

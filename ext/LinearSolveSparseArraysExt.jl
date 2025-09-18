@@ -1,9 +1,20 @@
 module LinearSolveSparseArraysExt
 
-using LinearSolve, LinearAlgebra
-using SparseArrays
-using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
-using LinearSolve: BLASELTYPES, pattern_changed
+using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
+                   @get_cacheval, CHOLMODFactorization, GenericFactorization,
+                   GenericLUFactorization,
+                   KLUFactorization, LUFactorization, NormalCholeskyFactorization,
+                   OperatorAssumptions,
+                   QRFactorization, RFLUFactorization, UMFPACKFactorization, solve
+using ArrayInterface: ArrayInterface
+using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!, QR
+using SparseArrays: SparseArrays, AbstractSparseArray, AbstractSparseMatrixCSC,
+                    SparseMatrixCSC,
+                    nonzeros, rowvals, getcolptr, sparse, sprand
+using SparseArrays.UMFPACK: UMFPACK_OK
+using Base: /, \, convert
+using SciMLBase: SciMLBase, LinearProblem, ReturnCode
+import StaticArraysCore: SVector
 
 # Can't `using KLU` because cannot have a dependency in there without
 # requiring the user does `using KLU`
@@ -25,13 +36,6 @@ function LinearSolve.init_cacheval(alg::RFLUFactorization,
         maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     nothing, nothing
-end
-
-function LinearSolve.init_cacheval(
-        alg::QRFactorization, A::Symmetric{<:Number, <:SparseMatrixCSC}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
-        assumptions::OperatorAssumptions)
-    return nothing
 end
 
 function LinearSolve.handle_sparsematrixcsc_lu(A::AbstractSparseMatrixCSC)
@@ -71,7 +75,31 @@ const PREALLOCATED_UMFPACK = SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC(0, 0
     Int[], Float64[]))
 
 function LinearSolve.init_cacheval(
-        alg::UMFPACKFactorization, A::SparseMatrixCSC{Float64, Int}, b, u,
+        alg::LUFactorization, A::AbstractSparseArray{<:Number, <:Integer}, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function LinearSolve.init_cacheval(
+        alg::GenericLUFactorization, A::AbstractSparseArray{<:Number, <:Integer}, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function LinearSolve.init_cacheval(
+        alg::UMFPACKFactorization, A::AbstractArray, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function LinearSolve.init_cacheval(
+        alg::LUFactorization, A::AbstractSparseArray{Float64, Int64}, b, u,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
@@ -79,14 +107,71 @@ function LinearSolve.init_cacheval(
 end
 
 function LinearSolve.init_cacheval(
-        alg::UMFPACKFactorization, A::AbstractSparseArray{Float64}, b, u, Pl, Pr,
+        alg::LUFactorization, A::AbstractSparseArray{T, Int64}, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions) where {T <: BLASELTYPES}
+    if LinearSolve.is_cusparse(A)
+        ArrayInterface.lu_instance(A)
+    else
+        SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC{T, Int64}(
+            zero(Int64), zero(Int64), [Int64(1)], Int64[], T[]))
+    end
+end
+
+function LinearSolve.init_cacheval(
+        alg::LUFactorization, A::AbstractSparseArray{T, Int32}, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions) where {T <: BLASELTYPES}
+    if LinearSolve.is_cusparse(A)
+        ArrayInterface.lu_instance(A)
+    else
+        SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC{T, Int32}(
+            zero(Int32), zero(Int32), [Int32(1)], Int32[], T[]))
+    end
+end
+
+function LinearSolve.init_cacheval(
+        alg::LUFactorization, A::LinearSolve.GPUArraysCore.AnyGPUArray, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    ArrayInterface.lu_instance(A)
+end
+
+function LinearSolve.init_cacheval(
+        alg::UMFPACKFactorization, A::AbstractSparseArray{Float64, Int}, b, u, Pl, Pr,
         maxiters::Int, abstol,
         reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
-    A = convert(AbstractMatrix, A)
-    zerobased = SparseArrays.getcolptr(A)[1] == 0
-    return SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC(size(A)..., getcolptr(A),
-        rowvals(A), nonzeros(A)))
+    PREALLOCATED_UMFPACK
+end
+
+function LinearSolve.init_cacheval(
+        alg::UMFPACKFactorization, A::LinearSolve.GPUArraysCore.AnyGPUArray, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function LinearSolve.init_cacheval(
+        alg::UMFPACKFactorization, A::AbstractSparseArray{T, Int64}, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions) where {T <: BLASELTYPES}
+    SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC{T, Int64}(
+        zero(Int64), zero(Int64), [Int64(1)], Int64[], T[]))
+end
+
+function LinearSolve.init_cacheval(
+        alg::UMFPACKFactorization, A::AbstractSparseArray{T, Int32}, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions) where {T <: BLASELTYPES}
+    SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC{T, Int32}(
+        zero(Int32), zero(Int32), [Int32(1)], Int32[], T[]))
 end
 
 function SciMLBase.solve!(
@@ -116,9 +201,10 @@ function SciMLBase.solve!(
     end
 
     F = LinearSolve.@get_cacheval(cache, :UMFPACKFactorization)
-    if F.status == SparseArrays.UMFPACK.UMFPACK_OK
+    if F.status == UMFPACK_OK
         y = ldiv!(cache.u, F, cache.b)
-        SciMLBase.build_linear_solution(alg, y, nothing, cache)
+        SciMLBase.build_linear_solution(
+            alg, y, nothing, cache; retcode = ReturnCode.Success)
     else
         SciMLBase.build_linear_solution(
             alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible)
@@ -129,21 +215,36 @@ const PREALLOCATED_KLU = KLU.KLUFactorization(SparseMatrixCSC(0, 0, [1], Int[],
     Float64[]))
 
 function LinearSolve.init_cacheval(
-        alg::KLUFactorization, A::SparseMatrixCSC{Float64, Int}, b, u, Pl,
+        alg::KLUFactorization, A::AbstractArray, b, u, Pl,
         Pr,
         maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function LinearSolve.init_cacheval(
+        alg::KLUFactorization, A::AbstractSparseArray{Float64, Int64}, b, u, Pl, Pr,
+        maxiters::Int, abstol,
+        reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
     PREALLOCATED_KLU
 end
 
 function LinearSolve.init_cacheval(
-        alg::KLUFactorization, A::AbstractSparseArray{Float64}, b, u, Pl, Pr,
+        alg::KLUFactorization, A::LinearSolve.GPUArraysCore.AnyGPUArray, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function LinearSolve.init_cacheval(
+        alg::KLUFactorization, A::AbstractSparseArray{Float64, Int32}, b, u, Pl, Pr,
         maxiters::Int, abstol,
         reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
-    A = convert(AbstractMatrix, A)
-    return KLU.KLUFactorization(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-        nonzeros(A)))
+    KLU.KLUFactorization(SparseMatrixCSC{Float64, Int32}(
+        0, 0, [Int32(1)], Int32[], Float64[]))
 end
 
 # TODO: guard this against errors
@@ -173,14 +274,24 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
     F = LinearSolve.@get_cacheval(cache, :KLUFactorization)
     if F.common.status == KLU.KLU_OK
         y = ldiv!(cache.u, F, cache.b)
-        SciMLBase.build_linear_solution(alg, y, nothing, cache)
+        SciMLBase.build_linear_solution(
+            alg, y, nothing, cache; retcode = ReturnCode.Success)
     else
         SciMLBase.build_linear_solution(
             alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible)
     end
 end
 
-const PREALLOCATED_CHOLMOD = cholesky(SparseMatrixCSC(0, 0, [1], Int[], Float64[]))
+const PREALLOCATED_CHOLMOD = cholesky(sparse(reshape([1.0], 1, 1)))
+
+function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
+        A::Union{SparseMatrixCSC{T, Int}, Symmetric{T, SparseMatrixCSC{T, Int}}}, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions) where {T <:
+                                                                Float64}
+    PREALLOCATED_CHOLMOD
+end
 
 function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
         A::Union{SparseMatrixCSC{T, Int}, Symmetric{T, SparseMatrixCSC{T, Int}}}, b, u,
@@ -188,7 +299,15 @@ function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions) where {T <:
                                                                 BLASELTYPES}
-    PREALLOCATED_CHOLMOD
+    cholesky(sparse(reshape([one(T)], 1, 1)))
+end
+
+function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
+        A::AbstractArray, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
 end
 
 function LinearSolve.init_cacheval(alg::NormalCholeskyFactorization,
@@ -196,36 +315,36 @@ function LinearSolve.init_cacheval(alg::NormalCholeskyFactorization,
             Symmetric{T, <:AbstractSparseArray{T}}}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions) where {T <: BLASELTYPES}
-    LinearSolve.ArrayInterface.cholesky_instance(convert(AbstractMatrix, A))
+    ArrayInterface.cholesky_instance(convert(AbstractMatrix, A))
 end
 
 # Specialize QR for the non-square case
 # Missing ldiv! definitions: https://github.com/JuliaSparse/SparseArrays.jl/issues/242
 function LinearSolve._ldiv!(x::Vector,
-        A::Union{SparseArrays.QR, LinearAlgebra.QRCompactWY,
+        A::Union{QR, LinearAlgebra.QRCompactWY,
             SparseArrays.SPQR.QRSparse,
             SparseArrays.CHOLMOD.Factor}, b::Vector)
     x .= A \ b
 end
 
 function LinearSolve._ldiv!(x::AbstractVector,
-        A::Union{SparseArrays.QR, LinearAlgebra.QRCompactWY,
+        A::Union{QR, LinearAlgebra.QRCompactWY,
             SparseArrays.SPQR.QRSparse,
             SparseArrays.CHOLMOD.Factor}, b::AbstractVector)
     x .= A \ b
 end
 
 # Ambiguity removal
-function LinearSolve._ldiv!(::LinearSolve.SVector,
+function LinearSolve._ldiv!(::SVector,
         A::Union{SparseArrays.CHOLMOD.Factor, LinearAlgebra.QR,
             LinearAlgebra.QRCompactWY, SparseArrays.SPQR.QRSparse},
         b::AbstractVector)
     (A \ b)
 end
-function LinearSolve._ldiv!(::LinearSolve.SVector,
+function LinearSolve._ldiv!(::SVector,
         A::Union{SparseArrays.CHOLMOD.Factor, LinearAlgebra.QR,
             LinearAlgebra.QRCompactWY, SparseArrays.SPQR.QRSparse},
-        b::LinearSolve.SVector)
+        b::SVector)
     (A \ b)
 end
 
@@ -247,6 +366,29 @@ function LinearSolve.defaultalg(
     else
         LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.QRFactorization)
     end
+end
+
+# SPQR Handling
+function LinearSolve.init_cacheval(
+        alg::QRFactorization, A::AbstractSparseArray{<:Number, <:Integer}, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function LinearSolve.init_cacheval(
+        alg::QRFactorization, A::SparseMatrixCSC{Float64, <:Integer}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+    ArrayInterface.qr_instance(convert(AbstractMatrix, A), alg.pivot)
+end
+
+function LinearSolve.init_cacheval(
+        alg::QRFactorization, A::Symmetric{<:Number, <:SparseMatrixCSC}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+    return nothing
 end
 
 LinearSolve.PrecompileTools.@compile_workload begin

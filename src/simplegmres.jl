@@ -307,7 +307,8 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
             # Compute and apply current Givens reflection Ωₖ.
             # [cₖ  sₖ] [ r̄ₖ.ₖ ] = [rₖ.ₖ]
             # [s̄ₖ -cₖ] [hₖ₊₁.ₖ]   [ 0  ]
-            (c[inner_iter], s[inner_iter], R[nr + inner_iter]) = _sym_givens(
+            (c[inner_iter], s[inner_iter],
+                R[nr + inner_iter]) = _sym_givens(
                 R[nr + inner_iter],
                 Hbis)
 

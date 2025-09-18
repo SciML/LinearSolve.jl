@@ -2,7 +2,14 @@ using LinearSolve, LinearAlgebra, SparseArrays, MultiFloats, ForwardDiff
 using SciMLOperators, RecursiveFactorization, Sparspak, FastLapackInterface
 using IterativeSolvers, KrylovKit, MKL_jll, KrylovPreconditioners
 using Test
-import Random
+import CliqueTrees, Random
+
+# Try to load BLIS extension
+try
+    using blis_jll, LAPACK_jll
+catch LoadError
+    # BLIS dependencies not available, tests will be skipped
+end
 
 const Dual64 = ForwardDiff.Dual{Nothing, Float64, 1}
 
@@ -198,24 +205,105 @@ end
         test_interface(SparspakFactorization(), prob1, prob2)
     end
 
-    if VERSION >= v"1.9"
-        @testset "FastLAPACK Factorizations" begin
-            A1 = A / 1
-            b1 = rand(n)
-            x1 = zero(b)
-            A2 = A / 2
-            b2 = rand(n)
-            x2 = zero(b)
+    @testset "CliqueTrees Factorization (Float64)" begin
+        A1 = sparse(A / 1)
+        b1 = rand(n)
+        x1 = zero(b)
+        A2 = sparse(A / 2)
+        b2 = rand(n)
+        x2 = zero(b)
 
-            prob1 = LinearProblem(A1, b1; u0 = x1)
-            prob2 = LinearProblem(A2, b2; u0 = x2)
-            test_interface(LinearSolve.FastLUFactorization(), prob1, prob2)
-            test_interface(LinearSolve.FastQRFactorization(), prob1, prob2)
+        prob1 = LinearProblem(A1, b1; u0 = x1)
+        prob2 = LinearProblem(A2, b2; u0 = x2)
+        test_interface(CliqueTreesFactorization(), prob1, prob2)
+    end
 
-            # TODO: Resizing tests. Upstream doesn't currently support it.
-            # Need to be absolutely certain we never segfault with incorrect
-            # ws sizes.
-        end
+    @testset "CliqueTrees Factorization (Float64x1)" begin
+        A1 = sparse(A / 1) .|> Float64x1
+        b1 = rand(n) .|> Float64x1
+        x1 = zero(b) .|> Float64x1
+        A2 = sparse(A / 2) .|> Float64x1
+        b2 = rand(n) .|> Float64x1
+        x2 = zero(b) .|> Float64x1
+
+        prob1 = LinearProblem(A1, b1; u0 = x1)
+        prob2 = LinearProblem(A2, b2; u0 = x2)
+        test_interface(CliqueTreesFactorization(), prob1, prob2)
+    end
+
+    @testset "CliqueTrees Factorization (Float64x2)" begin
+        A1 = sparse(A / 1) .|> Float64x2
+        b1 = rand(n) .|> Float64x2
+        x1 = zero(b) .|> Float64x2
+        A2 = sparse(A / 2) .|> Float64x2
+        b2 = rand(n) .|> Float64x2
+        x2 = zero(b) .|> Float64x2
+
+        prob1 = LinearProblem(A1, b1; u0 = x1)
+        prob2 = LinearProblem(A2, b2; u0 = x2)
+        test_interface(CliqueTreesFactorization(), prob1, prob2)
+    end
+
+    @testset "CliqueTrees Factorization (Dual64)" begin
+        A1 = sparse(A / 1) .|> Dual64
+        b1 = rand(n) .|> Dual64
+        x1 = zero(b) .|> Dual64
+        A2 = sparse(A / 2) .|> Dual64
+        b2 = rand(n) .|> Dual64
+        x2 = zero(b) .|> Dual64
+
+        prob1 = LinearProblem(A1, b1; u0 = x1)
+        prob2 = LinearProblem(A2, b2; u0 = x2)
+        test_interface(CliqueTreesFactorization(), prob1, prob2)
+    end
+
+    @testset "FastLAPACK Factorizations" begin
+        A1 = A / 1
+        b1 = rand(n)
+        x1 = zero(b)
+        A2 = A / 2
+        b2 = rand(n)
+        x2 = zero(b)
+
+        prob1 = LinearProblem(A1, b1; u0 = x1)
+        prob2 = LinearProblem(A2, b2; u0 = x2)
+        test_interface(LinearSolve.FastLUFactorization(), prob1, prob2)
+        test_interface(LinearSolve.FastQRFactorization(), prob1, prob2)
+
+        # TODO: Resizing tests. Upstream doesn't currently support it.
+        # Need to be absolutely certain we never segfault with incorrect
+        # ws sizes.
+    end
+
+    @testset "SymTridiagonal with LDLtFactorization" begin
+        # Test that LDLtFactorization works correctly with SymTridiagonal
+        # and that the default algorithm correctly selects it
+        k = 100
+        ρ = 0.95
+        A_tri = SymTridiagonal(ones(k) .+ ρ^2, -ρ * ones(k-1))
+        b = rand(k)
+        
+        # Test with explicit LDLtFactorization
+        prob_tri = LinearProblem(A_tri, b)
+        sol = solve(prob_tri, LDLtFactorization())
+        @test A_tri * sol.u ≈ b
+        
+        # Test that default algorithm uses LDLtFactorization for SymTridiagonal
+        default_alg = LinearSolve.defaultalg(A_tri, b, OperatorAssumptions(true))
+        @test default_alg isa LinearSolve.DefaultLinearSolver
+        @test default_alg.alg == LinearSolve.DefaultAlgorithmChoice.LDLtFactorization
+        
+        # Test that the factorization is cached and reused
+        cache = init(prob_tri, LDLtFactorization())
+        sol1 = solve!(cache)
+        @test A_tri * sol1.u ≈ b
+        @test !cache.isfresh  # Cache should not be fresh after first solve
+        
+        # Solve again with same matrix to ensure cache is reused
+        cache.b = rand(k)  # Change RHS
+        sol2 = solve!(cache)
+        @test A_tri * sol2.u ≈ cache.b
+        @test !cache.isfresh  # Cache should still not be fresh
     end
 
     test_algs = [
@@ -226,15 +314,25 @@ end
         LinearSolve.defaultalg(prob1.A, prob1.b)
     ]
 
-    if VERSION >= v"1.9" && LinearSolve.usemkl
+    if LinearSolve.usemkl
         push!(test_algs, MKLLUFactorization())
+    end
+
+    # Test OpenBLAS if available
+    if LinearSolve.useopenblas
+        push!(test_algs, OpenBLASLUFactorization())
+    end
+
+    # Test BLIS if extension is available
+    if Base.get_extension(LinearSolve, :LinearSolveBLISExt) !== nothing
+        push!(test_algs, BLISLUFactorization())
     end
 
     @testset "Concrete Factorizations" begin
         for alg in test_algs
             @testset "$alg" begin
                 test_interface(alg, prob1, prob2)
-                VERSION >= v"1.9" && test_interface(alg, prob3, prob4)
+                test_interface(alg, prob3, prob4)
             end
         end
         if LinearSolve.appleaccelerate_isavailable()
@@ -474,22 +572,22 @@ end
 
         @testset "DirectLdiv!" begin
             function get_operator(A, u; add_inverse = true)
-                function f(u, p, t)
+                function f(v, u, p, t)
                     println("using FunctionOperator OOP mul")
-                    A * u
+                    A * v
                 end
-                function f(du, u, p, t)
+                function f(w, v, u, p, t)
                     println("using FunctionOperator IIP mul")
-                    mul!(du, A, u)
+                    mul!(w, A, v)
                 end
 
-                function fi(du, u, p, t)
+                function fi(v, u, p, t)
                     println("using FunctionOperator OOP div")
-                    A \ u
+                    A \ v
                 end
-                function fi(du, u, p, t)
+                function fi(w, v, u, p, t)
                     println("using FunctionOperator IIP div")
-                    ldiv!(du, A, u)
+                    ldiv!(w, A, v)
                 end
 
                 if add_inverse
@@ -509,10 +607,8 @@ end
             prob3 = LinearProblem(op1, b1; u0 = x1)
             prob4 = LinearProblem(op2, b2; u0 = x2)
 
-            @test LinearSolve.defaultalg(op1, x1).alg ===
-                  LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
-            @test LinearSolve.defaultalg(op2, x2).alg ===
-                  LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
+            @test LinearSolve.defaultalg(op1, x1).alg === LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
+            @test LinearSolve.defaultalg(op2, x2).alg === LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
             @test LinearSolve.defaultalg(op3, x1).alg ===
                   LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
             @test LinearSolve.defaultalg(op4, x2).alg ===
@@ -613,4 +709,35 @@ end
     reinit!(cache; A = B1, b = b1)
     u = solve!(cache)
     @test norm(u - u0, Inf) < 1.0e-8
+end
+
+@testset "ParallelSolves" begin
+    n=1000
+    @info "ParallelSolves: Threads.nthreads()=$(Threads.nthreads())"
+    A_sparse = 10I - sprand(n, n, 0.01)
+    B = [rand(n), rand(n)]
+    U = [A_sparse \ B[i] for i in 1:2]
+    sol = similar(U)
+
+    Threads.@threads for i in 1:2
+        sol[i] = solve(LinearProblem(A_sparse, B[i]), UMFPACKFactorization())
+    end
+
+    for i in 1:2
+        @test sol[i] ≈ U[i]
+    end
+    
+    Threads.@threads for i in 1:2
+        sol[i] = solve(LinearProblem(A_sparse, B[i]), KLUFactorization())
+    end
+    for i in 1:2
+        @test sol[i] ≈ U[i]
+    end
+
+    Threads.@threads for i in 1:2
+        sol[i] = solve(LinearProblem(A_sparse, B[i]), SparspakFactorization())
+    end
+    for i in 1:2
+        @test sol[i] ≈ U[i]
+    end
 end

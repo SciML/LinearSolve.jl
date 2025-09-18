@@ -17,18 +17,23 @@ function LinearSolve.init_cacheval(
 end
 
 function LinearSolve.init_cacheval(
-        ::SparspakFactorization, A::AbstractSparseMatrixCSC, b, u, Pl, Pr, maxiters::Int, abstol,
+        ::SparspakFactorization, A::AbstractSparseMatrixCSC{Tv, Ti}, b, u, Pl, Pr, maxiters::Int, abstol,
         reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
-    A = convert(AbstractMatrix, A)
-    if A isa SparseArrays.AbstractSparseArray
-        return sparspaklu(
-            SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                nonzeros(A)),
-            factorize = false)
+        verbose::Bool, assumptions::OperatorAssumptions) where {Tv, Ti}
+    if size(A, 1) == size(A, 2)
+        A = convert(AbstractMatrix, A)
+        if A isa SparseArrays.AbstractSparseArray
+            return sparspaklu(
+                SparseMatrixCSC{Tv, Ti}(size(A)..., getcolptr(A), rowvals(A),
+                    nonzeros(A)),
+                factorize = false)
+        else
+            return sparspaklu(
+                SparseMatrixCSC{Tv, Ti}(zero(Ti), zero(Ti), [one(Ti)], Ti[], eltype(A)[]),
+                factorize = false)
+        end
     else
-        return sparspaklu(SparseMatrixCSC(0, 0, [1], Int[], eltype(A)[]),
-            factorize = false)
+        PREALLOCATED_SPARSEPAK
     end
 end
 
@@ -36,7 +41,7 @@ function SciMLBase.solve!(
         cache::LinearSolve.LinearCache, alg::SparspakFactorization; kwargs...)
     A = cache.A
     if cache.isfresh
-        if cache.cacheval !== nothing && alg.reuse_symbolic
+        if !(cache.cacheval === PREALLOCATED_SPARSEPAK) && alg.reuse_symbolic
             fact = sparspaklu!(LinearSolve.@get_cacheval(cache, :SparspakFactorization),
                 SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                     nonzeros(A)))

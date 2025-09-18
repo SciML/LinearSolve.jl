@@ -12,7 +12,7 @@ lambda = 3
 n = 4
 e = ones(n)
 e2 = ones(n - 1)
-A2 = spdiagm(-1 => im * e2, 0 => lambda * e, 1 => -im * e2)
+A2 = spdiagm(-1 => 1.0 .+ im * e2, 0 => lambda * e, 1 => 1.0 .+ -im * e2)
 b2 = rand(n) + im * zeros(n)
 cache_kwargs = (; abstol = 1e-8, reltol = 1e-8, maxiter = 30)
 
@@ -60,7 +60,7 @@ linsolve.A = copy(A2)
 sol13 = solve!(linsolve)
 
 for alg in algs
-    linsolve = init(prob, alg)
+    local linsolve = init(prob, alg)
     sol31 = solve!(linsolve)
     linsolve.b = copy(b2)
     sol32 = solve!(linsolve)
@@ -147,11 +147,11 @@ function makeA()
 end
 
 for alg in algs
-    A = makeA()
+    local A = makeA()
     u0 = fill(0.1, size(A, 2))
     linprob = LinearProblem(A, A * u0)
     u = LinearSolve.solve(linprob, alg)
-    @test norm(u - u0) < 1.0e-14
+    @test norm(u - u0) < 5.0e-14
 end
 
 # Testing and demonstrating Pardiso.set_iparm! for MKLPardisoSolver

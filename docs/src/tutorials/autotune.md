@@ -1,0 +1,506 @@
+# Automatic Algorithm Selection with LinearSolveAutotune
+
+LinearSolve.jl includes an automatic tuning system that benchmarks all available linear algebra algorithms on your specific hardware and automatically selects optimal algorithms for different problem sizes and data types. This tutorial will show you how to use the `LinearSolveAutotune` sublibrary to optimize your linear solve performance.
+
+The autotuning system provides comprehensive benchmarking and automatic algorithm selection optimization for your specific hardware.
+
+## Quick Start
+
+The simplest way to use the autotuner is to run it with default settings:
+
+```julia
+using LinearSolve
+using LinearSolveAutotune
+
+# Run autotune with default settings
+results = autotune_setup()
+
+# View the results
+display(results)
+
+# Generate performance plots
+plot(results)
+
+# Share results with the community (optional, requires GitHub authentication)
+share_results(results)
+```
+
+This will:
+- Benchmark algorithms for `Float64` matrices by default
+- Test matrix sizes from tiny (5×5) through large (1000×1000) 
+- Display a summary of algorithm performance
+- Return an `AutotuneResults` object containing all benchmark data
+
+## Understanding the Results
+
+The `autotune_setup()` function returns an `AutotuneResults` object containing:
+- `results_df`: A DataFrame with detailed benchmark results
+- `sysinfo`: System information dictionary
+
+You can explore the results in several ways:
+
+```julia
+# Get the results
+results = autotune_setup()
+
+# Display a formatted summary
+display(results)
+
+# Access the raw benchmark data
+df = results.results_df
+
+# View system information
+sysinfo = results.sysinfo
+
+# Generate performance plots
+plot(results)
+
+# Filter to see successful benchmarks only
+using DataFrames
+successful = filter(row -> row.success, df)
+```
+
+## Customizing the Autotune Process
+
+### Size Categories
+
+Control which matrix size ranges to test:
+
+```julia
+# Available size categories:
+# :tiny   - 5×5 to 20×20 (very small problems)
+# :small  - 20×20 to 100×100 (small problems)  
+# :medium - 100×100 to 300×300 (typical problems)
+# :large  - 300×300 to 1000×1000 (larger problems)
+# :big    - 1000×1000 to 15000×15000 (GPU/HPC scale, capped at 15000 for stability)
+
+# Default: test tiny through large
+results = autotune_setup()  # uses [:tiny, :small, :medium, :large]
+
+# Test only medium and large sizes
+results = autotune_setup(sizes = [:medium, :large])
+
+# Include huge matrices (for GPU systems)
+results = autotune_setup(sizes = [:large, :big])
+
+# Test all size categories
+results = autotune_setup(sizes = [:tiny, :small, :medium, :large, :big])
+```
+
+### Element Types
+
+Specify which numeric types to benchmark:
+
+```julia
+# Default: Float64 only
+results = autotune_setup()  # equivalent to eltypes = (Float64,)
+
+# Test standard floating point types
+results = autotune_setup(eltypes = (Float32, Float64))
+
+# Include complex numbers
+results = autotune_setup(eltypes = (Float64, ComplexF64))
+
+# Test all standard BLAS types
+results = autotune_setup(eltypes = (Float32, Float64, ComplexF32, ComplexF64))
+
+# Test arbitrary precision (excludes some BLAS algorithms)
+results = autotune_setup(eltypes = (BigFloat,), skip_missing_algs = true)
+```
+
+### Benchmark Quality vs Speed
+
+Adjust the thoroughness of benchmarking:
+
+```julia
+# Quick benchmark (fewer samples, less time per test)
+results = autotune_setup(samples = 1, seconds = 0.1)
+
+# Default benchmark (balanced)
+results = autotune_setup(samples = 5, seconds = 0.5)
+
+# Thorough benchmark (more samples, more time per test)
+results = autotune_setup(samples = 10, seconds = 2.0)
+
+# Production-quality benchmark for final tuning
+results = autotune_setup(
+    samples = 20,
+    seconds = 5.0,
+    sizes = [:small, :medium, :large],
+    eltypes = (Float32, Float64, ComplexF32, ComplexF64)
+)
+```
+
+### Time Limits for Algorithm Tests
+
+Control the maximum time allowed for each algorithm test (including accuracy check):
+
+```julia
+# Default: 100 seconds maximum per algorithm test
+results = autotune_setup()  # maxtime = 100.0
+
+# Quick timeout for fast exploration
+results = autotune_setup(maxtime = 10.0)
+
+# Extended timeout for slow algorithms or large matrices
+results = autotune_setup(
+    maxtime = 300.0,  # 5 minutes per test
+    sizes = [:large, :big]
+)
+
+# Conservative timeout for production benchmarking
+results = autotune_setup(
+    maxtime = 200.0,
+    samples = 10,
+    seconds = 2.0
+)
+```
+
+When an algorithm exceeds the `maxtime` limit:
+- The test is skipped to prevent hanging
+- The result is recorded as `NaN` in the benchmark data
+- A warning is displayed indicating the timeout
+- **The algorithm is automatically excluded from all larger matrix sizes** to save time
+- The benchmark continues with the next algorithm
+
+This intelligent timeout handling ensures that slow algorithms don't waste time on progressively larger matrices once they've proven too slow on smaller ones.
+
+### Missing Algorithm Handling
+
+By default, autotune expects all algorithms to be available to ensure complete benchmarking. You can relax this requirement:
+
+```julia
+# Default: error if expected algorithms are missing
+results = autotune_setup()  # Will error if RFLUFactorization is missing
+
+# Allow missing algorithms (useful for incomplete setups)
+results = autotune_setup(skip_missing_algs = true)  # Will warn instead of error
+```
+
+### Preferences Setting
+
+Control whether the autotuner updates LinearSolve preferences:
+
+```julia
+# Default: set preferences based on benchmark results
+results = autotune_setup(set_preferences = true)
+
+# Benchmark only, don't change preferences
+results = autotune_setup(set_preferences = false)
+```
+
+## GPU Systems
+
+On systems with CUDA or Metal GPU support, the autotuner will automatically detect and benchmark GPU algorithms:
+
+```julia
+# Enable large matrix testing for GPUs
+results = autotune_setup(
+    sizes = [:large, :big],
+    samples = 3,
+    seconds = 1.0
+)
+```
+
+GPU algorithms tested (when available):
+- **CudaOffloadFactorization**: CUDA GPU acceleration
+- **MetalLUFactorization**: Apple Metal GPU acceleration
+
+## Sharing Results with the Community
+
+The autotuner includes a telemetry feature that allows you to share your benchmark results with the LinearSolve.jl community. This helps improve algorithm selection across different hardware configurations.
+
+### Automatic Authentication
+
+**New in v2.0+**: LinearSolveAutotune now includes automatic authentication support! If you're not already authenticated, the system will offer to help you set up GitHub authentication when you run `share_results()`.
+
+```julia
+# Run benchmarks
+results = autotune_setup()
+
+# Share with the community - will prompt for authentication if needed
+share_results(results)
+```
+
+If you're not authenticated, you'll see:
+```
+🔐 GitHub authentication not found.
+   To share results with the community, authentication is required.
+
+Would you like to authenticate with GitHub now? (y/n)
+> 
+```
+
+Simply type `y` and follow the prompts to authenticate directly from Julia!
+
+### Manual Authentication Setup
+
+You can also set up authentication manually before sharing:
+
+#### Method 1: GitHub CLI (Recommended)
+
+The GitHub CLI is the easiest way to authenticate. LinearSolveAutotune will automatically use the GitHub CLI if it's installed, or fall back to a bundled version if not.
+
+1. **Install GitHub CLI (Optional)**
+   - macOS: `brew install gh`
+   - Windows: `winget install --id GitHub.cli`
+   - Linux: See [cli.github.com](https://cli.github.com/manual/installation)
+   
+   Note: If you don't have gh installed, LinearSolveAutotune includes a bundled version via `gh_cli_jll` that will be used automatically!
+
+2. **Authenticate**
+   ```bash
+   gh auth login
+   ```
+   Follow the prompts to authenticate with your GitHub account.
+
+3. **Verify authentication**
+   ```bash
+   gh auth status
+   ```
+
+#### Method 2: GitHub Personal Access Token
+
+1. Go to [GitHub Settings > Tokens](https://github.com/settings/tokens/new)
+2. Add description: "LinearSolve.jl Telemetry"
+3. Select scope: `public_repo` (for commenting on issues)
+4. Click "Generate token" and copy it
+5. In Julia:
+   ```julia
+   ENV["GITHUB_TOKEN"] = "your_token_here"
+   ```
+
+### Sharing Your Results
+
+Once authenticated (either automatically or manually), sharing is simple:
+
+```julia
+# Run benchmarks
+results = autotune_setup()
+
+# Share with the community (with automatic authentication prompt)
+share_results(results)
+
+# Or skip the authentication prompt if not authenticated
+share_results(results; auto_login = false)
+```
+
+This will:
+1. Check for existing GitHub authentication
+2. Offer to set up authentication if needed (unless `auto_login = false`)
+3. Format your benchmark results as a markdown report
+4. Post the results as a comment to the [community benchmark collection issue](https://github.com/SciML/LinearSolve.jl/issues/725)
+5. Save results locally if authentication is unavailable
+
+### No GitHub CLI Required!
+
+LinearSolveAutotune now includes `gh_cli_jll`, which provides a bundled version of the GitHub CLI. This means:
+- You don't need to install gh separately
+- Authentication works on all platforms
+- The system automatically uses your existing gh installation if available, or falls back to the bundled version
+
+!!! info "Privacy Note"
+    - Sharing is completely optional
+    - Only benchmark performance data and system specifications are shared
+    - No personal information is collected
+    - All shared data is publicly visible on GitHub
+    - If authentication fails or is skipped, results are saved locally for manual sharing
+
+## Working with Results
+
+### Examining Performance Data
+
+```julia
+using DataFrames
+using Statistics
+
+results = autotune_setup()
+
+# Access the raw DataFrame
+df = results.results_df
+
+# Filter successful results
+successful = filter(row -> row.success, df)
+
+# Summary by algorithm
+summary = combine(groupby(successful, [:algorithm, :eltype]), 
+                 :gflops => mean => :avg_gflops,
+                 :gflops => maximum => :max_gflops)
+sort!(summary, :avg_gflops, rev=true)
+println(summary)
+
+# Best algorithm for each size category
+by_size = combine(groupby(successful, [:size_category, :eltype])) do group
+    best_row = argmax(group.gflops)
+    return (algorithm = group.algorithm[best_row],
+            gflops = group.gflops[best_row])
+end
+println(by_size)
+```
+
+### Performance Visualization
+
+Generate and save performance plots:
+
+```julia
+results = autotune_setup()
+
+# Generate plots (returns a combined plot)
+p = plot(results)
+display(p)
+
+# Save the plot
+using Plots
+savefig(p, "benchmark_results.png")
+```
+
+### Accessing System Information
+
+```julia
+results = autotune_setup()
+
+# System information is stored in the results
+sysinfo = results.sysinfo
+println("CPU: ", sysinfo["cpu_name"])
+println("Cores: ", sysinfo["num_cores"])
+println("Julia: ", sysinfo["julia_version"])
+println("OS: ", sysinfo["os"])
+```
+
+## Advanced Usage
+
+### Custom Benchmark Pipeline
+
+For complete control over the benchmarking process:
+
+```julia
+# Step 1: Run benchmarks without plotting or sharing
+results = autotune_setup(
+    sizes = [:medium, :large],
+    eltypes = (Float64, ComplexF64),
+    set_preferences = false,  # Don't change preferences yet
+    samples = 10,
+    seconds = 1.0
+)
+
+# Step 2: Analyze results
+df = results.results_df
+# ... perform custom analysis ...
+
+# Step 3: Generate plots
+p = plot(results)
+savefig(p, "my_benchmarks.png")
+
+# Step 4: Optionally share results
+share_results(results)
+```
+
+### Batch Testing Multiple Configurations
+
+```julia
+# Test different element types separately
+configs = [
+    (eltypes = (Float32,), name = "float32"),
+    (eltypes = (Float64,), name = "float64"),
+    (eltypes = (ComplexF64,), name = "complex64")
+]
+
+all_results = Dict()
+for config in configs
+    println("Testing $(config.name)...")
+    results = autotune_setup(
+        eltypes = config.eltypes,
+        sizes = [:small, :medium],
+        samples = 3
+    )
+    all_results[config.name] = results
+end
+```
+
+## Algorithm Selection Analysis
+
+You can analyze what algorithms are currently being chosen for different matrix sizes:
+
+```julia
+using LinearSolve
+
+# Show current algorithm choices and preferences
+show_algorithm_choices()
+```
+
+This displays:
+- Current autotune preferences for all element types (if any are set)
+- Algorithm choices for all element types across representative sizes in each category  
+- Comprehensive element type behavior (Float32, Float64, ComplexF32, ComplexF64)
+- System information (MKL, Apple Accelerate, RecursiveFactorization status)
+
+The output shows a clear table format:
+```
+📊 Default Algorithm Choices:
+Size       Category    Float32            Float64            ComplexF32         ComplexF64
+8×8        tiny        GenericLUFactorization GenericLUFactorization GenericLUFactorization GenericLUFactorization
+200×200    medium      MKLLUFactorization MKLLUFactorization MKLLUFactorization MKLLUFactorization
+```
+
+## Preferences Integration
+
+The autotuner sets preferences that LinearSolve.jl uses for automatic algorithm selection:
+
+```julia
+using LinearSolveAutotune
+
+# Run autotune and set preferences
+results = autotune_setup(set_preferences = true)
+
+# View what algorithms are now being chosen
+using LinearSolve
+show_algorithm_choices()
+
+# View current preferences
+LinearSolveAutotune.show_current_preferences()
+
+# Clear all autotune preferences if needed
+LinearSolveAutotune.clear_algorithm_preferences()
+```
+
+After running autotune with `set_preferences = true`, LinearSolve.jl will automatically use the fastest algorithms found for each matrix size and element type, with intelligent fallbacks when extensions are not available.
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Missing algorithms error**
+   ```julia
+   # If you get errors about missing algorithms:
+   results = autotune_setup(skip_missing_algs = true)
+   ```
+
+2. **GitHub authentication fails**
+   - Ensure gh CLI is installed and authenticated: `gh auth status`
+   - Or set a valid GitHub token: `ENV["GITHUB_TOKEN"] = "your_token"`
+   - Results will be saved locally if authentication fails
+
+3. **Out of memory on large matrices**
+   ```julia
+   # Use smaller size categories
+   results = autotune_setup(sizes = [:tiny, :small, :medium])
+   ```
+
+4. **Benchmarks taking too long**
+   ```julia
+   # Reduce samples and time per benchmark
+   results = autotune_setup(samples = 1, seconds = 0.1)
+   ```
+
+## Summary
+
+LinearSolveAutotune provides a comprehensive system for benchmarking and optimizing LinearSolve.jl performance on your specific hardware. Key features include:
+
+- Flexible size categories from tiny to GPU-scale matrices
+- Support for all standard numeric types
+- Automatic GPU algorithm detection
+- Community result sharing via GitHub
+- Performance visualization
+- Preference setting for automatic algorithm selection (in development)
+
+By running autotune and optionally sharing your results, you help improve LinearSolve.jl's performance for everyone in the Julia community.

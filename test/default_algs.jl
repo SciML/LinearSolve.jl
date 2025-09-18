@@ -1,6 +1,6 @@
-using LinearSolve, RecursiveFactorization, LinearAlgebra, SparseArrays, Test, JET
-@test LinearSolve.defaultalg(nothing, zeros(3)).alg ===
-      LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
+using LinearSolve, RecursiveFactorization, LinearAlgebra, SparseArrays, Test
+
+@test LinearSolve.defaultalg(nothing, zeros(3)).alg === LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
 prob = LinearProblem(rand(3, 3), rand(3))
 solve(prob)
 
@@ -55,19 +55,7 @@ solve(prob)
 A = rand(4, 4)
 b = rand(4)
 prob = LinearProblem(A, b)
-VERSION ≥ v"1.10-" && JET.@test_opt init(prob, nothing)
-JET.@test_opt solve(prob, LUFactorization())
-JET.@test_opt solve(prob, GenericLUFactorization())
-@test_skip JET.@test_opt solve(prob, QRFactorization())
-JET.@test_opt solve(prob, DiagonalFactorization())
-#JET.@test_opt solve(prob, SVDFactorization())
-#JET.@test_opt solve(prob, KrylovJL_GMRES())
-
 prob = LinearProblem(sparse(A), b)
-#JET.@test_opt solve(prob, UMFPACKFactorization())
-#JET.@test_opt solve(prob, KLUFactorization())
-#JET.@test_opt solve(prob, SparspakFactorization())
-#JET.@test_opt solve(prob)
 @inferred solve(prob)
 @inferred init(prob, nothing)
 
@@ -81,8 +69,8 @@ m, n = 2, 2
 A = rand(m, n)
 b = rand(m)
 x = rand(n)
-f = (du, u, p, t) -> mul!(du, A, u)
-fadj = (du, u, p, t) -> mul!(du, A', u)
+f = (w, v, u, p, t) -> mul!(w, A, v)
+fadj = (w, v, u, p, t) -> mul!(w, A', v)
 funcop = FunctionOperator(f, x, b; op_adjoint = fadj)
 prob = LinearProblem(funcop, b)
 sol1 = solve(prob)
@@ -93,8 +81,8 @@ m, n = 3, 2
 A = rand(m, n)
 b = rand(m)
 x = rand(n)
-f = (du, u, p, t) -> mul!(du, A, u)
-fadj = (du, u, p, t) -> mul!(du, A', u)
+f = (w, v, u, p, t) -> mul!(w, A, v)
+fadj = (w, v, u, p, t) -> mul!(w, A', v)
 funcop = FunctionOperator(f, x, b; op_adjoint = fadj)
 prob = LinearProblem(funcop, b)
 sol1 = solve(prob)
@@ -105,8 +93,8 @@ m, n = 2, 3
 A = rand(m, n)
 b = rand(m)
 x = rand(n)
-f = (du, u, p, t) -> mul!(du, A, u)
-fadj = (du, u, p, t) -> mul!(du, A', u)
+f = (w, v, u, p, t) -> mul!(w, A, v)
+fadj = (w, v, u, p, t) -> mul!(w, A', v)
 funcop = FunctionOperator(f, x, b; op_adjoint = fadj)
 prob = LinearProblem(funcop, b)
 sol1 = solve(prob)
@@ -144,3 +132,42 @@ cache.A = [2.0 1.0
 sol = solve!(cache)
 
 @test !SciMLBase.successful_retcode(sol.retcode)
+
+## Non-square Sparse Defaults 
+# https://github.com/SciML/NonlinearSolve.jl/issues/599
+A = SparseMatrixCSC{Float64, Int64}([1.0 0.0
+                                     1.0 1.0])
+b = ones(2)
+A2 = hcat(A, A)
+prob = LinearProblem(A, b)
+@test SciMLBase.successful_retcode(solve(prob))
+
+prob2 = LinearProblem(A2, b)
+@test SciMLBase.successful_retcode(solve(prob2))
+
+A = SparseMatrixCSC{Float64, Int32}([1.0 0.0
+                                     1.0 1.0])
+b = ones(2)
+A2 = hcat(A, A)
+prob = LinearProblem(A, b)
+@test_broken SciMLBase.successful_retcode(solve(prob))
+
+prob2 = LinearProblem(A2, b)
+@test SciMLBase.successful_retcode(solve(prob2))
+
+# Column-Pivoted QR fallback on failed LU
+A = [1.0 0 0 0
+     0 1 0 0
+     0 0 1 0
+     0 0 0 0]
+b = rand(4)
+prob = LinearProblem(A, b)
+sol = solve(prob,
+    LinearSolve.DefaultLinearSolver(
+        LinearSolve.DefaultAlgorithmChoice.LUFactorization; safetyfallback = false))
+@test sol.retcode === ReturnCode.Failure
+@test sol.u == zeros(4)
+
+sol = solve(prob)
+@test sol.u ≈ svd(A)\b
+

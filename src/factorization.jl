@@ -1,3 +1,26 @@
+@generated function SciMLBase.solve!(cache::LinearCache, alg::AbstractFactorization;
+        kwargs...)
+    quote
+        if cache.isfresh
+            fact = do_factorization(alg, cache.A, cache.b, cache.u)
+            cache.cacheval = fact
+
+            # If factorization was not successful, return failure. Don't reset `isfresh`
+            if _notsuccessful(fact)
+                return SciMLBase.build_linear_solution(
+                    alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
+            end
+
+            cache.isfresh = false
+        end
+
+        y = _ldiv!(cache.u, @get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
+            cache.b)
+        return SciMLBase.build_linear_solution(
+            alg, y, nothing, cache; retcode = ReturnCode.Success)
+    end
+end
+
 macro get_cacheval(cache, algsym)
     quote
         if $(esc(cache)).alg isa DefaultLinearSolver
@@ -7,6 +30,8 @@ macro get_cacheval(cache, algsym)
         end
     end
 end
+
+const PREALLOCATED_IPIV = Vector{LinearAlgebra.BlasInt}(undef, 0)
 
 _ldiv!(x, A, b) = ldiv!(x, A, b)
 
@@ -41,8 +66,7 @@ function LinearSolve.init_cacheval(
         alg::RFLUFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
         maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
-    ipiv = Vector{LinearAlgebra.BlasInt}(undef, 0)
-    PREALLOCATED_LU, ipiv
+    PREALLOCATED_LU, PREALLOCATED_IPIV
 end
 
 function LinearSolve.init_cacheval(alg::RFLUFactorization,
@@ -117,7 +141,8 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
         end
         cache.cacheval = fact
 
-        if hasmethod(LinearAlgebra.issuccess, Tuple{typeof(fact)}) && !LinearAlgebra.issuccess(fact)
+        if hasmethod(LinearAlgebra.issuccess, Tuple{typeof(fact)}) &&
+           !LinearAlgebra.issuccess(fact)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
         end
@@ -127,7 +152,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
 
     F = @get_cacheval(cache, :LUFactorization)
     y = _ldiv!(cache.u, F, cache.b)
-    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
 end
 
 function do_factorization(alg::LUFactorization, A, b, u)
@@ -144,41 +169,86 @@ function do_factorization(alg::LUFactorization, A, b, u)
     return fact
 end
 
-function do_factorization(alg::GenericLUFactorization, A, b, u)
-    A = convert(AbstractMatrix, A)
-    fact = LinearAlgebra.generic_lufact!(A, alg.pivot, check = false)
-    return fact
+function init_cacheval(
+        alg::GenericLUFactorization, A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+    ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
+    ArrayInterface.lu_instance(convert(AbstractMatrix, A)), ipiv
 end
 
 function init_cacheval(
-        alg::Union{LUFactorization, GenericLUFactorization}, A, b, u, Pl, Pr,
+        alg::GenericLUFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+    PREALLOCATED_LU, PREALLOCATED_IPIV
+end
+
+function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::GenericLUFactorization;
+        kwargs...)
+    A = cache.A
+    A = convert(AbstractMatrix, A)
+    fact, ipiv = LinearSolve.@get_cacheval(cache, :GenericLUFactorization)
+
+    if cache.isfresh
+        if length(ipiv) != min(size(A)...)
+            ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
+        end
+        fact = generic_lufact!(A, alg.pivot, ipiv; check = false)
+        cache.cacheval = (fact, ipiv)
+
+        if !LinearAlgebra.issuccess(fact)
+            return SciMLBase.build_linear_solution(
+                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
+        end
+
+        cache.isfresh = false
+    end
+    y = ldiv!(
+        cache.u, LinearSolve.@get_cacheval(cache, :GenericLUFactorization)[1], cache.b)
+    SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
+end
+
+function init_cacheval(
+        alg::LUFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     ArrayInterface.lu_instance(convert(AbstractMatrix, A))
 end
 
-function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization},
+function init_cacheval(alg::LUFactorization,
         A::Union{<:Adjoint, <:Transpose}, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
     error_no_cudss_lu(A)
-    if alg isa LUFactorization
-        return lu(A; check = false)
-    else
-        A isa GPUArraysCore.AnyGPUArray && return nothing
-        return LinearAlgebra.generic_lufact!(copy(A), alg.pivot; check = false)
-    end
+    return lu(A; check = false)
+end
+
+function init_cacheval(alg::GenericLUFactorization,
+        A::Union{<:Adjoint, <:Transpose}, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    error_no_cudss_lu(A)
+    A isa GPUArraysCore.AnyGPUArray && return nothing
+    ipiv = Vector{LinearAlgebra.BlasInt}(undef, 0)
+    return LinearAlgebra.generic_lufact!(copy(A), alg.pivot; check = false), ipiv
 end
 
 const PREALLOCATED_LU = ArrayInterface.lu_instance(rand(1, 1))
 
-function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization},
+function init_cacheval(alg::LUFactorization,
         A::Matrix{Float64}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
     PREALLOCATED_LU
 end
 
-function init_cacheval(alg::Union{LUFactorization, GenericLUFactorization},
+function init_cacheval(alg::LUFactorization,
+        A::AbstractSciMLOperator, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool,
+        assumptions::OperatorAssumptions)
+    nothing
+end
+
+function init_cacheval(alg::GenericLUFactorization,
         A::AbstractSciMLOperator, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool,
         assumptions::OperatorAssumptions)
@@ -791,9 +861,11 @@ patterns with “more structure”.
 !!! note
 
     By default, the SparseArrays.jl are implemented for efficiency by caching the
-    symbolic factorization. I.e., if `set_A` is used, it is expected that the new
-    `A` has the same sparsity pattern as the previous `A`. If this algorithm is to
-    be used in a context where that assumption does not hold, set `reuse_symbolic=false`.
+    symbolic factorization. If the sparsity pattern of `A` may change between solves, set `reuse_symbolic=false`.
+    If the pattern is assumed or known to be constant, set `reuse_symbolic=true` to avoid
+    unnecessary recomputation. To further reduce computational overhead, you can disable
+    pattern checks entirely by setting `check_pattern = false`. Note that this may error
+    if the sparsity pattern does change unexpectedly.
 """
 Base.@kwdef struct UMFPACKFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool = true
@@ -815,9 +887,11 @@ A fast sparse LU-factorization which specializes on sparsity patterns with “le
 !!! note
 
     By default, the SparseArrays.jl are implemented for efficiency by caching the
-    symbolic factorization. I.e., if `set_A` is used, it is expected that the new
-    `A` has the same sparsity pattern as the previous `A`. If this algorithm is to
-    be used in a context where that assumption does not hold, set `reuse_symbolic=false`.
+    symbolic factorization. If the sparsity pattern of `A` may change between solves, set `reuse_symbolic=false`.
+    If the pattern is assumed or known to be constant, set `reuse_symbolic=true` to avoid
+    unnecessary recomputation. To further reduce computational overhead, you can disable
+    pattern checks entirely by setting `check_pattern = false`. Note that this may error
+    if the sparsity pattern does change unexpectedly.
 """
 Base.@kwdef struct KLUFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool = true
@@ -886,6 +960,13 @@ A fast factorization which uses a Cholesky factorization on A * A'. Can be much
 faster than LU factorization, but is not as numerically stable and thus should only
 be applied to well-conditioned matrices.
 
+!!! warn
+
+    `NormalCholeskyFactorization` should only be applied to well-conditioned matrices. As a
+    method it is not able to easily identify possible numerical issues. As a check it is
+    recommended that the user checks `A*u-b` is approximately zero, as this may be untrue
+    even if `sol.retcode === ReturnCode.Success` due to numerical stability issues.
+
 ## Positional Arguments
 
   - pivot: Defaults to RowMaximum(), but can be NoPivot()
@@ -943,6 +1024,13 @@ function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization; 
             fact = cholesky(Symmetric((A)' * A), alg.pivot; check = false)
         end
         cache.cacheval = fact
+
+        if hasmethod(LinearAlgebra.issuccess, Tuple{typeof(fact)}) &&
+           !LinearAlgebra.issuccess(fact)
+            return SciMLBase.build_linear_solution(
+                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
+        end
+
         cache.isfresh = false
     end
     if issparsematrixcsc(A)
@@ -954,7 +1042,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization; 
     else
         y = ldiv!(cache.u, @get_cacheval(cache, :NormalCholeskyFactorization), A' * cache.b)
     end
-    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
 end
 
 ## NormalBunchKaufmanFactorization
@@ -1066,6 +1154,68 @@ function init_cacheval(alg::SparspakFactorization,
 end
 
 function init_cacheval(::SparspakFactorization, ::StaticArray, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+## CliqueTreesFactorization is here since it's MIT licensed, not GPL
+
+"""
+    CliqueTreesFactorization(
+        alg = nothing,
+        snd = nothing,
+        reuse_symbolic = true,
+    )
+
+The sparse Cholesky factorization algorithm implemented in CliqueTrees.jl.
+The implementation is pure-Julia and accepts arbitrary numeric types. It is
+somewhat slower than CHOLMOD.
+"""
+struct CliqueTreesFactorization{A, S} <: AbstractSparseFactorization
+    alg::A
+    snd::S
+    reuse_symbolic::Bool
+
+    function CliqueTreesFactorization(;
+            alg::A = nothing,
+            snd::S = nothing,
+            reuse_symbolic = true,
+            throwerror = true,
+        ) where {A, S}
+
+        ext = Base.get_extension(@__MODULE__, :LinearSolveCliqueTreesExt)
+
+        if throwerror && isnothing(ext)
+            error("CliqueTreesFactorization requires that CliqueTrees is loaded, i.e. `using CliqueTrees`")
+        else
+            new{A, S}(alg, snd, reuse_symbolic)
+        end
+    end
+end
+
+function init_cacheval(::CliqueTreesFactorization, ::Union{AbstractMatrix, Nothing, AbstractSciMLOperator}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function init_cacheval(::CliqueTreesFactorization, ::StaticArray, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+# Fallback init_cacheval for extension-based algorithms when extensions aren't loaded
+# These return nothing since the actual implementations are in the extensions
+function init_cacheval(::BLISLUFactorization, A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function init_cacheval(::CudaOffloadLUFactorization, A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function init_cacheval(::MetalLUFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
     nothing
 end

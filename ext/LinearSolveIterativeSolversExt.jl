@@ -4,11 +4,7 @@ using LinearSolve, LinearAlgebra
 using LinearSolve: LinearCache, DEFAULT_PRECS
 import LinearSolve: IterativeSolversJL
 
-if isdefined(Base, :get_extension)
-    using IterativeSolvers
-else
-    using ..IterativeSolvers
-end
+using IterativeSolvers
 
 function LinearSolve.IterativeSolversJL(args...;
         generate_iterator = IterativeSolvers.gmres_iterable!,

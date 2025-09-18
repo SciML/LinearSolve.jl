@@ -32,13 +32,15 @@ dA = zeros(n, n);
 b1 = rand(n);
 db1 = zeros(n);
 
-_ff = (x, y) -> f(x,
+_ff = (x,
+    y) -> f(x,
     y;
     alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization))
 _ff(copy(A), copy(b1))
 
 Enzyme.autodiff(Reverse,
-    (x, y) -> f(x,
+    (x,
+        y) -> f(x,
         y;
         alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)),
     Duplicated(copy(A), dA),
@@ -157,7 +159,6 @@ Enzyme.autodiff(Reverse, f2, Duplicated(copy(A), dA),
 @test db1 ≈ db12
 @test db2 ≈ db22
 
-#=
 function f3(A, b1, b2; alg = KrylovJL_GMRES())
     prob = LinearProblem(A, b1)
     cache = init(prob, alg)
@@ -167,9 +168,45 @@ function f3(A, b1, b2; alg = KrylovJL_GMRES())
     norm(s1 + s2)
 end
 
-Enzyme.autodiff(Reverse, f3, Duplicated(copy(A), dA), Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
+dA = zeros(n, n);
+db1 = zeros(n);
+db2 = zeros(n);
+Enzyme.autodiff(set_runtime_activity(Reverse), f3, Duplicated(copy(A), dA),
+    Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
 
 @test dA ≈ dA2 atol=5e-5
+@test db1 ≈ db12
+@test db2 ≈ db22
+
+function f4(A, b1, b2; alg = LUFactorization())
+    prob = LinearProblem(A, b1)
+    cache = init(prob, alg)
+    solve!(cache)
+    s1 = copy(cache.u)
+    cache.b = b2
+    solve!(cache)
+    s2 = copy(cache.u)
+    norm(s1 + s2)
+end
+
+A = rand(n, n);
+dA = zeros(n, n);
+b1 = rand(n);
+db1 = zeros(n);
+b2 = rand(n);
+db2 = zeros(n);
+
+f4(A, b1, b2)
+@test_throws "Adjoint case currently not handled" Enzyme.autodiff(
+    Reverse, f4, Duplicated(copy(A), dA),
+    Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
+
+#=
+dA2 = ForwardDiff.gradient(x -> f4(x, eltype(x).(b1), eltype(x).(b2)), copy(A))
+db12 = ForwardDiff.gradient(x -> f4(eltype(x).(A), x, eltype(x).(b2)), copy(b1))
+db22 = ForwardDiff.gradient(x -> f4(eltype(x).(A), eltype(x).(b1), x), copy(b2))
+
+@test dA ≈ dA2
 @test db1 ≈ db12
 @test db2 ≈ db22
 =#
@@ -214,3 +251,41 @@ end
 
     @test en_jac≈fd_jac rtol=1e-4
 end
+
+# https://github.com/SciML/LinearSolve.jl/issues/479
+function testls(A, b, u)
+    oa = OperatorAssumptions(
+        true, condition = LinearSolve.OperatorCondition.WellConditioned)
+    prob = LinearProblem(A, b)
+    linsolve = init(prob, LUFactorization(), assumptions = oa)
+    cache = solve!(linsolve)
+    sum(cache.u)
+end
+
+A = [1.0 2.0; 3.0 4.0]
+b = [1.0, 2.0]
+u = zero(b)
+dA = copy(A)
+db = copy(b)
+du = copy(u)
+Enzyme.autodiff(Reverse, testls, Duplicated(A, dA), Duplicated(b, db), Duplicated(u, du))
+
+function testls(A, b, u)
+    oa = OperatorAssumptions(
+        true, condition = LinearSolve.OperatorCondition.WellConditioned)
+    prob = LinearProblem(A, b)
+    linsolve = init(prob, LUFactorization(), assumptions = oa)
+    solve!(linsolve)
+    sum(linsolve.u)
+end
+A = [1.0 2.0; 3.0 4.0]
+b = [1.0, 2.0]
+u = zero(b)
+dA2 = copy(A)
+db2 = copy(b)
+du2 = copy(u)
+Enzyme.autodiff(Reverse, testls, Duplicated(A, dA2), Duplicated(b, db2), Duplicated(u, du2))
+
+@test dA == dA2
+@test db == db2
+@test du == du2

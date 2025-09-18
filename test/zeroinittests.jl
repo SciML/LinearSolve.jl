@@ -3,7 +3,7 @@ using LinearSolve, LinearAlgebra, SparseArrays, Test
 A = Diagonal(ones(4))
 b = rand(4)
 A = sparse(A)
-Anz = deepcopy(A)
+Anz = copy(A)
 C = copy(A)
 C[begin, end] = 1e-8
 A.nzval .= 0

@@ -1,0 +1,676 @@
+# GPU hardware and package detection
+
+using CPUSummary
+using Pkg
+using Statistics: mean
+
+"""
+    is_cuda_available()
+
+Check if CUDA hardware and packages are available.
+Issues warnings if CUDA hardware is detected but packages aren't loaded.
+"""
+function is_cuda_available()
+    # Check if CUDA extension is loaded
+    ext = Base.get_extension(LinearSolve, :LinearSolveCUDAExt)
+    if ext === nothing
+        # Check if we might have CUDA hardware but missing packages
+        try
+            # Try to detect NVIDIA GPUs via nvidia-smi or similar system indicators
+            if haskey(ENV, "CUDA_VISIBLE_DEVICES") ||
+               (Sys.islinux() && isfile("/proc/driver/nvidia/version")) ||
+               (Sys.iswindows() && success(`where nvidia-smi`))
+                @warn "CUDA hardware may be available but CUDA.jl extension is not loaded. Consider adding `using CUDA` to enable GPU algorithms."
+            end
+        catch
+            # Silently continue if detection fails
+        end
+        return false
+    end
+
+    # Check if we have CUDA.jl loaded
+    try
+        CUDA = Base.get_extension(LinearSolve, :LinearSolveCUDAExt).CUDA
+        return CUDA.functional()
+    catch
+        return false
+    end
+end
+
+"""
+    is_metal_available()
+
+Check if Metal (Apple Silicon) hardware and packages are available.
+Issues warnings if Metal hardware is detected but packages aren't loaded.
+"""
+function is_metal_available()
+    # Check if we're on macOS with Apple Silicon
+    if !Sys.isapple()
+        return false
+    end
+
+    # Check if this is Apple Silicon
+    is_apple_silicon = Sys.ARCH == :aarch64
+
+    # Check if Metal extension is loaded
+    ext = Base.get_extension(LinearSolve, :LinearSolveMetalExt)
+    if ext === nothing
+        if is_apple_silicon
+            @warn "Apple Silicon hardware detected but Metal.jl extension is not loaded. Consider adding `using Metal` to enable GPU algorithms."
+        end
+        return false
+    end
+
+    # Check if we have Metal.jl loaded and functional
+    try
+        Metal = Base.get_extension(LinearSolve, :LinearSolveMetalExt).Metal
+        return Metal.functional()
+    catch
+        return false
+    end
+end
+
+"""
+    get_cuda_gpu_info()
+
+Get information about CUDA GPU devices if available.
+Returns a Dict with GPU type, count, memory, and compute capability.
+"""
+function get_cuda_gpu_info()
+    gpu_info = Dict{String, Any}()
+    
+    # Check if CUDA extension is loaded
+    ext = Base.get_extension(LinearSolve, :LinearSolveCUDAExt)
+    if ext === nothing
+        return gpu_info
+    end
+    
+    try
+        # Get CUDA module from the extension
+        CUDA = ext.CUDA
+        
+        # Check if CUDA is functional
+        if !CUDA.functional()
+            return gpu_info
+        end
+        
+        # Get device information
+        devices = collect(CUDA.devices())
+        num_devices = length(devices)
+        
+        if num_devices > 0
+            gpu_info["gpu_count"] = num_devices
+            
+            # Get information from the first GPU
+            first_device = devices[1]
+            gpu_info["gpu_type"] = CUDA.name(first_device)
+            
+            # Convert memory from bytes to GB
+            total_mem_bytes = CUDA.totalmem(first_device)
+            gpu_info["gpu_memory_gb"] = round(total_mem_bytes / (1024^3), digits=2)
+            
+            # Get compute capability
+            capability = CUDA.capability(first_device)
+            gpu_info["gpu_capability"] = "$(capability.major).$(capability.minor)"
+            
+            # If multiple GPUs, list all types
+            if num_devices > 1
+                gpu_types = String[]
+                for dev in devices
+                    push!(gpu_types, CUDA.name(dev))
+                end
+                gpu_info["gpu_types"] = unique(gpu_types)
+            end
+        end
+    catch e
+        # If there's any error, return empty info
+        @debug "Error getting CUDA GPU info: $e"
+    end
+    
+    return gpu_info
+end
+
+"""
+    get_metal_gpu_info()
+
+Get information about Metal GPU devices if available.
+Returns a Dict with GPU type and count.
+"""
+function get_metal_gpu_info()
+    gpu_info = Dict{String, Any}()
+    
+    # Check if Metal extension is loaded
+    ext = Base.get_extension(LinearSolve, :LinearSolveMetalExt)
+    if ext === nothing
+        return gpu_info
+    end
+    
+    try
+        # Get Metal module from the extension
+        Metal = ext.Metal
+        
+        # Check if Metal is functional
+        if !Metal.functional()
+            return gpu_info
+        end
+        
+        # Get device information
+        # Metal typically has one device on Apple Silicon
+        gpu_info["gpu_count"] = 1
+        
+        # Determine GPU type based on system architecture
+        if Sys.ARCH == :aarch64
+            # Try to get more specific model information
+            cpu_model = ""
+            cpu_info = Sys.cpu_info()
+            if !isempty(cpu_info)
+                cpu_model = cpu_info[1].model
+            end
+            
+            # Infer GPU type from CPU model for Apple Silicon
+            if contains(lowercase(cpu_model), "m1")
+                gpu_info["gpu_type"] = "Apple M1 GPU"
+            elseif contains(lowercase(cpu_model), "m2")
+                gpu_info["gpu_type"] = "Apple M2 GPU"
+            elseif contains(lowercase(cpu_model), "m3")
+                gpu_info["gpu_type"] = "Apple M3 GPU"
+            elseif contains(lowercase(cpu_model), "m4")
+                gpu_info["gpu_type"] = "Apple M4 GPU"
+            else
+                gpu_info["gpu_type"] = "Apple Silicon GPU"
+            end
+        else
+            gpu_info["gpu_type"] = "Metal GPU"
+        end
+    catch e
+        # If there's any error, return empty info
+        @debug "Error getting Metal GPU info: $e"
+    end
+    
+    return gpu_info
+end
+
+"""
+    get_system_info()
+
+Get system information for telemetry reporting.
+"""
+function get_system_info()
+    info = Dict{String, Any}()
+
+    info["julia_version"] = string(VERSION)
+    info["os"] = string(Sys.KERNEL)
+    info["os_name"] = Sys.iswindows() ? "Windows" : Sys.islinux() ? "Linux" : Sys.isapple() ? "macOS" : "Other"
+    info["arch"] = string(Sys.ARCH)
+    
+    # Get detailed CPU information from Sys.cpu_info()
+    cpu_info = Sys.cpu_info()
+    if !isempty(cpu_info)
+        first_cpu = cpu_info[1]
+        info["cpu_model"] = first_cpu.model
+        info["cpu_speed_mhz"] = first_cpu.speed
+        
+        # Count unique CPU models (for heterogeneous systems)
+        cpu_models = unique([cpu.model for cpu in cpu_info])
+        if length(cpu_models) > 1
+            info["cpu_models"] = join(cpu_models, ", ")
+            info["heterogeneous_cpus"] = true
+        else
+            info["heterogeneous_cpus"] = false
+        end
+    else
+        info["cpu_model"] = "Unknown"
+        info["cpu_speed_mhz"] = 0
+    end
+    
+    # Legacy CPU name for backward compatibility
+    try
+        info["cpu_name"] = string(Sys.CPU_NAME)
+    catch
+        # Fallback to cpu_model if CPU_NAME not available
+        info["cpu_name"] = get(info, "cpu_model", "Unknown")
+    end
+    
+    # CPUSummary.num_cores() returns the physical cores (as Static.StaticInt)
+    info["num_cores"] = Int(CPUSummary.num_cores())
+    info["num_logical_cores"] = Sys.CPU_THREADS
+    info["num_threads"] = Threads.nthreads()
+    
+    # BLAS threads
+    try
+        info["blas_num_threads"] = LinearAlgebra.BLAS.get_num_threads()
+    catch
+        info["blas_num_threads"] = 1
+    end
+    
+    info["blas_vendor"] = string(LinearAlgebra.BLAS.vendor())
+    info["has_cuda"] = is_cuda_available()
+    info["has_metal"] = is_metal_available()
+    
+    # Get GPU information if CUDA is available
+    if info["has_cuda"]
+        gpu_info = get_cuda_gpu_info()
+        if !isempty(gpu_info)
+            info["gpu_type"] = gpu_info["gpu_type"]
+            info["gpu_count"] = gpu_info["gpu_count"]
+            info["gpu_memory_gb"] = gpu_info["gpu_memory_gb"]
+            info["gpu_capability"] = gpu_info["gpu_capability"]
+        end
+    end
+    
+    # Get GPU information if Metal is available
+    if info["has_metal"]
+        metal_info = get_metal_gpu_info()
+        if !isempty(metal_info)
+            info["gpu_type"] = metal_info["gpu_type"]
+            info["gpu_count"] = metal_info["gpu_count"]
+        end
+    end
+
+    if MKL_jll.is_available()
+        info["mkl_available"] = true
+    else
+        info["mkl_available"] = false
+    end
+
+    if LinearSolve.appleaccelerate_isavailable()
+        info["apple_accelerate_available"] = true
+    else
+        info["apple_accelerate_available"] = false
+    end
+
+    # Add package versions
+    info["package_versions"] = get_package_versions()
+    
+    return info
+end
+
+"""
+    get_package_versions()
+
+Get versions of LinearSolve-related packages and their dependencies.
+Returns a Dict with package names and versions.
+"""
+function get_package_versions()
+    versions = Dict{String, String}()
+    
+    # Get the current project's dependencies
+    deps = Pkg.dependencies()
+    
+    # List of packages we're interested in tracking
+    important_packages = [
+        "LinearSolve",
+        "LinearSolveAutotune",
+        "RecursiveFactorization",
+        "CUDA",
+        "Metal",
+        "MKL_jll",
+        "BLISBLAS",
+        "AppleAccelerate",
+        "SparseArrays",
+        "KLU",
+        "Pardiso",
+        "MKLPardiso",
+        "BandedMatrices",
+        "FastLapackInterface",
+        "HYPRE",
+        "IterativeSolvers",
+        "Krylov",
+        "KrylovKit",
+        "LinearAlgebra"
+    ]
+    
+    # Also track JLL packages for BLAS libraries
+    jll_packages = [
+        "MKL_jll",
+        "OpenBLAS_jll",
+        "OpenBLAS32_jll",
+        "blis_jll",
+        "LAPACK_jll",
+        "CompilerSupportLibraries_jll"
+    ]
+    
+    all_packages = union(important_packages, jll_packages)
+    
+    # Iterate through dependencies and collect versions
+    for (uuid, dep) in deps
+        if dep.name in all_packages
+            if dep.version !== nothing
+                versions[dep.name] = string(dep.version)
+            else
+                # Try to get version from the package itself if loaded
+                try
+                    pkg_module = Base.loaded_modules[Base.PkgId(uuid, dep.name)]
+                    if isdefined(pkg_module, :version)
+                        versions[dep.name] = string(pkg_module.version)
+                    else
+                        versions[dep.name] = "unknown"
+                    end
+                catch
+                    versions[dep.name] = "unknown"
+                end
+            end
+        end
+    end
+    
+    # Try to get Julia's LinearAlgebra stdlib version
+    try
+        versions["LinearAlgebra"] = string(VERSION)  # Stdlib version matches Julia
+    catch
+        versions["LinearAlgebra"] = "stdlib"
+    end
+    
+    # Get BLAS configuration info
+    try
+        blas_config = LinearAlgebra.BLAS.get_config()
+        if hasfield(typeof(blas_config), :loaded_libs)
+            for lib in blas_config.loaded_libs
+                if hasfield(typeof(lib), :libname)
+                    lib_name = basename(string(lib.libname))
+                    # Extract version info if available
+                    versions["BLAS_lib"] = lib_name
+                end
+            end
+        end
+    catch
+        # Fallback for older Julia versions
+        versions["BLAS_vendor"] = string(LinearAlgebra.BLAS.vendor())
+    end
+    
+    return versions
+end
+
+"""
+    get_detailed_system_info()
+
+Returns a comprehensive DataFrame with detailed system information suitable for CSV export.
+Includes versioninfo() details and hardware-specific information for analysis.
+"""
+function get_detailed_system_info()
+    # Basic system information
+    system_data = Dict{String, Any}()
+    
+    # Julia and system basics - all with safe fallbacks
+    try
+        system_data["timestamp"] = string(Dates.now())
+    catch
+        system_data["timestamp"] = "unknown"
+    end
+    
+    try
+        system_data["julia_version"] = string(VERSION)
+    catch
+        system_data["julia_version"] = "unknown"
+    end
+    
+    try
+        system_data["julia_commit"] = Base.GIT_VERSION_INFO.commit[1:10]  # Short commit hash
+    catch
+        system_data["julia_commit"] = "unknown"
+    end
+    
+    try
+        system_data["os_name"] = Sys.iswindows() ? "Windows" : Sys.islinux() ? "Linux" : Sys.isapple() ? "macOS" : "Other"
+    catch
+        system_data["os_name"] = "unknown"
+    end
+    
+    try
+        system_data["os_version"] = string(Sys.KERNEL)
+    catch
+        system_data["os_version"] = "unknown"
+    end
+    
+    try
+        system_data["architecture"] = string(Sys.ARCH)
+    catch
+        system_data["architecture"] = "unknown"
+    end
+    
+    try
+        system_data["cpu_cores"] = Int(CPUSummary.num_cores())
+    catch
+        system_data["cpu_cores"] = "unknown"
+    end
+    
+    try
+        system_data["cpu_logical_cores"] = Sys.CPU_THREADS
+    catch
+        system_data["cpu_logical_cores"] = "unknown"
+    end
+    
+    try
+        system_data["julia_threads"] = Threads.nthreads()
+    catch
+        system_data["julia_threads"] = "unknown"
+    end
+    
+    try
+        system_data["word_size"] = Sys.WORD_SIZE
+    catch
+        system_data["word_size"] = "unknown"
+    end
+    
+    try
+        system_data["machine"] = Sys.MACHINE
+    catch
+        system_data["machine"] = "unknown"
+    end
+    
+    # CPU details from Sys.cpu_info()
+    try
+        cpu_info = Sys.cpu_info()
+        if !isempty(cpu_info)
+            first_cpu = cpu_info[1]
+            system_data["cpu_model"] = first_cpu.model
+            system_data["cpu_speed_mhz"] = first_cpu.speed
+            
+            # Check for heterogeneous CPUs
+            cpu_models = unique([cpu.model for cpu in cpu_info])
+            if length(cpu_models) > 1
+                system_data["cpu_models"] = join(cpu_models, ", ")
+                system_data["heterogeneous_cpus"] = true
+            else
+                system_data["heterogeneous_cpus"] = false
+            end
+            
+            # Calculate average CPU speed if speeds vary
+            cpu_speeds = [cpu.speed for cpu in cpu_info]
+            if length(unique(cpu_speeds)) > 1
+                system_data["cpu_speed_avg_mhz"] = round(mean(cpu_speeds), digits=0)
+                system_data["cpu_speed_min_mhz"] = minimum(cpu_speeds)
+                system_data["cpu_speed_max_mhz"] = maximum(cpu_speeds)
+            end
+        else
+            system_data["cpu_model"] = "unknown"
+            system_data["cpu_speed_mhz"] = 0
+        end
+    catch
+        system_data["cpu_model"] = "unknown"
+        system_data["cpu_speed_mhz"] = 0
+    end
+    
+    # Legacy CPU name for backward compatibility
+    try
+        system_data["cpu_name"] = string(Sys.CPU_NAME)
+    catch
+        # Fallback to cpu_model if available
+        system_data["cpu_name"] = get(system_data, "cpu_model", "unknown")
+    end
+    
+    try
+        # Architecture info from Sys
+        system_data["cpu_architecture"] = string(Sys.ARCH)
+    catch
+        system_data["cpu_architecture"] = "unknown"
+    end
+    
+    # Categorize CPU vendor for easy analysis
+    try
+        cpu_name_lower = lowercase(string(system_data["cpu_name"]))
+        if contains(cpu_name_lower, "intel")
+            system_data["cpu_vendor"] = "Intel"
+        elseif contains(cpu_name_lower, "amd")
+            system_data["cpu_vendor"] = "AMD"
+        elseif contains(cpu_name_lower, "apple") || contains(cpu_name_lower, "m1") || contains(cpu_name_lower, "m2") || contains(cpu_name_lower, "m3")
+            system_data["cpu_vendor"] = "Apple"
+        else
+            system_data["cpu_vendor"] = "Other"
+        end
+    catch
+        system_data["cpu_vendor"] = "unknown"
+    end
+    
+    # BLAS and linear algebra libraries
+    try
+        system_data["blas_vendor"] = string(LinearAlgebra.BLAS.vendor())
+    catch
+        system_data["blas_vendor"] = "unknown"
+    end
+    
+    # LAPACK vendor detection (safe for different Julia versions)
+    try
+        system_data["lapack_vendor"] = string(LinearAlgebra.LAPACK.vendor())
+    catch
+        # Fallback: LAPACK vendor often matches BLAS vendor
+        system_data["lapack_vendor"] = get(system_data, "blas_vendor", "unknown")
+    end
+    
+    try
+        system_data["blas_num_threads"] = LinearAlgebra.BLAS.get_num_threads()
+    catch
+        system_data["blas_num_threads"] = "unknown"
+    end
+    
+    # LinearSolve-specific package availability
+    try
+        system_data["mkl_available"] = MKL_jll.is_available()
+    catch
+        system_data["mkl_available"] = false
+    end
+    
+    try
+        system_data["mkl_used"] = system_data["mkl_available"] && contains(lowercase(string(system_data["blas_vendor"])), "mkl")
+    catch
+        system_data["mkl_used"] = false
+    end
+    
+    try
+        system_data["apple_accelerate_available"] = LinearSolve.appleaccelerate_isavailable()
+    catch
+        system_data["apple_accelerate_available"] = false
+    end
+    
+    try
+        system_data["apple_accelerate_used"] = system_data["apple_accelerate_available"] && contains(lowercase(string(system_data["blas_vendor"])), "accelerate")
+    catch
+        system_data["apple_accelerate_used"] = false
+    end
+    
+    # BLIS availability check - based on JLL packages
+    system_data["blis_available"] = false
+    system_data["blis_used"] = false
+    system_data["blis_jll_loaded"] = false
+    system_data["lapack_jll_loaded"] = false
+    
+    try
+        # Check if BLIS_jll and LAPACK_jll are loaded
+        system_data["blis_jll_loaded"] = haskey(Base.loaded_modules, Base.PkgId(Base.UUID("068f7417-6964-5086-9a5b-bc0c5b4f7fa6"), "BLIS_jll"))
+        system_data["lapack_jll_loaded"] = haskey(Base.loaded_modules, Base.PkgId(Base.UUID("51474c39-65e3-53ba-86ba-03b1b862ec14"), "LAPACK_jll"))
+        
+        # BLIS is available if JLL packages are loaded and BLISLUFactorization exists
+        if (system_data["blis_jll_loaded"] || system_data["lapack_jll_loaded"]) && 
+           isdefined(LinearSolve, :BLISLUFactorization) && hasmethod(LinearSolve.BLISLUFactorization, ())
+            system_data["blis_available"] = true
+            # Check if BLIS is actually being used (contains "blis" in BLAS vendor)
+            system_data["blis_used"] = contains(lowercase(string(system_data["blas_vendor"])), "blis")
+        end
+    catch
+        # If there's any error checking BLIS JLL packages, leave as false
+    end
+    
+    # GPU information
+    try
+        system_data["cuda_available"] = is_cuda_available()
+    catch
+        system_data["cuda_available"] = false
+    end
+    
+    try
+        system_data["metal_available"] = is_metal_available()
+    catch
+        system_data["metal_available"] = false
+    end
+    
+    # Get detailed GPU information if available
+    if system_data["cuda_available"]
+        gpu_info = get_cuda_gpu_info()
+        if !isempty(gpu_info)
+            system_data["gpu_type"] = gpu_info["gpu_type"]
+            system_data["gpu_count"] = gpu_info["gpu_count"]
+            system_data["gpu_memory_gb"] = gpu_info["gpu_memory_gb"]
+            system_data["gpu_capability"] = gpu_info["gpu_capability"]
+            if haskey(gpu_info, "gpu_types")
+                system_data["gpu_types"] = join(gpu_info["gpu_types"], ", ")
+            end
+        end
+    elseif system_data["metal_available"]
+        metal_info = get_metal_gpu_info()
+        if !isempty(metal_info)
+            system_data["gpu_type"] = metal_info["gpu_type"]
+            system_data["gpu_count"] = metal_info["gpu_count"]
+        end
+    end
+    
+    # Try to detect if CUDA/Metal packages are actually loaded
+    system_data["cuda_loaded"] = false
+    system_data["metal_loaded"] = false
+    try
+        # Check if CUDA algorithms are actually available
+        if system_data["cuda_available"]
+            system_data["cuda_loaded"] = isdefined(Main, :CUDA) || haskey(Base.loaded_modules, Base.PkgId(Base.UUID("052768ef-5323-5732-b1bb-66c8b64840ba"), "CUDA"))
+        end
+        if system_data["metal_available"]
+            system_data["metal_loaded"] = isdefined(Main, :Metal) || haskey(Base.loaded_modules, Base.PkgId(Base.UUID("dde4c033-4e86-420c-a63e-0dd931031962"), "Metal"))
+        end
+    catch
+        # If we can't detect, leave as false
+    end
+    
+    # Environment information
+    try
+        system_data["libm"] = Base.libm_name
+    catch
+        system_data["libm"] = "unknown"
+    end
+    
+    # libdl_name may not exist in all Julia versions
+    try
+        system_data["libdl"] = Base.libdl_name
+    catch
+        system_data["libdl"] = "unknown"
+    end
+
+    # Memory information (if available)
+    try
+        if Sys.islinux()
+            meminfo = read(`cat /proc/meminfo`, String)
+            mem_match = match(r"MemTotal:\s*(\d+)\s*kB", meminfo)
+            if mem_match !== nothing
+                system_data["total_memory_gb"] = round(parse(Int, mem_match.captures[1]) / 1024 / 1024, digits=2)
+            else
+                system_data["total_memory_gb"] = "unknown"
+            end
+        elseif Sys.isapple()
+            mem_bytes = parse(Int, read(`sysctl -n hw.memsize`, String))
+            system_data["total_memory_gb"] = round(mem_bytes / 1024^3, digits=2)
+        else
+            system_data["total_memory_gb"] = "unknown"
+        end
+    catch
+        system_data["total_memory_gb"] = "unknown"
+    end
+    
+    # Create DataFrame with single row
+    return DataFrame([system_data])
+end

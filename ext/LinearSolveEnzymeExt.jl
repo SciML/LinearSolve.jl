@@ -1,9 +1,13 @@
 module LinearSolveEnzymeExt
 
-using LinearSolve
+using LinearSolve: LinearSolve, SciMLLinearSolveAlgorithm, init, solve!, LinearProblem,
+                   LinearCache, AbstractKrylovSubspaceMethod, DefaultLinearSolver,
+                   defaultalg_adjoint_eval, solve
 using LinearSolve.LinearAlgebra
 using EnzymeCore
 using EnzymeCore: EnzymeRules
+
+@inline EnzymeCore.EnzymeRules.inactive_type(::Type{<:LinearSolve.SciMLLinearSolveAlgorithm}) = true
 
 function EnzymeRules.forward(config::EnzymeRules.FwdConfigWidth{1},
         func::Const{typeof(LinearSolve.init)}, ::Type{RT}, prob::EnzymeCore.Annotation{LP},
@@ -200,7 +204,11 @@ function EnzymeRules.augmented_primal(
     cachesolve = deepcopy(linsolve.val)
 
     cache = (copy(res.u), resvals, cachesolve, dAs, dbs)
-    return EnzymeRules.AugmentedReturn(res, dres, cache)
+
+    _res = EnzymeRules.needs_primal(config) ? res : nothing
+    _dres = EnzymeRules.needs_shadow(config) ? dres : nothing
+
+    return EnzymeRules.AugmentedReturn(_res, _dres, cache)
 end
 
 function EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.solve!)},
@@ -213,9 +221,22 @@ function EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.solve!)},
 
     if EnzymeRules.width(config) == 1
         dys = (dys,)
+        dlinsolves = (linsolve.dval,)
+        if (iszero(linsolve.dval.A) || iszero(linsolve.dval.b)) && !iszero(linsolve.dval.u)
+            error("Adjoint case currently not handled. Instead of using `solve!(cache); s1 = copy(cache.u) ...`, use `sol = solve!(cache); s1 = copy(sol.u)`.")
+        end
+    else
+        dlinsolves = linsolve.dval
+        if any(x->(iszero(x.A) || iszero(x.b)) && !iszero(x.u), linsolve.dval)
+            error("Adjoint case currently not handled. Instead of using `solve!(cache); s1 = copy(cache.u) ...`, use `sol = solve!(cache); s1 = copy(sol.u)`.")
+        end
     end
 
-    for (dA, db, dy) in zip(dAs, dbs, dys)
+    for (dA, db, dy, dy2) in zip(dAs, dbs, dys, dlinsolves)
+
+        # Add the contribution from direct `linsolve.u` modifications
+        dy .+= dy2.u
+
         z = if _linsolve.cacheval isa Factorization
             _linsolve.cacheval' \ dy
         elseif _linsolve.cacheval isa Tuple && _linsolve.cacheval[1] isa Factorization
@@ -223,10 +244,10 @@ function EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.solve!)},
         elseif _linsolve.alg isa LinearSolve.AbstractKrylovSubspaceMethod
             # Doesn't modify `A`, so it's safe to just reuse it
             invprob = LinearSolve.LinearProblem(transpose(_linsolve.A), dy)
-            solve(invprob, _linearsolve.alg;
-                abstol = _linsolve.val.abstol,
-                reltol = _linsolve.val.reltol,
-                verbose = _linsolve.val.verbose)
+            solve(invprob, _linsolve.alg;
+                abstol = _linsolve.abstol,
+                reltol = _linsolve.reltol,
+                verbose = _linsolve.verbose)
         elseif _linsolve.alg isa LinearSolve.DefaultLinearSolver
             LinearSolve.defaultalg_adjoint_eval(_linsolve, dy)
         else

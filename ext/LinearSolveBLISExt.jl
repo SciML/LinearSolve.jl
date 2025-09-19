@@ -9,7 +9,7 @@ using LinearSolve
 using LinearAlgebra: BlasInt, LU
 using LinearAlgebra.LAPACK: require_one_based_indexing, chkfinite, chkstride1, 
                             @blasfunc, chkargsok
-using LinearSolve: ArrayInterface, BLISLUFactorization, @get_cacheval, LinearCache, SciMLBase
+using LinearSolve: ArrayInterface, BLISLUFactorization, @get_cacheval, LinearCache, SciMLBase, LinearVerbosity
 using SciMLBase: ReturnCode
 
 const global libblis = blis_jll.blis
@@ -206,13 +206,13 @@ const PREALLOCATED_BLIS_LU = begin
 end
 
 function LinearSolve.init_cacheval(alg::BLISLUFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
-    maxiters::Int, abstol, reltol, verbose::Bool,
+    maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
     assumptions::OperatorAssumptions)
     PREALLOCATED_BLIS_LU
 end
 
 function LinearSolve.init_cacheval(alg::BLISLUFactorization, A::AbstractMatrix{<:Union{Float32,ComplexF32,ComplexF64}}, b, u, Pl, Pr,
-    maxiters::Int, abstol, reltol, verbose::Bool,
+    maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
     assumptions::OperatorAssumptions)
     A = rand(eltype(A), 0, 0)
     ArrayInterface.lu_instance(A), Ref{BlasInt}()

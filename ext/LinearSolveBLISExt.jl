@@ -15,6 +15,8 @@ using SciMLBase: ReturnCode
 const global libblis = blis_jll.blis
 const global liblapack = LAPACK_jll.liblapack
 
+LinearSolve.useblis() = true
+
 function getrf!(A::AbstractMatrix{<:ComplexF64};
     ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
     info = Ref{BlasInt}(),

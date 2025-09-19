@@ -11,6 +11,8 @@ using LinearSolve: LinearSolve, is_cusparse, defaultalg, cudss_loaded, DefaultLi
 using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase, LinearSolve.ArrayInterface
 using SciMLBase: AbstractSciMLOperator
 
+LinearSolve.usecuda() = CUDA.functional()
+
 function LinearSolve.is_cusparse(A::Union{
         CUDA.CUSPARSE.CuSparseMatrixCSR, CUDA.CUSPARSE.CuSparseMatrixCSC})
     true

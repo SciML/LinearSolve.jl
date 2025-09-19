@@ -1,4 +1,4 @@
-using LinearSolve, ForwardDiff, RecursiveFactorization, LinearAlgebra, SparseArrays, Test
+using LinearSolve, ForwardDiff, ForwardDiff, RecursiveFactorization, LinearAlgebra, SparseArrays, Test
 using JET
 
 # Dense problem setup
@@ -21,6 +21,18 @@ prob_sparse = LinearProblem(A_sparse, b)
 # Sparse SPD for CHOLMODFactorization
 A_sparse_spd = sparse(A_spd)
 prob_sparse_spd = LinearProblem(A_sparse_spd, b)
+
+# Dual problem set up 
+function h(p)
+    (A = [p[1] p[2]+1 p[2]^3;
+          3*p[1] p[1]+5 p[2] * p[1]-4;
+          p[2]^2 9*p[1] p[2]],
+        b = [p[1] + 1, p[2] * 2, p[1]^2])
+end
+
+A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+
+dual_prob = LinearProblem(A, b)
 
 # Dual problem set up 
 function h(p)

@@ -26,7 +26,7 @@ algs = [
     MKLLUFactorization(),
     FastLUFactorization(),
     SimpleLUFactorization(),
-    ButterflyFactorization()
+    ButterflyFactorization(Val(true))
 ]
 res = [Float64[] for i in 1:length(algs)]
 ns = 4:8:500

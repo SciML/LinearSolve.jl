@@ -51,6 +51,9 @@ LinearSolve.@concrete mutable struct DualLinearCache{DT}
     primal_u_cache
     primal_b_cache
 
+    # Cache validity flag for RHS precalculation optimization
+    rhs_cache_valid
+
     dual_A
     dual_b
     dual_u
@@ -96,14 +99,17 @@ end
 function xp_linsolve_rhs!(uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}},
         ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}}, cache::DualLinearCache)
 
-    # Update cached partials lists
-    update_partials_list!(∂_A, cache.partials_A_list)
-    update_partials_list!(∂_b, cache.partials_b_list)
+    # Update cached partials lists if cache is invalid
+    if !cache.rhs_cache_valid
+        update_partials_list!(∂_A, cache.partials_A_list)
+        update_partials_list!(∂_b, cache.partials_b_list)
+        cache.rhs_cache_valid = true
+    end
 
     A_list = cache.partials_A_list
     b_list = cache.partials_b_list
 
-    # Compute rhs = b - A*uu using five-argument mul!
+    # Compute rhs = b - A*uu using precalculated b_list and five-argument mul!
     for i in eachindex(b_list)
         cache.rhs_list[i] .= b_list[i]
         mul!(cache.rhs_list[i], A_list[i], uu, -1, 1)
@@ -116,8 +122,12 @@ function xp_linsolve_rhs!(
         uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}},
         ∂_b::Nothing, cache::DualLinearCache)
 
-    # Update cached partials list for A
-    update_partials_list!(∂_A, cache.partials_A_list)
+    # Update cached partials list for A if cache is invalid
+    if !cache.rhs_cache_valid
+        update_partials_list!(∂_A, cache.partials_A_list)
+        cache.rhs_cache_valid = true
+    end
+
     A_list = cache.partials_A_list
 
     # Compute rhs = -A*uu using five-argument mul!
@@ -132,11 +142,15 @@ function xp_linsolve_rhs!(
         uu, ∂_A::Nothing, ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}},
         cache::DualLinearCache)
 
-    # Update cached partials list for b
-    update_partials_list!(∂_b, cache.partials_b_list)
+    # Update cached partials list for b if cache is invalid
+    if !cache.rhs_cache_valid
+        update_partials_list!(∂_b, cache.partials_b_list)
+        cache.rhs_cache_valid = true
+    end
+
     b_list = cache.partials_b_list
 
-    # Copy b_list to rhs_list
+    # Copy precalculated b_list to rhs_list (no A*uu computation needed)
     for i in eachindex(b_list)
         cache.rhs_list[i] .= b_list[i]
     end
@@ -247,6 +261,7 @@ function __dual_init(
         similar(new_b),
         similar(new_b),
         similar(new_b),
+        true,  # Cache is initially valid
         A,
         b,
         zeros(dual_type, length(b))
@@ -284,13 +299,15 @@ function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)
         setproperty!(dc.linear_cache, sym, val)
     end
 
-    # Update the partials if setting A or b
+    # Update the partials and invalidate cache if setting A or b
     if sym === :A
         setfield!(dc, :dual_A, val)
         setfield!(dc, :partials_A, partial_vals(val))
+        setfield!(dc, :rhs_cache_valid, false)  # Invalidate cache
     elseif sym === :b
         setfield!(dc, :dual_b, val)
         setfield!(dc, :partials_b, partial_vals(val))
+        setfield!(dc, :rhs_cache_valid, false)  # Invalidate cache
     elseif sym === :u
         setfield!(dc, :dual_u, val)
         setfield!(dc, :partials_u, partial_vals(val))

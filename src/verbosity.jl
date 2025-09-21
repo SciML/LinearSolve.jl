@@ -93,34 +93,69 @@ end
 end
 
 function LinearVerbosity(; error_control=nothing, performance=nothing, numerical=nothing, kwargs...)
-    # Start with default arguments
-    args = Dict{Symbol, Any}()
-
-    # Set group-level defaults if specified
-    if error_control !== nothing
-        for opt in error_control_options
-            args[opt] = error_control
-        end
+    # Validate group arguments
+    if error_control !== nothing && !(error_control isa Verbosity.LogLevel)
+        throw(ArgumentError("error_control must be a Verbosity.LogLevel, got $(typeof(error_control))"))
+    end
+    if performance !== nothing && !(performance isa Verbosity.LogLevel)
+        throw(ArgumentError("performance must be a Verbosity.LogLevel, got $(typeof(performance))"))
+    end
+    if numerical !== nothing && !(numerical isa Verbosity.LogLevel)
+        throw(ArgumentError("numerical must be a Verbosity.LogLevel, got $(typeof(numerical))"))
     end
 
-    if performance !== nothing
-        for opt in performance_options
-            args[opt] = performance
-        end
-    end
-
-    if numerical !== nothing
-        for opt in numerical_options
-            args[opt] = numerical
-        end
-    end
-
-    # Override with any individual option settings
+    # Validate individual kwargs
     for (key, value) in kwargs
-        args[key] = value
+        if !(key in error_control_options || key in performance_options || key in numerical_options)
+            throw(ArgumentError("Unknown verbosity option: $key. Valid options are: $(tuple(error_control_options..., performance_options..., numerical_options...))"))
+        end
+        if !(value isa Verbosity.LogLevel)
+            throw(ArgumentError("$key must be a Verbosity.LogLevel, got $(typeof(value))"))
+        end
     end
 
-    LinearVerbosity{true}(; args...)
+    # Build arguments using NamedTuple for type stability
+    default_args = (
+        default_lu_fallback = Verbosity.Warn(),
+        no_right_preconditioning = Verbosity.Warn(),
+        using_iterative_solvers = Verbosity.Warn(),
+        using_IterativeSolvers = Verbosity.Warn(),
+        IterativeSolvers_iterations = Verbosity.Warn(),
+        KrylovKit_verbosity = Verbosity.Warn(),
+        KrylovJL_verbosity = Verbosity.Silent(),
+        HYPRE_verbosity = Verbosity.Info(),
+        pardiso_verbosity = Verbosity.Silent()
+    )
+
+    # Apply group-level settings
+    final_args = if error_control !== nothing || performance !== nothing || numerical !== nothing
+        NamedTuple{keys(default_args)}(
+            _resolve_arg_value(key, default_args[key], error_control, performance, numerical)
+            for key in keys(default_args)
+        )
+    else
+        default_args
+    end
+
+    # Apply individual overrides
+    if !isempty(kwargs)
+        final_args = merge(final_args, NamedTuple(kwargs))
+    end
+
+    LinearVerbosity{true}(; final_args...)
+end
+
+# Helper function to resolve argument values based on group membership
+@inline function _resolve_arg_value(key::Symbol, default_val, error_control, performance, numerical)
+    if key in error_control_options && error_control !== nothing
+        return error_control
+    elseif key in performance_options && performance !== nothing
+        return performance
+    elseif key in numerical_options && numerical !== nothing
+        return numerical
+    else
+        return default_val
+    end
 end
 
 # Group classifications

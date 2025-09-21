@@ -65,9 +65,6 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
     cache.primal_b_cache .= cache.linear_cache.b
     uu = sol.u
 
-    # Store solution metadata without copying - we'll return this
-    primal_sol = sol
-
     # Solves Dual partials separately 
     ∂_A = cache.partials_A
     ∂_b = cache.partials_b
@@ -93,7 +90,7 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
     cache.linear_cache.b .= cache.primal_b_cache
     cache.linear_cache.u .= cache.primal_u_cache
 
-    return primal_sol
+    return sol
 end
 
 function xp_linsolve_rhs!(uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}},

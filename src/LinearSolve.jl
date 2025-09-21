@@ -503,7 +503,6 @@ export OperatorAssumptions, OperatorCondition
 
 export LinearSolveAdjoint
 
-export LinearVerbosity, LinearErrorControlVerbosity, LinearPerformanceVerbosity,
-       LinearNumericalVerbosity
+export LinearVerbosity
 
 end

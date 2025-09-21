@@ -327,13 +327,15 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     if verbose isa Bool
         #@warn "Using `true` or `false` for `verbose` is being deprecated. Please use a `LinearVerbosity` type to specify verbosity settings.
         # For details see the verbosity section of the common solver options documentation page."
-        if verbose
-            verbose = LinearVerbosity()
+        if verbose 
+            verbose_spec = LinearVerbosity{true}()
         else
-            verbose = LinearVerbosity{false}(nothing, nothing, nothing)
+            verbose_spec = LinearVerbosity{false}()
         end
     elseif verbose isa Verbosity.Type
-        verbose = LinearVerbosity(verbose)
+        verbose_spec = LinearVerbosity(verbose)
+    else
+        verbose_spec = verbose
     end
 
     b = if issparsematrix(b) && !(A isa Diagonal)
@@ -373,7 +375,7 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         # TODO: deprecate once all docs are updated to the new form
         #@warn "passing Preconditioners at `init`/`solve` time is deprecated. Instead add a `precs` function to your algorithm."
     end
-    cacheval = init_cacheval(alg, A, b, u0_, Pl, Pr, maxiters, abstol, reltol, verbose,
+    cacheval = init_cacheval(alg, A, b, u0_, Pl, Pr, maxiters, abstol, reltol, verbose_spec,
         assumptions)
     isfresh = true
     precsisfresh = false
@@ -383,7 +385,7 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         typeof(Pl), typeof(Pr), typeof(reltol), typeof(assumptions.issq),
         typeof(sensealg)}(
         A, b, u0_, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
-        maxiters, verbose, assumptions, sensealg)
+        maxiters, verbose_spec, assumptions, sensealg)
     return cache
 end
 

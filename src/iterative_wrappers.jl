@@ -284,7 +284,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
         cache.cacheval
     end
 
-    krylovJL_verbose = isnothing(verbose.numerical) ? 0 : verbosity_to_int(verbose.numerical.KrylovJL_verbosity)
+    krylovJL_verbose = verbosity_to_int(verbose.KrylovJL_verbosity)
 
     args = (cacheval, cache.A, cache.b)
     kwargs = (atol = atol, rtol, itmax, verbose = krylovJL_verbose,
@@ -293,7 +293,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     if cache.cacheval isa Krylov.CgWorkspace
         N !== I &&
             @SciMLMessage("$(alg.KrylovAlg) doesn't support right preconditioning.",
-                verbose, :no_right_preconditioning, :performance)
+                verbose, :no_right_preconditioning)
         Krylov.krylov_solve!(args...; M, kwargs...)
     elseif cache.cacheval isa Krylov.GmresWorkspace
         Krylov.krylov_solve!(args...; M, N, restart = alg.gmres_restart > 0, kwargs...)
@@ -302,7 +302,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     elseif cache.cacheval isa Krylov.MinresWorkspace
         N !== I &&
             @SciMLMessage("$(alg.KrylovAlg) doesn't support right preconditioning.",
-                verbose, :no_right_preconditioning, :performance)
+                verbose, :no_right_preconditioning)
         Krylov.krylov_solve!(args...; M, kwargs...)
     else
         Krylov.krylov_solve!(args...; kwargs...)

@@ -332,7 +332,7 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         else
             verbose_spec = LinearVerbosity{false}()
         end
-    elseif verbose isa SciMLLogging.Verbosity.Type
+    elseif verbose isa Verbosity.VerbosityPreset
         verbose_spec = LinearVerbosity(verbose)
     else
         verbose_spec = verbose

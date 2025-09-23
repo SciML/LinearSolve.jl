@@ -13,7 +13,7 @@ end
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 
 prob = LinearProblem(A, b)
-overload_x_p = solve(prob)
+overload_x_p = solve(prob, LUFactorization())
 backslash_x_p = A \ b
 krylov_overload_x_p = solve(prob, KrylovJL_GMRES())
 @test ≈(overload_x_p, backslash_x_p, rtol = 1e-9)
@@ -42,7 +42,7 @@ prob = LinearProblem(A, b)
 A, b = h([ForwardDiff.Dual(10.0, 1.0, 0.0), ForwardDiff.Dual(10.0, 0.0, 1.0)])
 
 prob = LinearProblem(A, b)
-cache = init(prob)
+cache = init(prob, LUFactorization())
 
 new_A, new_b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 cache.A = new_A
@@ -60,7 +60,7 @@ backslash_x_p = new_A \ new_b
 A, b = h([ForwardDiff.Dual(10.0, 1.0, 0.0), ForwardDiff.Dual(10.0, 0.0, 1.0)])
 
 prob = LinearProblem(A, b)
-cache = init(prob)
+cache = init(prob, LUFactorization())
 
 new_A, _ = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 cache.A = new_A
@@ -75,7 +75,7 @@ backslash_x_p = new_A \ b
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 
 prob = LinearProblem(A, b)
-cache = init(prob)
+cache = init(prob, LUFactorization())
 
 _, new_b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 cache.b = new_b
@@ -99,7 +99,7 @@ original_x_p = A \ b
 @test ≈(overload_x_p, original_x_p, rtol = 1e-9)
 
 prob = LinearProblem(A, b)
-cache = init(prob)
+cache = init(prob, LUFactorization())
 
 new_A,
 new_b = h([ForwardDiff.Dual(ForwardDiff.Dual(10.0, 1.0, 0.0), 1.0, 0.0),
@@ -155,7 +155,7 @@ end
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 
 prob = LinearProblem(A, b)
-cache = init(prob)
+cache = init(prob, LUFactorization())
 
 new_A, new_b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 cache.A = new_A
@@ -193,3 +193,5 @@ A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 
 prob = LinearProblem(A, b)
 @test init(prob, GenericLUFactorization()) isa LinearSolve.LinearCache
+
+@test init(prob) isa LinearSolve.LinearCache

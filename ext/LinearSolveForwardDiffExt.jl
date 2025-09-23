@@ -239,7 +239,6 @@ function __dual_init(
     partials_b_list = !isnothing(∂_b) ? partials_to_list(∂_b) : nothing
 
     # Determine size and type for rhs_list
-    n_partials = 0
     if !isnothing(partials_A_list)
         n_partials = length(partials_A_list)
         rhs_list = [similar(non_partial_cache.b) for _ in 1:n_partials]

@@ -222,7 +222,7 @@ function __dual_init(
         abstol = LinearSolve.default_tol(real(eltype(prob.b))),
         reltol = LinearSolve.default_tol(real(eltype(prob.b))),
         maxiters::Int = length(prob.b),
-        verbose = LinearVerbosity(Verbosity.None()),
+        verbose = LinearVerbosity(SciMLLogging.None()),
         Pl = nothing,
         Pr = nothing,
         assumptions = OperatorAssumptions(issquare(prob.A)),

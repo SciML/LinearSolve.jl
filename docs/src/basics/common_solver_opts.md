@@ -44,16 +44,16 @@ The following verbosity levels are available:
 
 #### Individual Settings
 These settings are meant for individual settings within a category. These can also be used to set all of the individual settings in a group to the same value.
-- Verbosity.None() - Suppress all messages
-- Verbosity.Info() - Show message as log message at info level
-- Verbosity.Warn() - Show warnings (default for most settings)
-- Verbosity.Error() - Throw errors instead of warnings
-- Verbosity.Level(n) - Show messages with a log level setting of n
+- SciMLLogging.None() - Suppress all messages
+- SciMLLogging.Info() - Show message as log message at info level
+- SciMLLogging.Warn() - Show warnings (default for most settings)
+- SciMLLogging.Error() - Throw errors instead of warnings
+- SciMLLogging.Level(n) - Show messages with a log level setting of n
 
 #### Group Settings
 These settings are meant for controlling a group of settings. 
-- Verbosity.Default() - Use the default settings
-- Verbosity.All() - Show all possible messages
+- SciMLLogging.Default() - Use the default settings
+- SciMLLogging.All() - Show all possible messages
 
 ### Basic Usage 
 
@@ -63,16 +63,16 @@ These settings are meant for controlling a group of settings.
 using LinearSolve
 
 # Suppress all messages
-verbose = LinearVerbosity(Verbosity.None())
+verbose = LinearVerbosity(SciMLLogging.None())
 prob = LinearProblem(A, b)
 sol = solve(prob; verbose=verbose)
 
 # Show all messages
-verbose = LinearVerbosity(Verbosity.All())
+verbose = LinearVerbosity(SciMLLogging.All())
 sol = solve(prob; verbose=verbose)
 
 # Use default settings
-verbose = LinearVerbosity(Verbosity.Default())
+verbose = LinearVerbosity(SciMLLogging.Default())
 sol = solve(prob; verbose=verbose)
 ```
 
@@ -81,9 +81,9 @@ sol = solve(prob; verbose=verbose)
 ```julia 
 # Customize by category
 verbose = LinearVerbosity(
-    error_control = Verbosity.Warn(),   # Show warnings for error control related issues
-    performance = Verbosity.None(),     # Suppress performance messages
-    numerical = Verbosity.Info()        # Show all numerical related log messages at info level
+    error_control = SciMLLogging.Warn(),   # Show warnings for error control related issues
+    performance = SciMLLogging.None(),     # Suppress performance messages
+    numerical = SciMLLogging.Info()        # Show all numerical related log messages at info level
 )
 
 sol = solve(prob; verbose=verbose)
@@ -95,10 +95,10 @@ The verbosity settings for the toggles are automatically passed to the group obj
 ```julia
 # Set specific message types
 verbose = LinearVerbosity(
-    default_lu_fallback = Verbosity.Info(),                     # Show info when LU fallback is used
-    KrylovJL_verbosity = Verbosity.Warn(),                      # Show warnings from KrylovJL
-    no_right_preconditioning = Verbosity.None(),                # Suppress right preconditioning messages
-    KrylovKit_verbosity = Verbosity.Level(KrylovKit.WARN_LEVEL) # Set KrylovKit verbosity level using KrylovKit's own verbosity levels
+    default_lu_fallback = SciMLLogging.Info(),                     # Show info when LU fallback is used
+    KrylovJL_verbosity = SciMLLogging.Warn(),                      # Show warnings from KrylovJL
+    no_right_preconditioning = SciMLLogging.None(),                # Suppress right preconditioning messages
+    KrylovKit_verbosity = SciMLLogging.Level(KrylovKit.WARN_LEVEL) # Set KrylovKit verbosity level using KrylovKit's own verbosity levels
 )
 
 sol = solve(prob; verbose=verbose)

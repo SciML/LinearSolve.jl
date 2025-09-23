@@ -21,7 +21,7 @@ using SciMLBase: SciMLBase, LinearAliasSpecifier, AbstractSciMLOperator,
 using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator,
                       MatrixOperator,
                       has_ldiv!, issquare
-using SciMLLogging: Verbosity, @SciMLMessage, verbosity_to_int, AbstractVerbositySpecifier
+using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_int, AbstractVerbositySpecifier, LogLevel, VerbosityPreset
 using Setfield: @set, @set!
 using UnPack: @unpack
 using DocStringExtensions: DocStringExtensions
@@ -386,6 +386,7 @@ const BLASELTYPES = Union{Float32, Float64, ComplexF32, ComplexF64}
 function defaultalg_symbol end
 
 include("verbosity.jl")
+include("blas_logging.jl")
 include("generic_lufact.jl")
 include("common.jl")
 include("extension_algs.jl")

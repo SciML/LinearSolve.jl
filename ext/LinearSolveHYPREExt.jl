@@ -6,7 +6,7 @@ using HYPRE: HYPRE, HYPREMatrix, HYPRESolver, HYPREVector
 using LinearSolve: HYPREAlgorithm, LinearCache, LinearProblem, LinearSolve,
                    OperatorAssumptions, default_tol, init_cacheval, __issquare,
                    __conditioning, LinearSolveAdjoint, LinearVerbosity
-using SciMLLogging: verbosity_to_int
+using SciMLLogging: SciMLLogging, verbosity_to_int, @SciMLMessage
 using SciMLBase: LinearProblem, LinearAliasSpecifier, SciMLBase
 using UnPack: @unpack
 using Setfield: @set!
@@ -120,7 +120,7 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
         else
             verbose = LinearVerbosity(SciMLLogging.None())
         end
-    elseif verbose isa SciMLLogging.Type
+    elseif verbose isa SciMLLogging.MessageLevel
         verbose = LinearVerbosity(verbose)
     end
 

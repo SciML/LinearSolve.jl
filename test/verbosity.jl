@@ -6,8 +6,8 @@ using Test
     @testset "Default constructor" begin
         v1 = LinearVerbosity()
         @test v1 isa LinearVerbosity{true}
-        @test v1.default_lu_fallback isa SciMLLogging.Warn
-        @test v1.KrylovKit_verbosity isa SciMLLogging.Warn
+        @test v1.default_lu_fallback isa SciMLLogging.WarnLevel
+        @test v1.KrylovKit_verbosity isa SciMLLogging.WarnLevel
     end
 
     @testset "Bool constructor" begin
@@ -26,51 +26,51 @@ using Test
 
         @test v3_none isa LinearVerbosity{false}
         @test v3_all isa LinearVerbosity{true}
-        @test v3_all.default_lu_fallback isa SciMLLogging.Info
-        @test v3_minimal.default_lu_fallback isa SciMLLogging.Error
+        @test v3_all.default_lu_fallback isa SciMLLogging.InfoLevel
+        @test v3_minimal.default_lu_fallback isa SciMLLogging.ErrorLevel
         @test v3_minimal.KrylovKit_verbosity isa SciMLLogging.Silent
         @test v3_standard isa LinearVerbosity{true}
-        @test v3_detailed.KrylovKit_verbosity isa SciMLLogging.Warn
+        @test v3_detailed.KrylovKit_verbosity isa SciMLLogging.WarnLevel
     end
 
     @testset "Group-level keyword constructors" begin
-        v4_error = LinearVerbosity(error_control = SciMLLogging.Error())
-        @test v4_error.default_lu_fallback isa SciMLLogging.Error
+        v4_error = LinearVerbosity(error_control = ErrorLevel())
+        @test v4_error.default_lu_fallback isa SciMLLogging.ErrorLevel
 
-        v4_numerical = LinearVerbosity(numerical = SciMLLogging.Silent())
+        v4_numerical = LinearVerbosity(numerical = Silent())
         @test v4_numerical.KrylovKit_verbosity isa SciMLLogging.Silent
         @test v4_numerical.using_IterativeSolvers isa SciMLLogging.Silent
         @test v4_numerical.pardiso_verbosity isa SciMLLogging.Silent
 
-        v4_performance = LinearVerbosity(performance = SciMLLogging.Info())
-        @test v4_performance.no_right_preconditioning isa SciMLLogging.Info
+        v4_performance = LinearVerbosity(performance = InfoLevel())
+        @test v4_performance.no_right_preconditioning isa SciMLLogging.InfoLevel
     end
 
     @testset "Mixed group and individual settings" begin
         v5_mixed = LinearVerbosity(
-            numerical = SciMLLogging.Silent(),
-            KrylovKit_verbosity = SciMLLogging.Warn(),
-            performance = SciMLLogging.Info()
+            numerical = Silent(),
+            KrylovKit_verbosity = WarnLevel(),
+            performance = InfoLevel()
         )
         # Individual override should take precedence
-        @test v5_mixed.KrylovKit_verbosity isa SciMLLogging.Warn
+        @test v5_mixed.KrylovKit_verbosity isa SciMLLogging.WarnLevel
         # Other numerical options should use group setting
         @test v5_mixed.using_IterativeSolvers isa SciMLLogging.Silent
         # Performance group setting should apply
-        @test v5_mixed.no_right_preconditioning isa SciMLLogging.Info
+        @test v5_mixed.no_right_preconditioning isa SciMLLogging.InfoLevel
     end
 
     @testset "Individual keyword arguments" begin
         v6_individual = LinearVerbosity(
-            default_lu_fallback = SciMLLogging.Error(),
-            KrylovKit_verbosity = SciMLLogging.Info(),
-            pardiso_verbosity = SciMLLogging.Silent()
+            default_lu_fallback = ErrorLevel(),
+            KrylovKit_verbosity = InfoLevel(),
+            pardiso_verbosity = Silent()
         )
-        @test v6_individual.default_lu_fallback isa SciMLLogging.Error
-        @test v6_individual.KrylovKit_verbosity isa SciMLLogging.Info
+        @test v6_individual.default_lu_fallback isa SciMLLogging.ErrorLevel
+        @test v6_individual.KrylovKit_verbosity isa SciMLLogging.InfoLevel
         @test v6_individual.pardiso_verbosity isa SciMLLogging.Silent
         # Unspecified options should use defaults
-        @test v6_individual.no_right_preconditioning isa SciMLLogging.Warn
+        @test v6_individual.no_right_preconditioning isa SciMLLogging.WarnLevel
     end
 
     @testset "Group classification functions" begin
@@ -83,12 +83,12 @@ using Test
     end
 
     @testset "Group options function" begin
-        v8 = LinearVerbosity(numerical = SciMLLogging.Warn())
+        v8 = LinearVerbosity(numerical = WarnLevel())
         numerical_opts = group_options(v8, :numerical)
         @test numerical_opts isa NamedTuple
         @test :KrylovKit_verbosity in keys(numerical_opts)
         @test :using_IterativeSolvers in keys(numerical_opts)
-        @test numerical_opts.KrylovKit_verbosity isa SciMLLogging.Warn
+        @test numerical_opts.KrylovKit_verbosity isa SciMLLogging.WarnLevel
 
         error_opts = group_options(v8, :error_control)
         @test :default_lu_fallback in keys(error_opts)
@@ -132,41 +132,41 @@ using Test
         @test :using_IterativeSolvers in keys(numerical_group)
         @test :pardiso_verbosity in keys(numerical_group)
 
-        # Test values are LogLevel types
-        @test error_group.default_lu_fallback isa SciMLLogging.LogLevel
-        @test performance_group.no_right_preconditioning isa SciMLLogging.LogLevel
-        @test numerical_group.KrylovKit_verbosity isa SciMLLogging.LogLevel
+        # Test values are MessageLevel types
+        @test error_group.default_lu_fallback isa SciMLLogging.MessageLevel
+        @test performance_group.no_right_preconditioning isa SciMLLogging.MessageLevel
+        @test numerical_group.KrylovKit_verbosity isa SciMLLogging.MessageLevel
 
         # Individual field access should still work
-        @test v.default_lu_fallback isa SciMLLogging.Warn
-        @test v.KrylovKit_verbosity isa SciMLLogging.Warn
+        @test v.default_lu_fallback isa SciMLLogging.WarnLevel
+        @test v.KrylovKit_verbosity isa SciMLLogging.WarnLevel
     end
 
     @testset "Group setproperty! setting" begin
         v = LinearVerbosity()
 
         # Test setting entire error_control group
-        v.error_control = SciMLLogging.Error()
-        @test v.default_lu_fallback isa SciMLLogging.Error
+        v.error_control = ErrorLevel()
+        @test v.default_lu_fallback isa SciMLLogging.ErrorLevel
 
         # Test setting entire performance group
-        v.performance = SciMLLogging.Info()
-        @test v.no_right_preconditioning isa SciMLLogging.Info
+        v.performance = InfoLevel()
+        @test v.no_right_preconditioning isa SciMLLogging.InfoLevel
 
         # Test setting entire numerical group
-        v.numerical = SciMLLogging.Silent()
+        v.numerical = Silent()
         @test v.KrylovKit_verbosity isa SciMLLogging.Silent
         @test v.using_IterativeSolvers isa SciMLLogging.Silent
         @test v.pardiso_verbosity isa SciMLLogging.Silent
         @test v.HYPRE_verbosity isa SciMLLogging.Silent
 
         # Test that other groups aren't affected
-        @test v.default_lu_fallback isa SciMLLogging.Error  # error_control unchanged
-        @test v.no_right_preconditioning isa SciMLLogging.Info  # performance unchanged
+        @test v.default_lu_fallback isa SciMLLogging.ErrorLevel  # error_control unchanged
+        @test v.no_right_preconditioning isa SciMLLogging.InfoLevel  # performance unchanged
 
         # Test individual setting still works after group setting
-        v.KrylovKit_verbosity = SciMLLogging.Warn()
-        @test v.KrylovKit_verbosity isa SciMLLogging.Warn
+        v.KrylovKit_verbosity = WarnLevel()
+        @test v.KrylovKit_verbosity isa SciMLLogging.WarnLevel
         # Other numerical options should still be Silent
         @test v.using_IterativeSolvers isa SciMLLogging.Silent
     end
@@ -188,59 +188,61 @@ using Test
         v = LinearVerbosity()
 
         # Set a group and verify getproperty reflects the change
-        v.numerical = SciMLLogging.Error()
+        v.numerical = ErrorLevel()
         numerical_group = v.numerical
 
-        @test all(x -> x isa SciMLLogging.Error, values(numerical_group))
+        @test all(x -> x isa SciMLLogging.ErrorLevel, values(numerical_group))
 
         # Set individual option and verify both individual and group access work
-        v.KrylovKit_verbosity = SciMLLogging.Info()
-        @test v.KrylovKit_verbosity isa SciMLLogging.Info
+        v.KrylovKit_verbosity = InfoLevel()
+        @test v.KrylovKit_verbosity isa SciMLLogging.InfoLevel
 
         updated_numerical = v.numerical
-        @test updated_numerical.KrylovKit_verbosity isa SciMLLogging.Info
+        @test updated_numerical.KrylovKit_verbosity isa SciMLLogging.InfoLevel
         # Other numerical options should still be Error
-        @test updated_numerical.using_IterativeSolvers isa SciMLLogging.Error
+        @test updated_numerical.using_IterativeSolvers isa SciMLLogging.ErrorLevel
     end
 end
 
 
-A = [1.0 0 0 0
-     0 1 0 0
-     0 0 1 0
-     0 0 0 0]
-b = rand(4)
-prob = LinearProblem(A, b)
+@testset "LinearVerbosity Logs Tests" begin
+    A = [1.0 0 0 0
+         0 1 0 0
+         0 0 1 0
+         0 0 0 0]
+    b = rand(4)
+    prob = LinearProblem(A, b)
 
-@test_logs (:warn,
-    "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(
-    prob,
-    verbose = LinearVerbosity(default_lu_fallback = SciMLLogging.Warn()))
+    @test_logs (:warn,
+        "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(
+        prob,
+        verbose = LinearVerbosity(default_lu_fallback = WarnLevel()))
 
-@test_logs (:warn,
-    "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(
-    prob, verbose = true)
+    @test_logs (:warn,
+        "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(
+        prob, verbose = true)
 
-@test_logs min_level=SciMLLogging.Logging.Warn solve(prob, verbose = false)
+    @test_logs min_level=SciMLLogging.Logging.Warn solve(prob, verbose = false)
 
-@test_logs (:info,
-    "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(
-    prob,
-    verbose = LinearVerbosity(default_lu_fallback = SciMLLogging.Info()))
+    @test_logs (:info,
+        "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(
+        prob,
+        verbose = LinearVerbosity(default_lu_fallback = InfoLevel()))
 
-verb = LinearVerbosity(default_lu_fallback = SciMLLogging.Warn())
+    verb = LinearVerbosity(default_lu_fallback = WarnLevel())
 
-@test_logs (:warn,
-    "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(
-    prob,
-    verbose = verb)
+    @test_logs (:warn,
+        "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(
+        prob,
+        verbose = verb)
 
-verb.default_lu_fallback = SciMLLogging.Info()
+    verb.default_lu_fallback = InfoLevel()
 
-@test_logs (:info,
-    "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(
-    prob,
-    verbose = verb)
+    @test_logs (:info,
+        "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(
+        prob,
+        verbose = verb)
+end
 
 @testset "BLAS Return Code Interpretation" begin
     # Test interpretation of various BLAS return codes
@@ -285,7 +287,7 @@ verb.default_lu_fallback = SciMLLogging.Info()
         @test info[:memory_usage_MB] >= 0  # Memory can be 0 for very small matrices
 
         # Test with condition number computation enabled via verbosity
-        verbose_with_cond = LinearVerbosity(condition_number = SciMLLogging.Info())
+        verbose_with_cond = LinearVerbosity(condition_number = InfoLevel())
         info_with_cond = LinearSolve.get_blas_operation_info(
             :dgetrf, A, b, condition = !isa(verbose_with_cond.condition_number, SciMLLogging.Silent))
         @test haskey(info_with_cond, :condition_number)
@@ -331,9 +333,9 @@ end
             prob_good = LinearProblem(A_good, b_good)
 
             verbose_success = LinearVerbosity(
-                blas_success = SciMLLogging.Info(),
-                blas_errors = SciMLLogging.Silent(),
-                blas_info = SciMLLogging.Silent()
+                blas_success = InfoLevel(),
+                blas_errors = Silent(),
+                blas_info = Silent()
             )
 
             @test_logs (:info, r"BLAS LU factorization.*completed successfully") solve(
@@ -345,9 +347,9 @@ end
             prob_singular = LinearProblem(A_singular, b_singular)
 
             verbose_errors = LinearVerbosity(
-                blas_errors = SciMLLogging.Warn(),
-                blas_success = SciMLLogging.Silent(),
-                blas_info = SciMLLogging.Silent()
+                blas_errors = WarnLevel(),
+                blas_success = Silent(),
+                blas_info = Silent()
             )
 
             @test_logs (:warn, r"BLAS/LAPACK.*Matrix is singular") solve(
@@ -355,9 +357,9 @@ end
 
             # Test with info logging enabled
             verbose_info = LinearVerbosity(
-                blas_info = SciMLLogging.Info(),
-                blas_errors = SciMLLogging.Info(),
-                blas_success = SciMLLogging.Silent()
+                blas_info = InfoLevel(),
+                blas_errors = InfoLevel(),
+                blas_success = Silent()
             )
 
             @test_logs (:info, r"BLAS/LAPACK.*Matrix is singular") solve(
@@ -365,10 +367,10 @@ end
 
             # Test with all BLAS logging disabled - should produce no logs
             verbose_silent = LinearVerbosity(
-                blas_errors = SciMLLogging.Silent(),
-                blas_invalid_args = SciMLLogging.Silent(),
-                blas_info = SciMLLogging.Silent(),
-                blas_success = SciMLLogging.Silent()
+                blas_errors = Silent(),
+                blas_invalid_args = Silent(),
+                blas_info = Silent(),
+                blas_success = Silent()
             )
 
             @test_logs min_level=SciMLLogging.Logging.Warn solve(
@@ -376,9 +378,9 @@ end
 
             # Test condition number logging if enabled
             verbose_with_cond = LinearVerbosity(
-                condition_number = SciMLLogging.Info(),
-                blas_success = SciMLLogging.Info(),
-                blas_errors = SciMLLogging.Silent()
+                condition_number = InfoLevel(),
+                blas_success = InfoLevel(),
+                blas_errors = Silent()
             )
 
             @test_logs (:info, r"Matrix condition number:.*for.*matrix") match_mode=:any solve(

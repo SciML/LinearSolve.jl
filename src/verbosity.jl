@@ -1,40 +1,40 @@
 mutable struct LinearVerbosity{Enabled} <: AbstractVerbositySpecifier{Enabled}
     # Error control
-    default_lu_fallback::SciMLLogging.LogLevel
+    default_lu_fallback::MessageLevel
     # Performance
-    no_right_preconditioning::SciMLLogging.LogLevel
+    no_right_preconditioning::MessageLevel
     # Numerical
-    using_iterative_solvers::SciMLLogging.LogLevel
-    using_IterativeSolvers::SciMLLogging.LogLevel
-    IterativeSolvers_iterations::SciMLLogging.LogLevel
-    KrylovKit_verbosity::SciMLLogging.LogLevel
-    KrylovJL_verbosity::SciMLLogging.LogLevel
-    HYPRE_verbosity::SciMLLogging.LogLevel
-    pardiso_verbosity::SciMLLogging.LogLevel
-    blas_errors::SciMLLogging.LogLevel
-    blas_invalid_args::SciMLLogging.LogLevel
-    blas_info::SciMLLogging.LogLevel
-    blas_success::SciMLLogging.LogLevel
-    condition_number::SciMLLogging.LogLevel
+    using_iterative_solvers::MessageLevel
+    using_IterativeSolvers::MessageLevel
+    IterativeSolvers_iterations::MessageLevel
+    KrylovKit_verbosity::MessageLevel
+    KrylovJL_verbosity::MessageLevel
+    HYPRE_verbosity::MessageLevel
+    pardiso_verbosity::MessageLevel
+    blas_errors::MessageLevel
+    blas_invalid_args::MessageLevel
+    blas_info::MessageLevel
+    blas_success::MessageLevel
+    condition_number::MessageLevel
 
     function LinearVerbosity{true}(;
         # Error control defaults
-        default_lu_fallback = SciMLLogging.Warn(),
+        default_lu_fallback = WarnLevel(),
         # Performance defaults
-        no_right_preconditioning = SciMLLogging.Warn(),
+        no_right_preconditioning = WarnLevel(),
         # Numerical defaults
-        using_iterative_solvers = SciMLLogging.Warn(),
-        using_IterativeSolvers = SciMLLogging.Warn(),
-        IterativeSolvers_iterations = SciMLLogging.Warn(),
-        KrylovKit_verbosity = SciMLLogging.Warn(),
-        KrylovJL_verbosity = SciMLLogging.Silent(),
-        HYPRE_verbosity = SciMLLogging.Info(),
-        pardiso_verbosity = SciMLLogging.Silent(),
-        blas_errors = SciMLLogging.Warn(),
-        blas_invalid_args = SciMLLogging.Warn(),
-        blas_info = SciMLLogging.Silent(),
-        blas_success = SciMLLogging.Silent(),
-        condition_number = SciMLLogging.Silent())
+        using_iterative_solvers = WarnLevel(),
+        using_IterativeSolvers = WarnLevel(),
+        IterativeSolvers_iterations = WarnLevel(),
+        KrylovKit_verbosity = WarnLevel(),
+        KrylovJL_verbosity = Silent(),
+        HYPRE_verbosity = InfoLevel(),
+        pardiso_verbosity = Silent(),
+        blas_errors = WarnLevel(),
+        blas_invalid_args = WarnLevel(),
+        blas_info = Silent(),
+        blas_success = Silent(),
+        condition_number = Silent())
 
         new{true}(default_lu_fallback, no_right_preconditioning,
                      using_iterative_solvers, using_IterativeSolvers,
@@ -44,11 +44,11 @@ mutable struct LinearVerbosity{Enabled} <: AbstractVerbositySpecifier{Enabled}
     end
 
     function LinearVerbosity{false}()
-        new{false}(SciMLLogging.Silent(), SciMLLogging.Silent(),
-        SciMLLogging.Silent(), SciMLLogging.Silent(),
-        SciMLLogging.Silent(), SciMLLogging.Silent(),
-        SciMLLogging.Silent(), SciMLLogging.Silent(), SciMLLogging.Silent(),
-        SciMLLogging.Silent(), SciMLLogging.Silent(), SciMLLogging.Silent(), SciMLLogging.Silent(), SciMLLogging.Silent())
+        new{false}(Silent(), Silent(),
+        Silent(), Silent(),
+        Silent(), Silent(),
+        Silent(), Silent(), Silent(),
+        Silent(), Silent(), Silent(), Silent(), Silent())
     end
 end
 
@@ -59,56 +59,56 @@ function LinearVerbosity(verbose::SciMLLogging.VerbosityPreset)
         LinearVerbosity{false}()
     elseif verbose isa SciMLLogging.All
         LinearVerbosity{true}(
-            default_lu_fallback = SciMLLogging.Info(),
-            no_right_preconditioning = SciMLLogging.Info(),
-            using_iterative_solvers = SciMLLogging.Info(),
-            using_IterativeSolvers = SciMLLogging.Info(),
-            IterativeSolvers_iterations = SciMLLogging.Info(),
-            KrylovKit_verbosity = SciMLLogging.Info(),
-            KrylovJL_verbosity = SciMLLogging.Info(),
-            HYPRE_verbosity = SciMLLogging.Info(),
-            pardiso_verbosity = SciMLLogging.Info(),
-            blas_errors = SciMLLogging.Info(),
-            blas_invalid_args = SciMLLogging.Info(),
-            blas_info = SciMLLogging.Info(),
-            blas_success = SciMLLogging.Info(),
-            condition_number = SciMLLogging.Info()
+            default_lu_fallback = InfoLevel(),
+            no_right_preconditioning = InfoLevel(),
+            using_iterative_solvers = InfoLevel(),
+            using_IterativeSolvers = InfoLevel(),
+            IterativeSolvers_iterations = InfoLevel(),
+            KrylovKit_verbosity = InfoLevel(),
+            KrylovJL_verbosity = InfoLevel(),
+            HYPRE_verbosity = InfoLevel(),
+            pardiso_verbosity = InfoLevel(),
+            blas_errors = InfoLevel(),
+            blas_invalid_args = InfoLevel(),
+            blas_info = InfoLevel(),
+            blas_success = InfoLevel(),
+            condition_number = InfoLevel()
         )
     elseif verbose isa SciMLLogging.Minimal
         LinearVerbosity{true}(
-            default_lu_fallback = SciMLLogging.Error(),
-            no_right_preconditioning = SciMLLogging.Silent(),
-            using_iterative_solvers = SciMLLogging.Silent(),
-            using_IterativeSolvers = SciMLLogging.Silent(),
-            IterativeSolvers_iterations = SciMLLogging.Silent(),
-            KrylovKit_verbosity = SciMLLogging.Silent(),
-            KrylovJL_verbosity = SciMLLogging.Silent(),
-            HYPRE_verbosity = SciMLLogging.Silent(),
-            pardiso_verbosity = SciMLLogging.Silent(),
-            blas_errors = SciMLLogging.Error(),
-            blas_invalid_args = SciMLLogging.Error(),
-            blas_info = SciMLLogging.Silent(),
-            blas_success = SciMLLogging.Silent(),
-            condition_number = SciMLLogging.Silent()
+            default_lu_fallback = ErrorLevel(),
+            no_right_preconditioning = Silent(),
+            using_iterative_solvers = Silent(),
+            using_IterativeSolvers = Silent(),
+            IterativeSolvers_iterations = Silent(),
+            KrylovKit_verbosity = Silent(),
+            KrylovJL_verbosity = Silent(),
+            HYPRE_verbosity = Silent(),
+            pardiso_verbosity = Silent(),
+            blas_errors = ErrorLevel(),
+            blas_invalid_args = ErrorLevel(),
+            blas_info = Silent(),
+            blas_success = Silent(),
+            condition_number = Silent()
         )
     elseif verbose isa SciMLLogging.Standard
         LinearVerbosity{true}()  # Use default settings
     elseif verbose isa SciMLLogging.Detailed
         LinearVerbosity{true}(
-            default_lu_fallback = SciMLLogging.Info(),
-            no_right_preconditioning = SciMLLogging.Info(),
-            using_iterative_solvers = SciMLLogging.Info(),
-            using_IterativeSolvers = SciMLLogging.Info(),
-            IterativeSolvers_iterations = SciMLLogging.Info(),
-            KrylovKit_verbosity = SciMLLogging.Warn(),
-            KrylovJL_verbosity = SciMLLogging.Warn(),
-            HYPRE_verbosity = SciMLLogging.Info(),
-            pardiso_verbosity = SciMLLogging.Warn(),
-            blas_errors = SciMLLogging.Warn(),
-            blas_invalid_args = SciMLLogging.Warn(),
-            blas_info = SciMLLogging.Info(),
-            blas_success = SciMLLogging.Info(),
-            condition_number = SciMLLogging.Info()
+            default_lu_fallback = InfoLevel(),
+            no_right_preconditioning = InfoLevel(),
+            using_iterative_solvers = InfoLevel(),
+            using_IterativeSolvers = InfoLevel(),
+            IterativeSolvers_iterations = InfoLevel(),
+            KrylovKit_verbosity = WarnLevel(),
+            KrylovJL_verbosity = WarnLevel(),
+            HYPRE_verbosity = InfoLevel(),
+            pardiso_verbosity = WarnLevel(),
+            blas_errors = WarnLevel(),
+            blas_invalid_args = WarnLevel(),
+            blas_info = InfoLevel(),
+            blas_success = InfoLevel(),
+            condition_number = InfoLevel()
         )
     else
         LinearVerbosity{true}()  # Default fallback
@@ -121,14 +121,14 @@ end
 
 function LinearVerbosity(; error_control=nothing, performance=nothing, numerical=nothing, kwargs...)
     # Validate group arguments
-    if error_control !== nothing && !(error_control isa SciMLLogging.LogLevel)
-        throw(ArgumentError("error_control must be a SciMLLogging.LogLevel, got $(typeof(error_control))"))
+    if error_control !== nothing && !(error_control isa MessageLevel)
+        throw(ArgumentError("error_control must be a SciMLLogging.MessageLevel, got $(typeof(error_control))"))
     end
-    if performance !== nothing && !(performance isa SciMLLogging.LogLevel)
-        throw(ArgumentError("performance must be a SciMLLogging.LogLevel, got $(typeof(performance))"))
+    if performance !== nothing && !(performance isa MessageLevel)
+        throw(ArgumentError("performance must be a SciMLLogging.MessageLevel, got $(typeof(performance))"))
     end
-    if numerical !== nothing && !(numerical isa SciMLLogging.LogLevel)
-        throw(ArgumentError("numerical must be a SciMLLogging.LogLevel, got $(typeof(numerical))"))
+    if numerical !== nothing && !(numerical isa MessageLevel)
+        throw(ArgumentError("numerical must be a SciMLLogging.MessageLevel, got $(typeof(numerical))"))
     end
 
     # Validate individual kwargs
@@ -136,27 +136,27 @@ function LinearVerbosity(; error_control=nothing, performance=nothing, numerical
         if !(key in error_control_options || key in performance_options || key in numerical_options)
             throw(ArgumentError("Unknown verbosity option: $key. Valid options are: $(tuple(error_control_options..., performance_options..., numerical_options...))"))
         end
-        if !(value isa SciMLLogging.LogLevel)
-            throw(ArgumentError("$key must be a SciMLLogging.LogLevel, got $(typeof(value))"))
+        if !(value isa MessageLevel)
+            throw(ArgumentError("$key must be a SciMLLogging.MessageLevel, got $(typeof(value))"))
         end
     end
 
     # Build arguments using NamedTuple for type stability
     default_args = (
-        default_lu_fallback = SciMLLogging.Warn(),
-        no_right_preconditioning = SciMLLogging.Warn(),
-        using_iterative_solvers = SciMLLogging.Warn(),
-        using_IterativeSolvers = SciMLLogging.Warn(),
-        IterativeSolvers_iterations = SciMLLogging.Warn(),
-        KrylovKit_verbosity = SciMLLogging.Warn(),
-        KrylovJL_verbosity = SciMLLogging.Silent(),
-        HYPRE_verbosity = SciMLLogging.Info(),
-        pardiso_verbosity = SciMLLogging.Silent(),
-        blas_errors = SciMLLogging.Warn(),
-        blas_invalid_args = SciMLLogging.Warn(),
-        blas_info = SciMLLogging.Silent(),
-        blas_success = SciMLLogging.Silent(),
-        condition_number = SciMLLogging.Silent()
+        default_lu_fallback = WarnLevel(),
+        no_right_preconditioning = WarnLevel(),
+        using_iterative_solvers = WarnLevel(),
+        using_IterativeSolvers = WarnLevel(),
+        IterativeSolvers_iterations = WarnLevel(),
+        KrylovKit_verbosity = WarnLevel(),
+        KrylovJL_verbosity = Silent(),
+        HYPRE_verbosity = InfoLevel(),
+        pardiso_verbosity = Silent(),
+        blas_errors = WarnLevel(),
+        blas_invalid_args = WarnLevel(),
+        blas_info = Silent(),
+        blas_success = Silent(),
+        condition_number = Silent()
     )
 
     # Apply group-level settings
@@ -225,36 +225,36 @@ end
 function Base.setproperty!(verbosity::LinearVerbosity, name::Symbol, value)
     # Check if this is a group name
     if name === :error_control
-        if value isa SciMLLogging.LogLevel
+        if value isa MessageLevel
             for opt in error_control_options
                 setfield!(verbosity, opt, value)
             end
         else
-            error("error_control must be set to a SciMLLogging.LogLevel")
+            error("error_control must be set to a SciMLLogging.MessageLevel")
         end
     elseif name === :performance
-        if value isa SciMLLogging.LogLevel
+        if value isa MessageLevel
             for opt in performance_options
                 setfield!(verbosity, opt, value)
             end
         else
-            error("performance must be set to a SciMLLogging.LogLevel")
+            error("performance must be set to a SciMLLogging.MessageLevel")
         end
     elseif name === :numerical
-        if value isa SciMLLogging.LogLevel
+        if value isa MessageLevel
             for opt in numerical_options
                 setfield!(verbosity, opt, value)
             end
         else
-            error("numerical must be set to a SciMLLogging.LogLevel")
+            error("numerical must be set to a SciMLLogging.MessageLevel")
         end
     else
         # Check if this is an individual option
         if name in error_control_options || name in performance_options || name in numerical_options
-            if value isa SciMLLogging.LogLevel
+            if value isa MessageLevel
                 setfield!(verbosity, name, value)
             else
-                error("$name must be set to a SciMLLogging.LogLevel")
+                error("$name must be set to a SciMLLogging.MessageLevel")
             end
         else
             # Fall back to default behavior for unknown properties

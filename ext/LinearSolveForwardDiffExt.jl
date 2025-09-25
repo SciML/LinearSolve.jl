@@ -7,7 +7,7 @@ using ForwardDiff
 using ForwardDiff: Dual, Partials
 using SciMLBase
 using RecursiveArrayTools
-using SciMLLogging: Verbosity
+using SciMLLogging
 
 const DualLinearProblem = LinearProblem{
     <:Union{Number, <:AbstractArray, Nothing}, iip,

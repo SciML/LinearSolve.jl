@@ -2,7 +2,7 @@ module LinearSolveKrylovKitExt
 
 using LinearSolve, KrylovKit, LinearAlgebra
 using LinearSolve: LinearCache, DEFAULT_PRECS
-using SciMLLogging: verbosity_to_int
+using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_int
 
 function LinearSolve.KrylovKitJL(args...;
         KrylovAlg = KrylovKit.GMRES, gmres_restart = 0,

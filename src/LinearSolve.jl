@@ -8,7 +8,7 @@ import PrecompileTools
 using ArrayInterface: ArrayInterface
 using Base: Bool, convert, copyto!, adjoint, transpose, /, \, require_one_based_indexing
 using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, BunchKaufman,
-                     ColumnNorm, Diagonal, Factorization, Hermitian, I, LAPACK, NoPivot,
+                     ColumnNorm, cond, Diagonal, Factorization, Hermitian, I, LAPACK, NoPivot,
                      RowMaximum, RowNonZero, SymTridiagonal, Symmetric, Transpose,
                      Tridiagonal, UniformScaling, axpby!, axpy!, bunchkaufman,
                      bunchkaufman!,

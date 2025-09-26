@@ -12,7 +12,7 @@ struct MKLLUFactorization <: AbstractFactorization end
 # MKL_jll < 2022.2 doesn't support the mixed LP64 and ILP64 interfaces that we make use of in LinearSolve
 # In particular, the `_64` APIs do not exist
 # https://www.intel.com/content/www/us/en/developer/articles/release-notes/onemkl-release-notes-2022.html
-@static if !@isdefined(MKL_jll) || !MKL_jll.is_available() || pkgversion(MKL_jll) >= v"2022.2"
+@static if !@isdefined(MKL_jll) || !MKL_jll.is_available() || pkgversion(MKL_jll) < v"2022.2"
     __mkl_isavailable() = false
 else
     __mkl_isavailable() = true

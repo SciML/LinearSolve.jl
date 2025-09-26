@@ -26,7 +26,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovKitJL; kwargs...)
     atol = float(cache.abstol)
     rtol = float(cache.reltol)
     maxiter = cache.maxiters
-    verbosity = isnothing(cache.verbose.numerical) ? 0 : verbosity_to_int(cache.verbose.numerical.KrylovKit_verbosity)
+    verbosity = verbosity_to_int(cache.verbose.KrylovKit_verbosity)
     krylovdim = (alg.gmres_restart == 0) ? min(20, size(cache.A, 1)) : alg.gmres_restart
 
     kwargs = (atol = atol, rtol = rtol, maxiter = maxiter, verbosity = verbosity,

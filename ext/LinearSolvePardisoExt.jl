@@ -74,10 +74,8 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
         end
     end
     
-    if !isnothing(verbose.numerical)
-        if verbosity_to_bool(verbose.numerical.pardiso_verbosity)
-            Pardiso.set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
-        end
+    if verbosity_to_bool(verbose.pardiso_verbosity)
+        Pardiso.set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
     end
     #=
     Note: It is recommended to use IPARM(11)=1 (scaling) and IPARM(13)=1 (matchings) for

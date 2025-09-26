@@ -161,7 +161,7 @@ function init_cacheval(alg::SimpleGMRES{UDB}, args...; kwargs...) where {UDB}
 end
 
 function _init_cacheval(::Val{false}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiters::Int,
-        abstol, reltol, ::Bool, ::OperatorAssumptions; zeroinit = true, kwargs...)
+        abstol, reltol, ::LinearVerbosity, ::OperatorAssumptions; zeroinit = true, kwargs...)
     @unpack memory, restart, blocksize, warm_start = alg
 
     if zeroinit
@@ -392,7 +392,7 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
 end
 
 function _init_cacheval(::Val{true}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiters::Int,
-        abstol, reltol, ::Bool, ::OperatorAssumptions; zeroinit = true,
+        abstol, reltol, ::LinearVerbosity, ::OperatorAssumptions; zeroinit = true,
         blocksize = alg.blocksize)
     @unpack memory, restart, warm_start = alg
 

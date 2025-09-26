@@ -41,18 +41,15 @@ LinearSolve.@concrete mutable struct DualLinearCache{DT}
     partials_b
     partials_u
 
-    # Cached lists of partials to avoid repeated allocations
-    partials_A_list
-    partials_b_list
+    # Pre-reinterpreted partials for efficient access
+    partials_A_reinterpreted
+    partials_b_reinterpreted
 
     # Cached intermediate values for calculations
     rhs_list
     dual_u0_cache
     primal_u_cache
     primal_b_cache
-
-    # Cache validity flag for RHS precalculation optimization
-    rhs_cache_valid
 
     dual_A
     dual_b
@@ -99,20 +96,14 @@ end
 function xp_linsolve_rhs!(uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}},
         ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}}, cache::DualLinearCache)
 
-    # Update cached partials lists if cache is invalid
-    if !cache.rhs_cache_valid
-        update_partials_list!(∂_A, cache.partials_A_list)
-        update_partials_list!(∂_b, cache.partials_b_list)
-        cache.rhs_cache_valid = true
-    end
+    # Use pre-reinterpreted partials for efficient access
+    A_reinterpreted = cache.partials_A_reinterpreted
+    b_reinterpreted = cache.partials_b_reinterpreted
 
-    A_list = cache.partials_A_list
-    b_list = cache.partials_b_list
-
-    # Compute rhs = b - A*uu using precalculated b_list and five-argument mul!
-    for i in eachindex(b_list)
-        cache.rhs_list[i] .= b_list[i]
-        mul!(cache.rhs_list[i], A_list[i], uu, -1, 1)
+    # Compute rhs = b - A*uu using pre-reinterpreted views
+    for k in axes(A_reinterpreted, 1)
+        cache.rhs_list[k] .= view(b_reinterpreted, k, :)
+        mul!(cache.rhs_list[k], view(A_reinterpreted, k, :, :), uu, -1, 1)
     end
 
     return cache.rhs_list
@@ -122,17 +113,12 @@ function xp_linsolve_rhs!(
         uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}},
         ∂_b::Nothing, cache::DualLinearCache)
 
-    # Update cached partials list for A if cache is invalid
-    if !cache.rhs_cache_valid
-        update_partials_list!(∂_A, cache.partials_A_list)
-        cache.rhs_cache_valid = true
-    end
+    # Use pre-reinterpreted partials for efficient access
+    A_reinterpreted = cache.partials_A_reinterpreted
 
-    A_list = cache.partials_A_list
-
-    # Compute rhs = -A*uu using five-argument mul!
-    for i in eachindex(A_list)
-        mul!(cache.rhs_list[i], A_list[i], uu, -1, 0)
+    # Compute rhs = -A*uu using pre-reinterpreted views
+    for k in axes(A_reinterpreted, 1)
+        mul!(cache.rhs_list[k], view(A_reinterpreted, k, :, :), uu, -1, 0)
     end
 
     return cache.rhs_list
@@ -142,17 +128,12 @@ function xp_linsolve_rhs!(
         uu, ∂_A::Nothing, ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}},
         cache::DualLinearCache)
 
-    # Update cached partials list for b if cache is invalid
-    if !cache.rhs_cache_valid
-        update_partials_list!(∂_b, cache.partials_b_list)
-        cache.rhs_cache_valid = true
-    end
+    # Use pre-reinterpreted partials for efficient access
+    b_reinterpreted = cache.partials_b_reinterpreted
 
-    b_list = cache.partials_b_list
-
-    # Copy precalculated b_list to rhs_list (no A*uu computation needed)
-    for i in eachindex(b_list)
-        cache.rhs_list[i] .= b_list[i]
+    # Copy pre-reinterpreted b to rhs_list (no A*uu computation needed)
+    for k in axes(b_reinterpreted, 1)
+        cache.rhs_list[k] .= view(b_reinterpreted, k, :)
     end
 
     return cache.rhs_list
@@ -234,16 +215,16 @@ function __dual_init(
         maxiters = maxiters, verbose = verbose, Pl = Pl, Pr = Pr, assumptions = assumptions,
         sensealg = sensealg, u0 = new_u0, kwargs...)
 
-    # Initialize caches for partials lists and intermediate calculations
-    partials_A_list = !isnothing(∂_A) ? partials_to_list(∂_A) : nothing
-    partials_b_list = !isnothing(∂_b) ? partials_to_list(∂_b) : nothing
+    # Pre-reinterpret partials for efficient access
+    partials_A_reinterpreted = !isnothing(∂_A) ? reinterpret(reshape, eltype(first(∂_A)), ∂_A) : nothing
+    partials_b_reinterpreted = !isnothing(∂_b) ? reinterpret(reshape, eltype(first(∂_b)), ∂_b) : nothing
 
-    # Determine size and type for rhs_list
-    if !isnothing(partials_A_list)
-        n_partials = length(partials_A_list)
+    # Determine size and type for rhs_list based on partials
+    if !isnothing(∂_A)
+        n_partials = length(first(∂_A))
         rhs_list = [similar(non_partial_cache.b) for _ in 1:n_partials]
-    elseif !isnothing(partials_b_list)
-        n_partials = length(partials_b_list)
+    elseif !isnothing(∂_b)
+        n_partials = length(first(∂_b))
         rhs_list = [similar(non_partial_cache.b) for _ in 1:n_partials]
     else
         rhs_list = nothing
@@ -254,13 +235,12 @@ function __dual_init(
         ∂_A,
         ∂_b,
         !isnothing(∂_b) ? zero.(∂_b) : ∂_b,
-        partials_A_list,
-        partials_b_list,
+        partials_A_reinterpreted,
+        partials_b_reinterpreted,
         rhs_list,
         similar(new_b),
         similar(new_b),
         similar(new_b),
-        true,  # Cache is initially valid
         A,
         b,
         zeros(dual_type, length(b))
@@ -298,15 +278,19 @@ function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)
         setproperty!(dc.linear_cache, sym, val)
     end
 
-    # Update the partials and invalidate cache if setting A or b
+    # Update the partials and reinterpreted views when setting A, b, or u
     if sym === :A
         setfield!(dc, :dual_A, val)
-        setfield!(dc, :partials_A, partial_vals(val))
-        setfield!(dc, :rhs_cache_valid, false)  # Invalidate cache
+        partials_A = partial_vals(val)
+        setfield!(dc, :partials_A, partials_A)
+        setfield!(dc, :partials_A_reinterpreted,
+                 !isnothing(partials_A) ? reinterpret(reshape, eltype(first(partials_A)), partials_A) : nothing)
     elseif sym === :b
         setfield!(dc, :dual_b, val)
-        setfield!(dc, :partials_b, partial_vals(val))
-        setfield!(dc, :rhs_cache_valid, false)  # Invalidate cache
+        partials_b = partial_vals(val)
+        setfield!(dc, :partials_b, partials_b)
+        setfield!(dc, :partials_b_reinterpreted,
+                 !isnothing(partials_b) ? reinterpret(reshape, eltype(first(partials_b)), partials_b) : nothing)
     elseif sym === :u
         setfield!(dc, :dual_u, val)
         setfield!(dc, :partials_u, partial_vals(val))
@@ -358,29 +342,6 @@ function nodual_value(x::AbstractArray{<:Dual})
     return result
 end
 
-function update_partials_list!(partial_matrix::AbstractVector{T}, list_cache) where {T}
-    p = eachindex(first(partial_matrix))
-    for i in p
-        for j in eachindex(partial_matrix)
-            list_cache[i][j] = partial_matrix[j][i]
-        end
-    end
-    return list_cache
-end
-
-function update_partials_list!(partial_matrix, list_cache)
-    p = length(first(partial_matrix))
-    m, n = size(partial_matrix)
-
-    for k in 1:p
-        for i in 1:m
-            for j in 1:n
-                list_cache[k][i, j] = partial_matrix[i, j][k]
-            end
-        end
-    end
-    return list_cache
-end
 
 function partials_to_list(partial_matrix::AbstractVector{T}) where {T}
     p = eachindex(first(partial_matrix))

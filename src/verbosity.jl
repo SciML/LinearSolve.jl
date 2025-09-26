@@ -54,10 +54,10 @@ end
 
 LinearVerbosity(enabled::Bool) = enabled ? LinearVerbosity{true}() : LinearVerbosity{false}()
 
-function LinearVerbosity(verbose::SciMLLogging.VerbosityPreset)
-    if verbose isa SciMLLogging.None
+function LinearVerbosity(verbose::VerbosityPreset)
+    if verbose isa None
         LinearVerbosity{false}()
-    elseif verbose isa SciMLLogging.All
+    elseif verbose isa All
         LinearVerbosity{true}(
             default_lu_fallback = InfoLevel(),
             no_right_preconditioning = InfoLevel(),
@@ -74,7 +74,7 @@ function LinearVerbosity(verbose::SciMLLogging.VerbosityPreset)
             blas_success = InfoLevel(),
             condition_number = InfoLevel()
         )
-    elseif verbose isa SciMLLogging.Minimal
+    elseif verbose isa Minimal
         LinearVerbosity{true}(
             default_lu_fallback = ErrorLevel(),
             no_right_preconditioning = Silent(),
@@ -91,9 +91,9 @@ function LinearVerbosity(verbose::SciMLLogging.VerbosityPreset)
             blas_success = Silent(),
             condition_number = Silent()
         )
-    elseif verbose isa SciMLLogging.Standard
+    elseif verbose isa Standard
         LinearVerbosity{true}()  # Use default settings
-    elseif verbose isa SciMLLogging.Detailed
+    elseif verbose isa Detailed
         LinearVerbosity{true}(
             default_lu_fallback = InfoLevel(),
             no_right_preconditioning = InfoLevel(),
@@ -115,7 +115,7 @@ function LinearVerbosity(verbose::SciMLLogging.VerbosityPreset)
     end
 end
 
-@inline function LinearVerbosity(verbose::SciMLLogging.None)
+@inline function LinearVerbosity(verbose::None)
     LinearVerbosity{false}()
 end
 

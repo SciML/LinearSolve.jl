@@ -1,7 +1,7 @@
 module LinearSolveRecursiveFactorizationExt
 
 using LinearSolve: LinearSolve, userecursivefactorization, LinearCache, @get_cacheval,
-                   RFLUFactorization, RF32MixedLUFactorization, default_alias_A,
+                   RFLUFactorization, ButterflyFactorization, RF32MixedLUFactorization, default_alias_A,
                    default_alias_b
 using LinearSolve.LinearAlgebra, LinearSolve.ArrayInterface, RecursiveFactorization
 using SciMLBase: SciMLBase, ReturnCode
@@ -19,7 +19,6 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::RFLUFactorization
         end
         fact = RecursiveFactorization.lu!(A, ipiv, Val(P), Val(T), check = false)
         cache.cacheval = (fact, ipiv)
-
         if !LinearAlgebra.issuccess(fact)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
@@ -105,4 +104,32 @@ function SciMLBase.solve!(
         alg, cache.u, nothing, cache; retcode = ReturnCode.Success)
 end
 
+function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::ButterflyFactorization;
+        kwargs...)
+    A = cache.A
+    A = convert(AbstractMatrix, A)
+    b = cache.b
+    M, N = size(A)
+    B, U, V = cache.cacheval[2], cache.cacheval[3], cache.cacheval[4]
+    if cache.isfresh
+        @assert M==N "A must be square"
+        U, V, F, out = RecursiveFactorization.🦋workspace(A, b, B, U, V, alg.thread)
+        cache.cacheval = (A, B, U, V, F)
+        cache.isfresh = false
+        if (M % 4 != 0)
+            b = [b; rand(4 - M % 4)]
+        end
+    end
+    A, B, U, V, F = cache.cacheval
+    sol = V * (F \ (U * b))
+    out .= @view sol[1:M]    
+   SciMLBase.build_linear_solution(alg, out, nothing, cache)
 end
+
+function LinearSolve.init_cacheval(alg::ButterflyFactorization, A, b, u, Pl, Pr, maxiters::Int,
+        abstol, reltol, verbose::Bool, assumptions::LinearSolve.OperatorAssumptions)
+    A, A, A', A, RecursiveFactorization.lu!(rand(1, 1), alg.thread)
+end
+
+end
+

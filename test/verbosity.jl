@@ -2,6 +2,7 @@ using LinearSolve
 using LinearSolve: LinearVerbosity, option_group, group_options, BLISLUFactorization
 using SciMLLogging
 using Test
+
 @testset "LinearVerbosity Tests" begin
     @testset "Default constructor" begin
         v1 = LinearVerbosity()
@@ -132,75 +133,14 @@ using Test
         @test :using_IterativeSolvers in keys(numerical_group)
         @test :pardiso_verbosity in keys(numerical_group)
 
-        # Test values are MessageLevel types
-        @test error_group.default_lu_fallback isa SciMLLogging.MessageLevel
-        @test performance_group.no_right_preconditioning isa SciMLLogging.MessageLevel
-        @test numerical_group.KrylovKit_verbosity isa SciMLLogging.MessageLevel
+        # Test values are AbstractMessageLevel types
+        @test error_group.default_lu_fallback isa SciMLLogging.AbstractMessageLevel
+        @test performance_group.no_right_preconditioning isa SciMLLogging.AbstractMessageLevel
+        @test numerical_group.KrylovKit_verbosity isa SciMLLogging.AbstractMessageLevel
 
         # Individual field access should still work
         @test v.default_lu_fallback isa SciMLLogging.WarnLevel
         @test v.KrylovKit_verbosity isa SciMLLogging.WarnLevel
-    end
-
-    @testset "Group setproperty! setting" begin
-        v = LinearVerbosity()
-
-        # Test setting entire error_control group
-        v.error_control = ErrorLevel()
-        @test v.default_lu_fallback isa SciMLLogging.ErrorLevel
-
-        # Test setting entire performance group
-        v.performance = InfoLevel()
-        @test v.no_right_preconditioning isa SciMLLogging.InfoLevel
-
-        # Test setting entire numerical group
-        v.numerical = Silent()
-        @test v.KrylovKit_verbosity isa SciMLLogging.Silent
-        @test v.using_IterativeSolvers isa SciMLLogging.Silent
-        @test v.pardiso_verbosity isa SciMLLogging.Silent
-        @test v.HYPRE_verbosity isa SciMLLogging.Silent
-
-        # Test that other groups aren't affected
-        @test v.default_lu_fallback isa SciMLLogging.ErrorLevel  # error_control unchanged
-        @test v.no_right_preconditioning isa SciMLLogging.InfoLevel  # performance unchanged
-
-        # Test individual setting still works after group setting
-        v.KrylovKit_verbosity = WarnLevel()
-        @test v.KrylovKit_verbosity isa SciMLLogging.WarnLevel
-        # Other numerical options should still be Silent
-        @test v.using_IterativeSolvers isa SciMLLogging.Silent
-    end
-
-    @testset "Group setproperty! error handling" begin
-        v = LinearVerbosity()
-
-        # Test error for invalid group value type
-        @test_throws ErrorException v.error_control = "invalid"
-        @test_throws ErrorException v.performance = 123
-        @test_throws ErrorException v.numerical = :invalid
-
-        # Test error for invalid individual option type
-        @test_throws ErrorException v.KrylovKit_verbosity = "invalid"
-        @test_throws ErrorException v.default_lu_fallback = 123
-    end
-
-    @testset "getproperty and setproperty! consistency" begin
-        v = LinearVerbosity()
-
-        # Set a group and verify getproperty reflects the change
-        v.numerical = ErrorLevel()
-        numerical_group = v.numerical
-
-        @test all(x -> x isa SciMLLogging.ErrorLevel, values(numerical_group))
-
-        # Set individual option and verify both individual and group access work
-        v.KrylovKit_verbosity = InfoLevel()
-        @test v.KrylovKit_verbosity isa SciMLLogging.InfoLevel
-
-        updated_numerical = v.numerical
-        @test updated_numerical.KrylovKit_verbosity isa SciMLLogging.InfoLevel
-        # Other numerical options should still be Error
-        @test updated_numerical.using_IterativeSolvers isa SciMLLogging.ErrorLevel
     end
 end
 

@@ -120,7 +120,7 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
         else
             verbose = LinearVerbosity(SciMLLogging.None())
         end
-    elseif verbose isa SciMLLogging.MessageLevel
+    elseif verbose isa SciMLLogging.AbstractMessageLevel
         verbose = LinearVerbosity(verbose)
     end
 

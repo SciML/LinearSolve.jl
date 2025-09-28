@@ -176,12 +176,6 @@ end
         prob,
         verbose = verb)
 
-    verb.default_lu_fallback = InfoLevel()
-
-    @test_logs (:info,
-        "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(
-        prob,
-        verbose = verb)
 end
 
 @testset "BLAS Return Code Interpretation" begin

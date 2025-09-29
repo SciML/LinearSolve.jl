@@ -116,19 +116,20 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::ButterflyFactoriz
         U, V, F, out = RecursiveFactorization.🦋workspace(A, b, B, U, V, alg.thread)
         cache.cacheval = (A, B, U, V, F)
         cache.isfresh = false
-        if (M % 4 != 0)
-            b = [b; rand(4 - M % 4)]
-        end
+    end
+    if (M % 4 != 0)
+        b = [b; rand(4 - M % 4)]
     end
     A, B, U, V, F = cache.cacheval
     sol = V * (F \ (U * b))
+
     out .= @view sol[1:M]    
    SciMLBase.build_linear_solution(alg, out, nothing, cache)
 end
 
 function LinearSolve.init_cacheval(alg::ButterflyFactorization, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::LinearSolve.OperatorAssumptions)
-    A, A, A', A, RecursiveFactorization.lu!(rand(1, 1), alg.thread)
+    A, A, A', A, ArrayInterface.lu_instance(A)
 end
 
 end

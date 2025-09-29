@@ -52,21 +52,24 @@ const CRC = ChainRulesCore
         # MKL_jll < 2022.2 doesn't support the mixed LP64 and ILP64 interfaces that we make use of in LinearSolve
         # In particular, the `_64` APIs do not exist
         # https://www.intel.com/content/www/us/en/developer/articles/release-notes/onemkl-release-notes-2022.html
-        using MKL_jll
+        using MKL_jll: MKL_jll, libmkl_rt
         const usemkl = MKL_jll.is_available() && pkgversion(MKL_jll) >= v"2022.2"
     else
+        global libmkl_rt
         const usemkl = false
     end
 else
+    global libmkl_rt
     const usemkl = false
 end
 
 # OpenBLAS_jll is a standard library, but allow users to disable it via preferences
 if Preferences.@load_preference("LoadOpenBLAS_JLL", true)
-    using OpenBLAS_jll: OpenBLAS_jll
+    using OpenBLAS_jll: OpenBLAS_jll, libopenblas
     const useopenblas = OpenBLAS_jll.is_available()
 else
     const useopenblas = false
+    global libopenblas
 end
 
 @reexport using SciMLBase

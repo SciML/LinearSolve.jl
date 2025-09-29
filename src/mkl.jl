@@ -32,7 +32,7 @@ function getrf!(A::AbstractMatrix{<:ComplexF64};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(zgetrf_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(zgetrf_), libmkl_rt), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -54,7 +54,7 @@ function getrf!(A::AbstractMatrix{<:ComplexF32};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(cgetrf_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(cgetrf_), libmkl_rt), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -76,7 +76,7 @@ function getrf!(A::AbstractMatrix{<:Float64};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(dgetrf_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(dgetrf_), libmkl_rt), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -98,7 +98,7 @@ function getrf!(A::AbstractMatrix{<:Float32};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(sgetrf_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(sgetrf_), libmkl_rt), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -124,7 +124,7 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall((@blasfunc(zgetrs_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(zgetrs_), libmkl_rt), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
@@ -151,7 +151,7 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall((@blasfunc(cgetrs_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(cgetrs_), libmkl_rt), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
@@ -178,7 +178,7 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall((@blasfunc(dgetrs_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(dgetrs_), libmkl_rt), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{Float64}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
@@ -205,7 +205,7 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall((@blasfunc(sgetrs_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(sgetrs_), libmkl_rt), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{Float32}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,

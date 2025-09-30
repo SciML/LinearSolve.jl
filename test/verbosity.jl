@@ -6,31 +6,20 @@ using Test
 @testset "LinearVerbosity Tests" begin
     @testset "Default constructor" begin
         v1 = LinearVerbosity()
-        @test v1 isa LinearVerbosity{true}
+        @test v1 isa LinearVerbosity
         @test v1.default_lu_fallback isa SciMLLogging.WarnLevel
         @test v1.KrylovKit_verbosity isa SciMLLogging.WarnLevel
     end
-
-    @testset "Bool constructor" begin
-        v2_true = LinearVerbosity(true)
-        v2_false = LinearVerbosity(false)
-        @test v2_true isa LinearVerbosity{true}
-        @test v2_false isa LinearVerbosity{false}
-    end
-
-    @testset "VerbosityPreset constructors" begin
+    @testset "AbstractVerbosityPreset constructors" begin
         v3_none = LinearVerbosity(SciMLLogging.None())
         v3_all = LinearVerbosity(SciMLLogging.All())
         v3_minimal = LinearVerbosity(SciMLLogging.Minimal())
         v3_standard = LinearVerbosity(SciMLLogging.Standard())
         v3_detailed = LinearVerbosity(SciMLLogging.Detailed())
 
-        @test v3_none isa LinearVerbosity{false}
-        @test v3_all isa LinearVerbosity{true}
         @test v3_all.default_lu_fallback isa SciMLLogging.InfoLevel
         @test v3_minimal.default_lu_fallback isa SciMLLogging.ErrorLevel
         @test v3_minimal.KrylovKit_verbosity isa SciMLLogging.Silent
-        @test v3_standard isa LinearVerbosity{true}
         @test v3_detailed.KrylovKit_verbosity isa SciMLLogging.WarnLevel
     end
 
@@ -99,19 +88,6 @@ using Test
 
         # Test error for unknown group
         @test_throws ErrorException group_options(v8, :unknown_group)
-    end
-
-    @testset "Type parameter consistency" begin
-        v_enabled = LinearVerbosity{true}()
-        v_disabled = LinearVerbosity{false}()
-
-        @test v_enabled isa LinearVerbosity{true}
-        @test v_disabled isa LinearVerbosity{false}
-
-        # Test that the constructors create the right types
-        @test LinearVerbosity() isa LinearVerbosity{true}
-        @test LinearVerbosity(true) isa LinearVerbosity{true}
-        @test LinearVerbosity(false) isa LinearVerbosity{false}
     end
 
     @testset "Group getproperty access" begin

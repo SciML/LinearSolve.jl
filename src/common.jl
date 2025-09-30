@@ -328,11 +328,11 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         #@warn "Using `true` or `false` for `verbose` is being deprecated. Please use a `LinearVerbosity` type to specify verbosity settings.
         # For details see the verbosity section of the common solver options documentation page."
         if verbose 
-            verbose_spec = LinearVerbosity{true}()
+            verbose_spec = LinearVerbosity()
         else
-            verbose_spec = LinearVerbosity{false}()
+            verbose_spec = LinearVerbosity(SciMLLogging.None())
         end
-    elseif verbose isa SciMLLogging.VerbosityPreset
+    elseif verbose isa SciMLLogging.AbstractVerbosityPreset
         verbose_spec = LinearVerbosity(verbose)
     else
         verbose_spec = verbose

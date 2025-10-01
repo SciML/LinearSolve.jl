@@ -261,7 +261,7 @@ db22 = ForwardDiff.gradient(x -> f4(eltype(x).(A), eltype(x).(b1), x), copy(b2))
 # @test db12 ≈ results[2][3]
 # @test db22 ≈ results[2][4]
 
-# eigth test
+# 8th test
 A = rand(n, n);
 dA = zeros(n, n);
 b1 = rand(n);

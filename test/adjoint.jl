@@ -2,7 +2,7 @@ using Zygote, ForwardDiff
 using LinearSolve, LinearAlgebra, Test
 using FiniteDiff, RecursiveFactorization
 using LazyArrays: BroadcastArray
-using Enzyme, Mooncake
+using Mooncake
 
 # first test
 # zygote

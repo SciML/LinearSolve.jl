@@ -41,70 +41,121 @@ LinearSolve.@concrete mutable struct DualLinearCache{DT}
     partials_b
     partials_u
 
+    # Cached lists of partials to avoid repeated allocations
+    partials_A_list
+    partials_b_list
+
+    # Cached intermediate values for calculations
+    rhs_list
+    dual_u0_cache
+    primal_u_cache
+    primal_b_cache
+
+    # Cache validity flag for RHS precalculation optimization
+    rhs_cache_valid
+
     dual_A
     dual_b
     dual_u
 end
 
-function linearsolve_forwarddiff_solve(cache::DualLinearCache, alg, args...; kwargs...)
+function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kwargs...)
     # Solve the primal problem
-    dual_u0 = copy(cache.linear_cache.u)
-    sol = solve!(cache.linear_cache, alg, args...; kwargs...)
-    primal_b = copy(cache.linear_cache.b)
-    uu = sol.u
+    cache.dual_u0_cache .= cache.linear_cache.u
+    sol = solve!(cache.linear_cache, alg, args...; kwargs...)  
 
-    primal_sol = (;
-        u = recursivecopy(sol.u),
-        resid = recursivecopy(sol.resid),
-        retcode = recursivecopy(sol.retcode),
-        iters = recursivecopy(sol.iters),
-        stats = recursivecopy(sol.stats)
-    )
+    cache.primal_u_cache .= cache.linear_cache.u
+    cache.primal_b_cache .= cache.linear_cache.b
+    uu = sol.u
 
     # Solves Dual partials separately 
     ∂_A = cache.partials_A
     ∂_b = cache.partials_b
 
-    rhs_list = xp_linsolve_rhs(uu, ∂_A, ∂_b)
+    xp_linsolve_rhs!(uu, ∂_A, ∂_b, cache)
 
-    cache.linear_cache.u = dual_u0
+    rhs_list = cache.rhs_list
+
+    cache.linear_cache.u .= cache.dual_u0_cache
     # We can reuse the linear cache, because the same factorization will work for the partials.
     for i in eachindex(rhs_list)
-        cache.linear_cache.b = rhs_list[i]
-        rhs_list[i] = copy(solve!(cache.linear_cache, alg, args...; kwargs...).u)
+        if cache.linear_cache isa DualLinearCache
+            # For nested duals, assign directly to partials_b
+            cache.linear_cache.b = copy(rhs_list[i])
+        else
+            # For regular linear cache, use broadcasting assignment
+            cache.linear_cache.b .= rhs_list[i]
+        end
+        rhs_list[i] .= solve!(cache.linear_cache, alg, args...; kwargs...).u
     end
 
     # Reset to the original `b` and `u`, users will expect that `b` doesn't change if they don't tell it to
-    cache.linear_cache.b = primal_b
+    cache.linear_cache.b .= cache.primal_b_cache
+    cache.linear_cache.u .= cache.primal_u_cache
 
-    partial_sols = rhs_list
-
-    primal_sol, partial_sols
+    return sol
 end
 
-function xp_linsolve_rhs(uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}},
-        ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}})
-    A_list = partials_to_list(∂_A)
-    b_list = partials_to_list(∂_b)
+function xp_linsolve_rhs!(uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}},
+        ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}}, cache::DualLinearCache)
 
-    Auu = [A * uu for A in A_list]
+    # Update cached partials lists if cache is invalid
+    if !cache.rhs_cache_valid
+        update_partials_list!(∂_A, cache.partials_A_list)
+        update_partials_list!(∂_b, cache.partials_b_list)
+        cache.rhs_cache_valid = true
+    end
 
-    return b_list .- Auu
+    A_list = cache.partials_A_list
+    b_list = cache.partials_b_list
+
+    # Compute rhs = b - A*uu using precalculated b_list and five-argument mul!
+    for i in eachindex(b_list)
+        cache.rhs_list[i] .= b_list[i]
+        mul!(cache.rhs_list[i], A_list[i], uu, -1, 1)
+    end
+
+    return cache.rhs_list
 end
 
-function xp_linsolve_rhs(
-        uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}}, ∂_b::Nothing)
-    A_list = partials_to_list(∂_A)
+function xp_linsolve_rhs!(
+        uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}},
+        ∂_b::Nothing, cache::DualLinearCache)
 
-    Auu = [A * uu for A in A_list]
+    # Update cached partials list for A if cache is invalid
+    if !cache.rhs_cache_valid
+        update_partials_list!(∂_A, cache.partials_A_list)
+        cache.rhs_cache_valid = true
+    end
 
-    return -Auu
+    A_list = cache.partials_A_list
+
+    # Compute rhs = -A*uu using five-argument mul!
+    for i in eachindex(A_list)
+        mul!(cache.rhs_list[i], A_list[i], uu, -1, 0)
+    end
+
+    return cache.rhs_list
 end
 
-function xp_linsolve_rhs(
-        uu, ∂_A::Nothing, ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}})
-    b_list = partials_to_list(∂_b)
-    b_list
+function xp_linsolve_rhs!(
+        uu, ∂_A::Nothing, ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}},
+        cache::DualLinearCache)
+
+    # Update cached partials list for b if cache is invalid
+    if !cache.rhs_cache_valid
+        update_partials_list!(∂_b, cache.partials_b_list)
+        cache.rhs_cache_valid = true
+    end
+
+    b_list = cache.partials_b_list
+
+    # Copy precalculated b_list to rhs_list (no A*uu computation needed)
+    for i in eachindex(b_list)
+        cache.rhs_list[i] .= b_list[i]
+    end
+
+    return cache.rhs_list
 end
 
 function linearsolve_dual_solution(
@@ -114,10 +165,26 @@ end
 
 function linearsolve_dual_solution(u::AbstractArray, partials,
         cache::DualLinearCache{DT}) where {T, V, N, DT <: Dual{T,V,N}}
-    # Handle single-level duals for arrays
-    partials_list = RecursiveArrayTools.VectorOfArray(partials)
-    return map(((uᵢ, pᵢ),) -> DT(uᵢ, Partials{N,V}(NTuple{N,V}(pᵢ))),
-        zip(u, partials_list[i, :] for i in 1:length(partials_list.u[1])))
+    # Optimized in-place version that reuses cache.dual_u
+    linearsolve_dual_solution!(getfield(cache, :dual_u), u, partials)
+    return getfield(cache, :dual_u)
+end
+
+function linearsolve_dual_solution!(dual_u::AbstractArray{DT}, u::AbstractArray, partials) where {T, V, N, DT <: Dual{T,V,N}}
+    # Direct in-place construction of dual numbers without temporary allocations
+    n_partials = length(partials)
+    
+    for i in eachindex(u, dual_u)
+        # Extract partials for this element directly
+        partial_vals = ntuple(Val(N)) do j
+            V(partials[j][i])
+        end
+        
+        # Construct dual number in-place
+        dual_u[i] = DT(u[i], Partials{N,V}(partial_vals))
+    end
+    
+    return dual_u
 end
 
 function SciMLBase.init(prob::DualAbstractLinearProblem, alg::SciMLLinearSolveAlgorithm, args...; kwargs...)
@@ -126,7 +193,7 @@ end
 
 # Opt out for GenericLUFactorization
 function SciMLBase.init(prob::DualAbstractLinearProblem, alg::GenericLUFactorization, args...; kwargs...)
-    return __init(prob,alg, args...; kwargs...)
+    return __init(prob, alg, args...; kwargs...)
 end
 
 function __dual_init(
@@ -166,29 +233,57 @@ function __dual_init(
         alias = alias, abstol = abstol, reltol = reltol,
         maxiters = maxiters, verbose = verbose, Pl = Pl, Pr = Pr, assumptions = assumptions,
         sensealg = sensealg, u0 = new_u0, kwargs...)
-    return DualLinearCache{dual_type}(non_partial_cache, ∂_A, ∂_b,
-        !isnothing(∂_b) ? zero.(∂_b) : ∂_b, A, b, zeros(dual_type, length(b)))
+
+    # Initialize caches for partials lists and intermediate calculations
+    partials_A_list = !isnothing(∂_A) ? partials_to_list(∂_A) : nothing
+    partials_b_list = !isnothing(∂_b) ? partials_to_list(∂_b) : nothing
+
+    # Determine size and type for rhs_list
+    if !isnothing(partials_A_list)
+        n_partials = length(partials_A_list)
+        rhs_list = [similar(non_partial_cache.b) for _ in 1:n_partials]
+    elseif !isnothing(partials_b_list)
+        n_partials = length(partials_b_list)
+        rhs_list = [similar(non_partial_cache.b) for _ in 1:n_partials]
+    else
+        rhs_list = nothing
+    end
+
+    return DualLinearCache{dual_type}(
+        non_partial_cache,
+        ∂_A,
+        ∂_b,
+        !isnothing(∂_b) ? zero.(∂_b) : ∂_b,
+        partials_A_list,
+        partials_b_list,
+        rhs_list,
+        similar(new_b),
+        similar(new_b),
+        similar(new_b),
+        true,  # Cache is initially valid
+        A,
+        b,
+        zeros(dual_type, length(b))
+    )
 end
 
 function SciMLBase.solve!(cache::DualLinearCache, args...; kwargs...)
-    solve!(cache, cache.alg, args...; kwargs...)
+    solve!(cache, getfield(cache, :linear_cache).alg, args...; kwargs...)
 end
 
 function SciMLBase.solve!(
         cache::DualLinearCache{DT}, alg::SciMLLinearSolveAlgorithm, args...; kwargs...) where {DT <: ForwardDiff.Dual}
-    sol,
-    partials = linearsolve_forwarddiff_solve(
-        cache::DualLinearCache, cache.alg, args...; kwargs...)
-    dual_sol = linearsolve_dual_solution(sol.u, partials, cache)
+    primal_sol = linearsolve_forwarddiff_solve!(
+        cache::DualLinearCache, getfield(cache, :linear_cache).alg, args...; kwargs...)
+    dual_sol = linearsolve_dual_solution(getfield(cache,:linear_cache).u, getfield(cache, :rhs_list), cache)
 
-    if cache.dual_u isa AbstractArray
-        cache.dual_u[:] = dual_sol
-    else
-        cache.dual_u = dual_sol
+    # For scalars, we still need to assign since cache.dual_u might not be pre-allocated
+    if !(getfield(cache, :dual_u) isa AbstractArray)
+        setfield!(cache, :dual_u, dual_sol)
     end
 
     return SciMLBase.build_linear_solution(
-        cache.alg, dual_sol, sol.resid, cache; sol.retcode, sol.iters, sol.stats
+        getfield(cache, :linear_cache).alg, getfield(cache, :dual_u), primal_sol.resid, cache; primal_sol.retcode, primal_sol.iters, primal_sol.stats
     )
 end
 
@@ -203,13 +298,15 @@ function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)
         setproperty!(dc.linear_cache, sym, val)
     end
 
-    # Update the partials if setting A or b
+    # Update the partials and invalidate cache if setting A or b
     if sym === :A
         setfield!(dc, :dual_A, val)
         setfield!(dc, :partials_A, partial_vals(val))
+        setfield!(dc, :rhs_cache_valid, false)  # Invalidate cache
     elseif sym === :b
         setfield!(dc, :dual_b, val)
         setfield!(dc, :partials_b, partial_vals(val))
+        setfield!(dc, :rhs_cache_valid, false)  # Invalidate cache
     elseif sym === :u
         setfield!(dc, :dual_u, val)
         setfield!(dc, :partials_u, partial_vals(val))
@@ -247,7 +344,43 @@ partial_vals(x) = nothing
 nodual_value(x) = x
 nodual_value(x::Dual{T, V, P}) where {T, V <: AbstractFloat, P} = ForwardDiff.value(x)
 nodual_value(x::Dual{T, V, P}) where {T, V <: Dual, P} = x.value  # Keep the inner dual intact
-nodual_value(x::AbstractArray{<:Dual}) = map(nodual_value, x)
+
+function nodual_value(x::AbstractArray{<:Dual})
+    # Create a similar array with the appropriate element type
+    T = typeof(nodual_value(first(x)))
+    result = similar(x, T)
+
+    # Fill the result array with values
+    for i in eachindex(x)
+        result[i] = nodual_value(x[i])
+    end
+
+    return result
+end
+
+function update_partials_list!(partial_matrix::AbstractVector{T}, list_cache) where {T}
+    p = eachindex(first(partial_matrix))
+    for i in p
+        for j in eachindex(partial_matrix)
+            list_cache[i][j] = partial_matrix[j][i]
+        end
+    end
+    return list_cache
+end
+
+function update_partials_list!(partial_matrix, list_cache)
+    p = length(first(partial_matrix))
+    m, n = size(partial_matrix)
+
+    for k in 1:p
+        for i in 1:m
+            for j in 1:n
+                list_cache[k][i, j] = partial_matrix[i, j][k]
+            end
+        end
+    end
+    return list_cache
+end
 
 function partials_to_list(partial_matrix::AbstractVector{T}) where {T}
     p = eachindex(first(partial_matrix))

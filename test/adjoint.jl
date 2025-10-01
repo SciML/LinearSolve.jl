@@ -2,7 +2,10 @@ using Zygote, ForwardDiff
 using LinearSolve, LinearAlgebra, Test
 using FiniteDiff, RecursiveFactorization
 using LazyArrays: BroadcastArray
+using Enzyme, Mooncake
 
+# first test
+# zygote
 n = 4
 A = rand(n, n);
 b1 = rand(n);
@@ -16,17 +19,28 @@ function f(A, b1; alg = LUFactorization())
     norm(s1)
 end
 
-f(A, b1) # Uses BLAS
+f_primal = f(A, b1) # Uses BLAS
 
 dA, db1 = Zygote.gradient(f, A, b1)
 @test dA isa BroadcastArray
 
+cache = prepare_gradient_cache(f, (copy(A), copy(b1))...)
+value, gradient = Mooncake.value_and_gradient!!(cache, f, (copy(A), copy(b1))...)
+
 dA2 = ForwardDiff.gradient(x -> f(x, eltype(x).(b1)), copy(A))
 db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x), copy(b1))
 
+# Zygote
 @test dA ≈ dA2
 @test db1 ≈ db12
 
+# Mooncake
+@test value ≈ f_primal
+@test gradient[2] ≈ dA2
+@test gradient[3] ≈ db12
+
+# Second test
+# zygote
 A = rand(n, n);
 b1 = rand(n);
 
@@ -34,17 +48,27 @@ _ff = (x,
     y) -> f(x,
     y;
     alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization))
-_ff(copy(A), copy(b1))
+f_primal = _ff(copy(A), copy(b1))
 
 dA, db1 = Zygote.gradient(_ff, copy(A), copy(b1))
 @test dA isa BroadcastArray
 
+cache = prepare_gradient_cache(_ff, (copy(A), copy(b1))...)
+value, gradient = Mooncake.value_and_gradient!!(cache, _ff, (copy(A), copy(b1))...)
+
 dA2 = ForwardDiff.gradient(x -> f(x, eltype(x).(b1)), copy(A))
 db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x), copy(b1))
 
+# Zygote
 @test dA ≈ dA2
 @test db1 ≈ db12
 
+# Mooncake
+@test value ≈ f_primal
+@test gradient[2] ≈ dA2
+@test gradient[3] ≈ db12
+
+# third test
 # Test complex numbers
 A = rand(n, n) + 1im * rand(n, n);
 b1 = rand(n) + 1im * rand(n);
@@ -60,6 +84,15 @@ end
 dA, db1, db2 = Zygote.gradient(f3, A, b1, b1)
 @test dA isa BroadcastArray
 
+# Mooncake fails
+# cache = Mooncake.prepare_gradient_cache(f3, (copy(A), copy(b1), copy(b1))...)
+# results = Mooncake.value_and_gradient!!(cache, f3, (copy(A), copy(b1), copy(b1))...)
+
+# @test f3(A, b1, b1) ≈ results[1]
+# @test dA2 ≈ results[2][2]
+# @test db12 ≈ results[2][3]
+# @test db22 ≈ results[2][4]
+
 dA2 = FiniteDiff.finite_difference_gradient(
     x -> f3(x, eltype(x).(b1), eltype(x).(b1)), copy(A))
 db12 = FiniteDiff.finite_difference_gradient(
@@ -71,6 +104,7 @@ db22 = FiniteDiff.finite_difference_gradient(
 @test db1 ≈ db12
 @test db2 ≈ db22
 
+# fourth test
 A = rand(n, n);
 b1 = rand(n);
 
@@ -85,6 +119,15 @@ end
 dA, db1, db2 = Zygote.gradient(f4, A, b1, b1)
 @test dA isa BroadcastArray
 
+# Mooncake fails
+# cache = Mooncake.prepare_gradient_cache(f4, (copy(A), copy(b1), copy(b1))...)
+# results = Mooncake.value_and_gradient!!(cache, f4, (copy(A), copy(b1), copy(b1))...)
+
+# @test f4(A, b1, b1) ≈ results[1]
+# @test dA2 ≈ results[2][2]
+# @test db12 ≈ results[2][3]
+# @test db22 ≈ results[2][4]
+
 dA2 = ForwardDiff.gradient(x -> f4(x, eltype(x).(b1), eltype(x).(b1)), copy(A))
 db12 = ForwardDiff.gradient(x -> f4(eltype(x).(A), x, eltype(x).(b1)), copy(b1))
 db22 = ForwardDiff.gradient(x -> f4(eltype(x).(A), eltype(x).(b1), x), copy(b1))
@@ -93,6 +136,7 @@ db22 = ForwardDiff.gradient(x -> f4(eltype(x).(A), eltype(x).(b1), x), copy(b1))
 @test db1 ≈ db12
 @test db2 ≈ db22
 
+# fifth test
 A = rand(n, n);
 b1 = rand(n);
 for alg in (

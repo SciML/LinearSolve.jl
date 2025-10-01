@@ -3,6 +3,7 @@ module LinearSolveAutotune
 # Ensure MKL is available for benchmarking by setting the preference before loading LinearSolve
 using Preferences
 using MKL_jll
+using OpenBLAS_jll
 
 # Set MKL preference to true for benchmarking if MKL is available
 # We need to use UUID instead of the module since LinearSolve isn't loaded yet
@@ -78,13 +79,14 @@ function Base.show(io::IO, results::AutotuneResults)
     println(io, "  • Julia: ", get(results.sysinfo, "julia_version", "Unknown"))
     println(io, "  • Threads: ", get(results.sysinfo, "num_threads", "Unknown"), " (BLAS: ", get(results.sysinfo, "blas_num_threads", "Unknown"), ")")
     
-    # Results summary
-    successful_results = filter(row -> row.success, results.results_df)
+    # Results summary - include all results to show what was attempted
+    all_results = results.results_df
+    successful_results = filter(row -> row.success && !isnan(row.gflops), results.results_df)
     if nrow(successful_results) > 0
         println(io, "\n🏆 Top Performing Algorithms:")
         summary = combine(groupby(successful_results, :algorithm),
-            :gflops => mean => :avg_gflops,
-            :gflops => maximum => :max_gflops,
+            :gflops => (x -> mean(filter(!isnan, x))) => :avg_gflops,
+            :gflops => (x -> maximum(filter(!isnan, x))) => :max_gflops,
             nrow => :num_tests)
         sort!(summary, :avg_gflops, rev = true)
         
@@ -93,6 +95,13 @@ function Base.show(io::IO, results::AutotuneResults)
             println(io, "  ", i, ". ", row.algorithm, ": ",
                     @sprintf("%.2f GFLOPs avg", row.avg_gflops))
         end
+    end
+    
+    # Show algorithms that had failures/timeouts to make it clear what was attempted
+    failed_results = filter(row -> !row.success, all_results)
+    if nrow(failed_results) > 0
+        failed_algs = unique(failed_results.algorithm)
+        println(io, "\n⚠️  Algorithms with failures/timeouts: ", join(failed_algs, ", "))
     end
     
     # Element types tested
@@ -104,6 +113,12 @@ function Base.show(io::IO, results::AutotuneResults)
     println(io, "📏 Matrix Sizes: ", minimum(sizes), "×", minimum(sizes), 
             " to ", maximum(sizes), "×", maximum(sizes))
     
+    # Report tests that exceeded maxtime if any
+    exceeded_results = filter(row -> isnan(row.gflops) && contains(get(row, :error, ""), "Exceeded maxtime"), results.results_df)
+    if nrow(exceeded_results) > 0
+        println(io, "⏱️  Exceeded maxtime: ", nrow(exceeded_results), " tests exceeded time limit")
+    end
+    
     # Call to action - reordered
     println(io, "\n" * "="^60)
     println(io, "🚀 For comprehensive results, consider running:")
@@ -112,7 +127,7 @@ function Base.show(io::IO, results::AutotuneResults)
     println(io, "       eltypes = (Float32, Float64, ComplexF32, ComplexF64)")
     println(io, "   )")
     println(io, "\n📈 See community results at:")
-    println(io, "   https://github.com/SciML/LinearSolve.jl/issues/669")
+    println(io, "   https://github.com/SciML/LinearSolve.jl/issues/725")
     println(io, "\n💡 To share your results with the community, run:")
     println(io, "   share_results(results)")
     println(io, "="^60)
@@ -158,7 +173,8 @@ end
         seconds::Float64 = 0.5,
         eltypes = (Float32, Float64, ComplexF32, ComplexF64),
         skip_missing_algs::Bool = false,
-        include_fastlapack::Bool = false)
+        include_fastlapack::Bool = false,
+        maxtime::Float64 = 100.0)
 
 Run a comprehensive benchmark of all available LU factorization methods and optionally:
 
@@ -175,13 +191,15 @@ Run a comprehensive benchmark of all available LU factorization methods and opti
 
 # Arguments
 
-  - `sizes = [:small, :medium, :large]`: Size categories to test. Options: :small (5-20), :medium (20-300), :large (300-1000), :big (10000-100000)
+  - `sizes = [:small, :medium, :large]`: Size categories to test. Options: :tiny (5-20), :small (20-100), :medium (100-300), :large (300-1000), :big (1000-15000)
   - `set_preferences::Bool = true`: Update LinearSolve preferences with optimal algorithms
   - `samples::Int = 5`: Number of benchmark samples per algorithm/size
   - `seconds::Float64 = 0.5`: Maximum time per benchmark
   - `eltypes = (Float32, Float64, ComplexF32, ComplexF64)`: Element types to benchmark
   - `skip_missing_algs::Bool = false`: If false, error when expected algorithms are missing; if true, warn instead
   - `include_fastlapack::Bool = false`: If true, includes FastLUFactorization in benchmarks
+  - `maxtime::Float64 = 100.0`: Maximum time in seconds for each algorithm test (including accuracy check). 
+    If exceeded, the run is skipped and recorded as NaN
 
 # Returns
 
@@ -216,7 +234,8 @@ function autotune_setup(;
         seconds::Float64 = 0.5,
         eltypes = (Float64,),
         skip_missing_algs::Bool = false,
-        include_fastlapack::Bool = false)
+        include_fastlapack::Bool = false,
+        maxtime::Float64 = 100.0)
     @info "Starting LinearSolve.jl autotune setup..."
     @info "Configuration: sizes=$sizes, set_preferences=$set_preferences"
     @info "Element types to benchmark: $(join(eltypes, ", "))"
@@ -249,30 +268,76 @@ function autotune_setup(;
 
     # Run benchmarks
     @info "Running benchmarks (this may take several minutes)..."
+    @info "Maximum time per algorithm test: $(maxtime)s"
     results_df = benchmark_algorithms(matrix_sizes, all_algs, all_names, eltypes;
-        samples = samples, seconds = seconds, sizes = sizes)
+        samples = samples, seconds = seconds, sizes = sizes, maxtime = maxtime)
 
-    # Display results table
-    successful_results = filter(row -> row.success, results_df)
+    # Display results table - show all results including NaN values to indicate what was tested
+    all_results = results_df
+    successful_results = filter(row -> row.success && !isnan(row.gflops), results_df)
+    exceeded_maxtime_results = filter(row -> isnan(row.gflops) && contains(get(row, :error, ""), "Exceeded maxtime"), results_df)
+    skipped_results = filter(row -> contains(get(row, :error, ""), "Skipped"), results_df)
+    
+    if nrow(exceeded_maxtime_results) > 0
+        @info "$(nrow(exceeded_maxtime_results)) tests exceeded maxtime limit ($(maxtime)s)"
+    end
+    
+    if nrow(skipped_results) > 0
+        # Count unique algorithms that were skipped
+        skipped_algs = unique([row.algorithm for row in eachrow(skipped_results)])
+        @info "$(length(skipped_algs)) algorithms skipped for larger matrices after exceeding maxtime"
+    end
+    
     if nrow(successful_results) > 0
         @info "Benchmark completed successfully!"
 
-        # Create summary table for display
-        summary = combine(groupby(successful_results, :algorithm),
-            :gflops => mean => :avg_gflops,
-            :gflops => maximum => :max_gflops,
-            nrow => :num_tests)
-        sort!(summary, :avg_gflops, rev = true)
+        # Create summary table for display - include algorithms with NaN values to show what was tested
+        # Create summary for all algorithms tested (not just successful ones)
+        full_summary = combine(groupby(all_results, :algorithm),
+            :gflops => (x -> begin
+                valid_vals = filter(!isnan, x)
+                length(valid_vals) > 0 ? mean(valid_vals) : NaN
+            end) => :avg_gflops,
+            :gflops => (x -> begin
+                valid_vals = filter(!isnan, x)
+                length(valid_vals) > 0 ? maximum(valid_vals) : NaN
+            end) => :max_gflops,
+            :success => (x -> count(x)) => :successful_tests,
+            nrow => :total_tests)
+        
+        # Sort by average GFLOPs, putting NaN values at the end
+        sort!(full_summary, [:avg_gflops], rev = true, lt = (a, b) -> begin
+            if isnan(a) && isnan(b)
+                return false
+            elseif isnan(a)
+                return false
+            elseif isnan(b)
+                return true
+            else
+                return a < b
+            end
+        end)
 
         println("\n" * "="^60)
-        println("BENCHMARK RESULTS SUMMARY")
+        println("BENCHMARK RESULTS SUMMARY (including failed attempts)")
         println("="^60)
-        pretty_table(summary,
-            header = ["Algorithm", "Avg GFLOPs", "Max GFLOPs", "Tests"],
-            formatters = ft_printf("%.2f", [2, 3]),
+        pretty_table(full_summary,
+            header = ["Algorithm", "Avg GFLOPs", "Max GFLOPs", "Success", "Total"],
+            formatters = (v, i, j) -> begin
+                if j in [2, 3] && isa(v, Float64)
+                    return isnan(v) ? "NaN" : @sprintf("%.2f", v)
+                else
+                    return v
+                end
+            end,
             crop = :none)
     else
         @warn "No successful benchmark results!"
+        # Still show what was attempted
+        if nrow(all_results) > 0
+            failed_algs = unique(all_results.algorithm)
+            @info "Algorithms tested (all failed): $(join(failed_algs, ", "))"
+        end
         return results_df, nothing
     end
 
@@ -281,7 +346,7 @@ function autotune_setup(;
 
     # Set preferences if requested
     if set_preferences && !isempty(categories)
-        set_algorithm_preferences(categories)
+        set_algorithm_preferences(categories, results_df)
     end
 
     @info "Autotune setup completed!"
@@ -374,7 +439,7 @@ function share_results(results::AutotuneResults; auto_login::Bool = true)
         end
         @info "📁 Results saved locally to $fallback_file"
         @info "    You can manually share this file on the issue tracker:"
-        @info "    https://github.com/SciML/LinearSolve.jl/issues/669"
+        @info "    https://github.com/SciML/LinearSolve.jl/issues/725"
         return
     end
     

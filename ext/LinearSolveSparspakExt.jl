@@ -41,7 +41,7 @@ function SciMLBase.solve!(
         cache::LinearSolve.LinearCache, alg::SparspakFactorization; kwargs...)
     A = cache.A
     if cache.isfresh
-        if cache.cacheval !== nothing && alg.reuse_symbolic
+        if !(cache.cacheval === PREALLOCATED_SPARSEPAK) && alg.reuse_symbolic
             fact = sparspaklu!(LinearSolve.@get_cacheval(cache, :SparspakFactorization),
                 SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                     nonzeros(A)))

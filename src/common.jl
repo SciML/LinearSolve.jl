@@ -65,6 +65,46 @@ end
 __issquare(assump::OperatorAssumptions) = assump.issq
 __conditioning(assump::OperatorAssumptions) = assump.condition
 
+"""
+    LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, S}
+
+The core cache structure used by LinearSolve for storing and managing the state of linear
+solver computations. This mutable struct acts as the primary interface for iterative 
+solving and caching of factorizations and intermediate results.
+
+## Fields
+
+- `A::TA`: The matrix operator of the linear system.
+- `b::Tb`: The right-hand side vector of the linear system.
+- `u::Tu`: The solution vector (preallocated storage for the result).
+- `p::Tp`: Parameters passed to the linear solver algorithm.
+- `alg::Talg`: The linear solver algorithm instance.
+- `cacheval::Tc`: Algorithm-specific cache storage for factorizations and intermediate computations.
+- `isfresh::Bool`: Cache validity flag for the matrix `A`. `false` means `cacheval` is up-to-date 
+  with respect to `A`, `true` means `cacheval` needs to be updated.
+- `precsisfresh::Bool`: Cache validity flag for preconditioners. `false` means `Pl` and `Pr` 
+  are up-to-date with respect to `A`, `true` means they need to be updated.
+- `Pl::Tl`: Left preconditioner operator.
+- `Pr::Tr`: Right preconditioner operator.
+- `abstol::Ttol`: Absolute tolerance for iterative solvers.
+- `reltol::Ttol`: Relative tolerance for iterative solvers.
+- `maxiters::Int`: Maximum number of iterations for iterative solvers.
+- `verbose::Bool`: Whether to print verbose output during solving.
+- `assumptions::OperatorAssumptions{issq}`: Assumptions about the operator properties.
+- `sensealg::S`: Sensitivity analysis algorithm for automatic differentiation.
+
+## Usage
+
+The `LinearCache` is typically created via `init(::LinearProblem, ::SciMLLinearSolveAlgorithm)` 
+and then used with `solve!(cache)` for efficient repeated solves with the same matrix structure
+but potentially different right-hand sides or parameter values.
+
+## Cache Management
+
+The cache automatically tracks when matrix `A` or parameters `p` change by setting the 
+appropriate freshness flags. When `solve!` is called, stale cache entries are automatically
+recomputed as needed.
+"""
 mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, S}
     A::TA
     b::Tb
@@ -106,19 +146,81 @@ function update_cacheval!(cache::LinearCache, name::Symbol, x)
 end
 update_cacheval!(cache, cacheval, name::Symbol, x) = cacheval
 
+"""
+    init_cacheval(alg::SciMLLinearSolveAlgorithm, args...)
+
+Initialize algorithm-specific cache values for the given linear solver algorithm.
+This function returns `nothing` by default and is intended to be overloaded by 
+specific algorithm implementations that need to store intermediate computations
+or factorizations.
+
+## Arguments
+- `alg`: The linear solver algorithm instance
+- `args...`: Additional arguments passed to the cache initialization
+
+## Returns
+Algorithm-specific cache value or `nothing` for algorithms that don't require caching.
+"""
 init_cacheval(alg::SciMLLinearSolveAlgorithm, args...) = nothing
 
 function SciMLBase.init(prob::LinearProblem, args...; kwargs...)
     SciMLBase.init(prob, nothing, args...; kwargs...)
 end
 
+"""
+    default_tol(T)
+
+Compute the default tolerance for iterative linear solvers based on the element type.
+The tolerance is typically set as the square root of the machine epsilon for the 
+given floating point type, ensuring numerical accuracy appropriate for that precision.
+
+## Arguments
+- `T`: The element type of the linear system
+
+## Returns
+- For floating point types: `√(eps(T))`
+- For exact types (Rational, Integer): `0` (exact arithmetic)
+- For Any type: `0` (conservative default)
+"""
 default_tol(::Type{T}) where {T} = √(eps(T))
 default_tol(::Type{Complex{T}}) where {T} = √(eps(T))
 default_tol(::Type{<:Rational}) = 0
 default_tol(::Type{<:Integer}) = 0
 default_tol(::Type{Any}) = 0
 
+"""
+    default_alias_A(alg, A, b) -> Bool
+
+Determine the default aliasing behavior for the matrix `A` given the algorithm type.
+Aliasing allows the algorithm to modify the original matrix in-place for efficiency,
+but this may not be desirable or safe for all algorithm types.
+
+## Arguments
+- `alg`: The linear solver algorithm
+- `A`: The matrix operator  
+- `b`: The right-hand side vector
+
+## Returns
+- `false`: Safe default, algorithm will not modify the original matrix `A`
+- `true`: Algorithm may modify `A` in-place for efficiency
+
+## Algorithm-Specific Behavior
+- Dense factorizations: `false` (destructive, need to preserve original)
+- Krylov methods: `true` (non-destructive, safe to alias)
+- Sparse factorizations: `true` (typically preserve sparsity structure)
+"""
 default_alias_A(::Any, ::Any, ::Any) = false
+
+"""
+    default_alias_b(alg, A, b) -> Bool
+
+Determine the default aliasing behavior for the right-hand side vector `b` given the 
+algorithm type. Similar to `default_alias_A` but for the RHS vector.
+
+## Returns
+- `false`: Safe default, algorithm will not modify the original vector `b`
+- `true`: Algorithm may modify `b` in-place for efficiency
+"""
 default_alias_b(::Any, ::Any, ::Any) = false
 
 # Non-destructive algorithms default to true
@@ -130,6 +232,24 @@ default_alias_b(::AbstractSparseFactorization, ::Any, ::Any) = true
 
 DEFAULT_PRECS(A, p) = IdentityOperator(size(A)[1]), IdentityOperator(size(A)[2])
 
+"""
+    __init_u0_from_Ab(A, b)
+
+Initialize the solution vector `u0` with appropriate size and type based on the 
+matrix `A` and right-hand side `b`. The solution vector is allocated with the 
+same element type as `b` and sized to match the number of columns in `A`.
+
+## Arguments
+- `A`: The matrix operator (determines solution vector size)
+- `b`: The right-hand side vector (determines element type)
+
+## Returns
+A zero-initialized vector of size `(size(A, 2),)` with element type matching `b`.
+
+## Specializations
+- For static matrices (`SMatrix`): Returns a static vector (`SVector`)
+- For regular matrices: Returns a similar vector to `b` with appropriate size
+"""
 function __init_u0_from_Ab(A, b)
     u0 = similar(b, size(A, 2))
     fill!(u0, false)
@@ -201,7 +321,7 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     elseif issparsematrixcsc(A)
         make_SparseMatrixCSC(A)
     else
-        deepcopy(A)
+        copy(A)
     end
 
     b = if issparsematrix(b) && !(A isa Diagonal)
@@ -214,7 +334,7 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         # Extension must be loaded if issparsematrixcsc returns true
         make_SparseMatrixCSC(b)
     else
-        deepcopy(b)
+        copy(b)
     end
 
     u0_ = u0 !== nothing ? u0 : __init_u0_from_Ab(A, b)

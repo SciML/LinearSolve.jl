@@ -28,7 +28,7 @@ using EnumX: EnumX, @enumx
 using Markdown: Markdown, @doc_str
 using ChainRulesCore: ChainRulesCore, NoTangent
 using Reexport: Reexport, @reexport
-using Libdl: Libdl, dlsym_e
+using Libdl: Libdl
 import InteractiveUtils
 import RecursiveArrayTools
 
@@ -49,26 +49,204 @@ const CRC = ChainRulesCore
 @static if Sys.ARCH === :x86_64 || Sys.ARCH === :i686
     if Preferences.@load_preference("LoadMKL_JLL",
         !occursin("EPYC", Sys.cpu_info()[1].model))
-        using MKL_jll
-        const usemkl = MKL_jll.is_available()
+        # MKL_jll < 2022.2 doesn't support the mixed LP64 and ILP64 interfaces that we make use of in LinearSolve
+        # In particular, the `_64` APIs do not exist
+        # https://www.intel.com/content/www/us/en/developer/articles/release-notes/onemkl-release-notes-2022.html
+        using MKL_jll: MKL_jll, libmkl_rt
+        const usemkl = MKL_jll.is_available() && pkgversion(MKL_jll) >= v"2022.2"
     else
+        global libmkl_rt
         const usemkl = false
     end
 else
+    global libmkl_rt
     const usemkl = false
+end
+
+# OpenBLAS_jll is a standard library, but allow users to disable it via preferences
+if Preferences.@load_preference("LoadOpenBLAS_JLL", true)
+    using OpenBLAS_jll: OpenBLAS_jll, libopenblas
+    const useopenblas = OpenBLAS_jll.is_available()
+else
+    const useopenblas = false
+    global libopenblas
 end
 
 @reexport using SciMLBase
 
+"""
+    SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm
+
+The root abstract type for all linear solver algorithms in LinearSolve.jl.
+All concrete linear solver implementations should inherit from one of the
+specialized subtypes rather than directly from this type.
+
+This type integrates with the SciMLBase ecosystem, providing a consistent
+interface for linear algebra operations across the Julia scientific computing
+ecosystem.
+"""
 abstract type SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
+
+"""
+    AbstractFactorization <: SciMLLinearSolveAlgorithm
+
+Abstract type for linear solvers that work by computing a matrix factorization.
+These algorithms typically decompose the matrix `A` into a product of simpler
+matrices (e.g., `A = LU`, `A = QR`, `A = LDL'`) and then solve the system
+using forward/backward substitution.
+
+## Characteristics
+
+  - Requires concrete matrix representation (`needs_concrete_A() = true`)
+  - Typically efficient for multiple solves with the same matrix
+  - Generally provides high accuracy for well-conditioned problems
+  - Memory requirements depend on the specific factorization type
+
+## Subtypes
+
+  - `AbstractDenseFactorization`: For dense matrix factorizations
+  - `AbstractSparseFactorization`: For sparse matrix factorizations
+
+## Examples of concrete subtypes
+
+  - `LUFactorization`, `QRFactorization`, `CholeskyFactorization`
+  - `UMFPACKFactorization`, `KLUFactorization`
+"""
 abstract type AbstractFactorization <: SciMLLinearSolveAlgorithm end
+
+"""
+    AbstractSparseFactorization <: AbstractFactorization
+
+Abstract type for factorization-based linear solvers optimized for sparse matrices.
+These algorithms take advantage of sparsity patterns to reduce memory usage and
+computational cost compared to dense factorizations.
+
+## Characteristics
+
+  - Optimized for matrices with many zero entries
+  - Often use specialized pivoting strategies to preserve sparsity
+  - May reorder rows/columns to minimize fill-in during factorization
+  - Typically more memory-efficient than dense methods for sparse problems
+
+## Examples of concrete subtypes
+
+  - `UMFPACKFactorization`: General sparse LU with partial pivoting
+  - `KLUFactorization`: Sparse LU optimized for circuit simulation
+  - `CHOLMODFactorization`: Sparse Cholesky for positive definite systems
+  - `SparspakFactorization`: Envelope/profile method for sparse systems
+"""
 abstract type AbstractSparseFactorization <: AbstractFactorization end
+
+"""
+    AbstractDenseFactorization <: AbstractFactorization
+
+Abstract type for factorization-based linear solvers optimized for dense matrices.
+These algorithms assume the matrix has no particular sparsity structure and use
+dense linear algebra routines (typically from BLAS/LAPACK) for optimal performance.
+
+## Characteristics
+
+  - Optimized for matrices with few zeros or no sparsity structure
+  - Leverage highly optimized BLAS/LAPACK routines when available
+  - Generally provide excellent performance for moderately-sized dense problems
+  - Memory usage scales as O(n²) with matrix size
+
+## Examples of concrete subtypes
+
+  - `LUFactorization`: Dense LU with partial pivoting (via LAPACK)
+  - `QRFactorization`: Dense QR factorization for overdetermined systems
+  - `CholeskyFactorization`: Dense Cholesky for symmetric positive definite matrices
+  - `BunchKaufmanFactorization`: For symmetric indefinite matrices
+"""
 abstract type AbstractDenseFactorization <: AbstractFactorization end
+
+"""
+    AbstractKrylovSubspaceMethod <: SciMLLinearSolveAlgorithm
+
+Abstract type for iterative linear solvers based on Krylov subspace methods.
+These algorithms solve linear systems by iteratively building an approximation
+from a sequence of Krylov subspaces, without requiring explicit matrix factorization.
+
+## Characteristics
+
+  - Does not require concrete matrix representation (`needs_concrete_A() = false`)
+  - Only needs matrix-vector products `A*v` (can work with operators/functions)
+  - Memory usage typically O(n) or O(kn) where k << n
+  - Convergence depends on matrix properties (condition number, eigenvalue distribution)
+  - Often benefits significantly from preconditioning
+
+## Advantages
+
+  - Low memory requirements for large sparse systems
+  - Can handle matrix-free operators (functions that compute `A*v`)
+  - Often the only feasible approach for very large systems
+  - Can exploit matrix structure through specialized operators
+
+## Examples of concrete subtypes
+
+  - `GMRESIteration`: Generalized Minimal Residual method
+  - `CGIteration`: Conjugate Gradient (for symmetric positive definite systems)
+  - `BiCGStabLIteration`: Bi-Conjugate Gradient Stabilized
+  - Wrapped external iterative solvers (KrylovKit.jl, IterativeSolvers.jl)
+"""
 abstract type AbstractKrylovSubspaceMethod <: SciMLLinearSolveAlgorithm end
+
+"""
+    AbstractSolveFunction <: SciMLLinearSolveAlgorithm
+
+Abstract type for linear solvers that wrap custom solving functions or
+provide direct interfaces to specific solve methods. These provide flexibility
+for integrating custom algorithms or simple solve strategies.
+
+## Characteristics
+
+  - Does not require concrete matrix representation (`needs_concrete_A() = false`)
+  - Provides maximum flexibility for custom solving strategies
+  - Can wrap external solver libraries or implement specialized algorithms
+  - Performance and stability depend entirely on the wrapped implementation
+
+## Examples of concrete subtypes
+
+  - `LinearSolveFunction`: Wraps arbitrary user-defined solve functions
+  - `DirectLdiv!`: Direct application of the `\\` operator
+"""
 abstract type AbstractSolveFunction <: SciMLLinearSolveAlgorithm end
 
 # Traits
 
+"""
+    needs_concrete_A(alg) -> Bool
+
+Trait function that determines whether a linear solver algorithm requires
+a concrete matrix representation or can work with abstract operators.
+
+## Arguments
+
+  - `alg`: A linear solver algorithm instance
+
+## Returns
+
+  - `true`: Algorithm requires a concrete matrix (e.g., for factorization)
+  - `false`: Algorithm can work with abstract operators (e.g., matrix-free methods)
+
+## Usage
+
+This trait is used internally by LinearSolve.jl to optimize algorithm dispatch
+and determine when matrix operators need to be converted to concrete arrays.
+
+## Algorithm-Specific Behavior
+
+  - `AbstractFactorization`: `true` (needs explicit matrix entries for factorization)
+  - `AbstractKrylovSubspaceMethod`: `false` (only needs matrix-vector products)
+  - `AbstractSolveFunction`: `false` (depends on the wrapped function's requirements)
+
+## Example
+
+```julia
+needs_concrete_A(LUFactorization())  # true
+needs_concrete_A(GMRESIteration())   # false
+```
+"""
 needs_concrete_A(alg::AbstractFactorization) = true
 needs_concrete_A(alg::AbstractSparseFactorization) = true
 needs_concrete_A(alg::AbstractKrylovSubspaceMethod) = false
@@ -127,6 +305,43 @@ EnumX.@enumx DefaultAlgorithmChoice begin
     QRFactorizationPivoted
     KrylovJL_CRAIGMR
     KrylovJL_LSMR
+    BLISLUFactorization
+    CudaOffloadLUFactorization
+    MetalLUFactorization
+end
+
+# Autotune preference constants - loaded once at package import time
+
+# Algorithm availability checking functions
+"""
+    is_algorithm_available(alg::DefaultAlgorithmChoice.T)
+
+Check if the given algorithm is currently available (extensions loaded, etc.).
+"""
+function is_algorithm_available(alg::DefaultAlgorithmChoice.T)
+    if alg === DefaultAlgorithmChoice.LUFactorization
+        return true  # Always available
+    elseif alg === DefaultAlgorithmChoice.GenericLUFactorization
+        return true  # Always available
+    elseif alg === DefaultAlgorithmChoice.MKLLUFactorization
+        return usemkl  # Available if MKL is loaded
+    elseif alg === DefaultAlgorithmChoice.AppleAccelerateLUFactorization
+        return appleaccelerate_isavailable()  # Available on macOS with Accelerate
+    elseif alg === DefaultAlgorithmChoice.RFLUFactorization
+        return userecursivefactorization(nothing)  # Requires RecursiveFactorization extension
+    elseif alg === DefaultAlgorithmChoice.BLISLUFactorization
+        return useblis()  # Available if BLIS extension is loaded
+    elseif alg === DefaultAlgorithmChoice.CudaOffloadLUFactorization
+        return usecuda()  # Available if CUDA extension is loaded
+    elseif alg === DefaultAlgorithmChoice.MetalLUFactorization
+        return usemetal()  # Available if Metal extension is loaded
+    else
+        # For extension-dependent algorithms not explicitly handled above,
+        # we cannot easily check availability without trying to use them.
+        # For now, assume they're not available in the default selection.
+        # This includes other extensions that might be added in the future.
+        return false
+    end
 end
 
 """
@@ -158,10 +373,12 @@ include("extension_algs.jl")
 include("factorization.jl")
 include("appleaccelerate.jl")
 include("mkl.jl")
+include("openblas.jl")
 include("simplelu.jl")
 include("simplegmres.jl")
 include("iterative_wrappers.jl")
 include("preconditioners.jl")
+include("preferences.jl")
 include("solve_function.jl")
 include("default.jl")
 include("init.jl")
@@ -221,6 +438,11 @@ isopenblas() = IS_OPENBLAS[]
 const HAS_APPLE_ACCELERATE = Ref(false)
 appleaccelerate_isavailable() = HAS_APPLE_ACCELERATE[]
 
+# Extension availability checking functions
+useblis() = false
+usecuda() = false
+usemetal() = false
+
 PrecompileTools.@compile_workload begin
     A = rand(4, 4)
     b = rand(4)
@@ -241,9 +463,9 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization,
        SparspakFactorization, DiagonalFactorization, CholeskyFactorization,
        BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization,
-       CUSOLVERRFFactorization
+       CUSOLVERRFFactorization, CliqueTreesFactorization
 
-export LinearSolveFunction, DirectLdiv!
+export LinearSolveFunction, DirectLdiv!, show_algorithm_choices
 
 export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
        KrylovJL_BICGSTAB, KrylovJL_LSMR, KrylovJL_CRAIGMR,
@@ -257,13 +479,20 @@ export HYPREAlgorithm
 export CudaOffloadFactorization
 export CudaOffloadLUFactorization
 export CudaOffloadQRFactorization
+export CUDAOffload32MixedLUFactorization
 export AMDGPUOffloadLUFactorization, AMDGPUOffloadQRFactorization
 export MKLPardisoFactorize, MKLPardisoIterate
 export PanuaPardisoFactorize, PanuaPardisoIterate
 export PardisoJL
 export MKLLUFactorization
+export OpenBLASLUFactorization
+export OpenBLAS32MixedLUFactorization
+export MKL32MixedLUFactorization
 export AppleAccelerateLUFactorization
+export AppleAccelerate32MixedLUFactorization
+export RF32MixedLUFactorization
 export MetalLUFactorization
+export MetalOffload32MixedLUFactorization
 
 export OperatorAssumptions, OperatorCondition
 

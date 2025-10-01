@@ -204,33 +204,212 @@ if isempty(VERSION.prerelease)
             @test isa(system_info["has_metal"], Bool)
         end
         
-        @testset "Preference Management" begin
-            # Test setting and getting preferences with new format
-            test_categories = Dict{String, String}(
-                "Float64_0-128" => "TestAlg1",
-                "Float64_128-256" => "TestAlg2",
-                "Float32_0-128" => "TestAlg1"
-            )
+        @testset "Algorithm Classification" begin
+            # Test is_always_loaded_algorithm function
+            @test LinearSolveAutotune.is_always_loaded_algorithm("LUFactorization") == true
+            @test LinearSolveAutotune.is_always_loaded_algorithm("GenericLUFactorization") == true
+            @test LinearSolveAutotune.is_always_loaded_algorithm("MKLLUFactorization") == true
+            @test LinearSolveAutotune.is_always_loaded_algorithm("AppleAccelerateLUFactorization") == true
+            @test LinearSolveAutotune.is_always_loaded_algorithm("SimpleLUFactorization") == true
             
+            # Test extension-dependent algorithms
+            @test LinearSolveAutotune.is_always_loaded_algorithm("RFLUFactorization") == false
+            @test LinearSolveAutotune.is_always_loaded_algorithm("FastLUFactorization") == false
+            @test LinearSolveAutotune.is_always_loaded_algorithm("BLISLUFactorization") == false
+            @test LinearSolveAutotune.is_always_loaded_algorithm("CudaOffloadLUFactorization") == false
+            @test LinearSolveAutotune.is_always_loaded_algorithm("MetalLUFactorization") == false
+            
+            # Test unknown algorithm
+            @test LinearSolveAutotune.is_always_loaded_algorithm("UnknownAlgorithm") == false
+        end
+        
+        @testset "Best Always-Loaded Algorithm Finding" begin
+            # Create mock benchmark data with both always-loaded and extension-dependent algorithms
+            mock_data = [
+                (size = 150, algorithm = "RFLUFactorization", eltype = "Float64", gflops = 50.0, success = true, error = ""),
+                (size = 150, algorithm = "LUFactorization", eltype = "Float64", gflops = 30.0, success = true, error = ""),
+                (size = 150, algorithm = "MKLLUFactorization", eltype = "Float64", gflops = 40.0, success = true, error = ""),
+                (size = 150, algorithm = "GenericLUFactorization", eltype = "Float64", gflops = 20.0, success = true, error = ""),
+                # Add Float32 data
+                (size = 150, algorithm = "LUFactorization", eltype = "Float32", gflops = 25.0, success = true, error = ""),
+                (size = 150, algorithm = "MKLLUFactorization", eltype = "Float32", gflops = 35.0, success = true, error = ""),
+                (size = 150, algorithm = "GenericLUFactorization", eltype = "Float32", gflops = 15.0, success = true, error = ""),
+            ]
+            
+            test_df = DataFrame(mock_data)
+            
+            # Test finding best always-loaded algorithm for Float64 medium size
+            best_always_loaded = LinearSolveAutotune.find_best_always_loaded_algorithm(
+                test_df, "Float64", "medium (100-300)")
+            @test best_always_loaded == "MKLLUFactorization"  # Best among always-loaded (40.0 > 30.0 > 20.0)
+            
+            # Test finding best always-loaded algorithm for Float32 medium size
+            best_always_loaded_f32 = LinearSolveAutotune.find_best_always_loaded_algorithm(
+                test_df, "Float32", "medium (100-300)")
+            @test best_always_loaded_f32 == "MKLLUFactorization"  # Best among always-loaded (35.0 > 25.0 > 15.0)
+            
+            # Test with no data for a size range
+            no_result = LinearSolveAutotune.find_best_always_loaded_algorithm(
+                test_df, "Float64", "large (300-1000)")
+            @test no_result === nothing
+            
+            # Test with unknown element type
+            no_result_et = LinearSolveAutotune.find_best_always_loaded_algorithm(
+                test_df, "ComplexF64", "medium (100-300)")
+            @test no_result_et === nothing
+        end
+        
+        @testset "Dual Preference System" begin
             # Clear any existing preferences first
             LinearSolveAutotune.clear_algorithm_preferences()
             
-            # Set test preferences
-            LinearSolveAutotune.set_algorithm_preferences(test_categories)
+            # Create mock benchmark data
+            mock_data = [
+                (size = 150, algorithm = "RFLUFactorization", eltype = "Float64", gflops = 50.0, success = true, error = ""),
+                (size = 150, algorithm = "LUFactorization", eltype = "Float64", gflops = 30.0, success = true, error = ""),
+                (size = 150, algorithm = "MKLLUFactorization", eltype = "Float64", gflops = 40.0, success = true, error = ""),
+                (size = 150, algorithm = "GenericLUFactorization", eltype = "Float64", gflops = 20.0, success = true, error = ""),
+                # Add Float32 data where MKL is best overall
+                (size = 150, algorithm = "LUFactorization", eltype = "Float32", gflops = 25.0, success = true, error = ""),
+                (size = 150, algorithm = "MKLLUFactorization", eltype = "Float32", gflops = 45.0, success = true, error = ""),
+                (size = 150, algorithm = "GenericLUFactorization", eltype = "Float32", gflops = 15.0, success = true, error = ""),
+            ]
+            
+            test_df = DataFrame(mock_data)
+            
+            # Test categories: RFLU best for Float64, MKL best for Float32
+            test_categories = Dict{String, String}(
+                "Float64_medium (100-300)" => "RFLUFactorization",
+                "Float32_medium (100-300)" => "MKLLUFactorization"
+            )
+            
+            # Set preferences with benchmark data for intelligent fallback selection
+            LinearSolveAutotune.set_algorithm_preferences(test_categories, test_df)
             
             # Get preferences back
             retrieved_prefs = LinearSolveAutotune.get_algorithm_preferences()
-            @test isa(retrieved_prefs, Dict{String, String})
+            @test isa(retrieved_prefs, Dict{String, Any})
             @test !isempty(retrieved_prefs)
             
-            # The new preference system uses different keys (eltype_sizecategory)
-            # so we just check that preferences were set
-            @test length(retrieved_prefs) > 0
+            # Test Float64 preferences
+            @test haskey(retrieved_prefs, "Float64_medium")
+            float64_prefs = retrieved_prefs["Float64_medium"]
+            @test isa(float64_prefs, Dict)
+            @test haskey(float64_prefs, "best")
+            @test haskey(float64_prefs, "always_loaded")
+            @test float64_prefs["best"] == "RFLUFactorization"  # Best overall
+            @test float64_prefs["always_loaded"] == "MKLLUFactorization"  # Best always-loaded
             
-            # Test clearing preferences
+            # Test Float32 preferences
+            @test haskey(retrieved_prefs, "Float32_medium")
+            float32_prefs = retrieved_prefs["Float32_medium"]
+            @test isa(float32_prefs, Dict)
+            @test haskey(float32_prefs, "best")
+            @test haskey(float32_prefs, "always_loaded")
+            @test float32_prefs["best"] == "MKLLUFactorization"  # Best overall
+            @test float32_prefs["always_loaded"] == "MKLLUFactorization"  # Same as best (already always-loaded)
+            
+            # Test that both preference types are actually set in LinearSolve
+            using Preferences
+            @test Preferences.has_preference(LinearSolve, "best_algorithm_Float64_medium")
+            @test Preferences.has_preference(LinearSolve, "best_always_loaded_Float64_medium")
+            @test Preferences.has_preference(LinearSolve, "best_algorithm_Float32_medium")
+            @test Preferences.has_preference(LinearSolve, "best_always_loaded_Float32_medium")
+            
+            # Verify the actual preference values
+            @test Preferences.load_preference(LinearSolve, "best_algorithm_Float64_medium") == "RFLUFactorization"
+            @test Preferences.load_preference(LinearSolve, "best_always_loaded_Float64_medium") == "MKLLUFactorization"
+            @test Preferences.load_preference(LinearSolve, "best_algorithm_Float32_medium") == "MKLLUFactorization"
+            @test Preferences.load_preference(LinearSolve, "best_always_loaded_Float32_medium") == "MKLLUFactorization"
+            
+            # Test clearing dual preferences
             LinearSolveAutotune.clear_algorithm_preferences()
             cleared_prefs = LinearSolveAutotune.get_algorithm_preferences()
             @test isempty(cleared_prefs)
+            
+            # Verify preferences are actually cleared from LinearSolve
+            @test !Preferences.has_preference(LinearSolve, "best_algorithm_Float64_medium")
+            @test !Preferences.has_preference(LinearSolve, "best_always_loaded_Float64_medium")
+            @test !Preferences.has_preference(LinearSolve, "best_algorithm_Float32_medium")
+            @test !Preferences.has_preference(LinearSolve, "best_always_loaded_Float32_medium")
+        end
+        
+        @testset "Dual Preference Fallback Logic" begin
+            # Test fallback logic when no benchmark data is provided
+            LinearSolveAutotune.clear_algorithm_preferences()
+            
+            # Test categories with extension-dependent algorithms but no benchmark data
+            test_categories_no_data = Dict{String, String}(
+                "Float64_medium (100-300)" => "RFLUFactorization",
+                "ComplexF64_medium (100-300)" => "RFLUFactorization"
+            )
+            
+            # Set preferences WITHOUT benchmark data (should use fallback logic)
+            LinearSolveAutotune.set_algorithm_preferences(test_categories_no_data, nothing)
+            
+            # Get preferences back
+            retrieved_prefs = LinearSolveAutotune.get_algorithm_preferences()
+            
+            # Test Float64 fallback logic
+            @test haskey(retrieved_prefs, "Float64_medium")
+            float64_prefs = retrieved_prefs["Float64_medium"]
+            @test float64_prefs["best"] == "RFLUFactorization"
+            # Should fall back to LUFactorization for real types when no MKL detected
+            @test float64_prefs["always_loaded"] == "LUFactorization"
+            
+            # Test ComplexF64 fallback logic
+            @test haskey(retrieved_prefs, "ComplexF64_medium")
+            complex_prefs = retrieved_prefs["ComplexF64_medium"]
+            @test complex_prefs["best"] == "RFLUFactorization"
+            # Should fall back to LUFactorization for complex types (conservative)
+            @test complex_prefs["always_loaded"] == "LUFactorization"
+            
+            # Clean up
+            LinearSolveAutotune.clear_algorithm_preferences()
+        end
+        
+        @testset "Integration: Dual Preferences Set in autotune_setup" begin
+            # Test that autotune_setup actually sets dual preferences
+            LinearSolveAutotune.clear_algorithm_preferences()
+            
+            # Run a minimal autotune that sets preferences
+            result = LinearSolveAutotune.autotune_setup(
+                sizes = [:tiny],
+                set_preferences = true,  # KEY: Must be true to test preference setting
+                samples = 1,
+                seconds = 0.1,
+                eltypes = (Float64,)
+            )
+            
+            @test isa(result, AutotuneResults)
+            
+            # Check if any preferences were set
+            prefs_after_autotune = LinearSolveAutotune.get_algorithm_preferences()
+            
+            # If autotune found and categorized results, we should have dual preferences
+            if !isempty(prefs_after_autotune)
+                # Pick the first preference set to test
+                first_key = first(keys(prefs_after_autotune))
+                first_prefs = prefs_after_autotune[first_key]
+                
+                @test isa(first_prefs, Dict)
+                @test haskey(first_prefs, "best")
+                @test haskey(first_prefs, "always_loaded")
+                @test first_prefs["best"] !== nothing
+                @test first_prefs["always_loaded"] !== nothing
+                
+                # Both should be valid algorithm names
+                @test isa(first_prefs["best"], String)
+                @test isa(first_prefs["always_loaded"], String)
+                @test !isempty(first_prefs["best"])
+                @test !isempty(first_prefs["always_loaded"])
+                
+                # The always_loaded algorithm should indeed be always loaded
+                @test LinearSolveAutotune.is_always_loaded_algorithm(first_prefs["always_loaded"])
+            end
+            
+            # Clean up
+            LinearSolveAutotune.clear_algorithm_preferences()
         end
         
         @testset "AutotuneResults Type" begin

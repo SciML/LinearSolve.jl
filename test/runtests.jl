@@ -18,10 +18,11 @@ if GROUP == "All" || GROUP == "Core"
     @time @safetestset "ForwardDiff Overloads" include("forwarddiff_overloads.jl")
     @time @safetestset "Traits" include("traits.jl")
     @time @safetestset "BandedMatrices" include("banded.jl")
+    @time @safetestset "Mixed Precision" include("test_mixed_precision.jl")
 end
 
 # Don't run Enzyme tests on prerelease
-if GROUP == "All" || GROUP == "NoPre" && isempty(VERSION.prerelease)
+if GROUP == "NoPre" && isempty(VERSION.prerelease)
     Pkg.activate("nopre")
     Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
     Pkg.instantiate()
@@ -39,6 +40,10 @@ end
 if GROUP == "LinearSolveAutotune"
     Pkg.activate(joinpath(dirname(@__DIR__), "lib", GROUP))
     Pkg.test(GROUP, julia_args=["--check-bounds=auto", "--compiled-modules=yes", "--depwarn=yes"], force_latest_compatible_version=false, allow_reresolve=true)
+end
+
+if GROUP == "Preferences"
+    @time @safetestset "Dual Preference System Integration" include("preferences.jl")
 end
 
 if GROUP == "LinearSolveCUDA"

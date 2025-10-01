@@ -17,9 +17,11 @@ the best choices, with SVD being the slowest but most precise.
 For efficiency, `RFLUFactorization` is the fastest for dense LU-factorizations until around
 150x150 matrices, though this can be dependent on the exact details of the hardware. After this
 point, `MKLLUFactorization` is usually faster on most hardware. Note that on Mac computers
-that `AppleAccelerateLUFactorization` is generally always the fastest. `LUFactorization` will
-use your base system BLAS which can be fast or slow depending on the hardware configuration.
-`SimpleLUFactorization` will be fast only on very small matrices but can cut down on compile times.
+that `AppleAccelerateLUFactorization` is generally always the fastest. `OpenBLASLUFactorization` 
+provides direct OpenBLAS calls without going through libblastrampoline and can be faster than 
+`LUFactorization` in some configurations. `LUFactorization` will use your base system BLAS which 
+can be fast or slow depending on the hardware configuration. `SimpleLUFactorization` will be fast 
+only on very small matrices but can cut down on compile times.
 
 For very large dense factorizations, offloading to the GPU can be preferred. Metal.jl can be used
 on Mac hardware to offload, and has a cutoff point of being faster at around size 20,000 x 20,000
@@ -31,6 +33,24 @@ CUDA offload supports Float64 but most consumer GPU hardware will be much faster
 this is only recommended for Float32 matrices. Choose `CudaOffloadLUFactorization` for better 
 performance on well-conditioned problems, or `CudaOffloadQRFactorization` for better numerical 
 stability on ill-conditioned problems.
+
+#### Mixed Precision Methods
+
+For large well-conditioned problems where memory bandwidth is the bottleneck, mixed precision 
+methods can provide significant speedups (up to 2x) by performing the factorization in Float32 
+while maintaining Float64 interfaces. These methods are particularly effective for:
+- Large dense matrices (> 1000x1000)
+- Well-conditioned problems (condition number < 10^4)
+- Hardware with good Float32 performance
+
+Available mixed precision solvers:
+- `MKL32MixedLUFactorization` - CPUs with MKL
+- `AppleAccelerate32MixedLUFactorization` - Apple CPUs with Accelerate
+- `CUDAOffload32MixedLUFactorization` - NVIDIA GPUs with CUDA
+- `MetalOffload32MixedLUFactorization` - Apple GPUs with Metal
+
+These methods automatically handle the precision conversion, making them easy drop-in replacements
+when reduced precision is acceptable for the factorization step.
 
 !!! note
     
@@ -65,8 +85,8 @@ factorization methods if a lower tolerance of the solution is required.
 Krylov.jl generally outperforms IterativeSolvers.jl and KrylovKit.jl, and is compatible
 with CPUs and GPUs, and thus is the generally preferred form for Krylov methods. The
 choice of Krylov method should be the one most constrained to the type of operator one
-has, for example if positive definite then `Krylov_CG()`, but if no good properties then
-use `Krylov_GMRES()`.
+has, for example if positive definite then `KrylovJL_CG()`, but if no good properties then
+use `KrylovJL_GMRES()`.
 
 Finally, a user can pass a custom function for handling the linear solve using
 `LS.LinearSolveFunction()` if existing solvers are not optimally suited for their application.
@@ -79,8 +99,8 @@ then using a Krylov method is preferred in order to not concretize the matrix.
 Krylov.jl generally outperforms IterativeSolvers.jl and KrylovKit.jl, and is compatible
 with CPUs and GPUs, and thus is the generally preferred form for Krylov methods. The
 choice of Krylov method should be the one most constrained to the type of operator one
-has, for example if positive definite then `Krylov_CG()`, but if no good properties then
-use `Krylov_GMRES()`.
+has, for example if positive definite then `KrylovJL_CG()`, but if no good properties then
+use `KrylovJL_GMRES()`.
 
 !!! tip
     
@@ -135,6 +155,8 @@ LinearSolve.jl contains some linear solvers built in for specialized cases.
 SimpleLUFactorization
 DiagonalFactorization
 SimpleGMRES
+DirectLdiv!
+LinearSolveFunction
 ```
 
 ### FastLapackInterface.jl
@@ -177,6 +199,16 @@ UMFPACKFactorization
 SparspakFactorization
 ```
 
+### CliqueTrees.jl
+
+!!! note
+    
+    Using this solver requires adding the package CliqueTrees.jl, i.e. `using CliqueTrees`
+
+```@docs
+CliqueTreesFactorization
+```
+
 ### Krylov.jl
 
 ```@docs
@@ -193,6 +225,13 @@ KrylovJL
 
 ```@docs
 MKLLUFactorization
+MKL32MixedLUFactorization
+```
+
+### OpenBLAS
+
+```@docs
+OpenBLASLUFactorization
 ```
 
 ### AppleAccelerate.jl
@@ -203,6 +242,7 @@ MKLLUFactorization
 
 ```@docs
 AppleAccelerateLUFactorization
+AppleAccelerate32MixedLUFactorization
 ```
 
 ### Metal.jl
@@ -213,6 +253,7 @@ AppleAccelerateLUFactorization
 
 ```@docs
 MetalLUFactorization
+MetalOffload32MixedLUFactorization
 ```
 
 ### Pardiso.jl
@@ -239,6 +280,7 @@ The following are non-standard GPU factorization routines.
 ```@docs
 CudaOffloadLUFactorization
 CudaOffloadQRFactorization
+CUDAOffload32MixedLUFactorization
 ```
 
 ### AMDGPU.jl

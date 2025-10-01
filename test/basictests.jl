@@ -2,7 +2,7 @@ using LinearSolve, LinearAlgebra, SparseArrays, MultiFloats, ForwardDiff
 using SciMLOperators, RecursiveFactorization, Sparspak, FastLapackInterface
 using IterativeSolvers, KrylovKit, MKL_jll, KrylovPreconditioners
 using Test
-import Random
+import CliqueTrees, Random
 
 # Try to load BLIS extension
 try
@@ -205,6 +205,58 @@ end
         test_interface(SparspakFactorization(), prob1, prob2)
     end
 
+    @testset "CliqueTrees Factorization (Float64)" begin
+        A1 = sparse(A / 1)
+        b1 = rand(n)
+        x1 = zero(b)
+        A2 = sparse(A / 2)
+        b2 = rand(n)
+        x2 = zero(b)
+
+        prob1 = LinearProblem(A1, b1; u0 = x1)
+        prob2 = LinearProblem(A2, b2; u0 = x2)
+        test_interface(CliqueTreesFactorization(), prob1, prob2)
+    end
+
+    @testset "CliqueTrees Factorization (Float64x1)" begin
+        A1 = sparse(A / 1) .|> Float64x1
+        b1 = rand(n) .|> Float64x1
+        x1 = zero(b) .|> Float64x1
+        A2 = sparse(A / 2) .|> Float64x1
+        b2 = rand(n) .|> Float64x1
+        x2 = zero(b) .|> Float64x1
+
+        prob1 = LinearProblem(A1, b1; u0 = x1)
+        prob2 = LinearProblem(A2, b2; u0 = x2)
+        test_interface(CliqueTreesFactorization(), prob1, prob2)
+    end
+
+    @testset "CliqueTrees Factorization (Float64x2)" begin
+        A1 = sparse(A / 1) .|> Float64x2
+        b1 = rand(n) .|> Float64x2
+        x1 = zero(b) .|> Float64x2
+        A2 = sparse(A / 2) .|> Float64x2
+        b2 = rand(n) .|> Float64x2
+        x2 = zero(b) .|> Float64x2
+
+        prob1 = LinearProblem(A1, b1; u0 = x1)
+        prob2 = LinearProblem(A2, b2; u0 = x2)
+        test_interface(CliqueTreesFactorization(), prob1, prob2)
+    end
+
+    @testset "CliqueTrees Factorization (Dual64)" begin
+        A1 = sparse(A / 1) .|> Dual64
+        b1 = rand(n) .|> Dual64
+        x1 = zero(b) .|> Dual64
+        A2 = sparse(A / 2) .|> Dual64
+        b2 = rand(n) .|> Dual64
+        x2 = zero(b) .|> Dual64
+
+        prob1 = LinearProblem(A1, b1; u0 = x1)
+        prob2 = LinearProblem(A2, b2; u0 = x2)
+        test_interface(CliqueTreesFactorization(), prob1, prob2)
+    end
+
     @testset "FastLAPACK Factorizations" begin
         A1 = A / 1
         b1 = rand(n)
@@ -223,6 +275,37 @@ end
         # ws sizes.
     end
 
+    @testset "SymTridiagonal with LDLtFactorization" begin
+        # Test that LDLtFactorization works correctly with SymTridiagonal
+        # and that the default algorithm correctly selects it
+        k = 100
+        ρ = 0.95
+        A_tri = SymTridiagonal(ones(k) .+ ρ^2, -ρ * ones(k-1))
+        b = rand(k)
+        
+        # Test with explicit LDLtFactorization
+        prob_tri = LinearProblem(A_tri, b)
+        sol = solve(prob_tri, LDLtFactorization())
+        @test A_tri * sol.u ≈ b
+        
+        # Test that default algorithm uses LDLtFactorization for SymTridiagonal
+        default_alg = LinearSolve.defaultalg(A_tri, b, OperatorAssumptions(true))
+        @test default_alg isa LinearSolve.DefaultLinearSolver
+        @test default_alg.alg == LinearSolve.DefaultAlgorithmChoice.LDLtFactorization
+        
+        # Test that the factorization is cached and reused
+        cache = init(prob_tri, LDLtFactorization())
+        sol1 = solve!(cache)
+        @test A_tri * sol1.u ≈ b
+        @test !cache.isfresh  # Cache should not be fresh after first solve
+        
+        # Solve again with same matrix to ensure cache is reused
+        cache.b = rand(k)  # Change RHS
+        sol2 = solve!(cache)
+        @test A_tri * sol2.u ≈ cache.b
+        @test !cache.isfresh  # Cache should still not be fresh
+    end
+
     test_algs = [
         LUFactorization(),
         QRFactorization(),
@@ -233,6 +316,11 @@ end
 
     if LinearSolve.usemkl
         push!(test_algs, MKLLUFactorization())
+    end
+
+    # Test OpenBLAS if available
+    if LinearSolve.useopenblas
+        push!(test_algs, OpenBLASLUFactorization())
     end
 
     # Test BLIS if extension is available
@@ -621,4 +709,35 @@ end
     reinit!(cache; A = B1, b = b1)
     u = solve!(cache)
     @test norm(u - u0, Inf) < 1.0e-8
+end
+
+@testset "ParallelSolves" begin
+    n=1000
+    @info "ParallelSolves: Threads.nthreads()=$(Threads.nthreads())"
+    A_sparse = 10I - sprand(n, n, 0.01)
+    B = [rand(n), rand(n)]
+    U = [A_sparse \ B[i] for i in 1:2]
+    sol = similar(U)
+
+    Threads.@threads for i in 1:2
+        sol[i] = solve(LinearProblem(A_sparse, B[i]), UMFPACKFactorization())
+    end
+
+    for i in 1:2
+        @test sol[i] ≈ U[i]
+    end
+    
+    Threads.@threads for i in 1:2
+        sol[i] = solve(LinearProblem(A_sparse, B[i]), KLUFactorization())
+    end
+    for i in 1:2
+        @test sol[i] ≈ U[i]
+    end
+
+    Threads.@threads for i in 1:2
+        sol[i] = solve(LinearProblem(A_sparse, B[i]), SparspakFactorization())
+    end
+    for i in 1:2
+        @test sol[i] ≈ U[i]
+    end
 end

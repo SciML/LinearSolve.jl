@@ -1158,6 +1158,68 @@ function init_cacheval(::SparspakFactorization, ::StaticArray, b, u, Pl, Pr,
     nothing
 end
 
+## CliqueTreesFactorization is here since it's MIT licensed, not GPL
+
+"""
+    CliqueTreesFactorization(
+        alg = nothing,
+        snd = nothing,
+        reuse_symbolic = true,
+    )
+
+The sparse Cholesky factorization algorithm implemented in CliqueTrees.jl.
+The implementation is pure-Julia and accepts arbitrary numeric types. It is
+somewhat slower than CHOLMOD.
+"""
+struct CliqueTreesFactorization{A, S} <: AbstractSparseFactorization
+    alg::A
+    snd::S
+    reuse_symbolic::Bool
+
+    function CliqueTreesFactorization(;
+            alg::A = nothing,
+            snd::S = nothing,
+            reuse_symbolic = true,
+            throwerror = true,
+        ) where {A, S}
+
+        ext = Base.get_extension(@__MODULE__, :LinearSolveCliqueTreesExt)
+
+        if throwerror && isnothing(ext)
+            error("CliqueTreesFactorization requires that CliqueTrees is loaded, i.e. `using CliqueTrees`")
+        else
+            new{A, S}(alg, snd, reuse_symbolic)
+        end
+    end
+end
+
+function init_cacheval(::CliqueTreesFactorization, ::Union{AbstractMatrix, Nothing, AbstractSciMLOperator}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function init_cacheval(::CliqueTreesFactorization, ::StaticArray, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+# Fallback init_cacheval for extension-based algorithms when extensions aren't loaded
+# These return nothing since the actual implementations are in the extensions
+function init_cacheval(::BLISLUFactorization, A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function init_cacheval(::CudaOffloadLUFactorization, A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
+function init_cacheval(::MetalLUFactorization, A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
 for alg in vcat(InteractiveUtils.subtypes(AbstractDenseFactorization),
     InteractiveUtils.subtypes(AbstractSparseFactorization))
     @eval function init_cacheval(alg::$alg, A::MatrixOperator, b, u, Pl, Pr,

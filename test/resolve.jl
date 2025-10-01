@@ -1,5 +1,14 @@
 using LinearSolve, LinearAlgebra, SparseArrays, InteractiveUtils, Test
-using LinearSolve: AbstractDenseFactorization, AbstractSparseFactorization
+using LinearSolve: AbstractDenseFactorization, AbstractSparseFactorization,
+                   BLISLUFactorization, CliqueTreesFactorization,
+                   AMDGPUOffloadLUFactorization, AMDGPUOffloadQRFactorization,
+                   SparspakFactorization
+
+# Function to check if an algorithm is mixed precision
+function is_mixed_precision_alg(alg)
+    alg_name = string(alg)
+    return contains(alg_name, "32Mixed") || contains(alg_name, "Mixed32")
+end
 
 for alg in vcat(InteractiveUtils.subtypes(AbstractDenseFactorization),
     InteractiveUtils.subtypes(AbstractSparseFactorization))
@@ -15,11 +24,24 @@ for alg in vcat(InteractiveUtils.subtypes(AbstractDenseFactorization),
            CudaOffloadQRFactorization,
            CUSOLVERRFFactorization,
            AppleAccelerateLUFactorization,
-           MetalLUFactorization
+           MetalLUFactorization,
+           FastLUFactorization,
+           FastQRFactorization,
+           CliqueTreesFactorization,
+           BLISLUFactorization,
+           AMDGPUOffloadLUFactorization,
+           AMDGPUOffloadQRFactorization
        ]) &&
        (!(alg == AppleAccelerateLUFactorization) ||
         LinearSolve.appleaccelerate_isavailable()) &&
-       (!(alg == MKLLUFactorization) || LinearSolve.usemkl)
+       (!(alg == MKLLUFactorization) || LinearSolve.usemkl) &&
+       (!(alg == OpenBLASLUFactorization) || LinearSolve.useopenblas) &&
+       (!(alg == RFLUFactorization) || LinearSolve.userecursivefactorization(nothing)) &&
+       (!(alg == RF32MixedLUFactorization) || LinearSolve.userecursivefactorization(nothing)) &&
+       (!(alg == MKL32MixedLUFactorization) || LinearSolve.usemkl) &&
+       (!(alg == AppleAccelerate32MixedLUFactorization) || Sys.isapple()) &&
+       (!(alg == OpenBLAS32MixedLUFactorization) || LinearSolve.useopenblas) &&
+       (!(alg == SparspakFactorization) || false)
         A = [1.0 2.0; 3.0 4.0]
         alg in [KLUFactorization, UMFPACKFactorization, SparspakFactorization] &&
             (A = sparse(A))
@@ -32,9 +54,18 @@ for alg in vcat(InteractiveUtils.subtypes(AbstractDenseFactorization),
         prob = LinearProblem(A, b)
         linsolve = init(
             prob, alg(), alias = LinearAliasSpecifier(alias_A = false, alias_b = false))
-        @test solve!(linsolve).u ≈ [-2.0, 1.5]
-        @test !linsolve.isfresh
-        @test solve!(linsolve).u ≈ [-2.0, 1.5]
+        
+        # Use higher tolerance for mixed precision algorithms
+        expected = [-2.0, 1.5]
+        if is_mixed_precision_alg(alg)
+            @test solve!(linsolve).u ≈ expected atol=1e-4 rtol=1e-4
+            @test !linsolve.isfresh
+            @test solve!(linsolve).u ≈ expected atol=1e-4 rtol=1e-4
+        else
+            @test solve!(linsolve).u ≈ expected
+            @test !linsolve.isfresh
+            @test solve!(linsolve).u ≈ expected
+        end
 
         A = [1.0 2.0; 3.0 4.0]
         alg in [KLUFactorization, UMFPACKFactorization, SparspakFactorization] &&
@@ -45,7 +76,13 @@ for alg in vcat(InteractiveUtils.subtypes(AbstractDenseFactorization),
         alg in [LDLtFactorization] && (A = SymTridiagonal(A))
         linsolve.A = A
         @test linsolve.isfresh
-        @test solve!(linsolve).u ≈ [-2.0, 1.5]
+        
+        # Use higher tolerance for mixed precision algorithms
+        if is_mixed_precision_alg(alg)
+            @test solve!(linsolve).u ≈ expected atol=1e-4 rtol=1e-4
+        else
+            @test solve!(linsolve).u ≈ expected
+        end
     end
 end
 

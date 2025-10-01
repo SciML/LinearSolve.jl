@@ -2,8 +2,7 @@
 
 LinearSolve.jl includes an automatic tuning system that benchmarks all available linear algebra algorithms on your specific hardware and automatically selects optimal algorithms for different problem sizes and data types. This tutorial will show you how to use the `LinearSolveAutotune` sublibrary to optimize your linear solve performance.
 
-!!! warn
-    The autotuning system is under active development. While benchmarking and result sharing are fully functional, automatic preference setting for algorithm selection is still being refined.
+The autotuning system provides comprehensive benchmarking and automatic algorithm selection optimization for your specific hardware.
 
 ## Quick Start
 
@@ -73,7 +72,7 @@ Control which matrix size ranges to test:
 # :small  - 20×20 to 100×100 (small problems)  
 # :medium - 100×100 to 300×300 (typical problems)
 # :large  - 300×300 to 1000×1000 (larger problems)
-# :big    - 10000×1000 to 20000x20000 (GPU/HPC scale)
+# :big    - 1000×1000 to 15000×15000 (GPU/HPC scale, capped at 15000 for stability)
 
 # Default: test tiny through large
 results = autotune_setup()  # uses [:tiny, :small, :medium, :large]
@@ -131,6 +130,40 @@ results = autotune_setup(
     eltypes = (Float32, Float64, ComplexF32, ComplexF64)
 )
 ```
+
+### Time Limits for Algorithm Tests
+
+Control the maximum time allowed for each algorithm test (including accuracy check):
+
+```julia
+# Default: 100 seconds maximum per algorithm test
+results = autotune_setup()  # maxtime = 100.0
+
+# Quick timeout for fast exploration
+results = autotune_setup(maxtime = 10.0)
+
+# Extended timeout for slow algorithms or large matrices
+results = autotune_setup(
+    maxtime = 300.0,  # 5 minutes per test
+    sizes = [:large, :big]
+)
+
+# Conservative timeout for production benchmarking
+results = autotune_setup(
+    maxtime = 200.0,
+    samples = 10,
+    seconds = 2.0
+)
+```
+
+When an algorithm exceeds the `maxtime` limit:
+- The test is skipped to prevent hanging
+- The result is recorded as `NaN` in the benchmark data
+- A warning is displayed indicating the timeout
+- **The algorithm is automatically excluded from all larger matrix sizes** to save time
+- The benchmark continues with the next algorithm
+
+This intelligent timeout handling ensures that slow algorithms don't waste time on progressively larger matrices once they've proven too slow on smaller ones.
 
 ### Missing Algorithm Handling
 
@@ -256,7 +289,7 @@ This will:
 1. Check for existing GitHub authentication
 2. Offer to set up authentication if needed (unless `auto_login = false`)
 3. Format your benchmark results as a markdown report
-4. Post the results as a comment to the [community benchmark collection issue](https://github.com/SciML/LinearSolve.jl/issues/669)
+4. Post the results as a comment to the [community benchmark collection issue](https://github.com/SciML/LinearSolve.jl/issues/725)
 5. Save results locally if authentication is unavailable
 
 ### No GitHub CLI Required!
@@ -384,32 +417,53 @@ for config in configs
 end
 ```
 
+## Algorithm Selection Analysis
+
+You can analyze what algorithms are currently being chosen for different matrix sizes:
+
+```julia
+using LinearSolve
+
+# Show current algorithm choices and preferences
+show_algorithm_choices()
+```
+
+This displays:
+- Current autotune preferences for all element types (if any are set)
+- Algorithm choices for all element types across representative sizes in each category  
+- Comprehensive element type behavior (Float32, Float64, ComplexF32, ComplexF64)
+- System information (MKL, Apple Accelerate, RecursiveFactorization status)
+
+The output shows a clear table format:
+```
+📊 Default Algorithm Choices:
+Size       Category    Float32            Float64            ComplexF32         ComplexF64
+8×8        tiny        GenericLUFactorization GenericLUFactorization GenericLUFactorization GenericLUFactorization
+200×200    medium      MKLLUFactorization MKLLUFactorization MKLLUFactorization MKLLUFactorization
+```
+
 ## Preferences Integration
 
-!!! warn
-    Automatic preference setting is still under development and may not affect algorithm selection in the current version.
-
-The autotuner can set preferences that LinearSolve.jl will use for automatic algorithm selection:
+The autotuner sets preferences that LinearSolve.jl uses for automatic algorithm selection:
 
 ```julia
 using LinearSolveAutotune
 
-# View current preferences (if any)
-LinearSolveAutotune.show_current_preferences()
-
 # Run autotune and set preferences
 results = autotune_setup(set_preferences = true)
 
-# Clear all autotune preferences
-LinearSolveAutotune.clear_algorithm_preferences()
+# View what algorithms are now being chosen
+using LinearSolve
+show_algorithm_choices()
 
-# Manually set custom preferences
-custom_categories = Dict(
-    "Float64_0-128" => "RFLUFactorization",
-    "Float64_128-256" => "LUFactorization"
-)
-LinearSolveAutotune.set_algorithm_preferences(custom_categories)
+# View current preferences
+LinearSolveAutotune.show_current_preferences()
+
+# Clear all autotune preferences if needed
+LinearSolveAutotune.clear_algorithm_preferences()
 ```
+
+After running autotune with `set_preferences = true`, LinearSolve.jl will automatically use the fastest algorithms found for each matrix size and element type, with intelligent fallbacks when extensions are not available.
 
 ## Troubleshooting
 

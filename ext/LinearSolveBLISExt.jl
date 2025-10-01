@@ -15,6 +15,8 @@ using SciMLBase: ReturnCode
 const global libblis = blis_jll.blis
 const global liblapack = LAPACK_jll.liblapack
 
+LinearSolve.useblis() = true
+
 function getrf!(A::AbstractMatrix{<:ComplexF64};
     ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
     info = Ref{BlasInt}(),
@@ -203,7 +205,7 @@ const PREALLOCATED_BLIS_LU = begin
     luinst = ArrayInterface.lu_instance(A), Ref{BlasInt}()
 end
 
-function LinearSolve.init_cacheval(alg::BLISLUFactorization, A, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(alg::BLISLUFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
     maxiters::Int, abstol, reltol, verbose::Bool,
     assumptions::OperatorAssumptions)
     PREALLOCATED_BLIS_LU

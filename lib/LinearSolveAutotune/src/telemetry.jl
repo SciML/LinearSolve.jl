@@ -166,7 +166,9 @@ Format benchmark results as a markdown table suitable for GitHub issues.
 """
 function format_results_for_github(df::DataFrame, system_info::Dict, categories::Dict{
         String, String})
-    # Filter successful results
+    # Include all results, both successful and failed (with NaN values)
+    # This shows what algorithms were attempted, making it clear what was tested
+    all_results_df = df
     successful_df = filter(row -> row.success, df)
 
     if nrow(successful_df) == 0
@@ -180,7 +182,7 @@ function format_results_for_github(df::DataFrame, system_info::Dict, categories:
 $(format_categories_markdown(categories))
 
 ### Detailed Results
-$(format_detailed_results_markdown(successful_df))
+$(format_detailed_results_markdown(all_results_df))
 
 ### System Information
 $(format_system_info_markdown(system_info))
@@ -365,21 +367,29 @@ function format_detailed_results_markdown(df::DataFrame)
         end
         
         # Create a summary table with average performance per algorithm for this element type
+        # Include statistics that account for NaN values
         summary = combine(groupby(eltype_df, :algorithm), 
-                         :gflops => mean => :avg_gflops, 
-                         :gflops => std => :std_gflops,
-                         nrow => :num_tests)
+                         :gflops => (x -> begin
+                             valid_vals = filter(!isnan, x)
+                             length(valid_vals) > 0 ? mean(valid_vals) : NaN
+                         end) => :avg_gflops, 
+                         :gflops => (x -> begin
+                             valid_vals = filter(!isnan, x)
+                             length(valid_vals) > 1 ? std(valid_vals) : NaN
+                         end) => :std_gflops,
+                         :gflops => (x -> count(!isnan, x)) => :successful_tests,
+                         nrow => :total_tests)
         sort!(summary, :avg_gflops, rev = true)
 
         push!(lines, "##### Summary Statistics")
         push!(lines, "")
-        push!(lines, "| Algorithm | Avg GFLOPs | Std Dev | Tests |")
-        push!(lines, "|-----------|------------|---------|-------|")
+        push!(lines, "| Algorithm | Avg GFLOPs | Std Dev | Success/Total |")
+        push!(lines, "|-----------|------------|---------|---------------|")
 
         for row in eachrow(summary)
-            avg_str = @sprintf("%.2f", row.avg_gflops)
-            std_str = @sprintf("%.2f", row.std_gflops)
-            push!(lines, "| $(row.algorithm) | $avg_str | $std_str | $(row.num_tests) |")
+            avg_str = isnan(row.avg_gflops) ? "NaN" : @sprintf("%.2f", row.avg_gflops)
+            std_str = isnan(row.std_gflops) ? "NaN" : @sprintf("%.2f", row.std_gflops)
+            push!(lines, "| $(row.algorithm) | $avg_str | $std_str | $(row.successful_tests)/$(row.total_tests) |")
         end
         
         push!(lines, "")
@@ -406,7 +416,13 @@ function format_detailed_results_markdown(df::DataFrame)
             push!(lines, "|-------------|--------|--------|")
             
             for row in eachrow(algo_df)
-                gflops_str = row.success ? @sprintf("%.3f", row.gflops) : "N/A"
+                gflops_str = if row.success
+                    @sprintf("%.3f", row.gflops)
+                elseif isnan(row.gflops)
+                    "NaN"
+                else
+                    string(row.gflops)
+                end
                 status = row.success ? "✅ Success" : "❌ Failed"
                 push!(lines, "| $(row.size) | $gflops_str | $status |")
             end
@@ -448,7 +464,7 @@ function upload_to_github(content::String, plot_files, auth_info::Tuple,
 
     try
         target_repo = "SciML/LinearSolve.jl"
-        issue_number = 669  # The existing issue for collecting autotune results
+        issue_number = 725  # The existing issue for collecting autotune results
         
         # Construct comment body - use cpu_model if available for more specific info
         cpu_display = get(system_info, "cpu_model", get(system_info, "cpu_name", "unknown"))
@@ -470,7 +486,7 @@ function upload_to_github(content::String, plot_files, auth_info::Tuple,
         🤖 *Generated automatically by LinearSolve.jl autotune system*
         """
 
-        @info "📝 Adding comment to issue #669..."
+        @info "📝 Adding comment to issue #725..."
         
         issue_url = nothing
         if auth_method == :gh_cli
@@ -482,7 +498,7 @@ function upload_to_github(content::String, plot_files, auth_info::Tuple,
         if issue_url !== nothing
             @info "✅ Successfully added benchmark results to issue: $issue_url"
             @info "🔗 Your benchmark data has been shared with the LinearSolve.jl community!"
-            @info "💡 View all community benchmark data: https://github.com/SciML/LinearSolve.jl/issues/669"
+            @info "💡 View all community benchmark data: https://github.com/SciML/LinearSolve.jl/issues/725"
         else
             error("Failed to add comment to GitHub issue")
         end

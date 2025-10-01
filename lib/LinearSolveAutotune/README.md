@@ -119,7 +119,7 @@ If you prefer using a token:
 
 3. **Preferences**: Optionally sets Julia preferences to automatically use the best algorithms for your system.
 
-4. **Sharing**: The `share_results()` function allows you to contribute your benchmark data to the community collection at [LinearSolve.jl Issue #669](https://github.com/SciML/LinearSolve.jl/issues/669).
+4. **Sharing**: The `share_results()` function allows you to contribute your benchmark data to the community collection at [LinearSolve.jl Issue #725](https://github.com/SciML/LinearSolve.jl/issues/725).
 
 ## Privacy and Telemetry
 

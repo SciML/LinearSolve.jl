@@ -73,10 +73,39 @@ Requires a sufficiently large `A` to overcome the data transfer costs.
     Using this solver requires adding the package CUDA.jl, i.e. `using CUDA`
 """
 struct CudaOffloadLUFactorization <: AbstractFactorization
-    function CudaOffloadLUFactorization()
+    function CudaOffloadLUFactorization(; throwerror = true)
         ext = Base.get_extension(@__MODULE__, :LinearSolveCUDAExt)
-        if ext === nothing
+        if ext === nothing && throwerror
             error("CudaOffloadLUFactorization requires that CUDA is loaded, i.e. `using CUDA`")
+        else
+            return new()
+        end
+    end
+end
+
+"""
+`CUDAOffload32MixedLUFactorization()`
+
+A mixed precision GPU-accelerated LU factorization that converts matrices to Float32 
+before offloading to CUDA GPU for factorization, then converts back for the solve.
+This can provide speedups when the reduced precision is acceptable and memory 
+bandwidth is a bottleneck.
+
+## Performance Notes
+- Converts Float64 matrices to Float32 for GPU factorization
+- Can be significantly faster for large matrices where memory bandwidth is limiting
+- May have reduced accuracy compared to full precision methods
+- Most beneficial when the condition number of the matrix is moderate
+
+!!! note
+
+    Using this solver requires adding the package CUDA.jl, i.e. `using CUDA`
+"""
+struct CUDAOffload32MixedLUFactorization <: AbstractFactorization
+    function CUDAOffload32MixedLUFactorization(; throwerror = true)
+        ext = Base.get_extension(@__MODULE__, :LinearSolveCUDAExt)
+        if ext === nothing && throwerror
+            error("CUDAOffload32MixedLUFactorization requires that CUDA is loaded, i.e. `using CUDA`")
         else
             return new()
         end
@@ -174,13 +203,42 @@ end
 ## RFLUFactorization
 
 """
-`RFLUFactorization()`
+    RFLUFactorization{P, T}(; pivot = Val(true), thread = Val(true))
 
-A fast pure Julia LU-factorization implementation
-using RecursiveFactorization.jl. This is by far the fastest LU-factorization
-implementation, usually outperforming OpenBLAS and MKL for smaller matrices
-(<500x500), but currently optimized only for Base `Array` with `Float32` or `Float64`.
-Additional optimization for complex matrices is in the works.
+A fast pure Julia LU-factorization implementation using RecursiveFactorization.jl. 
+This is by far the fastest LU-factorization implementation, usually outperforming 
+OpenBLAS and MKL for smaller matrices (<500x500), but currently optimized only for 
+Base `Array` with `Float32` or `Float64`. Additional optimization for complex matrices 
+is in the works.
+
+## Type Parameters
+- `P`: Pivoting strategy as `Val{Bool}`. `Val{true}` enables partial pivoting for stability.
+- `T`: Threading strategy as `Val{Bool}`. `Val{true}` enables multi-threading for performance.
+
+## Constructor Arguments
+- `pivot = Val(true)`: Enable partial pivoting. Set to `Val{false}` to disable for speed 
+  at the cost of numerical stability.
+- `thread = Val(true)`: Enable multi-threading. Set to `Val{false}` for single-threaded 
+  execution.
+- `throwerror = true`: Whether to throw an error if RecursiveFactorization.jl is not loaded.
+
+## Performance Notes
+- Fastest for dense matrices with dimensions roughly < 500×500
+- Optimized specifically for Float32 and Float64 element types
+- Recursive blocking strategy provides excellent cache performance
+- Multi-threading can provide significant speedups on multi-core systems
+
+## Requirements
+Using this solver requires that RecursiveFactorization.jl is loaded: `using RecursiveFactorization`
+
+## Example
+```julia
+using RecursiveFactorization
+# Fast, stable (with pivoting)
+alg1 = RFLUFactorization()
+# Fastest (no pivoting), less stable
+alg2 = RFLUFactorization(pivot=Val(false))  
+```
 """
 struct RFLUFactorization{P, T} <: AbstractDenseFactorization
     function RFLUFactorization(::Val{P}, ::Val{T}; throwerror = true) where {P, T}
@@ -200,17 +258,78 @@ end
 # But I'm not sure it makes sense as a GenericFactorization
 # since it just uses `LAPACK.getrf!`.
 """
-`FastLUFactorization()`
+    FastLUFactorization()
 
-The FastLapackInterface.jl version of the LU factorization. Notably,
-this version does not allow for choice of pivoting method.
+A high-performance LU factorization using the FastLapackInterface.jl package.
+This provides an optimized interface to LAPACK routines with reduced overhead
+compared to the standard LinearAlgebra LAPACK wrappers.
+
+## Features
+- Reduced function call overhead compared to standard LAPACK wrappers
+- Optimized for performance-critical applications
+- Uses partial pivoting (no choice of pivoting method available)
+- Suitable for dense matrices where maximum performance is required
+
+## Limitations
+- Does not allow customization of pivoting strategy (always uses partial pivoting)
+- Requires FastLapackInterface.jl to be loaded
+- Limited to dense matrix types supported by LAPACK
+
+## Requirements
+Using this solver requires that FastLapackInterface.jl is loaded: `using FastLapackInterface`
+
+## Performance Notes
+This factorization is optimized for cases where the overhead of standard LAPACK
+function calls becomes significant, typically for moderate-sized dense matrices
+or when performing many factorizations.
+
+## Example
+```julia
+using FastLapackInterface
+alg = FastLUFactorization()
+sol = solve(prob, alg)
+```
 """
 struct FastLUFactorization <: AbstractDenseFactorization end
 
 """
-`FastQRFactorization()`
+    FastQRFactorization{P}(; pivot = ColumnNorm(), blocksize = 36)
 
-The FastLapackInterface.jl version of the QR factorization.
+A high-performance QR factorization using the FastLapackInterface.jl package.
+This provides an optimized interface to LAPACK QR routines with reduced overhead
+compared to the standard LinearAlgebra LAPACK wrappers.
+
+## Type Parameters
+- `P`: The type of pivoting strategy used
+
+## Fields
+- `pivot::P`: Pivoting strategy (e.g., `ColumnNorm()` for column pivoting, `nothing` for no pivoting)
+- `blocksize::Int`: Block size for the blocked QR algorithm (default: 36)
+
+## Features
+- Reduced function call overhead compared to standard LAPACK wrappers
+- Supports various pivoting strategies for numerical stability
+- Configurable block size for optimal performance
+- Suitable for dense matrices, especially overdetermined systems
+
+## Performance Notes
+The block size can be tuned for optimal performance depending on matrix size and architecture.
+The default value of 36 is generally good for most cases, but experimentation may be beneficial
+for specific applications.
+
+## Requirements
+Using this solver requires that FastLapackInterface.jl is loaded: `using FastLapackInterface`
+
+## Example
+```julia
+using FastLapackInterface
+# QR with column pivoting
+alg1 = FastQRFactorization()  
+# QR without pivoting for speed
+alg2 = FastQRFactorization(pivot=nothing)
+# Custom block size
+alg3 = FastQRFactorization(blocksize=64)
+```
 """
 struct FastQRFactorization{P} <: AbstractDenseFactorization
     pivot::P
@@ -520,16 +639,120 @@ A wrapper over the IterativeSolvers.jl MINRES.
 function IterativeSolversJL_MINRES end
 
 """
+    MetalLUFactorization()
+
+A wrapper over Apple's Metal GPU library for LU factorization. Direct calls to Metal 
+in a way that pre-allocates workspace to avoid allocations and automatically offloads 
+to the GPU. This solver is optimized for Metal-capable Apple Silicon Macs.
+
+## Requirements
+Using this solver requires that Metal.jl is loaded: `using Metal`
+
+## Performance Notes
+- Most efficient for large dense matrices where GPU acceleration benefits outweigh transfer costs
+- Automatically manages GPU memory and transfers
+- Particularly effective on Apple Silicon Macs with unified memory
+
+## Example
 ```julia
-MetalLUFactorization()
+using Metal
+alg = MetalLUFactorization()
+sol = solve(prob, alg)
 ```
-
-A wrapper over Apple's Metal GPU library. Direct calls to Metal in a way that pre-allocates workspace
-to avoid allocations and automatically offloads to the GPU.
 """
-struct MetalLUFactorization <: AbstractFactorization end
+struct MetalLUFactorization <: AbstractFactorization 
+    function MetalLUFactorization(; throwerror = true)
+        @static if !Sys.isapple()
+            if throwerror
+                error("MetalLUFactorization is only available on Apple platforms")
+            else
+                return new()
+            end
+        else
+            ext = Base.get_extension(@__MODULE__, :LinearSolveMetalExt)
+            if ext === nothing && throwerror
+                error("MetalLUFactorization requires that Metal.jl is loaded, i.e. `using Metal`")
+            else
+                return new()
+            end
+        end
+    end
+end
 
-struct BLISLUFactorization <: AbstractFactorization end
+"""
+    MetalOffload32MixedLUFactorization()
+
+A mixed precision Metal GPU-accelerated LU factorization that converts matrices to Float32
+before offloading to Metal GPU for factorization, then converts back for the solve.
+This can provide speedups on Apple Silicon when reduced precision is acceptable.
+
+## Performance Notes
+- Converts Float64 matrices to Float32 for GPU factorization
+- Can be significantly faster for large matrices where memory bandwidth is limiting
+- Particularly effective on Apple Silicon Macs with unified memory architecture
+- May have reduced accuracy compared to full precision methods
+
+## Requirements
+Using this solver requires that Metal.jl is loaded: `using Metal`
+
+## Example
+```julia
+using Metal
+alg = MetalOffload32MixedLUFactorization()
+sol = solve(prob, alg)
+```
+"""
+struct MetalOffload32MixedLUFactorization <: AbstractFactorization
+    function MetalOffload32MixedLUFactorization(; throwerror = true)
+        @static if !Sys.isapple()
+            if throwerror
+                error("MetalOffload32MixedLUFactorization is only available on Apple platforms")
+            else
+                return new()
+            end
+        else
+            ext = Base.get_extension(@__MODULE__, :LinearSolveMetalExt)
+            if ext === nothing && throwerror
+                error("MetalOffload32MixedLUFactorization requires that Metal.jl is loaded, i.e. `using Metal`")
+            else
+                return new()
+            end
+        end
+    end
+end
+
+"""
+    BLISLUFactorization()
+
+An LU factorization implementation using the BLIS (BLAS-like Library Instantiation Software) 
+framework. BLIS provides high-performance dense linear algebra kernels optimized for various 
+CPU architectures.
+
+## Requirements
+Using this solver requires that blis_jll is available and the BLIS extension is loaded.
+The solver will be automatically available when conditions are met.
+
+## Performance Notes
+- Optimized for modern CPU architectures with BLIS-specific optimizations
+- May provide better performance than standard BLAS on certain processors
+- Best suited for dense matrices with Float32, Float64, ComplexF32, or ComplexF64 elements
+
+## Example
+```julia
+alg = BLISLUFactorization()
+sol = solve(prob, alg)
+```
+"""
+struct BLISLUFactorization <: AbstractFactorization 
+    function BLISLUFactorization(; throwerror = true)
+        ext = Base.get_extension(@__MODULE__, :LinearSolveBLISExt)
+        if ext === nothing && throwerror
+            error("BLISLUFactorization requires that the BLIS extension is loaded and blis_jll is available")
+        else
+            return new()
+        end
+    end
+end
 
 """
 `CUSOLVERRFFactorization(; symbolic = :RF, reuse_symbolic = true)`
@@ -562,4 +785,126 @@ struct CUSOLVERRFFactorization <: AbstractSparseFactorization
             return new{}(symbolic, reuse_symbolic)
         end
     end
+end
+
+"""
+    MKL32MixedLUFactorization()
+
+A mixed precision LU factorization using Intel MKL that performs factorization in Float32
+precision while maintaining Float64 interface. This can provide significant speedups
+for large matrices when reduced precision is acceptable.
+
+## Performance Notes
+- Converts Float64 matrices to Float32 for factorization
+- Uses optimized MKL routines for the factorization
+- Can be 2x faster than full precision for memory-bandwidth limited problems
+- May have reduced accuracy compared to full Float64 precision
+
+## Requirements
+This solver requires MKL to be available through MKL_jll.
+
+## Example
+```julia
+alg = MKL32MixedLUFactorization()
+sol = solve(prob, alg)
+```
+"""
+struct MKL32MixedLUFactorization <: AbstractDenseFactorization end
+
+"""
+    AppleAccelerate32MixedLUFactorization()
+
+A mixed precision LU factorization using Apple's Accelerate framework that performs
+factorization in Float32 precision while maintaining Float64 interface. This can
+provide significant speedups on Apple hardware when reduced precision is acceptable.
+
+## Performance Notes
+- Converts Float64 matrices to Float32 for factorization
+- Uses optimized Accelerate routines for the factorization
+- Particularly effective on Apple Silicon with unified memory
+- May have reduced accuracy compared to full Float64 precision
+
+## Requirements
+This solver is only available on Apple platforms and requires the Accelerate framework.
+
+## Example
+```julia
+alg = AppleAccelerate32MixedLUFactorization()
+sol = solve(prob, alg)
+```
+"""
+struct AppleAccelerate32MixedLUFactorization <: AbstractDenseFactorization end
+
+"""
+    OpenBLAS32MixedLUFactorization()
+
+A mixed precision LU factorization using OpenBLAS that performs factorization in Float32
+precision while maintaining Float64 interface. This can provide significant speedups
+for large matrices when reduced precision is acceptable.
+
+## Performance Notes
+- Converts Float64 matrices to Float32 for factorization
+- Uses optimized OpenBLAS routines for the factorization
+- Can be 2x faster than full precision for memory-bandwidth limited problems
+- May have reduced accuracy compared to full Float64 precision
+
+## Requirements
+This solver requires OpenBLAS to be available through OpenBLAS_jll.
+
+## Example
+```julia
+alg = OpenBLAS32MixedLUFactorization()
+sol = solve(prob, alg)
+```
+"""
+struct OpenBLAS32MixedLUFactorization <: AbstractDenseFactorization end
+
+"""
+    RF32MixedLUFactorization{P, T}(; pivot = Val(true), thread = Val(true))
+
+A mixed precision LU factorization using RecursiveFactorization.jl that performs 
+factorization in Float32 precision while maintaining Float64 interface. This combines
+the speed benefits of RecursiveFactorization.jl with reduced precision computation
+for additional performance gains.
+
+## Type Parameters
+- `P`: Pivoting strategy as `Val{Bool}`. `Val{true}` enables partial pivoting for stability.
+- `T`: Threading strategy as `Val{Bool}`. `Val{true}` enables multi-threading for performance.
+
+## Constructor Arguments
+- `pivot = Val(true)`: Enable partial pivoting. Set to `Val{false}` to disable for speed 
+  at the cost of numerical stability.
+- `thread = Val(true)`: Enable multi-threading. Set to `Val{false}` for single-threaded 
+  execution.
+
+## Performance Notes
+- Converts Float64 matrices to Float32 for factorization
+- Leverages RecursiveFactorization.jl's optimized blocking strategies
+- Can provide significant speedups for small to medium matrices (< 500×500)
+- May have reduced accuracy compared to full Float64 precision
+
+## Requirements
+Using this solver requires that RecursiveFactorization.jl is loaded: `using RecursiveFactorization`
+
+## Example
+```julia
+using RecursiveFactorization
+# Fast mixed precision with pivoting
+alg1 = RF32MixedLUFactorization()
+# Fastest mixed precision (no pivoting), less stable
+alg2 = RF32MixedLUFactorization(pivot=Val(false))
+```
+"""
+struct RF32MixedLUFactorization{P, T} <: AbstractDenseFactorization
+    function RF32MixedLUFactorization(::Val{P}, ::Val{T}; throwerror = true) where {P, T}
+        if !userecursivefactorization(nothing)
+            throwerror &&
+                error("RF32MixedLUFactorization requires that RecursiveFactorization.jl is loaded, i.e. `using RecursiveFactorization`")
+        end
+        new{P, T}()
+    end
+end
+
+function RF32MixedLUFactorization(; pivot = Val(true), thread = Val(true), throwerror = true)
+    RF32MixedLUFactorization(pivot, thread; throwerror)
 end

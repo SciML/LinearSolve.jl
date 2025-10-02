@@ -8,7 +8,7 @@ using LinearSolve: ArrayInterface, MKLLUFactorization, MetalOffload32MixedLUFact
 
 @static if Sys.isapple()
 
-LinearSolve.usemetal() = true
+LinearSolve.usemetal(x::Nothing) = true
 
 end
 

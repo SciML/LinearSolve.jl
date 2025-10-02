@@ -330,11 +330,11 @@ function is_algorithm_available(alg::DefaultAlgorithmChoice.T)
     elseif alg === DefaultAlgorithmChoice.RFLUFactorization
         return userecursivefactorization(nothing)  # Requires RecursiveFactorization extension
     elseif alg === DefaultAlgorithmChoice.BLISLUFactorization
-        return useblis()  # Available if BLIS extension is loaded
+        return useblis(nothing)  # Available if BLIS extension is loaded
     elseif alg === DefaultAlgorithmChoice.CudaOffloadLUFactorization
-        return usecuda()  # Available if CUDA extension is loaded
+        return usecuda(nothing)  # Available if CUDA extension is loaded
     elseif alg === DefaultAlgorithmChoice.MetalLUFactorization
-        return usemetal()  # Available if Metal extension is loaded
+        return usemetal(nothing)  # Available if Metal extension is loaded
     else
         # For extension-dependent algorithms not explicitly handled above,
         # we cannot easily check availability without trying to use them.
@@ -439,9 +439,10 @@ const HAS_APPLE_ACCELERATE = Ref(false)
 appleaccelerate_isavailable() = HAS_APPLE_ACCELERATE[]
 
 # Extension availability checking functions
-useblis() = false
-usecuda() = false
-usemetal() = false
+# Argument is simply to allow for a new dispatch to be added
+useblis(x) = false
+usecuda(x) = false
+usemetal(x) = false
 
 PrecompileTools.@compile_workload begin
     A = rand(4, 4)

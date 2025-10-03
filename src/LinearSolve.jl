@@ -65,6 +65,7 @@ end
    using MKL_jll: libmkl_rt
 else
    global libmkl_rt
+   nothing
 end
 
 # OpenBLAS_jll is a standard library, but allow users to disable it via preferences
@@ -74,6 +75,7 @@ if Preferences.@load_preference("LoadOpenBLAS_JLL", true)
 else
     const useopenblas = false
     global libopenblas
+    nothing
 end
 
 @reexport using SciMLBase

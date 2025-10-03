@@ -54,19 +54,17 @@ const CRC = ChainRulesCore
         # https://www.intel.com/content/www/us/en/developer/articles/release-notes/onemkl-release-notes-2022.html
         using MKL_jll: MKL_jll
         const usemkl = MKL_jll.is_available() && pkgversion(MKL_jll) >= v"2022.2"
-
-        @static if usemkl
-            using MKL_jll: libmkl_rt
-        else
-            global libmkl_rt
-        end
     else
-        global libmkl_rt
         const usemkl = false
     end
 else
-    global libmkl_rt
     const usemkl = false
+end
+
+@static if usemkl
+   using MKL_jll: libmkl_rt
+else
+   global libmkl_rt
 end
 
 # OpenBLAS_jll is a standard library, but allow users to disable it via preferences

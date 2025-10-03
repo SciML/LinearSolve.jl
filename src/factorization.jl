@@ -311,7 +311,7 @@ function init_cacheval(alg::QRFactorization, A::Symmetric{<:Number, <:Array}, b,
     return qr(convert(AbstractMatrix, A), alg.pivot)
 end
 
-const PREALLOCATED_QR_ColumnNorm = ArrayInterface.qr_instance(rand(1, 1), ColumnNorm())
+const PREALLOCATED_QR_ColumnNorm = qr(rand(1, 1), ColumnNorm())
 
 function init_cacheval(alg::QRFactorization{ColumnNorm}, A::Matrix{Float64}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)

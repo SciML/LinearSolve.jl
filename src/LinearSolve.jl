@@ -52,8 +52,14 @@ const CRC = ChainRulesCore
         # MKL_jll < 2022.2 doesn't support the mixed LP64 and ILP64 interfaces that we make use of in LinearSolve
         # In particular, the `_64` APIs do not exist
         # https://www.intel.com/content/www/us/en/developer/articles/release-notes/onemkl-release-notes-2022.html
-        using MKL_jll: MKL_jll, libmkl_rt
+        using MKL_jll: MKL_jll
         const usemkl = MKL_jll.is_available() && pkgversion(MKL_jll) >= v"2022.2"
+
+        @static if usemkl
+            using MKL_jll: libmkl_rt
+        else
+            global libmkl_rt
+        end
     else
         global libmkl_rt
         const usemkl = false

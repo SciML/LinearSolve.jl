@@ -46,7 +46,7 @@ import Krylov
 
 const CRC = ChainRulesCore
 
-if Int === Int64 && Base.USE_BLAS64
+if Int === Int64 && !Base.USE_BLAS64
    error("Invalid installation of Julia detected.\n\n Detected that Julia was built in 64-bit version but with a 32-bit BLAS. This gives issues" *
          " in LinearAlgebra.jl and LinearSolve.jl which can be unrecoverable and are thus not supported. Most likely this is due to a bad build" *
          " of Julia, with the common reasons being an incorrect build script in the NixOS and ArchLinux package managers (and old versions of homebrew)." *

@@ -1,0 +1,218 @@
+LinearSolve.@concrete struct LinearVerbosity <:
+                                      AbstractVerbositySpecifier
+    # Error control
+    default_lu_fallback
+    # Performance
+    no_right_preconditioning
+    # Numerical
+    using_iterative_solvers
+    using_IterativeSolvers
+    IterativeSolvers_iterations
+    KrylovKit_verbosity
+    KrylovJL_verbosity
+    HYPRE_verbosity
+    pardiso_verbosity
+    blas_errors
+    blas_invalid_args
+    blas_info
+    blas_success
+    condition_number
+end
+
+function LinearVerbosity(;
+        error_control = nothing, performance = nothing, numerical = nothing, kwargs...)
+    # Validate group arguments
+    if error_control !== nothing && !(error_control isa AbstractMessageLevel)
+        throw(ArgumentError("error_control must be a SciMLLogging.AbstractMessageLevel, got $(typeof(error_control))"))
+    end
+    if performance !== nothing && !(performance isa AbstractMessageLevel)
+        throw(ArgumentError("performance must be a SciMLLogging.AbstractMessageLevel, got $(typeof(performance))"))
+    end
+    if numerical !== nothing && !(numerical isa AbstractMessageLevel)
+        throw(ArgumentError("numerical must be a SciMLLogging.AbstractMessageLevel, got $(typeof(numerical))"))
+    end
+
+    # Validate individual kwargs
+    for (key, value) in kwargs
+        if !(key in error_control_options || key in performance_options ||
+             key in numerical_options)
+            throw(ArgumentError("Unknown verbosity option: $key. Valid options are: $(tuple(error_control_options..., performance_options..., numerical_options...))"))
+        end
+        if !(value isa AbstractMessageLevel)
+            throw(ArgumentError("$key must be a SciMLLogging.AbstractMessageLevel, got $(typeof(value))"))
+        end
+    end
+
+    # Build arguments using NamedTuple for type stability
+    default_args = (
+        default_lu_fallback = WarnLevel(),
+        no_right_preconditioning = WarnLevel(),
+        using_iterative_solvers = WarnLevel(),
+        using_IterativeSolvers = WarnLevel(),
+        IterativeSolvers_iterations = WarnLevel(),
+        KrylovKit_verbosity = WarnLevel(),
+        KrylovJL_verbosity = Silent(),
+        HYPRE_verbosity = InfoLevel(),
+        pardiso_verbosity = Silent(),
+        blas_errors = WarnLevel(),
+        blas_invalid_args = WarnLevel(),
+        blas_info = Silent(),
+        blas_success = Silent(),
+        condition_number = Silent()
+    )
+
+    # Apply group-level settings
+    final_args = if error_control !== nothing || performance !== nothing ||
+                    numerical !== nothing
+        NamedTuple{keys(default_args)}(
+            _resolve_arg_value(
+                key, default_args[key], error_control, performance, numerical)
+        for key in keys(default_args)
+        )
+    else
+        default_args
+    end
+
+    # Apply individual overrides
+    if !isempty(kwargs)
+        final_args = merge(final_args, NamedTuple(kwargs))
+    end
+
+    LinearVerbosity(values(final_args)...)
+end
+
+function LinearVerbosity(verbose::AbstractVerbosityPreset)
+    if verbose isa All
+        LinearVerbosity(
+            default_lu_fallback = InfoLevel(),
+            no_right_preconditioning = InfoLevel(),
+            using_iterative_solvers = InfoLevel(),
+            using_IterativeSolvers = InfoLevel(),
+            IterativeSolvers_iterations = InfoLevel(),
+            KrylovKit_verbosity = InfoLevel(),
+            KrylovJL_verbosity = InfoLevel(),
+            HYPRE_verbosity = InfoLevel(),
+            pardiso_verbosity = InfoLevel(),
+            blas_errors = InfoLevel(),
+            blas_invalid_args = InfoLevel(),
+            blas_info = InfoLevel(),
+            blas_success = InfoLevel(),
+            condition_number = InfoLevel()
+        )
+    elseif verbose isa Minimal
+        LinearVerbosity(
+            default_lu_fallback = ErrorLevel(),
+            no_right_preconditioning = Silent(),
+            using_iterative_solvers = Silent(),
+            using_IterativeSolvers = Silent(),
+            IterativeSolvers_iterations = Silent(),
+            KrylovKit_verbosity = Silent(),
+            KrylovJL_verbosity = Silent(),
+            HYPRE_verbosity = Silent(),
+            pardiso_verbosity = Silent(),
+            blas_errors = ErrorLevel(),
+            blas_invalid_args = ErrorLevel(),
+            blas_info = Silent(),
+            blas_success = Silent(),
+            condition_number = Silent()
+        )
+    elseif verbose isa Standard
+        LinearVerbosity()  # Use default settings
+    elseif verbose isa Detailed
+        LinearVerbosity(
+            default_lu_fallback = InfoLevel(),
+            no_right_preconditioning = InfoLevel(),
+            using_iterative_solvers = InfoLevel(),
+            using_IterativeSolvers = InfoLevel(),
+            IterativeSolvers_iterations = InfoLevel(),
+            KrylovKit_verbosity = WarnLevel(),
+            KrylovJL_verbosity = WarnLevel(),
+            HYPRE_verbosity = InfoLevel(),
+            pardiso_verbosity = WarnLevel(),
+            blas_errors = WarnLevel(),
+            blas_invalid_args = WarnLevel(),
+            blas_info = InfoLevel(),
+            blas_success = InfoLevel(),
+            condition_number = InfoLevel()
+        )
+    else
+        LinearVerbosity()  # Default fallback
+    end
+end
+
+@inline function LinearVerbosity(verbose::None) 
+    LinearVerbosity(
+    Silent(),
+    Silent(),
+    Silent(),
+    Silent(),
+    Silent(),
+    Silent(),
+    Silent(),
+    Silent(),
+    Silent(),
+    Silent(),
+    Silent(),
+    Silent(),
+    Silent(),
+    Silent())
+end
+
+# Helper function to resolve argument values based on group membership
+@inline function _resolve_arg_value(key::Symbol, default_val, error_control, performance, numerical)
+    if key in error_control_options && error_control !== nothing
+        return error_control
+    elseif key in performance_options && performance !== nothing
+        return performance
+    elseif key in numerical_options && numerical !== nothing
+        return numerical
+    else
+        return default_val
+    end
+end
+
+# Group classifications
+const error_control_options = (:default_lu_fallback, :blas_errors, :blas_invalid_args)
+const performance_options = (:no_right_preconditioning,)
+const numerical_options = (:using_iterative_solvers, :using_IterativeSolvers, :IterativeSolvers_iterations,
+                       :KrylovKit_verbosity, :KrylovJL_verbosity, :HYPRE_verbosity, :pardiso_verbosity,
+                       :blas_info, :blas_success, :condition_number)
+
+function option_group(option::Symbol)
+    if option in error_control_options
+        return :error_control
+    elseif option in performance_options
+        return :performance
+    elseif option in numerical_options
+        return :numerical
+    else
+        error("Unknown verbosity option: $option")
+    end
+end
+
+# Get all options in a group
+function group_options(verbosity::LinearVerbosity, group::Symbol)
+    if group === :error_control
+        return NamedTuple{error_control_options}(getproperty(verbosity, opt) for opt in error_control_options)
+    elseif group === :performance
+        return NamedTuple{performance_options}(getproperty(verbosity, opt) for opt in performance_options)
+    elseif group === :numerical
+        return NamedTuple{numerical_options}(getproperty(verbosity, opt) for opt in numerical_options)
+    else
+        error("Unknown group: $group")
+    end
+end
+
+function Base.getproperty(verbosity::LinearVerbosity, name::Symbol)
+    # Check if this is a group name
+    if name === :error_control
+        return group_options(verbosity, :error_control)
+    elseif name === :performance
+        return group_options(verbosity, :performance)
+    elseif name === :numerical
+        return group_options(verbosity, :numerical)
+    else
+        # Fall back to default field access
+        return getfield(verbosity, name)
+    end
+end

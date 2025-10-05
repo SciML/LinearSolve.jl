@@ -46,6 +46,17 @@ import Krylov
 
 const CRC = ChainRulesCore
 
+if Int === Int64 && Base.USE_BLAS64
+   error("Invalid installation of Julia detected.\n\n Detected that Julia was built in 64-bit version but with a 32-bit BLAS. This gives issues" *
+         " in LinearAlgebra.jl and LinearSolve.jl which can be unrecoverable and are thus not supported. Most likely this is due to a bad build" *
+         " of Julia, with the common reasons being an incorrect build script in the NixOS and ArchLinux package managers (and old versions of homebrew)." *
+         " To fix this issue, and many other potentially small issues that may be undetected, use get a valid version of Julia with the correct BLAS and" *
+         " LLVM versions by either installing via juliaup (recommended), or downloading the appropriate binary from https://julialang.org/install/" *
+         " If using a Unix machine with a bash terminal, `curl -fsSL https://install.julialang.org` | sh will install juliaup and `juliaup add latest` will"
+         " then give the latest version.\n\n If you wish to help fix the incorrect package manager build, share the discussion on fixing the homebrew build" *
+         " https://github.com/Homebrew/homebrew-core/issues/246702 with the package manager of interest in order to improve the ecosystem.")
+end
+
 @static if Sys.ARCH === :x86_64 || Sys.ARCH === :i686
     if Preferences.@load_preference("LoadMKL_JLL",
         !occursin("EPYC", Sys.cpu_info()[1].model))

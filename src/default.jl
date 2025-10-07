@@ -396,17 +396,9 @@ function algchoice_to_alg(alg::Symbol)
     elseif alg === :SparspakFactorization
         SparspakFactorization(throwerror = false)
     elseif alg === :KLUFactorization
-        @static if Base.USE_GPL_LIBS
-            KLUFactorization()
-        else
-            error("KLUFactorization requires GPL libraries. Rebuild Julia with USE_GPL_LIBS=1 or use a different algorithm")
-        end
+        KLUFactorization()
     elseif alg === :UMFPACKFactorization
-        @static if Base.USE_GPL_LIBS
-            UMFPACKFactorization()
-        else
-            error("UMFPACKFactorization requires GPL libraries. Rebuild Julia with USE_GPL_LIBS=1 or use a different algorithm")
-        end
+        UMFPACKFactorization()
     elseif alg === :KrylovJL_GMRES
         KrylovJL_GMRES()
     elseif alg === :GenericLUFactorization
@@ -416,11 +408,7 @@ function algchoice_to_alg(alg::Symbol)
     elseif alg === :BunchKaufmanFactorization
         BunchKaufmanFactorization()
     elseif alg === :CHOLMODFactorization
-        @static if Base.USE_GPL_LIBS
-            CHOLMODFactorization()
-        else
-            error("CHOLMODFactorization requires GPL libraries. Rebuild Julia with USE_GPL_LIBS=1 or use CholeskyFactorization instead")
-        end
+        CHOLMODFactorization()
     elseif alg === :CholeskyFactorization
         CholeskyFactorization()
     elseif alg === :NormalCholeskyFactorization

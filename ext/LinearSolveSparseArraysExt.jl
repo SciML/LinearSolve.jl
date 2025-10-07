@@ -259,8 +259,6 @@ function LinearSolve.init_cacheval(
     nothing
 end
 
-@static if Base.USE_GPL_LIBS
-
 const PREALLOCATED_KLU = KLU.KLUFactorization(SparseMatrixCSC(0, 0, [1], Int[],
     Float64[]))
 
@@ -314,14 +312,6 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
             alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible)
     end
 end
-
-else
-
-function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization; kwargs...)
-    error("KLUFactorization requires GPL libraries (KLU/SuiteSparse). Rebuild Julia with USE_GPL_LIBS=1 or use an alternative algorithm like SparspakFactorization")
-end
-
-end # @static if Base.USE_GPL_LIBS
 
 function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
         A::AbstractArray, b, u,
@@ -435,15 +425,10 @@ else
 function LinearSolve.defaultalg(
         A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
         assump::OperatorAssumptions{Bool}) where {Ti}
-    ext = Base.get_extension(LinearSolve, :LinearSolveSparspakExt)
-    if assump.issq && ext !== nothing
-        LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.SparspakFactorization)
+    if assump.issq
+        LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KLUFactorization)
     elseif !assump.issq
         LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.QRFactorization)
-    elseif ext === nothing
-        error("SparspakFactorization required for sparse matrix LU without GPL libraries. Do `using Sparspak` to enable this functionality")
-    else
-        error("Unreachable reached. Please report this error with a reproducer.")
     end
 end
 end # @static if Base.USE_GPL_LIBS
@@ -476,7 +461,9 @@ LinearSolve.PrecompileTools.@compile_workload begin
     b = rand(4)
     prob = LinearProblem(A, b)
     sol = solve(prob, KLUFactorization())
-    sol = solve(prob, UMFPACKFactorization())
+    if Base.USE_GPL_LIBS
+        sol = solve(prob, UMFPACKFactorization())
+    end
 end
 
 end

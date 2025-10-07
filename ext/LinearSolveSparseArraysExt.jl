@@ -38,15 +38,28 @@ function LinearSolve.init_cacheval(alg::RFLUFactorization,
     nothing, nothing
 end
 
+@static if Base.USE_GPL_LIBS
 function LinearSolve.handle_sparsematrixcsc_lu(A::AbstractSparseMatrixCSC)
     lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
         check = false)
 end
+else
+function LinearSolve.handle_sparsematrixcsc_lu(A::AbstractSparseMatrixCSC)
+    error("Sparse LU factorization requires GPL libraries (UMFPACK). Use `using Sparspak` for a non-GPL alternative or rebuild Julia with USE_GPL_LIBS=1")
+end
+end # @static if Base.USE_GPL_LIBS
 
+@static if Base.USE_GPL_LIBS
 function LinearSolve.defaultalg(
         A::Symmetric{<:BLASELTYPES, <:SparseMatrixCSC}, b, ::OperatorAssumptions{Bool})
     LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.CHOLMODFactorization)
 end
+else
+function LinearSolve.defaultalg(
+        A::Symmetric{<:BLASELTYPES, <:SparseMatrixCSC}, b, ::OperatorAssumptions{Bool})
+    LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.CholeskyFactorization)
+end
+end # @static if Base.USE_GPL_LIBS
 
 function LinearSolve.defaultalg(A::AbstractSparseMatrixCSC{Tv, Ti}, b,
         assump::OperatorAssumptions{Bool}) where {Tv, Ti}
@@ -71,8 +84,12 @@ function LinearSolve.init_cacheval(alg::GenericFactorization,
     LinearSolve.do_factorization(alg, newA, b, u)
 end
 
+@static if Base.USE_GPL_LIBS
+
 const PREALLOCATED_UMFPACK = SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC(0, 0, [1],
     Int[], Float64[]))
+
+end # @static if Base.USE_GPL_LIBS
 
 function LinearSolve.init_cacheval(
         alg::LUFactorization, A::AbstractSparseArray{<:Number, <:Integer}, b, u,
@@ -89,6 +106,8 @@ function LinearSolve.init_cacheval(
         verbose::Bool, assumptions::OperatorAssumptions)
     nothing
 end
+
+@static if Base.USE_GPL_LIBS
 
 function LinearSolve.init_cacheval(
         alg::UMFPACKFactorization, A::AbstractArray, b, u,
@@ -132,6 +151,8 @@ function LinearSolve.init_cacheval(
     end
 end
 
+end # @static if Base.USE_GPL_LIBS
+
 function LinearSolve.init_cacheval(
         alg::LUFactorization, A::LinearSolve.GPUArraysCore.AnyGPUArray, b, u,
         Pl, Pr,
@@ -139,6 +160,8 @@ function LinearSolve.init_cacheval(
         verbose::Bool, assumptions::OperatorAssumptions)
     ArrayInterface.lu_instance(A)
 end
+
+@static if Base.USE_GPL_LIBS
 
 function LinearSolve.init_cacheval(
         alg::UMFPACKFactorization, A::AbstractSparseArray{Float64, Int}, b, u, Pl, Pr,
@@ -211,6 +234,8 @@ function SciMLBase.solve!(
     end
 end
 
+end # @static if Base.USE_GPL_LIBS
+
 const PREALLOCATED_KLU = KLU.KLUFactorization(SparseMatrixCSC(0, 0, [1], Int[],
     Float64[]))
 
@@ -282,6 +307,8 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
     end
 end
 
+@static if Base.USE_GPL_LIBS
+
 const PREALLOCATED_CHOLMOD = cholesky(sparse(reshape([1.0], 1, 1)))
 
 function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
@@ -310,6 +337,8 @@ function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
     nothing
 end
 
+end # @static if Base.USE_GPL_LIBS
+
 function LinearSolve.init_cacheval(alg::NormalCholeskyFactorization,
         A::Union{AbstractSparseArray{T}, LinearSolve.GPUArraysCore.AnyGPUArray,
             Symmetric{T, <:AbstractSparseArray{T}}}, b, u, Pl, Pr,
@@ -320,6 +349,7 @@ end
 
 # Specialize QR for the non-square case
 # Missing ldiv! definitions: https://github.com/JuliaSparse/SparseArrays.jl/issues/242
+@static if Base.USE_GPL_LIBS
 function LinearSolve._ldiv!(x::Vector,
         A::Union{QR, LinearAlgebra.QRCompactWY,
             SparseArrays.SPQR.QRSparse,
@@ -347,6 +377,30 @@ function LinearSolve._ldiv!(::SVector,
         b::SVector)
     (A \ b)
 end
+else
+# Non-GPL version without SPQR and CHOLMOD
+function LinearSolve._ldiv!(x::Vector,
+        A::Union{QR, LinearAlgebra.QRCompactWY}, b::Vector)
+    x .= A \ b
+end
+
+function LinearSolve._ldiv!(x::AbstractVector,
+        A::Union{QR, LinearAlgebra.QRCompactWY}, b::AbstractVector)
+    x .= A \ b
+end
+
+# Ambiguity removal
+function LinearSolve._ldiv!(::SVector,
+        A::Union{LinearAlgebra.QR, LinearAlgebra.QRCompactWY},
+        b::AbstractVector)
+    (A \ b)
+end
+function LinearSolve._ldiv!(::SVector,
+        A::Union{LinearAlgebra.QR, LinearAlgebra.QRCompactWY},
+        b::SVector)
+    (A \ b)
+end
+end # @static if Base.USE_GPL_LIBS
 
 function LinearSolve.pattern_changed(fact, A::SparseArrays.SparseMatrixCSC)
     !(SparseArrays.decrement(SparseArrays.getcolptr(A)) ==
@@ -354,6 +408,7 @@ function LinearSolve.pattern_changed(fact, A::SparseArrays.SparseMatrixCSC)
       fact.rowval)
 end
 
+@static if Base.USE_GPL_LIBS
 function LinearSolve.defaultalg(
         A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
         assump::OperatorAssumptions{Bool}) where {Ti}
@@ -367,6 +422,22 @@ function LinearSolve.defaultalg(
         LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.QRFactorization)
     end
 end
+else
+function LinearSolve.defaultalg(
+        A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
+        assump::OperatorAssumptions{Bool}) where {Ti}
+    ext = Base.get_extension(LinearSolve, :LinearSolveSparspakExt)
+    if assump.issq && ext !== nothing
+        LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.SparspakFactorization)
+    elseif !assump.issq
+        LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.QRFactorization)
+    elseif ext === nothing
+        error("SparspakFactorization required for sparse matrix LU without GPL libraries. Do `using Sparspak` to enable this functionality")
+    else
+        error("Unreachable reached. Please report this error with a reproducer.")
+    end
+end
+end # @static if Base.USE_GPL_LIBS
 
 # SPQR Handling
 function LinearSolve.init_cacheval(

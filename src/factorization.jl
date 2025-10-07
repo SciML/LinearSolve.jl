@@ -852,11 +852,13 @@ end
 
 ################################## Factorizations which require solve! overloads
 
+@static if Base.USE_GPL_LIBS
+
 """
 `UMFPACKFactorization(;reuse_symbolic=true, check_pattern=true)`
 
 A fast sparse multithreaded LU-factorization which specializes on sparsity
-patterns with “more structure”.
+patterns with "more structure".
 
 !!! note
 
@@ -878,6 +880,8 @@ function init_cacheval(alg::UMFPACKFactorization,
         verbose::Bool, assumptions::OperatorAssumptions)
     nothing
 end
+
+end # @static if Base.USE_GPL_LIBS
 
 """
 `KLUFactorization(;reuse_symbolic=true, check_pattern=true)`
@@ -906,6 +910,8 @@ function init_cacheval(alg::KLUFactorization,
 end
 
 ## CHOLMODFactorization
+
+@static if Base.USE_GPL_LIBS
 
 """
 `CHOLMODFactorization(; shift = 0.0, perm = nothing)`
@@ -950,6 +956,8 @@ function SciMLBase.solve!(cache::LinearCache, alg::CHOLMODFactorization; kwargs.
     cache.u .= @get_cacheval(cache, :CHOLMODFactorization) \ cache.b
     SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
 end
+
+end # @static if Base.USE_GPL_LIBS
 
 ## NormalCholeskyFactorization
 

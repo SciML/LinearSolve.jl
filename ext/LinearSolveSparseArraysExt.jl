@@ -38,16 +38,14 @@ function LinearSolve.init_cacheval(alg::RFLUFactorization,
     nothing, nothing
 end
 
-@static if Base.USE_GPL_LIBS
 function LinearSolve.handle_sparsematrixcsc_lu(A::AbstractSparseMatrixCSC)
-    lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
-        check = false)
+    @static if Base.USE_GPL_LIBS
+        lu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
+            check = false)
+    else
+        error("Sparse LU factorization requires GPL libraries (UMFPACK). Use `using Sparspak` for a non-GPL alternative or rebuild Julia with USE_GPL_LIBS=1")
+    end
 end
-else
-function LinearSolve.handle_sparsematrixcsc_lu(A::AbstractSparseMatrixCSC)
-    error("Sparse LU factorization requires GPL libraries (UMFPACK). Use `using Sparspak` for a non-GPL alternative or rebuild Julia with USE_GPL_LIBS=1")
-end
-end # @static if Base.USE_GPL_LIBS
 
 @static if Base.USE_GPL_LIBS
 function LinearSolve.defaultalg(
@@ -234,10 +232,14 @@ function SciMLBase.solve!(
     end
 end
 
-end # @static if Base.USE_GPL_LIBS
+else
 
-const PREALLOCATED_KLU = KLU.KLUFactorization(SparseMatrixCSC(0, 0, [1], Int[],
-    Float64[]))
+function SciMLBase.solve!(
+        cache::LinearSolve.LinearCache, alg::UMFPACKFactorization; kwargs...)
+    error("UMFPACKFactorization requires GPL libraries (UMFPACK). Rebuild Julia with USE_GPL_LIBS=1 or use an alternative algorithm like SparspakFactorization")
+end
+
+end # @static if Base.USE_GPL_LIBS
 
 function LinearSolve.init_cacheval(
         alg::KLUFactorization, A::AbstractArray, b, u, Pl,
@@ -248,19 +250,24 @@ function LinearSolve.init_cacheval(
 end
 
 function LinearSolve.init_cacheval(
-        alg::KLUFactorization, A::AbstractSparseArray{Float64, Int64}, b, u, Pl, Pr,
-        maxiters::Int, abstol,
-        reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
-    PREALLOCATED_KLU
-end
-
-function LinearSolve.init_cacheval(
         alg::KLUFactorization, A::LinearSolve.GPUArraysCore.AnyGPUArray, b, u,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
     nothing
+end
+
+@static if Base.USE_GPL_LIBS
+
+const PREALLOCATED_KLU = KLU.KLUFactorization(SparseMatrixCSC(0, 0, [1], Int[],
+    Float64[]))
+
+function LinearSolve.init_cacheval(
+        alg::KLUFactorization, A::AbstractSparseArray{Float64, Int64}, b, u, Pl, Pr,
+        maxiters::Int, abstol,
+        reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    PREALLOCATED_KLU
 end
 
 function LinearSolve.init_cacheval(
@@ -272,7 +279,6 @@ function LinearSolve.init_cacheval(
         0, 0, [Int32(1)], Int32[], Float64[]))
 end
 
-# TODO: guard this against errors
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
@@ -306,6 +312,14 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
             alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible)
     end
 end
+
+else
+
+function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization; kwargs...)
+    error("KLUFactorization requires GPL libraries (KLU/SuiteSparse). Rebuild Julia with USE_GPL_LIBS=1 or use an alternative algorithm like SparspakFactorization")
+end
+
+end # @static if Base.USE_GPL_LIBS
 
 function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
         A::AbstractArray, b, u,

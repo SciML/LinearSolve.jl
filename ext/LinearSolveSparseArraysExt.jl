@@ -11,7 +11,10 @@ using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu
 using SparseArrays: SparseArrays, AbstractSparseArray, AbstractSparseMatrixCSC,
                     SparseMatrixCSC,
                     nonzeros, rowvals, getcolptr, sparse, sprand
+
+@static if Base.USE_GPL_LIBS
 using SparseArrays.UMFPACK: UMFPACK_OK
+end
 using Base: /, \, convert
 using SciMLBase: SciMLBase, LinearProblem, ReturnCode
 import StaticArraysCore: SVector
@@ -83,7 +86,6 @@ function LinearSolve.init_cacheval(alg::GenericFactorization,
 end
 
 @static if Base.USE_GPL_LIBS
-
 const PREALLOCATED_UMFPACK = SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC(0, 0, [1],
     Int[], Float64[]))
 

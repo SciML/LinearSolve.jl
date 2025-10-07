@@ -475,7 +475,6 @@ error_no_cudss_lu(A) = nothing
 cudss_loaded(A) = false
 is_cusparse(A) = false
 
-@static if Base.USE_GPL_LIBS
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
        NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
@@ -483,15 +482,6 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
        SparspakFactorization, DiagonalFactorization, CholeskyFactorization,
        BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization,
        CUSOLVERRFFactorization, CliqueTreesFactorization
-else
-export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
-       GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
-       NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
-       FastLUFactorization, FastQRFactorization,
-       SparspakFactorization, DiagonalFactorization, CholeskyFactorization,
-       BunchKaufmanFactorization, LDLtFactorization,
-       CUSOLVERRFFactorization, CliqueTreesFactorization
-end # @static if Base.USE_GPL_LIBS
 
 export LinearSolveFunction, DirectLdiv!, show_algorithm_choices
 

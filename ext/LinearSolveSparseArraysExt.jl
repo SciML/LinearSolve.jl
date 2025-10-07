@@ -107,8 +107,6 @@ function LinearSolve.init_cacheval(
     nothing
 end
 
-@static if Base.USE_GPL_LIBS
-
 function LinearSolve.init_cacheval(
         alg::UMFPACKFactorization, A::AbstractArray, b, u,
         Pl, Pr,
@@ -116,6 +114,8 @@ function LinearSolve.init_cacheval(
         verbose::Bool, assumptions::OperatorAssumptions)
     nothing
 end
+
+@static if Base.USE_GPL_LIBS
 
 function LinearSolve.init_cacheval(
         alg::LUFactorization, A::AbstractSparseArray{Float64, Int64}, b, u,
@@ -161,6 +161,14 @@ function LinearSolve.init_cacheval(
     ArrayInterface.lu_instance(A)
 end
 
+function LinearSolve.init_cacheval(
+        alg::UMFPACKFactorization, A::LinearSolve.GPUArraysCore.AnyGPUArray, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
 @static if Base.USE_GPL_LIBS
 
 function LinearSolve.init_cacheval(
@@ -169,14 +177,6 @@ function LinearSolve.init_cacheval(
         reltol,
         verbose::Bool, assumptions::OperatorAssumptions)
     PREALLOCATED_UMFPACK
-end
-
-function LinearSolve.init_cacheval(
-        alg::UMFPACKFactorization, A::LinearSolve.GPUArraysCore.AnyGPUArray, b, u,
-        Pl, Pr,
-        maxiters::Int, abstol, reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
-    nothing
 end
 
 function LinearSolve.init_cacheval(
@@ -307,6 +307,14 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
     end
 end
 
+function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
+        A::AbstractArray, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Bool, assumptions::OperatorAssumptions)
+    nothing
+end
+
 @static if Base.USE_GPL_LIBS
 
 const PREALLOCATED_CHOLMOD = cholesky(sparse(reshape([1.0], 1, 1)))
@@ -329,14 +337,6 @@ function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
     cholesky(sparse(reshape([one(T)], 1, 1)))
 end
 
-function LinearSolve.init_cacheval(alg::CHOLMODFactorization,
-        A::AbstractArray, b, u,
-        Pl, Pr,
-        maxiters::Int, abstol, reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
-    nothing
-end
-
 end # @static if Base.USE_GPL_LIBS
 
 function LinearSolve.init_cacheval(alg::NormalCholeskyFactorization,
@@ -349,36 +349,6 @@ end
 
 # Specialize QR for the non-square case
 # Missing ldiv! definitions: https://github.com/JuliaSparse/SparseArrays.jl/issues/242
-@static if Base.USE_GPL_LIBS
-function LinearSolve._ldiv!(x::Vector,
-        A::Union{QR, LinearAlgebra.QRCompactWY,
-            SparseArrays.SPQR.QRSparse,
-            SparseArrays.CHOLMOD.Factor}, b::Vector)
-    x .= A \ b
-end
-
-function LinearSolve._ldiv!(x::AbstractVector,
-        A::Union{QR, LinearAlgebra.QRCompactWY,
-            SparseArrays.SPQR.QRSparse,
-            SparseArrays.CHOLMOD.Factor}, b::AbstractVector)
-    x .= A \ b
-end
-
-# Ambiguity removal
-function LinearSolve._ldiv!(::SVector,
-        A::Union{SparseArrays.CHOLMOD.Factor, LinearAlgebra.QR,
-            LinearAlgebra.QRCompactWY, SparseArrays.SPQR.QRSparse},
-        b::AbstractVector)
-    (A \ b)
-end
-function LinearSolve._ldiv!(::SVector,
-        A::Union{SparseArrays.CHOLMOD.Factor, LinearAlgebra.QR,
-            LinearAlgebra.QRCompactWY, SparseArrays.SPQR.QRSparse},
-        b::SVector)
-    (A \ b)
-end
-else
-# Non-GPL version without SPQR and CHOLMOD
 function LinearSolve._ldiv!(x::Vector,
         A::Union{QR, LinearAlgebra.QRCompactWY}, b::Vector)
     x .= A \ b
@@ -397,6 +367,29 @@ function LinearSolve._ldiv!(::SVector,
 end
 function LinearSolve._ldiv!(::SVector,
         A::Union{LinearAlgebra.QR, LinearAlgebra.QRCompactWY},
+        b::SVector)
+    (A \ b)
+end
+
+@static if Base.USE_GPL_LIBS
+# SPQR and CHOLMOD Factor support
+function LinearSolve._ldiv!(x::Vector,
+        A::Union{SparseArrays.SPQR.QRSparse, SparseArrays.CHOLMOD.Factor}, b::Vector)
+    x .= A \ b
+end
+
+function LinearSolve._ldiv!(x::AbstractVector,
+        A::Union{SparseArrays.SPQR.QRSparse, SparseArrays.CHOLMOD.Factor}, b::AbstractVector)
+    x .= A \ b
+end
+
+function LinearSolve._ldiv!(::SVector,
+        A::Union{SparseArrays.CHOLMOD.Factor, SparseArrays.SPQR.QRSparse},
+        b::AbstractVector)
+    (A \ b)
+end
+function LinearSolve._ldiv!(::SVector,
+        A::Union{SparseArrays.CHOLMOD.Factor, SparseArrays.SPQR.QRSparse},
         b::SVector)
     (A \ b)
 end

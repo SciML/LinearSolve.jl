@@ -1,7 +1,7 @@
 module LinearSolveRecursiveFactorizationExt
 
 using LinearSolve: LinearSolve, userecursivefactorization, LinearCache, @get_cacheval,
-                   RFLUFactorization, RF32MixedLUFactorization, default_alias_A,
+                   RFLUFactorization, ButterflyFactorization, RF32MixedLUFactorization, default_alias_A,
                    default_alias_b
 using LinearSolve.LinearAlgebra, LinearSolve.ArrayInterface, RecursiveFactorization
 using SciMLBase: SciMLBase, ReturnCode
@@ -19,7 +19,6 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::RFLUFactorization
         end
         fact = RecursiveFactorization.lu!(A, ipiv, Val(P), Val(T), check = false)
         cache.cacheval = (fact, ipiv)
-
         if !LinearAlgebra.issuccess(fact)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
@@ -105,4 +104,26 @@ function SciMLBase.solve!(
         alg, cache.u, nothing, cache; retcode = ReturnCode.Success)
 end
 
+function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::ButterflyFactorization;
+        kwargs...)
+    A = cache.A
+    A = convert(AbstractMatrix, A)
+    b = cache.b
+    M, N = size(A)
+    if cache.isfresh
+        @assert M==N "A must be square"
+        ws = RecursiveFactorization.🦋workspace(A, b)    
+        cache.cacheval = (ws)
+        cache.isfresh = false
+    end
+    out = RecursiveFactorization.🦋lu!(ws, M, alg.thread)
+    SciMLBase.build_linear_solution(alg, out, nothing, cache)
 end
+
+function LinearSolve.init_cacheval(alg::ButterflyFactorization, A, b, u, Pl, Pr, maxiters::Int,
+        abstol, reltol, verbose::Bool, assumptions::LinearSolve.OperatorAssumptions)
+    ws = RecursiveFactorization.🦋workspace(A, b)    
+end
+
+end
+

@@ -25,7 +25,6 @@ end
 @static if VERSION ≥ v"1.11.0" && VERSION < v"1.12.0"
     if GROUP == "All"
         @info "Running Mooncake tests on Julia $(VERSION)"
-        using Mooncake
         @time @safetestset "Mooncake Adjoint Sensitivity" include("adjoint_mooncake.jl")
     end
 else

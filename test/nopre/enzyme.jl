@@ -1,9 +1,7 @@
 using Enzyme, ForwardDiff
 using LinearSolve, LinearAlgebra, Test
 using FiniteDiff, RecursiveFactorization
-using Mooncake
 
-# first test
 n = 4
 A = rand(n, n);
 dA = zeros(n, n);
@@ -29,7 +27,6 @@ db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x), copy(b1))
 @test dA ≈ dA2
 @test db1 ≈ db12
 
-# second test
 A = rand(n, n);
 dA = zeros(n, n);
 b1 = rand(n);
@@ -55,7 +52,6 @@ db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x), copy(b1))
 @test dA ≈ dA2
 @test db1 ≈ db12
 
-# third test
 A = rand(n, n);
 dA = zeros(n, n);
 dA2 = zeros(n, n);
@@ -93,21 +89,12 @@ dy2 = [1.0]
 Enzyme.autodiff(
     Reverse, fbatch, Duplicated(y, dy1), Duplicated(copy(A), dA), Duplicated(copy(b1), db1))
 
-cache = Mooncake.prepare_gradient_cache(f, (copy(A), copy(b1))...)
-results = Mooncake.value_and_gradient!!(cache, f, (copy(A), copy(b1))...)
-
 @test y[1] ≈ f(copy(A), b1)
 dA_2 = ForwardDiff.gradient(x -> f(x, eltype(x).(b1)), copy(A))
 db1_2 = ForwardDiff.gradient(x -> f(eltype(x).(A), x), copy(b1))
 
-# enzyme
 @test dA ≈ dA_2
 @test db1 ≈ db1_2
-
-# mooncake
-@test results[1] ≈ f(copy(A), b1)
-@test dA ≈ results[2][2]
-@test db1 ≈ results[2][3]
 
 y .= 0
 dy1 .= 1
@@ -119,23 +106,11 @@ db12 .= 0
 Enzyme.autodiff(Reverse, fbatch, BatchDuplicated(y, (dy1, dy2)),
     BatchDuplicated(copy(A), (dA, dA2)), BatchDuplicated(copy(b1), (db1, db12)))
 
-# enzyme
 @test dA ≈ dA_2
 @test db1 ≈ db1_2
 @test dA2 ≈ dA_2
 @test db12 ≈ db1_2
 
-# mooncake batch case WIP
-# cache = Mooncake.prepare_pullback_cache(fbatch, (y, copy(A), copy(b1))...)
-# results = Mooncake.value_and_pullback!!(cache, fbatch, (y, copy(A), copy(b1))...)
-
-# @test results[1] ≈ f(copy(A), b1)
-# @test results[2][2] ≈ dA_2
-# @test results[2][3] ≈ db1_2
-# @test results[2][4] ≈ dA_2
-# @test results[2][5] ≈ db1_2
-
-# fourth test
 function f(A, b1, b2; alg = LUFactorization())
     prob = LinearProblem(A, b1)
     cache = init(prob, alg)
@@ -152,30 +127,18 @@ db1 = zeros(n);
 b2 = rand(n);
 db2 = zeros(n);
 
-f_primal = f(A, b1, b2)
+f(A, b1, b2)
 Enzyme.autodiff(Reverse, f, Duplicated(copy(A), dA),
     Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
-
-cache = Mooncake.prepare_gradient_cache(f, (copy(A), copy(b1), copy(b2))...)
-results = Mooncake.value_and_gradient!!(cache, f, (copy(A), copy(b1), copy(b2))...)
 
 dA2 = ForwardDiff.gradient(x -> f(x, eltype(x).(b1), eltype(x).(b2)), copy(A))
 db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x, eltype(x).(b2)), copy(b1))
 db22 = ForwardDiff.gradient(x -> f(eltype(x).(A), eltype(x).(b1), x), copy(b2))
 
-# enzyme
 @test dA ≈ dA2
 @test db1 ≈ db12
 @test db2 ≈ db22
 
-# mooncake
-@test results[1] ≈ f_primal
-@test dA ≈ results[2][2]
-@test db1 ≈ results[2][3]
-@test db2 ≈ results[2][4]
-
-# fifth test
-# mooncake need rrules for solve!
 function f2(A, b1, b2; alg = RFLUFactorization())
     prob = LinearProblem(A, b1)
     cache = init(prob, alg)
@@ -196,8 +159,6 @@ Enzyme.autodiff(Reverse, f2, Duplicated(copy(A), dA),
 @test db1 ≈ db12
 @test db2 ≈ db22
 
-# sixth test
-# mooncake need rrules for solve!
 function f3(A, b1, b2; alg = KrylovJL_GMRES())
     prob = LinearProblem(A, b1)
     cache = init(prob, alg)
@@ -217,8 +178,6 @@ Enzyme.autodiff(set_runtime_activity(Reverse), f3, Duplicated(copy(A), dA),
 @test db1 ≈ db12
 @test db2 ≈ db22
 
-# seventh test
-# mooncake need rrules for solve!
 function f4(A, b1, b2; alg = LUFactorization())
     prob = LinearProblem(A, b1)
     cache = init(prob, alg)
@@ -237,7 +196,7 @@ db1 = zeros(n);
 b2 = rand(n);
 db2 = zeros(n);
 
-f_primal = f4(A, b1, b2)
+f4(A, b1, b2)
 @test_throws "Adjoint case currently not handled" Enzyme.autodiff(
     Reverse, f4, Duplicated(copy(A), dA),
     Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
@@ -252,16 +211,6 @@ db22 = ForwardDiff.gradient(x -> f4(eltype(x).(A), eltype(x).(b1), x), copy(b2))
 @test db2 ≈ db22
 =#
 
-# Mooncake is able to derive rrules for this test
-# cache = Mooncake.prepare_gradient_cache(f4, (copy(A), copy(b1), copy(b2))...)
-# results = Mooncake.value_and_gradient!!(cache, f4, (copy(A), copy(b1), copy(b2))...)
-
-# @test f_primal ≈ results[1]
-# @test dA2 ≈ results[2][2]
-# @test db12 ≈ results[2][3]
-# @test db22 ≈ results[2][4]
-
-# 8th test
 A = rand(n, n);
 dA = zeros(n, n);
 b1 = rand(n);

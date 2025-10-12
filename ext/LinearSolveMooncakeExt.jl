@@ -23,7 +23,7 @@ function Mooncake.to_cr_tangent(x::Mooncake.PossiblyUninitTangent{T}) where T
     if Mooncake.is_init(x)
         return Mooncake.to_cr_tangent(x.tangent)
     else
-        return
+        error("Trying to convert uninitialized tangent to ChainRules tangent.")
     end
 end
 

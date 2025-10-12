@@ -136,8 +136,21 @@ end
 
 @testset "JET Tests for creating Dual solutions" begin
     # Make sure there's no runtime dispatch when making solutions of Dual problems
-    dual_cache = init(dual_prob)
+    dual_cache = init(dual_prob, LUFactorization())
     ext = Base.get_extension(LinearSolve, :LinearSolveForwardDiffExt)
     JET.@test_opt ext.linearsolve_dual_solution(
         [1.0, 1.0, 1.0], [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], dual_cache)
+end
+
+@testset "JET Tests for default algs with DualLinear Problems" begin
+    # Test for Default alg choosing for DualLinear Problems
+    # These should both produce a LinearCache
+    alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization)
+    if VERSION < v"1.11"
+        JET.@test_opt init(dual_prob, alg) broken=true
+        JET.@test_opt init(dual_prob) broken=true
+    else
+        JET.@test_opt init(dual_prob, alg)
+        JET.@test_opt init(dual_prob)
+    end
 end

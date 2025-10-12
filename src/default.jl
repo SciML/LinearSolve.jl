@@ -547,7 +547,7 @@ end
             end
         elseif alg == Symbol(DefaultAlgorithmChoice.BLISLUFactorization)
             newex = quote
-                if !useblis()
+                if !useblis(nothing)
                     error("Default algorithm calling solve on BLISLUFactorization without the extension being loaded. This shouldn't happen.")
                 end
 
@@ -567,7 +567,7 @@ end
             end
         elseif alg == Symbol(DefaultAlgorithmChoice.CudaOffloadLUFactorization)
             newex = quote
-                if !usecuda()
+                if !usecuda(nothing)
                     error("Default algorithm calling solve on CudaOffloadLUFactorization without CUDA.jl being loaded. This shouldn't happen.")
                 end
 
@@ -587,7 +587,7 @@ end
             end
         elseif alg == Symbol(DefaultAlgorithmChoice.MetalLUFactorization)
             newex = quote
-                if !usemetal()
+                if !usemetal(nothing)
                     error("Default algorithm calling solve on MetalLUFactorization without Metal.jl being loaded. This shouldn't happen.")
                 end
 

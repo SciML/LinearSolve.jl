@@ -1,7 +1,7 @@
 module LinearSolveForwardDiffExt
 
 using LinearSolve
-using LinearSolve: SciMLLinearSolveAlgorithm, __init
+using LinearSolve: SciMLLinearSolveAlgorithm, __init, DefaultLinearSolver, DefaultAlgorithmChoice, defaultalg
 using LinearAlgebra
 using ForwardDiff
 using ForwardDiff: Dual, Partials
@@ -196,6 +196,24 @@ function SciMLBase.init(prob::DualAbstractLinearProblem, alg::GenericLUFactoriza
     return __init(prob, alg, args...; kwargs...)
 end
 
+function SciMLBase.init(prob::DualAbstractLinearProblem, alg::DefaultLinearSolver, args...; kwargs...)
+    if alg.alg === DefaultAlgorithmChoice.GenericLUFactorization
+        return __init(prob, alg, args...; kwargs...)
+    else
+        return __dual_init(prob, alg, args...; kwargs...)
+    end
+end
+
+function SciMLBase.init(prob::DualAbstractLinearProblem, alg::Nothing,
+        args...;
+        assumptions = OperatorAssumptions(issquare(prob.A)),
+        kwargs...)
+    new_A = nodual_value(prob.A)
+    new_b = nodual_value(prob.b)
+    SciMLBase.init(
+        prob, defaultalg(new_A, new_b, assumptions), args...; assumptions, kwargs...)
+end
+
 function __dual_init(
         prob::DualAbstractLinearProblem, alg::SciMLLinearSolveAlgorithm,
         args...;
@@ -225,11 +243,8 @@ function __dual_init(
         dual_type = get_dual_type(prob.b)
     end
 
-    alg isa LinearSolve.DefaultLinearSolver ?
-    real_alg = LinearSolve.defaultalg(primal_prob.A, primal_prob.b) : real_alg = alg
-
     non_partial_cache = init(
-        primal_prob, real_alg, assumptions, args...;
+        primal_prob, alg, assumptions, args...;
         alias = alias, abstol = abstol, reltol = reltol,
         maxiters = maxiters, verbose = verbose, Pl = Pl, Pr = Pr, assumptions = assumptions,
         sensealg = sensealg, u0 = new_u0, kwargs...)

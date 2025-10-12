@@ -22,7 +22,7 @@ if GROUP == "All" || GROUP == "Core"
 end
 
 # Mooncake tests only on Julia lts
-@static if VERSION == v"1.11"
+@static if VERSION ≥ v"1.11.0" && VERSION < v"1.12.0"
     if GROUP == "All"
         @info "Running Mooncake tests on Julia $(VERSION)"
         using Mooncake

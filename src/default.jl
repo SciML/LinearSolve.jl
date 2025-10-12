@@ -636,7 +636,7 @@ end
 @generated function defaultalg_adjoint_eval(cache::LinearCache, dy)
     ex = :()
     for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))
-        newex = if alg in Symbol(DefaultAlgorithmChoice.RFLUFactorization)
+        newex = if alg == Symbol(DefaultAlgorithmChoice.RFLUFactorization)
             quote
                 getproperty(cache.cacheval, $(Meta.quot(alg)))[1]' \ dy
             end

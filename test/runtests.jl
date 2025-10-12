@@ -21,6 +21,17 @@ if GROUP == "All" || GROUP == "Core"
     @time @safetestset "Mixed Precision" include("test_mixed_precision.jl")
 end
 
+# Mooncake tests only on Julia lts
+@static if VERSION == v"1.11"
+    if GROUP == "All"
+        @info "Running Mooncake tests on Julia $(VERSION)"
+        using Mooncake
+        @time @safetestset "Mooncake Adjoint Sensitivity" include("adjoint_mooncake.jl")
+    end
+else
+    @info "Skipping Mooncake tests on Julia $(VERSION)"
+end
+
 # Don't run Enzyme tests on prerelease
 if GROUP == "NoPre" && isempty(VERSION.prerelease)
     Pkg.activate("nopre")
@@ -39,7 +50,10 @@ end
 
 if GROUP == "LinearSolveAutotune"
     Pkg.activate(joinpath(dirname(@__DIR__), "lib", GROUP))
-    Pkg.test(GROUP, julia_args=["--check-bounds=auto", "--compiled-modules=yes", "--depwarn=yes"], force_latest_compatible_version=false, allow_reresolve=true)
+    Pkg.test(GROUP,
+        julia_args = ["--check-bounds=auto", "--compiled-modules=yes", "--depwarn=yes"],
+        force_latest_compatible_version = false,
+        allow_reresolve = true)
 end
 
 if GROUP == "Preferences"

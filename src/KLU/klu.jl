@@ -10,7 +10,7 @@ const libsuitesparseconfig = :libsuitesparseconfig
 using Base: Ptr, Cvoid, Cint, Cdouble, Cchar, Csize_t
 include("wrappers.jl")
 
-import Base: (\), size, getproperty, setproperty!, propertynames, show,
+import Base: size, getproperty, setproperty!, show,
              copy, eachindex, view, sortperm, unsafe_load, zeros, convert, eltype,
              length, parent, stride, finalizer, Complex, complex, imag, real, map!,
              summary, println, oneunit, sizeof, isdefined, setfield!, getfield,
@@ -35,8 +35,7 @@ function increment!(A::AbstractArray{T}) where {T <: Integer}
 end
 increment(A::AbstractArray{<:Integer}) = increment!(copy(A))
 
-using LinearAlgebra: LinearAlgebra, ldiv!, Adjoint, Transpose, Factorization
-import LinearAlgebra: issuccess
+using LinearAlgebra: LinearAlgebra, Adjoint, Transpose
 
 const AdjointFact = isdefined(LinearAlgebra, :AdjointFactorization) ?
                     LinearAlgebra.AdjointFactorization : Adjoint

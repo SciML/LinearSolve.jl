@@ -27,10 +27,11 @@ if GROUP == "NoPre" && isempty(VERSION.prerelease)
     Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
     Pkg.instantiate()
     @time @safetestset "Quality Assurance" include("qa.jl")
-    @time @safetestset "Enzyme Derivative Rules" include("nopre/enzyme.jl")
+    @time @safetestset "Mooncake Derivative Rules" include("nopre/mooncake.jl")
     @time @safetestset "JET Tests" include("nopre/jet.jl")
     @time @safetestset "Static Arrays" include("nopre/static_arrays.jl")
     @time @safetestset "Caching Allocation Tests" include("nopre/caching_allocation_tests.jl")
+    @time @safetestset "Enzyme Derivative Rules" include("nopre/enzyme.jl")
 end
 
 if GROUP == "DefaultsLoading"
@@ -39,7 +40,10 @@ end
 
 if GROUP == "LinearSolveAutotune"
     Pkg.activate(joinpath(dirname(@__DIR__), "lib", GROUP))
-    Pkg.test(GROUP, julia_args=["--check-bounds=auto", "--compiled-modules=yes", "--depwarn=yes"], force_latest_compatible_version=false, allow_reresolve=true)
+    Pkg.test(GROUP,
+        julia_args = ["--check-bounds=auto", "--compiled-modules=yes", "--depwarn=yes"],
+        force_latest_compatible_version = false,
+        allow_reresolve = true)
 end
 
 if GROUP == "Preferences"

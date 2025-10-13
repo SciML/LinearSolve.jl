@@ -636,7 +636,7 @@ end
 @generated function defaultalg_adjoint_eval(cache::LinearCache, dy)
     ex = :()
     for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))
-        newex = if alg == Symbol(DefaultAlgorithmChoice.RFLUFactorization)
+        newex = if alg in Symbol.((DefaultAlgorithmChoice.RFLUFactorization, DefaultAlgorithmChoice.GenericLUFactorization))
             quote
                 getproperty(cache.cacheval, $(Meta.quot(alg)))[1]' \ dy
             end
@@ -661,8 +661,7 @@ end
             DefaultAlgorithmChoice.SVDFactorization,
             DefaultAlgorithmChoice.CholeskyFactorization,
             DefaultAlgorithmChoice.NormalCholeskyFactorization,
-            DefaultAlgorithmChoice.QRFactorizationPivoted,
-            DefaultAlgorithmChoice.GenericLUFactorization))
+            DefaultAlgorithmChoice.QRFactorizationPivoted))
             quote
                 getproperty(cache.cacheval, $(Meta.quot(alg)))' \ dy
             end

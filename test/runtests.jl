@@ -21,16 +21,6 @@ if GROUP == "All" || GROUP == "Core"
     @time @safetestset "Mixed Precision" include("test_mixed_precision.jl")
 end
 
-# Mooncake tests only on Julia lts
-@static if VERSION ≥ v"1.11.0" && VERSION < v"1.12.0"
-    if GROUP == "All"
-        @info "Running Mooncake tests on Julia $(VERSION)"
-        @time @safetestset "Mooncake Adjoint Sensitivity" include("adjoint_mooncake.jl")
-    end
-else
-    @info "Skipping Mooncake tests on Julia $(VERSION)"
-end
-
 # Don't run Enzyme tests on prerelease
 if GROUP == "NoPre" && isempty(VERSION.prerelease)
     Pkg.activate("nopre")
@@ -38,6 +28,7 @@ if GROUP == "NoPre" && isempty(VERSION.prerelease)
     Pkg.instantiate()
     @time @safetestset "Quality Assurance" include("qa.jl")
     @time @safetestset "Enzyme Derivative Rules" include("nopre/enzyme.jl")
+    @time @safetestset "Mooncake Derivative Rules" include("nopre/mooncake.jl")
     @time @safetestset "JET Tests" include("nopre/jet.jl")
     @time @safetestset "Static Arrays" include("nopre/static_arrays.jl")
     @time @safetestset "Caching Allocation Tests" include("nopre/caching_allocation_tests.jl")

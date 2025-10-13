@@ -27,11 +27,11 @@ if GROUP == "NoPre" && isempty(VERSION.prerelease)
     Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
     Pkg.instantiate()
     @time @safetestset "Quality Assurance" include("qa.jl")
-    @time @safetestset "Enzyme Derivative Rules" include("nopre/enzyme.jl")
     @time @safetestset "Mooncake Derivative Rules" include("nopre/mooncake.jl")
     @time @safetestset "JET Tests" include("nopre/jet.jl")
     @time @safetestset "Static Arrays" include("nopre/static_arrays.jl")
     @time @safetestset "Caching Allocation Tests" include("nopre/caching_allocation_tests.jl")
+    @time @safetestset "Enzyme Derivative Rules" include("nopre/enzyme.jl")
 end
 
 if GROUP == "DefaultsLoading"

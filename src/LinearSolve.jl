@@ -22,7 +22,7 @@ using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator,
                       MatrixOperator,
                       has_ldiv!, issquare
 using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_int, AbstractVerbositySpecifier, AbstractMessageLevel, AbstractVerbosityPreset,
-                    Silent, InfoLevel, WarnLevel, ErrorLevel, None, Minimal, Standard, Detailed, All
+                    Silent, InfoLevel, WarnLevel, ErrorLevel, CustomLevel, None, Minimal, Standard, Detailed, All
 using Setfield: @set, @set!
 using UnPack: @unpack
 using DocStringExtensions: DocStringExtensions

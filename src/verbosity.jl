@@ -5,7 +5,6 @@ LinearSolve.@concrete struct LinearVerbosity <:
     # Performance
     no_right_preconditioning
     # Numerical
-    using_iterative_solvers
     using_IterativeSolvers
     IterativeSolvers_iterations
     KrylovKit_verbosity
@@ -47,18 +46,17 @@ function LinearVerbosity(;
     default_args = (
         default_lu_fallback = WarnLevel(),
         no_right_preconditioning = WarnLevel(),
-        using_iterative_solvers = WarnLevel(),
-        using_IterativeSolvers = WarnLevel(),
-        IterativeSolvers_iterations = WarnLevel(),
-        KrylovKit_verbosity = WarnLevel(),
+        using_IterativeSolvers = Silent(),
+        IterativeSolvers_iterations = Silent(),
+        KrylovKit_verbosity = CustomLevel(1), # WARN_LEVEL in KrylovKit.jl
         KrylovJL_verbosity = Silent(),
         HYPRE_verbosity = InfoLevel(),
         pardiso_verbosity = Silent(),
-        blas_errors = WarnLevel(),
-        blas_invalid_args = WarnLevel(),
+        blas_errors = ErrorLevel(),
+        blas_invalid_args = ErrorLevel(),
         blas_info = Silent(),
         blas_success = Silent(),
-        condition_number = Silent()
+        condition_number=Silent()
     )
 
     # Apply group-level settings
@@ -90,7 +88,6 @@ function LinearVerbosity(verbose::AbstractVerbosityPreset)
         LinearVerbosity(
             default_lu_fallback = Silent(),
             no_right_preconditioning = Silent(),
-            using_iterative_solvers = Silent(),
             using_IterativeSolvers = Silent(),
             IterativeSolvers_iterations = Silent(),
             KrylovKit_verbosity = Silent(),
@@ -105,52 +102,35 @@ function LinearVerbosity(verbose::AbstractVerbosityPreset)
         )
     elseif verbose isa Standard
         # Standard: Everything from Minimal + non-fatal warnings
-        LinearVerbosity(
-            default_lu_fallback = WarnLevel(),
-            no_right_preconditioning = WarnLevel(),
-            using_iterative_solvers = WarnLevel(),
-            using_IterativeSolvers = WarnLevel(),
-            IterativeSolvers_iterations = WarnLevel(),
-            KrylovKit_verbosity = WarnLevel(),
-            KrylovJL_verbosity = Silent(),
-            HYPRE_verbosity = InfoLevel(),
-            pardiso_verbosity = Silent(),
-            blas_errors = ErrorLevel(),  
-            blas_invalid_args = ErrorLevel(),  
-            blas_info = Silent(),
-            blas_success = Silent(),
-            condition_number = Silent()
-        )
+        LinearVerbosity()
     elseif verbose isa Detailed
         # Detailed: Everything from Standard + debugging/solver behavior
         LinearVerbosity(
-            default_lu_fallback = InfoLevel(),  
+            default_lu_fallback = WarnLevel(),  
             no_right_preconditioning = InfoLevel(),  
-            using_iterative_solvers = InfoLevel(), 
             using_IterativeSolvers = InfoLevel(),  
-            IterativeSolvers_iterations = InfoLevel(),  
-            KrylovKit_verbosity = InfoLevel(),  
-            KrylovJL_verbosity = WarnLevel(), 
+            IterativeSolvers_iterations = Silent(),  
+            KrylovKit_verbosity = CustomLevel(2), # STARTSTOP_LEVEL in KrylovKit.jl
+            KrylovJL_verbosity = CustomLevel(1), # verbose = true in Krylov.jl 
             HYPRE_verbosity = InfoLevel(),
-            pardiso_verbosity = WarnLevel(),  
+            pardiso_verbosity = CustomLevel(1), # verbose = true in Pardiso.jl  
             blas_errors = ErrorLevel(), 
             blas_invalid_args = ErrorLevel(), 
             blas_info = InfoLevel(),  
             blas_success = InfoLevel(), 
-            condition_number = InfoLevel()  
+            condition_number = Silent()  
         )
     elseif verbose isa All
         # All: Maximum verbosity - every possible logging message at InfoLevel
         LinearVerbosity(
-            default_lu_fallback = InfoLevel(),
+            default_lu_fallback = WarnLevel(),
             no_right_preconditioning = InfoLevel(),
-            using_iterative_solvers = InfoLevel(),
             using_IterativeSolvers = InfoLevel(),
             IterativeSolvers_iterations = InfoLevel(),
-            KrylovKit_verbosity = InfoLevel(),
-            KrylovJL_verbosity = InfoLevel(),  
+            KrylovKit_verbosity = CustomLevel(3), # EACHITERATION_LEVEL in KrylovKit.jl
+            KrylovJL_verbosity = CustomLevel(1),  
             HYPRE_verbosity = InfoLevel(),
-            pardiso_verbosity = InfoLevel(),  
+            pardiso_verbosity = CustomLevel(1), # verbsoe = true in Pardiso.jl  
             blas_errors = ErrorLevel(), 
             blas_invalid_args = ErrorLevel(),
             blas_info = InfoLevel(),
@@ -162,7 +142,6 @@ end
 
 @inline function LinearVerbosity(verbose::None) 
     LinearVerbosity(
-    Silent(),
     Silent(),
     Silent(),
     Silent(),
@@ -194,7 +173,7 @@ end
 # Group classifications
 const error_control_options = (:default_lu_fallback, :blas_errors, :blas_invalid_args)
 const performance_options = (:no_right_preconditioning,)
-const numerical_options = (:using_iterative_solvers, :using_IterativeSolvers, :IterativeSolvers_iterations,
+const numerical_options = (:using_IterativeSolvers, :IterativeSolvers_iterations,
                        :KrylovKit_verbosity, :KrylovJL_verbosity, :HYPRE_verbosity, :pardiso_verbosity,
                        :blas_info, :blas_success, :condition_number)
 

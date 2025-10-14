@@ -1,5 +1,6 @@
 using LinearSolve
-using LinearSolve: LinearVerbosity, option_group, group_options, BLISLUFactorization
+using LinearSolve: LinearVerbosity, option_group, group_options, BLISLUFactorization,
+    __appleaccelerate_isavailable, __mkl_isavailable, __openblas_isavailable
 using SciMLLogging
 using Test
 
@@ -8,7 +9,7 @@ using Test
         v1 = LinearVerbosity()
         @test v1 isa LinearVerbosity
         @test v1.default_lu_fallback isa SciMLLogging.WarnLevel
-        @test v1.KrylovKit_verbosity isa SciMLLogging.WarnLevel
+        @test v1.KrylovKit_verbosity == SciMLLogging.CustomLevel(1)
     end
     @testset "LinearVerbosity constructors" begin
         v3_none = LinearVerbosity(SciMLLogging.None())
@@ -17,10 +18,10 @@ using Test
         v3_standard = LinearVerbosity(SciMLLogging.Standard())
         v3_detailed = LinearVerbosity(SciMLLogging.Detailed())
 
-        @test v3_all.default_lu_fallback isa SciMLLogging.InfoLevel
-        @test v3_minimal.default_lu_fallback isa SciMLLogging.ErrorLevel
+        @test v3_all.default_lu_fallback isa SciMLLogging.WarnLevel
+        @test v3_minimal.default_lu_fallback isa SciMLLogging.Silent
         @test v3_minimal.KrylovKit_verbosity isa SciMLLogging.Silent
-        @test v3_detailed.KrylovKit_verbosity isa SciMLLogging.WarnLevel
+        @test v3_detailed.KrylovKit_verbosity == SciMLLogging.CustomLevel(2)
     end
 
     @testset "Group-level keyword constructors" begin
@@ -116,7 +117,7 @@ using Test
 
         # Individual field access should still work
         @test v.default_lu_fallback isa SciMLLogging.WarnLevel
-        @test v.KrylovKit_verbosity isa SciMLLogging.WarnLevel
+        @test v.KrylovKit_verbosity == SciMLLogging.CustomLevel(1)
     end
 end
 
@@ -302,7 +303,7 @@ end
 @testset "OpenBLAS Verbosity Integration Tests" begin
     @testset "OpenBLAS solver with verbosity logging" begin
         # Test basic OpenBLAS solver functionality with verbosity
-        try
+        if __openblas_isavailable()
             # Test successful solve with success logging enabled
             A_good = [2.0 1.0; 1.0 2.0]
             b_good = [3.0, 4.0]
@@ -361,12 +362,8 @@ end
 
             @test_logs (:info, r"Matrix condition number:.*for.*matrix") match_mode=:any solve(
                 prob_good, OpenBLASLUFactorization(); verbose = verbose_with_cond)
-        catch e
-            if isa(e, ErrorException) && occursin("OpenBLAS binary is missing", string(e))
-                @info "Skipping OpenBLAS tests - OpenBLAS not available"
-            else
-                rethrow(e)
-            end
+        else
+            @info "Skipping OpenBLAS tests - OpenBLAS not available"
         end
     end
 end
@@ -374,7 +371,7 @@ end
 @testset "AppleAccelerate Verbosity Integration Tests" begin
     @testset "AppleAccelerate solver with verbosity logging" begin
         # Test basic AppleAccelerate solver functionality with verbosity
-        try
+        if __appleaccelerate_isavailable()
             # Test successful solve with success logging enabled
             A_good = [2.0 1.0; 1.0 2.0]
             b_good = [3.0, 4.0]
@@ -433,12 +430,8 @@ end
 
             @test_logs (:info, r"Matrix condition number:.*for.*matrix") match_mode=:any solve(
                 prob_good, AppleAccelerateLUFactorization(); verbose = verbose_with_cond)
-        catch e
-            if isa(e, ErrorException) && occursin("AppleAccelerate binary is missing", string(e))
-                @info "Skipping AppleAccelerate tests - AppleAccelerate not available"
-            else
-                rethrow(e)
-            end
+        else
+            @info "Skipping AppleAccelerate tests - AppleAccelerate not available"
         end
     end
 end
@@ -446,7 +439,7 @@ end
 @testset "MKL Verbosity Integration Tests" begin
     @testset "MKL solver with verbosity logging" begin
         # Test basic MKL solver functionality with verbosity
-        try
+        if __mkl_isavailable()
             # Test successful solve with success logging enabled
             A_good = [2.0 1.0; 1.0 2.0]
             b_good = [3.0, 4.0]
@@ -505,12 +498,8 @@ end
 
             @test_logs (:info, r"Matrix condition number:.*for.*matrix") match_mode=:any solve(
                 prob_good, MKLLUFactorization(); verbose = verbose_with_cond)
-        catch e
-            if isa(e, ErrorException) && occursin("MKL binary is missing", string(e))
-                @info "Skipping MKL tests - MKL not available"
-            else
-                rethrow(e)
-            end
+        else
+            @info "Skipping MKL tests - MKL not available"
         end
     end
 end

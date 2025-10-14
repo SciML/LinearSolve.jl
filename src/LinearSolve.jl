@@ -21,7 +21,7 @@ using SciMLBase: SciMLBase, LinearAliasSpecifier, AbstractSciMLOperator,
 using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator,
                       MatrixOperator,
                       has_ldiv!, issquare
-using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_int, AbstractVerbositySpecifier, AbstractMessageLevel, VerbosityPreset,
+using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_int, AbstractVerbositySpecifier, AbstractMessageLevel, AbstractVerbosityPreset,
                     Silent, InfoLevel, WarnLevel, ErrorLevel, None, Minimal, Standard, Detailed, All
 using Setfield: @set, @set!
 using UnPack: @unpack

@@ -10,7 +10,7 @@ using Test
         @test v1.default_lu_fallback isa SciMLLogging.WarnLevel
         @test v1.KrylovKit_verbosity isa SciMLLogging.WarnLevel
     end
-    @testset "AbstractVerbosityPreset constructors" begin
+    @testset "LinearVerbosity constructors" begin
         v3_none = LinearVerbosity(SciMLLogging.None())
         v3_all = LinearVerbosity(SciMLLogging.All())
         v3_minimal = LinearVerbosity(SciMLLogging.Minimal())

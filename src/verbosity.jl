@@ -44,7 +44,7 @@ function LinearVerbosity(;
 
     # Build arguments using NamedTuple for type stability
     default_args = (
-        default_lu_fallback = WarnLevel(),
+        default_lu_fallback = Silent(),
         no_right_preconditioning = WarnLevel(),
         using_IterativeSolvers = Silent(),
         IterativeSolvers_iterations = Silent(),

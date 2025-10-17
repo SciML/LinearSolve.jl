@@ -99,3 +99,78 @@ function CRC.rrule(::Type{<:LinearProblem}, A, b, p; kwargs...)
     ∇prob(∂prob) = (NoTangent(), ∂prob.A, ∂prob.b, ∂prob.p)
     return prob, ∇prob
 end
+
+function CRC.rrule(T::typeof(LinearSolve.init), prob::LinearSolve.LinearProblem, alg::Nothing, args...; kwargs...)
+    assump = OperatorAssumptions(issquare(prob.A))
+    alg = defaultalg(prob.A, prob.b, assump)
+    CRC.rrule(T, prob, alg, args...; kwargs...)
+end
+
+function CRC.rrule(::typeof(LinearSolve.init), prob::LinearSolve.LinearProblem, alg::Union{LinearSolve.SciMLLinearSolveAlgorithm,Nothing}, args...; kwargs...)
+    init_res = LinearSolve.init(prob, alg)
+    function init_adjoint(∂init)
+        ∂prob = LinearProblem(∂init.A, ∂init.b, NoTangent())
+        return NoTangent(), ∂prob, NoTangent(), ntuple((_ -> NoTangent(), length(args))...)
+    end
+
+    return init_res, init_adjoint
+end
+
+function CRC.rrule(T::typeof(SciMLBase.solve!), cache::LinearSolve.LinearCache, alg::Nothing, args...; kwargs...)
+    assump = OperatorAssumptions()
+    alg = defaultalg(cache.A, cache.b, assump)
+    CRC.rrule(T, cache, alg, args...; kwargs)
+end
+
+function CRC.rrule(::typeof(SciMLBase.solve!), cache::LinearSolve.LinearCache, alg::LinearSolve.SciMLLinearSolveAlgorithm, args...; alias_A=default_alias_A(
+        alg, cache.A, cache.b), kwargs...)
+    _cache = deepcopy(cache)
+    (; A, sensealg) = _cache
+    @assert sensealg isa LinearSolveAdjoint "Currently only `LinearSolveAdjoint` is supported for adjoint sensitivity analysis."
+
+    # logic behind caching `A` and `b` for the reverse pass based on rrule above for SciMLBase.solve
+    if sensealg.linsolve === missing
+        if !(alg isa AbstractFactorization || alg isa AbstractKrylovSubspaceMethod ||
+             alg isa DefaultLinearSolver)
+            A_ = alias_A ? deepcopy(A) : A
+        end
+    else
+        A_ = deepcopy(A)
+    end
+
+    sol = solve!(_cache)
+
+    function solve!_adjoint(∂sol)
+        ∂∅ = NoTangent()
+        ∂u = ∂sol.u
+
+        if sensealg.linsolve === missing
+            λ = if _cache.cacheval isa Factorization
+                _cache.cacheval' \ ∂u
+            elseif _cache.cacheval isa Tuple && _cache.cacheval[1] isa Factorization
+                first(_cache.cacheval)' \ ∂u
+            elseif alg isa AbstractKrylovSubspaceMethod
+                invprob = LinearProblem(adjoint(_cache.A), ∂u)
+                solve(invprob, alg; cache.abstol, cache.reltol, cache.verbose).u
+            elseif alg isa DefaultLinearSolver
+                LinearSolve.defaultalg_adjoint_eval(_cache, ∂u)
+            else
+                invprob = LinearProblem(adjoint(A_), ∂u) # We cached `A`
+                solve(invprob, alg; cache.abstol, cache.reltol, cache.verbose).u
+            end
+        else
+            invprob = LinearProblem(adjoint(A_), ∂u) # We cached `A`
+            λ = solve(
+                invprob, sensealg.linsolve; cache.abstol, cache.reltol, cache.verbose).u
+        end
+
+        tu = adjoint(sol.u)
+        ∂A = BroadcastArray(@~ .-(λ .* tu))
+        ∂b = λ
+        ∂prob = LinearProblem(∂A, ∂b, ∂∅)
+        ∂cache = LinearSolve.init(∂prob)
+        return (∂∅, ∂cache, ∂∅, ntuple(_ -> ∂∅, length(args))...)
+    end
+
+    return sol, solve!_adjoint
+end

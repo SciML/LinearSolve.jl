@@ -153,3 +153,179 @@ for alg in (
     @test results[1] ≈ fA(A)
     @test mooncake_gradient ≈ fd_jac rtol = 1e-5
 end
+
+# Tests for solve! and init rrules.
+
+n = 4
+A = rand(n, n);
+b1 = rand(n);
+b2 = rand(n);
+
+function f(A, b1, b2; alg=LUFactorization())
+    prob = LinearProblem(A, b1)
+    cache = init(prob, alg)
+    s1 = copy(solve!(cache).u)
+    cache.b = b2
+    s2 = solve!(cache).u
+    norm(s1 + s2)
+end
+
+f_primal = f(copy(A), copy(b1), copy(b2))
+value, gradient = Mooncake.value_and_gradient!!(
+    prepare_gradient_cache(f, copy(A), copy(b1), copy(b2)),
+    f, copy(A), copy(b1), copy(b2)
+)
+
+dA2 = ForwardDiff.gradient(x -> f(x, eltype(x).(b1), eltype(x).(b2)), copy(A))
+db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x, eltype(x).(b2)), copy(b1))
+db22 = ForwardDiff.gradient(x -> f(eltype(x).(A), eltype(x).(b1), x), copy(b2))
+
+@test value == f_primal
+@test gradient[2] ≈ dA2
+@test gradient[3] ≈ db12
+@test gradient[4] ≈ db22
+
+function f2(A, b1, b2; alg=RFLUFactorization())
+    prob = LinearProblem(A, b1)
+    cache = init(prob, alg)
+    s1 = copy(solve!(cache).u)
+    cache.b = b2
+    s2 = solve!(cache).u
+    norm(s1 + s2)
+end
+
+f_primal = f2(copy(A), copy(b1), copy(b2))
+value, gradient = Mooncake.value_and_gradient!!(
+    prepare_gradient_cache(f2, copy(A), copy(b1), copy(b2)),
+    f2, copy(A), copy(b1), copy(b2)
+)
+
+@test value == f_primal
+@test gradient[2] ≈ dA2
+@test gradient[3] ≈ db12
+@test gradient[4] ≈ db22
+
+function f3(A, b1, b2; alg=LUFactorization())
+    # alg = KrylovJL_GMRES())
+    prob = LinearProblem(A, b1)
+    cache = init(prob, alg)
+    s1 = copy(solve!(cache).u)
+    cache.b = b2
+    s2 = solve!(cache).u
+    norm(s1 + s2)
+end
+
+f_primal = f3(copy(A), copy(b1), copy(b2))
+value, gradient = Mooncake.value_and_gradient!!(
+    prepare_gradient_cache(f3, copy(A), copy(b1), copy(b2)),
+    f3, copy(A), copy(b1), copy(b2)
+)
+
+@test value == f_primal
+@test gradient[2] ≈ dA2 atol = 5e-5
+@test gradient[3] ≈ db12
+@test gradient[4] ≈ db22
+
+A = rand(n, n);
+b1 = rand(n);
+
+function fnice(A, b, alg)
+    prob = LinearProblem(A, b)
+    sol1 = solve(prob, alg)
+    return sum(sol1.u)
+end
+
+@testset for alg in (
+    LUFactorization(),
+    RFLUFactorization(),
+    KrylovJL_GMRES()
+)
+    # for B
+    fb_closure = b -> fnice(A, b, alg)
+    fd_jac_b = FiniteDiff.finite_difference_jacobian(fb_closure, b1) |> vec
+
+    val, en_jac = Mooncake.value_and_gradient!!(
+        prepare_gradient_cache(fnice, copy(A), copy(b1), alg),
+        fnice, copy(A), copy(b1), alg
+    )
+    @test en_jac[3] ≈ fd_jac_b rtol = 1e-5
+
+    # For A
+    fA_closure = A -> fnice(A, b1, alg)
+    fd_jac_A = FiniteDiff.finite_difference_jacobian(fA_closure, A) |> vec
+    A_grad = en_jac[2] |> vec
+    @test A_grad ≈ fd_jac_A rtol = 1e-5
+end
+
+# The below test function cases fails !
+# AVOID Adjoint case in code as : `solve!(cache); s1 = copy(cache.u)`.
+# Instead stick to code like : `sol = solve!(cache); s1 = copy(sol.u)`.
+
+function f4(A, b1, b2; alg=LUFactorization())
+    prob = LinearProblem(A, b1)
+    cache = init(prob, alg)
+    solve!(cache)
+    s1 = copy(cache.u)
+    cache.b = b2
+    solve!(cache)
+    s2 = copy(cache.u)
+    norm(s1 + s2)
+end
+
+# value, grad = Mooncake.value_and_gradient!!(
+# prepare_gradient_cache(f4, copy(A), copy(b1), copy(b2)),
+# f4, copy(A), copy(b1), copy(b2)
+# )
+# (0.0, (Mooncake.NoTangent(), [0.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0], [0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]))
+
+# dA2 = ForwardDiff.gradient(x -> f4(x, eltype(x).(b1), eltype(x).(b2)), copy(A))
+# db12 = ForwardDiff.gradient(x -> f4(eltype(x).(A), x, eltype(x).(b2)), copy(b1))
+# db22 = ForwardDiff.gradient(x -> f4(eltype(x).(A), eltype(x).(b1), x), copy(b2))
+
+# @test value == f_primal
+# @test grad[2] ≈ dA2
+# @test grad[3] ≈ db12
+# @test grad[4] ≈ db22
+
+function testls(A, b, u)
+    oa = OperatorAssumptions(
+        true, condition=LinearSolve.OperatorCondition.WellConditioned)
+    prob = LinearProblem(A, b)
+    linsolve = init(prob, LUFactorization(), assumptions=oa)
+    cache = solve!(linsolve)
+    sum(cache.u)
+end
+
+# A = [1.0 2.0; 3.0 4.0]
+# b = [1.0, 2.0]
+# u = zero(b)
+# value, gradient = Mooncake.value_and_gradient!!(
+#     prepare_gradient_cache(testls, copy(A), copy(b), copy(u)),
+#     testls, copy(A), copy(b), copy(u)
+# )
+
+# dA = gradient[2]
+# db = gradient[3]
+# du = gradient[4]
+
+function testls(A, b, u)
+    oa = OperatorAssumptions(
+        true, condition=LinearSolve.OperatorCondition.WellConditioned)
+    prob = LinearProblem(A, b)
+    linsolve = init(prob, LUFactorization(), assumptions=oa)
+    solve!(linsolve)
+    sum(linsolve.u)
+end
+
+# value, gradient = Mooncake.value_and_gradient!!(
+#     prepare_gradient_cache(testls, copy(A), copy(b), copy(u)),
+#     testls, copy(A), copy(b), copy(u)
+# )
+
+# dA2 = gradient[2]
+# db2 = gradient[3]
+# du2 = gradient[4]
+
+# @test dA == dA2
+# @test db == db2
+# @test du == du2

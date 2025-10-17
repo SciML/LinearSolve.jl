@@ -29,4 +29,20 @@ function Mooncake.to_cr_tangent(x::Mooncake.PossiblyUninitTangent{T}) where {T}
     end
 end
 
+function Mooncake.increment_and_get_rdata!(f, r::NoRData, t::LinearCache)
+    println("inside increment and get rdata 2")
+    f.fields.A .+= t.A
+    f.fields.b .+= t.b
+
+    return NoRData()
+end
+
+# rrules for LinearCache
+@from_chainrules MinimalCtx Tuple{typeof(init),LinearProblem,SciMLLinearSolveAlgorithm} true ReverseMode
+@from_chainrules MinimalCtx Tuple{typeof(init),LinearProblem,Nothing} true ReverseMode
+
+# rrule for solve!
+@from_chainrules MinimalCtx Tuple{typeof(SciMLBase.solve!),LinearCache,SciMLLinearSolveAlgorithm} true ReverseMode
+@from_chainrules MinimalCtx Tuple{typeof(SciMLBase.solve!),LinearCache,Nothing} true ReverseMode
+
 end

@@ -5,6 +5,7 @@ using LinearSolve: LinearSolve, userecursivefactorization, LinearCache, @get_cac
                    default_alias_b, LinearVerbosity
 using LinearSolve.LinearAlgebra, LinearSolve.ArrayInterface, RecursiveFactorization
 using SciMLBase: SciMLBase, ReturnCode
+using SciMLLogging: @SciMLMessage
 
 LinearSolve.userecursivefactorization(A::Union{Nothing, AbstractMatrix}) = true
 

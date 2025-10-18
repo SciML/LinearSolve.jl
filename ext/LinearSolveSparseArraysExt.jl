@@ -11,6 +11,7 @@ using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu
 using SparseArrays: SparseArrays, AbstractSparseArray, AbstractSparseMatrixCSC,
                     SparseMatrixCSC,
                     nonzeros, rowvals, getcolptr, sparse, sprand
+using SciMLLogging: @SciMLMessage
 
 @static if Base.USE_GPL_LIBS
     using SparseArrays.UMFPACK: UMFPACK_OK

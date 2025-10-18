@@ -36,7 +36,13 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovKitJL; kwargs...)
 
     copy!(cache.u, x)
     resid = info.normres
-    retcode = info.converged == 1 ? ReturnCode.Default : ReturnCode.ConvergenceFailure
+    retcode = if info.converged == 1 
+        ReturnCode.Default
+    else
+        @SciMLMessage("Solver failed to converge", cache.verbose, :convergence_failure)
+        ReturnCode.ConvergenceFailure
+    end
+
     iters = info.numiter
     return SciMLBase.build_linear_solution(alg, cache.u, resid, cache; retcode = retcode,
         iters = iters)

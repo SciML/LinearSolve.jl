@@ -21,6 +21,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::RFLUFactorization
         cache.cacheval = (fact, ipiv)
 
         if !LinearAlgebra.issuccess(fact)
+            @SciMLMessage("Solver failed to converge", cache.verbose, :convergence_failure)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
         end

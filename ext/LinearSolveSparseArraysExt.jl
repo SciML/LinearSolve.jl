@@ -226,6 +226,7 @@ end
             SciMLBase.build_linear_solution(
                 alg, y, nothing, cache; retcode = ReturnCode.Success)
         else
+            @SciMLMessage("Solver failed to converge", cache.verbose, :convergence_failure)
             SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible)
         end
@@ -303,6 +304,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
         SciMLBase.build_linear_solution(
             alg, y, nothing, cache; retcode = ReturnCode.Success)
     else
+        @SciMLMessage("Solver failed to converge", cache.verbose, :convergence_failure)
         SciMLBase.build_linear_solution(
             alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible)
     end

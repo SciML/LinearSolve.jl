@@ -16,6 +16,7 @@ LinearSolve.@concrete struct LinearVerbosity <:
     blas_info
     blas_success
     condition_number
+    convergence_failure
 end
 
 function LinearVerbosity(;
@@ -56,7 +57,8 @@ function LinearVerbosity(;
         blas_invalid_args = ErrorLevel(),
         blas_info = Silent(),
         blas_success = Silent(),
-        condition_number=Silent()
+        condition_number=Silent(),
+        convergence_failure=WarnLevel()
     )
 
     # Apply group-level settings
@@ -94,11 +96,12 @@ function LinearVerbosity(verbose::AbstractVerbosityPreset)
             KrylovJL_verbosity = Silent(),
             HYPRE_verbosity = Silent(),
             pardiso_verbosity = Silent(),
-            blas_errors = ErrorLevel(),  
-            blas_invalid_args = ErrorLevel(),  
+            blas_errors = ErrorLevel(),
+            blas_invalid_args = ErrorLevel(),
             blas_info = Silent(),
             blas_success = Silent(),
-            condition_number = Silent()
+            condition_number = Silent(),
+            convergence_failure = Silent()
         )
     elseif verbose isa Standard
         # Standard: Everything from Minimal + non-fatal warnings
@@ -106,19 +109,20 @@ function LinearVerbosity(verbose::AbstractVerbosityPreset)
     elseif verbose isa Detailed
         # Detailed: Everything from Standard + debugging/solver behavior
         LinearVerbosity(
-            default_lu_fallback = WarnLevel(),  
-            no_right_preconditioning = InfoLevel(),  
-            using_IterativeSolvers = InfoLevel(),  
-            IterativeSolvers_iterations = Silent(),  
+            default_lu_fallback = WarnLevel(),
+            no_right_preconditioning = InfoLevel(),
+            using_IterativeSolvers = InfoLevel(),
+            IterativeSolvers_iterations = Silent(),
             KrylovKit_verbosity = CustomLevel(2), # STARTSTOP_LEVEL in KrylovKit.jl
-            KrylovJL_verbosity = CustomLevel(1), # verbose = true in Krylov.jl 
+            KrylovJL_verbosity = CustomLevel(1), # verbose = true in Krylov.jl
             HYPRE_verbosity = InfoLevel(),
-            pardiso_verbosity = CustomLevel(1), # verbose = true in Pardiso.jl  
-            blas_errors = ErrorLevel(), 
-            blas_invalid_args = ErrorLevel(), 
-            blas_info = InfoLevel(),  
-            blas_success = InfoLevel(), 
-            condition_number = Silent()  
+            pardiso_verbosity = CustomLevel(1), # verbose = true in Pardiso.jl
+            blas_errors = ErrorLevel(),
+            blas_invalid_args = ErrorLevel(),
+            blas_info = InfoLevel(),
+            blas_success = InfoLevel(),
+            condition_number = Silent(),
+            convergence_failure = WarnLevel()
         )
     elseif verbose isa All
         # All: Maximum verbosity - every possible logging message at InfoLevel
@@ -128,20 +132,22 @@ function LinearVerbosity(verbose::AbstractVerbosityPreset)
             using_IterativeSolvers = InfoLevel(),
             IterativeSolvers_iterations = InfoLevel(),
             KrylovKit_verbosity = CustomLevel(3), # EACHITERATION_LEVEL in KrylovKit.jl
-            KrylovJL_verbosity = CustomLevel(1),  
+            KrylovJL_verbosity = CustomLevel(1),
             HYPRE_verbosity = InfoLevel(),
-            pardiso_verbosity = CustomLevel(1), # verbsoe = true in Pardiso.jl  
-            blas_errors = ErrorLevel(), 
+            pardiso_verbosity = CustomLevel(1), # verbsoe = true in Pardiso.jl
+            blas_errors = ErrorLevel(),
             blas_invalid_args = ErrorLevel(),
             blas_info = InfoLevel(),
             blas_success = InfoLevel(),
-            condition_number = InfoLevel()
+            condition_number = InfoLevel(),
+            convergence_failure = WarnLevel()
         )
     end
 end
 
-@inline function LinearVerbosity(verbose::None) 
+@inline function LinearVerbosity(verbose::None)
     LinearVerbosity(
+    Silent(),
     Silent(),
     Silent(),
     Silent(),
@@ -175,7 +181,7 @@ const error_control_options = (:default_lu_fallback, :blas_errors, :blas_invalid
 const performance_options = (:no_right_preconditioning,)
 const numerical_options = (:using_IterativeSolvers, :IterativeSolvers_iterations,
                        :KrylovKit_verbosity, :KrylovJL_verbosity, :HYPRE_verbosity, :pardiso_verbosity,
-                       :blas_info, :blas_success, :condition_number)
+                       :blas_info, :blas_success, :condition_number, :convergence_failure)
 
 function option_group(option::Symbol)
     if option in error_control_options

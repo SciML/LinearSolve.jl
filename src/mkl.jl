@@ -282,6 +282,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
         end
 
         if !LinearAlgebra.issuccess(fact[1])
+            @SciMLMessage("Solver failed to converge", cache.verbose, :convergence_failure)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
         end
@@ -345,6 +346,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKL32MixedLUFactorization;
         cache.cacheval = fact
 
         if !LinearAlgebra.issuccess(fact[1])
+            @SciMLMessage("Solver failed to converge", cache.verbose, :convergence_failure)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
         end

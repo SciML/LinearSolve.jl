@@ -1,3 +1,72 @@
+"""
+    LinearVerbosity <: AbstractVerbositySpecifier
+
+Verbosity configuration for LinearSolve.jl solvers, providing fine-grained control over
+diagnostic messages, warnings, and errors during linear system solution.
+
+# Fields
+
+## Error Control Group
+- `default_lu_fallback`: Messages when falling back to LU factorization from other methods
+- `blas_errors`: Critical BLAS errors that stop computation
+- `blas_invalid_args`: BLAS errors due to invalid arguments
+
+## Performance Group
+- `no_right_preconditioning`: Messages when right preconditioning is not used
+
+## Numerical Group
+- `using_IterativeSolvers`: Messages when using the IterativeSolvers.jl package
+- `IterativeSolvers_iterations`: Iteration count messages from IterativeSolvers.jl
+- `KrylovKit_verbosity`: Verbosity level passed to KrylovKit.jl solvers
+- `KrylovJL_verbosity`: Verbosity level passed to Krylov.jl solvers
+- `HYPRE_verbosity`: Verbosity level passed to HYPRE solvers
+- `pardiso_verbosity`: Verbosity level passed to Pardiso solvers
+- `blas_info`: Informational messages from BLAS operations
+- `blas_success`: Success messages from BLAS operations
+- `condition_number`: Messages related to condition number calculations
+- `convergence_failure`: Messages when iterative solvers fail to converge
+
+# Constructors
+
+    LinearVerbosity(preset::AbstractVerbosityPreset)
+
+Create a `LinearVerbosity` using a preset configuration:
+- `SciMLLogging.None()`: All messages disabled
+- `SciMLLogging.Minimal()`: Only critical errors and fatal issues
+- `SciMLLogging.Standard()`: Balanced verbosity (default)
+- `SciMLLogging.Detailed()`: Comprehensive debugging information
+- `SciMLLogging.All()`: Maximum verbosity
+
+    LinearVerbosity(; error_control=nothing, performance=nothing, numerical=nothing, kwargs...)
+
+Create a `LinearVerbosity` with group-level or individual field control.
+
+# Examples
+
+```julia
+# Use a preset
+verbose = LinearVerbosity(SciMLLogging.Standard())
+
+# Set entire groups
+verbose = LinearVerbosity(
+    error_control = SciMLLogging.WarnLevel(),
+    numerical = SciMLLogging.InfoLevel()
+)
+
+# Set individual fields
+verbose = LinearVerbosity(
+    default_lu_fallback = SciMLLogging.InfoLevel(),
+    KrylovJL_verbosity = SciMLLogging.CustomLevel(1),
+    blas_errors = SciMLLogging.ErrorLevel()
+)
+
+# Mix group and individual settings
+verbose = LinearVerbosity(
+    numerical = SciMLLogging.InfoLevel(),  # Set all numerical to InfoLevel
+    blas_errors = SciMLLogging.ErrorLevel()  # Override specific field
+)
+```
+"""
 LinearSolve.@concrete struct LinearVerbosity <:
                                       AbstractVerbositySpecifier
     # Error control

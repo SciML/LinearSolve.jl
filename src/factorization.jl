@@ -7,8 +7,8 @@
 
             # If factorization was not successful, return failure. Don't reset `isfresh`
             if _notsuccessful(fact)
-                @SciMLMessage("Solver failed to converge", cache.verbose,
-                    :convergence_failure)
+                @SciMLMessage("Solver failed", cache.verbose,
+                    :solver_failure)
                 return SciMLBase.build_linear_solution(
                     alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
             end
@@ -145,7 +145,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
 
         if hasmethod(LinearAlgebra.issuccess, Tuple{typeof(fact)}) &&
            !LinearAlgebra.issuccess(fact)
-            @SciMLMessage("Solver failed to converge", cache.verbose, :convergence_failure)
+            @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
         end
@@ -1030,7 +1030,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization; 
 
         if hasmethod(LinearAlgebra.issuccess, Tuple{typeof(fact)}) &&
            !LinearAlgebra.issuccess(fact)
-            @SciMLMessage("Solver failed to converge", cache.verbose, :convergence_failure)
+            @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
         end

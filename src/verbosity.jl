@@ -25,6 +25,8 @@ diagnostic messages, warnings, and errors during linear system solution.
 - `blas_success`: Success messages from BLAS operations
 - `condition_number`: Messages related to condition number calculations
 - `convergence_failure`: Messages when iterative solvers fail to converge
+- `solver_failure`: Messages when solvers fail for reasons other than convergence
+- `max_iters`: Messages when iterative solvers reach maximum iterations
 
 # Constructors
 
@@ -86,6 +88,8 @@ LinearSolve.@concrete struct LinearVerbosity <:
     blas_success
     condition_number
     convergence_failure
+    solver_failure
+    max_iters
 end
 
 function LinearVerbosity(;
@@ -115,7 +119,7 @@ function LinearVerbosity(;
     # Build arguments using NamedTuple for type stability
     default_args = (
         default_lu_fallback = Silent(),
-        no_right_preconditioning = WarnLevel(),
+        no_right_preconditioning = Silent(),
         using_IterativeSolvers = Silent(),
         IterativeSolvers_iterations = Silent(),
         KrylovKit_verbosity = CustomLevel(1), # WARN_LEVEL in KrylovKit.jl
@@ -127,7 +131,9 @@ function LinearVerbosity(;
         blas_info = Silent(),
         blas_success = Silent(),
         condition_number=Silent(),
-        convergence_failure=WarnLevel()
+        convergence_failure=WarnLevel(),
+        solver_failure=WarnLevel(),
+        max_iters=WarnLevel()
     )
 
     # Apply group-level settings
@@ -170,7 +176,9 @@ function LinearVerbosity(verbose::AbstractVerbosityPreset)
             blas_info = Silent(),
             blas_success = Silent(),
             condition_number = Silent(),
-            convergence_failure = Silent()
+            convergence_failure = Silent(),
+            solver_failure = Silent(),
+            max_iters = Silent()
         )
     elseif verbose isa Standard
         # Standard: Everything from Minimal + non-fatal warnings
@@ -191,7 +199,9 @@ function LinearVerbosity(verbose::AbstractVerbosityPreset)
             blas_info = InfoLevel(),
             blas_success = InfoLevel(),
             condition_number = Silent(),
-            convergence_failure = WarnLevel()
+            convergence_failure = WarnLevel(),
+            solver_failure = WarnLevel(),
+            max_iters = WarnLevel()
         )
     elseif verbose isa All
         # All: Maximum verbosity - every possible logging message at InfoLevel
@@ -209,13 +219,17 @@ function LinearVerbosity(verbose::AbstractVerbosityPreset)
             blas_info = InfoLevel(),
             blas_success = InfoLevel(),
             condition_number = InfoLevel(),
-            convergence_failure = WarnLevel()
+            convergence_failure = WarnLevel(),
+            solver_failure = WarnLevel(),
+            max_iters = WarnLevel()
         )
     end
 end
 
 @inline function LinearVerbosity(verbose::None)
     LinearVerbosity(
+    Silent(),
+    Silent(),
     Silent(),
     Silent(),
     Silent(),
@@ -250,7 +264,7 @@ const error_control_options = (:default_lu_fallback, :blas_errors, :blas_invalid
 const performance_options = (:no_right_preconditioning,)
 const numerical_options = (:using_IterativeSolvers, :IterativeSolvers_iterations,
                        :KrylovKit_verbosity, :KrylovJL_verbosity, :HYPRE_verbosity, :pardiso_verbosity,
-                       :blas_info, :blas_success, :condition_number, :convergence_failure)
+                       :blas_info, :blas_success, :condition_number, :convergence_failure, :solver_failure, :max_iters)
 
 function option_group(option::Symbol)
     if option in error_control_options

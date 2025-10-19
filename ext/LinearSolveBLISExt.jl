@@ -263,7 +263,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::BLISLUFactorization;
         end
 
         if !LinearAlgebra.issuccess(fact[1])
-            @SciMLMessage("Solver failed to converge", cache.verbose, :convergence_failure)
+            @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
         end

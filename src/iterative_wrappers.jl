@@ -314,10 +314,13 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
 
     retcode = if !stats.solved
         if stats.status == "maximum number of iterations exceeded"
+            @SciMLMessage("Solver reached maximum number of iterations")
             ReturnCode.MaxIters
         elseif stats.status == "solution good enough given atol and rtol"
+            @SciMLMessage("Solver failed to converge", cache.verbose, :convergence_failure)
             ReturnCode.ConvergenceFailure
         else
+            @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             ReturnCode.Failure
         end
     else

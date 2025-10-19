@@ -39,7 +39,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovKitJL; kwargs...)
     retcode = if info.converged == 1 
         ReturnCode.Default
     else
-        @SciMLMessage("Solver failed to converge", cache.verbose, :convergence_failure)
+        @SciMLMessage("Solver failed", cache.verbose, :convergence_failure)
         ReturnCode.ConvergenceFailure
     end
 

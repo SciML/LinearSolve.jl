@@ -379,7 +379,10 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
     end
 
     # Termination status
-    tired && (status = ReturnCode.MaxIters)
+    if tired  
+        @SciMLMessage("Solver reached maximum number of iterations", cache.verbose, :max_iters)
+        status = ReturnCode.MaxIters
+    end
     solved && (status = ReturnCode.Success)
     inconsistent && (status = ReturnCode.Infeasible)
 

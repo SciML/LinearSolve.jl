@@ -639,6 +639,7 @@ lp = LinearProblem(A, b; u0 = view(u0, :));
 truesol = solve(lp, LUFactorization())
 krylovsol = solve(lp, KrylovJL_GMRES())
 @test truesol ≈ krylovsol
+@test krylovsol.resid < 1e-8
 
 # Block Diagonals
 using BlockDiagonals

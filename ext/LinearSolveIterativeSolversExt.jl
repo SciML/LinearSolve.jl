@@ -117,10 +117,6 @@ function SciMLBase.solve!(cache::LinearCache, alg::IterativeSolversJL; kwargs...
     if resid isa IterativeSolvers.Residual
         resid = resid.current
     end
-    if resid isa Base.RefValue
-        resid = resid[]
-    end
-
     return SciMLBase.build_linear_solution(alg, cache.u, resid, cache; iters = i)
 end
 

@@ -257,10 +257,6 @@ end
     @test A_grad ≈ fd_jac_A rtol = 1e-5
 end
 
-# The below test function cases fails !
-# AVOID Adjoint case in code as : `solve!(cache); s1 = copy(cache.u)`.
-# Instead stick to code like : `sol = solve!(cache); s1 = copy(sol.u)`.
-
 function f4(A, b1, b2; alg=LUFactorization())
     prob = LinearProblem(A, b1)
     cache = init(prob, alg)
@@ -272,11 +268,16 @@ function f4(A, b1, b2; alg=LUFactorization())
     norm(s1 + s2)
 end
 
-# value, grad = Mooncake.value_and_gradient!!(
-# prepare_gradient_cache(f4, copy(A), copy(b1), copy(b2)),
-# f4, copy(A), copy(b1), copy(b2)
-# )
-# (0.0, (Mooncake.NoTangent(), [0.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0], [0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]))
+A = rand(n, n);
+b1 = rand(n);
+b2 = rand(n);
+# f_primal = f4(copy(A), copy(b1), copy(b2))
+
+rule = Mooncake.build_rrule(f4, copy(A), copy(b1), copy(b2))
+@test_throws "Adjoint case currently not handled" Mooncake.value_and_pullback!!(
+    rule, 1.0,
+    f4, copy(A), copy(b1), copy(b2)
+)
 
 # dA2 = ForwardDiff.gradient(x -> f4(x, eltype(x).(b1), eltype(x).(b2)), copy(A))
 # db12 = ForwardDiff.gradient(x -> f4(eltype(x).(A), x, eltype(x).(b2)), copy(b1))
@@ -286,46 +287,3 @@ end
 # @test grad[2] ≈ dA2
 # @test grad[3] ≈ db12
 # @test grad[4] ≈ db22
-
-function testls(A, b, u)
-    oa = OperatorAssumptions(
-        true, condition=LinearSolve.OperatorCondition.WellConditioned)
-    prob = LinearProblem(A, b)
-    linsolve = init(prob, LUFactorization(), assumptions=oa)
-    cache = solve!(linsolve)
-    sum(cache.u)
-end
-
-# A = [1.0 2.0; 3.0 4.0]
-# b = [1.0, 2.0]
-# u = zero(b)
-# value, gradient = Mooncake.value_and_gradient!!(
-#     prepare_gradient_cache(testls, copy(A), copy(b), copy(u)),
-#     testls, copy(A), copy(b), copy(u)
-# )
-
-# dA = gradient[2]
-# db = gradient[3]
-# du = gradient[4]
-
-function testls(A, b, u)
-    oa = OperatorAssumptions(
-        true, condition=LinearSolve.OperatorCondition.WellConditioned)
-    prob = LinearProblem(A, b)
-    linsolve = init(prob, LUFactorization(), assumptions=oa)
-    solve!(linsolve)
-    sum(linsolve.u)
-end
-
-# value, gradient = Mooncake.value_and_gradient!!(
-#     prepare_gradient_cache(testls, copy(A), copy(b), copy(u)),
-#     testls, copy(A), copy(b), copy(u)
-# )
-
-# dA2 = gradient[2]
-# db2 = gradient[3]
-# du2 = gradient[4]
-
-# @test dA == dA2
-# @test db == db2
-# @test du == du2

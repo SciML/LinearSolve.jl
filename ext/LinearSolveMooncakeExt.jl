@@ -30,9 +30,9 @@ function Mooncake.to_cr_tangent(x::Mooncake.PossiblyUninitTangent{T}) where {T}
 end
 
 function Mooncake.increment_and_get_rdata!(f, r::NoRData, t::LinearCache)
-    println("inside increment and get rdata 2")
     f.fields.A .+= t.A
     f.fields.b .+= t.b
+    f.fields.u .+= t.u
 
     return NoRData()
 end

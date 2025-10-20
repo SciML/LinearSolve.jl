@@ -124,8 +124,7 @@ end
 
 function CRC.rrule(::typeof(SciMLBase.solve!), cache::LinearSolve.LinearCache, alg::LinearSolve.SciMLLinearSolveAlgorithm, args...; alias_A=default_alias_A(
         alg, cache.A, cache.b), kwargs...)
-    _cache = deepcopy(cache)
-    (; A, sensealg) = _cache
+    (; A, sensealg) = cache
     @assert sensealg isa LinearSolveAdjoint "Currently only `LinearSolveAdjoint` is supported for adjoint sensitivity analysis."
 
     # logic behind caching `A` and `b` for the reverse pass based on rrule above for SciMLBase.solve
@@ -138,22 +137,21 @@ function CRC.rrule(::typeof(SciMLBase.solve!), cache::LinearSolve.LinearCache, a
         A_ = deepcopy(A)
     end
 
-    sol = solve!(_cache)
-
+    sol = solve!(cache)
     function solve!_adjoint(∂sol)
         ∂∅ = NoTangent()
         ∂u = ∂sol.u
 
         if sensealg.linsolve === missing
-            λ = if _cache.cacheval isa Factorization
-                _cache.cacheval' \ ∂u
-            elseif _cache.cacheval isa Tuple && _cache.cacheval[1] isa Factorization
-                first(_cache.cacheval)' \ ∂u
+            λ = if cache.cacheval isa Factorization
+                cache.cacheval' \ ∂u
+            elseif cache.cacheval isa Tuple && cache.cacheval[1] isa Factorization
+                first(cache.cacheval)' \ ∂u
             elseif alg isa AbstractKrylovSubspaceMethod
-                invprob = LinearProblem(adjoint(_cache.A), ∂u)
+                invprob = LinearProblem(adjoint(cache.A), ∂u)
                 solve(invprob, alg; cache.abstol, cache.reltol, cache.verbose).u
             elseif alg isa DefaultLinearSolver
-                LinearSolve.defaultalg_adjoint_eval(_cache, ∂u)
+                LinearSolve.defaultalg_adjoint_eval(cache, ∂u)
             else
                 invprob = LinearProblem(adjoint(A_), ∂u) # We cached `A`
                 solve(invprob, alg; cache.abstol, cache.reltol, cache.verbose).u
@@ -167,8 +165,13 @@ function CRC.rrule(::typeof(SciMLBase.solve!), cache::LinearSolve.LinearCache, a
         tu = adjoint(sol.u)
         ∂A = BroadcastArray(@~ .-(λ .* tu))
         ∂b = λ
+
+        if (iszero(∂b) || iszero(∂A)) && !iszero(tu)
+            error("Adjoint case currently not handled. Instead of using `solve!(cache); s1 = copy(cache.u) ...`, use `sol = solve!(cache); s1 = copy(sol.u)`.")
+        end
+
         ∂prob = LinearProblem(∂A, ∂b, ∂∅)
-        ∂cache = LinearSolve.init(∂prob)
+        ∂cache = LinearSolve.init(∂prob, u=∂u)
         return (∂∅, ∂cache, ∂∅, ntuple(_ -> ∂∅, length(args))...)
     end
 

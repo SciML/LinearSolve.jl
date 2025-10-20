@@ -325,8 +325,8 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     end
 
     if verbose isa Bool
-        #@warn "Using `true` or `false` for `verbose` is being deprecated. Please use a `LinearVerbosity` type to specify verbosity settings.
-        # For details see the verbosity section of the common solver options documentation page."
+        @warn "Using `true` or `false` for `verbose` is being deprecated. Please use a `LinearVerbosity` type to specify verbosity settings.
+        For details see the verbosity section of the common solver options documentation page."
         if verbose 
             verbose_spec = LinearVerbosity()
         else

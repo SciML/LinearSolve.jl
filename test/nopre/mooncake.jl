@@ -155,7 +155,6 @@ for alg in (
 end
 
 # Tests for solve! and init rrules.
-
 n = 4
 A = rand(n, n);
 b1 = rand(n);
@@ -205,8 +204,7 @@ value, gradient = Mooncake.value_and_gradient!!(
 @test gradient[3] ≈ db12
 @test gradient[4] ≈ db22
 
-function f3(A, b1, b2; alg=LUFactorization())
-    # alg = KrylovJL_GMRES())
+function f3(A, b1, b2; alg=KrylovJL_GMRES())
     prob = LinearProblem(A, b1)
     cache = init(prob, alg)
     s1 = copy(solve!(cache).u)
@@ -225,37 +223,6 @@ value, gradient = Mooncake.value_and_gradient!!(
 @test gradient[2] ≈ dA2 atol = 5e-5
 @test gradient[3] ≈ db12
 @test gradient[4] ≈ db22
-
-A = rand(n, n);
-b1 = rand(n);
-
-function fnice(A, b, alg)
-    prob = LinearProblem(A, b)
-    sol1 = solve(prob, alg)
-    return sum(sol1.u)
-end
-
-@testset for alg in (
-    LUFactorization(),
-    RFLUFactorization(),
-    KrylovJL_GMRES()
-)
-    # for B
-    fb_closure = b -> fnice(A, b, alg)
-    fd_jac_b = FiniteDiff.finite_difference_jacobian(fb_closure, b1) |> vec
-
-    val, en_jac = Mooncake.value_and_gradient!!(
-        prepare_gradient_cache(fnice, copy(A), copy(b1), alg),
-        fnice, copy(A), copy(b1), alg
-    )
-    @test en_jac[3] ≈ fd_jac_b rtol = 1e-5
-
-    # For A
-    fA_closure = A -> fnice(A, b1, alg)
-    fd_jac_A = FiniteDiff.finite_difference_jacobian(fA_closure, A) |> vec
-    A_grad = en_jac[2] |> vec
-    @test A_grad ≈ fd_jac_A rtol = 1e-5
-end
 
 function f4(A, b1, b2; alg=LUFactorization())
     prob = LinearProblem(A, b1)
@@ -287,3 +254,34 @@ rule = Mooncake.build_rrule(f4, copy(A), copy(b1), copy(b2))
 # @test grad[2] ≈ dA2
 # @test grad[3] ≈ db12
 # @test grad[4] ≈ db22
+
+A = rand(n, n);
+b1 = rand(n);
+
+function fnice(A, b, alg)
+    prob = LinearProblem(A, b)
+    sol1 = solve(prob, alg)
+    return sum(sol1.u)
+end
+
+@testset for alg in (
+    LUFactorization(),
+    RFLUFactorization(),
+    KrylovJL_GMRES()
+)
+    # for B
+    fb_closure = b -> fnice(A, b, alg)
+    fd_jac_b = FiniteDiff.finite_difference_jacobian(fb_closure, b1) |> vec
+
+    val, en_jac = Mooncake.value_and_gradient!!(
+        prepare_gradient_cache(fnice, copy(A), copy(b1), alg),
+        fnice, copy(A), copy(b1), alg
+    )
+    @test en_jac[3] ≈ fd_jac_b rtol = 1e-5
+
+    # For A
+    fA_closure = A -> fnice(A, b1, alg)
+    fd_jac_A = FiniteDiff.finite_difference_jacobian(fA_closure, A) |> vec
+    A_grad = en_jac[2] |> vec
+    @test A_grad ≈ fd_jac_A rtol = 1e-5
+end

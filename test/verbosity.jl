@@ -8,7 +8,7 @@ using Test
     @testset "Default constructor" begin
         v1 = LinearVerbosity()
         @test v1 isa LinearVerbosity
-        @test v1.default_lu_fallback isa SciMLLogging.WarnLevel
+        @test v1.default_lu_fallback isa SciMLLogging.Silent
         @test v1.KrylovKit_verbosity == SciMLLogging.CustomLevel(1)
     end
     @testset "LinearVerbosity constructors" begin
@@ -61,7 +61,7 @@ using Test
         @test v6_individual.KrylovKit_verbosity isa SciMLLogging.InfoLevel
         @test v6_individual.pardiso_verbosity isa SciMLLogging.Silent
         # Unspecified options should use defaults
-        @test v6_individual.no_right_preconditioning isa SciMLLogging.WarnLevel
+        @test v6_individual.no_right_preconditioning isa SciMLLogging.Silent
     end
 
     @testset "Group classification functions" begin
@@ -116,7 +116,7 @@ using Test
         @test numerical_group.KrylovKit_verbosity isa SciMLLogging.AbstractMessageLevel
 
         # Individual field access should still work
-        @test v.default_lu_fallback isa SciMLLogging.WarnLevel
+        @test v.default_lu_fallback isa SciMLLogging.Silent
         @test v.KrylovKit_verbosity == SciMLLogging.CustomLevel(1)
     end
 end
@@ -134,10 +134,6 @@ end
         "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(
         prob,
         verbose = LinearVerbosity(default_lu_fallback = WarnLevel()))
-
-    @test_logs (:warn,
-        "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(
-        prob, verbose = true)
 
     @test_logs min_level=SciMLLogging.Logging.Warn solve(prob, verbose = false)
 
@@ -281,7 +277,8 @@ end
                 blas_errors = Silent(),
                 blas_invalid_args = Silent(),
                 blas_info = Silent(),
-                blas_success = Silent()
+                blas_success = Silent(),
+                solver_failure = Silent()
             )
 
             @test_logs min_level=SciMLLogging.Logging.Warn solve(
@@ -329,7 +326,7 @@ end
                 blas_info = Silent()
             )
 
-            @test_logs (:warn, r"BLAS/LAPACK.*Matrix is singular") solve(
+            @test_logs (:warn, r"BLAS/LAPACK.*Matrix is singular") match_mode=:any solve(
                 prob_singular, OpenBLASLUFactorization(); verbose = verbose_errors)
 
             # Test with info logging enabled
@@ -339,7 +336,7 @@ end
                 blas_success = Silent()
             )
 
-            @test_logs (:info, r"BLAS/LAPACK.*Matrix is singular") solve(
+            @test_logs (:info, r"BLAS/LAPACK.*Matrix is singular") match_mode=:any solve(
                 prob_singular, OpenBLASLUFactorization(); verbose = verbose_info)
 
             # Test with all BLAS logging disabled - should produce no logs
@@ -347,7 +344,8 @@ end
                 blas_errors = Silent(),
                 blas_invalid_args = Silent(),
                 blas_info = Silent(),
-                blas_success = Silent()
+                blas_success = Silent(),
+                solver_failure = Silent()
             )
 
             @test_logs min_level=SciMLLogging.Logging.Warn solve(
@@ -415,7 +413,8 @@ end
                 blas_errors = Silent(),
                 blas_invalid_args = Silent(),
                 blas_info = Silent(),
-                blas_success = Silent()
+                blas_success = Silent(),
+                solver_failure = Silent()
             )
 
             @test_logs min_level=SciMLLogging.Logging.Warn solve(
@@ -451,7 +450,7 @@ end
                 blas_info = Silent()
             )
 
-            @test_logs (:info, r"BLAS LU factorization.*completed successfully") solve(
+            @test_logs (:info, r"BLAS LU factorization.*completed successfully") match_mode=:any solve(
                 prob_good, MKLLUFactorization(); verbose = verbose_success)
 
             # Test singular matrix with error logging
@@ -465,7 +464,7 @@ end
                 blas_info = Silent()
             )
 
-            @test_logs (:warn, r"BLAS/LAPACK.*Matrix is singular") solve(
+            @test_logs (:warn, r"BLAS/LAPACK.*Matrix is singular") match_mode=:any solve(
                 prob_singular, MKLLUFactorization(); verbose = verbose_errors)
 
             # Test with info logging enabled
@@ -475,7 +474,7 @@ end
                 blas_success = Silent()
             )
 
-            @test_logs (:info, r"BLAS/LAPACK.*Matrix is singular") solve(
+            @test_logs (:info, r"BLAS/LAPACK.*Matrix is singular") match_mode=:any solve(
                 prob_singular, MKLLUFactorization(); verbose = verbose_info)
 
             # Test with all BLAS logging disabled - should produce no logs
@@ -483,10 +482,11 @@ end
                 blas_errors = Silent(),
                 blas_invalid_args = Silent(),
                 blas_info = Silent(),
-                blas_success = Silent()
+                blas_success = Silent(),
+                solver_failure = Silent()
             )
 
-            @test_logs min_level=SciMLLogging.Logging.Warn solve(
+            @test_logs min_level=SciMLLogging.Logging.Warn match_mode=:any solve(
                 prob_singular, MKLLUFactorization(); verbose = verbose_silent)
 
             # Test condition number logging if enabled

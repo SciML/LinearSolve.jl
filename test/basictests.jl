@@ -545,7 +545,7 @@ end
         x2 = zero(b1)
 
         @testset "LinearSolveFunction" begin
-            function sol_func(A, b, u, p, newA, Pl, Pr, solverdata;
+            function sol_func(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,
                     kwargs...)
                 if verbose == true
                     println("out-of-place solve")
@@ -553,7 +553,7 @@ end
                 u .= A \ b
             end
 
-            function sol_func!(A, b, u, p, newA, Pl, Pr, solverdata;
+            function sol_func!(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,
                     kwargs...)
                 if verbose == true
                     println("in-place solve")

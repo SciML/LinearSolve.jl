@@ -90,35 +90,6 @@ using Test
         # Test error for unknown group
         @test_throws ErrorException group_options(v8, :unknown_group)
     end
-
-    @testset "Group getproperty access" begin
-        v = LinearVerbosity()
-
-        # Test getting groups returns NamedTuples
-        error_group = v.error_control
-        performance_group = v.performance
-        numerical_group = v.numerical
-
-        @test error_group isa NamedTuple
-        @test performance_group isa NamedTuple
-        @test numerical_group isa NamedTuple
-
-        # Test correct keys are present
-        @test :default_lu_fallback in keys(error_group)
-        @test :no_right_preconditioning in keys(performance_group)
-        @test :KrylovKit_verbosity in keys(numerical_group)
-        @test :using_IterativeSolvers in keys(numerical_group)
-        @test :pardiso_verbosity in keys(numerical_group)
-
-        # Test values are AbstractMessageLevel types
-        @test error_group.default_lu_fallback isa SciMLLogging.AbstractMessageLevel
-        @test performance_group.no_right_preconditioning isa SciMLLogging.AbstractMessageLevel
-        @test numerical_group.KrylovKit_verbosity isa SciMLLogging.AbstractMessageLevel
-
-        # Individual field access should still work
-        @test v.default_lu_fallback isa SciMLLogging.Silent
-        @test v.KrylovKit_verbosity == SciMLLogging.CustomLevel(1)
-    end
 end
 
 

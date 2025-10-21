@@ -78,7 +78,7 @@ function test_interface(alg; kw...)
 
     atol = 1e-6
     rtol = 1e-6
-    cache_kwargs = (; verbose = true, abstol = atol, reltol = rtol, maxiters = 50)
+    cache_kwargs = (;abstol = atol, reltol = rtol, maxiters = 50)
     cache_kwargs = merge(cache_kwargs, kw)
 
     # prob1, prob3 with initial guess, prob2, prob4 without

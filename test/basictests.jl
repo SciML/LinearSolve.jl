@@ -38,7 +38,7 @@ prob2 = LinearProblem(A2, b2; u0 = x2)
 prob3 = LinearProblem(A3, b3; u0 = x3)
 prob4 = LinearProblem(A4, b4; u0 = x4)
 
-cache_kwargs = (; verbose = true, abstol = 1e-8, reltol = 1e-8, maxiter = 30)
+cache_kwargs = (;abstol = 1e-8, reltol = 1e-8, maxiter = 30)
 
 function test_interface(alg, prob1, prob2)
     A1, b1 = prob1.A, prob1.b
@@ -545,7 +545,7 @@ end
         x2 = zero(b1)
 
         @testset "LinearSolveFunction" begin
-            function sol_func(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,
+            function sol_func(A, b, u, p, newA, Pl, Pr, solverdata;
                     kwargs...)
                 if verbose == true
                     println("out-of-place solve")
@@ -553,7 +553,7 @@ end
                 u .= A \ b
             end
 
-            function sol_func!(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,
+            function sol_func!(A, b, u, p, newA, Pl, Pr, solverdata;
                     kwargs...)
                 if verbose == true
                     println("in-place solve")

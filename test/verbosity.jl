@@ -106,7 +106,7 @@ end
         prob,
         verbose = LinearVerbosity(default_lu_fallback = WarnLevel()))
 
-    @test_logs min_level=SciMLLogging.Logging.Warn solve(prob, verbose = false)
+    @test_logs (:warn, r"Using `true` or `false` for `verbose` is being deprecated") match_mode=:any min_level=SciMLLogging.Logging.Warn solve(prob, verbose = false)
 
     @test_logs (:info,
         "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(

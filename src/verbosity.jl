@@ -290,17 +290,3 @@ function group_options(verbosity::LinearVerbosity, group::Symbol)
         error("Unknown group: $group")
     end
 end
-
-function Base.getproperty(verbosity::LinearVerbosity, name::Symbol)
-    # Check if this is a group name
-    if name === :error_control
-        return group_options(verbosity, :error_control)
-    elseif name === :performance
-        return group_options(verbosity, :performance)
-    elseif name === :numerical
-        return group_options(verbosity, :numerical)
-    else
-        # Fall back to default field access
-        return getfield(verbosity, name)
-    end
-end

@@ -116,6 +116,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::ButterflyFactoriz
         cache.cacheval = (ws)
         cache.isfresh = false
     end
+    ws = cache.cacheval
     out = RecursiveFactorization.🦋solve!(ws, alg.thread)
     SciMLBase.build_linear_solution(alg, out, nothing, cache)
 end

@@ -5,6 +5,7 @@ using LinearSolve: LinearSolve, userecursivefactorization, LinearCache, @get_cac
                    default_alias_b
 using LinearSolve.LinearAlgebra, LinearSolve.ArrayInterface, RecursiveFactorization
 using SciMLBase: SciMLBase, ReturnCode
+using TriangularSolve
 
 LinearSolve.userecursivefactorization(A::Union{Nothing, AbstractMatrix}) = true
 
@@ -106,18 +107,28 @@ end
 
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::ButterflyFactorization;
         kwargs...)
-    A = cache.A
-    A = convert(AbstractMatrix, A)
+    cache_A = cache.A
+    cache_A = convert(AbstractMatrix, cache_A)
     b = cache.b
-    M, N = size(A)
+    M, N = size(cache_A)
+    workspace = cache.cacheval
     if cache.isfresh
         @assert M==N "A must be square"
-        ws = RecursiveFactorization.🦋workspace(A, b)    
-        cache.cacheval = (ws)
+        if (size(workspace.A, 1) != M)
+            workspace = RecursiveFactorization.🦋workspace(cache_A, b)    
+            cache.cacheval = (workspace)
+        end
         cache.isfresh = false
     end
-    ws = cache.cacheval
-    out = RecursiveFactorization.🦋solve!(ws, alg.thread)
+    workspace = cache.cacheval
+    (;A, b, ws, U, V, out, tmp, n) = workspace
+    thread = alg.thread
+    RecursiveFactorization.🦋mul!(A, ws)
+    F = RecursiveFactorization.lu!(A, Val(false), thread)
+    mul!(tmp, U', b)
+    TriangularSolve.ldiv!(F, tmp, thread)
+    mul!(b, V, tmp)
+    out .= @view b[1:n]
     SciMLBase.build_linear_solution(alg, out, nothing, cache)
 end
 

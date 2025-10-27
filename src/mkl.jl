@@ -255,11 +255,11 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
             if !isa(verbose.blas_info, SciMLLogging.Silent) || !isa(verbose.blas_errors, SciMLLogging.Silent) ||
                 !isa(verbose.blas_invalid_args, SciMLLogging.Silent)
                 op_info = get_blas_operation_info(:dgetrf, A, cache.b, condition = !isa(verbose.condition_number, SciMLLogging.Silent))
-                @SciMLMessage(cache.verbose, :condition_number) do
+                if cache.verbose.condition_number != Silent()
                     if op_info[:condition_number] === nothing
-                        return "Matrix condition number calculation failed."
+                        @SciMLMessage("Matrix condition number calculation failed.", cache.verbose, :condition_number)
                     else
-                        return "Matrix condition number: $(round(op_info[:condition_number], sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf"
+                        @SciMLMessage("Matrix condition number: $(round(op_info[:condition_number], sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf", cache.verbose, :condition_number)
                     end
                 end
                 verb_option, message = blas_info_msg(
@@ -267,17 +267,17 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
                 @SciMLMessage(message, verbose, verb_option)
             end
         else
-            @SciMLMessage(cache.verbose, :blas_success) do
-                op_info = get_blas_operation_info(:dgetrf, A, cache.b,
-                    condition = !isa(verbose.condition_number, SciMLLogging.Silent))
-                @SciMLMessage(cache.verbose, :condition_number) do
+            if cache.verbose.blas_success != Silent()
+                op_info = get_blas_operation_info(:dgetrf, A, cache.b, condition = !isa(verbose.condition_number, SciMLLogging.Silent))
+                if cache.verbose.condition_number != Silent()
                     if op_info[:condition_number] === nothing
-                        return "Matrix condition number calculation failed."
+                        @SciMLMessage("Matrix condition number calculation failed.", cache.verbose, :condition_number)
                     else
-                        return "Matrix condition number: $(round(op_info[:condition_number], sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf"
+                        @SciMLMessage("Matrix condition number: $(round(op_info[:condition_number], sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf",
+                            cache.verbose, :condition_number)
                     end
                 end
-                return "BLAS LU factorization (dgetrf) completed successfully for $(op_info[:matrix_size]) matrix"
+                @SciMLMessage("BLAS LU factorization (dgetrf) completed successfully for $(op_info[:matrix_size]) matrix", cache.verbose, :blas_success)
             end
         end
 

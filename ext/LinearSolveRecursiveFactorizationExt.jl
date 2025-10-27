@@ -111,20 +111,23 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::ButterflyFactoriz
     cache_A = convert(AbstractMatrix, cache_A)
     b = cache.b
     M, N = size(cache_A)
-    workspace = cache.cacheval
+    workspace = cache.cacheval[1]
+    thread = alg.thread
+
     if cache.isfresh
         @assert M==N "A must be square"
         if (size(workspace.A, 1) != M)
             workspace = RecursiveFactorization.🦋workspace(cache_A, b)    
-            cache.cacheval = (workspace)
         end
+        (;A, b, ws, U, V, out, tmp, n) = workspace
+        RecursiveFactorization.🦋mul!(A, ws)
+        F = RecursiveFactorization.lu!(A, Val(false), thread)
+        cache.cacheval = (workspace, F)
         cache.isfresh = false
     end
-    workspace = cache.cacheval
+
+    workspace, F = cache.cacheval
     (;A, b, ws, U, V, out, tmp, n) = workspace
-    thread = alg.thread
-    RecursiveFactorization.🦋mul!(A, ws)
-    F = RecursiveFactorization.lu!(A, Val(false), thread)
     mul!(tmp, U', b)
     TriangularSolve.ldiv!(F, tmp, thread)
     mul!(b, V, tmp)
@@ -134,7 +137,7 @@ end
 
 function LinearSolve.init_cacheval(alg::ButterflyFactorization, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol, verbose::Bool, assumptions::LinearSolve.OperatorAssumptions)
-    ws = RecursiveFactorization.🦋workspace(A, b)    
+    ws = RecursiveFactorization.🦋workspace(A, b), RecursiveFactorization.lu!(rand(1, 1), Val(false), alg.thread)
 end
 
 end

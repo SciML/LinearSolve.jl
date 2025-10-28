@@ -21,7 +21,7 @@ for alg in (:SVDFactorization, :MKLLUFactorization, :DiagonalFactorization,
     :AppleAccelerateLUFactorization, :CholeskyFactorization, :LUFactorization)
     @eval begin
         function init_cacheval(::$(alg), ::AlmostBandedMatrix, b, u, Pl, Pr, maxiters::Int,
-                abstol, reltol, verbose::LinearVerbosity, assumptions::OperatorAssumptions)
+                abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
             return nothing
         end
     end

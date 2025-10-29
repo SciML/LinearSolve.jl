@@ -85,8 +85,8 @@ factorization methods if a lower tolerance of the solution is required.
 Krylov.jl generally outperforms IterativeSolvers.jl and KrylovKit.jl, and is compatible
 with CPUs and GPUs, and thus is the generally preferred form for Krylov methods. The
 choice of Krylov method should be the one most constrained to the type of operator one
-has, for example if positive definite then `Krylov_CG()`, but if no good properties then
-use `Krylov_GMRES()`.
+has, for example if positive definite then `KrylovJL_CG()`, but if no good properties then
+use `KrylovJL_GMRES()`.
 
 Finally, a user can pass a custom function for handling the linear solve using
 `LS.LinearSolveFunction()` if existing solvers are not optimally suited for their application.
@@ -99,8 +99,8 @@ then using a Krylov method is preferred in order to not concretize the matrix.
 Krylov.jl generally outperforms IterativeSolvers.jl and KrylovKit.jl, and is compatible
 with CPUs and GPUs, and thus is the generally preferred form for Krylov methods. The
 choice of Krylov method should be the one most constrained to the type of operator one
-has, for example if positive definite then `Krylov_CG()`, but if no good properties then
-use `Krylov_GMRES()`.
+has, for example if positive definite then `KrylovJL_CG()`, but if no good properties then
+use `KrylovJL_GMRES()`.
 
 !!! tip
     

@@ -7,7 +7,7 @@ Anz = copy(A)
 C = copy(A)
 C[begin, end] = 1e-8
 A.nzval .= 0
-cache_kwargs = (; verbose = true, abstol = 1e-8, reltol = 1e-8, maxiter = 30)
+cache_kwargs = (;abstol = 1e-8, reltol = 1e-8, maxiter = 30)
 
 function test_nonzero_init(alg = nothing)
     linprob = LinearProblem(A, b)

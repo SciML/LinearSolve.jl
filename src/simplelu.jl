@@ -218,6 +218,6 @@ function SciMLBase.solve!(cache::LinearCache, alg::SimpleLUFactorization; kwargs
 end
 
 function init_cacheval(alg::SimpleLUFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
-        reltol, verbose::Bool, assumptions::OperatorAssumptions)
+        reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
     LUSolver(convert(AbstractMatrix, A))
 end

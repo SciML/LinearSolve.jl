@@ -8,7 +8,7 @@ import PrecompileTools
 using ArrayInterface: ArrayInterface
 using Base: Bool, convert, copyto!, adjoint, transpose, /, \, require_one_based_indexing
 using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, BunchKaufman,
-                     ColumnNorm, Diagonal, Factorization, Hermitian, I, LAPACK, NoPivot,
+                     ColumnNorm, cond, Diagonal, Factorization, Hermitian, I, LAPACK, NoPivot,
                      RowMaximum, RowNonZero, SymTridiagonal, Symmetric, Transpose,
                      Tridiagonal, UniformScaling, axpby!, axpy!, bunchkaufman,
                      bunchkaufman!,
@@ -21,6 +21,8 @@ using SciMLBase: SciMLBase, LinearAliasSpecifier, AbstractSciMLOperator,
 using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator,
                       MatrixOperator,
                       has_ldiv!, issquare
+using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_int, AbstractVerbositySpecifier, AbstractMessageLevel, AbstractVerbosityPreset,
+                    Silent, InfoLevel, WarnLevel, ErrorLevel, CustomLevel, None, Minimal, Standard, Detailed, All
 using Setfield: @set, @set!
 using UnPack: @unpack
 using DocStringExtensions: DocStringExtensions
@@ -46,13 +48,24 @@ import Krylov
 
 const CRC = ChainRulesCore
 
+if Int === Int64 && !Base.USE_BLAS64
+   error("Invalid installation of Julia detected.\n\n Detected that Julia was built in 64-bit version but with a 32-bit BLAS. This gives issues" *
+         " in LinearAlgebra.jl and LinearSolve.jl which can be unrecoverable and are thus not supported. Most likely this is due to a bad build" *
+         " of Julia, with the common reasons being an incorrect build script in the NixOS and ArchLinux package managers (and old versions of homebrew)." *
+         " To fix this issue, and many other potentially small issues that may be undetected, use get a valid version of Julia with the correct BLAS and" *
+         " LLVM versions by either installing via juliaup (recommended), or downloading the appropriate binary from https://julialang.org/install/" *
+         " If using a Unix machine with a bash terminal, `curl -fsSL https://install.julialang.org` | sh will install juliaup and `juliaup add latest` will" *
+         " then give the latest version.\n\n If you wish to help fix the incorrect package manager build, share the discussion on fixing the homebrew build" *
+         " https://github.com/Homebrew/homebrew-core/issues/246702 with the package manager of interest in order to improve the ecosystem.")
+end
+
 @static if Sys.ARCH === :x86_64 || Sys.ARCH === :i686
     if Preferences.@load_preference("LoadMKL_JLL",
         !occursin("EPYC", Sys.cpu_info()[1].model))
         # MKL_jll < 2022.2 doesn't support the mixed LP64 and ILP64 interfaces that we make use of in LinearSolve
         # In particular, the `_64` APIs do not exist
         # https://www.intel.com/content/www/us/en/developer/articles/release-notes/onemkl-release-notes-2022.html
-        using MKL_jll
+        using MKL_jll: MKL_jll
         const usemkl = MKL_jll.is_available() && pkgversion(MKL_jll) >= v"2022.2"
     else
         const usemkl = false
@@ -61,12 +74,21 @@ else
     const usemkl = false
 end
 
+@static if usemkl
+   using MKL_jll: libmkl_rt
+else
+   global libmkl_rt
+   nothing
+end
+
 # OpenBLAS_jll is a standard library, but allow users to disable it via preferences
 if Preferences.@load_preference("LoadOpenBLAS_JLL", true)
-    using OpenBLAS_jll: OpenBLAS_jll
+    using OpenBLAS_jll: OpenBLAS_jll, libopenblas
     const useopenblas = OpenBLAS_jll.is_available()
 else
     const useopenblas = false
+    global libopenblas
+    nothing
 end
 
 @reexport using SciMLBase
@@ -327,11 +349,11 @@ function is_algorithm_available(alg::DefaultAlgorithmChoice.T)
     elseif alg === DefaultAlgorithmChoice.RFLUFactorization
         return userecursivefactorization(nothing)  # Requires RecursiveFactorization extension
     elseif alg === DefaultAlgorithmChoice.BLISLUFactorization
-        return useblis()  # Available if BLIS extension is loaded
+        return useblis(nothing)  # Available if BLIS extension is loaded
     elseif alg === DefaultAlgorithmChoice.CudaOffloadLUFactorization
-        return usecuda()  # Available if CUDA extension is loaded
+        return usecuda(nothing)  # Available if CUDA extension is loaded
     elseif alg === DefaultAlgorithmChoice.MetalLUFactorization
-        return usemetal()  # Available if Metal extension is loaded
+        return usemetal(nothing)  # Available if Metal extension is loaded
     else
         # For extension-dependent algorithms not explicitly handled above,
         # we cannot easily check availability without trying to use them.
@@ -364,6 +386,8 @@ const BLASELTYPES = Union{Float32, Float64, ComplexF32, ComplexF64}
 
 function defaultalg_symbol end
 
+include("verbosity.jl")
+include("blas_logging.jl")
 include("generic_lufact.jl")
 include("common.jl")
 include("extension_algs.jl")
@@ -436,18 +460,10 @@ const HAS_APPLE_ACCELERATE = Ref(false)
 appleaccelerate_isavailable() = HAS_APPLE_ACCELERATE[]
 
 # Extension availability checking functions
-useblis() = Base.get_extension(@__MODULE__, :LinearSolveBLISExt) !== nothing
-function usecuda()
-   ext = Base.get_extension(@__MODULE__, :LinearSolveCUDAExt)
-   !isnothing(ext) && ext.CUDA.functional()
-end
-
-# Metal is only available on Apple platforms
-@static if !Sys.isapple()
-    usemetal() = false
-else
-    usemetal() = Base.get_extension(@__MODULE__, :LinearSolveMetalExt) !== nothing
-end
+# Argument is simply to allow for a new dispatch to be added
+useblis(x) = false
+usecuda(x) = false
+usemetal(x) = false
 
 PrecompileTools.@compile_workload begin
     A = rand(4, 4)
@@ -503,5 +519,7 @@ export MetalOffload32MixedLUFactorization
 export OperatorAssumptions, OperatorCondition
 
 export LinearSolveAdjoint
+
+export LinearVerbosity
 
 end

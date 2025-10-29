@@ -9,13 +9,13 @@ to avoid allocations and does not require libblastrampoline.
 struct MKLLUFactorization <: AbstractFactorization end
 
 # Check if MKL is available
-@static if !@isdefined(MKL_jll)
+# MKL_jll < 2022.2 doesn't support the mixed LP64 and ILP64 interfaces that we make use of in LinearSolve
+# In particular, the `_64` APIs do not exist
+# https://www.intel.com/content/www/us/en/developer/articles/release-notes/onemkl-release-notes-2022.html
+@static if !@isdefined(MKL_jll) || !MKL_jll.is_available() || pkgversion(MKL_jll) < v"2022.2"
     __mkl_isavailable() = false
 else
-    # MKL_jll < 2022.2 doesn't support the mixed LP64 and ILP64 interfaces that we make use of in LinearSolve
-    # In particular, the `_64` APIs do not exist
-    # https://www.intel.com/content/www/us/en/developer/articles/release-notes/onemkl-release-notes-2022.html
-    __mkl_isavailable() = MKL_jll.is_available() && pkgversion(MKL_jll) >= v"2022.2"
+    __mkl_isavailable() = true
 end
 
 function getrf!(A::AbstractMatrix{<:ComplexF64};
@@ -32,7 +32,7 @@ function getrf!(A::AbstractMatrix{<:ComplexF64};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(zgetrf_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(zgetrf_), libmkl_rt), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -54,7 +54,7 @@ function getrf!(A::AbstractMatrix{<:ComplexF32};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(cgetrf_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(cgetrf_), libmkl_rt), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -76,7 +76,7 @@ function getrf!(A::AbstractMatrix{<:Float64};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(dgetrf_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(dgetrf_), libmkl_rt), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -98,7 +98,7 @@ function getrf!(A::AbstractMatrix{<:Float32};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(sgetrf_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(sgetrf_), libmkl_rt), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -124,7 +124,7 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall((@blasfunc(zgetrs_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(zgetrs_), libmkl_rt), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
@@ -151,7 +151,7 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall((@blasfunc(cgetrs_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(cgetrs_), libmkl_rt), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
@@ -178,7 +178,7 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall((@blasfunc(dgetrs_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(dgetrs_), libmkl_rt), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{Float64}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
@@ -205,7 +205,7 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall((@blasfunc(sgetrs_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(sgetrs_), libmkl_rt), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{Float32}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
@@ -223,14 +223,14 @@ const PREALLOCATED_MKL_LU = begin
 end
 
 function LinearSolve.init_cacheval(alg::MKLLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions)
     PREALLOCATED_MKL_LU
 end
 
 function LinearSolve.init_cacheval(alg::MKLLUFactorization,
         A::AbstractMatrix{<:Union{Float32, ComplexF32, ComplexF64}}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions)
     A = rand(eltype(A), 0, 0)
     ArrayInterface.lu_instance(A), Ref{BlasInt}()
@@ -242,13 +242,47 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
         error("Error, MKL binary is missing but solve is being called. Report this issue")
     A = cache.A
     A = convert(AbstractMatrix, A)
+    verbose = cache.verbose
     if cache.isfresh
         cacheval = @get_cacheval(cache, :MKLLUFactorization)
         res = getrf!(A; ipiv = cacheval[1].ipiv, info = cacheval[2])
         fact = LU(res[1:3]...), res[4]
         cache.cacheval = fact
 
+        info_value = res[3]
+
+        if info_value != 0
+            if !isa(verbose.blas_info, SciMLLogging.Silent) || !isa(verbose.blas_errors, SciMLLogging.Silent) ||
+                !isa(verbose.blas_invalid_args, SciMLLogging.Silent)
+                op_info = get_blas_operation_info(:dgetrf, A, cache.b, condition = !isa(verbose.condition_number, SciMLLogging.Silent))
+                if cache.verbose.condition_number != Silent()
+                    if op_info[:condition_number] === nothing
+                        @SciMLMessage("Matrix condition number calculation failed.", cache.verbose, :condition_number)
+                    else
+                        @SciMLMessage("Matrix condition number: $(round(op_info[:condition_number], sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf", cache.verbose, :condition_number)
+                    end
+                end
+                verb_option, message = blas_info_msg(
+                    :dgetrf, info_value; extra_context = op_info)
+                @SciMLMessage(message, verbose, verb_option)
+            end
+        else
+            if cache.verbose.blas_success != Silent()
+                op_info = get_blas_operation_info(:dgetrf, A, cache.b, condition = !isa(verbose.condition_number, SciMLLogging.Silent))
+                if cache.verbose.condition_number != Silent()
+                    if op_info[:condition_number] === nothing
+                        @SciMLMessage("Matrix condition number calculation failed.", cache.verbose, :condition_number)
+                    else
+                        @SciMLMessage("Matrix condition number: $(round(op_info[:condition_number], sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf",
+                            cache.verbose, :condition_number)
+                    end
+                end
+                @SciMLMessage("BLAS LU factorization (dgetrf) completed successfully for $(op_info[:matrix_size]) matrix", cache.verbose, :blas_success)
+            end
+        end
+
         if !LinearAlgebra.issuccess(fact[1])
+            @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
         end
@@ -281,7 +315,7 @@ const PREALLOCATED_MKL32_LU = begin
 end
 
 function LinearSolve.init_cacheval(alg::MKL32MixedLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions)
     # Pre-allocate appropriate 32-bit arrays based on input type
     m, n = size(A)
@@ -312,6 +346,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKL32MixedLUFactorization;
         cache.cacheval = fact
 
         if !LinearAlgebra.issuccess(fact[1])
+            @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
         end

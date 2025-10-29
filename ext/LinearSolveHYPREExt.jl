@@ -5,7 +5,8 @@ using HYPRE.LibHYPRE: HYPRE_Complex
 using HYPRE: HYPRE, HYPREMatrix, HYPRESolver, HYPREVector
 using LinearSolve: HYPREAlgorithm, LinearCache, LinearProblem, LinearSolve,
                    OperatorAssumptions, default_tol, init_cacheval, __issquare,
-                   __conditioning, LinearSolveAdjoint
+                   __conditioning, LinearSolveAdjoint, LinearVerbosity
+using SciMLLogging: SciMLLogging, verbosity_to_int, @SciMLMessage
 using SciMLBase: LinearProblem, LinearAliasSpecifier, SciMLBase
 using UnPack: @unpack
 using Setfield: @set!
@@ -22,7 +23,7 @@ end
 
 function LinearSolve.init_cacheval(alg::HYPREAlgorithm, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol,
-        verbose::Bool, assumptions::OperatorAssumptions)
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
     return HYPRECache(nothing, nothing, nothing, nothing, true, true, true)
 end
 
@@ -64,7 +65,7 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
                              eltype(prob.A)),
         # TODO: Implement length() for HYPREVector in HYPRE.jl?
         maxiters::Int = prob.b isa HYPREVector ? 1000 : length(prob.b),
-        verbose::Bool = false,
+        verbose = LinearVerbosity(SciMLLogging.None()),
         Pl = LinearAlgebra.I,
         Pr = LinearAlgebra.I,
         assumptions = OperatorAssumptions(),
@@ -111,6 +112,23 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
         alias_b = aliases.alias_b
     end
 
+    if verbose isa Bool
+        #@warn "Using `true` or `false` for `verbose` is being deprecated. Please use a `LinearVerbosity` type to specify verbosity settings.
+        # For details see the verbosity section of the common solver options documentation page."
+        init_cache_verb = verbose
+        if verbose
+            verb_spec = LinearVerbosity()
+        else
+            verb_spec = LinearVerbosity(SciMLLogging.None())
+        end
+    elseif verbose isa SciMLLogging.AbstractVerbosityPreset
+        verb_spec = LinearVerbosity(verbose)
+        init_cache_verb = verb_spec
+    else
+        verb_spec = verbose
+        init_cache_verb = verb_spec
+    end
+
     A = A isa HYPREMatrix ? A : HYPREMatrix(A)
     b = b isa HYPREVector ? b : HYPREVector(b)
     u0 = u0 isa HYPREVector ? u0 : (u0 === nothing ? nothing : HYPREVector(u0))
@@ -121,7 +139,7 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
     end
 
     # Initialize internal alg cache
-    cacheval = init_cacheval(alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, verbose,
+    cacheval = init_cacheval(alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, init_cache_verb,
         assumptions)
     Tc = typeof(cacheval)
     isfresh = true
@@ -159,10 +177,11 @@ function create_solver(alg::HYPREAlgorithm, cache::LinearCache)
     solver = create_solver(alg.solver, comm)
 
     # Construct solver options
+    verbose = verbosity_to_int(cache.verbose.HYPRE_verbosity)
     solver_options = (;
         AbsoluteTol = cache.abstol,
         MaxIter = cache.maxiters,
-        PrintLevel = Int(cache.verbose),
+        PrintLevel = verbose,
         Tol = cache.reltol)
 
     # Preconditioner (uses Pl even though it might not be a *left* preconditioner just *a*

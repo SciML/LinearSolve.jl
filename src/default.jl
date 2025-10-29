@@ -450,7 +450,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::Nothing,
 end
 
 function init_cacheval(alg::Nothing, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
-        verbose::Bool, assump::OperatorAssumptions)
+        verbose::Union{LinearVerbosity, Bool}, assump::OperatorAssumptions)
     init_cacheval(defaultalg(A, b, assump), A, b, u, Pl, Pr, maxiters, abstol, reltol,
         verbose,
         assump)
@@ -461,7 +461,7 @@ cache.cacheval = NamedTuple(LUFactorization = cache of LUFactorization, ...)
 """
 @generated function init_cacheval(alg::DefaultLinearSolver, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol,
-        verbose::Bool, assump::OperatorAssumptions)
+        verbose::Union{LinearVerbosity, Bool}, assump::OperatorAssumptions)
     caches = map(first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))) do alg
         if alg === :KrylovJL_GMRES || alg === :KrylovJL_CRAIGMR || alg === :KrylovJL_LSMR
             quote
@@ -513,7 +513,8 @@ end
             newex = quote
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
-                    ## TODO: Add verbosity logging here about using the fallback
+                    @SciMLMessage("LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.", 
+                        cache.verbose, :default_lu_fallback)
                     sol = SciMLBase.solve!(
                         cache, QRFactorization(ColumnNorm()), args...; kwargs...)
                     SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
@@ -533,7 +534,8 @@ end
 
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
-                    ## TODO: Add verbosity logging here about using the fallback
+                    @SciMLMessage("LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.",
+                        cache.verbose, :default_lu_fallback)
                     sol = SciMLBase.solve!(
                         cache, QRFactorization(ColumnNorm()), args...; kwargs...)
                     SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
@@ -547,13 +549,14 @@ end
             end
         elseif alg == Symbol(DefaultAlgorithmChoice.BLISLUFactorization)
             newex = quote
-                if !useblis()
+                if !useblis(nothing)
                     error("Default algorithm calling solve on BLISLUFactorization without the extension being loaded. This shouldn't happen.")
                 end
 
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
-                    ## TODO: Add verbosity logging here about using the fallback
+                    @SciMLMessage("LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.",
+                        cache.verbose, :default_lu_fallback)
                     sol = SciMLBase.solve!(
                         cache, QRFactorization(ColumnNorm()), args...; kwargs...)
                     SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
@@ -567,13 +570,14 @@ end
             end
         elseif alg == Symbol(DefaultAlgorithmChoice.CudaOffloadLUFactorization)
             newex = quote
-                if !usecuda()
+                if !usecuda(nothing)
                     error("Default algorithm calling solve on CudaOffloadLUFactorization without CUDA.jl being loaded. This shouldn't happen.")
                 end
 
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
-                    ## TODO: Add verbosity logging here about using the fallback
+                    @SciMLMessage("LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.",
+                        cache.verbose, :default_lu_fallback)
                     sol = SciMLBase.solve!(
                         cache, QRFactorization(ColumnNorm()), args...; kwargs...)
                     SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
@@ -587,13 +591,14 @@ end
             end
         elseif alg == Symbol(DefaultAlgorithmChoice.MetalLUFactorization)
             newex = quote
-                if !usemetal()
+                if !usemetal(nothing)
                     error("Default algorithm calling solve on MetalLUFactorization without Metal.jl being loaded. This shouldn't happen.")
                 end
 
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
-                    ## TODO: Add verbosity logging here about using the fallback
+                    @SciMLMessage("LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.",
+                        cache.verbose, :default_lu_fallback)
                     sol = SciMLBase.solve!(
                         cache, QRFactorization(ColumnNorm()), args...; kwargs...)
                     SciMLBase.build_linear_solution(alg, sol.u, sol.resid, sol.cache;
@@ -636,7 +641,7 @@ end
 @generated function defaultalg_adjoint_eval(cache::LinearCache, dy)
     ex = :()
     for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))
-        newex = if alg == Symbol(DefaultAlgorithmChoice.RFLUFactorization)
+        newex = if alg in Symbol.((DefaultAlgorithmChoice.RFLUFactorization, DefaultAlgorithmChoice.GenericLUFactorization))
             quote
                 getproperty(cache.cacheval, $(Meta.quot(alg)))[1]' \ dy
             end
@@ -661,8 +666,7 @@ end
             DefaultAlgorithmChoice.SVDFactorization,
             DefaultAlgorithmChoice.CholeskyFactorization,
             DefaultAlgorithmChoice.NormalCholeskyFactorization,
-            DefaultAlgorithmChoice.QRFactorizationPivoted,
-            DefaultAlgorithmChoice.GenericLUFactorization))
+            DefaultAlgorithmChoice.QRFactorizationPivoted))
             quote
                 getproperty(cache.cacheval, $(Meta.quot(alg)))' \ dy
             end

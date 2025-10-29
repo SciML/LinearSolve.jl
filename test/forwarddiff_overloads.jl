@@ -2,6 +2,7 @@ using LinearSolve
 using ForwardDiff
 using Test
 using SparseArrays
+using ComponentArrays
 
 function h(p)
     (A = [p[1] p[2]+1 p[2]^3;
@@ -195,3 +196,42 @@ prob = LinearProblem(A, b)
 @test init(prob, GenericLUFactorization()) isa LinearSolve.LinearCache
 
 @test init(prob) isa LinearSolve.LinearCache
+
+# Test ComponentArray with ForwardDiff (Issue SciML/DifferentialEquations.jl#1110)
+# This tests that ArrayInterface.restructure preserves ComponentArray structure
+
+# Direct test: ComponentVector with Dual elements should preserve structure
+ca_dual = ComponentArray(
+    a = ForwardDiff.Dual(1.0, 1.0, 0.0),
+    b = ForwardDiff.Dual(2.0, 0.0, 1.0)
+)
+A_dual = [ca_dual.a 1.0; 1.0 ca_dual.b]
+b_dual = ComponentArray(x = ca_dual.a + 1, y = ca_dual.b * 2)
+
+prob_dual = LinearProblem(A_dual, b_dual)
+sol_dual = solve(prob_dual)
+
+# The solution should preserve ComponentArray type
+@test sol_dual.u isa ComponentVector
+@test hasproperty(sol_dual.u, :x)
+@test hasproperty(sol_dual.u, :y)
+
+# Test gradient computation with ComponentArray inside ForwardDiff
+function component_linsolve(p)
+    # Create a matrix that depends on p
+    A = [p[1] p[2]; p[2] p[1] + 5]
+    # Create a ComponentArray RHS that depends on p
+    b_vec = ComponentArray(x = p[1] + 1, y = p[2] * 2)
+    prob = LinearProblem(A, b_vec)
+    sol = solve(prob)
+    # Return sum of solution
+    return sum(sol.u)
+end
+
+p_test = [2.0, 3.0]
+# This will internally create Dual numbers and ComponentArrays with Dual elements
+grad = ForwardDiff.gradient(component_linsolve, p_test)
+@test grad isa Vector
+@test length(grad) == 2
+@test !any(isnan, grad)
+@test !any(isinf, grad)

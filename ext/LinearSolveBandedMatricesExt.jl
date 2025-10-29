@@ -3,7 +3,7 @@ module LinearSolveBandedMatricesExt
 using BandedMatrices, LinearAlgebra, LinearSolve
 import LinearSolve: defaultalg,
                     do_factorization, init_cacheval, DefaultLinearSolver,
-                    DefaultAlgorithmChoice
+                    DefaultAlgorithmChoice, LinearVerbosity
 
 # Defaults for BandedMatrices
 function defaultalg(A::BandedMatrix, b, oa::OperatorAssumptions{Bool})
@@ -41,14 +41,14 @@ for alg in (:SVDFactorization, :MKLLUFactorization, :DiagonalFactorization,
     :AppleAccelerateLUFactorization, :CholeskyFactorization)
     @eval begin
         function init_cacheval(::$(alg), ::BandedMatrix, b, u, Pl, Pr, maxiters::Int,
-                abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions)
+                abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
             return nothing
         end
     end
 end
 
 function init_cacheval(::LUFactorization, A::BandedMatrix{T}, b, u, Pl, Pr, maxiters::Int,
-        abstol, reltol, verbose::Bool, assumptions::OperatorAssumptions) where {T}
+        abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions) where {T}
     (T <: BigFloat) && return qr(similar(A, 0, 0))
     return lu(similar(A, 0, 0))
 end
@@ -61,7 +61,7 @@ for alg in (:SVDFactorization, :MKLLUFactorization, :DiagonalFactorization,
     :AppleAccelerateLUFactorization, :QRFactorization, :LUFactorization)
     @eval begin
         function init_cacheval(::$(alg), ::Symmetric{<:Number, <:BandedMatrix}, b, u, Pl,
-                Pr, maxiters::Int, abstol, reltol, verbose::Bool,
+                Pr, maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
                 assumptions::OperatorAssumptions)
             return nothing
         end

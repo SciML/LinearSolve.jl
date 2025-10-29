@@ -2,9 +2,10 @@ module LinearSolveRecursiveFactorizationExt
 
 using LinearSolve: LinearSolve, userecursivefactorization, LinearCache, @get_cacheval,
                    RFLUFactorization, RF32MixedLUFactorization, default_alias_A,
-                   default_alias_b
+                   default_alias_b, LinearVerbosity
 using LinearSolve.LinearAlgebra, LinearSolve.ArrayInterface, RecursiveFactorization
 using SciMLBase: SciMLBase, ReturnCode
+using SciMLLogging: @SciMLMessage
 
 LinearSolve.userecursivefactorization(A::Union{Nothing, AbstractMatrix}) = true
 
@@ -21,6 +22,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::RFLUFactorization
         cache.cacheval = (fact, ipiv)
 
         if !LinearAlgebra.issuccess(fact)
+            @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
         end
@@ -42,7 +44,7 @@ const PREALLOCATED_RF32_LU = begin
 end
 
 function LinearSolve.init_cacheval(alg::RF32MixedLUFactorization{P, T}, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::LinearSolve.OperatorAssumptions) where {P, T}
     # Pre-allocate appropriate 32-bit arrays based on input type
     m, n = size(A)

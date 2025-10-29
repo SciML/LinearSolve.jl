@@ -8,7 +8,7 @@ import PrecompileTools
 using ArrayInterface: ArrayInterface
 using Base: Bool, convert, copyto!, adjoint, transpose, /, \, require_one_based_indexing
 using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, BunchKaufman,
-                     ColumnNorm, Diagonal, Factorization, Hermitian, I, LAPACK, NoPivot,
+                     ColumnNorm, cond, Diagonal, Factorization, Hermitian, I, LAPACK, NoPivot,
                      RowMaximum, RowNonZero, SymTridiagonal, Symmetric, Transpose,
                      Tridiagonal, UniformScaling, axpby!, axpy!, bunchkaufman,
                      bunchkaufman!,
@@ -21,6 +21,8 @@ using SciMLBase: SciMLBase, LinearAliasSpecifier, AbstractSciMLOperator,
 using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator,
                       MatrixOperator,
                       has_ldiv!, issquare
+using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_int, AbstractVerbositySpecifier, AbstractMessageLevel, AbstractVerbosityPreset,
+                    Silent, InfoLevel, WarnLevel, ErrorLevel, CustomLevel, None, Minimal, Standard, Detailed, All
 using Setfield: @set, @set!
 using UnPack: @unpack
 using DocStringExtensions: DocStringExtensions
@@ -384,6 +386,8 @@ const BLASELTYPES = Union{Float32, Float64, ComplexF32, ComplexF64}
 
 function defaultalg_symbol end
 
+include("verbosity.jl")
+include("blas_logging.jl")
 include("generic_lufact.jl")
 include("common.jl")
 include("extension_algs.jl")
@@ -515,5 +519,7 @@ export MetalOffload32MixedLUFactorization
 export OperatorAssumptions, OperatorCondition
 
 export LinearSolveAdjoint
+
+export LinearVerbosity
 
 end

@@ -3,8 +3,8 @@ module LinearSolvePardisoExt
 using Pardiso, LinearSolve
 using SparseArrays
 using SparseArrays: nonzeros, rowvals, getcolptr
-using LinearSolve: PardisoJL, @unpack
-
+using LinearSolve: PardisoJL, @unpack, LinearVerbosity
+using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_bool
 using LinearSolve.SciMLBase
 
 LinearSolve.needs_concrete_A(alg::PardisoJL) = true
@@ -20,7 +20,7 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
         maxiters::Int,
         abstol,
         reltol,
-        verbose::Bool,
+        verbose::Union{LinearVerbosity, Bool},
         assumptions::LinearSolve.OperatorAssumptions)
     @unpack nprocs, solver_type, matrix_type, cache_analysis, iparm, dparm, vendor = alg
     A = convert(AbstractMatrix, A)
@@ -73,8 +73,16 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
             error("Number type not supported by Pardiso")
         end
     end
-    verbose && Pardiso.set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
 
+    if verbose isa Bool
+        verbose_spec = LinearVerbosity(pardiso_verbosity = SciMLLogging.WarnLevel())
+    else
+        verbose_spec = verbose
+    end
+
+    if verbosity_to_bool(verbose_spec.pardiso_verbosity)
+        Pardiso.set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
+    end
     #=
     Note: It is recommended to use IPARM(11)=1 (scaling) and IPARM(13)=1 (matchings) for
     highly indefinite symmetric matrices e.g. from interior point optimizations or saddle point problems.

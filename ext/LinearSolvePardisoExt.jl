@@ -73,8 +73,14 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
             error("Number type not supported by Pardiso")
         end
     end
-    
-    if verbosity_to_bool(verbose.pardiso_verbosity)
+
+    if verbose isa Bool
+        verbose_spec = LinearVerbosity(pardiso_verbosity = SciMLLogging.WarnLevel())
+    else
+        verbose_spec = verbose
+    end
+
+    if verbosity_to_bool(verbose_spec.pardiso_verbosity)
         Pardiso.set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
     end
     #=

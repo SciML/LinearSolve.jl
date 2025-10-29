@@ -130,7 +130,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::ButterflyFactoriz
 
     workspace, F = cache.cacheval
     (;A, b, ws, U, V, out, tmp, n) = workspace
-    b .= cache_b
+    b[1:M] .= cache_b
     mul!(tmp, U', b)
     TriangularSolve.ldiv!(F, tmp, thread)
     mul!(b, V, tmp)

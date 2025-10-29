@@ -267,7 +267,7 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         abstol = default_tol(real(eltype(prob.b))),
         reltol = default_tol(real(eltype(prob.b))),
         maxiters::Int = length(prob.b),
-        verbose = LinearVerbosity(),
+        verbose = true,
         Pl = nothing,
         Pr = nothing,
         assumptions = OperatorAssumptions(issquare(prob.A)),
@@ -325,8 +325,9 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     end
 
     if verbose isa Bool
-        @warn "Using `true` or `false` for `verbose` is being deprecated. Please use a `LinearVerbosity` type to specify verbosity settings.
-        For details see the verbosity section of the common solver options documentation page."
+        # @warn "Using `true` or `false` for `verbose` is being deprecated. Please use a `LinearVerbosity` type to specify verbosity settings.
+        # For details see the verbosity section of the common solver options documentation page."
+        init_cache_verb = verbose
         if verbose 
             verbose_spec = LinearVerbosity()
         else
@@ -334,8 +335,10 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         end
     elseif verbose isa SciMLLogging.AbstractVerbosityPreset
         verbose_spec = LinearVerbosity(verbose)
+        init_cache_verb = verbose_spec
     else
         verbose_spec = verbose
+        init_cache_verb = verbose_spec
     end
 
     b = if issparsematrix(b) && !(A isa Diagonal)
@@ -375,7 +378,7 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         # TODO: deprecate once all docs are updated to the new form
         #@warn "passing Preconditioners at `init`/`solve` time is deprecated. Instead add a `precs` function to your algorithm."
     end
-    cacheval = init_cacheval(alg, A, b, u0_, Pl, Pr, maxiters, abstol, reltol, verbose_spec,
+    cacheval = init_cacheval(alg, A, b, u0_, Pl, Pr, maxiters, abstol, reltol, init_cache_verb,
         assumptions)
     isfresh = true
     precsisfresh = false

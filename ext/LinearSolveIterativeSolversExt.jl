@@ -49,6 +49,15 @@ function LinearSolve.init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, max
         abstol,
         reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+    if verbose isa Bool
+        if verbose
+            verbosity = LinearVerbosity(no_right_preconditioning = SciMLLogging.WarnLevel())
+        else
+            verbosity = LinearVerbosity(SciMLLogging.None())
+        end
+    else
+        verbosity = verbose
+    end
     restart = (alg.gmres_restart == 0) ? min(20, size(A, 1)) : alg.gmres_restart
     s = :idrs_s in keys(alg.kwargs) ? alg.kwargs.idrs_s : 4 # shadow space
 
@@ -58,7 +67,7 @@ function LinearSolve.init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, max
     iterable = if alg.generate_iterator === IterativeSolvers.cg_iterator!
         !LinearSolve._isidentity_struct(Pr) &&
             @SciMLMessage("$(alg.generate_iterator) doesn't support right preconditioning",
-                verbose, :no_right_preconditioning)
+                verbosity, :no_right_preconditioning)
         alg.generate_iterator(u, A, b, Pl;
             kwargs...)
     elseif alg.generate_iterator === IterativeSolvers.gmres_iterable!
@@ -67,7 +76,7 @@ function LinearSolve.init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, max
     elseif alg.generate_iterator === IterativeSolvers.idrs_iterable!
         !!LinearSolve._isidentity_struct(Pr) &&
             @SciMLMessage("$(alg.generate_iterator) doesn't support right preconditioning",
-                verbose, :no_right_preconditioning)
+                verbosity, :no_right_preconditioning)
         history = IterativeSolvers.ConvergenceHistory(partial = true)
         history[:abstol] = abstol
         history[:reltol] = reltol
@@ -76,7 +85,7 @@ function LinearSolve.init_cacheval(alg::IterativeSolversJL, A, b, u, Pl, Pr, max
     elseif alg.generate_iterator === IterativeSolvers.bicgstabl_iterator!
         !!LinearSolve._isidentity_struct(Pr) &&
             @SciMLMessage("$(alg.generate_iterator) doesn't support right preconditioning",
-                verbose, :no_right_preconditioning)
+                verbosity, :no_right_preconditioning)
         alg.generate_iterator(u, A, b, alg.args...; Pl = Pl,
             abstol = abstol, reltol = reltol,
             max_mv_products = maxiters * 2,

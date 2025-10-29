@@ -115,13 +115,18 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
     if verbose isa Bool
         #@warn "Using `true` or `false` for `verbose` is being deprecated. Please use a `LinearVerbosity` type to specify verbosity settings.
         # For details see the verbosity section of the common solver options documentation page."
+        init_cache_verb = verbose
         if verbose
-            verbose = LinearVerbosity()
+            verb_spec = LinearVerbosity()
         else
-            verbose = LinearVerbosity(SciMLLogging.None())
+            verb_spec = LinearVerbosity(SciMLLogging.None())
         end
-    elseif verbose isa SciMLLogging.AbstractMessageLevel
-        verbose = LinearVerbosity(verbose)
+    elseif verbose isa SciMLLogging.AbstractVerbosityPreset
+        verb_spec = LinearVerbosity(verbose)
+        init_cache_verb = verb_spec
+    else
+        verb_spec = verbose
+        init_cache_verb = verb_spec
     end
 
     A = A isa HYPREMatrix ? A : HYPREMatrix(A)
@@ -134,7 +139,7 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
     end
 
     # Initialize internal alg cache
-    cacheval = init_cacheval(alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, verbose,
+    cacheval = init_cacheval(alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, init_cache_verb,
         assumptions)
     Tc = typeof(cacheval)
     isfresh = true

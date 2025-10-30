@@ -385,7 +385,7 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     Tc = typeof(cacheval)
 
     cache = LinearCache{typeof(A), typeof(b), typeof(u0_), typeof(p), typeof(alg), Tc,
-        typeof(Pl), typeof(Pr), typeof(reltol), typeof(assumptions.issq),
+        typeof(Pl), typeof(Pr), typeof(reltol), typeof(verbose_spec), typeof(assumptions.issq),
         typeof(sensealg)}(
         A, b, u0_, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
         maxiters, verbose_spec, assumptions, sensealg)

@@ -105,7 +105,7 @@ The cache automatically tracks when matrix `A` or parameters `p` change by setti
 appropriate freshness flags. When `solve!` is called, stale cache entries are automatically
 recomputed as needed.
 """
-mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, S}
+mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, S, V <: LinearVerbosity}
     A::TA
     b::Tb
     u::Tu
@@ -119,7 +119,7 @@ mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, S}
     abstol::Ttol
     reltol::Ttol
     maxiters::Int
-    verbose::LinearVerbosity
+    verbose::V
     assumptions::OperatorAssumptions{issq}
     sensealg::S
 end

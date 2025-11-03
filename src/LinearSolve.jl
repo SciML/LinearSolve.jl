@@ -446,7 +446,7 @@ for kralg in (Krylov.lsmr!, Krylov.craigmr!)
 end
 for alg in (:LUFactorization, :FastLUFactorization, :SVDFactorization,
     :GenericFactorization, :GenericLUFactorization, :SimpleLUFactorization,
-    :RFLUFactorization, :UMFPACKFactorization, :KLUFactorization, :SparspakFactorization,
+    :RFLUFactorization, :ButterflyFactorization, :UMFPACKFactorization, :KLUFactorization, :SparspakFactorization,
     :DiagonalFactorization, :CholeskyFactorization, :BunchKaufmanFactorization,
     :CHOLMODFactorization, :LDLtFactorization, :AppleAccelerateLUFactorization,
     :MKLLUFactorization, :MetalLUFactorization, :CUSOLVERRFFactorization)
@@ -480,7 +480,7 @@ cudss_loaded(A) = false
 is_cusparse(A) = false
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
-       GenericLUFactorization, SimpleLUFactorization, RFLUFactorization,
+       GenericLUFactorization, SimpleLUFactorization, RFLUFactorization, ButterflyFactorization,
        NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
        UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization,
        SparspakFactorization, DiagonalFactorization, CholeskyFactorization,

@@ -11,9 +11,7 @@ b1 = rand(n);
 
 function f(A, b1; alg = LUFactorization())
     prob = LinearProblem(A, b1)
-
     sol1 = solve(prob, alg)
-
     s1 = sol1.u
     norm(s1)
 end
@@ -160,7 +158,7 @@ A = rand(n, n);
 b1 = rand(n);
 b2 = rand(n);
 
-function f(A, b1, b2; alg=LUFactorization())
+function f_(A, b1, b2; alg=LUFactorization())
     prob = LinearProblem(A, b1)
     cache = init(prob, alg)
     s1 = copy(solve!(cache).u)
@@ -169,22 +167,23 @@ function f(A, b1, b2; alg=LUFactorization())
     norm(s1 + s2)
 end
 
-f_primal = f(copy(A), copy(b1), copy(b2))
-value, gradient = Mooncake.value_and_gradient!!(
-    prepare_gradient_cache(f, copy(A), copy(b1), copy(b2)),
-    f, copy(A), copy(b1), copy(b2)
+f_primal = f_(copy(A), copy(b1), copy(b2))
+rule = Mooncake.build_rrule(f_, copy(A), copy(b1), copy(b2))
+value, gradient = Mooncake.value_and_pullback!!(
+    rule, 1.0,
+    f_, copy(A), copy(b1), copy(b2)
 )
 
-dA2 = ForwardDiff.gradient(x -> f(x, eltype(x).(b1), eltype(x).(b2)), copy(A))
-db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x, eltype(x).(b2)), copy(b1))
-db22 = ForwardDiff.gradient(x -> f(eltype(x).(A), eltype(x).(b1), x), copy(b2))
+dA2 = ForwardDiff.gradient(x -> f_(x, eltype(x).(b1), eltype(x).(b2)), copy(A))
+db12 = ForwardDiff.gradient(x -> f_(eltype(x).(A), x, eltype(x).(b2)), copy(b1))
+db22 = ForwardDiff.gradient(x -> f_(eltype(x).(A), eltype(x).(b1), x), copy(b2))
 
 @test value == f_primal
 @test gradient[2] ≈ dA2
 @test gradient[3] ≈ db12
 @test gradient[4] ≈ db22
 
-function f2(A, b1, b2; alg=RFLUFactorization())
+function f_2(A, b1, b2; alg=RFLUFactorization())
     prob = LinearProblem(A, b1)
     cache = init(prob, alg)
     s1 = copy(solve!(cache).u)
@@ -193,18 +192,23 @@ function f2(A, b1, b2; alg=RFLUFactorization())
     norm(s1 + s2)
 end
 
-f_primal = f2(copy(A), copy(b1), copy(b2))
-value, gradient = Mooncake.value_and_gradient!!(
-    prepare_gradient_cache(f2, copy(A), copy(b1), copy(b2)),
-    f2, copy(A), copy(b1), copy(b2)
+f_primal = f_2(copy(A), copy(b1), copy(b2))
+rule = Mooncake.build_rrule(f_2, copy(A), copy(b1), copy(b2))
+value, gradient = Mooncake.value_and_pullback!!(
+    rule, 1.0,
+    f_2, copy(A), copy(b1), copy(b2)
 )
+
+dA2 = ForwardDiff.gradient(x -> f_2(x, eltype(x).(b1), eltype(x).(b2)), copy(A))
+db12 = ForwardDiff.gradient(x -> f_2(eltype(x).(A), x, eltype(x).(b2)), copy(b1))
+db22 = ForwardDiff.gradient(x -> f_2(eltype(x).(A), eltype(x).(b1), x), copy(b2))
 
 @test value == f_primal
 @test gradient[2] ≈ dA2
 @test gradient[3] ≈ db12
 @test gradient[4] ≈ db22
 
-function f3(A, b1, b2; alg=KrylovJL_GMRES())
+function f_3(A, b1, b2; alg=KrylovJL_GMRES())
     prob = LinearProblem(A, b1)
     cache = init(prob, alg)
     s1 = copy(solve!(cache).u)
@@ -213,18 +217,23 @@ function f3(A, b1, b2; alg=KrylovJL_GMRES())
     norm(s1 + s2)
 end
 
-f_primal = f3(copy(A), copy(b1), copy(b2))
-value, gradient = Mooncake.value_and_gradient!!(
-    prepare_gradient_cache(f3, copy(A), copy(b1), copy(b2)),
-    f3, copy(A), copy(b1), copy(b2)
+f_primal = f_3(copy(A), copy(b1), copy(b2))
+rule = Mooncake.build_rrule(f_3, copy(A), copy(b1), copy(b2))
+value, gradient = Mooncake.value_and_pullback!!(
+    rule, 1.0,
+    f_3, copy(A), copy(b1), copy(b2)
 )
 
+dA2 = ForwardDiff.gradient(x -> f_3(x, eltype(x).(b1), eltype(x).(b2)), copy(A))
+db12 = ForwardDiff.gradient(x -> f_3(eltype(x).(A), x, eltype(x).(b2)), copy(b1))
+db22 = ForwardDiff.gradient(x -> f_3(eltype(x).(A), eltype(x).(b1), x), copy(b2))
+
 @test value == f_primal
-@test gradient[2] ≈ dA2 atol = 5e-5
+@test gradient[2] ≈ dA2
 @test gradient[3] ≈ db12
 @test gradient[4] ≈ db22
 
-function f4(A, b1, b2; alg=LUFactorization())
+function f_4(A, b1, b2; alg=LUFactorization())
     prob = LinearProblem(A, b1)
     cache = init(prob, alg)
     solve!(cache)
@@ -238,17 +247,17 @@ end
 A = rand(n, n);
 b1 = rand(n);
 b2 = rand(n);
-# f_primal = f4(copy(A), copy(b1), copy(b2))
+f_primal = f_4(copy(A), copy(b1), copy(b2))
 
-rule = Mooncake.build_rrule(f4, copy(A), copy(b1), copy(b2))
+rule = Mooncake.build_rrule(f_4, copy(A), copy(b1), copy(b2))
 @test_throws "Adjoint case currently not handled" Mooncake.value_and_pullback!!(
     rule, 1.0,
-    f4, copy(A), copy(b1), copy(b2)
+    f_4, copy(A), copy(b1), copy(b2)
 )
 
-# dA2 = ForwardDiff.gradient(x -> f4(x, eltype(x).(b1), eltype(x).(b2)), copy(A))
-# db12 = ForwardDiff.gradient(x -> f4(eltype(x).(A), x, eltype(x).(b2)), copy(b1))
-# db22 = ForwardDiff.gradient(x -> f4(eltype(x).(A), eltype(x).(b1), x), copy(b2))
+# dA2 = ForwardDiff.gradient(x -> f_4(x, eltype(x).(b1), eltype(x).(b2)), copy(A))
+# db12 = ForwardDiff.gradient(x -> f_4(eltype(x).(A), x, eltype(x).(b2)), copy(b1))
+# db22 = ForwardDiff.gradient(x -> f_4(eltype(x).(A), eltype(x).(b1), x), copy(b2))
 
 # @test value == f_primal
 # @test grad[2] ≈ dA2

@@ -89,7 +89,7 @@ solving and caching of factorizations and intermediate results.
 - `abstol::Ttol`: Absolute tolerance for iterative solvers.
 - `reltol::Ttol`: Relative tolerance for iterative solvers.
 - `maxiters::Int`: Maximum number of iterations for iterative solvers.
-- `verbose::Bool`: Whether to print verbose output during solving.
+- `verbose::LinearVerbosity`: Whether to print verbose output during solving.
 - `assumptions::OperatorAssumptions{issq}`: Assumptions about the operator properties.
 - `sensealg::S`: Sensitivity analysis algorithm for automatic differentiation.
 
@@ -105,7 +105,7 @@ The cache automatically tracks when matrix `A` or parameters `p` change by setti
 appropriate freshness flags. When `solve!` is called, stale cache entries are automatically
 recomputed as needed.
 """
-mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, S}
+mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, Tlv <: LinearVerbosity, issq, S}
     A::TA
     b::Tb
     u::Tu
@@ -119,7 +119,7 @@ mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, S}
     abstol::Ttol
     reltol::Ttol
     maxiters::Int
-    verbose::Bool
+    verbose::Tlv
     assumptions::OperatorAssumptions{issq}
     sensealg::S
 end
@@ -267,7 +267,7 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         abstol = default_tol(real(eltype(prob.b))),
         reltol = default_tol(real(eltype(prob.b))),
         maxiters::Int = length(prob.b),
-        verbose::Bool = false,
+        verbose = true,
         Pl = nothing,
         Pr = nothing,
         assumptions = OperatorAssumptions(issquare(prob.A)),
@@ -324,6 +324,23 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         copy(A)
     end
 
+    if verbose isa Bool
+        # @warn "Using `true` or `false` for `verbose` is being deprecated. Please use a `LinearVerbosity` type to specify verbosity settings.
+        # For details see the verbosity section of the common solver options documentation page."
+        init_cache_verb = verbose
+        if verbose 
+            verbose_spec = LinearVerbosity()
+        else
+            verbose_spec = LinearVerbosity(SciMLLogging.None())
+        end
+    elseif verbose isa SciMLLogging.AbstractVerbosityPreset
+        verbose_spec = LinearVerbosity(verbose)
+        init_cache_verb = verbose_spec
+    else
+        verbose_spec = verbose
+        init_cache_verb = verbose_spec
+    end
+
     b = if issparsematrix(b) && !(A isa Diagonal)
         Array(b) # the solution to a linear solve will always be dense!
     elseif alias_b || b isa SVector
@@ -361,17 +378,17 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         # TODO: deprecate once all docs are updated to the new form
         #@warn "passing Preconditioners at `init`/`solve` time is deprecated. Instead add a `precs` function to your algorithm."
     end
-    cacheval = init_cacheval(alg, A, b, u0_, Pl, Pr, maxiters, abstol, reltol, verbose,
+    cacheval = init_cacheval(alg, A, b, u0_, Pl, Pr, maxiters, abstol, reltol, init_cache_verb,
         assumptions)
     isfresh = true
     precsisfresh = false
     Tc = typeof(cacheval)
 
     cache = LinearCache{typeof(A), typeof(b), typeof(u0_), typeof(p), typeof(alg), Tc,
-        typeof(Pl), typeof(Pr), typeof(reltol), typeof(assumptions.issq),
+        typeof(Pl), typeof(Pr), typeof(reltol), typeof(verbose_spec), typeof(assumptions.issq),
         typeof(sensealg)}(
         A, b, u0_, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
-        maxiters, verbose, assumptions, sensealg)
+        maxiters, verbose_spec, assumptions, sensealg)
     return cache
 end
 

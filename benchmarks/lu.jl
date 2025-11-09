@@ -1,7 +1,8 @@
 using BenchmarkTools, Random, VectorizationBase
 using LinearAlgebra, LinearSolve, MKL_jll
+using RecursiveFactorization
+
 nc = min(Int(VectorizationBase.num_cores()), Threads.nthreads())
-BLAS.set_num_threads(nc)
 BenchmarkTools.DEFAULT_PARAMETERS.seconds = 0.5
 
 function luflop(m, n = m; innerflop = 2)
@@ -24,10 +25,10 @@ algs = [
     RFLUFactorization(),
     MKLLUFactorization(),
     FastLUFactorization(),
-    SimpleLUFactorization()
+    SimpleLUFactorization(),
+    ButterflyFactorization(Val(true))
 ]
 res = [Float64[] for i in 1:length(algs)]
-
 ns = 4:8:500
 for i in 1:length(ns)
     n = ns[i]
@@ -65,3 +66,4 @@ p
 
 savefig("lubench.png")
 savefig("lubench.pdf")
+

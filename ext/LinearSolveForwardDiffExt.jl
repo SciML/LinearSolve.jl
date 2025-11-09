@@ -1,12 +1,15 @@
 module LinearSolveForwardDiffExt
 
 using LinearSolve
-using LinearSolve: SciMLLinearSolveAlgorithm, __init, DefaultLinearSolver, DefaultAlgorithmChoice, defaultalg
+using LinearSolve: SciMLLinearSolveAlgorithm, __init, LinearVerbosity, DefaultLinearSolver,
+                   DefaultAlgorithmChoice, defaultalg
 using LinearAlgebra
 using ForwardDiff
 using ForwardDiff: Dual, Partials
 using SciMLBase
 using RecursiveArrayTools
+using SciMLLogging
+using ArrayInterface
 
 const DualLinearProblem = LinearProblem{
     <:Union{Number, <:AbstractArray, Nothing}, iip,
@@ -62,7 +65,7 @@ end
 function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kwargs...)
     # Solve the primal problem
     cache.dual_u0_cache .= cache.linear_cache.u
-    sol = solve!(cache.linear_cache, alg, args...; kwargs...)  
+    sol = solve!(cache.linear_cache, alg, args...; kwargs...)
 
     cache.primal_u_cache .= cache.linear_cache.u
     cache.primal_b_cache .= cache.linear_cache.b
@@ -164,26 +167,27 @@ function linearsolve_dual_solution(
 end
 
 function linearsolve_dual_solution(u::AbstractArray, partials,
-        cache::DualLinearCache{DT}) where {T, V, N, DT <: Dual{T,V,N}}
+        cache::DualLinearCache{DT}) where {T, V, N, DT <: Dual{T, V, N}}
     # Optimized in-place version that reuses cache.dual_u
     linearsolve_dual_solution!(getfield(cache, :dual_u), u, partials)
     return getfield(cache, :dual_u)
 end
 
-function linearsolve_dual_solution!(dual_u::AbstractArray{DT}, u::AbstractArray, partials) where {T, V, N, DT <: Dual{T,V,N}}
+function linearsolve_dual_solution!(dual_u::AbstractArray{DT}, u::AbstractArray,
+        partials) where {T, V, N, DT <: Dual{T, V, N}}
     # Direct in-place construction of dual numbers without temporary allocations
     n_partials = length(partials)
-    
+
     for i in eachindex(u, dual_u)
         # Extract partials for this element directly
         partial_vals = ntuple(Val(N)) do j
             V(partials[j][i])
         end
-        
+
         # Construct dual number in-place
-        dual_u[i] = DT(u[i], Partials{N,V}(partial_vals))
+        dual_u[i] = DT(u[i], Partials{N, V}(partial_vals))
     end
-    
+
     return dual_u
 end
 
@@ -221,7 +225,7 @@ function __dual_init(
         abstol = LinearSolve.default_tol(real(eltype(prob.b))),
         reltol = LinearSolve.default_tol(real(eltype(prob.b))),
         maxiters::Int = length(prob.b),
-        verbose::Bool = false,
+        verbose = LinearVerbosity(SciMLLogging.None()),
         Pl = nothing,
         Pr = nothing,
         assumptions = OperatorAssumptions(issquare(prob.A)),
@@ -278,7 +282,7 @@ function __dual_init(
         true,  # Cache is initially valid
         A,
         b,
-        zeros(dual_type, length(b))
+        ArrayInterface.restructure(b, zeros(dual_type, length(b)))
     )
 end
 
@@ -287,10 +291,11 @@ function SciMLBase.solve!(cache::DualLinearCache, args...; kwargs...)
 end
 
 function SciMLBase.solve!(
-        cache::DualLinearCache{DT}, alg::SciMLLinearSolveAlgorithm, args...; kwargs...) where {DT <: ForwardDiff.Dual}
+        cache::DualLinearCache{DT}, alg::SciMLLinearSolveAlgorithm, args...; kwargs...) where {DT <:
+                                                                                               ForwardDiff.Dual}
     primal_sol = linearsolve_forwarddiff_solve!(
         cache::DualLinearCache, getfield(cache, :linear_cache).alg, args...; kwargs...)
-    dual_sol = linearsolve_dual_solution(getfield(cache,:linear_cache).u, getfield(cache, :rhs_list), cache)
+    dual_sol = linearsolve_dual_solution(getfield(cache, :linear_cache).u, getfield(cache, :rhs_list), cache)
 
     # For scalars, we still need to assign since cache.dual_u might not be pre-allocated
     if !(getfield(cache, :dual_u) isa AbstractArray)
@@ -298,7 +303,8 @@ function SciMLBase.solve!(
     end
 
     return SciMLBase.build_linear_solution(
-        getfield(cache, :linear_cache).alg, getfield(cache, :dual_u), primal_sol.resid, cache; primal_sol.retcode, primal_sol.iters, primal_sol.stats
+        getfield(cache, :linear_cache).alg, getfield(cache, :dual_u), primal_sol.resid, cache;
+        primal_sol.retcode, primal_sol.iters, primal_sol.stats
     )
 end
 

@@ -223,14 +223,14 @@ const PREALLOCATED_MKL_LU = begin
 end
 
 function LinearSolve.init_cacheval(alg::MKLLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions)
     PREALLOCATED_MKL_LU
 end
 
 function LinearSolve.init_cacheval(alg::MKLLUFactorization,
         A::AbstractMatrix{<:Union{Float32, ComplexF32, ComplexF64}}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions)
     A = rand(eltype(A), 0, 0)
     ArrayInterface.lu_instance(A), Ref{BlasInt}()
@@ -242,13 +242,47 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
         error("Error, MKL binary is missing but solve is being called. Report this issue")
     A = cache.A
     A = convert(AbstractMatrix, A)
+    verbose = cache.verbose
     if cache.isfresh
         cacheval = @get_cacheval(cache, :MKLLUFactorization)
         res = getrf!(A; ipiv = cacheval[1].ipiv, info = cacheval[2])
         fact = LU(res[1:3]...), res[4]
         cache.cacheval = fact
 
+        info_value = res[3]
+
+        if info_value != 0
+            if !isa(verbose.blas_info, SciMLLogging.Silent) || !isa(verbose.blas_errors, SciMLLogging.Silent) ||
+                !isa(verbose.blas_invalid_args, SciMLLogging.Silent)
+                op_info = get_blas_operation_info(:dgetrf, A, cache.b, condition = !isa(verbose.condition_number, SciMLLogging.Silent))
+                if cache.verbose.condition_number != Silent()
+                    if op_info[:condition_number] === nothing
+                        @SciMLMessage("Matrix condition number calculation failed.", cache.verbose, :condition_number)
+                    else
+                        @SciMLMessage("Matrix condition number: $(round(op_info[:condition_number], sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf", cache.verbose, :condition_number)
+                    end
+                end
+                verb_option, message = blas_info_msg(
+                    :dgetrf, info_value; extra_context = op_info)
+                @SciMLMessage(message, verbose, verb_option)
+            end
+        else
+            if cache.verbose.blas_success != Silent()
+                op_info = get_blas_operation_info(:dgetrf, A, cache.b, condition = !isa(verbose.condition_number, SciMLLogging.Silent))
+                if cache.verbose.condition_number != Silent()
+                    if op_info[:condition_number] === nothing
+                        @SciMLMessage("Matrix condition number calculation failed.", cache.verbose, :condition_number)
+                    else
+                        @SciMLMessage("Matrix condition number: $(round(op_info[:condition_number], sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf",
+                            cache.verbose, :condition_number)
+                    end
+                end
+                @SciMLMessage("BLAS LU factorization (dgetrf) completed successfully for $(op_info[:matrix_size]) matrix", cache.verbose, :blas_success)
+            end
+        end
+
         if !LinearAlgebra.issuccess(fact[1])
+            @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
         end
@@ -281,7 +315,7 @@ const PREALLOCATED_MKL32_LU = begin
 end
 
 function LinearSolve.init_cacheval(alg::MKL32MixedLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Bool,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions)
     # Pre-allocate appropriate 32-bit arrays based on input type
     m, n = size(A)
@@ -312,6 +346,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKL32MixedLUFactorization;
         cache.cacheval = fact
 
         if !LinearAlgebra.issuccess(fact[1])
+            @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
         end

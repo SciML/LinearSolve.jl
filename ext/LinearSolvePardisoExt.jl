@@ -75,7 +75,7 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
     end
 
     if verbose isa Bool
-        verbose_spec = LinearVerbosity(pardiso_verbosity = SciMLLogging.WarnLevel())
+        verbose_spec = LinearVerbosity(pardiso_verbosity = SciMLLogging.Silent())
     else
         verbose_spec = verbose
     end

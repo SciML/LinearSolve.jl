@@ -1,0 +1,11 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
+LinearSolveAutotune = "67398393-80e8-4254-b7e4-1b9a36a3c5b6"
+SciMLOperators = "c0aeaf25-5076-4817-a8d5-81caf7dfa961"
+
+[compat]
+Documenter = "1"
+LinearSolve = "3"
+LinearSolveAutotune = "1.1"
+SciMLOperators = "1"

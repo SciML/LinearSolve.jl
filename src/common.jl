@@ -261,7 +261,7 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm, arg
     __init(prob, alg, args...; kwargs...)
 end
 
-function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
+Base.@constprop :aggressive function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         args...;
         alias = LinearAliasSpecifier(),
         abstol = default_tol(real(eltype(prob.b))),
@@ -328,7 +328,7 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         # @warn "Using `true` or `false` for `verbose` is being deprecated. Please use a `LinearVerbosity` type to specify verbosity settings.
         # For details see the verbosity section of the common solver options documentation page."
         init_cache_verb = verbose
-        if verbose 
+        if verbose
             verbose_spec = LinearVerbosity()
         else
             verbose_spec = LinearVerbosity(SciMLLogging.None())

@@ -87,7 +87,8 @@ function Mooncake.rrule!!(::CoDual{typeof(SciMLBase.solve!)}, _cache::CoDual{<:L
 
     function solve!_adjoint(::NoRData)
         ∂∅ = NoRData()
-        cachenew = init(LinearProblem(cache.A, cache.b), cache.alg, _args...; kwargs...)
+        alg = cache.alg
+        cachenew = init(LinearProblem(cache.A, cache.b), alg, _args...; kwargs...)
         new_sol = solve!(cachenew)
         ∂u = sol.dx.data.u
 

@@ -20,6 +20,7 @@ if GROUP == "All" || GROUP == "Core"
     @time @safetestset "Verbosity" include("verbosity.jl")
     @time @safetestset "BandedMatrices" include("banded.jl")
     @time @safetestset "Mixed Precision" include("test_mixed_precision.jl")
+    @time @safetestset "Butterfly" include("butterfly.jl")
 end
 
 # Don't run Enzyme tests on prerelease

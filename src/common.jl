@@ -261,13 +261,13 @@ function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm, arg
     __init(prob, alg, args...; kwargs...)
 end
 
-Base.@constprop :aggressive function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
+function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         args...;
         alias = LinearAliasSpecifier(),
         abstol = default_tol(real(eltype(prob.b))),
         reltol = default_tol(real(eltype(prob.b))),
         maxiters::Int = length(prob.b),
-        verbose = true,
+        verbose = LinearVerbosity(),
         Pl = nothing,
         Pr = nothing,
         assumptions = OperatorAssumptions(issquare(prob.A)),
@@ -324,7 +324,13 @@ Base.@constprop :aggressive function __init(prob::LinearProblem, alg::SciMLLinea
         copy(A)
     end
 
-    if verbose isa Bool
+    if verbose isa LinearVerbosity
+        verbose_spec = verbose
+        init_cache_verb = verbose_spec
+    elseif verbose isa SciMLLogging.AbstractVerbosityPreset
+        verbose_spec = LinearVerbosity(verbose)
+        init_cache_verb = verbose_spec
+    elseif verbose isa Bool
         # @warn "Using `true` or `false` for `verbose` is being deprecated. Please use a `LinearVerbosity` type to specify verbosity settings.
         # For details see the verbosity section of the common solver options documentation page."
         init_cache_verb = verbose
@@ -333,10 +339,8 @@ Base.@constprop :aggressive function __init(prob::LinearProblem, alg::SciMLLinea
         else
             verbose_spec = LinearVerbosity(SciMLLogging.None())
         end
-    elseif verbose isa SciMLLogging.AbstractVerbosityPreset
-        verbose_spec = LinearVerbosity(verbose)
-        init_cache_verb = verbose_spec
     else
+        # Fallback for any other type
         verbose_spec = verbose
         init_cache_verb = verbose_spec
     end

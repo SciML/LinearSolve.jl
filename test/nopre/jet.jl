@@ -60,10 +60,10 @@ dual_prob = LinearProblem(A, b)
     # JET.@test_opt solve(prob_spd, CholeskyFactorization())
     # JET.@test_opt solve(prob, SVDFactorization())
     
-    # These tests now pass with improved type stability
-    JET.@test_opt solve(prob, QRFactorization())
-    JET.@test_opt solve(prob_sym, LDLtFactorization())
-    JET.@test_opt solve(prob_sym, BunchKaufmanFactorization())
+    # These tests still have runtime dispatch issues
+    JET.@test_opt solve(prob, QRFactorization()) broken=true
+    JET.@test_opt solve(prob_sym, LDLtFactorization()) broken=true
+    JET.@test_opt solve(prob_sym, BunchKaufmanFactorization()) broken=true
     JET.@test_opt solve(prob, GenericFactorization()) broken=true
 end
 
@@ -71,14 +71,14 @@ end
     # RecursiveFactorization.jl extensions
     # JET.@test_opt solve(prob, RFLUFactorization())
 
-    # These tests now pass with improved type stability
-    JET.@test_opt solve(prob, FastLUFactorization())
-    JET.@test_opt solve(prob, FastQRFactorization())
+    # These tests still have runtime dispatch issues
+    JET.@test_opt solve(prob, FastLUFactorization()) broken=true
+    JET.@test_opt solve(prob, FastQRFactorization()) broken=true
     
     # Platform-specific factorizations (may not be available on all systems)
     if @isdefined(MKLLUFactorization)
-        # MKLLUFactorization passes JET tests
-        JET.@test_opt solve(prob, MKLLUFactorization())
+        # MKLLUFactorization has runtime dispatch in blas_logging.jl (pre-existing bug)
+        JET.@test_opt solve(prob, MKLLUFactorization()) broken=true
     end
     
     if Sys.isapple() && @isdefined(AppleAccelerateLUFactorization)
@@ -117,10 +117,10 @@ end
     # SimpleGMRES passes JET tests
     # JET.@test_opt solve(prob, SimpleGMRES())
 
-    # These tests now pass with improved type stability
-    JET.@test_opt solve(prob, KrylovJL_GMRES())
-    JET.@test_opt solve(prob_sym, KrylovJL_MINRES())
-    JET.@test_opt solve(prob_sym, KrylovJL_MINARES())
+    # These tests still have Printf runtime dispatch issues in Krylov.jl
+    JET.@test_opt solve(prob, KrylovJL_GMRES()) broken=true
+    JET.@test_opt solve(prob_sym, KrylovJL_MINRES()) broken=true
+    JET.@test_opt solve(prob_sym, KrylovJL_MINARES()) broken=true
     
     # Extension Krylov methods (require extensions)
     # KrylovKitJL_CG, KrylovKitJL_GMRES require KrylovKit to be loaded

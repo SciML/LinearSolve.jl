@@ -105,7 +105,7 @@ The cache automatically tracks when matrix `A` or parameters `p` change by setti
 appropriate freshness flags. When `solve!` is called, stale cache entries are automatically
 recomputed as needed.
 """
-mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, S}
+mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, Tlv <: LinearVerbosity, issq, S}
     A::TA
     b::Tb
     u::Tu
@@ -119,7 +119,7 @@ mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, S}
     abstol::Ttol
     reltol::Ttol
     maxiters::Int
-    verbose::LinearVerbosity
+    verbose::Tlv
     assumptions::OperatorAssumptions{issq}
     sensealg::S
 end
@@ -385,7 +385,7 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     Tc = typeof(cacheval)
 
     cache = LinearCache{typeof(A), typeof(b), typeof(u0_), typeof(p), typeof(alg), Tc,
-        typeof(Pl), typeof(Pr), typeof(reltol), typeof(assumptions.issq),
+        typeof(Pl), typeof(Pr), typeof(reltol), typeof(verbose_spec), typeof(assumptions.issq),
         typeof(sensealg)}(
         A, b, u0_, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
         maxiters, verbose_spec, assumptions, sensealg)

@@ -1,7 +1,7 @@
 name = "LinearSolve"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 authors = ["SciML"]
-version = "3.46.0"
+version = "3.46.1"
 
 [deps]
 ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
@@ -27,7 +27,6 @@ SciMLLogging = "a6db7da4-7206-11f0-1eab-35f2a5dbe1d1"
 SciMLOperators = "c0aeaf25-5076-4817-a8d5-81caf7dfa961"
 Setfield = "efcf1570-3423-57d1-acb7-fd33fddbac46"
 StaticArraysCore = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
-TriangularSolve = "d5829a12-d9aa-46ab-831f-fb7c9ab06edf"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 
 [weakdeps]
@@ -92,6 +91,7 @@ CUSOLVERRF = "0.2.6"
 ChainRulesCore = "1.25"
 CliqueTrees = "1.11.0"
 ConcreteStructs = "0.2.3"
+ComponentArrays = "0.15.29"
 DocStringExtensions = "0.9.3"
 EnumX = "1.0.4"
 EnzymeCore = "0.8.5"
@@ -138,7 +138,6 @@ StableRNGs = "1.0"
 StaticArrays = "1.9"
 StaticArraysCore = "1.4.3"
 Test = "1.10"
-TriangularSolve = "0.2.1"
 UnPack = "1.0.2"
 Zygote = "0.7"
 blis_jll = "0.9.0"
@@ -150,6 +149,7 @@ Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
 BlockDiagonals = "0a1fb500-61f7-11e9-3c65-f5ef3456f9f0"
 CliqueTrees = "60701a23-6482-424a-84db-faee86b9b1f8"
+ComponentArrays = "b0b7db55-cfe3-40fc-9ded-d10e2dbeff66"
 ExplicitImports = "7d51a73a-1435-4ff3-83d9-f097790105c7"
 FastAlmostBandedMatrices = "9d29842c-ecb8-4973-b1e9-a27b1157504e"
 FastLapackInterface = "29a986be-02c6-4525-aec4-84b980013641"
@@ -178,4 +178,4 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [targets]
-test = ["Aqua", "Test", "IterativeSolvers", "InteractiveUtils", "KrylovKit", "KrylovPreconditioners", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI", "BlockDiagonals", "FiniteDiff", "BandedMatrices", "FastAlmostBandedMatrices", "StaticArrays", "AllocCheck", "StableRNGs", "Zygote", "RecursiveFactorization", "Sparspak", "CliqueTrees", "FastLapackInterface", "SparseArrays", "ExplicitImports"]
+test = ["Aqua", "Test", "IterativeSolvers", "InteractiveUtils", "KrylovKit", "KrylovPreconditioners", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI", "BlockDiagonals", "FiniteDiff", "BandedMatrices", "FastAlmostBandedMatrices", "StaticArrays", "AllocCheck", "StableRNGs", "Zygote", "RecursiveFactorization", "Sparspak", "CliqueTrees", "FastLapackInterface", "SparseArrays", "ExplicitImports", "ComponentArrays"]

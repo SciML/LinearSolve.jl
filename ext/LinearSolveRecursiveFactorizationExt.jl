@@ -6,7 +6,7 @@ using LinearSolve: LinearSolve, userecursivefactorization, LinearCache, @get_cac
 using LinearSolve.LinearAlgebra, LinearSolve.ArrayInterface, RecursiveFactorization
 using SciMLBase: SciMLBase, ReturnCode
 using SciMLLogging: @SciMLMessage
-using TriangularSolve
+using RecursiveFactorization.TriangularSolve
 
 LinearSolve.userecursivefactorization(A::Union{Nothing, AbstractMatrix}) = true
 

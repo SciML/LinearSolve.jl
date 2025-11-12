@@ -77,7 +77,8 @@ end
     
     # Platform-specific factorizations (may not be available on all systems)
     if @isdefined(MKLLUFactorization)
-        # MKLLUFactorization has runtime dispatch in blas_logging.jl (pre-existing bug)
+        # MKLLUFactorization has one acceptable runtime dispatch in logging code
+        # (_format_context_pair with Dict{Symbol,Any}) that's isolated behind a type barrier
         JET.@test_opt solve(prob, MKLLUFactorization()) broken=true
     end
     

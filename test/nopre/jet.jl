@@ -49,7 +49,15 @@ dual_prob = LinearProblem(A, b)
 @testset "JET Tests for Dense Factorizations" begin
     # Working tests - these pass JET optimization checks
     JET.@test_opt init(prob, nothing)
-    JET.@test_opt solve(prob, LUFactorization())
+
+    # LUFactorization has runtime dispatch in Base.CoreLogging on Julia < 1.11
+    # Fixed in Julia 1.11+
+    if VERSION < v"1.11"
+        JET.@test_opt solve(prob, LUFactorization()) broken=true
+    else
+        JET.@test_opt solve(prob, LUFactorization())
+    end
+
     JET.@test_opt solve(prob, GenericLUFactorization())
     JET.@test_opt solve(prob, DiagonalFactorization())
     JET.@test_opt solve(prob, SimpleLUFactorization())
@@ -89,10 +97,8 @@ end
     
     # Platform-specific factorizations (may not be available on all systems)
     if @isdefined(MKLLUFactorization)
-        # MKLLUFactorization has one runtime dispatch in logging code on Julia < 1.12
-        # (_format_context_pair with Dict{Symbol,Any}) that's isolated behind a type barrier
-        # Julia 1.12+ has improved type inference that sees through the barrier
-        if VERSION < v"1.12.0-"
+        # MKLLUFactorization passes on Julia < 1.12 but has runtime dispatch on 1.12+
+        if VERSION >= v"1.12.0-"
             JET.@test_opt solve(prob, MKLLUFactorization()) broken=true
         else
             JET.@test_opt solve(prob, MKLLUFactorization())

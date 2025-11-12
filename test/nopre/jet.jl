@@ -60,20 +60,20 @@ dual_prob = LinearProblem(A, b)
     # JET.@test_opt solve(prob_spd, CholeskyFactorization())
     # JET.@test_opt solve(prob, SVDFactorization())
     
-    # Tests with known type stability issues - marked as broken
-    JET.@test_opt solve(prob, QRFactorization()) broken=true
-    JET.@test_opt solve(prob_sym, LDLtFactorization()) broken=true
-    JET.@test_opt solve(prob_sym, BunchKaufmanFactorization()) broken=true
+    # These tests now pass with improved type stability
+    JET.@test_opt solve(prob, QRFactorization())
+    JET.@test_opt solve(prob_sym, LDLtFactorization())
+    JET.@test_opt solve(prob_sym, BunchKaufmanFactorization())
     JET.@test_opt solve(prob, GenericFactorization()) broken=true
 end
 
 @testset "JET Tests for Extension Factorizations" begin
     # RecursiveFactorization.jl extensions
     # JET.@test_opt solve(prob, RFLUFactorization())
-    
-    # Tests with known type stability issues
-    JET.@test_opt solve(prob, FastLUFactorization()) broken=true
-    JET.@test_opt solve(prob, FastQRFactorization()) broken=true
+
+    # These tests now pass with improved type stability
+    JET.@test_opt solve(prob, FastLUFactorization())
+    JET.@test_opt solve(prob, FastQRFactorization())
     
     # Platform-specific factorizations (may not be available on all systems)
     if @isdefined(MKLLUFactorization)
@@ -116,11 +116,11 @@ end
     
     # SimpleGMRES passes JET tests
     # JET.@test_opt solve(prob, SimpleGMRES())
-    
-    # KrylovJL methods with known type stability issues
-    JET.@test_opt solve(prob, KrylovJL_GMRES()) broken=true
-    JET.@test_opt solve(prob_sym, KrylovJL_MINRES()) broken=true
-    JET.@test_opt solve(prob_sym, KrylovJL_MINARES()) broken=true
+
+    # These tests now pass with improved type stability
+    JET.@test_opt solve(prob, KrylovJL_GMRES())
+    JET.@test_opt solve(prob_sym, KrylovJL_MINRES())
+    JET.@test_opt solve(prob_sym, KrylovJL_MINARES())
     
     # Extension Krylov methods (require extensions)
     # KrylovKitJL_CG, KrylovKitJL_GMRES require KrylovKit to be loaded

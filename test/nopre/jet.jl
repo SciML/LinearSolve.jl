@@ -89,9 +89,14 @@ end
     
     # Platform-specific factorizations (may not be available on all systems)
     if @isdefined(MKLLUFactorization)
-        # MKLLUFactorization has one acceptable runtime dispatch in logging code
+        # MKLLUFactorization has one runtime dispatch in logging code on Julia < 1.12
         # (_format_context_pair with Dict{Symbol,Any}) that's isolated behind a type barrier
-        JET.@test_opt solve(prob, MKLLUFactorization()) broken=true
+        # Julia 1.12+ has improved type inference that sees through the barrier
+        if VERSION < v"1.12.0-"
+            JET.@test_opt solve(prob, MKLLUFactorization()) broken=true
+        else
+            JET.@test_opt solve(prob, MKLLUFactorization())
+        end
     end
     
     if Sys.isapple() && @isdefined(AppleAccelerateLUFactorization)

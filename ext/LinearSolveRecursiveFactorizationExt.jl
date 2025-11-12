@@ -6,7 +6,6 @@ using LinearSolve: LinearSolve, userecursivefactorization, LinearCache, @get_cac
 using LinearSolve.LinearAlgebra, LinearSolve.ArrayInterface, RecursiveFactorization
 using SciMLBase: SciMLBase, ReturnCode
 using SciMLLogging: @SciMLMessage
-using TriangularSolve
 
 LinearSolve.userecursivefactorization(A::Union{Nothing, AbstractMatrix}) = true
 
@@ -132,7 +131,10 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::ButterflyFactoriz
     (;A, b, ws, U, V, out, tmp, n) = workspace
     b[1:M] .= cache_b
     mul!(tmp, U', b)
-    TriangularSolve.ldiv!(F, tmp, thread)
+
+    # TriangularSolve.ldiv!
+    RecursiveFactorization.ldiv!(F, tmp, thread)
+  
     mul!(b, V, tmp)
     out .= @view b[1:n]
     SciMLBase.build_linear_solution(alg, out, nothing, cache)

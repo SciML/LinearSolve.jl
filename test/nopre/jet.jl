@@ -115,10 +115,17 @@ end
 end
 
 @testset "JET Tests for Sparse Factorizations" begin
-    JET.@test_opt solve(prob_sparse, UMFPACKFactorization()) broken=true
-    JET.@test_opt solve(prob_sparse, KLUFactorization()) broken=true
-    JET.@test_opt solve(prob_sparse_spd, CHOLMODFactorization()) broken=true
-    
+    # These tests have runtime dispatch issues on Julia < 1.12
+    if VERSION < v"1.12.0-"
+        JET.@test_opt solve(prob_sparse, UMFPACKFactorization()) broken=true
+        JET.@test_opt solve(prob_sparse, KLUFactorization()) broken=true
+        JET.@test_opt solve(prob_sparse_spd, CHOLMODFactorization()) broken=true
+    else
+        JET.@test_opt solve(prob_sparse, UMFPACKFactorization())
+        JET.@test_opt solve(prob_sparse, KLUFactorization())
+        JET.@test_opt solve(prob_sparse_spd, CHOLMODFactorization())
+    end
+
     # SparspakFactorization requires Sparspak to be loaded
     # PardisoJL requires Pardiso to be loaded
     # CUSOLVERRFFactorization requires CUSOLVERRF to be loaded
@@ -154,8 +161,14 @@ end
 
 @testset "JET Tests for Default Solver" begin
     # Test the default solver selection
-    JET.@test_opt solve(prob) broken=true
-    JET.@test_opt solve(prob_sparse) broken=true
+    # These tests have runtime dispatch issues on Julia < 1.12
+    if VERSION < v"1.12.0-"
+        JET.@test_opt solve(prob) broken=true
+        JET.@test_opt solve(prob_sparse) broken=true
+    else
+        JET.@test_opt solve(prob)
+        JET.@test_opt solve(prob_sparse)
+    end
 end
 
 @testset "JET Tests for creating Dual solutions" begin

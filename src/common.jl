@@ -232,6 +232,9 @@ default_alias_b(::AbstractSparseFactorization, ::Any, ::Any) = true
 
 DEFAULT_PRECS(A, p) = IdentityOperator(size(A)[1]), IdentityOperator(size(A)[2])
 
+# Default verbose setting (const for type stability)
+const DEFAULT_VERBOSE = LinearVerbosity()
+
 # Helper functions for processing verbose parameter with multiple dispatch (type-stable)
 @inline _process_verbose_param(verbose::LinearVerbosity) = (verbose, verbose)
 @inline function _process_verbose_param(verbose::SciMLLogging.AbstractVerbosityPreset)
@@ -240,7 +243,7 @@ DEFAULT_PRECS(A, p) = IdentityOperator(size(A)[1]), IdentityOperator(size(A)[2])
 end
 @inline function _process_verbose_param(verbose::Bool)
     # @warn "Using `true` or `false` for `verbose` is being deprecated."
-    verbose_spec = verbose ? LinearVerbosity() : LinearVerbosity(SciMLLogging.None())
+    verbose_spec = verbose ? DEFAULT_VERBOSE : LinearVerbosity(SciMLLogging.None())
     return (verbose_spec, verbose)
 end
 

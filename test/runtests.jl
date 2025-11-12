@@ -19,16 +19,7 @@ if GROUP == "All" || GROUP == "Core"
     @time @safetestset "Traits" include("traits.jl")
     @time @safetestset "Verbosity" include("verbosity.jl")
     @time @safetestset "BandedMatrices" include("banded.jl")
-    # Butterfly test requires RecursiveFactorization 0.2.26+
-    if HAS_EXTENSIONS
-        try
-            import RecursiveFactorization
-            if pkgversion(RecursiveFactorization) >= v"0.2.26"
-                @time @safetestset "Butterfly Factorization" include("butterfly.jl")
-            end
-        catch
-        end
-    end
+    @time @safetestset "Butterfly Factorization" include("butterfly.jl")
     @time @safetestset "Mixed Precision" include("test_mixed_precision.jl")
 end
 

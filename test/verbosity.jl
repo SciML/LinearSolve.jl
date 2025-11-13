@@ -156,7 +156,7 @@ end
         info = LinearSolve.get_blas_operation_info(:dgetrf, A, b)
 
         @test info.matrix_size == (10, 10)
-        @test info.element_type == Float64
+        @test info.element_type == "Float64"
         @test isinf(info.condition_number)  # Should not compute by default (-Inf sentinel)
         @test info.memory_usage_MB >= 0  # Memory can be 0 for very small matrices
 

@@ -5,15 +5,15 @@ Uses sentinel values for optional fields to maintain type stability:
 
   - condition_number: -Inf means not computed
   - rhs_length: 0 means not applicable
-  - rhs_type: Nothing means not applicable
+  - rhs_type: "" means not applicable
 """
 struct BlasOperationInfo
     matrix_size::Tuple{Int, Int}
-    matrix_type::Type
-    element_type::Type
+    matrix_type::String
+    element_type::String
     condition_number::Float64  # -Inf means not computed
     rhs_length::Int  # 0 means not applicable
-    rhs_type::Type  # Nothing means not applicable
+    rhs_type::String  # "" means not applicable
     memory_usage_MB::Float64
 end
 
@@ -125,7 +125,7 @@ function _format_blas_context(op_info::BlasOperationInfo)
         push!(parts, "RHS length: $(op_info.rhs_length)")
     end
 
-    if op_info.rhs_type !== Nothing
+    if !isempty(op_info.rhs_type)
         push!(parts, "RHS type: $(op_info.rhs_type)")
     end
 
@@ -135,13 +135,13 @@ end
 """
     blas_info_msg(func::Symbol, info::Integer;
                   extra_context::BlasOperationInfo = BlasOperationInfo(
-                      (0, 0), Nothing, Nothing, -Inf, 0, Nothing, 0.0))
+                      (0, 0), "", "", -Inf, 0, "", 0.0))
 
 Log BLAS/LAPACK return code information with appropriate verbosity level.
 """
 function blas_info_msg(func::Symbol, info::Integer;
         extra_context::BlasOperationInfo = BlasOperationInfo(
-            (0, 0), Nothing, Nothing, -Inf, 0, Nothing, 0.0))
+            (0, 0), "", "", -Inf, 0, "", 0.0))
     category, message, details = interpret_blas_code(func, info)
 
     verbosity_field = if category in [
@@ -183,11 +183,11 @@ end
 function get_blas_operation_info(func::Symbol, A, b; condition = false)
     # Matrix properties (always present)
     matrix_size = size(A)
-    matrix_type = typeof(A)
-    element_type = eltype(A)
+    matrix_type = string(typeof(A))
+    element_type = string(eltype(A))
 
     # Memory usage estimate (always present)
-    mem_bytes = prod(matrix_size) * sizeof(element_type)
+    mem_bytes = prod(matrix_size) * sizeof(eltype(A))
     memory_usage_MB = round(mem_bytes / 1024^2, digits = 2)
 
     # Condition number (optional - use -Inf as sentinel)
@@ -201,9 +201,9 @@ function get_blas_operation_info(func::Symbol, A, b; condition = false)
         -Inf
     end
 
-    # RHS properties (optional - use 0 and Nothing as sentinels)
+    # RHS properties (optional - use 0 and "" as sentinels)
     rhs_length = b !== nothing ? length(b) : 0
-    rhs_type = b !== nothing ? typeof(b) : Nothing
+    rhs_type = b !== nothing ? string(typeof(b)) : ""
 
     return BlasOperationInfo(
         matrix_size,

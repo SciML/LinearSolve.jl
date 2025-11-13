@@ -232,6 +232,21 @@ default_alias_b(::AbstractSparseFactorization, ::Any, ::Any) = true
 
 DEFAULT_PRECS(A, p) = IdentityOperator(size(A)[1]), IdentityOperator(size(A)[2])
 
+# Default verbose setting (const for type stability)
+const DEFAULT_VERBOSE = LinearVerbosity()
+
+# Helper functions for processing verbose parameter with multiple dispatch (type-stable)
+@inline _process_verbose_param(verbose::LinearVerbosity) = (verbose, verbose)
+@inline function _process_verbose_param(verbose::SciMLLogging.AbstractVerbosityPreset)
+    verbose_spec = LinearVerbosity(verbose)
+    return (verbose_spec, verbose_spec)
+end
+@inline function _process_verbose_param(verbose::Bool)
+    # @warn "Using `true` or `false` for `verbose` is being deprecated."
+    verbose_spec = verbose ? DEFAULT_VERBOSE : LinearVerbosity(SciMLLogging.None())
+    return (verbose_spec, verbose)
+end
+
 """
     __init_u0_from_Ab(A, b)
 
@@ -267,7 +282,7 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         abstol = default_tol(real(eltype(prob.b))),
         reltol = default_tol(real(eltype(prob.b))),
         maxiters::Int = length(prob.b),
-        verbose = true,
+        verbose = LinearVerbosity(),
         Pl = nothing,
         Pr = nothing,
         assumptions = OperatorAssumptions(issquare(prob.A)),
@@ -324,22 +339,7 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         copy(A)
     end
 
-    if verbose isa Bool
-        # @warn "Using `true` or `false` for `verbose` is being deprecated. Please use a `LinearVerbosity` type to specify verbosity settings.
-        # For details see the verbosity section of the common solver options documentation page."
-        init_cache_verb = verbose
-        if verbose 
-            verbose_spec = LinearVerbosity()
-        else
-            verbose_spec = LinearVerbosity(SciMLLogging.None())
-        end
-    elseif verbose isa SciMLLogging.AbstractVerbosityPreset
-        verbose_spec = LinearVerbosity(verbose)
-        init_cache_verb = verbose_spec
-    else
-        verbose_spec = verbose
-        init_cache_verb = verbose_spec
-    end
+    verbose_spec, init_cache_verb = _process_verbose_param(verbose)
 
     b = if issparsematrix(b) && !(A isa Diagonal)
         Array(b) # the solution to a linear solve will always be dense!

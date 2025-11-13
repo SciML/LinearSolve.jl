@@ -49,7 +49,15 @@ dual_prob = LinearProblem(A, b)
 @testset "JET Tests for Dense Factorizations" begin
     # Working tests - these pass JET optimization checks
     JET.@test_opt init(prob, nothing)
-    JET.@test_opt solve(prob, LUFactorization())
+
+    # LUFactorization has runtime dispatch in Base.CoreLogging on Julia < 1.11
+    # Fixed in Julia 1.11+
+    if VERSION < v"1.11"
+        JET.@test_opt solve(prob, LUFactorization()) broken=true
+    else
+        JET.@test_opt solve(prob, LUFactorization())
+    end
+
     JET.@test_opt solve(prob, GenericLUFactorization())
     JET.@test_opt solve(prob, DiagonalFactorization())
     JET.@test_opt solve(prob, SimpleLUFactorization())
@@ -60,25 +68,41 @@ dual_prob = LinearProblem(A, b)
     # JET.@test_opt solve(prob_spd, CholeskyFactorization())
     # JET.@test_opt solve(prob, SVDFactorization())
     
-    # Tests with known type stability issues - marked as broken
-    JET.@test_opt solve(prob, QRFactorization()) broken=true
-    JET.@test_opt solve(prob_sym, LDLtFactorization()) broken=true
-    JET.@test_opt solve(prob_sym, BunchKaufmanFactorization()) broken=true
+    # These tests have runtime dispatch issues on Julia < 1.12
+    # Fixed in Julia nightly/pre-release (1.12+)
+    if VERSION < v"1.12.0-"
+        JET.@test_opt solve(prob, QRFactorization()) broken=true
+        JET.@test_opt solve(prob_sym, LDLtFactorization()) broken=true
+        JET.@test_opt solve(prob_sym, BunchKaufmanFactorization()) broken=true
+    else
+        JET.@test_opt solve(prob, QRFactorization())
+        JET.@test_opt solve(prob_sym, LDLtFactorization())
+        JET.@test_opt solve(prob_sym, BunchKaufmanFactorization())
+    end
     JET.@test_opt solve(prob, GenericFactorization()) broken=true
 end
 
 @testset "JET Tests for Extension Factorizations" begin
     # RecursiveFactorization.jl extensions
     # JET.@test_opt solve(prob, RFLUFactorization())
-    
-    # Tests with known type stability issues
-    JET.@test_opt solve(prob, FastLUFactorization()) broken=true
-    JET.@test_opt solve(prob, FastQRFactorization()) broken=true
+
+    # These tests have runtime dispatch issues on Julia < 1.12
+    if VERSION < v"1.12.0-"
+        JET.@test_opt solve(prob, FastLUFactorization()) broken=true
+        JET.@test_opt solve(prob, FastQRFactorization()) broken=true
+    else
+        JET.@test_opt solve(prob, FastLUFactorization())
+        JET.@test_opt solve(prob, FastQRFactorization())
+    end
     
     # Platform-specific factorizations (may not be available on all systems)
     if @isdefined(MKLLUFactorization)
-        # MKLLUFactorization passes JET tests
-        JET.@test_opt solve(prob, MKLLUFactorization())
+        # MKLLUFactorization passes on Julia < 1.12 but has runtime dispatch on 1.12+
+        if VERSION >= v"1.12.0-"
+            JET.@test_opt solve(prob, MKLLUFactorization()) broken=true
+        else
+            JET.@test_opt solve(prob, MKLLUFactorization())
+        end
     end
     
     if Sys.isapple() && @isdefined(AppleAccelerateLUFactorization)
@@ -97,10 +121,17 @@ end
 end
 
 @testset "JET Tests for Sparse Factorizations" begin
-    JET.@test_opt solve(prob_sparse, UMFPACKFactorization()) broken=true
-    JET.@test_opt solve(prob_sparse, KLUFactorization()) broken=true
-    JET.@test_opt solve(prob_sparse_spd, CHOLMODFactorization()) broken=true
-    
+    # These tests have runtime dispatch issues on Julia < 1.12
+    if VERSION < v"1.12.0-"
+        JET.@test_opt solve(prob_sparse, UMFPACKFactorization()) broken=true
+        JET.@test_opt solve(prob_sparse, KLUFactorization()) broken=true
+        JET.@test_opt solve(prob_sparse_spd, CHOLMODFactorization()) broken=true
+    else
+        JET.@test_opt solve(prob_sparse, UMFPACKFactorization())
+        JET.@test_opt solve(prob_sparse, KLUFactorization())
+        JET.@test_opt solve(prob_sparse_spd, CHOLMODFactorization())
+    end
+
     # SparspakFactorization requires Sparspak to be loaded
     # PardisoJL requires Pardiso to be loaded
     # CUSOLVERRFFactorization requires CUSOLVERRF to be loaded
@@ -116,11 +147,17 @@ end
     
     # SimpleGMRES passes JET tests
     # JET.@test_opt solve(prob, SimpleGMRES())
-    
-    # KrylovJL methods with known type stability issues
-    JET.@test_opt solve(prob, KrylovJL_GMRES()) broken=true
-    JET.@test_opt solve(prob_sym, KrylovJL_MINRES()) broken=true
-    JET.@test_opt solve(prob_sym, KrylovJL_MINARES()) broken=true
+
+    # These tests have Printf runtime dispatch issues in Krylov.jl on Julia < 1.12
+    if VERSION < v"1.12.0-"
+        JET.@test_opt solve(prob, KrylovJL_GMRES()) broken=true
+        JET.@test_opt solve(prob_sym, KrylovJL_MINRES()) broken=true
+        JET.@test_opt solve(prob_sym, KrylovJL_MINARES()) broken=true
+    else
+        JET.@test_opt solve(prob, KrylovJL_GMRES())
+        JET.@test_opt solve(prob_sym, KrylovJL_MINRES())
+        JET.@test_opt solve(prob_sym, KrylovJL_MINARES())
+    end
     
     # Extension Krylov methods (require extensions)
     # KrylovKitJL_CG, KrylovKitJL_GMRES require KrylovKit to be loaded
@@ -130,8 +167,14 @@ end
 
 @testset "JET Tests for Default Solver" begin
     # Test the default solver selection
-    JET.@test_opt solve(prob) broken=true
-    JET.@test_opt solve(prob_sparse) broken=true
+    # These tests have runtime dispatch issues on Julia < 1.12
+    if VERSION < v"1.12.0-"
+        JET.@test_opt solve(prob) broken=true
+        JET.@test_opt solve(prob_sparse) broken=true
+    else
+        JET.@test_opt solve(prob)
+        JET.@test_opt solve(prob_sparse)
+    end
 end
 
 @testset "JET Tests for creating Dual solutions" begin

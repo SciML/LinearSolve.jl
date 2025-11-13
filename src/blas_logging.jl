@@ -66,15 +66,9 @@ function interpret_positive_info(func::Symbol, info::Integer)
 
         # General eigenvalue problem
     elseif occursin("ggev", func_str) || occursin("gges", func_str)
-        if info <= size
-            return (:convergence_failure,
-                "QZ iteration failed",
-                "The QZ iteration failed to compute all eigenvalues. Elements 1:$(info-1) converged.")
-        else
-            return (:unexpected_error,
-                "Unexpected error in generalized eigenvalue problem",
-                "Info value $info is unexpected for $func.")
-        end
+        return (:convergence_failure,
+            "Generalized eigenvalue computation failed",
+            "The algorithm failed to compute eigenvalues (info=$info). This may indicate QZ iteration failure or other numerical issues.")
 
         # LDLT factorization
     elseif occursin("ldlt", func_str)
@@ -91,6 +85,10 @@ function interpret_positive_info(func::Symbol, info::Integer)
 end
 
 
+
+# Type barrier for string interpolation with Any-typed values
+# The ::String return type annotation prevents JET from seeing runtime dispatch propagate
+@noinline _format_context_pair(key::Symbol, value)::String = string(key, ": ", value)
 
 """
     blas_info_msg(func::Symbol, info::Integer, verbose::LinearVerbosity;
@@ -124,7 +122,8 @@ function blas_info_msg(func::Symbol, info::Integer;
         push!(parts, "Return code (info): $msg_info")
         if !isempty(extra_context)
             for (key, value) in extra_context
-                push!(parts, "$key: $value")
+                # Use type barrier to prevent runtime dispatch from propagating
+                push!(parts, _format_context_pair(key, value))
             end
         end
         join(parts, "\n  ")

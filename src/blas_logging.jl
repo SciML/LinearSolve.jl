@@ -4,7 +4,7 @@ Type-stable container for BLAS operation information.
 Uses sentinel values for optional fields to maintain type stability:
 
   - condition_number: -Inf means not computed
-  - rhs_size: () means not applicable
+  - rhs_length: 0 means not applicable
   - rhs_type: Nothing means not applicable
 """
 struct BlasOperationInfo
@@ -12,7 +12,7 @@ struct BlasOperationInfo
     matrix_type::Type
     element_type::Type
     condition_number::Float64  # -Inf means not computed
-    rhs_size::Tuple{Vararg{Int}}  # () means not applicable
+    rhs_length::Int  # 0 means not applicable
     rhs_type::Type  # Nothing means not applicable
     memory_usage_MB::Float64
 end
@@ -121,8 +121,8 @@ function _format_blas_context(op_info::BlasOperationInfo)
         push!(parts, "Condition number: $(round(op_info.condition_number, sigdigits=4))")
     end
 
-    if !isempty(op_info.rhs_size)
-        push!(parts, "RHS size: $(op_info.rhs_size)")
+    if op_info.rhs_length > 0
+        push!(parts, "RHS length: $(op_info.rhs_length)")
     end
 
     if op_info.rhs_type !== Nothing
@@ -135,13 +135,13 @@ end
 """
     blas_info_msg(func::Symbol, info::Integer;
                   extra_context::BlasOperationInfo = BlasOperationInfo(
-                      (0, 0), Nothing, Nothing, -Inf, (), Nothing, 0.0))
+                      (0, 0), Nothing, Nothing, -Inf, 0, Nothing, 0.0))
 
 Log BLAS/LAPACK return code information with appropriate verbosity level.
 """
 function blas_info_msg(func::Symbol, info::Integer;
         extra_context::BlasOperationInfo = BlasOperationInfo(
-            (0, 0), Nothing, Nothing, -Inf, (), Nothing, 0.0))
+            (0, 0), Nothing, Nothing, -Inf, 0, Nothing, 0.0))
     category, message, details = interpret_blas_code(func, info)
 
     verbosity_field = if category in [
@@ -201,8 +201,8 @@ function get_blas_operation_info(func::Symbol, A, b; condition = false)
         -Inf
     end
 
-    # RHS properties (optional - use () and Nothing as sentinels)
-    rhs_size = b !== nothing ? size(b) : ()
+    # RHS properties (optional - use 0 and Nothing as sentinels)
+    rhs_length = b !== nothing ? length(b) : 0
     rhs_type = b !== nothing ? typeof(b) : Nothing
 
     return BlasOperationInfo(
@@ -210,7 +210,7 @@ function get_blas_operation_info(func::Symbol, A, b; condition = false)
         matrix_type,
         element_type,
         condition_number,
-        rhs_size,
+        rhs_length,
         rhs_type,
         memory_usage_MB
     )

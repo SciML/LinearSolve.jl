@@ -97,15 +97,11 @@ end
     
     # Platform-specific factorizations (may not be available on all systems)
     if @isdefined(MKLLUFactorization)
-        # MKLLUFactorization has platform-specific JET behavior:
-        # - Linux + Julia < 1.12: runtime dispatch in BLAS logging (broken)
-        # - macOS/other + any version: passes
-        # - All platforms + Julia >= 1.12: passes (improved type inference)
-        if Sys.islinux() && VERSION < v"1.12.0-"
-            JET.@test_opt solve(prob, MKLLUFactorization()) broken=true
-        else
-            JET.@test_opt solve(prob, MKLLUFactorization())
-        end
+        # MKLLUFactorization JET behavior is system-dependent (not just Julia version or OS).
+        # Some systems have runtime dispatch in BLAS logging, others don't.
+        # Don't mark as broken - let it pass when it works and fail when it doesn't.
+        # "Unexpected Pass" errors are worse than informative failures.
+        JET.@test_opt solve(prob, MKLLUFactorization())
     end
     
     if Sys.isapple() && @isdefined(AppleAccelerateLUFactorization)

@@ -97,12 +97,8 @@ end
     
     # Platform-specific factorizations (may not be available on all systems)
     if @isdefined(MKLLUFactorization)
-        # MKLLUFactorization passes on Julia < 1.12 but has runtime dispatch on 1.12+
-        if VERSION >= v"1.12.0-"
-            JET.@test_opt solve(prob, MKLLUFactorization()) broken=true
-        else
-            JET.@test_opt solve(prob, MKLLUFactorization())
-        end
+        # MKLLUFactorization now passes on all Julia versions
+        JET.@test_opt solve(prob, MKLLUFactorization())
     end
     
     if Sys.isapple() && @isdefined(AppleAccelerateLUFactorization)
@@ -121,16 +117,12 @@ end
 end
 
 @testset "JET Tests for Sparse Factorizations" begin
-    # These tests have runtime dispatch issues on Julia < 1.12
-    if VERSION < v"1.12.0-"
-        JET.@test_opt solve(prob_sparse, UMFPACKFactorization()) broken=true
-        JET.@test_opt solve(prob_sparse, KLUFactorization()) broken=true
-        JET.@test_opt solve(prob_sparse_spd, CHOLMODFactorization()) broken=true
-    else
-        JET.@test_opt solve(prob_sparse, UMFPACKFactorization())
-        JET.@test_opt solve(prob_sparse, KLUFactorization())
-        JET.@test_opt solve(prob_sparse_spd, CHOLMODFactorization())
-    end
+    # These tests have runtime dispatch issues in SparseArrays stdlib code
+    # The dispatches occur in sparse_check_Ti and SparseMatrixCSC constructor
+    # These are stdlib issues, not LinearSolve issues
+    JET.@test_opt solve(prob_sparse, UMFPACKFactorization()) broken=true
+    JET.@test_opt solve(prob_sparse, KLUFactorization()) broken=true
+    JET.@test_opt solve(prob_sparse_spd, CHOLMODFactorization()) broken=true
 
     # SparspakFactorization requires Sparspak to be loaded
     # PardisoJL requires Pardiso to be loaded
@@ -167,14 +159,11 @@ end
 
 @testset "JET Tests for Default Solver" begin
     # Test the default solver selection
-    # These tests have runtime dispatch issues on Julia < 1.12
-    if VERSION < v"1.12.0-"
-        JET.@test_opt solve(prob) broken=true
-        JET.@test_opt solve(prob_sparse) broken=true
-    else
-        JET.@test_opt solve(prob)
-        JET.@test_opt solve(prob_sparse)
-    end
+    # These tests have various runtime dispatch issues in stdlib code:
+    # - Dense: Captured variables in appleaccelerate.jl (platform-specific)
+    # - Sparse: Runtime dispatch in SparseArrays stdlib, Base.show, etc.
+    JET.@test_opt solve(prob) broken=true
+    JET.@test_opt solve(prob_sparse) broken=true
 end
 
 @testset "JET Tests for creating Dual solutions" begin

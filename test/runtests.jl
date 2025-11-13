@@ -19,10 +19,12 @@ if GROUP == "All" || GROUP == "Core"
     @time @safetestset "Traits" include("traits.jl")
     @time @safetestset "Verbosity" include("verbosity.jl")
     @time @safetestset "BandedMatrices" include("banded.jl")
+    @time @safetestset "Butterfly Factorization" include("butterfly.jl")
     @time @safetestset "Mixed Precision" include("test_mixed_precision.jl")
 end
 
-# Don't run Enzyme tests on prerelease
+# Don't run Enzyme tests on prerelease or Julia >= 1.12 (Enzyme compatibility issues)
+# See: https://github.com/SciML/LinearSolve.jl/issues/817
 if GROUP == "NoPre" && isempty(VERSION.prerelease)
     Pkg.activate("nopre")
     Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
@@ -32,7 +34,10 @@ if GROUP == "NoPre" && isempty(VERSION.prerelease)
     @time @safetestset "JET Tests" include("nopre/jet.jl")
     @time @safetestset "Static Arrays" include("nopre/static_arrays.jl")
     @time @safetestset "Caching Allocation Tests" include("nopre/caching_allocation_tests.jl")
-    @time @safetestset "Enzyme Derivative Rules" include("nopre/enzyme.jl")
+    # Disable Enzyme tests on Julia >= 1.12 due to compatibility issues
+    if VERSION < v"1.12.0-"
+        @time @safetestset "Enzyme Derivative Rules" include("nopre/enzyme.jl")
+    end
 end
 
 if GROUP == "DefaultsLoading"

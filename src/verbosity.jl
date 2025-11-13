@@ -94,6 +94,28 @@ end
 
 function LinearVerbosity(;
         error_control = nothing, performance = nothing, numerical = nothing, kwargs...)
+    # Fast path for default construction (type-stable)
+    if error_control === nothing && performance === nothing &&
+       numerical === nothing && isempty(kwargs)
+        return LinearVerbosity(
+            Silent(),
+            Silent(),
+            Silent(),
+            Silent(),
+            CustomLevel(1), # WARN_LEVEL in KrylovKit.jl
+            Silent(),
+            InfoLevel(),
+            Silent(),
+            ErrorLevel(),
+            ErrorLevel(),
+            Silent(),
+            Silent(),
+            Silent(),
+            WarnLevel(),
+            WarnLevel(),
+            WarnLevel())
+    end
+
     # Validate group arguments
     if error_control !== nothing && !(error_control isa AbstractMessageLevel)
         throw(ArgumentError("error_control must be a SciMLLogging.AbstractMessageLevel, got $(typeof(error_control))"))

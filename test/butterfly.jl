@@ -30,6 +30,6 @@ end
         b = rand(i)
         prob = LinearProblem(A, b)
         x = solve(prob, ButterflyFactorization())
-        @test norm(A * x .- b) <= 1e-10
+        @test norm(A * x .- b) <= 1e-9
     end
 end

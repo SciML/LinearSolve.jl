@@ -96,14 +96,10 @@ end
     end
     
     # Platform-specific factorizations (may not be available on all systems)
-    # MKLLUFactorization: Skipped - has runtime dispatch in BLAS error logging
-    # The dispatch is in _format_context_pair, which only executes when BLAS operations fail (rare).
-    # This is acceptable since it's in error handling code, not performance-critical paths.
-    # Behavior is also system-dependent (passes on some systems, fails on others), making
-    # reliable testing with broken markers impossible (causes "Unexpected Pass" errors).
-    # if @isdefined(MKLLUFactorization)
-    #     JET.@test_opt solve(prob, MKLLUFactorization())
-    # end
+    # MKLLUFactorization: Fixed type stability issues in BLAS error logging
+    if @isdefined(MKLLUFactorization)
+        JET.@test_opt solve(prob, MKLLUFactorization())
+    end
     
     if Sys.isapple() && @isdefined(AppleAccelerateLUFactorization)
         JET.@test_opt solve(prob, AppleAccelerateLUFactorization()) broken=true

@@ -274,17 +274,20 @@ function SciMLBase.solve!(cache::LinearCache, alg::OpenBLASLUFactorization;
         info_value = res[3]
 
         if info_value != 0
-            if !isa(verbose.blas_info, SciMLLogging.Silent) || !isa(verbose.blas_errors, SciMLLogging.Silent) ||
-                !isa(verbose.blas_invalid_args, SciMLLogging.Silent)
-                op_info = get_blas_operation_info(:dgetrf, A, cache.b, condition = !isa(verbose.condition_number, SciMLLogging.Silent))
+            if !isa(verbose.blas_info, SciMLLogging.Silent) ||
+               !isa(verbose.blas_errors, SciMLLogging.Silent) ||
+               !isa(verbose.blas_invalid_args, SciMLLogging.Silent)
+                op_info = get_blas_operation_info(:dgetrf, A, cache.b,
+                    condition = !isa(verbose.condition_number, SciMLLogging.Silent))
                 @SciMLMessage(cache.verbose, :condition_number) do
-                    if op_info[:condition_number] === nothing
+                    if isinf(op_info.condition_number)
                         return "Matrix condition number calculation failed."
                     else
-                        return "Matrix condition number: $(round(op_info[:condition_number], sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf"
+                        return "Matrix condition number: $(round(op_info.condition_number, sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf"
                     end
                 end
-                verb_option, message = blas_info_msg(
+                verb_option,
+                message = blas_info_msg(
                     :dgetrf, info_value; extra_context = op_info)
                 @SciMLMessage(message, verbose, verb_option)
             end
@@ -293,13 +296,13 @@ function SciMLBase.solve!(cache::LinearCache, alg::OpenBLASLUFactorization;
                 op_info = get_blas_operation_info(:dgetrf, A, cache.b,
                     condition = !isa(verbose.condition_number, SciMLLogging.Silent))
                 @SciMLMessage(cache.verbose, :condition_number) do
-                    if op_info[:condition_number] === nothing
+                    if isinf(op_info.condition_number)
                         return "Matrix condition number calculation failed."
                     else
-                        return "Matrix condition number: $(round(op_info[:condition_number], sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf"
+                        return "Matrix condition number: $(round(op_info.condition_number, sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf"
                     end
                 end
-                return "BLAS LU factorization (dgetrf) completed successfully for $(op_info[:matrix_size]) matrix"
+                return "BLAS LU factorization (dgetrf) completed successfully for $(op_info.matrix_size) matrix"
             end
         end
 
@@ -359,7 +362,8 @@ function SciMLBase.solve!(cache::LinearCache, alg::OpenBLAS32MixedLUFactorizatio
 
     if cache.isfresh
         # Get pre-allocated arrays from cacheval
-        luinst, info, A_32, b_32, u_32 = @get_cacheval(cache, :OpenBLAS32MixedLUFactorization)
+        luinst, info, A_32, b_32,
+        u_32 = @get_cacheval(cache, :OpenBLAS32MixedLUFactorization)
         # Compute 32-bit type on demand and copy A
         T32 = eltype(A) <: Complex ? ComplexF32 : Float32
         A_32 .= T32.(A)
@@ -382,7 +386,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::OpenBLAS32MixedLUFactorizatio
     # Compute types on demand for conversions
     T32 = eltype(A) <: Complex ? ComplexF32 : Float32
     Torig = eltype(cache.u)
-    
+
     # Copy b to pre-allocated 32-bit array
     b_32 .= T32.(cache.b)
 

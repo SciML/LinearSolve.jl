@@ -1,3 +1,21 @@
+"""
+Type-stable container for BLAS operation information.
+
+Uses sentinel values for optional fields to maintain type stability:
+
+  - condition_number: -Inf means not computed
+  - rhs_size: () means not applicable
+  - rhs_type: Nothing means not applicable
+"""
+struct BlasOperationInfo
+    matrix_size::Tuple{Int, Int}
+    matrix_type::Type
+    element_type::Type
+    condition_number::Float64  # -Inf means not computed
+    rhs_size::Tuple{Vararg{Int}}  # () means not applicable
+    rhs_type::Type  # Nothing means not applicable
+    memory_usage_MB::Float64
+end
 
 """
     interpret_blas_code(func::Symbol, info::Integer)
@@ -84,23 +102,50 @@ function interpret_positive_info(func::Symbol, info::Integer)
     end
 end
 
+"""
+Format BlasOperationInfo fields into human-readable strings.
 
+Type-stable implementation using concrete struct fields instead of Dict iteration.
+"""
+function _format_blas_context(op_info::BlasOperationInfo)
+    parts = String[]
 
-# Type barrier for string interpolation with Any-typed values
-# The ::String return type annotation prevents JET from seeing runtime dispatch propagate
-@noinline _format_context_pair(key::Symbol, value)::String = string(key, ": ", value)
+    # Always-present fields
+    push!(parts, "Matrix size: $(op_info.matrix_size)")
+    push!(parts, "Matrix type: $(op_info.matrix_type)")
+    push!(parts, "Element type: $(op_info.element_type)")
+    push!(parts, "Memory usage: $(op_info.memory_usage_MB) MB")
+
+    # Optional fields - check for sentinel values
+    if !isinf(op_info.condition_number)
+        push!(parts, "Condition number: $(round(op_info.condition_number, sigdigits=4))")
+    end
+
+    if !isempty(op_info.rhs_size)
+        push!(parts, "RHS size: $(op_info.rhs_size)")
+    end
+
+    if op_info.rhs_type !== Nothing
+        push!(parts, "RHS type: $(op_info.rhs_type)")
+    end
+
+    return parts
+end
 
 """
-    blas_info_msg(func::Symbol, info::Integer, verbose::LinearVerbosity;
-                  extra_context::Dict{Symbol,Any} = Dict())
+    blas_info_msg(func::Symbol, info::Integer;
+                  extra_context::BlasOperationInfo = BlasOperationInfo(
+                      (0, 0), Nothing, Nothing, -Inf, (), Nothing, 0.0))
 
 Log BLAS/LAPACK return code information with appropriate verbosity level.
 """
 function blas_info_msg(func::Symbol, info::Integer;
-        extra_context::Dict{Symbol, Any} = Dict())
+        extra_context::BlasOperationInfo = BlasOperationInfo(
+            (0, 0), Nothing, Nothing, -Inf, (), Nothing, 0.0))
     category, message, details = interpret_blas_code(func, info)
 
-    verbosity_field = if category in [:singular_matrix, :not_positive_definite, :convergence_failure]
+    verbosity_field = if category in [
+        :singular_matrix, :not_positive_definite, :convergence_failure]
         :blas_errors
     elseif category == :invalid_argument
         :blas_invalid_args
@@ -114,17 +159,18 @@ function blas_info_msg(func::Symbol, info::Integer;
     msg_info = info
 
     # Build complete message with all details
-    full_msg = if !isempty(extra_context) || msg_details !== nothing
+    # Check if extra_context has any non-sentinel values
+    has_extra_context = extra_context.matrix_size != (0, 0)
+
+    full_msg = if has_extra_context || msg_details !== nothing
         parts = String[msg_main]
         if msg_details !== nothing
             push!(parts, "Details: $msg_details")
         end
         push!(parts, "Return code (info): $msg_info")
-        if !isempty(extra_context)
-            for (key, value) in extra_context
-                # Use type barrier to prevent runtime dispatch from propagating
-                push!(parts, _format_context_pair(key, value))
-            end
+        if has_extra_context
+            # Type-stable formatting using struct fields
+            append!(parts, _format_blas_context(extra_context))
         end
         join(parts, "\n  ")
     else
@@ -134,39 +180,38 @@ function blas_info_msg(func::Symbol, info::Integer;
     verbosity_field, full_msg
 end
 
-
 function get_blas_operation_info(func::Symbol, A, b; condition = false)
-    info = Dict{Symbol, Any}()
+    # Matrix properties (always present)
+    matrix_size = size(A)
+    matrix_type = typeof(A)
+    element_type = eltype(A)
 
-    # Matrix properties
-    info[:matrix_size] = size(A)
-    info[:matrix_type] = typeof(A)
-    info[:element_type] = eltype(A)
+    # Memory usage estimate (always present)
+    mem_bytes = prod(matrix_size) * sizeof(element_type)
+    memory_usage_MB = round(mem_bytes / 1024^2, digits = 2)
 
-    # Condition number (based on verbosity setting)
-    if condition && size(A, 1) == size(A, 2)
+    # Condition number (optional - use -Inf as sentinel)
+    condition_number = if condition && matrix_size[1] == matrix_size[2]
         try
-            cond_num = cond(A)
-            info[:condition_number] = cond_num
-
-            # Log the condition number if enabled  
-            cond_msg = "Matrix condition number: $(round(cond_num, sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in $func"
-
+            cond(A)
         catch
-            # Skip if condition number computation fails
-            info[:condition_number] = nothing
+            -Inf
         end
+    else
+        -Inf
     end
 
-    # RHS properties if provided
-    if b !== nothing
-        info[:rhs_size] = size(b)
-        info[:rhs_type] = typeof(b)
-    end
+    # RHS properties (optional - use () and Nothing as sentinels)
+    rhs_size = b !== nothing ? size(b) : ()
+    rhs_type = b !== nothing ? typeof(b) : Nothing
 
-    # Memory usage estimate
-    mem_bytes = prod(size(A)) * sizeof(eltype(A))
-    info[:memory_usage_MB] = round(mem_bytes / 1024^2, digits = 2)
-
-    return info
+    return BlasOperationInfo(
+        matrix_size,
+        matrix_type,
+        element_type,
+        condition_number,
+        rhs_size,
+        rhs_type,
+        memory_usage_MB
+    )
 end

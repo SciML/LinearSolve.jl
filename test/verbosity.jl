@@ -1,6 +1,6 @@
 using LinearSolve
 using LinearSolve: LinearVerbosity, option_group, group_options, BLISLUFactorization,
-    __appleaccelerate_isavailable, __mkl_isavailable, __openblas_isavailable
+                   __appleaccelerate_isavailable, __mkl_isavailable, __openblas_isavailable
 using SciMLLogging
 using Test
 
@@ -92,7 +92,6 @@ using Test
     end
 end
 
-
 @testset "LinearVerbosity Logs Tests" begin
     A = [1.0 0 0 0
          0 1 0 0
@@ -117,7 +116,6 @@ end
         "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(
         prob,
         verbose = verb)
-
 end
 
 @testset "BLAS Return Code Interpretation" begin
@@ -157,16 +155,17 @@ end
         # Test with condition_number disabled (default)
         info = LinearSolve.get_blas_operation_info(:dgetrf, A, b)
 
-        @test info[:matrix_size] == (10, 10)
-        @test info[:element_type] == Float64
-        @test !haskey(info, :condition_number)  # Should not compute by default
-        @test info[:memory_usage_MB] >= 0  # Memory can be 0 for very small matrices
+        @test info.matrix_size == (10, 10)
+        @test info.element_type == Float64
+        @test isinf(info.condition_number)  # Should not compute by default (-Inf sentinel)
+        @test info.memory_usage_MB >= 0  # Memory can be 0 for very small matrices
 
         # Test with condition number computation enabled via verbosity
         verbose_with_cond = LinearVerbosity(condition_number = InfoLevel())
         info_with_cond = LinearSolve.get_blas_operation_info(
-            :dgetrf, A, b, condition = !isa(verbose_with_cond.condition_number, SciMLLogging.Silent))
-        @test haskey(info_with_cond, :condition_number)
+            :dgetrf, A, b,
+            condition = !isa(verbose_with_cond.condition_number, SciMLLogging.Silent))
+        @test !isinf(info_with_cond.condition_number)  # Should be computed (not -Inf)
     end
 
     @testset "Error Categories" begin

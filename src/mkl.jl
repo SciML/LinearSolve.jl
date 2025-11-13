@@ -12,7 +12,8 @@ struct MKLLUFactorization <: AbstractFactorization end
 # MKL_jll < 2022.2 doesn't support the mixed LP64 and ILP64 interfaces that we make use of in LinearSolve
 # In particular, the `_64` APIs do not exist
 # https://www.intel.com/content/www/us/en/developer/articles/release-notes/onemkl-release-notes-2022.html
-@static if !@isdefined(MKL_jll) || !MKL_jll.is_available() || pkgversion(MKL_jll) < v"2022.2"
+@static if !@isdefined(MKL_jll) || !MKL_jll.is_available() ||
+           pkgversion(MKL_jll) < v"2022.2"
     __mkl_isavailable() = false
 else
     __mkl_isavailable() = true
@@ -252,32 +253,40 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
         info_value = res[3]
 
         if info_value != 0
-            if !isa(verbose.blas_info, SciMLLogging.Silent) || !isa(verbose.blas_errors, SciMLLogging.Silent) ||
-                !isa(verbose.blas_invalid_args, SciMLLogging.Silent)
-                op_info = get_blas_operation_info(:dgetrf, A, cache.b, condition = !isa(verbose.condition_number, SciMLLogging.Silent))
+            if !isa(verbose.blas_info, SciMLLogging.Silent) ||
+               !isa(verbose.blas_errors, SciMLLogging.Silent) ||
+               !isa(verbose.blas_invalid_args, SciMLLogging.Silent)
+                op_info = get_blas_operation_info(:dgetrf, A, cache.b,
+                    condition = !isa(verbose.condition_number, SciMLLogging.Silent))
                 if cache.verbose.condition_number != Silent()
-                    if op_info[:condition_number] === nothing
-                        @SciMLMessage("Matrix condition number calculation failed.", cache.verbose, :condition_number)
+                    if isinf(op_info.condition_number)
+                        @SciMLMessage("Matrix condition number calculation failed.",
+                            cache.verbose, :condition_number)
                     else
-                        @SciMLMessage("Matrix condition number: $(round(op_info[:condition_number], sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf", cache.verbose, :condition_number)
+                        @SciMLMessage("Matrix condition number: $(round(op_info.condition_number, sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf",
+                            cache.verbose, :condition_number)
                     end
                 end
-                verb_option, message = blas_info_msg(
+                verb_option,
+                message = blas_info_msg(
                     :dgetrf, info_value; extra_context = op_info)
                 @SciMLMessage(message, verbose, verb_option)
             end
         else
             if cache.verbose.blas_success != Silent()
-                op_info = get_blas_operation_info(:dgetrf, A, cache.b, condition = !isa(verbose.condition_number, SciMLLogging.Silent))
+                op_info = get_blas_operation_info(:dgetrf, A, cache.b,
+                    condition = !isa(verbose.condition_number, SciMLLogging.Silent))
                 if cache.verbose.condition_number != Silent()
-                    if op_info[:condition_number] === nothing
-                        @SciMLMessage("Matrix condition number calculation failed.", cache.verbose, :condition_number)
+                    if isinf(op_info.condition_number)
+                        @SciMLMessage("Matrix condition number calculation failed.",
+                            cache.verbose, :condition_number)
                     else
-                        @SciMLMessage("Matrix condition number: $(round(op_info[:condition_number], sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf",
+                        @SciMLMessage("Matrix condition number: $(round(op_info.condition_number, sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf",
                             cache.verbose, :condition_number)
                     end
                 end
-                @SciMLMessage("BLAS LU factorization (dgetrf) completed successfully for $(op_info[:matrix_size]) matrix", cache.verbose, :blas_success)
+                @SciMLMessage("BLAS LU factorization (dgetrf) completed successfully for $(op_info.matrix_size) matrix",
+                    cache.verbose, :blas_success)
             end
         end
 
@@ -360,7 +369,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKL32MixedLUFactorization;
     # Compute types on demand for conversions
     T32 = eltype(A) <: Complex ? ComplexF32 : Float32
     Torig = eltype(cache.u)
-    
+
     # Copy b to pre-allocated 32-bit array
     b_32 .= T32.(cache.b)
 

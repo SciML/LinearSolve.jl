@@ -97,8 +97,13 @@ end
     
     # Platform-specific factorizations (may not be available on all systems)
     if @isdefined(MKLLUFactorization)
-        # MKLLUFactorization now passes on all Julia versions
-        JET.@test_opt solve(prob, MKLLUFactorization())
+        # MKLLUFactorization has runtime dispatch in BLAS logging on Julia < 1.12
+        # Passes on Julia 1.12+ due to improved type inference
+        if VERSION < v"1.12.0-"
+            JET.@test_opt solve(prob, MKLLUFactorization()) broken=true
+        else
+            JET.@test_opt solve(prob, MKLLUFactorization())
+        end
     end
     
     if Sys.isapple() && @isdefined(AppleAccelerateLUFactorization)

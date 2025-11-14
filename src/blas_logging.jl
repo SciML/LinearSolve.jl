@@ -180,11 +180,17 @@ function blas_info_msg(func::Symbol, info::Integer;
     verbosity_field, full_msg
 end
 
+# Function barrier to isolate runtime dispatch in type string conversion
+# This prevents JET from analyzing the runtime dispatch in Base.show for types
+@noinline function _type_to_string(::Type{T}) where {T}
+    string(T)
+end
+
 function get_blas_operation_info(func::Symbol, A, b; condition = false)
     # Matrix properties (always present)
     matrix_size = size(A)
-    matrix_type = string(typeof(A))
-    element_type = string(eltype(A))
+    matrix_type = _type_to_string(typeof(A))
+    element_type = _type_to_string(eltype(A))
 
     # Memory usage estimate (always present)
     mem_bytes = prod(matrix_size) * sizeof(eltype(A))
@@ -203,7 +209,7 @@ function get_blas_operation_info(func::Symbol, A, b; condition = false)
 
     # RHS properties (optional - use 0 and "" as sentinels)
     rhs_length = b !== nothing ? length(b) : 0
-    rhs_type = b !== nothing ? string(typeof(b)) : ""
+    rhs_type = b !== nothing ? _type_to_string(typeof(b)) : ""
 
     return BlasOperationInfo(
         matrix_size,

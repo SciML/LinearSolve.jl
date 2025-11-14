@@ -374,7 +374,7 @@ function update_partials_list!(partial_matrix::AbstractVector{T}, list_cache) wh
     p = eachindex(first(partial_matrix))
     for i in p
         for j in eachindex(partial_matrix)
-            list_cache[i][j] = partial_matrix[j][i]
+            @inbounds list_cache[i][j] = partial_matrix[j][i]
         end
     end
     return list_cache
@@ -387,7 +387,7 @@ function update_partials_list!(partial_matrix, list_cache)
     for k in 1:p
         for i in 1:m
             for j in 1:n
-                list_cache[k][i, j] = partial_matrix[i, j][k]
+                @inbounds list_cache[k][i, j] = partial_matrix[i, j][k]
             end
         end
     end

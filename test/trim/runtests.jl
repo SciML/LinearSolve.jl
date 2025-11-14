@@ -11,7 +11,7 @@ end
     using LinearAlgebra
     using LinearSolve
     # Only test if MKL is available
-    if LinearSolve.usemkl(nothing)
+    if LinearSolve.usemkl
         include("linear_mkl.jl")
         sol = TestMKLLUFactorization.solve_linear(1.0)
         @test sol.u ≈ [0.09090909090909091, 0.6363636363636364]
@@ -59,7 +59,7 @@ end
         ("main_lu.jl", true),
         ("main_rf.jl", true)
     ]
-    if LinearSolve.usemkl(nothing)
+    if LinearSolve.usemkl
         push!(test_files, ("main_mkl.jl", true))
     end
 

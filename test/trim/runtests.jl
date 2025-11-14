@@ -1,21 +1,30 @@
 using SafeTestsets
 
 @safetestset "LUFactorization implementation" begin
-    using SciMLBase: successful_retcode
+    using LinearAlgebra
     include("linear_lu.jl")
-    @test successful_retcode(TestLUFactorization.solve_linear(1.0).retcode)
+    sol = TestLUFactorization.solve_linear(1.0)
+    @test sol.u ≈ [0.09090909090909091, 0.6363636363636364]
 end
 
 @safetestset "MKLLUFactorization implementation" begin
-    using SciMLBase: successful_retcode
-    include("linear_mkl.jl")
-    @test successful_retcode(TestMKLLUFactorization.solve_linear(1.0).retcode)
+    using LinearAlgebra
+    using LinearSolve
+    # Only test if MKL is available
+    if LinearSolve.usemkl(nothing)
+        include("linear_mkl.jl")
+        sol = TestMKLLUFactorization.solve_linear(1.0)
+        @test sol.u ≈ [0.09090909090909091, 0.6363636363636364]
+    else
+        @test_skip "MKL not available"
+    end
 end
 
 @safetestset "RFLUFactorization implementation" begin
-    using SciMLBase: successful_retcode
+    using LinearAlgebra
     include("linear_rf.jl")
-    @test successful_retcode(TestRFLUFactorization.solve_linear(1.0).retcode)
+    sol = TestRFLUFactorization.solve_linear(1.0)
+    @test sol.u ≈ [0.09090909090909091, 0.6363636363636364]
 end
 
 @safetestset "Run trim" begin
@@ -44,11 +53,17 @@ end
     )
     @test isfile(JULIAC)
 
-    for (mainfile, expectedtopass) in [
+    using LinearSolve
+    # Build list of tests to run, conditionally including MKL
+    test_files = [
         ("main_lu.jl", true),
-        ("main_mkl.jl", true),
         ("main_rf.jl", true)
     ]
+    if LinearSolve.usemkl(nothing)
+        push!(test_files, ("main_mkl.jl", true))
+    end
+
+    for (mainfile, expectedtopass) in test_files
         binpath = tempname()
         cmd = `$(Base.julia_cmd()) --project=. --depwarn=error $(JULIAC) --experimental --trim=unsafe-warn --output-exe $(binpath) $(mainfile)`
 

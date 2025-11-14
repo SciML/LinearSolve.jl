@@ -309,10 +309,11 @@ function SciMLBase.solve!(
 end
 
 # If setting A or b for DualLinearCache, put the Dual-stripped versions in the LinearCache
-function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)
+function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val::AbstractArray)
     # If the property is A or b, also update it in the LinearCache
     if sym === :A || sym === :b || sym === :u
-        setproperty!(dc.linear_cache, sym, nodual_value(val))
+        prop = nodual_value!(getproperty(dc.linear_cache, sym), val) # Update in-place
+        setproperty!(dc.linear_cache, sym, prop) # Does additional invalidation logic etc.
     elseif hasfield(DualLinearCache, sym)
         setfield!(dc, sym, val)
     elseif hasfield(LinearSolve.LinearCache, sym)
@@ -322,15 +323,15 @@ function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)
     # Update the partials and invalidate cache if setting A or b
     if sym === :A
         setfield!(dc, :dual_A, val)
-        setfield!(dc, :partials_A, partial_vals(val))
+        partial_vals!(getfield(dc, :partials_A), val) # Update in-place
         setfield!(dc, :rhs_cache_valid, false)  # Invalidate cache
     elseif sym === :b
         setfield!(dc, :dual_b, val)
-        setfield!(dc, :partials_b, partial_vals(val))
+        partial_vals!(getfield(dc, :partials_b), val) # Update in-place
         setfield!(dc, :rhs_cache_valid, false)  # Invalidate cache
     elseif sym === :u
         setfield!(dc, :dual_u, val)
-        setfield!(dc, :partials_u, partial_vals(val))
+        partial_vals!(getfield(dc, :partials_u), val) # Update in-place
     end
 end
 
@@ -360,11 +361,13 @@ partial_vals(x::Dual{T, V, P}) where {T, V <: AbstractFloat, P} = ForwardDiff.pa
 partial_vals(x::Dual{T, V, P}) where {T, V <: Dual, P} = ForwardDiff.partials(x)
 partial_vals(x::AbstractArray{<:Dual}) = map(ForwardDiff.partials, x)
 partial_vals(x) = nothing
+partial_vals!(out, x) = map!(partial_vals, out, x) # Update in-place
 
 # Add recursive handling for nested dual values
 nodual_value(x) = x
 nodual_value(x::Dual{T, V, P}) where {T, V <: AbstractFloat, P} = ForwardDiff.value(x)
 nodual_value(x::Dual{T, V, P}) where {T, V <: Dual, P} = x.value  # Keep the inner dual intact
+nodual_value!(out, x) = map!(nodual_value, out, x) # Update in-place
 
 function nodual_value(x::AbstractArray{<:Dual})
     # Create a similar array with the appropriate element type

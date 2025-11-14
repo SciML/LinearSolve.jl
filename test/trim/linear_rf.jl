@@ -17,7 +17,7 @@ function solve_linear(x)
     # Create a new problem with a modified b vector
     b_new = [x, 2.0 * x]
     reinit!(cache; b = b_new)
-    solve!(cache)
-    return cache
+    sol = solve!(cache)
+    return sol
 end
 end

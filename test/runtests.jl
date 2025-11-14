@@ -73,3 +73,10 @@ end
 if Base.Sys.islinux() && (GROUP == "All" || GROUP == "LinearSolveHYPRE") && HAS_EXTENSIONS
     @time @safetestset "LinearSolveHYPRE" include("hypretests.jl")
 end
+
+if GROUP == "Trim" && VERSION >= v"1.12.0"
+    Pkg.activate("trim")
+    Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
+    Pkg.instantiate()
+    @time @safetestset "Trim Tests" include("trim/runtests.jl")
+end

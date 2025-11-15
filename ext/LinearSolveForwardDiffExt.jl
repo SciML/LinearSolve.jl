@@ -309,10 +309,10 @@ function SciMLBase.solve!(
 end
 
 # If setting A or b for DualLinearCache, put the Dual-stripped versions in the LinearCache
-function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)
+function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val::AbstractArray)
     # If the property is A or b, also update it in the LinearCache
     if sym === :A || sym === :b || sym === :u
-        setproperty!(dc.linear_cache, sym, nodual_value(val))
+        setproperty!(dc.linear_cache, sym, val, nodual_value) # maps nodual_value.(val) without allocating
     elseif hasfield(DualLinearCache, sym)
         setfield!(dc, sym, val)
     elseif hasfield(LinearSolve.LinearCache, sym)
@@ -322,15 +322,15 @@ function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)
     # Update the partials and invalidate cache if setting A or b
     if sym === :A
         setfield!(dc, :dual_A, val)
-        setfield!(dc, :partials_A, partial_vals(val))
+        map!(partial_vals, getfield(dc, :partials_A), val)
         setfield!(dc, :rhs_cache_valid, false)  # Invalidate cache
     elseif sym === :b
         setfield!(dc, :dual_b, val)
-        setfield!(dc, :partials_b, partial_vals(val))
+        map!(partial_vals, getfield(dc, :partials_b), val)
         setfield!(dc, :rhs_cache_valid, false)  # Invalidate cache
     elseif sym === :u
         setfield!(dc, :dual_u, val)
-        setfield!(dc, :partials_u, partial_vals(val))
+        map!(partial_vals, getfield(dc, :partials_u), val)
     end
 end
 
@@ -383,7 +383,7 @@ function update_partials_list!(partial_matrix::AbstractVector{T}, list_cache) wh
     p = eachindex(first(partial_matrix))
     for i in p
         for j in eachindex(partial_matrix)
-            list_cache[i][j] = partial_matrix[j][i]
+            @inbounds list_cache[i][j] = partial_matrix[j][i]
         end
     end
     return list_cache
@@ -396,7 +396,7 @@ function update_partials_list!(partial_matrix, list_cache)
     for k in 1:p
         for i in 1:m
             for j in 1:n
-                list_cache[k][i, j] = partial_matrix[i, j][k]
+                @inbounds list_cache[k][i, j] = partial_matrix[i, j][k]
             end
         end
     end

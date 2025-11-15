@@ -141,6 +141,14 @@ function Base.setproperty!(cache::LinearCache, name::Symbol, x)
     setfield!(cache, name, x)
 end
 
+# Dispatch for setting a property to f.(x) without allocating
+function Base.setproperty!(cache::LinearCache, name::Symbol, x::AbstractArray, f::Function)
+    field = getfield(cache, name)
+    setproperty!(cache, name, field) # set with current field as dummy to do invalidation logic etc.
+    map!(f, field, x) # set to f.(x)
+    field
+end
+
 function update_cacheval!(cache::LinearCache, name::Symbol, x)
     return update_cacheval!(cache, cache.cacheval, name, x)
 end

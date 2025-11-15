@@ -338,3 +338,5 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     return SciMLBase.build_linear_solution(alg, cache.u, Ref(resid), cache;
         iters = stats.niter, retcode, stats)
 end
+
+update_tolerances_internal!(cache, alg::KrylovJL, atol, rtol) = nothing

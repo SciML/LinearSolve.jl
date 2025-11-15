@@ -478,3 +478,22 @@ function SciMLBase.solve(prob::StaticLinearProblem,
     return SciMLBase.build_linear_solution(
         alg, u, nothing, prob; retcode = ReturnCode.Success)
 end
+
+function update_tolerances!(cache; abstol = nothing, reltol = nothing)
+    if abstol !== nothing
+        cache.abstol = abstol
+    end
+    if reltol !== nothing
+        cache.reltol = reltol
+    end
+    update_tolerances_internal!(cache, cache.alg, abstol, reltol)
+end
+
+
+function update_tolerances_internal!(cache, alg::AbstractFactorization, abstol, reltol)
+    error("Cannot update tolerances for factorization.")
+end
+
+function update_tolerances_internal!(cache, alg::AbstractKrylovSubspaceMethod, abstol, reltol)
+    @warn "Tolerance update for Krylov subspace method '$typeof(alg)' not implemented." maxlog = 1
+end

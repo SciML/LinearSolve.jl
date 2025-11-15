@@ -96,9 +96,11 @@ end
     end
     
     # Platform-specific factorizations (may not be available on all systems)
-    # MKLLUFactorization: Fixed type stability issues in BLAS error logging
+    # MKLLUFactorization: Use target_modules to focus JET analysis on LinearSolve code
+    # This avoids false positives from Base.show and other stdlib runtime dispatches
+    # while still catching real type stability issues in the solver itself
     if @isdefined(MKLLUFactorization)
-        JET.@test_opt solve(prob, MKLLUFactorization())
+        JET.@test_opt target_modules=(LinearSolve, SciMLBase) solve(prob, MKLLUFactorization())
     end
     
     if Sys.isapple() && @isdefined(AppleAccelerateLUFactorization)

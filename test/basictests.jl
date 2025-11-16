@@ -77,7 +77,7 @@ function test_interface(alg, prob1, prob2)
 end
 
 function test_tolerance_update(alg, prob, u)
-    cache = init(prob, alg; verbose=LinearVerbosity(; error_control=SciMLLogging.WarnLevel(), numerical=SciMLLogging.WarnLevel()))
+    cache = init(prob, alg)
     LinearSolve.update_tolerances!(cache; reltol = 1e-2, abstol=1e-8)
     u1 = copy(solve!(cache).u)
 

@@ -48,4 +48,6 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovKitJL; kwargs...)
         iters = iters)
 end
 
+LinearSolve.update_tolerances_internal!(cache, alg::KrylovKitJL, atol, rtol) = nothing
+
 end

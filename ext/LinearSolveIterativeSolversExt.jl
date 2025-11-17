@@ -105,7 +105,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::IterativeSolversJL; kwargs...
         cache.Pr = Pr
         cache.precsisfresh = false
     end
-    if cache.isfresh || !(alg isa IterativeSolvers.GMRESIterable)
+    if cache.isfresh || !(cache.cacheval isa IterativeSolvers.GMRESIterable)
         solver = LinearSolve.init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl,
             cache.Pr,
             cache.maxiters, cache.abstol, cache.reltol,
@@ -147,6 +147,31 @@ function purge_history!(iter::IterativeSolvers.GMRESIterable, x, b)
     IterativeSolvers.init_residual!(iter.residual, iter.residual.current)
     iter.β = iter.residual.current
     nothing
+end
+
+# The constructors above all set the tolerance as follows.
+#   tol = max(reltol * ||residual||, abstol)
+#
+# The iterable in turn is stored in `cache.cacheval`.
+function update_tolerances_iterativesolversjl!(iter, atol, rtol)
+    Rnorm = norm(iter.r)
+    iter.tol = max(rtol * Rnorm, atol)
+end
+function update_tolerances_iterativesolversjl!(iter::IterativeSolvers.GMRESIterable, atol, rtol)
+    Rnorm = iter.residual.current
+    iter.tol = max(rtol * Rnorm, atol)
+end
+function update_tolerances_iterativesolversjl!(iter::IterativeSolvers.MINRESIterable, atol, rtol)
+    Rnorm = norm(iter.v_curr)
+    iter.tol = max(rtol * Rnorm, atol)
+end
+function update_tolerances_iterativesolversjl!(iter::IterativeSolvers.IDRSIterable, atol, rtol)
+    Rnorm = iter.normR
+    iter.tol = max(rtol * Rnorm, atol)
+end
+
+function LinearSolve.update_tolerances_internal!(cache, alg::IterativeSolversJL, atol, rtol)
+    update_tolerances_iterativesolversjl!(cache.cacheval, atol, rtol)
 end
 
 end

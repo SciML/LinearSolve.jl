@@ -33,10 +33,17 @@ A4 = A2 .|> ComplexF32
 b4 = b2 .|> ComplexF32
 x4 = x2 .|> ComplexF32
 
+A5_ = A - 0.01Tridiagonal(ones(n,n)) + sparse([1], [8], 0.5, n,n)
+A5 = sparse(transpose(A5_) * A5_)
+x5 = zeros(n)
+u5 = ones(n)
+b5 = A5*u5
+
 prob1 = LinearProblem(A1, b1; u0 = x1)
 prob2 = LinearProblem(A2, b2; u0 = x2)
 prob3 = LinearProblem(A3, b3; u0 = x3)
 prob4 = LinearProblem(A4, b4; u0 = x4)
+prob5 = LinearProblem(A5, b5)
 
 cache_kwargs = (;abstol = 1e-8, reltol = 1e-8, maxiter = 30)
 
@@ -65,6 +72,19 @@ function test_interface(alg, prob1, prob2)
     cache.b = b2
     sol = solve!(cache; cache_kwargs...)
     @test A2 * sol.u ≈ b2
+
+    return
+end
+
+function test_tolerance_update(alg, prob, u)
+    cache = init(prob, alg)
+    LinearSolve.update_tolerances!(cache; reltol = 1e-2, abstol=1e-8)
+    u1 = copy(solve!(cache).u)
+
+    LinearSolve.update_tolerances!(cache; reltol = 1e-8, abstol=1e-8)
+    u2 = solve!(cache).u
+
+    @test norm(u2 - u) < norm(u1 - u)
 
     return
 end
@@ -379,6 +399,7 @@ end
             @testset "$name" begin
                 test_interface(algorithm, prob1, prob2)
                 test_interface(algorithm, prob3, prob4)
+                test_tolerance_update(algorithm, prob5, u5)
             end
         end
     end
@@ -418,6 +439,7 @@ end
                 @testset "$(alg[1])" begin
                     test_interface(alg[2], prob1, prob2)
                     test_interface(alg[2], prob3, prob4)
+                    test_tolerance_update(alg[2], prob5, u5)
                 end
             end
         end
@@ -432,6 +454,7 @@ end
                 @testset "$(alg[1])" begin
                     test_interface(alg[2], prob1, prob2)
                     test_interface(alg[2], prob3, prob4)
+                    test_tolerance_update(alg[2], prob5, u5)
                 end
                 @test alg[2] isa KrylovKitJL
             end

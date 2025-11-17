@@ -367,20 +367,8 @@ partial_vals!(out, x) = map!(partial_vals, out, x) # Update in-place
 nodual_value(x) = x
 nodual_value(x::Dual{T, V, P}) where {T, V <: AbstractFloat, P} = ForwardDiff.value(x)
 nodual_value(x::Dual{T, V, P}) where {T, V <: Dual, P} = x.value  # Keep the inner dual intact
+nodual_value(x::AbstractArray{<:Dual}) = nodual_value!(similar(x, typeof(nodual_value(first(x)))), x)
 nodual_value!(out, x) = map!(nodual_value, out, x) # Update in-place
-
-function nodual_value(x::AbstractArray{<:Dual})
-    # Create a similar array with the appropriate element type
-    T = typeof(nodual_value(first(x)))
-    result = similar(x, T)
-
-    # Fill the result array with values
-    for i in eachindex(x)
-        result[i] = nodual_value(x[i])
-    end
-
-    return result
-end
 
 function update_partials_list!(partial_matrix::AbstractVector{T}, list_cache) where {T}
     p = eachindex(first(partial_matrix))

@@ -2,7 +2,7 @@ using LinearAlgebra, LinearSolve
 using Test
 using RecursiveFactorization
 
-@testset "Random Matricies" begin
+@testset "Random Matrices" begin
     for i in 490 : 510
         A = rand(i, i)
         b = rand(i)

@@ -308,31 +308,54 @@ function SciMLBase.solve!(
     )
 end
 
-# If setting A or b for DualLinearCache, put the Dual-stripped versions in the LinearCache
-function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val::AbstractArray)
+function setA!(dc::DualLinearCache, A)
+    # Put the Dual-stripped versions in the LinearCache
+    prop = nodual_value!(getproperty(dc.linear_cache, :A), A) # Update in-place
+    setproperty!(dc.linear_cache, :A, prop) # Does additional invalidation logic etc.
+
+    # Update partials
+    setfield!(dc, :dual_A, A)
+    partial_vals!(getfield(dc, :partials_A), A) # Update in-place
+
+    # Invalidate cache (if setting A or b)
+    setfield!(dc, :rhs_cache_valid, false)
+end
+function setb!(dc::DualLinearCache, b)
+    # Put the Dual-stripped versions in the LinearCache
+    prop = nodual_value!(getproperty(dc.linear_cache, :b), b) # Update in-place
+    setproperty!(dc.linear_cache, :b, prop) # Does additional invalidation logic etc.
+
+    # Update partials
+    setfield!(dc, :dual_b, b)
+    partial_vals!(getfield(dc, :partials_b), b) # Update in-place
+
+    # Invalidate cache (if setting A or b)
+    setfield!(dc, :rhs_cache_valid, false)
+end
+function setu!(dc::DualLinearCache, u)
+    # Put the Dual-stripped versions in the LinearCache
+    prop = nodual_value!(getproperty(dc.linear_cache, :u), u) # Update in-place
+    setproperty!(dc.linear_cache, :u, prop) # Does additional invalidation logic etc.
+
+    # Update partials
+    setfield!(dc, :dual_u, u)
+    partial_vals!(getfield(dc, :partials_u), u) # Update in-place
+end
+
+function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)
     # If the property is A or b, also update it in the LinearCache
-    if sym === :A || sym === :b || sym === :u
-        prop = nodual_value!(getproperty(dc.linear_cache, sym), val) # Update in-place
-        setproperty!(dc.linear_cache, sym, prop) # Does additional invalidation logic etc.
+    if sym === :A
+        setA!(dc, val)
+    elseif sym === :b
+        setb!(dc, val)
+    elseif sym === :u
+        setu!(dc, val)
     elseif hasfield(DualLinearCache, sym)
         setfield!(dc, sym, val)
     elseif hasfield(LinearSolve.LinearCache, sym)
         setproperty!(dc.linear_cache, sym, val)
     end
-
-    # Update the partials and invalidate cache if setting A or b
-    if sym === :A
-        setfield!(dc, :dual_A, val)
-        partial_vals!(getfield(dc, :partials_A), val) # Update in-place
-        setfield!(dc, :rhs_cache_valid, false)  # Invalidate cache
-    elseif sym === :b
-        setfield!(dc, :dual_b, val)
-        partial_vals!(getfield(dc, :partials_b), val) # Update in-place
-        setfield!(dc, :rhs_cache_valid, false)  # Invalidate cache
-    elseif sym === :u
-        setfield!(dc, :dual_u, val)
-        partial_vals!(getfield(dc, :partials_u), val) # Update in-place
-    end
+    nothing
 end
 
 # "Forwards" getproperty to LinearCache if necessary

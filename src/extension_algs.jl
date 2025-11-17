@@ -258,7 +258,7 @@ end
 `ButterflyFactorization()`
 
 A fast pure Julia LU-factorization implementation
-using RecursiveFactorization.jl. This method utilizes a butterly 
+using RecursiveFactorization.jl. This method utilizes a butterfly
 factorization approach rather than pivoting. 
 """
 struct ButterflyFactorization{T} <: AbstractDenseFactorization

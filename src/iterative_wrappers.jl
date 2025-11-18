@@ -65,6 +65,17 @@ end
 
 """
 ```julia
+KrylovJL_FGMRES(args...; gmres_restart = 0, window = 0, kwargs...)
+```
+
+A generic FGMRES implementation for square non-Hermitian linear systems
+"""
+function KrylovJL_FGMRES(args...; kwargs...)
+    KrylovJL(args...; KrylovAlg = Krylov.fgmres!, kwargs...)
+end
+
+"""
+```julia
 KrylovJL_BICGSTAB(args...; kwargs...)
 ```
 

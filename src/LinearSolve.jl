@@ -490,7 +490,7 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
 export LinearSolveFunction, DirectLdiv!, show_algorithm_choices
 
 export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
-       KrylovJL_BICGSTAB, KrylovJL_LSMR, KrylovJL_CRAIGMR,
+       KrylovJL_BICGSTAB, KrylovJL_LSMR, KrylovJL_CRAIGMR, KrylovJL_FGMRES,
        IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
        IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES, IterativeSolversJL_IDRS,
        KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES, KrylovJL_MINARES

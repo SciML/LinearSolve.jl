@@ -5,9 +5,11 @@ using LinearSolve: LinearSolve, is_cusparse, defaultalg, cudss_loaded, DefaultLi
                    DefaultAlgorithmChoice, ALREADY_WARNED_CUDSS, LinearCache,
                    needs_concrete_A,
                    error_no_cudss_lu, init_cacheval, OperatorAssumptions,
-                   CudaOffloadFactorization, CudaOffloadLUFactorization, CudaOffloadQRFactorization,
+                   CudaOffloadFactorization, CudaOffloadLUFactorization,
+                   CudaOffloadQRFactorization,
                    CUDAOffload32MixedLUFactorization,
-                   SparspakFactorization, KLUFactorization, UMFPACKFactorization, LinearVerbosity
+                   SparspakFactorization, KLUFactorization, UMFPACKFactorization,
+                   LinearVerbosity
 using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase, LinearSolve.ArrayInterface
 using SciMLBase: AbstractSciMLOperator
 
@@ -56,14 +58,15 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadLUFact
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
-function LinearSolve.init_cacheval(alg::CudaOffloadLUFactorization, A::AbstractArray, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(
+        alg::CudaOffloadLUFactorization, A::AbstractArray, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions)
     # Check if CUDA is functional before creating CUDA arrays
     if !CUDA.functional()
         return nothing
     end
-    
+
     T = eltype(A)
     noUnitT = typeof(zero(T))
     luT = LinearAlgebra.lutype(noUnitT)
@@ -91,7 +94,7 @@ function LinearSolve.init_cacheval(alg::CudaOffloadQRFactorization, A, b, u, Pl,
     if !CUDA.functional()
         return nothing
     end
-    
+
     qr(CUDA.CuArray(A))
 end
 
@@ -108,7 +111,8 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadFactor
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
-function LinearSolve.init_cacheval(alg::CudaOffloadFactorization, A::AbstractArray, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(
+        alg::CudaOffloadFactorization, A::AbstractArray, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions)
     qr(CUDA.CuArray(A))
@@ -116,27 +120,33 @@ end
 
 function LinearSolve.init_cacheval(
         ::SparspakFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
-        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+        Pl, Pr, maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
     nothing
 end
 
 function LinearSolve.init_cacheval(
         ::KLUFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
-        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+        Pl, Pr, maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
     nothing
 end
 
 function LinearSolve.init_cacheval(
         ::UMFPACKFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
-        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+        Pl, Pr, maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
     nothing
 end
 
 # Mixed precision CUDA LU implementation
-function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CUDAOffload32MixedLUFactorization;
+function SciMLBase.solve!(
+        cache::LinearSolve.LinearCache, alg::CUDAOffload32MixedLUFactorization;
         kwargs...)
     if cache.isfresh
-        fact, A_gpu_f32, b_gpu_f32, u_gpu_f32 = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
+        fact, A_gpu_f32,
+        b_gpu_f32,
+        u_gpu_f32 = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
         # Compute 32-bit type on demand and convert
         T32 = eltype(cache.A) <: Complex ? ComplexF32 : Float32
         A_f32 = T32.(cache.A)
@@ -145,12 +155,14 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CUDAOffload32Mixe
         cache.cacheval = (fact, A_gpu_f32, b_gpu_f32, u_gpu_f32)
         cache.isfresh = false
     end
-    fact, A_gpu_f32, b_gpu_f32, u_gpu_f32 = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
-    
+    fact, A_gpu_f32,
+    b_gpu_f32,
+    u_gpu_f32 = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
+
     # Compute types on demand for conversions
     T32 = eltype(cache.A) <: Complex ? ComplexF32 : Float32
     Torig = eltype(cache.u)
-    
+
     # Convert b to Float32, solve, then convert back to original precision
     b_f32 = T32.(cache.b)
     copyto!(b_gpu_f32, b_f32)

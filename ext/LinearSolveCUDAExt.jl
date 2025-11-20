@@ -22,12 +22,20 @@ end
 
 function LinearSolve.defaultalg(A::CUDA.CUSPARSE.CuSparseMatrixCSR{Tv, Ti}, b,
         assump::OperatorAssumptions{Bool}) where {Tv, Ti}
-    LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)
+    if LinearSolve.cudss_loaded(A)
+        LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)
+    else
+        error("CUDSS.jl is required for LU Factorizations on CuSparseMatrixCSR. Please load this library.")
+    end
 end
 
 function LinearSolve.defaultalg(A::CUDA.CUSPARSE.CuSparseMatrixCSC{Tv, Ti}, b,
         assump::OperatorAssumptions{Bool}) where {Tv, Ti}
-    LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)
+    if LinearSolve.cudss_loaded(A)
+        LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)
+    else
+        error("CUDSS.jl is required for LU Factorizations on CuSparseMatrixCSC. Please load this library.")
+    end
 end
 
 function LinearSolve.error_no_cudss_lu(A::CUDA.CUSPARSE.CuSparseMatrixCSR)

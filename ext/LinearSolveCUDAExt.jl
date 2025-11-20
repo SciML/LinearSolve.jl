@@ -20,20 +20,24 @@ end
 
 function LinearSolve.defaultalg(A::CUDA.CUSPARSE.CuSparseMatrixCSR{Tv, Ti}, b,
         assump::OperatorAssumptions{Bool}) where {Tv, Ti}
-    if LinearSolve.cudss_loaded(A)
-        LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)
-    else
-        if !LinearSolve.ALREADY_WARNED_CUDSS[]
-            @warn("CUDSS.jl is required for LU Factorizations on CuSparseMatrixCSR. Please load this library. Falling back to Krylov")
-            LinearSolve.ALREADY_WARNED_CUDSS[] = true
-        end
-        LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES)
-    end
+    LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)
+end
+
+function LinearSolve.defaultalg(A::CUDA.CUSPARSE.CuSparseMatrixCSC{Tv, Ti}, b,
+        assump::OperatorAssumptions{Bool}) where {Tv, Ti}
+    LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)
 end
 
 function LinearSolve.error_no_cudss_lu(A::CUDA.CUSPARSE.CuSparseMatrixCSR)
     if !LinearSolve.cudss_loaded(A)
         error("CUDSS.jl is required for LU Factorizations on CuSparseMatrixCSR. Please load this library.")
+    end
+    nothing
+end
+
+function LinearSolve.error_no_cudss_lu(A::CUDA.CUSPARSE.CuSparseMatrixCSC)
+    if !LinearSolve.cudss_loaded(A)
+        error("CUDSS.jl is required for LU Factorizations on CuSparseMatrixCSC. Please load this library.")
     end
     nothing
 end

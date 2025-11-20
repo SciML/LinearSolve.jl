@@ -25,7 +25,7 @@ using Test
     end
 
     @testset "Group-level keyword constructors" begin
-        v4_error = LinearVerbosity(error_control = ErrorLevel())
+        v4_error = LinearVerbosity(error_control = SciMLLogging.ErrorLevel())
         @test v4_error.default_lu_fallback isa SciMLLogging.ErrorLevel
 
         v4_numerical = LinearVerbosity(numerical = Silent())
@@ -53,9 +53,9 @@ using Test
 
     @testset "Individual keyword arguments" begin
         v6_individual = LinearVerbosity(
-            default_lu_fallback = ErrorLevel(),
-            KrylovKit_verbosity = InfoLevel(),
-            pardiso_verbosity = Silent()
+            default_lu_fallback = SciMLLogging.ErrorLevel(),
+            KrylovKit_verbosity = SciMLLogging.InfoLevel(),
+            pardiso_verbosity = SciMLLogging.Silent()
         )
         @test v6_individual.default_lu_fallback isa SciMLLogging.ErrorLevel
         @test v6_individual.KrylovKit_verbosity isa SciMLLogging.InfoLevel

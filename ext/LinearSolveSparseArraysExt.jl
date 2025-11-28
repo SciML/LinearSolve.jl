@@ -129,7 +129,7 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions) where {T <: BLASELTYPES}
     if LinearSolve.is_cusparse(A)
-        ArrayInterface.lu_instance(A)
+        LinearSolve.cudss_loaded(A) ? ArrayInterface.lu_instance(A) : nothing
     else
         SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC{T, Int64}(
             zero(Int64), zero(Int64), [Int64(1)], Int64[], T[]))
@@ -141,7 +141,7 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions) where {T <: BLASELTYPES}
     if LinearSolve.is_cusparse(A)
-        ArrayInterface.lu_instance(A)
+        LinearSolve.cudss_loaded(A) ? ArrayInterface.lu_instance(A) : nothing
     else
         SparseArrays.UMFPACK.UmfpackLU(SparseMatrixCSC{T, Int32}(
             zero(Int32), zero(Int32), [Int32(1)], Int32[], T[]))
@@ -344,7 +344,13 @@ function LinearSolve.init_cacheval(alg::NormalCholeskyFactorization,
             Symmetric{T, <:AbstractSparseArray{T}}}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions) where {T <: BLASELTYPES}
-    ArrayInterface.cholesky_instance(convert(AbstractMatrix, A))
+    if LinearSolve.is_cusparse_csc(A)
+        nothing
+    elseif LinearSolve.is_cusparse_csr(A) && !LinearSolve.cudss_loaded(A)
+        nothing
+    else
+        ArrayInterface.cholesky_instance(convert(AbstractMatrix, A))
+    end
 end
 
 # Specialize QR for the non-square case

@@ -41,7 +41,6 @@ using Test
         @test alg.alg == LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
     end
 
-    # after loading CUDSS, it should fall back tu LU factorization
     using CUDSS
 
     @testset "Test with CUDSS loaded" begin
@@ -55,7 +54,7 @@ using Test
         # csr symmetric uses LU/cholesky
         alg = solve(prob_sym_csr).alg
         @test alg.alg == LinearSolve.DefaultAlgorithmChoice.LUFactorization
-        # csc symetric fallback to krylov
+        # csc symmetric fallback to krylov
         alg = solve(prob_sym_csc).alg
         @test alg.alg == LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
     end

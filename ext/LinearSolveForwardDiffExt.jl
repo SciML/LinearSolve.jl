@@ -2,7 +2,7 @@ module LinearSolveForwardDiffExt
 
 using LinearSolve
 using LinearSolve: SciMLLinearSolveAlgorithm, __init, LinearVerbosity, DefaultLinearSolver,
-                   DefaultAlgorithmChoice, defaultalg
+                   DefaultAlgorithmChoice, defaultalg, reinit!
 using LinearAlgebra
 using ForwardDiff
 using ForwardDiff: Dual, Partials
@@ -342,6 +342,38 @@ function setu!(dc::DualLinearCache, u)
     partial_vals!(getfield(dc, :partials_u), u) # Update in-place
 end
 
+function SciMLBase.reinit!(cache::DualLinearCache;
+        A = nothing,
+        b = nothing,
+        u = nothing,
+        p = nothing,
+        reuse_precs = false)
+    if !isnothing(A)
+        setA!(cache, A)
+    end
+
+    if !isnothing(b)
+        setb!(cache, b)
+    end
+
+    if !isnothing(u)
+        setu!(cache, u)
+    end
+
+    if !isnothing(p)
+        cache.linear_cache.p=p
+    end
+
+    isfresh = !isnothing(A)
+    precsisfresh = !reuse_precs && (isfresh || !isnothing(p))
+    isfresh |= cache.isfresh
+    precsisfresh |= cache.linear_cache.precsisfresh
+    cache.linear_cache.isfresh = true
+    cache.linear_cache.precsisfresh = precsisfresh
+
+    nothing
+end
+
 function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)
     # If the property is A or b, also update it in the LinearCache
     if sym === :A
@@ -390,7 +422,9 @@ partial_vals!(out, x) = map!(partial_vals, out, x) # Update in-place
 nodual_value(x) = x
 nodual_value(x::Dual{T, V, P}) where {T, V <: AbstractFloat, P} = ForwardDiff.value(x)
 nodual_value(x::Dual{T, V, P}) where {T, V <: Dual, P} = x.value  # Keep the inner dual intact
-nodual_value(x::AbstractArray{<:Dual}) = nodual_value!(similar(x, typeof(nodual_value(first(x)))), x)
+function nodual_value(x::AbstractArray{<:Dual})
+    nodual_value!(similar(x, typeof(nodual_value(first(x)))), x)
+end
 nodual_value!(out, x) = map!(nodual_value, out, x) # Update in-place
 
 function update_partials_list!(partial_matrix::AbstractVector{T}, list_cache) where {T}

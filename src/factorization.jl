@@ -395,7 +395,13 @@ end
 function init_cacheval(
         alg::CholeskyFactorization, A::AbstractArray{<:BLASELTYPES}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
-    ArrayInterface.cholesky_instance(convert(AbstractMatrix, A), alg.pivot)
+    if LinearSolve.is_cusparse_csc(A)
+        nothing
+    elseif LinearSolve.is_cusparse_csr(A) && !LinearSolve.cudss_loaded(A)
+        nothing
+    else
+        ArrayInterface.cholesky_instance(convert(AbstractMatrix, A), alg.pivot)
+    end
 end
 
 const PREALLOCATED_CHOLESKY = ArrayInterface.cholesky_instance(rand(1, 1), NoPivot())

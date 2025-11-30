@@ -200,6 +200,11 @@ function SciMLBase.init(prob::DualAbstractLinearProblem, alg::GenericLUFactoriza
     return __init(prob, alg, args...; kwargs...)
 end
 
+# Opt out for SparspakFactorization
+function SciMLBase.init(prob::DualAbstractLinearProblem, alg::SparspakFactorization, args...; kwargs...)
+    return __init(prob, alg, args...; kwargs...)
+end
+
 function SciMLBase.init(prob::DualAbstractLinearProblem, alg::DefaultLinearSolver, args...; kwargs...)
     if alg.alg === DefaultAlgorithmChoice.GenericLUFactorization
         return __init(prob, alg, args...; kwargs...)

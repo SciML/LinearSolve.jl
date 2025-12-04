@@ -357,8 +357,8 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     u0_ = u0 !== nothing ? u0 : __init_u0_from_Ab(A, b)
 
     # Guard against type mismatch for user-specified reltol/abstol
-    reltol = real(eltype(prob.b))(reltol)
-    abstol = real(eltype(prob.b))(abstol)
+    reltol = real(eltype(prob.b))(SciMLBase.value(reltol))
+    abstol = real(eltype(prob.b))(SciMLBase.value(abstol))
 
     precs = if hasproperty(alg, :precs)
         isnothing(alg.precs) ? DEFAULT_PRECS : alg.precs

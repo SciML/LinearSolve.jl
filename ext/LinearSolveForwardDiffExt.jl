@@ -270,6 +270,13 @@ function __dual_init(
     else
         rhs_list = nothing
     end
+    # Use b for restructuring if sizes match (square system), otherwise use u (non-square)
+    # This preserves ComponentArray structure from b when possible
+    dual_u_init = if length(non_partial_cache.u) == length(b)
+        ArrayInterface.restructure(b, zeros(dual_type, length(b)))
+    else
+        ArrayInterface.restructure(non_partial_cache.u, zeros(dual_type, length(non_partial_cache.u)))
+    end
 
     return DualLinearCache{dual_type}(
         non_partial_cache,
@@ -285,7 +292,7 @@ function __dual_init(
         true,  # Cache is initially valid
         A,
         b,
-        ArrayInterface.restructure(non_partial_cache.u, zeros(dual_type, length(non_partial_cache.u)))
+        dual_u_init
     )
 end
 

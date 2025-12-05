@@ -76,9 +76,8 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
     ∂_b = cache.partials_b
 
     xp_linsolve_rhs!(uu, ∂_A, ∂_b, cache)
-
+    
     rhs_list = cache.rhs_list
-
     cache.linear_cache.u .= cache.dual_u0_cache
     # We can reuse the linear cache, because the same factorization will work for the partials.
     for i in eachindex(rhs_list)
@@ -177,7 +176,6 @@ function linearsolve_dual_solution!(dual_u::AbstractArray{DT}, u::AbstractArray,
         partials) where {T, V, N, DT <: Dual{T, V, N}}
     # Direct in-place construction of dual numbers without temporary allocations
     n_partials = length(partials)
-
     for i in eachindex(u, dual_u)
         # Extract partials for this element directly
         partial_vals = ntuple(Val(N)) do j
@@ -281,13 +279,13 @@ function __dual_init(
         partials_A_list,
         partials_b_list,
         rhs_list,
-        similar(new_b),
-        similar(new_b),
-        similar(new_b),
+        similar(non_partial_cache.u),  # Use u's size, not b's size
+        similar(non_partial_cache.u),  # primal_u_cache
+        similar(new_b),                # primal_b_cache
         true,  # Cache is initially valid
         A,
         b,
-        ArrayInterface.restructure(b, zeros(dual_type, length(b)))
+        ArrayInterface.restructure(non_partial_cache.u, zeros(dual_type, length(non_partial_cache.u)))
     )
 end
 
@@ -300,6 +298,7 @@ function SciMLBase.solve!(
                                                                                                ForwardDiff.Dual}
     primal_sol = linearsolve_forwarddiff_solve!(
         cache::DualLinearCache, getfield(cache, :linear_cache).alg, args...; kwargs...)
+
     dual_sol = linearsolve_dual_solution(getfield(cache, :linear_cache).u, getfield(cache, :rhs_list), cache)
 
     # For scalars, we still need to assign since cache.dual_u might not be pre-allocated

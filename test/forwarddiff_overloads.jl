@@ -189,6 +189,34 @@ backslash_x_p = A \ b
 
 @test ≈(overload_x_p, backslash_x_p, rtol = 1e-9)
 
+# Test reinit! for DualLinearCache
+A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+prob = LinearProblem(sparse(A), sparse(b))
+cache = init(prob, UMFPACKFactorization())
+overload_x_p = solve!(cache)
+backslash_x_p = A \ b
+@test ≈(overload_x_p, backslash_x_p, rtol = 1e-9)
+
+# Now use reinit! to update A
+new_A, new_b = h([ForwardDiff.Dual(10.0, 1.0, 0.0), ForwardDiff.Dual(10.0, 0.0, 1.0)])
+reinit!(cache; A = sparse(new_A))
+overload_x_p = solve!(cache, UMFPACKFactorization())
+backslash_x_p = new_A \ b
+@test ≈(overload_x_p, backslash_x_p, rtol = 1e-9)
+
+# Test reinit! with both A and b
+reinit!(cache; A = sparse(new_A), b = sparse(new_b))
+overload_x_p = solve!(cache, UMFPACKFactorization())
+backslash_x_p = new_A \ new_b
+@test ≈(overload_x_p, backslash_x_p, rtol = 1e-9)
+
+# Test reinit! with just b
+A2, b2 = h([ForwardDiff.Dual(7.0, 1.0, 0.0), ForwardDiff.Dual(7.0, 0.0, 1.0)])
+reinit!(cache; b = sparse(b2))
+overload_x_p = solve!(cache, UMFPACKFactorization())
+backslash_x_p = new_A \ b2
+@test ≈(overload_x_p, backslash_x_p, rtol = 1e-9)
+
 # Test that GenericLU doesn't create a DualLinearCache
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 

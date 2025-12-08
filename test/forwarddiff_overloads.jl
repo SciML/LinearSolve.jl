@@ -194,7 +194,7 @@ cache = overload_x_p.cache
 reinit!(cache; A = sparse(A))
 overload_x_p = solve!(cache, UMFPACKFactorization())
 backslash_x_p = A \ b
-@test ≈ (overload_x_p, backslash_x_p, rtol = 1e-9)
+@test ≈(overload_x_p, backslash_x_p, rtol = 1e-9)
 
 # Test that GenericLU doesn't create a DualLinearCache
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])

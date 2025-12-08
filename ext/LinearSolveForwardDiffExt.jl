@@ -371,7 +371,7 @@ function SciMLBase.reinit!(cache::DualLinearCache;
 
     isfresh = !isnothing(A)
     precsisfresh = !reuse_precs && (isfresh || !isnothing(p))
-    isfresh |= cache.isfresh
+    isfresh |= cache.linear_cache.isfresh
     precsisfresh |= cache.linear_cache.precsisfresh
     cache.linear_cache.isfresh = true
     cache.linear_cache.precsisfresh = precsisfresh

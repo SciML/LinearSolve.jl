@@ -5,11 +5,9 @@ using LinearSolve: LinearSolve, is_cusparse, defaultalg, cudss_loaded, DefaultLi
                    DefaultAlgorithmChoice, ALREADY_WARNED_CUDSS, LinearCache,
                    needs_concrete_A,
                    error_no_cudss_lu, init_cacheval, OperatorAssumptions,
-                   CudaOffloadFactorization, CudaOffloadLUFactorization,
-                   CudaOffloadQRFactorization,
+                   CudaOffloadFactorization, CudaOffloadLUFactorization, CudaOffloadQRFactorization,
                    CUDAOffload32MixedLUFactorization,
-                   SparspakFactorization, KLUFactorization, UMFPACKFactorization,
-                   LinearVerbosity
+                   SparspakFactorization, KLUFactorization, UMFPACKFactorization, LinearVerbosity
 using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase, LinearSolve.ArrayInterface
 using SciMLBase: AbstractSciMLOperator
 
@@ -19,35 +17,35 @@ function LinearSolve.is_cusparse(A::Union{
         CUDA.CUSPARSE.CuSparseMatrixCSR, CUDA.CUSPARSE.CuSparseMatrixCSC})
     true
 end
+LinearSolve.is_cusparse_csr(::CUDA.CUSPARSE.CuSparseMatrixCSR) = true
+LinearSolve.is_cusparse_csc(::CUDA.CUSPARSE.CuSparseMatrixCSC) = true
 
 function LinearSolve.defaultalg(A::CUDA.CUSPARSE.CuSparseMatrixCSR{Tv, Ti}, b,
         assump::OperatorAssumptions{Bool}) where {Tv, Ti}
     if LinearSolve.cudss_loaded(A)
         LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)
     else
-        error("CUDSS.jl is required for LU Factorizations on CuSparseMatrixCSR. Please load this library.")
+        if !LinearSolve.ALREADY_WARNED_CUDSS[]
+            @warn("CUDSS.jl is required for LU Factorizations on CuSparseMatrixCSR. Please load this library. Falling back to Krylov")
+            LinearSolve.ALREADY_WARNED_CUDSS[] = true
+        end
+        LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES)
     end
 end
 
-function LinearSolve.defaultalg(A::CUDA.CUSPARSE.CuSparseMatrixCSC{Tv, Ti}, b,
-        assump::OperatorAssumptions{Bool}) where {Tv, Ti}
+function LinearSolve.defaultalg(A::CUDA.CUSPARSE.CuSparseMatrixCSC, b,
+        assump::OperatorAssumptions{Bool})
     if LinearSolve.cudss_loaded(A)
-        LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)
+        @warn("CUDSS.jl does not support CuSparseMatrixCSC for LU Factorizations, consider using CuSparseMatrixCSR instead. Falling back to Krylov", maxlog=1)
     else
-        error("CUDSS.jl is required for LU Factorizations on CuSparseMatrixCSC. Please load this library.")
+        @warn("CuSparseMatrixCSC does not support LU Factorization falling back to Krylov. Consider using CUDSS.jl together with CuSparseMatrixCSR", maxlog=1)
     end
+    LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES)
 end
 
 function LinearSolve.error_no_cudss_lu(A::CUDA.CUSPARSE.CuSparseMatrixCSR)
     if !LinearSolve.cudss_loaded(A)
         error("CUDSS.jl is required for LU Factorizations on CuSparseMatrixCSR. Please load this library.")
-    end
-    nothing
-end
-
-function LinearSolve.error_no_cudss_lu(A::CUDA.CUSPARSE.CuSparseMatrixCSC)
-    if !LinearSolve.cudss_loaded(A)
-        error("CUDSS.jl is required for LU Factorizations on CuSparseMatrixCSC. Please load this library.")
     end
     nothing
 end
@@ -66,15 +64,14 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadLUFact
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
-function LinearSolve.init_cacheval(
-        alg::CudaOffloadLUFactorization, A::AbstractArray, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(alg::CudaOffloadLUFactorization, A::AbstractArray, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions)
     # Check if CUDA is functional before creating CUDA arrays
     if !CUDA.functional()
         return nothing
     end
-
+    
     T = eltype(A)
     noUnitT = typeof(zero(T))
     luT = LinearAlgebra.lutype(noUnitT)
@@ -102,7 +99,7 @@ function LinearSolve.init_cacheval(alg::CudaOffloadQRFactorization, A, b, u, Pl,
     if !CUDA.functional()
         return nothing
     end
-
+    
     qr(CUDA.CuArray(A))
 end
 
@@ -119,8 +116,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CudaOffloadFactor
     SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
-function LinearSolve.init_cacheval(
-        alg::CudaOffloadFactorization, A::AbstractArray, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(alg::CudaOffloadFactorization, A::AbstractArray, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions)
     qr(CUDA.CuArray(A))
@@ -128,33 +124,27 @@ end
 
 function LinearSolve.init_cacheval(
         ::SparspakFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
-        Pl, Pr, maxiters::Int, abstol, reltol,
-        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
     nothing
 end
 
 function LinearSolve.init_cacheval(
         ::KLUFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
-        Pl, Pr, maxiters::Int, abstol, reltol,
-        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
     nothing
 end
 
 function LinearSolve.init_cacheval(
         ::UMFPACKFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
-        Pl, Pr, maxiters::Int, abstol, reltol,
-        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
     nothing
 end
 
 # Mixed precision CUDA LU implementation
-function SciMLBase.solve!(
-        cache::LinearSolve.LinearCache, alg::CUDAOffload32MixedLUFactorization;
+function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CUDAOffload32MixedLUFactorization;
         kwargs...)
     if cache.isfresh
-        fact, A_gpu_f32,
-        b_gpu_f32,
-        u_gpu_f32 = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
+        fact, A_gpu_f32, b_gpu_f32, u_gpu_f32 = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
         # Compute 32-bit type on demand and convert
         T32 = eltype(cache.A) <: Complex ? ComplexF32 : Float32
         A_f32 = T32.(cache.A)
@@ -163,14 +153,12 @@ function SciMLBase.solve!(
         cache.cacheval = (fact, A_gpu_f32, b_gpu_f32, u_gpu_f32)
         cache.isfresh = false
     end
-    fact, A_gpu_f32,
-    b_gpu_f32,
-    u_gpu_f32 = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
-
+    fact, A_gpu_f32, b_gpu_f32, u_gpu_f32 = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
+    
     # Compute types on demand for conversions
     T32 = eltype(cache.A) <: Complex ? ComplexF32 : Float32
     Torig = eltype(cache.u)
-
+    
     # Convert b to Float32, solve, then convert back to original precision
     b_f32 = T32.(cache.b)
     copyto!(b_gpu_f32, b_f32)

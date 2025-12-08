@@ -3,6 +3,7 @@ using ForwardDiff
 using Test
 using SparseArrays
 using ComponentArrays
+using Sparspak
 
 function h(p)
     (A = [p[1] p[2]+1 p[2]^3;
@@ -202,6 +203,12 @@ prob = LinearProblem(A, b)
 @test init(prob, GenericLUFactorization()) isa LinearSolve.LinearCache
 
 @test init(prob) isa LinearSolve.LinearCache
+
+# Test that SparspakFactorization doesn't create a DualLinearCache
+A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+
+prob = LinearProblem(sparse(A), b)
+@test init(prob, SparspakFactorization()) isa LinearSolve.LinearCache
 
 # Test ComponentArray with ForwardDiff (Issue SciML/DifferentialEquations.jl#1110)
 # This tests that ArrayInterface.restructure preserves ComponentArray structure

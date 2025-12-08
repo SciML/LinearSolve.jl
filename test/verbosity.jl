@@ -101,19 +101,19 @@ end
     prob = LinearProblem(A, b)
 
     @test_logs (:warn,
-        "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(
+        r"LU factorization failed, falling back to QR factorization\. `A` is potentially rank-deficient\.") solve(
         prob,
         verbose = LinearVerbosity(default_lu_fallback = WarnLevel()))
 
     @test_logs (:info,
-        "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(
+        r"LU factorization failed, falling back to QR factorization\. `A` is potentially rank-deficient\.") solve(
         prob,
         verbose = LinearVerbosity(default_lu_fallback = InfoLevel()))
 
     verb = LinearVerbosity(default_lu_fallback = WarnLevel())
 
     @test_logs (:warn,
-        "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.") solve(
+        r"LU factorization failed, falling back to QR factorization\. `A` is potentially rank-deficient\.") solve(
         prob,
         verbose = verb)
 end

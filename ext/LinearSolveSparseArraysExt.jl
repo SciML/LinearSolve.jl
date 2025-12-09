@@ -394,9 +394,19 @@ end
 end # @static if Base.USE_GPL_LIBS
 
 function LinearSolve.pattern_changed(fact, A::SparseArrays.SparseMatrixCSC)
-    !(SparseArrays.decrement(SparseArrays.getcolptr(A)) ==
-      fact.colptr && SparseArrays.decrement(SparseArrays.getrowval(A)) ==
-      fact.rowval)
+    colptr0 = fact.colptr # has 0-based indices
+    colptr1 = SparseArrays.getcolptr(A) # has 1-based indices
+    length(colptr0) == length(colptr1) || return true
+    @inbounds for i in eachindex(colptr0)
+        colptr0[i] + 1 == colptr1[i] || return true
+    end
+    rowval0 = fact.rowval
+    rowval1 = SparseArrays.getrowval(A)
+    length(rowval0) == length(rowval1) || return true
+    @inbounds for i in eachindex(rowval0)
+        rowval0[i] + 1 == rowval1[i] || return true
+    end
+    return false
 end
 
 @static if Base.USE_GPL_LIBS

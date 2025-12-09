@@ -134,9 +134,9 @@ See the [`klu`](@ref) docs for more information.
 
 You typically should not construct this directly, instead use [`klu`](@ref).
 """
-mutable struct KLUFactorization{Tv <: KLUTypes, Ti <: KLUITypes} <:
+mutable struct KLUFactorization{Tv <: KLUTypes, Ti <: KLUITypes, Tklu <: Union{klu_l_common, klu_common}} <:
                AbstractKLUFactorization{Tv, Ti}
-    common::Union{klu_l_common, klu_common}
+    common::Tklu
     _symbolic::Ptr{Cvoid}
     _numeric::Ptr{Cvoid}
     n::Int
@@ -146,7 +146,7 @@ mutable struct KLUFactorization{Tv <: KLUTypes, Ti <: KLUITypes} <:
     function KLUFactorization(n, colptr, rowval, nzval)
         Ti = eltype(colptr)
         common = _common(Ti)
-        obj = new{eltype(nzval), Ti}(common, C_NULL, C_NULL, n, colptr, rowval, nzval)
+        obj = new{eltype(nzval), Ti, typeof(common)}(common, C_NULL, C_NULL, n, colptr, rowval, nzval)
         function f(klu)
             _free_symbolic(klu)
             _free_numeric(klu)

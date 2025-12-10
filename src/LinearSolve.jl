@@ -24,7 +24,6 @@ using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator,
 using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_int, AbstractVerbositySpecifier, AbstractMessageLevel, AbstractVerbosityPreset,
                     Silent, InfoLevel, WarnLevel, CustomLevel, None, Minimal, Standard, Detailed, All
 using Setfield: @set, @set!
-using UnPack: @unpack
 using DocStringExtensions: DocStringExtensions
 using EnumX: EnumX, @enumx
 using Markdown: Markdown, @doc_str

@@ -162,7 +162,7 @@ end
 
 function _init_cacheval(::Val{false}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol, ::Union{LinearVerbosity, Bool}, ::OperatorAssumptions; zeroinit = true, kwargs...)
-    @unpack memory, restart, blocksize, warm_start = alg
+    (; memory, restart, blocksize, warm_start) = alg
 
     if zeroinit
         return SimpleGMRESCache{false}(memory, 0, restart, maxiters, blocksize,
@@ -218,8 +218,8 @@ function _init_cacheval(::Val{false}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiter
 end
 
 function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
-    @unpack memory, n, restart, maxiters, blocksize, ε, PlisI, PrisI, Pl, Pr = cache
-    @unpack Δx, q, p, x, A, b, abstol, reltol, w, V, s, c, z, R, β, warm_start = cache
+    (; memory, n, restart, maxiters, blocksize, ε, PlisI, PrisI, Pl, Pr) = cache
+    (; Δx, q, p, x, A, b, abstol, reltol, w, V, s, c, z, R, β, warm_start) = cache
 
     T = eltype(x)
     q = PlisI ? w : q
@@ -394,7 +394,7 @@ end
 function _init_cacheval(::Val{true}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol, ::Union{LinearVerbosity, Bool}, ::OperatorAssumptions; zeroinit = true,
         blocksize = alg.blocksize)
-    @unpack memory, restart, warm_start = alg
+    (; memory, restart, warm_start) = alg
 
     if zeroinit
         return SimpleGMRESCache{true}(memory, 0, restart, maxiters, blocksize,
@@ -449,8 +449,8 @@ function _init_cacheval(::Val{true}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiters
 end
 
 function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
-    @unpack memory, n, restart, maxiters, blocksize, ε, PlisI, PrisI, Pl, Pr = cache
-    @unpack Δx, q, p, x, A, b, abstol, reltol, w, V, s, c, z, R, β, warm_start = cache
+    (; memory, n, restart, maxiters, blocksize, ε, PlisI, PrisI, Pl, Pr) = cache
+    (; Δx, q, p, x, A, b, abstol, reltol, w, V, s, c, z, R, β, warm_start) = cache
     bsize = n ÷ blocksize
 
     __batch = Base.Fix2(reshape, (blocksize, bsize))

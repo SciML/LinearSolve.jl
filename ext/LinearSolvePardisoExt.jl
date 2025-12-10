@@ -3,7 +3,7 @@ module LinearSolvePardisoExt
 using Pardiso, LinearSolve
 using SparseArrays
 using SparseArrays: nonzeros, rowvals, getcolptr
-using LinearSolve: PardisoJL, @unpack, LinearVerbosity
+using LinearSolve: PardisoJL, LinearVerbosity
 using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_bool
 using LinearSolve.SciMLBase
 
@@ -22,7 +22,7 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
         reltol,
         verbose::Union{LinearVerbosity, Bool},
         assumptions::LinearSolve.OperatorAssumptions)
-    @unpack nprocs, solver_type, matrix_type, cache_analysis, iparm, dparm, vendor = alg
+    (; nprocs, solver_type, matrix_type, cache_analysis, iparm, dparm, vendor) = alg
     A = convert(AbstractMatrix, A)
 
     if isnothing(vendor)
@@ -137,7 +137,7 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
 end
 
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::PardisoJL; kwargs...)
-    @unpack A, b, u = cache
+    (; A, b, u) = cache
     A = convert(AbstractMatrix, A)
     if cache.isfresh
         phase = alg.cache_analysis ? Pardiso.NUM_FACT : Pardiso.ANALYSIS_NUM_FACT

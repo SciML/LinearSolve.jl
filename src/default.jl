@@ -445,7 +445,7 @@ end
 function SciMLBase.solve!(cache::LinearCache, alg::Nothing,
         args...; assump::OperatorAssumptions = OperatorAssumptions(),
         kwargs...)
-    @unpack A, b = cache
+    (; A, b) = cache
     SciMLBase.solve!(cache, defaultalg(A, b, assump), args...; kwargs...)
 end
 

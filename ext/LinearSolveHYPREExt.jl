@@ -8,7 +8,6 @@ using LinearSolve: HYPREAlgorithm, LinearCache, LinearProblem, LinearSolve,
                    __conditioning, LinearSolveAdjoint, LinearVerbosity
 using SciMLLogging: SciMLLogging, verbosity_to_int, @SciMLMessage
 using SciMLBase: LinearProblem, LinearAliasSpecifier, SciMLBase
-using UnPack: @unpack
 using Setfield: @set!
 
 mutable struct HYPRECache
@@ -71,7 +70,7 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
         assumptions = OperatorAssumptions(),
         sensealg = LinearSolveAdjoint(),
         kwargs...)
-    @unpack A, b, u0, p = prob
+    (; A, b, u0, p) = prob
 
     if haskey(kwargs, :alias_A) || haskey(kwargs, :alias_b)
         aliases = LinearAliasSpecifier()

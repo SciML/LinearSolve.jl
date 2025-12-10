@@ -47,8 +47,8 @@ end
 
 function SciMLBase.solve!(cache::LinearCache, alg::LinearSolveFunction,
         args...; kwargs...)
-    @unpack A, b, u, p, isfresh, Pl, Pr, cacheval = cache
-    @unpack solve_func = alg
+    (; A, b, u, p, isfresh, Pl, Pr, cacheval) = cache
+    (; solve_func) = alg
 
     u = solve_func(A, b, u, p, isfresh, Pl, Pr, cacheval; kwargs...)
     return SciMLBase.build_linear_solution(alg, u, nothing, cache)
@@ -79,7 +79,7 @@ sol = solve(prob, alg)
 struct DirectLdiv! <: AbstractSolveFunction end
 
 function SciMLBase.solve!(cache::LinearCache, alg::DirectLdiv!, args...; kwargs...)
-    @unpack A, b, u = cache
+    (; A, b, u) = cache
     ldiv!(u, A, b)
 
     return SciMLBase.build_linear_solution(alg, u, nothing, cache)

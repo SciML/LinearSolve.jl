@@ -72,7 +72,7 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
         # Taking d/dθ of both sides:
         # dA'/dθ · Ax + A' · dA/dθ · x + A'A · dx/dθ = dA'/dθ · b + A' · db/dθ
         # Rearranging:
-        # A'A · dx/dθ = A' · db/dθ + dA'/dθ · (b - Ax) - A' · dA/dθ · x
+        # A'A · dx/dθ = A' · db/dθ + dA'/dθ · (b  - Ax) - A' · dA/dθ · x
 
         # Solve the primal problem first
         cache.dual_u0_cache .= cache.linear_cache.u
@@ -124,15 +124,11 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
             end
         end
 
-        # Solve A'A · dx/dθ = rhs for each partial
-        # Create a cache for the normal equations and reuse the factorization
-        AtA = A' * A
-        normal_prob = LinearProblem(AtA, rhs_list[1])
-        normal_cache = init(normal_prob, alg, args...; kwargs...)
+        A_adj = A'
 
         for i in eachindex(rhs_list)
-            normal_cache.b .= rhs_list[i]
-            rhs_list[i] .= solve!(normal_cache).u
+            cache.linear_cache.b .= A_adj \ rhs_list[i]
+            rhs_list[i] .= solve!(cache.linear_cache, alg, args...; kwargs...).u
         end
 
         cache.linear_cache.b .= cache.primal_b_cache

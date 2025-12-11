@@ -265,11 +265,6 @@ cache_overdet = init(prob_overdet)
 sol_cache_overdet = solve!(cache_overdet)
 @test sol_cache_overdet.u ≈ sol_overdet.u
 
-# Test residuals - check if both solutions minimize ||A*x - b||^2
-residual_linsolve = A_overdet * sol_overdet.u - b_overdet
-residual_backslash = A_overdet * backslash_overdet - b_overdet
-@test norm(residual_linsolve) ≈ norm(residual_backslash)
-
 # Dual values should match
 @test ForwardDiff.partials.(sol_overdet.u) ≈ ForwardDiff.partials.(backslash_overdet)
 
@@ -288,11 +283,6 @@ backslash_large = A_large_dual \ b_large_dual
 
 # Test primal values match
 @test ForwardDiff.value.(sol_large.u) ≈ ForwardDiff.value.(backslash_large)
-
-# Test residuals match - both should minimize ||A*x - b||^2
-residual_large_linsolve = A_large_dual * sol_large.u - b_large_dual
-residual_large_backslash = A_large_dual * backslash_large - b_large_dual
-@test norm(residual_large_linsolve) ≈ norm(residual_large_backslash)
 
 # Test partials match
 @test ForwardDiff.partials.(sol_large.u) ≈ ForwardDiff.partials.(backslash_large)

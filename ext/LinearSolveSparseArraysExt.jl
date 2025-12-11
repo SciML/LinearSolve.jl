@@ -313,30 +313,6 @@ function LinearSolve.init_cacheval(
 end
 
 function LinearSolve.init_cacheval(
-        alg::GenericFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol,
-        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
-    if has_concretization(A)
-        return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
-            maxiters, abstol, reltol, verbose, assumptions)
-    else
-        nothing
-    end
-end
-
-function LinearSolve.init_cacheval(
-        alg::GenericLUFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol,
-        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
-    if has_concretization(A)
-        return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
-            maxiters, abstol, reltol, verbose, assumptions)
-    else
-        nothing
-    end
-end
-
-function LinearSolve.init_cacheval(
         alg::QRFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
@@ -484,6 +460,10 @@ function LinearSolve._ldiv!(::SVector,
     (A \ b)
 end
 end # @static if Base.USE_GPL_LIBS
+
+function LinearSolve.pattern_changed(fact::Nothing, A::SparseArrays.SparseMatrixCSC)
+    true
+end
 
 function LinearSolve.pattern_changed(fact, A::SparseArrays.SparseMatrixCSC)
     !(SparseArrays.decrement(SparseArrays.getcolptr(A)) ==

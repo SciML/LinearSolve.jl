@@ -5,7 +5,8 @@ using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
                    GenericLUFactorization,
                    KLUFactorization, LUFactorization, NormalCholeskyFactorization,
                    OperatorAssumptions, LinearVerbosity,
-                   QRFactorization, RFLUFactorization, UMFPACKFactorization, solve
+                   QRFactorization, RFLUFactorization, UMFPACKFactorization, solve, has_concretization
+using SciMLOperators: AbstractSciMLOperator
 using ArrayInterface: ArrayInterface
 using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!, QR
 using SparseArrays: SparseArrays, AbstractSparseArray, AbstractSparseMatrixCSC,
@@ -272,6 +273,103 @@ function LinearSolve.init_cacheval(
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
     KLU.KLUFactorization(SparseMatrixCSC{Float64, Int32}(
         0, 0, [Int32(1)], Int32[], Float64[]))
+end
+
+# AbstractSciMLOperator handling for sparse factorizations
+function LinearSolve.init_cacheval(
+        alg::KLUFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+    if has_concretization(A)
+        return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
+            maxiters, abstol, reltol, verbose, assumptions)
+    else
+        error("KLUFactorization requires a concrete matrix. The provided operator does not support concretization. Use a Krylov method instead.")
+    end
+end
+
+function LinearSolve.init_cacheval(
+        alg::UMFPACKFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+    if has_concretization(A)
+        return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
+            maxiters, abstol, reltol, verbose, assumptions)
+    else
+        error("UMFPACKFactorization requires a concrete matrix. The provided operator does not support concretization. Use a Krylov method instead.")
+    end
+end
+
+function LinearSolve.init_cacheval(
+        alg::LUFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+    if has_concretization(A)
+        return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
+            maxiters, abstol, reltol, verbose, assumptions)
+    else
+        error("LUFactorization requires a concrete matrix. The provided operator does not support concretization. Use a Krylov method instead.")
+    end
+end
+
+function LinearSolve.init_cacheval(
+        alg::CHOLMODFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+    if has_concretization(A)
+        return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
+            maxiters, abstol, reltol, verbose, assumptions)
+    else
+        error("CHOLMODFactorization requires a concrete matrix. The provided operator does not support concretization. Use a Krylov method instead.")
+    end
+end
+
+function LinearSolve.init_cacheval(
+        alg::GenericFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+    if has_concretization(A)
+        return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
+            maxiters, abstol, reltol, verbose, assumptions)
+    else
+        error("GenericFactorization requires a concrete matrix. The provided operator does not support concretization. Use a Krylov method instead.")
+    end
+end
+
+function LinearSolve.init_cacheval(
+        alg::GenericLUFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+    if has_concretization(A)
+        return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
+            maxiters, abstol, reltol, verbose, assumptions)
+    else
+        error("GenericLUFactorization requires a concrete matrix. The provided operator does not support concretization. Use a Krylov method instead.")
+    end
+end
+
+function LinearSolve.init_cacheval(
+        alg::QRFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+    if has_concretization(A)
+        return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
+            maxiters, abstol, reltol, verbose, assumptions)
+    else
+        error("QRFactorization requires a concrete matrix. The provided operator does not support concretization. Use a Krylov method instead.")
+    end
+end
+
+function LinearSolve.init_cacheval(
+        alg::NormalCholeskyFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+    if has_concretization(A)
+        return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
+            maxiters, abstol, reltol, verbose, assumptions)
+    else
+        error("NormalCholeskyFactorization requires a concrete matrix. The provided operator does not support concretization. Use a Krylov method instead.")
+    end
 end
 
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization; kwargs...)

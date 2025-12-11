@@ -20,7 +20,7 @@ using SciMLBase: SciMLBase, LinearAliasSpecifier, AbstractSciMLOperator,
                  init, solve!, reinit!, solve, ReturnCode, LinearProblem
 using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator,
                       MatrixOperator,
-                      has_ldiv!, issquare
+                      has_ldiv!, issquare, has_concretization
 using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_int, AbstractVerbositySpecifier, AbstractMessageLevel, AbstractVerbosityPreset,
                     Silent, InfoLevel, WarnLevel, CustomLevel, None, Minimal, Standard, Detailed, All
 using Setfield: @set, @set!

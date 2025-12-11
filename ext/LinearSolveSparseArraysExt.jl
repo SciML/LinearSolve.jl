@@ -5,8 +5,8 @@ using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
                    GenericLUFactorization,
                    KLUFactorization, LUFactorization, NormalCholeskyFactorization,
                    OperatorAssumptions, LinearVerbosity, RequiresConcreteMatrixError,
-                   QRFactorization, RFLUFactorization, UMFPACKFactorization, solve, has_concretization
-using SciMLOperators: AbstractSciMLOperator
+                   QRFactorization, RFLUFactorization, UMFPACKFactorization, solve
+using SciMLOperators: AbstractSciMLOperator, has_concretization
 using ArrayInterface: ArrayInterface
 using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!, QR
 using SparseArrays: SparseArrays, AbstractSparseArray, AbstractSparseMatrixCSC,

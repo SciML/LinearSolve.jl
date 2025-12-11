@@ -5,7 +5,7 @@ LinearSolveAutotune = "67398393-80e8-4254-b7e4-1b9a36a3c5b6"
 SciMLOperators = "c0aeaf25-5076-4817-a8d5-81caf7dfa961"
 
 [sources]
-LinearSolve = {path = "/home/runner/work/LinearSolve.jl/LinearSolve.jl"}
+LinearSolve = {path = "/home/chrisrackauckas/github-runners/demeter4-20/_work/LinearSolve.jl/LinearSolve.jl"}
 
 [compat]
 Documenter = "1"

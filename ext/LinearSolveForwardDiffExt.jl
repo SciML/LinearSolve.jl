@@ -81,9 +81,12 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
         cache.primal_b_cache .= cache.linear_cache.b
         u = sol.u
 
-        # Get the partials
+        # Get the partials and primal values
+        # After solve!, cache.linear_cache.A may be modified by factorization,
+        # so we extract primal A from the original dual_A stored in cache
         ∂_A = cache.partials_A
         ∂_b = cache.partials_b
+        A = nodual_value(cache.dual_A)
         b = cache.primal_b_cache
         residual = b - A * u  # residual r = b - Ax
 
@@ -138,7 +141,6 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
         return sol
     end
 
-    # Square system: use the optimized dual splitting approach
     # Solve the primal problem
     cache.dual_u0_cache .= cache.linear_cache.u
     sol = solve!(cache.linear_cache, alg, args...; kwargs...)

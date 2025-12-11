@@ -230,6 +230,30 @@ for integrating custom algorithms or simple solve strategies.
 """
 abstract type AbstractSolveFunction <: SciMLLinearSolveAlgorithm end
 
+# Errors
+
+"""
+    RequiresConcreteMatrixError(alg::String)
+
+Error thrown when a factorization algorithm that requires a concrete matrix
+receives an operator that does not support concretization (i.e., `has_concretization(A)` returns `false`).
+
+## Example
+
+```julia
+throw(RequiresConcreteMatrixError("KLUFactorization"))
+```
+
+This error suggests using a Krylov method instead, which can work with abstract operators.
+"""
+struct RequiresConcreteMatrixError <: Exception
+    alg::String
+end
+
+function Base.showerror(io::IO, e::RequiresConcreteMatrixError)
+    print(io, "$(e.alg) requires a concrete matrix. The provided operator does not support concretization. Use a Krylov method instead.")
+end
+
 # Traits
 
 """
@@ -518,6 +542,8 @@ export MetalLUFactorization
 export MetalOffload32MixedLUFactorization
 
 export OperatorAssumptions, OperatorCondition
+
+export RequiresConcreteMatrixError
 
 export LinearSolveAdjoint
 

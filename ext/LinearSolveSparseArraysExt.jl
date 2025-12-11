@@ -4,7 +4,7 @@ using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
                    @get_cacheval, CHOLMODFactorization, GenericFactorization,
                    GenericLUFactorization,
                    KLUFactorization, LUFactorization, NormalCholeskyFactorization,
-                   OperatorAssumptions, LinearVerbosity,
+                   OperatorAssumptions, LinearVerbosity, RequiresConcreteMatrixError,
                    QRFactorization, RFLUFactorization, UMFPACKFactorization, solve, has_concretization
 using SciMLOperators: AbstractSciMLOperator
 using ArrayInterface: ArrayInterface
@@ -284,7 +284,7 @@ function LinearSolve.init_cacheval(
         return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions)
     else
-        error("KLUFactorization requires a concrete matrix. The provided operator does not support concretization. Use a Krylov method instead.")
+        throw(RequiresConcreteMatrixError("KLUFactorization"))
     end
 end
 
@@ -296,7 +296,7 @@ function LinearSolve.init_cacheval(
         return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions)
     else
-        error("UMFPACKFactorization requires a concrete matrix. The provided operator does not support concretization. Use a Krylov method instead.")
+        throw(RequiresConcreteMatrixError("UMFPACKFactorization"))
     end
 end
 
@@ -308,7 +308,7 @@ function LinearSolve.init_cacheval(
         return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions)
     else
-        error("LUFactorization requires a concrete matrix. The provided operator does not support concretization. Use a Krylov method instead.")
+        throw(RequiresConcreteMatrixError("LUFactorization"))
     end
 end
 
@@ -320,7 +320,7 @@ function LinearSolve.init_cacheval(
         return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions)
     else
-        error("CHOLMODFactorization requires a concrete matrix. The provided operator does not support concretization. Use a Krylov method instead.")
+        throw(RequiresConcreteMatrixError("CHOLMODFactorization"))
     end
 end
 
@@ -332,7 +332,7 @@ function LinearSolve.init_cacheval(
         return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions)
     else
-        error("GenericFactorization requires a concrete matrix. The provided operator does not support concretization. Use a Krylov method instead.")
+        throw(RequiresConcreteMatrixError("GenericFactorization"))
     end
 end
 
@@ -344,7 +344,7 @@ function LinearSolve.init_cacheval(
         return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions)
     else
-        error("GenericLUFactorization requires a concrete matrix. The provided operator does not support concretization. Use a Krylov method instead.")
+        throw(RequiresConcreteMatrixError("GenericLUFactorization"))
     end
 end
 
@@ -356,7 +356,7 @@ function LinearSolve.init_cacheval(
         return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions)
     else
-        error("QRFactorization requires a concrete matrix. The provided operator does not support concretization. Use a Krylov method instead.")
+        throw(RequiresConcreteMatrixError("QRFactorization"))
     end
 end
 
@@ -368,7 +368,7 @@ function LinearSolve.init_cacheval(
         return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions)
     else
-        error("NormalCholeskyFactorization requires a concrete matrix. The provided operator does not support concretization. Use a Krylov method instead.")
+        throw(RequiresConcreteMatrixError("NormalCholeskyFactorization"))
     end
 end
 

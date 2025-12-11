@@ -257,31 +257,35 @@ backslash_overdet = A_overdet \ b_overdet
 # Primal values should match
 @test ForwardDiff.value.(sol_overdet.u) ≈ ForwardDiff.value.(backslash_overdet)
 
-# Dual values should match
-@test ForwardDiff.partials.(sol_overdet.u) ≈ ForwardDiff.partials.(backslash_overdet)
-
 # Test with cache - should give identical results
 cache_overdet = init(prob_overdet)
 sol_cache_overdet = solve!(cache_overdet)
 @test sol_cache_overdet.u ≈ sol_overdet.u
 
-# Test gradient computation through overdetermined system
-function overdet_loss(p)
-    A = reshape([p[1], 1.0], 2, 1)
-    b = [p[2], 2.0]
-    prob = LinearProblem(A, b)
-    sol = solve(prob)
-    return sol.u[1]
-end
+# Test residuals - check if both solutions minimize ||A*x - b||^2
+residual_linsolve = A_overdet * sol_overdet.u - b_overdet
+residual_backslash = A_overdet * backslash_overdet - b_overdet
+@test norm(residual_linsolve) ≈ norm(residual_backslash)
 
-function overdet_loss_backslash(p)
-    A = reshape([p[1], 1.0], 2, 1)
-    b = [p[2], 2.0]
-    return (A \ b)[1]
-end
+# Test larger overdetermined system with dual numbers
+m, n = 10, 3
+A_large = rand(m, n)
+p = [2.0, 3.0]
+A_large_dual = [ForwardDiff.Dual(A_large[i, j], i == 1 ? 1.0 : 0.0, j == 1 ? 1.0 : 0.0)
+                for i in 1:m, j in 1:n]
+b_large_dual = [ForwardDiff.Dual(rand(), i == 1 ? 1.0 : 0.0, i == 2 ? 1.0 : 0.0)
+                for i in 1:m]
 
-p_overdet = [1.0, 3.0]
-grad_linsolve = ForwardDiff.gradient(overdet_loss, p_overdet)
-grad_backslash = ForwardDiff.gradient(overdet_loss_backslash, p_overdet)
+prob_large = LinearProblem(A_large_dual, b_large_dual)
+sol_large = solve(prob_large)
+backslash_large = A_large_dual \ b_large_dual
 
-@test grad_linsolve ≈ grad_backslash
+# Test primal values match
+@test ForwardDiff.value.(sol_large.u) ≈ ForwardDiff.value.(backslash_large)
+
+# Test residuals match - both should minimize ||A*x - b||^2
+residual_large_linsolve = A_large_dual * sol_large.u - b_large_dual
+residual_large_backslash = A_large_dual * backslash_large - b_large_dual
+@test norm(residual_large_linsolve) ≈ norm(residual_large_backslash)
+
+

@@ -68,22 +68,72 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
     is_overdetermined = size(A, 1) > size(A, 2)
 
     if is_overdetermined
-        # For overdetermined systems, bypass the dual splitting and use QR directly
-        # Reconstruct the full dual A and b
-        A_dual = cache.dual_A
-        b_dual = cache.dual_b
+        # For overdetermined systems, differentiate the normal equations: A'Ax = A'b
+        # Taking d/dθ of both sides:
+        # dA'/dθ · Ax + A' · dA/dθ · x + A'A · dx/dθ = dA'/dθ · b + A' · db/dθ
+        # Rearranging:
+        # A'A · dx/dθ = A' · db/dθ + dA'/dθ · (b - Ax) - A' · dA/dθ · x
 
-        # Solve directly with QR on the dual numbers
-        result = qr(A_dual) \ b_dual
-
-        # Store the result in cache.dual_u
-        cache.dual_u .= result
-
-        # Also solve the primal for the return value
+        # Solve the primal problem first
         cache.dual_u0_cache .= cache.linear_cache.u
         sol = solve!(cache.linear_cache, alg, args...; kwargs...)
         cache.primal_u_cache .= cache.linear_cache.u
         cache.primal_b_cache .= cache.linear_cache.b
+        u = sol.u
+
+        # Get the partials
+        ∂_A = cache.partials_A
+        ∂_b = cache.partials_b
+        b = cache.primal_b_cache
+        residual = b - A * u  # residual r = b - Ax
+
+        rhs_list = cache.rhs_list
+
+        # Update cached partials lists if cache is invalid
+        if !cache.rhs_cache_valid
+            if !isnothing(∂_A)
+                update_partials_list!(∂_A, cache.partials_A_list)
+            end
+            if !isnothing(∂_b)
+                update_partials_list!(∂_b, cache.partials_b_list)
+            end
+            cache.rhs_cache_valid = true
+        end
+
+        A_list = cache.partials_A_list
+        b_list = cache.partials_b_list
+
+        # Compute RHS: A' · db/dθ + dA'/dθ · (b - Ax) - A' · dA/dθ · x
+        for i in eachindex(rhs_list)
+            if !isnothing(b_list)
+                # A' · db/dθ
+                rhs_list[i] .= A' * b_list[i]
+            else
+                fill!(rhs_list[i], 0)
+            end
+
+            if !isnothing(A_list)
+                # Add dA'/dθ · (b - Ax) = (dA/dθ)' · residual
+                rhs_list[i] .+= A_list[i]' * residual
+                # Subtract A' · dA/dθ · x
+                temp = A_list[i] * u
+                rhs_list[i] .-= A' * temp
+            end
+        end
+
+        # Solve A'A · dx/dθ = rhs for each partial
+        # Create a cache for the normal equations and reuse the factorization
+        AtA = A' * A
+        normal_prob = LinearProblem(AtA, rhs_list[1])
+        normal_cache = init(normal_prob, alg, args...; kwargs...)
+
+        for i in eachindex(rhs_list)
+            normal_cache.b .= rhs_list[i]
+            rhs_list[i] .= solve!(normal_cache).u
+        end
+
+        cache.linear_cache.b .= cache.primal_b_cache
+        cache.linear_cache.u .= cache.primal_u_cache
 
         return sol
     end
@@ -287,12 +337,16 @@ function __dual_init(
     partials_b_list = !isnothing(∂_b) ? partials_to_list(∂_b) : nothing
 
     # Determine size and type for rhs_list
+    # For square systems, use b size. For overdetermined, use u size (solution size)
+    rhs_template = length(non_partial_cache.u) == length(non_partial_cache.b) ?
+                   non_partial_cache.b : non_partial_cache.u
+
     if !isnothing(partials_A_list)
         n_partials = length(partials_A_list)
-        rhs_list = [similar(non_partial_cache.b) for _ in 1:n_partials]
+        rhs_list = [similar(rhs_template) for _ in 1:n_partials]
     elseif !isnothing(partials_b_list)
         n_partials = length(partials_b_list)
-        rhs_list = [similar(non_partial_cache.b) for _ in 1:n_partials]
+        rhs_list = [similar(rhs_template) for _ in 1:n_partials]
     else
         rhs_list = nothing
     end
@@ -332,17 +386,12 @@ function SciMLBase.solve!(
     primal_sol = linearsolve_forwarddiff_solve!(
         cache::DualLinearCache, getfield(cache, :linear_cache).alg, args...; kwargs...)
 
-    # Check if overdetermined - if so, dual_u was already computed in linearsolve_forwarddiff_solve!
-    A = getfield(cache, :linear_cache).A
-    is_overdetermined = size(A, 1) > size(A, 2)
+    # Construct dual solution from primal solution and partials
+    dual_sol = linearsolve_dual_solution(getfield(cache, :linear_cache).u, getfield(cache, :rhs_list), cache)
 
-    if !is_overdetermined
-        dual_sol = linearsolve_dual_solution(getfield(cache, :linear_cache).u, getfield(cache, :rhs_list), cache)
-
-        # For scalars, we still need to assign since cache.dual_u might not be pre-allocated
-        if !(getfield(cache, :dual_u) isa AbstractArray)
-            setfield!(cache, :dual_u, dual_sol)
-        end
+    # For scalars, we still need to assign since cache.dual_u might not be pre-allocated
+    if !(getfield(cache, :dual_u) isa AbstractArray)
+        setfield!(cache, :dual_u, dual_sol)
     end
 
     return SciMLBase.build_linear_solution(

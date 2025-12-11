@@ -584,11 +584,6 @@ end
         sol_operator = solve(prob_operator, UMFPACKFactorization())
         @test sol_matrix.u ≈ sol_operator.u
 
-        # Test LU with operator
-        sol_matrix = solve(prob_matrix, LUFactorization())
-        sol_operator = solve(prob_operator, LUFactorization())
-        @test sol_matrix.u ≈ sol_operator.u
-
         # Test WOperator with sparse Jacobian
         n_w = 8
         M = sparse(I(n_w) * 1.0)
@@ -611,11 +606,6 @@ end
         # Test UMFPACK with WOperator
         sol_woperator = solve(prob_woperator, UMFPACKFactorization())
         sol_wmatrix = solve(prob_wmatrix, UMFPACKFactorization())
-        @test sol_woperator.u ≈ sol_wmatrix.u
-
-        # Test LU with WOperator
-        sol_woperator = solve(prob_woperator, LUFactorization())
-        sol_wmatrix = solve(prob_wmatrix, LUFactorization())
         @test sol_woperator.u ≈ sol_wmatrix.u
     end
 

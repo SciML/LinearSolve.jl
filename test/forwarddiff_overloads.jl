@@ -284,6 +284,9 @@ backslash_large = A_large_dual \ b_large_dual
 # Test primal values match
 @test ForwardDiff.value.(sol_large.u) ≈ ForwardDiff.value.(backslash_large)
 
+@test A_large_dual' * A_large_dual * sol_large.u ≈ A_large_dual' * b_large_dual
+@test A_large_dual' * A_large_dual * backslash_large ≈ A_large_dual' * b_large_dual
+
 # Test partials match
 @test ForwardDiff.partials.(sol_large.u) ≈ ForwardDiff.partials.(backslash_large)
 

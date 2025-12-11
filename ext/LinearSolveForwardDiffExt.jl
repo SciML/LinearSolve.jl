@@ -63,11 +63,10 @@ LinearSolve.@concrete mutable struct DualLinearCache{DT}
 end
 
 function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kwargs...)
-    # Check if we're solving an overdetermined system (more rows than columns in A)
+    # Check if A is square - if not, use the non-square system path
     A = cache.linear_cache.A
-    is_overdetermined = size(A, 1) > size(A, 2)
 
-    if is_overdetermined
+    if !issquare(A)
         # For overdetermined systems, differentiate the normal equations: A'Ax = A'b
         # Taking d/dθ of both sides:
         # dA'/dθ · Ax + A' · dA/dθ · x + A'A · dx/dθ = dA'/dθ · b + A' · db/dθ

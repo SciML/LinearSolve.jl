@@ -4,7 +4,7 @@ using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
                    @get_cacheval, CHOLMODFactorization, GenericFactorization,
                    GenericLUFactorization,
                    KLUFactorization, LUFactorization, NormalCholeskyFactorization,
-                   OperatorAssumptions, LinearVerbosity, RequiresConcreteMatrixError,
+                   OperatorAssumptions, LinearVerbosity,
                    QRFactorization, RFLUFactorization, UMFPACKFactorization, solve
 using SciMLOperators: AbstractSciMLOperator, has_concretization
 using ArrayInterface: ArrayInterface
@@ -284,7 +284,7 @@ function LinearSolve.init_cacheval(
         return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions)
     else
-        throw(RequiresConcreteMatrixError("KLUFactorization"))
+        nothing
     end
 end
 
@@ -296,7 +296,7 @@ function LinearSolve.init_cacheval(
         return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions)
     else
-        throw(RequiresConcreteMatrixError("UMFPACKFactorization"))
+        nothing
     end
 end
 
@@ -308,7 +308,7 @@ function LinearSolve.init_cacheval(
         return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions)
     else
-        throw(RequiresConcreteMatrixError("LUFactorization"))
+        nothing
     end
 end
 
@@ -320,7 +320,7 @@ function LinearSolve.init_cacheval(
         return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions)
     else
-        throw(RequiresConcreteMatrixError("CHOLMODFactorization"))
+        nothing
     end
 end
 
@@ -332,7 +332,7 @@ function LinearSolve.init_cacheval(
         return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions)
     else
-        throw(RequiresConcreteMatrixError("GenericFactorization"))
+        nothing
     end
 end
 
@@ -344,7 +344,7 @@ function LinearSolve.init_cacheval(
         return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions)
     else
-        throw(RequiresConcreteMatrixError("GenericLUFactorization"))
+        nothing
     end
 end
 
@@ -356,7 +356,7 @@ function LinearSolve.init_cacheval(
         return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions)
     else
-        throw(RequiresConcreteMatrixError("QRFactorization"))
+        nothing
     end
 end
 
@@ -368,7 +368,7 @@ function LinearSolve.init_cacheval(
         return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions)
     else
-        throw(RequiresConcreteMatrixError("NormalCholeskyFactorization"))
+        nothing
     end
 end
 

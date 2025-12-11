@@ -241,3 +241,47 @@ grad = ForwardDiff.gradient(component_linsolve, p_test)
 @test length(grad) == 2
 @test !any(isnan, grad)
 @test !any(isinf, grad)
+
+# Test overdetermined (non-square) system: 2×1 matrix with dual numbers
+# This tests that cache sizes are correctly allocated when solution size != RHS size
+A_overdet = reshape([ForwardDiff.Dual(2.0, 1.0), ForwardDiff.Dual(3.0, 1.0)], 2, 1)  # 2×1 matrix
+b_overdet = [ForwardDiff.Dual(5.0, 1.0), ForwardDiff.Dual(8.0, 9.0)]
+
+prob_overdet = LinearProblem(A_overdet, b_overdet)
+sol_overdet = solve(prob_overdet)
+backslash_overdet = A_overdet \ b_overdet
+
+# Test that solution has correct dimensions (length 1, not length 2)
+@test length(sol_overdet.u) == 1
+
+# Primal values should match
+@test ForwardDiff.value.(sol_overdet.u) ≈ ForwardDiff.value.(backslash_overdet)
+
+# Dual values should match
+@test ForwardDiff.partials.(sol_overdet.u) ≈ ForwardDiff.partials.(backslash_overdet)
+
+# Test with cache - should give identical results
+cache_overdet = init(prob_overdet)
+sol_cache_overdet = solve!(cache_overdet)
+@test sol_cache_overdet.u ≈ sol_overdet.u
+
+# Test gradient computation through overdetermined system
+function overdet_loss(p)
+    A = reshape([p[1], 1.0], 2, 1)
+    b = [p[2], 2.0]
+    prob = LinearProblem(A, b)
+    sol = solve(prob)
+    return sol.u[1]
+end
+
+function overdet_loss_backslash(p)
+    A = reshape([p[1], 1.0], 2, 1)
+    b = [p[2], 2.0]
+    return (A \ b)[1]
+end
+
+p_overdet = [1.0, 3.0]
+grad_linsolve = ForwardDiff.gradient(overdet_loss, p_overdet)
+grad_backslash = ForwardDiff.gradient(overdet_loss_backslash, p_overdet)
+
+@test grad_linsolve ≈ grad_backslash

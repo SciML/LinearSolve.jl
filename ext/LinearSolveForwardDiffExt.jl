@@ -63,6 +63,32 @@ LinearSolve.@concrete mutable struct DualLinearCache{DT}
 end
 
 function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kwargs...)
+    # Check if we're solving an overdetermined system (more rows than columns in A)
+    A = cache.linear_cache.A
+    is_overdetermined = size(A, 1) > size(A, 2)
+
+    if is_overdetermined
+        # For overdetermined systems, bypass the dual splitting and use QR directly
+        # Reconstruct the full dual A and b
+        A_dual = cache.dual_A
+        b_dual = cache.dual_b
+
+        # Solve directly with QR on the dual numbers
+        result = qr(A_dual) \ b_dual
+
+        # Store the result in cache.dual_u
+        cache.dual_u .= result
+
+        # Also solve the primal for the return value
+        cache.dual_u0_cache .= cache.linear_cache.u
+        sol = solve!(cache.linear_cache, alg, args...; kwargs...)
+        cache.primal_u_cache .= cache.linear_cache.u
+        cache.primal_b_cache .= cache.linear_cache.b
+
+        return sol
+    end
+
+    # Square system: use the optimized dual splitting approach
     # Solve the primal problem
     cache.dual_u0_cache .= cache.linear_cache.u
     sol = solve!(cache.linear_cache, alg, args...; kwargs...)
@@ -71,12 +97,12 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
     cache.primal_b_cache .= cache.linear_cache.b
     uu = sol.u
 
-    # Solves Dual partials separately 
+    # Solves Dual partials separately
     ∂_A = cache.partials_A
     ∂_b = cache.partials_b
 
     xp_linsolve_rhs!(uu, ∂_A, ∂_b, cache)
-    
+
     rhs_list = cache.rhs_list
     cache.linear_cache.u .= cache.dual_u0_cache
     # We can reuse the linear cache, because the same factorization will work for the partials.
@@ -306,11 +332,17 @@ function SciMLBase.solve!(
     primal_sol = linearsolve_forwarddiff_solve!(
         cache::DualLinearCache, getfield(cache, :linear_cache).alg, args...; kwargs...)
 
-    dual_sol = linearsolve_dual_solution(getfield(cache, :linear_cache).u, getfield(cache, :rhs_list), cache)
+    # Check if overdetermined - if so, dual_u was already computed in linearsolve_forwarddiff_solve!
+    A = getfield(cache, :linear_cache).A
+    is_overdetermined = size(A, 1) > size(A, 2)
 
-    # For scalars, we still need to assign since cache.dual_u might not be pre-allocated
-    if !(getfield(cache, :dual_u) isa AbstractArray)
-        setfield!(cache, :dual_u, dual_sol)
+    if !is_overdetermined
+        dual_sol = linearsolve_dual_solution(getfield(cache, :linear_cache).u, getfield(cache, :rhs_list), cache)
+
+        # For scalars, we still need to assign since cache.dual_u might not be pre-allocated
+        if !(getfield(cache, :dual_u) isa AbstractArray)
+            setfield!(cache, :dual_u, dual_sol)
+        end
     end
 
     return SciMLBase.build_linear_solution(

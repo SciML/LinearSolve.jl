@@ -257,6 +257,9 @@ backslash_overdet = A_overdet \ b_overdet
 # Primal values should match
 @test ForwardDiff.value.(sol_overdet.u) ≈ ForwardDiff.value.(backslash_overdet)
 
+# Dual values should match
+@test ForwardDiff.partials.(sol_overdet.u) ≈ ForwardDiff.partials.(backslash_overdet)
+
 # Test with cache - should give identical results
 cache_overdet = init(prob_overdet)
 sol_cache_overdet = solve!(cache_overdet)

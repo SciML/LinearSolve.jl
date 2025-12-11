@@ -301,18 +301,6 @@ function LinearSolve.init_cacheval(
 end
 
 function LinearSolve.init_cacheval(
-        alg::LUFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol,
-        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
-    if has_concretization(A)
-        return LinearSolve.init_cacheval(alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
-            maxiters, abstol, reltol, verbose, assumptions)
-    else
-        nothing
-    end
-end
-
-function LinearSolve.init_cacheval(
         alg::CHOLMODFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)

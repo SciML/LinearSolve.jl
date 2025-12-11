@@ -1,5 +1,6 @@
 using LinearSolve, LinearAlgebra, SparseArrays, MultiFloats, ForwardDiff
-using SciMLOperators, RecursiveFactorization, Sparspak, FastLapackInterface
+using SciMLOperators: SciMLOperators, MatrixOperator, FunctionOperator, WOperator
+using RecursiveFactorization, Sparspak, FastLapackInterface
 using IterativeSolvers, KrylovKit, MKL_jll, KrylovPreconditioners
 using Test
 import CliqueTrees, Random
@@ -559,6 +560,63 @@ end
         @test sol11.u ≈ sol21.u
         @test sol12.u ≈ sol22.u
         @test sol13.u ≈ sol23.u
+    end
+
+    @testset "Operators with has_concretization" begin
+        n = 4
+        Random.seed!(42)
+        A_sparse = sprand(n, n, 0.8) + I
+        b = rand(n)
+
+        # Create a MatrixOperator wrapping the sparse matrix
+        A_op = MatrixOperator(A_sparse)
+
+        prob_matrix = LinearProblem(A_sparse, b)
+        prob_operator = LinearProblem(A_op, b)
+
+        # Test KLU with operator
+        sol_matrix = solve(prob_matrix, KLUFactorization())
+        sol_operator = solve(prob_operator, KLUFactorization())
+        @test sol_matrix.u ≈ sol_operator.u
+
+        # Test UMFPACK with operator
+        sol_matrix = solve(prob_matrix, UMFPACKFactorization())
+        sol_operator = solve(prob_operator, UMFPACKFactorization())
+        @test sol_matrix.u ≈ sol_operator.u
+
+        # Test LU with operator
+        sol_matrix = solve(prob_matrix, LUFactorization())
+        sol_operator = solve(prob_operator, LUFactorization())
+        @test sol_matrix.u ≈ sol_operator.u
+
+        # Test WOperator with sparse Jacobian
+        n_w = 8
+        M = sparse(I(n_w) * 1.0)
+        gamma = 1 / 2.0
+        J = sprand(n_w, n_w, 0.5) + sparse(I(n_w) * 10.0)  # Make it diagonally dominant
+        u = rand(n_w)
+        b_w = rand(n_w)
+
+        W = WOperator{true}(M, gamma, J, u)
+        W_matrix = convert(AbstractMatrix, W)
+
+        prob_woperator = LinearProblem(W, b_w)
+        prob_wmatrix = LinearProblem(W_matrix, b_w)
+
+        # Test KLU with WOperator
+        sol_woperator = solve(prob_woperator, KLUFactorization())
+        sol_wmatrix = solve(prob_wmatrix, KLUFactorization())
+        @test sol_woperator.u ≈ sol_wmatrix.u
+
+        # Test UMFPACK with WOperator
+        sol_woperator = solve(prob_woperator, UMFPACKFactorization())
+        sol_wmatrix = solve(prob_wmatrix, UMFPACKFactorization())
+        @test sol_woperator.u ≈ sol_wmatrix.u
+
+        # Test LU with WOperator
+        sol_woperator = solve(prob_woperator, LUFactorization())
+        sol_wmatrix = solve(prob_wmatrix, LUFactorization())
+        @test sol_woperator.u ≈ sol_wmatrix.u
     end
 
     @testset "Solve Function" begin

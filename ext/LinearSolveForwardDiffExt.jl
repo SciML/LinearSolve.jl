@@ -87,6 +87,7 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
         ∂_A = cache.partials_A
         ∂_b = cache.partials_b
         A = nodual_value(cache.dual_A)
+        A_adj = A'
         b = cache.primal_b_cache
         residual = b - A * u  # residual r = b - Ax
 
@@ -110,7 +111,7 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
         for i in eachindex(rhs_list)
             if !isnothing(b_list)
                 # A' · db/dθ
-                rhs_list[i] .= A' * b_list[i]
+                rhs_list[i] .= A_adj * b_list[i]
             else
                 fill!(rhs_list[i], 0)
             end
@@ -120,11 +121,9 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
                 rhs_list[i] .+= A_list[i]' * residual
                 # Subtract A' · dA/dθ · x
                 temp = A_list[i] * u
-                rhs_list[i] .-= A' * temp
+                rhs_list[i] .-= A_adj * temp
             end
         end
-
-        A_adj = A'
 
         for i in eachindex(rhs_list)
             cache.linear_cache.b .= A_adj \ rhs_list[i]

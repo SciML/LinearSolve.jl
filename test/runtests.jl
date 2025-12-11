@@ -7,6 +7,7 @@ const GROUP = get(ENV, "GROUP", "All")
 const HAS_EXTENSIONS = isdefined(Base, :get_extension)
 
 if GROUP == "All" || GROUP == "Core"
+    @time @safetestset "Butterfly Factorization" include("butterfly.jl")
     @time @safetestset "Basic Tests" include("basictests.jl")
     @time @safetestset "Return codes" include("retcodes.jl")
     @time @safetestset "Re-solve" include("resolve.jl")

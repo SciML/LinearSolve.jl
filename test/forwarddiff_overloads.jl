@@ -241,3 +241,53 @@ grad = ForwardDiff.gradient(component_linsolve, p_test)
 @test length(grad) == 2
 @test !any(isnan, grad)
 @test !any(isinf, grad)
+
+# Test overdetermined (non-square) system: 2×1 matrix with dual numbers
+# This tests that cache sizes are correctly allocated when solution size != RHS size
+A_overdet = reshape([ForwardDiff.Dual(2.0, 1.0), ForwardDiff.Dual(3.0, 1.0)], 2, 1)  # 2×1 matrix
+b_overdet = [ForwardDiff.Dual(5.0, 1.0), ForwardDiff.Dual(8.0, 9.0)]
+
+prob_overdet = LinearProblem(A_overdet, b_overdet)
+sol_overdet = solve(prob_overdet)
+backslash_overdet = A_overdet \ b_overdet
+
+# Test that solution has correct dimensions (length 1, not length 2)
+@test length(sol_overdet.u) == 1
+
+# Primal values should match
+@test ForwardDiff.value.(sol_overdet.u) ≈ ForwardDiff.value.(backslash_overdet)
+
+# Dual values should match
+@test ForwardDiff.partials.(sol_overdet.u) ≈ ForwardDiff.partials.(backslash_overdet)
+
+# Test with cache - should give identical results
+cache_overdet = init(prob_overdet)
+sol_cache_overdet = solve!(cache_overdet)
+@test sol_cache_overdet.u ≈ sol_overdet.u
+
+# Dual values should match
+@test ForwardDiff.partials.(sol_overdet.u) ≈ ForwardDiff.partials.(backslash_overdet)
+
+# Test larger overdetermined system with dual numbers
+m, n = 10, 3
+A_large = rand(m, n)
+p = [2.0, 3.0]
+A_large_dual = [ForwardDiff.Dual(A_large[i, j], i == 1 ? 1.0 : 0.0, j == 1 ? 1.0 : 0.0)
+                for i in 1:m, j in 1:n]
+b_large_dual = [ForwardDiff.Dual(rand(), i == 1 ? 1.0 : 0.0, i == 2 ? 1.0 : 0.0)
+                for i in 1:m]
+
+prob_large = LinearProblem(A_large_dual, b_large_dual)
+sol_large = solve(prob_large)
+backslash_large = A_large_dual \ b_large_dual
+
+# Test primal values match
+@test ForwardDiff.value.(sol_large.u) ≈ ForwardDiff.value.(backslash_large)
+
+@test A_large_dual' * A_large_dual * sol_large.u ≈ A_large_dual' * b_large_dual
+@test A_large_dual' * A_large_dual * backslash_large ≈ A_large_dual' * b_large_dual
+
+# Test partials match
+@test ForwardDiff.partials.(sol_large.u) ≈ ForwardDiff.partials.(backslash_large)
+
+

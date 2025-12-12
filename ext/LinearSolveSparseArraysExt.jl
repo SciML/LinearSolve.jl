@@ -201,7 +201,7 @@ function SciMLBase.solve!(
         cacheval = LinearSolve.@get_cacheval(cache, :UMFPACKFactorization)
         if alg.reuse_symbolic
             # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
-            if alg.check_pattern && pattern_changed(cacheval, A)
+            if length(cacheval.nzval) != length(A.nzval) || alg.check_pattern && pattern_changed(cacheval, A)
                 fact = lu(
                     SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                         nonzeros(A)),
@@ -331,7 +331,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
     if cache.isfresh
         cacheval = LinearSolve.@get_cacheval(cache, :KLUFactorization)
         if alg.reuse_symbolic
-            if alg.check_pattern && pattern_changed(cacheval, A)
+            if length(cacheval.nzval) != length(A.nzval) || alg.check_pattern && pattern_changed(cacheval, A)
                 fact = KLU.klu(
                     SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                         nonzeros(A)),
@@ -455,9 +455,19 @@ function LinearSolve.pattern_changed(fact::Nothing, A::SparseArrays.SparseMatrix
 end
 
 function LinearSolve.pattern_changed(fact, A::SparseArrays.SparseMatrixCSC)
-    !(SparseArrays.decrement(SparseArrays.getcolptr(A)) ==
-      fact.colptr && SparseArrays.decrement(SparseArrays.getrowval(A)) ==
-      fact.rowval)
+    colptr0 = fact.colptr # has 0-based indices
+    colptr1 = SparseArrays.getcolptr(A) # has 1-based indices
+    length(colptr0) == length(colptr1) || return true
+    @inbounds for i in eachindex(colptr0)
+        colptr0[i] + 1 == colptr1[i] || return true
+    end
+    rowval0 = fact.rowval
+    rowval1 = SparseArrays.getrowval(A)
+    length(rowval0) == length(rowval1) || return true
+    @inbounds for i in eachindex(rowval0)
+        rowval0[i] + 1 == rowval1[i] || return true
+    end
+    return false
 end
 
 @static if Base.USE_GPL_LIBS

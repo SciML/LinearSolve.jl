@@ -201,7 +201,7 @@ function SciMLBase.solve!(
         cacheval = LinearSolve.@get_cacheval(cache, :UMFPACKFactorization)
         if alg.reuse_symbolic
             # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
-            if length(cacheval.nzval) != length(A.nzval) || alg.check_pattern && pattern_changed(cacheval, A)
+            if length(cacheval.nzval) != length(nonzeros(A)) || alg.check_pattern && pattern_changed(cacheval, A)
                 fact = lu(
                     SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                         nonzeros(A)),
@@ -331,7 +331,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
     if cache.isfresh
         cacheval = LinearSolve.@get_cacheval(cache, :KLUFactorization)
         if alg.reuse_symbolic
-            if length(cacheval.nzval) != length(A.nzval) || alg.check_pattern && pattern_changed(cacheval, A)
+            if length(cacheval.nzval) != length(nonzeros(A)) || alg.check_pattern && pattern_changed(cacheval, A)
                 fact = KLU.klu(
                     SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                         nonzeros(A)),

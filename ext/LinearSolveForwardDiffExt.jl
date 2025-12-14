@@ -413,30 +413,30 @@ end
 # This avoids the primal/partials separation overhead
 function _solve_direct_dual!(
         cache::DualLinearCache{DT}, alg, args...; kwargs...) where {DT <: ForwardDiff.Dual}
-    # Reconstruct the dual A and b
+    # Get the dual A and b
     dual_A = getfield(cache, :dual_A)
     dual_b = getfield(cache, :dual_b)
 
-    # Solve directly with Duals using the generic LU path
-    # This works because GenericLUFactorization doesn't use BLAS and can handle any number type
-    dual_u = dual_A \ dual_b
+    # Solve by creating a LinearProblem with the dual values and using LinearSolve
+    dual_prob = LinearProblem(dual_A, dual_b)
+    dual_sol = solve(dual_prob, getfield(cache, :linear_cache).alg, args...; kwargs...)
 
     # Update the cache
     if getfield(cache, :dual_u) isa AbstractArray
-        getfield(cache, :dual_u) .= dual_u
+        getfield(cache, :dual_u) .= dual_sol.u
     else
-        setfield!(cache, :dual_u, dual_u)
+        setfield!(cache, :dual_u, dual_sol.u)
     end
 
     # Also update the primal cache for consistency
-    primal_u = nodual_value.(dual_u)
+    primal_u = nodual_value.(dual_sol.u)
     if getfield(cache, :linear_cache).u isa AbstractArray
         getfield(cache, :linear_cache).u .= primal_u
     end
 
     return SciMLBase.build_linear_solution(
-        getfield(cache, :linear_cache).alg, getfield(cache, :dual_u), nothing, cache;
-        retcode = ReturnCode.Success, iters = 1, stats = nothing
+        getfield(cache, :linear_cache).alg, getfield(cache, :dual_u), dual_sol.resid, cache;
+        dual_sol.retcode, dual_sol.iters, dual_sol.stats
     )
 end
 

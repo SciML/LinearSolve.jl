@@ -782,6 +782,25 @@ end
     reinit!(cache; A = B1, b = b1)
     u = solve!(cache)
     @test norm(u - u0, Inf) < 1.0e-8
+
+    pr = LinearProblem(B, b)
+    solver = UMFPACKFactorization()
+    cache = init(pr, solver)
+    u = solve!(cache)
+    @test norm(u - u0, Inf) < 1.0e-8
+    reinit!(cache; A = B1, b = b1)
+    u = solve!(cache)
+    @test norm(u - u0, Inf) < 1.0e-8
+
+    pr = LinearProblem(B, b)
+    solver = KLUFactorization()
+    cache = init(pr, solver)
+    u = solve!(cache)
+    @test norm(u - u0, Inf) < 1.0e-8
+    reinit!(cache; A = B1, b = b1)
+    u = solve!(cache)
+    @test norm(u - u0, Inf) < 1.0e-8
+
 end
 
 @testset "ParallelSolves" begin

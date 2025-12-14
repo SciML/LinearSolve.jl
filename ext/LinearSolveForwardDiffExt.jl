@@ -417,9 +417,11 @@ function _solve_direct_dual!(
     dual_A = getfield(cache, :dual_A)
     dual_b = getfield(cache, :dual_b)
 
-    # Solve by creating a LinearProblem with the dual values and using LinearSolve
+    # Use __init to create a regular LinearCache (bypasses ForwardDiff extension)
+    # then solve! on that cache directly with the dual values
     dual_prob = LinearProblem(dual_A, dual_b)
-    dual_sol = solve(dual_prob, getfield(cache, :linear_cache).alg, args...; kwargs...)
+    dual_cache = __init(dual_prob, getfield(cache, :linear_cache).alg, args...; kwargs...)
+    dual_sol = SciMLBase.solve!(dual_cache)
 
     # Update the cache
     if getfield(cache, :dual_u) isa AbstractArray

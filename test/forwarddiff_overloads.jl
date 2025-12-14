@@ -202,17 +202,20 @@ A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 
 prob = LinearProblem(A, b)
 
+# Helper to check if type is DualLinearCache (extension type not directly accessible)
+is_dual_cache(x) = nameof(typeof(x)) == :DualLinearCache
+
 # GenericLUFactorization now returns DualLinearCache for type stability
 # (the optimization for GenericLU happens at solve-time instead of init-time)
-@test init(prob, GenericLUFactorization()) isa LinearSolve.LinearSolveForwardDiffExt.DualLinearCache
+@test is_dual_cache(init(prob, GenericLUFactorization()))
 
 # Test inference with explicit algorithm
-@test (@inferred init(prob, LUFactorization())) isa LinearSolve.LinearSolveForwardDiffExt.DualLinearCache
-@test (@inferred init(prob, GenericLUFactorization())) isa LinearSolve.LinearSolveForwardDiffExt.DualLinearCache
+@test is_dual_cache(@inferred init(prob, LUFactorization()))
+@test is_dual_cache(@inferred init(prob, GenericLUFactorization()))
 
 # Test inference with default algorithm (nothing) - this was the main bug
 # Previously returned Union{LinearCache, DualLinearCache} due to runtime conditional
-@test (@inferred init(prob, nothing)) isa LinearSolve.LinearSolveForwardDiffExt.DualLinearCache
+@test is_dual_cache(@inferred init(prob, nothing))
 
 # Test that SparspakFactorization still opts out (sparse solvers can't handle Duals the same way)
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])

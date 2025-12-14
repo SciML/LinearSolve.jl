@@ -265,22 +265,19 @@ function SciMLBase.init(prob::DualAbstractLinearProblem, alg::SciMLLinearSolveAl
     return __dual_init(prob, alg, args...; kwargs...)
 end
 
-# Opt out for GenericLUFactorization
-function SciMLBase.init(prob::DualAbstractLinearProblem, alg::GenericLUFactorization, args...; kwargs...)
-    return __init(prob, alg, args...; kwargs...)
-end
+# NOTE: Removed GenericLUFactorization opt-out from init to fix type inference.
+# The special handling for GenericLUFactorization is now done in solve! instead.
+# This ensures init always returns DualLinearCache for type stability.
 
-# Opt out for SparspakFactorization
+# Opt out for SparspakFactorization (sparse solvers can't handle Duals in the same way)
 function SciMLBase.init(prob::DualAbstractLinearProblem, alg::SparspakFactorization, args...; kwargs...)
     return __init(prob, alg, args...; kwargs...)
 end
 
+# NOTE: Removed the runtime conditional for DefaultLinearSolver that checked for
+# GenericLUFactorization. Now always use __dual_init for type stability.
 function SciMLBase.init(prob::DualAbstractLinearProblem, alg::DefaultLinearSolver, args...; kwargs...)
-    if alg.alg === DefaultAlgorithmChoice.GenericLUFactorization
-        return __init(prob, alg, args...; kwargs...)
-    else
-        return __dual_init(prob, alg, args...; kwargs...)
-    end
+    return __dual_init(prob, alg, args...; kwargs...)
 end
 
 function SciMLBase.init(prob::DualAbstractLinearProblem, alg::Nothing,
@@ -376,9 +373,25 @@ function SciMLBase.solve!(cache::DualLinearCache, args...; kwargs...)
     solve!(cache, getfield(cache, :linear_cache).alg, args...; kwargs...)
 end
 
+# Check if the algorithm should use the direct dual solve path
+# (algorithms that can work directly with Dual numbers without the primal/partials separation)
+function _use_direct_dual_solve(alg)
+    return alg isa GenericLUFactorization
+end
+
+function _use_direct_dual_solve(alg::DefaultLinearSolver)
+    return alg.alg === DefaultAlgorithmChoice.GenericLUFactorization
+end
+
 function SciMLBase.solve!(
         cache::DualLinearCache{DT}, alg::SciMLLinearSolveAlgorithm, args...; kwargs...) where {DT <:
                                                                                                ForwardDiff.Dual}
+    # Check if this algorithm can work directly with Duals (e.g., GenericLUFactorization)
+    # In that case, we solve the dual problem directly without separating primal/partials
+    if _use_direct_dual_solve(getfield(cache, :linear_cache).alg)
+        return _solve_direct_dual!(cache, alg, args...; kwargs...)
+    end
+
     primal_sol = linearsolve_forwarddiff_solve!(
         cache::DualLinearCache, getfield(cache, :linear_cache).alg, args...; kwargs...)
 
@@ -393,6 +406,39 @@ function SciMLBase.solve!(
     return SciMLBase.build_linear_solution(
         getfield(cache, :linear_cache).alg, getfield(cache, :dual_u), primal_sol.resid, cache;
         primal_sol.retcode, primal_sol.iters, primal_sol.stats
+    )
+end
+
+# Direct solve path for algorithms that can work with Dual numbers directly
+# This avoids the primal/partials separation overhead
+function _solve_direct_dual!(
+        cache::DualLinearCache{DT}, alg, args...; kwargs...) where {DT <: ForwardDiff.Dual}
+    # Get the dual A and b
+    dual_A = getfield(cache, :dual_A)
+    dual_b = getfield(cache, :dual_b)
+
+    # Use __init to create a regular LinearCache (bypasses ForwardDiff extension)
+    # then solve! on that cache directly with the dual values
+    dual_prob = LinearProblem(dual_A, dual_b)
+    dual_cache = __init(dual_prob, getfield(cache, :linear_cache).alg, args...; kwargs...)
+    dual_sol = SciMLBase.solve!(dual_cache)
+
+    # Update the cache
+    if getfield(cache, :dual_u) isa AbstractArray
+        getfield(cache, :dual_u) .= dual_sol.u
+    else
+        setfield!(cache, :dual_u, dual_sol.u)
+    end
+
+    # Also update the primal cache for consistency
+    primal_u = nodual_value.(dual_sol.u)
+    if getfield(cache, :linear_cache).u isa AbstractArray
+        getfield(cache, :linear_cache).u .= primal_u
+    end
+
+    return SciMLBase.build_linear_solution(
+        getfield(cache, :linear_cache).alg, getfield(cache, :dual_u), dual_sol.resid, cache;
+        dual_sol.retcode, dual_sol.iters, dual_sol.stats
     )
 end
 

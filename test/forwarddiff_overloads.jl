@@ -196,19 +196,39 @@ overload_x_p = solve!(cache, UMFPACKFactorization())
 backslash_x_p = A \ b
 @test ≈(overload_x_p, backslash_x_p, rtol = 1e-9)
 
-# Test that GenericLU doesn't create a DualLinearCache
+# Test type inference for init with ForwardDiff Dual numbers
+# This ensures init returns a concrete type (not a Union) for type stability
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 
 prob = LinearProblem(A, b)
-@test init(prob, GenericLUFactorization()) isa LinearSolve.LinearCache
 
-@test init(prob) isa LinearSolve.LinearCache
+# Helper to check if type is DualLinearCache (extension type not directly accessible)
+is_dual_cache(x) = nameof(typeof(x)) == :DualLinearCache
 
-# Test that SparspakFactorization doesn't create a DualLinearCache
+# GenericLUFactorization now returns DualLinearCache for type stability
+# (the optimization for GenericLU happens at solve-time instead of init-time)
+@test is_dual_cache(init(prob, GenericLUFactorization()))
+
+# Test inference with explicit algorithm
+@test is_dual_cache(@inferred init(prob, LUFactorization()))
+@test is_dual_cache(@inferred init(prob, GenericLUFactorization()))
+
+# Test inference with default algorithm (nothing) - this was the main bug
+# Previously returned Union{LinearCache, DualLinearCache} due to runtime conditional
+@test is_dual_cache(@inferred init(prob, nothing))
+
+# Test that SparspakFactorization still opts out (sparse solvers can't handle Duals the same way)
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 
 prob = LinearProblem(sparse(A), b)
 @test init(prob, SparspakFactorization()) isa LinearSolve.LinearCache
+
+# Test that solve still works correctly with GenericLUFactorization
+A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+prob = LinearProblem(A, b)
+sol_generic = solve(prob, GenericLUFactorization())
+backslash_result = A \ b
+@test ≈(sol_generic.u, backslash_result, rtol = 1e-9)
 
 # Test ComponentArray with ForwardDiff (Issue SciML/DifferentialEquations.jl#1110)
 # This tests that ArrayInterface.restructure preserves ComponentArray structure

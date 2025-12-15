@@ -84,3 +84,45 @@ function SciMLBase.solve!(cache::LinearCache, alg::DirectLdiv!, args...; kwargs.
 
     return SciMLBase.build_linear_solution(alg, u, nothing, cache)
 end
+
+# Specialized handling for Tridiagonal matrices to avoid mutating cache.A
+# ldiv! for Tridiagonal performs in-place LU factorization which would corrupt the cache.
+# We cache a copy of the Tridiagonal matrix and use that for the factorization.
+# See https://github.com/SciML/LinearSolve.jl/issues/825
+
+function init_cacheval(alg::DirectLdiv!, A::Tridiagonal, b, u, Pl, Pr, maxiters::Int,
+        abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions)
+    # Allocate a copy of the Tridiagonal matrix to use as workspace for ldiv!
+    return copy(A)
+end
+
+function init_cacheval(alg::DirectLdiv!, A::SymTridiagonal, b, u, Pl, Pr, maxiters::Int,
+        abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions)
+    # SymTridiagonal also gets mutated by ldiv!, cache a copy
+    return copy(A)
+end
+
+function SciMLBase.solve!(cache::LinearCache{<:Tridiagonal}, alg::DirectLdiv!,
+        args...; kwargs...)
+    (; A, b, u, cacheval) = cache
+    # Copy current A values into the cached workspace (non-allocating)
+    copyto!(cacheval.dl, A.dl)
+    copyto!(cacheval.d, A.d)
+    copyto!(cacheval.du, A.du)
+    # Perform ldiv! on the copy, preserving the original A
+    ldiv!(u, cacheval, b)
+    return SciMLBase.build_linear_solution(alg, u, nothing, cache)
+end
+
+function SciMLBase.solve!(cache::LinearCache{<:SymTridiagonal}, alg::DirectLdiv!,
+        args...; kwargs...)
+    (; A, b, u, cacheval) = cache
+    # Copy current A values into the cached workspace (non-allocating)
+    copyto!(cacheval.dv, A.dv)
+    copyto!(cacheval.ev, A.ev)
+    # Perform ldiv! on the copy, preserving the original A
+    ldiv!(u, cacheval, b)
+    return SciMLBase.build_linear_solution(alg, u, nothing, cache)
+end

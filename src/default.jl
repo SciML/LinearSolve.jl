@@ -134,7 +134,7 @@ end
 
 function defaultalg(A::Tridiagonal, b, assump::OperatorAssumptions{Bool})
     if assump.issq
-        @static if VERSION>=v"1.11"
+        @static if VERSION >= v"1.11"
             DirectLdiv!()
         else
             DefaultLinearSolver(DefaultAlgorithmChoice.LUFactorization)
@@ -239,10 +239,11 @@ Get the tuned algorithm preference for the given element type and matrix size.
 Returns `nothing` if no preference exists. Uses preloaded constants for efficiency.
 Fast path when no preferences are set.
 """
-@inline function get_tuned_algorithm(::Type{eltype_A}, ::Type{eltype_b}, matrix_size::Integer) where {eltype_A, eltype_b}
+@inline function get_tuned_algorithm(
+        ::Type{eltype_A}, ::Type{eltype_b}, matrix_size::Integer) where {eltype_A, eltype_b}
     # Determine the element type to use for preference lookup
     target_eltype = eltype_A !== Nothing ? eltype_A : eltype_b
-    
+
     # Determine size category based on matrix size (matching LinearSolveAutotune categories)
     size_category = if matrix_size <= 20
         :tiny
@@ -255,10 +256,10 @@ Fast path when no preferences are set.
     else
         :big
     end
-    
+
     # Fast path: if no preferences are set, return nothing immediately
     AUTOTUNE_PREFS_SET || return nothing
-    
+
     # Look up the tuned algorithm from preloaded constants with type specialization
     return _get_tuned_algorithm_impl(target_eltype, size_category)
 end
@@ -286,11 +287,10 @@ end
 
 @inline _get_tuned_algorithm_impl(::Type, ::Symbol) = nothing  # Fallback for other types
 
-
-
 # Convenience method for when A is nothing - delegate to main implementation
-@inline get_tuned_algorithm(::Type{Nothing}, ::Type{eltype_b}, matrix_size::Integer) where {eltype_b} = 
-    get_tuned_algorithm(eltype_b, eltype_b, matrix_size)
+@inline get_tuned_algorithm(::Type{Nothing},
+    ::Type{eltype_b},
+    matrix_size::Integer) where {eltype_b} = get_tuned_algorithm(eltype_b, eltype_b, matrix_size)
 
 # Allows A === nothing as a stand-in for dense matrix
 function defaultalg(A, b, assump::OperatorAssumptions{Bool})
@@ -304,7 +304,7 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
                ArrayInterface.can_setindex(b) &&
                (__conditioning(assump) === OperatorCondition.IllConditioned ||
                 __conditioning(assump) === OperatorCondition.WellConditioned)
-                
+
                 # Small matrix override - always use GenericLUFactorization for tiny problems
                 if length(b) <= 10
                     DefaultAlgorithmChoice.GenericLUFactorization
@@ -313,7 +313,7 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
                     matrix_size = length(b)
                     eltype_A = A === nothing ? Nothing : eltype(A)
                     tuned_alg = get_tuned_algorithm(eltype_A, eltype(b), matrix_size)
-                    
+
                     if tuned_alg !== nothing
                         tuned_alg
                     elseif appleaccelerate_isavailable() && b isa Array &&
@@ -513,7 +513,7 @@ end
             newex = quote
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
-                    @SciMLMessage("LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.", 
+                    @SciMLMessage("LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.",
                         cache.verbose, :default_lu_fallback)
                     sol = SciMLBase.solve!(
                         cache, QRFactorization(ColumnNorm()), args...; kwargs...)
@@ -641,7 +641,8 @@ end
 @generated function defaultalg_adjoint_eval(cache::LinearCache, dy)
     ex = :()
     for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))
-        newex = if alg in Symbol.((DefaultAlgorithmChoice.RFLUFactorization, DefaultAlgorithmChoice.GenericLUFactorization))
+        newex = if alg in Symbol.((DefaultAlgorithmChoice.RFLUFactorization,
+            DefaultAlgorithmChoice.GenericLUFactorization))
             quote
                 getproperty(cache.cacheval, $(Meta.quot(alg)))[1]' \ dy
             end

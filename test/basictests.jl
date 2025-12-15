@@ -34,7 +34,7 @@ A4 = A2 .|> ComplexF32
 b4 = b2 .|> ComplexF32
 x4 = x2 .|> ComplexF32
 
-A5_ = A - 0.01Tridiagonal(ones(n,n)) + sparse([1], [8], 0.5, n,n)
+A5_ = A - 0.01Tridiagonal(ones(n, n)) + sparse([1], [8], 0.5, n, n)
 A5 = sparse(transpose(A5_) * A5_)
 x5 = zeros(n)
 u5 = ones(n)
@@ -46,7 +46,7 @@ prob3 = LinearProblem(A3, b3; u0 = x3)
 prob4 = LinearProblem(A4, b4; u0 = x4)
 prob5 = LinearProblem(A5, b5)
 
-cache_kwargs = (;abstol = 1e-8, reltol = 1e-8, maxiter = 30)
+cache_kwargs = (; abstol = 1e-8, reltol = 1e-8, maxiter = 30)
 
 function test_interface(alg, prob1, prob2)
     A1, b1 = prob1.A, prob1.b
@@ -79,10 +79,10 @@ end
 
 function test_tolerance_update(alg, prob, u)
     cache = init(prob, alg)
-    LinearSolve.update_tolerances!(cache; reltol = 1e-2, abstol=1e-8)
+    LinearSolve.update_tolerances!(cache; reltol = 1e-2, abstol = 1e-8)
     u1 = copy(solve!(cache).u)
 
-    LinearSolve.update_tolerances!(cache; reltol = 1e-8, abstol=1e-8)
+    LinearSolve.update_tolerances!(cache; reltol = 1e-8, abstol = 1e-8)
     u2 = solve!(cache).u
 
     @test norm(u2 - u) < norm(u1 - u)
@@ -303,28 +303,84 @@ end
         ρ = 0.95
         A_tri = SymTridiagonal(ones(k) .+ ρ^2, -ρ * ones(k-1))
         b = rand(k)
-        
+
         # Test with explicit LDLtFactorization
         prob_tri = LinearProblem(A_tri, b)
         sol = solve(prob_tri, LDLtFactorization())
         @test A_tri * sol.u ≈ b
-        
+
         # Test that default algorithm uses LDLtFactorization for SymTridiagonal
         default_alg = LinearSolve.defaultalg(A_tri, b, OperatorAssumptions(true))
         @test default_alg isa LinearSolve.DefaultLinearSolver
         @test default_alg.alg == LinearSolve.DefaultAlgorithmChoice.LDLtFactorization
-        
+
         # Test that the factorization is cached and reused
         cache = init(prob_tri, LDLtFactorization())
         sol1 = solve!(cache)
         @test A_tri * sol1.u ≈ b
         @test !cache.isfresh  # Cache should not be fresh after first solve
-        
+
         # Solve again with same matrix to ensure cache is reused
         cache.b = rand(k)  # Change RHS
         sol2 = solve!(cache)
         @test A_tri * sol2.u ≈ cache.b
         @test !cache.isfresh  # Cache should still not be fresh
+    end
+
+    @testset "Tridiagonal cache not mutated (issue #825)" begin
+        # Test that solving with Tridiagonal does not mutate cache.A
+        # See https://github.com/SciML/LinearSolve.jl/issues/825
+        k = 6
+        lower = ones(k - 1)
+        diag = -2 * ones(k)
+        upper = ones(k - 1)
+        A_tri = Tridiagonal(lower, diag, upper)
+        b = rand(k)
+
+        # Store original matrix values for comparison
+        A_orig = Tridiagonal(copy(lower), copy(diag), copy(upper))
+
+        # Test that default algorithm uses DirectLdiv! for Tridiagonal on Julia 1.11+
+        default_alg = LinearSolve.defaultalg(A_tri, b, OperatorAssumptions(true))
+        @static if VERSION >= v"1.11"
+            @test default_alg isa DirectLdiv!
+        else
+            @test default_alg isa LinearSolve.DefaultLinearSolver
+            @test default_alg.alg == LinearSolve.DefaultAlgorithmChoice.LUFactorization
+        end
+
+        # Test with default algorithm
+        prob_tri = LinearProblem(A_tri, b)
+        cache = init(prob_tri)
+
+        # Verify solution is correct
+        sol1 = solve!(cache)
+        @test A_orig * sol1.u ≈ b
+
+        # Verify cache.A is not mutated
+        @test cache.A ≈ A_orig
+
+        # Verify multiple solves give correct answers
+        b2 = rand(k)
+        cache.b = b2
+        sol2 = solve!(cache)
+        @test A_orig * sol2.u ≈ b2
+
+        # Cache.A should still be unchanged
+        @test cache.A ≈ A_orig
+
+        # Verify solve! allocates minimally after first solve (warm-up)
+        # The small allocation (48 bytes) is from the return type construction,
+        # same as other factorization methods like LUFactorization
+        @static if VERSION >= v"1.11"
+            # Warm up
+            for _ in 1:3
+                solve!(cache)
+            end
+            # Test minimal allocations (same as LUFactorization)
+            allocs = @allocated solve!(cache)
+            @test allocs <= 64  # Allow small overhead from return type
+        end
     end
 
     test_algs = [
@@ -680,8 +736,10 @@ end
             prob3 = LinearProblem(op1, b1; u0 = x1)
             prob4 = LinearProblem(op2, b2; u0 = x2)
 
-            @test LinearSolve.defaultalg(op1, x1).alg === LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
-            @test LinearSolve.defaultalg(op2, x2).alg === LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
+            @test LinearSolve.defaultalg(op1, x1).alg ===
+                  LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
+            @test LinearSolve.defaultalg(op2, x2).alg ===
+                  LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
             @test LinearSolve.defaultalg(op3, x1).alg ===
                   LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
             @test LinearSolve.defaultalg(op4, x2).alg ===
@@ -800,7 +858,6 @@ end
     reinit!(cache; A = B1, b = b1)
     u = solve!(cache)
     @test norm(u - u0, Inf) < 1.0e-8
-
 end
 
 @testset "ParallelSolves" begin
@@ -818,7 +875,7 @@ end
     for i in 1:2
         @test sol[i] ≈ U[i]
     end
-    
+
     Threads.@threads for i in 1:2
         sol[i] = solve(LinearProblem(A_sparse, B[i]), KLUFactorization())
     end

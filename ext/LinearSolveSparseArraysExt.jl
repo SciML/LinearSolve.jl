@@ -399,6 +399,11 @@ function LinearSolve.init_cacheval(alg::NormalCholeskyFactorization,
         nothing
     elseif LinearSolve.is_cusparse_csr(A) && !LinearSolve.cudss_loaded(A)
         nothing
+    elseif !assumptions.issq
+        # Cholesky requires square matrices - return nothing for non-square to avoid errors
+        # during DefaultLinearSolver cache initialization
+        # See https://github.com/SciML/NonlinearSolve.jl/issues/746
+        nothing
     else
         ArrayInterface.cholesky_instance(convert(AbstractMatrix, A))
     end

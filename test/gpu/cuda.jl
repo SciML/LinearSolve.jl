@@ -75,7 +75,7 @@ x2 = zero(b);
 prob1 = LinearProblem(A1, b1; u0 = x1)
 prob2 = LinearProblem(A2, b2; u0 = x2)
 
-cache_kwargs = (;abstol = 1e-8, reltol = 1e-8, maxiter = 30)
+cache_kwargs = (; abstol = 1e-8, reltol = 1e-8, maxiter = 30)
 
 function test_interface(alg, prob1, prob2)
     A1 = prob1.A
@@ -103,7 +103,8 @@ function test_interface(alg, prob1, prob2)
     return
 end
 
-@testset "$alg" for alg in (CudaOffloadLUFactorization(), CudaOffloadQRFactorization(), NormalCholeskyFactorization())
+@testset "$alg" for alg in (CudaOffloadLUFactorization(), CudaOffloadQRFactorization(),
+    NormalCholeskyFactorization())
     test_interface(alg, prob1, prob2)
 end
 
@@ -169,5 +170,47 @@ end
 if Base.find_package("CUSOLVERRF") !== nothing
     @testset "CUSOLVERRF" begin
         include("cusolverrf.jl")
+    end
+end
+
+# Test for non-square GPU matrices (least squares problems)
+# See https://github.com/SciML/NonlinearSolve.jl/issues/746
+@testset "Non-square GPU matrices" begin
+    # Overdetermined system: more rows than columns (4x2)
+    A_rect = cu(Float32[1.0 2.0; 3.0 4.0; 5.0 6.0; 7.0 8.0])
+    b_rect = cu(Float32[1.0, 2.0, 3.0, 4.0])
+
+    prob_rect = LinearProblem(A_rect, b_rect)
+
+    # Test that default solver works (should use QRFactorization)
+    @testset "Default solver for non-square" begin
+        sol = solve(prob_rect)
+        @test sol.alg.alg == LinearSolve.DefaultAlgorithmChoice.QRFactorization
+        # Verify least squares solution
+        @test norm(A_rect * sol.u - b_rect) < norm(b_rect)  # residual should be smaller than b
+    end
+
+    # Test explicit QRFactorization
+    @testset "QRFactorization for non-square" begin
+        sol = solve(prob_rect, QRFactorization())
+        @test norm(A_rect * sol.u - b_rect) < norm(b_rect)
+    end
+
+    # Test NormalCholeskyFactorization (should work via A'*A)
+    @testset "NormalCholeskyFactorization for non-square" begin
+        sol = solve(prob_rect, NormalCholeskyFactorization())
+        @test norm(A_rect * sol.u - b_rect) < norm(b_rect)
+    end
+
+    # Underdetermined system: more columns than rows (2x4)
+    A_under = cu(Float32[1.0 2.0 3.0 4.0; 5.0 6.0 7.0 8.0])
+    b_under = cu(Float32[1.0, 2.0])
+
+    prob_under = LinearProblem(A_under, b_under)
+
+    @testset "Default solver for underdetermined" begin
+        sol = solve(prob_under)
+        # Should still work and give a solution
+        @test norm(A_under * sol.u - b_under) < 1e-4
     end
 end

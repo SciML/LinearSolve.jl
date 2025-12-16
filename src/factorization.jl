@@ -317,13 +317,15 @@ end
 const PREALLOCATED_QR_ColumnNorm = ArrayInterface.qr_instance(rand(1, 1), ColumnNorm())
 
 function init_cacheval(alg::QRFactorization{ColumnNorm}, A::Matrix{Float64}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions)
     return PREALLOCATED_QR_ColumnNorm
 end
 
 function init_cacheval(
         alg::QRFactorization, A::Union{<:Adjoint, <:Transpose}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions)
     A isa GPUArraysCore.AnyGPUArray && return qr(A)
     return qr(A, alg.pivot)
 end
@@ -331,7 +333,8 @@ end
 const PREALLOCATED_QR_NoPivot = ArrayInterface.qr_instance(rand(1, 1))
 
 function init_cacheval(alg::QRFactorization{NoPivot}, A::Matrix{Float64}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions)
     return PREALLOCATED_QR_NoPivot
 end
 
@@ -388,13 +391,18 @@ function init_cacheval(alg::CholeskyFactorization, A::SMatrix{S1, S2}, b, u, Pl,
 end
 
 function init_cacheval(alg::CholeskyFactorization, A::GPUArraysCore.AnyGPUArray, b, u, Pl,
-        Pr, maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
-    cholesky(A; check = false)
+        Pr, maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions)
+    # Cholesky requires square matrices - return nothing for non-square to avoid errors
+    # during DefaultLinearSolver cache initialization
+    # See https://github.com/SciML/NonlinearSolve.jl/issues/746
+    assumptions.issq ? cholesky(A; check = false) : nothing
 end
 
 function init_cacheval(
         alg::CholeskyFactorization, A::AbstractArray{<:BLASELTYPES}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions)
     if LinearSolve.is_cusparse_csc(A)
         nothing
     elseif LinearSolve.is_cusparse_csr(A) && !LinearSolve.cudss_loaded(A)
@@ -1012,7 +1020,8 @@ const PREALLOCATED_NORMALCHOLESKY_SYMMETRIC = ArrayInterface.cholesky_instance(
     Symmetric(rand(1, 1)), NoPivot())
 
 function init_cacheval(alg::NormalCholeskyFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions)
     return PREALLOCATED_NORMALCHOLESKY_SYMMETRIC
 end
 
@@ -1164,7 +1173,8 @@ function init_cacheval(alg::SparspakFactorization,
 end
 
 function init_cacheval(::SparspakFactorization, ::StaticArray, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions)
     nothing
 end
 
@@ -1190,9 +1200,8 @@ struct CliqueTreesFactorization{A, S} <: AbstractSparseFactorization
             alg::A = nothing,
             snd::S = nothing,
             reuse_symbolic = true,
-            throwerror = true,
-        ) where {A, S}
-
+            throwerror = true
+    ) where {A, S}
         ext = Base.get_extension(@__MODULE__, :LinearSolveCliqueTreesExt)
 
         if throwerror && isnothing(ext)
@@ -1203,30 +1212,36 @@ struct CliqueTreesFactorization{A, S} <: AbstractSparseFactorization
     end
 end
 
-function init_cacheval(::CliqueTreesFactorization, ::Union{AbstractMatrix, Nothing, AbstractSciMLOperator}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+function init_cacheval(::CliqueTreesFactorization,
+        ::Union{AbstractMatrix, Nothing, AbstractSciMLOperator}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions)
     nothing
 end
 
 function init_cacheval(::CliqueTreesFactorization, ::StaticArray, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions)
     nothing
 end
 
 # Fallback init_cacheval for extension-based algorithms when extensions aren't loaded
 # These return nothing since the actual implementations are in the extensions
 function init_cacheval(::BLISLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions)
     nothing
 end
 
 function init_cacheval(::CudaOffloadLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions)
     nothing
 end
 
 function init_cacheval(::MetalLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions)
     nothing
 end
 

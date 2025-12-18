@@ -27,7 +27,14 @@ end
 
     @test check_no_implicit_imports(LinearSolve; skip = (Base, Core),
         allow_unanalyzable = unanalyzable_mods) === nothing
-    @test check_no_stale_explicit_imports(
-        LinearSolve; allow_unanalyzable = unanalyzable_mods) === nothing
+    # These SciMLLogging imports are used by the @verbosity_specifier macro-generated code
+    # but ExplicitImports can't detect usage through macro expansions
+    sciml_logging_macro_imports = (
+        :AbstractVerbositySpecifier, :AbstractMessageLevel, :AbstractVerbosityPreset,
+        :None, :Minimal, :Standard, :Detailed, :All
+    )
+    @test check_no_stale_explicit_imports(LinearSolve;
+        allow_unanalyzable = unanalyzable_mods,
+        ignore = sciml_logging_macro_imports) === nothing
     @test check_all_qualified_accesses_via_owners(LinearSolve) === nothing
 end

@@ -6,8 +6,142 @@ using LinearSolve: LinearSolve, SciMLLinearSolveAlgorithm, init, solve!, LinearP
 using LinearSolve.LinearAlgebra
 using EnzymeCore
 using EnzymeCore: EnzymeRules
+using SparseArrays: AbstractSparseMatrix, AbstractSparseMatrixCSC, SparseMatrixCSC
 
 @inline EnzymeCore.EnzymeRules.inactive_type(::Type{<:LinearSolve.SciMLLinearSolveAlgorithm}) = true
+
+# Helper functions for sparse-safe gradient accumulation
+# These avoid broadcast operations that can change sparsity patterns
+#
+# Key insight: Enzyme.make_zero shares structural arrays (rowval, colptr) between
+# primal and shadow sparse matrices. Broadcast operations like `dA .-= z * y'` can
+# change the sparsity pattern, corrupting both shadow AND primal. We must operate
+# directly on nzval to preserve the sparsity pattern.
+
+using SparseArrays: nonzeros, rowvals, getcolptr, nzrange
+
+"""
+    _safe_add!(dst, src)
+
+Add `src` to `dst` in a way that preserves the sparsity pattern of sparse matrices.
+For sparse matrices with matching sparsity patterns (as with Enzyme shadows),
+this operates directly on the nonzeros array.
+"""
+function _safe_add!(dst::AbstractSparseMatrixCSC, src::AbstractSparseMatrixCSC)
+    nonzeros(dst) .+= nonzeros(src)
+    return dst
+end
+
+function _safe_add!(dst::AbstractArray, src::AbstractArray)
+    dst .+= src
+    return dst
+end
+
+"""
+    _safe_zero!(A)
+
+Zero out `A` in a way that preserves the sparsity pattern of sparse matrices.
+For sparse matrices, this operates directly on the nonzeros array.
+"""
+function _safe_zero!(A::AbstractSparseMatrixCSC)
+    fill!(nonzeros(A), zero(eltype(A)))
+    return A
+end
+
+function _safe_zero!(A::AbstractArray)
+    fill!(A, zero(eltype(A)))
+    return A
+end
+
+"""
+    _sparse_outer_sub!(dA, z, y)
+
+Compute `dA .-= z * transpose(y)` in a sparsity-preserving manner.
+
+For sparse matrices, only accumulates gradients into existing non-zero positions.
+This is mathematically correct for sparse matrix AD: gradients are only meaningful
+at positions where the matrix can be modified.
+"""
+function _sparse_outer_sub!(dA::SparseMatrixCSC, z::AbstractVector, y::AbstractVector)
+    rows = rowvals(dA)
+    vals = nonzeros(dA)
+    colptr = getcolptr(dA)
+
+    # Non-allocating loop over CSC structure
+    # This is efficient and cache-friendly (column-major order)
+    @inbounds for col in 1:size(dA, 2)
+        y_col = y[col]
+        for idx in colptr[col]:(colptr[col + 1] - 1)
+            vals[idx] -= z[rows[idx]] * y_col
+        end
+    end
+
+    return dA
+end
+
+# GPU sparse matrices (CuSparseMatrixCSC, ROCSparseMatrixCSC, etc.)
+# Use vectorized operations that work on GPU arrays
+function _sparse_outer_sub!(dA::AbstractSparseMatrixCSC, z::AbstractVector, y::AbstractVector)
+    rows = rowvals(dA)
+    vals = nonzeros(dA)
+    colptr = getcolptr(dA)
+    n_cols = size(dA, 2)
+
+    # Build column indices for each stored value (allocates O(nnz) memory)
+    # This is needed for GPU-compatible vectorized operations
+    col_indices = _expand_colptr_to_col_indices(rows, colptr, n_cols)
+
+    # Vectorized update - works on GPU via broadcasting
+    # vals[i] -= z[rows[i]] * y[col_indices[i]]
+    vals .-= z[rows] .* y[col_indices]
+
+    return dA
+end
+
+"""
+    _expand_colptr_to_col_indices(rows, colptr, n_cols)
+
+Convert CSC column pointer array to per-element column indices.
+Returns a vector where element i contains the column index of the i-th stored value.
+The output array is allocated on the same device as `rows`.
+"""
+function _expand_colptr_to_col_indices(rows::Vector, colptr::Vector, n_cols::Integer)
+    # CPU path - use efficient loop
+    nnz = length(rows)
+    col_indices = Vector{eltype(colptr)}(undef, nnz)
+    @inbounds for col in 1:n_cols
+        for idx in colptr[col]:(colptr[col + 1] - 1)
+            col_indices[idx] = col
+        end
+    end
+    return col_indices
+end
+
+function _expand_colptr_to_col_indices(
+        rows::AbstractVector, colptr::AbstractVector, n_cols::Integer)
+    # GPU path - copy colptr to CPU, build indices, copy back
+    # This avoids slow scalar indexing on GPU arrays
+    colptr_cpu = collect(colptr)
+    nnz = length(rows)
+
+    # Build on CPU (fast)
+    col_indices_cpu = Vector{eltype(colptr_cpu)}(undef, nnz)
+    @inbounds for col in 1:n_cols
+        for idx in colptr_cpu[col]:(colptr_cpu[col + 1] - 1)
+            col_indices_cpu[idx] = col
+        end
+    end
+
+    # Copy to GPU (matching rows array type)
+    col_indices = similar(rows, eltype(colptr_cpu), nnz)
+    copyto!(col_indices, col_indices_cpu)
+    return col_indices
+end
+
+function _sparse_outer_sub!(dA::AbstractArray, z::AbstractVector, y::AbstractVector)
+    dA .-= z * transpose(y)
+    return dA
+end
 
 function EnzymeRules.forward(config::EnzymeRules.FwdConfigWidth{1},
         func::Const{typeof(LinearSolve.init)}, ::Type{RT}, prob::EnzymeCore.Annotation{LP},
@@ -25,10 +159,10 @@ function EnzymeRules.forward(config::EnzymeRules.FwdConfigWidth{1},
     dres = func.val(prob.dval, alg.val; kwargs...)
 
     if dres.b == res.b
-        dres.b .= false
+        _safe_zero!(dres.b)
     end
     if dres.A == res.A
-        dres.A .= false
+        _safe_zero!(dres.A)
     end
 
     if EnzymeRules.needs_primal(config) && EnzymeRules.needs_shadow(config)
@@ -125,22 +259,23 @@ function EnzymeRules.reverse(
 
     if EnzymeRules.width(config) == 1
         if d_A !== prob_d_A
-            prob_d_A .+= d_A
-            d_A .= 0
+            # Use sparse-safe addition to preserve sparsity pattern
+            _safe_add!(prob_d_A, d_A)
+            _safe_zero!(d_A)
         end
         if d_b !== prob_d_b
-            prob_d_b .+= d_b
-            d_b .= 0
+            _safe_add!(prob_d_b, d_b)
+            _safe_zero!(d_b)
         end
     else
         for (_prob_d_A, _d_A, _prob_d_b, _d_b) in zip(prob_d_A, d_A, prob_d_b, d_b)
             if _d_A !== _prob_d_A
-                _prob_d_A .+= _d_A
-                _d_A .= 0
+                _safe_add!(_prob_d_A, _d_A)
+                _safe_zero!(_d_A)
             end
             if _d_b !== _prob_d_b
-                _prob_d_b .+= _d_b
-                _d_b .= 0
+                _safe_add!(_prob_d_b, _d_b)
+                _safe_zero!(_d_b)
             end
         end
     end
@@ -149,7 +284,7 @@ function EnzymeRules.reverse(
 end
 
 # y=inv(A) B
-#   dA −= z y^T  
+#   dA −= z y^T
 #   dB += z, where  z = inv(A^T) dy
 function EnzymeRules.augmented_primal(
         config, func::Const{typeof(LinearSolve.solve!)},
@@ -254,7 +389,8 @@ function EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.solve!)},
             error("Algorithm $(_linsolve.alg) is currently not supported by Enzyme rules on LinearSolve.jl. Please open an issue on LinearSolve.jl detailing which algorithm is missing the adjoint handling")
         end
 
-        dA .-= z * transpose(y)
+        # Use sparse-safe outer product subtraction to preserve sparsity pattern
+        _sparse_outer_sub!(dA, z, y)
         db .+= z
         dy .= eltype(dy)(0)
     end

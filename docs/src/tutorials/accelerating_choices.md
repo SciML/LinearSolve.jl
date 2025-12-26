@@ -52,7 +52,7 @@ there are a few major tips to note when fine tuning the results to your system:
     MKLFactorization (X86) and hardcoding the choice for your problem if the default did not make
     the right guess.
 
-!!! warn
+!!! warning
     
     As noted, RecursiveFactorization.jl is one of the fastest linear solvers for smaller dense
     matrices but requires `using RecursiveFactorization` in order to be used in the default

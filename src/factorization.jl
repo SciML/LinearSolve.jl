@@ -969,7 +969,7 @@ A fast factorization which uses a Cholesky factorization on A * A'. Can be much
 faster than LU factorization, but is not as numerically stable and thus should only
 be applied to well-conditioned matrices.
 
-!!! warn
+!!! warning
 
     `NormalCholeskyFactorization` should only be applied to well-conditioned matrices. As a
     method it is not able to easily identify possible numerical issues. As a check it is

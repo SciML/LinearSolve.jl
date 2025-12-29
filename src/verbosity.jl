@@ -1,184 +1,230 @@
-# Linear Verbosity
+SciMLLogging.@verbosity_specifier LinearVerbosity begin
+    toggles = (
+        :default_lu_fallback,
+        :no_right_preconditioning,
+        :using_IterativeSolvers,
+        :IterativeSolvers_iterations,
+        :KrylovKit_verbosity,
+        :KrylovJL_verbosity,
+        :HYPRE_verbosity,
+        :pardiso_verbosity,
+        :blas_errors,
+        :blas_invalid_args,
+        :blas_info,
+        :blas_success,
+        :condition_number,
+        :convergence_failure,
+        :solver_failure,
+        :max_iters
+    )
 
-const linear_defaults = Dict{Symbol, Verbosity.Type}(
-    :default_lu_fallback => Verbosity.Warn(),
-    :no_right_preconditioning => Verbosity.Warn(),
-    :using_iterative_solvers => Verbosity.Warn(),
-    :using_IterativeSolvers => Verbosity.Warn(),
-    :IterativeSolvers_iterations => Verbosity.Warn(),
-    :KrylovKit_verbosity => Verbosity.Warn(),
-    :KrylovJL_verbosity => Verbosity.None(),
-    :HYPRE_verbosity => Verbosity.Level(1),
-    :pardiso_verbosity => Verbosity.None()
+    presets = (
+        None = (
+            default_lu_fallback = Silent(),
+            no_right_preconditioning = Silent(),
+            using_IterativeSolvers = Silent(),
+            IterativeSolvers_iterations = Silent(),
+            KrylovKit_verbosity = Silent(),
+            KrylovJL_verbosity = Silent(),
+            HYPRE_verbosity = Silent(),
+            pardiso_verbosity = Silent(),
+            blas_errors = Silent(),
+            blas_invalid_args = Silent(),
+            blas_info = Silent(),
+            blas_success = Silent(),
+            condition_number = Silent(),
+            convergence_failure = Silent(),
+            solver_failure = Silent(),
+            max_iters = Silent()
+        ),
+        Minimal = (
+            default_lu_fallback = Silent(),
+            no_right_preconditioning = Silent(),
+            using_IterativeSolvers = Silent(),
+            IterativeSolvers_iterations = Silent(),
+            KrylovKit_verbosity = Silent(),
+            KrylovJL_verbosity = Silent(),
+            HYPRE_verbosity = Silent(),
+            pardiso_verbosity = Silent(),
+            blas_errors = WarnLevel(),
+            blas_invalid_args = WarnLevel(),
+            blas_info = Silent(),
+            blas_success = Silent(),
+            condition_number = Silent(),
+            convergence_failure = Silent(),
+            solver_failure = Silent(),
+            max_iters = Silent()
+        ),
+        Standard = (
+            default_lu_fallback = Silent(),
+            no_right_preconditioning = Silent(),
+            using_IterativeSolvers = Silent(),
+            IterativeSolvers_iterations = Silent(),
+            KrylovKit_verbosity = CustomLevel(1),
+            KrylovJL_verbosity = Silent(),
+            HYPRE_verbosity = InfoLevel(),
+            pardiso_verbosity = Silent(),
+            blas_errors = WarnLevel(),
+            blas_invalid_args = WarnLevel(),
+            blas_info = Silent(),
+            blas_success = Silent(),
+            condition_number = Silent(),
+            convergence_failure = WarnLevel(),
+            solver_failure = WarnLevel(),
+            max_iters = WarnLevel()
+        ),
+        Detailed = (
+            default_lu_fallback = WarnLevel(),
+            no_right_preconditioning = InfoLevel(),
+            using_IterativeSolvers = InfoLevel(),
+            IterativeSolvers_iterations = Silent(),
+            KrylovKit_verbosity = CustomLevel(2),
+            KrylovJL_verbosity = CustomLevel(1),
+            HYPRE_verbosity = InfoLevel(),
+            pardiso_verbosity = CustomLevel(1),
+            blas_errors = WarnLevel(),
+            blas_invalid_args = WarnLevel(),
+            blas_info = InfoLevel(),
+            blas_success = InfoLevel(),
+            condition_number = Silent(),
+            convergence_failure = WarnLevel(),
+            solver_failure = WarnLevel(),
+            max_iters = WarnLevel()
+        ),
+        All = (
+            default_lu_fallback = WarnLevel(),
+            no_right_preconditioning = InfoLevel(),
+            using_IterativeSolvers = InfoLevel(),
+            IterativeSolvers_iterations = InfoLevel(),
+            KrylovKit_verbosity = CustomLevel(3),
+            KrylovJL_verbosity = CustomLevel(1),
+            HYPRE_verbosity = InfoLevel(),
+            pardiso_verbosity = CustomLevel(1),
+            blas_errors = WarnLevel(),
+            blas_invalid_args = WarnLevel(),
+            blas_info = InfoLevel(),
+            blas_success = InfoLevel(),
+            condition_number = InfoLevel(),
+            convergence_failure = WarnLevel(),
+            solver_failure = WarnLevel(),
+            max_iters = WarnLevel()
+        )
+    )
+
+    groups = (
+        error_control = (:default_lu_fallback, :blas_errors, :blas_invalid_args),
+        performance = (:no_right_preconditioning,),
+        numerical = (:using_IterativeSolvers, :IterativeSolvers_iterations,
+            :KrylovKit_verbosity, :KrylovJL_verbosity, :HYPRE_verbosity,
+            :pardiso_verbosity, :blas_info, :blas_success, :condition_number,
+            :convergence_failure, :solver_failure, :max_iters)
+    )
+end
+
+@doc """
+    LinearVerbosity <: AbstractVerbositySpecifier
+
+Verbosity configuration for LinearSolve.jl solvers, providing fine-grained control over
+diagnostic messages, warnings, and errors during linear system solution.
+
+# Fields
+
+## Error Control Group
+- `default_lu_fallback`: Messages when falling back to LU factorization from other methods
+- `blas_errors`: Critical BLAS errors that stop computation
+- `blas_invalid_args`: BLAS errors due to invalid arguments
+
+## Performance Group
+- `no_right_preconditioning`: Messages when right preconditioning is not used
+
+## Numerical Group
+- `using_IterativeSolvers`: Messages when using the IterativeSolvers.jl package
+- `IterativeSolvers_iterations`: Iteration count messages from IterativeSolvers.jl
+- `KrylovKit_verbosity`: Verbosity level passed to KrylovKit.jl solvers
+- `KrylovJL_verbosity`: Verbosity level passed to Krylov.jl solvers
+- `HYPRE_verbosity`: Verbosity level passed to HYPRE solvers
+- `pardiso_verbosity`: Verbosity level passed to Pardiso solvers
+- `blas_info`: Informational messages from BLAS operations
+- `blas_success`: Success messages from BLAS operations
+- `condition_number`: Messages related to condition number calculations
+- `convergence_failure`: Messages when iterative solvers fail to converge
+- `solver_failure`: Messages when solvers fail for reasons other than convergence
+- `max_iters`: Messages when iterative solvers reach maximum iterations
+
+# Constructors
+
+    LinearVerbosity(preset::AbstractVerbosityPreset)
+
+Create a `LinearVerbosity` using a preset configuration:
+- `SciMLLogging.None()`: All messages disabled
+- `SciMLLogging.Minimal()`: Only critical errors and fatal issues
+- `SciMLLogging.Standard()`: Balanced verbosity (default)
+- `SciMLLogging.Detailed()`: Comprehensive debugging information
+- `SciMLLogging.All()`: Maximum verbosity
+
+    LinearVerbosity(; error_control=nothing, performance=nothing, numerical=nothing, kwargs...)
+
+Create a `LinearVerbosity` with group-level or individual field control.
+
+# Examples
+
+```julia
+# Use a preset
+verbose = LinearVerbosity(SciMLLogging.Standard())
+
+# Set entire groups
+verbose = LinearVerbosity(
+    error_control = SciMLLogging.WarnLevel(),
+    numerical = SciMLLogging.InfoLevel()
 )
-mutable struct LinearErrorControlVerbosity
-    default_lu_fallback::Verbosity.Type
 
-    function LinearErrorControlVerbosity(;
-            default_lu_fallback = linear_defaults[:default_lu_fallback])
-        new(default_lu_fallback)
-    end
+# Set individual fields
+verbose = LinearVerbosity(
+    default_lu_fallback = SciMLLogging.InfoLevel(),
+    KrylovJL_verbosity = SciMLLogging.CustomLevel(1),
+    blas_errors = SciMLLogging.ErrorLevel()
+)
 
-    function LinearErrorControlVerbosity(verbose::Verbosity.Type)
-        @match verbose begin
-            Verbosity.None() => new(fill(
-                Verbosity.None(), length(fieldnames(LinearErrorControlVerbosity)))...)
+# Mix group and individual settings
+verbose = LinearVerbosity(
+    numerical = SciMLLogging.InfoLevel(),  # Set all numerical to InfoLevel
+    blas_errors = SciMLLogging.ErrorLevel()  # Override specific field
+)
+```
+""" LinearVerbosity
 
-            Verbosity.Info() => new(fill(
-                Verbosity.Info(), length(fieldnames(LinearErrorControlVerbosity)))...)
+# Group classifications (for backwards compatibility)
+const error_control_options = (:default_lu_fallback, :blas_errors, :blas_invalid_args)
+const performance_options = (:no_right_preconditioning,)
+const numerical_options = (:using_IterativeSolvers, :IterativeSolvers_iterations,
+    :KrylovKit_verbosity, :KrylovJL_verbosity, :HYPRE_verbosity,
+    :pardiso_verbosity, :blas_info, :blas_success, :condition_number,
+    :convergence_failure, :solver_failure, :max_iters)
 
-            Verbosity.Warn() => new(fill(
-                Verbosity.Warn(), length(fieldnames(LinearErrorControlVerbosity)))...)
-
-            Verbosity.Error() => new(fill(
-                Verbosity.Error(), length(fieldnames(LinearErrorControlVerbosity)))...)
-
-            Verbosity.Default() => LinearErrorControlVerbosity()
-
-            Verbosity.Edge() => LinearErrorControlVerbosity()
-
-            _ => @error "Not a valid choice for verbosity."
-        end
-    end
-end
-
-mutable struct LinearPerformanceVerbosity
-    no_right_preconditioning::Verbosity.Type
-
-    function LinearPerformanceVerbosity(;
-            no_right_preconditioning = linear_defaults[:no_right_preconditioning])
-        new(no_right_preconditioning)
-    end
-
-    function LinearPerformanceVerbosity(verbose::Verbosity.Type)
-        @match verbose begin
-            Verbosity.None() => new(fill(
-                Verbosity.None(), length(fieldnames(LinearPerformanceVerbosity)))...)
-
-            Verbosity.Info() => new(fill(
-                Verbosity.Info(), length(fieldnames(LinearPerformanceVerbosity)))...)
-
-            Verbosity.Warn() => new(fill(
-                Verbosity.Warn(), length(fieldnames(LinearPerformanceVerbosity)))...)
-
-            Verbosity.Error() => new(fill(
-                Verbosity.Error(), length(fieldnames(LinearPerformanceVerbosity)))...)
-
-            Verbosity.Default() => LinearPerformanceVerbosity()
-
-            Verbosity.Edge() => LinearPerformanceVerbosity()
-
-            _ => @error "Not a valid choice for verbosity."
-        end
-    end
-end
-
-mutable struct LinearNumericalVerbosity
-    using_IterativeSolvers::Verbosity.Type
-    IterativeSolvers_iterations::Verbosity.Type
-    KrylovKit_verbosity::Verbosity.Type
-    KrylovJL_verbosity::Verbosity.Type
-    HYPRE_verbosity::Verbosity.Type
-    pardiso_verbosity::Verbosity.Type
-
-    function LinearNumericalVerbosity(;
-            using_IterativeSolvers = linear_defaults[:using_IterativeSolvers],
-            IterativeSolvers_iterations = linear_defaults[:IterativeSolvers_iterations],
-            KrylovKit_verbosity = linear_defaults[:KrylovKit_verbosity],
-            KrylovJL_verbosity = linear_defaults[:KrylovJL_verbosity],
-            HYPRE_verbosity = linear_defaults[:HYPRE_verbosity],
-            pardiso_verbosity = linear_defaults[:pardiso_verbosity])
-        new(using_IterativeSolvers, IterativeSolvers_iterations,
-            KrylovKit_verbosity, KrylovJL_verbosity, HYPRE_verbosity, pardiso_verbosity)
-    end
-
-    function LinearNumericalVerbosity(verbose::Verbosity.Type)
-        @match verbose begin
-            Verbosity.None() => new(fill(
-                Verbosity.None(), length(fieldnames(LinearNumericalVerbosity)))...)
-
-            Verbosity.Info() => new(fill(
-                Verbosity.Info(), length(fieldnames(LinearNumericalVerbosity)))...)
-
-            Verbosity.Warn() => new(fill(
-                Verbosity.Warn(), length(fieldnames(LinearNumericalVerbosity)))...)
-
-            Verbosity.Error() => new(fill(
-                Verbosity.Error(), length(fieldnames(LinearNumericalVerbosity)))...)
-
-            Verbosity.Default() => LinearNumericalVerbosity()
-
-            Verbosity.Edge() => LinearNumericalVerbosity()
-
-            _ => @error "Not a valid choice for verbosity."
-        end
-    end
-end
-
-struct LinearVerbosity{T} <: AbstractVerbositySpecifier{T}
-    error_control::LinearErrorControlVerbosity
-    performance::LinearPerformanceVerbosity
-    numerical::LinearNumericalVerbosity
-end
-
-function LinearVerbosity(verbose::Verbosity.Type)
-    @match verbose begin
-        Verbosity.Default() => LinearVerbosity{true}(
-            LinearErrorControlVerbosity(Verbosity.Default()),
-            LinearPerformanceVerbosity(Verbosity.Default()),
-            LinearNumericalVerbosity(Verbosity.Default())
-        )
-
-        Verbosity.None() => LinearVerbosity{false}(
-            LinearErrorControlVerbosity(Verbosity.None()),
-            LinearPerformanceVerbosity(Verbosity.None()),
-            LinearNumericalVerbosity(Verbosity.None()))
-
-        Verbosity.All() => LinearVerbosity{true}(
-            LinearErrorControlVerbosity(Verbosity.Info()),
-            LinearPerformanceVerbosity(Verbosity.Info()),
-            LinearNumericalVerbosity(Verbosity.Info())
-        )
-
-        _ => @error "Not a valid choice for LinearVerbosity. Available choices are `Default`, `None`, and `All`."
-    end
-end
-
-function LinearVerbosity(;
-        error_control = Verbosity.Default(), performance = Verbosity.Default(),
-        numerical = Verbosity.Default(), kwargs...)
-    if error_control isa Verbosity.Type
-        error_control_verbosity = LinearErrorControlVerbosity(error_control)
+function option_group(option::Symbol)
+    if option in error_control_options
+        return :error_control
+    elseif option in performance_options
+        return :performance
+    elseif option in numerical_options
+        return :numerical
     else
-        error_control_verbosity = error_control
+        error("Unknown verbosity option: $option")
     end
+end
 
-    if performance isa Verbosity.Type
-        performance_verbosity = LinearPerformanceVerbosity(performance)
+# Get all options in a group
+function group_options(verbosity::LinearVerbosity, group::Symbol)
+    if group === :error_control
+        return NamedTuple{error_control_options}(getproperty(verbosity, opt)
+        for opt in error_control_options)
+    elseif group === :performance
+        return NamedTuple{performance_options}(getproperty(verbosity, opt)
+        for opt in performance_options)
+    elseif group === :numerical
+        return NamedTuple{numerical_options}(getproperty(verbosity, opt)
+        for opt in numerical_options)
     else
-        performance_verbosity = performance
+        error("Unknown group: $group")
     end
-
-    if numerical isa Verbosity.Type
-        numerical_verbosity = LinearNumericalVerbosity(numerical)
-    else
-        numerical_verbosity = numerical
-    end
-
-    if !isempty(kwargs)
-        for (key, value) in pairs(kwargs)
-            if hasfield(LinearErrorControlVerbosity, key)
-                setproperty!(error_control_verbosity, key, value)
-            elseif hasfield(LinearPerformanceVerbosity, key)
-                setproperty!(performance_verbosity, key, value)
-            elseif hasfield(LinearNumericalVerbosity, key)
-                setproperty!(numerical_verbosity, key, value)
-            else
-                error("$key is not a recognized verbosity toggle.")
-            end
-        end
-    end
-
-    LinearVerbosity{true}(error_control_verbosity,
-        performance_verbosity, numerical_verbosity)
 end

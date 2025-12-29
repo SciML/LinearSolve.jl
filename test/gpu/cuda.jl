@@ -1,6 +1,64 @@
 using LinearSolve, CUDA, LinearAlgebra, SparseArrays, StableRNGs
-using CUDA.CUSPARSE, CUDSS
+using CUDA.CUSPARSE
 using Test
+
+@testset "Test default solver choice for CuSparse" begin
+    b = Float64[1, 2, 3, 4]
+    b_gpu = CUDA.adapt(CuArray, b)
+
+    A = Float64[1 1 0 0
+                0 1 1 0
+                0 0 3 1
+                0 0 0 4]
+    A_gpu_csr = CUDA.CUSPARSE.CuSparseMatrixCSR(sparse(A))
+    A_gpu_csc = CUDA.CUSPARSE.CuSparseMatrixCSC(sparse(A))
+    prob_csr = LinearProblem(A_gpu_csr, b_gpu)
+    prob_csc = LinearProblem(A_gpu_csc, b_gpu)
+
+    A_sym = Float64[1 1 0 0
+                    1 0 0 2
+                    0 0 3 0
+                    0 2 0 0]
+    A_gpu_sym_csr = CUDA.CUSPARSE.CuSparseMatrixCSR(sparse(A_sym))
+    A_gpu_sym_csc = CUDA.CUSPARSE.CuSparseMatrixCSC(sparse(A_sym))
+    prob_sym_csr = LinearProblem(A_gpu_sym_csr, b_gpu)
+    prob_sym_csc = LinearProblem(A_gpu_sym_csc, b_gpu)
+
+    @testset "Test without CUDSS loaded" begin
+        # assert CuDSS is not loaded yet
+        @test !LinearSolve.cudss_loaded(A_gpu_csr)
+        # csr fallback to krylov
+        alg = solve(prob_csr).alg
+        @test alg.alg == LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
+        # csc fallback to krylov
+        alg = solve(prob_csc).alg
+        @test alg.alg == LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
+        # csr symmetric fallback to krylov
+        alg = solve(prob_sym_csr).alg
+        @test alg.alg == LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
+        # csc symmetric fallback to krylov
+        alg = solve(prob_sym_csc).alg
+        @test alg.alg == LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
+    end
+
+    using CUDSS
+
+    @testset "Test with CUDSS loaded" begin
+        @test LinearSolve.cudss_loaded(A_gpu_csr)
+        # csr uses LU
+        alg = solve(prob_csr).alg
+        @test alg.alg == LinearSolve.DefaultAlgorithmChoice.LUFactorization
+        # csc fallback to krylov
+        alg = solve(prob_csc).alg
+        @test alg.alg == LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
+        # csr symmetric uses LU/cholesky
+        alg = solve(prob_sym_csr).alg
+        @test alg.alg == LinearSolve.DefaultAlgorithmChoice.LUFactorization
+        # csc symmetric fallback to krylov
+        alg = solve(prob_sym_csc).alg
+        @test alg.alg == LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
+    end
+end
 
 CUDA.allowscalar(false)
 
@@ -17,7 +75,7 @@ x2 = zero(b);
 prob1 = LinearProblem(A1, b1; u0 = x1)
 prob2 = LinearProblem(A2, b2; u0 = x2)
 
-cache_kwargs = (; verbose = true, abstol = 1e-8, reltol = 1e-8, maxiter = 30)
+cache_kwargs = (;abstol = 1e-8, reltol = 1e-8, maxiter = 30)
 
 function test_interface(alg, prob1, prob2)
     A1 = prob1.A
@@ -96,9 +154,9 @@ end
 @testset "CUDSS" begin
     T = Float32
     n = 100
-    A_cpu = sprand(T, n, n, 0.05) + I
+    A_cpu = sprand(rng, T, n, n, 0.05) + I
     x_cpu = zeros(T, n)
-    b_cpu = rand(T, n)
+    b_cpu = rand(rng, T, n)
 
     A_gpu_csr = CuSparseMatrixCSR(A_cpu)
     b_gpu = CuVector(b_cpu)

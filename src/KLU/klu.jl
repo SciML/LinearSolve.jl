@@ -10,7 +10,7 @@ const libsuitesparseconfig = :libsuitesparseconfig
 using Base: Ptr, Cvoid, Cint, Cdouble, Cchar, Csize_t
 include("wrappers.jl")
 
-import Base: (\), size, getproperty, setproperty!, propertynames, show,
+import Base: size, getproperty, setproperty!, show,
              copy, eachindex, view, sortperm, unsafe_load, zeros, convert, eltype,
              length, parent, stride, finalizer, Complex, complex, imag, real, map!,
              summary, println, oneunit, sizeof, isdefined, setfield!, getfield,
@@ -35,8 +35,7 @@ function increment!(A::AbstractArray{T}) where {T <: Integer}
 end
 increment(A::AbstractArray{<:Integer}) = increment!(copy(A))
 
-using LinearAlgebra: LinearAlgebra, ldiv!, Adjoint, Transpose, Factorization
-import LinearAlgebra: issuccess
+using LinearAlgebra: LinearAlgebra, Adjoint, Transpose
 
 const AdjointFact = isdefined(LinearAlgebra, :AdjointFactorization) ?
                     LinearAlgebra.AdjointFactorization : Adjoint
@@ -135,9 +134,9 @@ See the [`klu`](@ref) docs for more information.
 
 You typically should not construct this directly, instead use [`klu`](@ref).
 """
-mutable struct KLUFactorization{Tv <: KLUTypes, Ti <: KLUITypes} <:
+mutable struct KLUFactorization{Tv <: KLUTypes, Ti <: KLUITypes, Tklu <: Union{klu_l_common, klu_common}} <:
                AbstractKLUFactorization{Tv, Ti}
-    common::Union{klu_l_common, klu_common}
+    common::Tklu
     _symbolic::Ptr{Cvoid}
     _numeric::Ptr{Cvoid}
     n::Int
@@ -147,7 +146,7 @@ mutable struct KLUFactorization{Tv <: KLUTypes, Ti <: KLUITypes} <:
     function KLUFactorization(n, colptr, rowval, nzval)
         Ti = eltype(colptr)
         common = _common(Ti)
-        obj = new{eltype(nzval), Ti}(common, C_NULL, C_NULL, n, colptr, rowval, nzval)
+        obj = new{eltype(nzval), Ti, typeof(common)}(common, C_NULL, C_NULL, n, colptr, rowval, nzval)
         function f(klu)
             _free_symbolic(klu)
             _free_numeric(klu)

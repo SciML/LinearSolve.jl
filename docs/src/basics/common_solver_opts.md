@@ -29,50 +29,38 @@ solve completely. Error controls only apply to iterative solvers.
 
 ## Verbosity Controls
 
-The verbosity system in LinearSolve.jl provides fine-grained control over the diagnostic messages, warnings, and errors that are displayed during the solution of linear systems.
+The verbosity system in LinearSolve.jl provides fine-grained control over the diagnostic messages, warnings, and errors that are displayed during the solution of linear systems. To use this system, a keyword argument `verbose` is provided to `solve`. 
 
-The verbosity system is organized hierarchically into three main categories:
-
-1. Error Control - Messages related to fallbacks and error handling
-2. Performance - Messages related to performance considerations
-3. Numerical - Messages related to numerical solvers and iterations
-
-Each category can be configured independently, and individual settings can be adjusted to suit your needs.
-
-### Verbosity Levels
-The following verbosity levels are available:
-
-#### Individual Settings
-These settings are meant for individual settings within a category. These can also be used to set all of the individual settings in a group to the same value.
-- Verbosity.None() - Suppress all messages
-- Verbosity.Info() - Show message as log message at info level
-- Verbosity.Warn() - Show warnings (default for most settings)
-- Verbosity.Error() - Throw errors instead of warnings
-- Verbosity.Level(n) - Show messages with a log level setting of n
-
-#### Group Settings
-These settings are meant for controlling a group of settings. 
-- Verbosity.Default() - Use the default settings
-- Verbosity.All() - Show all possible messages
+```@docs
+LinearVerbosity
+```
 
 ### Basic Usage 
 
 #### Global Verbosity Control
 
-```julia 
+```julia
 using LinearSolve
 
 # Suppress all messages
-verbose = LinearVerbosity(Verbosity.None())
+verbose = LinearVerbosity(SciMLLogging.None())
 prob = LinearProblem(A, b)
 sol = solve(prob; verbose=verbose)
 
-# Show all messages
-verbose = LinearVerbosity(Verbosity.All())
+# Show only essential messages (critical errors and fatal issues)
+verbose = LinearVerbosity(SciMLLogging.Minimal())
 sol = solve(prob; verbose=verbose)
 
-# Use default settings
-verbose = LinearVerbosity(Verbosity.Default())
+# Use default settings (balanced verbosity for typical usage)
+verbose = LinearVerbosity(SciMLLogging.Standard())
+sol = solve(prob; verbose=verbose)
+
+# Show comprehensive debugging information
+verbose = LinearVerbosity(SciMLLogging.Detailed())
+sol = solve(prob; verbose=verbose)
+
+# Show all messages (maximum verbosity)
+verbose = LinearVerbosity(SciMLLogging.All())
 sol = solve(prob; verbose=verbose)
 ```
 
@@ -81,9 +69,9 @@ sol = solve(prob; verbose=verbose)
 ```julia 
 # Customize by category
 verbose = LinearVerbosity(
-    error_control = Verbosity.Warn(),   # Show warnings for error control related issues
-    performance = Verbosity.None(),     # Suppress performance messages
-    numerical = Verbosity.Info()        # Show all numerical related log messages at info level
+    error_control = SciMLLogging.Warn(),   # Show warnings for error control related issues
+    performance = SciMLLogging.Silent(),     # Suppress performance messages
+    numerical = SciMLLogging.Info()        # Show all numerical related log messages at info level
 )
 
 sol = solve(prob; verbose=verbose)
@@ -95,23 +83,12 @@ The verbosity settings for the toggles are automatically passed to the group obj
 ```julia
 # Set specific message types
 verbose = LinearVerbosity(
-    default_lu_fallback = Verbosity.Info(),                     # Show info when LU fallback is used
-    KrylovJL_verbosity = Verbosity.Warn(),                      # Show warnings from KrylovJL
-    no_right_preconditioning = Verbosity.None(),                # Suppress right preconditioning messages
-    KrylovKit_verbosity = Verbosity.Level(KrylovKit.WARN_LEVEL) # Set KrylovKit verbosity level using KrylovKit's own verbosity levels
+    default_lu_fallback = SciMLLogging.InfoLevel(),                     # Show info when LU fallback is used
+    KrylovJL_verbosity = SciMLLogging.WarnLevel(),                      # Show warnings from KrylovJL
+    no_right_preconditioning = SciMLLogging.Silent(),                # Suppress right preconditioning messages
+    KrylovKit_verbosity = SciMLLogging.Level(KrylovKit.WARN_LEVEL) # Set KrylovKit verbosity level using KrylovKit's own verbosity levels
 )
 
 sol = solve(prob; verbose=verbose)
 
 ```
-
-#### Verbosity Levels
-##### Error Control Settings
-- default_lu_fallback: Controls messages when falling back to LU factorization (default: Warn)
-##### Performance Settings
-- no_right_preconditioning: Controls messages when right preconditioning is not used (default: Warn)
-##### Numerical Settings
-- using_IterativeSolvers: Controls messages when using the IterativeSolvers.jl package (default: Warn)
-- IterativeSolvers_iterations: Controls messages about iteration counts from IterativeSolvers.jl (default: Warn)
-- KrylovKit_verbosity: Controls messages from the KrylovKit.jl package (default: Warn)
-- KrylovJL_verbosity: Controls verbosity of the KrylovJL.jl package (default: None)

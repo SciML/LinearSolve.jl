@@ -99,3 +99,19 @@ function CRC.rrule(::Type{<:LinearProblem}, A, b, p; kwargs...)
     ∇prob(∂prob) = (NoTangent(), ∂prob.A, ∂prob.b, ∂prob.p)
     return prob, ∇prob
 end
+
+function CRC.rrule(T::typeof(LinearSolve.init), prob::LinearSolve.LinearProblem, alg::Nothing, args...; kwargs...)
+    assump = OperatorAssumptions(issquare(prob.A))
+    alg = defaultalg(prob.A, prob.b, assump)
+    CRC.rrule(T, prob, alg, args...; kwargs...)
+end
+
+function CRC.rrule(::typeof(LinearSolve.init), prob::LinearSolve.LinearProblem, alg::Union{LinearSolve.SciMLLinearSolveAlgorithm,Nothing}, args...; kwargs...)
+    init_res = LinearSolve.init(prob, alg)
+    function init_adjoint(∂init)
+        ∂prob = LinearProblem(∂init.A, ∂init.b, NoTangent())
+        return NoTangent(), ∂prob, NoTangent(), ntuple((_ -> NoTangent(), length(args))...)
+    end
+
+    return init_res, init_adjoint
+end

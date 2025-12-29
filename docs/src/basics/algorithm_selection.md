@@ -71,9 +71,10 @@ sol = solve(LinearProblem(A_small, rand(50)), SimpleLUFactorization())
 A_medium = rand(200, 200)
 sol = solve(LinearProblem(A_medium, rand(200)), RFLUFactorization())
 
-# Large matrices (> 500×500): MKLLUFactorization or AppleAccelerate
+# Large matrices (> 500×500): MKLLUFactorization, OpenBLASLUFactorization, or AppleAccelerate
 A_large = rand(1000, 1000) 
 sol = solve(LinearProblem(A_large, rand(1000)), MKLLUFactorization())
+# Alternative: OpenBLASLUFactorization() for direct OpenBLAS calls
 ```
 
 ### Sparse Matrices
@@ -141,7 +142,7 @@ Is A symmetric positive definite? → CholeskyFactorization
 Is A symmetric indefinite? → BunchKaufmanFactorization
 Is A sparse? → UMFPACKFactorization or KLUFactorization
 Is A small dense? → RFLUFactorization or SimpleLUFactorization
-Is A large dense? → MKLLUFactorization or AppleAccelerateLUFactorization
+Is A large dense? → MKLLUFactorization, OpenBLASLUFactorization, or AppleAccelerateLUFactorization
 Is A GPU array? → QRFactorization or LUFactorization
 Is A an operator/function? → KrylovJL_GMRES
 Is the system overdetermined? → QRFactorization or KrylovJL_LSMR

@@ -1,5 +1,6 @@
 using LinearSolve, LinearAlgebra, SparseArrays, MultiFloats, ForwardDiff
-using SciMLOperators, RecursiveFactorization, Sparspak, FastLapackInterface
+using SciMLOperators: SciMLOperators, MatrixOperator, FunctionOperator, WOperator
+using RecursiveFactorization, Sparspak, FastLapackInterface
 using IterativeSolvers, KrylovKit, MKL_jll, KrylovPreconditioners
 using Test
 import CliqueTrees, Random
@@ -33,12 +34,19 @@ A4 = A2 .|> ComplexF32
 b4 = b2 .|> ComplexF32
 x4 = x2 .|> ComplexF32
 
+A5_ = A - 0.01Tridiagonal(ones(n, n)) + sparse([1], [8], 0.5, n, n)
+A5 = sparse(transpose(A5_) * A5_)
+x5 = zeros(n)
+u5 = ones(n)
+b5 = A5*u5
+
 prob1 = LinearProblem(A1, b1; u0 = x1)
 prob2 = LinearProblem(A2, b2; u0 = x2)
 prob3 = LinearProblem(A3, b3; u0 = x3)
 prob4 = LinearProblem(A4, b4; u0 = x4)
+prob5 = LinearProblem(A5, b5)
 
-cache_kwargs = (; verbose = true, abstol = 1e-8, reltol = 1e-8, maxiter = 30)
+cache_kwargs = (; abstol = 1e-8, reltol = 1e-8, maxiter = 30)
 
 function test_interface(alg, prob1, prob2)
     A1, b1 = prob1.A, prob1.b
@@ -65,6 +73,19 @@ function test_interface(alg, prob1, prob2)
     cache.b = b2
     sol = solve!(cache; cache_kwargs...)
     @test A2 * sol.u ≈ b2
+
+    return
+end
+
+function test_tolerance_update(alg, prob, u)
+    cache = init(prob, alg)
+    LinearSolve.update_tolerances!(cache; reltol = 1e-2, abstol = 1e-8)
+    u1 = copy(solve!(cache).u)
+
+    LinearSolve.update_tolerances!(cache; reltol = 1e-8, abstol = 1e-8)
+    u2 = solve!(cache).u
+
+    @test norm(u2 - u) < norm(u1 - u)
 
     return
 end
@@ -275,6 +296,93 @@ end
         # ws sizes.
     end
 
+    @testset "SymTridiagonal with LDLtFactorization" begin
+        # Test that LDLtFactorization works correctly with SymTridiagonal
+        # and that the default algorithm correctly selects it
+        k = 100
+        ρ = 0.95
+        A_tri = SymTridiagonal(ones(k) .+ ρ^2, -ρ * ones(k-1))
+        b = rand(k)
+
+        # Test with explicit LDLtFactorization
+        prob_tri = LinearProblem(A_tri, b)
+        sol = solve(prob_tri, LDLtFactorization())
+        @test A_tri * sol.u ≈ b
+
+        # Test that default algorithm uses LDLtFactorization for SymTridiagonal
+        default_alg = LinearSolve.defaultalg(A_tri, b, OperatorAssumptions(true))
+        @test default_alg isa LinearSolve.DefaultLinearSolver
+        @test default_alg.alg == LinearSolve.DefaultAlgorithmChoice.LDLtFactorization
+
+        # Test that the factorization is cached and reused
+        cache = init(prob_tri, LDLtFactorization())
+        sol1 = solve!(cache)
+        @test A_tri * sol1.u ≈ b
+        @test !cache.isfresh  # Cache should not be fresh after first solve
+
+        # Solve again with same matrix to ensure cache is reused
+        cache.b = rand(k)  # Change RHS
+        sol2 = solve!(cache)
+        @test A_tri * sol2.u ≈ cache.b
+        @test !cache.isfresh  # Cache should still not be fresh
+    end
+
+    @testset "Tridiagonal cache not mutated (issue #825)" begin
+        # Test that solving with Tridiagonal does not mutate cache.A
+        # See https://github.com/SciML/LinearSolve.jl/issues/825
+        k = 6
+        lower = ones(k - 1)
+        diag = -2 * ones(k)
+        upper = ones(k - 1)
+        A_tri = Tridiagonal(lower, diag, upper)
+        b = rand(k)
+
+        # Store original matrix values for comparison
+        A_orig = Tridiagonal(copy(lower), copy(diag), copy(upper))
+
+        # Test that default algorithm uses DirectLdiv! for Tridiagonal on Julia 1.11+
+        default_alg = LinearSolve.defaultalg(A_tri, b, OperatorAssumptions(true))
+        @static if VERSION >= v"1.11"
+            @test default_alg isa DirectLdiv!
+        else
+            @test default_alg isa LinearSolve.DefaultLinearSolver
+            @test default_alg.alg == LinearSolve.DefaultAlgorithmChoice.LUFactorization
+        end
+
+        # Test with default algorithm
+        prob_tri = LinearProblem(A_tri, b)
+        cache = init(prob_tri)
+
+        # Verify solution is correct
+        sol1 = solve!(cache)
+        @test A_orig * sol1.u ≈ b
+
+        # Verify cache.A is not mutated
+        @test cache.A ≈ A_orig
+
+        # Verify multiple solves give correct answers
+        b2 = rand(k)
+        cache.b = b2
+        sol2 = solve!(cache)
+        @test A_orig * sol2.u ≈ b2
+
+        # Cache.A should still be unchanged
+        @test cache.A ≈ A_orig
+
+        # Verify solve! allocates minimally after first solve (warm-up)
+        # The small allocation (48 bytes) is from the return type construction,
+        # same as other factorization methods like LUFactorization
+        @static if VERSION >= v"1.11"
+            # Warm up
+            for _ in 1:3
+                solve!(cache)
+            end
+            # Test minimal allocations (same as LUFactorization)
+            allocs = @allocated solve!(cache)
+            @test allocs <= 64  # Allow small overhead from return type
+        end
+    end
+
     test_algs = [
         LUFactorization(),
         QRFactorization(),
@@ -285,6 +393,11 @@ end
 
     if LinearSolve.usemkl
         push!(test_algs, MKLLUFactorization())
+    end
+
+    # Test OpenBLAS if available
+    if LinearSolve.useopenblas
+        push!(test_algs, OpenBLASLUFactorization())
     end
 
     # Test BLIS if extension is available
@@ -334,7 +447,9 @@ end
             ("Default", KrylovJL(kwargs...)),
             ("CG", KrylovJL_CG(kwargs...)),
             ("GMRES", KrylovJL_GMRES(kwargs...)),
+            ("FGMRES", KrylovJL_FGMRES(kwargs...)),
             ("GMRES_prec", KrylovJL_GMRES(; precs, ldiv = false, kwargs...)),
+            ("FGMRES_prec", KrylovJL_FGMRES(; precs, ldiv = false, kwargs...)),
             # ("BICGSTAB",KrylovJL_BICGSTAB(kwargs...)),
             ("MINRES", KrylovJL_MINRES(kwargs...)),
             ("MINARES", KrylovJL_MINARES(kwargs...))
@@ -343,6 +458,7 @@ end
             @testset "$name" begin
                 test_interface(algorithm, prob1, prob2)
                 test_interface(algorithm, prob3, prob4)
+                test_tolerance_update(algorithm, prob5, u5)
             end
         end
     end
@@ -382,6 +498,7 @@ end
                 @testset "$(alg[1])" begin
                     test_interface(alg[2], prob1, prob2)
                     test_interface(alg[2], prob3, prob4)
+                    test_tolerance_update(alg[2], prob5, u5)
                 end
             end
         end
@@ -396,6 +513,7 @@ end
                 @testset "$(alg[1])" begin
                     test_interface(alg[2], prob1, prob2)
                     test_interface(alg[2], prob3, prob4)
+                    test_tolerance_update(alg[2], prob5, u5)
                 end
                 @test alg[2] isa KrylovKitJL
             end
@@ -500,6 +618,53 @@ end
         @test sol13.u ≈ sol23.u
     end
 
+    @testset "Operators with has_concretization" begin
+        n = 4
+        Random.seed!(42)
+        A_sparse = sprand(n, n, 0.8) + I
+        b = rand(n)
+
+        # Create a MatrixOperator wrapping the sparse matrix
+        A_op = MatrixOperator(A_sparse)
+
+        prob_matrix = LinearProblem(A_sparse, b)
+        prob_operator = LinearProblem(A_op, b)
+
+        # Test KLU with operator
+        sol_matrix = solve(prob_matrix, KLUFactorization())
+        sol_operator = solve(prob_operator, KLUFactorization())
+        @test sol_matrix.u ≈ sol_operator.u
+
+        # Test UMFPACK with operator
+        sol_matrix = solve(prob_matrix, UMFPACKFactorization())
+        sol_operator = solve(prob_operator, UMFPACKFactorization())
+        @test sol_matrix.u ≈ sol_operator.u
+
+        # Test WOperator with sparse Jacobian
+        n_w = 8
+        M = sparse(I(n_w) * 1.0)
+        gamma = 1 / 2.0
+        J = sprand(n_w, n_w, 0.5) + sparse(I(n_w) * 10.0)  # Make it diagonally dominant
+        u = rand(n_w)
+        b_w = rand(n_w)
+
+        W = WOperator{true}(M, gamma, J, u)
+        W_matrix = convert(AbstractMatrix, W)
+
+        prob_woperator = LinearProblem(W, b_w)
+        prob_wmatrix = LinearProblem(W_matrix, b_w)
+
+        # Test KLU with WOperator
+        sol_woperator = solve(prob_woperator, KLUFactorization())
+        sol_wmatrix = solve(prob_wmatrix, KLUFactorization())
+        @test sol_woperator.u ≈ sol_wmatrix.u
+
+        # Test UMFPACK with WOperator
+        sol_woperator = solve(prob_woperator, UMFPACKFactorization())
+        sol_wmatrix = solve(prob_wmatrix, UMFPACKFactorization())
+        @test sol_woperator.u ≈ sol_wmatrix.u
+    end
+
     @testset "Solve Function" begin
         A1 = rand(n) |> Diagonal
         b1 = rand(n)
@@ -571,8 +736,10 @@ end
             prob3 = LinearProblem(op1, b1; u0 = x1)
             prob4 = LinearProblem(op2, b2; u0 = x2)
 
-            @test LinearSolve.defaultalg(op1, x1).alg === LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
-            @test LinearSolve.defaultalg(op2, x2).alg === LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
+            @test LinearSolve.defaultalg(op1, x1).alg ===
+                  LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
+            @test LinearSolve.defaultalg(op2, x2).alg ===
+                  LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
             @test LinearSolve.defaultalg(op3, x1).alg ===
                   LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
             @test LinearSolve.defaultalg(op4, x2).alg ===
@@ -673,4 +840,53 @@ end
     reinit!(cache; A = B1, b = b1)
     u = solve!(cache)
     @test norm(u - u0, Inf) < 1.0e-8
+
+    pr = LinearProblem(B, b)
+    solver = UMFPACKFactorization()
+    cache = init(pr, solver)
+    u = solve!(cache)
+    @test norm(u - u0, Inf) < 1.0e-8
+    reinit!(cache; A = B1, b = b1)
+    u = solve!(cache)
+    @test norm(u - u0, Inf) < 1.0e-8
+
+    pr = LinearProblem(B, b)
+    solver = KLUFactorization()
+    cache = init(pr, solver)
+    u = solve!(cache)
+    @test norm(u - u0, Inf) < 1.0e-8
+    reinit!(cache; A = B1, b = b1)
+    u = solve!(cache)
+    @test norm(u - u0, Inf) < 1.0e-8
+end
+
+@testset "ParallelSolves" begin
+    n=1000
+    @info "ParallelSolves: Threads.nthreads()=$(Threads.nthreads())"
+    A_sparse = 10I - sprand(n, n, 0.01)
+    B = [rand(n), rand(n)]
+    U = [A_sparse \ B[i] for i in 1:2]
+    sol = similar(U)
+
+    Threads.@threads for i in 1:2
+        sol[i] = solve(LinearProblem(A_sparse, B[i]), UMFPACKFactorization())
+    end
+
+    for i in 1:2
+        @test sol[i] ≈ U[i]
+    end
+
+    Threads.@threads for i in 1:2
+        sol[i] = solve(LinearProblem(A_sparse, B[i]), KLUFactorization())
+    end
+    for i in 1:2
+        @test sol[i] ≈ U[i]
+    end
+
+    Threads.@threads for i in 1:2
+        sol[i] = solve(LinearProblem(A_sparse, B[i]), SparspakFactorization())
+    end
+    for i in 1:2
+        @test sol[i] ≈ U[i]
+    end
 end

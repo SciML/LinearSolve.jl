@@ -43,6 +43,14 @@ function get_available_algorithms(; skip_missing_algs::Bool = false, include_fas
         end
     end
 
+    # OpenBLAS if available (should be available on most platforms)
+    if OpenBLAS_jll.is_available()
+        push!(algs, OpenBLASLUFactorization())
+        push!(alg_names, "OpenBLASLUFactorization")
+    else
+        @warn "OpenBLAS_jll not available for this platform. OpenBLASLUFactorization will not be included."
+    end
+
     # RecursiveFactorization - should always be available as it's a hard dependency
     try
         if LinearSolve.userecursivefactorization(nothing)
@@ -53,7 +61,8 @@ function get_available_algorithms(; skip_missing_algs::Bool = false, include_fas
             if skip_missing_algs
                 @warn msg
             else
-                error(msg * ". Pass `skip_missing_algs=true` to continue with warning instead.")
+                error(msg *
+                      ". Pass `skip_missing_algs=true` to continue with warning instead.")
             end
         end
     catch e
@@ -98,7 +107,8 @@ function get_gpu_algorithms(; skip_missing_algs::Bool = false)
             if skip_missing_algs
                 @warn msg
             else
-                error(msg * " Pass `skip_missing_algs=true` to continue with warning instead.")
+                error(msg *
+                      " Pass `skip_missing_algs=true` to continue with warning instead.")
             end
         end
     end
@@ -113,7 +123,8 @@ function get_gpu_algorithms(; skip_missing_algs::Bool = false)
             if skip_missing_algs
                 @warn msg
             else
-                error(msg * " Pass `skip_missing_algs=true` to continue with warning instead.")
+                error(msg *
+                      " Pass `skip_missing_algs=true` to continue with warning instead.")
             end
         end
     end

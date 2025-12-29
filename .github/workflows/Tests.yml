@@ -38,10 +38,17 @@ jobs:
           - "NoPre"
           - "LinearSolveAutotune"
           - "Preferences"
+          - "Trim"
         os:
           - ubuntu-latest
           - macos-latest
           - windows-latest
+        exclude:
+          # Don't run trim tests on Julia versions below 1.12
+          - group: Trim
+            version: "lts"
+          - group: Trim
+            version: "pre"
     uses: "SciML/.github/.github/workflows/tests.yml@v1"
     with:
       group: "${{ matrix.group }}"

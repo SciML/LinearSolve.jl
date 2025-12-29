@@ -6,9 +6,8 @@ using HYPRE: HYPRE, HYPREMatrix, HYPRESolver, HYPREVector
 using LinearSolve: HYPREAlgorithm, LinearCache, LinearProblem, LinearSolve,
                    OperatorAssumptions, default_tol, init_cacheval, __issquare,
                    __conditioning, LinearSolveAdjoint, LinearVerbosity
-using SciMLLogging: Verbosity, verbosity_to_int
+using SciMLLogging: SciMLLogging, verbosity_to_int, @SciMLMessage
 using SciMLBase: LinearProblem, LinearAliasSpecifier, SciMLBase
-using UnPack: @unpack
 using Setfield: @set!
 
 mutable struct HYPRECache
@@ -23,7 +22,7 @@ end
 
 function LinearSolve.init_cacheval(alg::HYPREAlgorithm, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol,
-        verbose::LinearVerbosity, assumptions::OperatorAssumptions)
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
     return HYPRECache(nothing, nothing, nothing, nothing, true, true, true)
 end
 
@@ -65,13 +64,13 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
                              eltype(prob.A)),
         # TODO: Implement length() for HYPREVector in HYPRE.jl?
         maxiters::Int = prob.b isa HYPREVector ? 1000 : length(prob.b),
-        verbose = LinearVerbosity(Verbosity.None()),
+        verbose = LinearVerbosity(SciMLLogging.None()),
         Pl = LinearAlgebra.I,
         Pr = LinearAlgebra.I,
         assumptions = OperatorAssumptions(),
         sensealg = LinearSolveAdjoint(),
         kwargs...)
-    @unpack A, b, u0, p = prob
+    (; A, b, u0, p) = prob
 
     if haskey(kwargs, :alias_A) || haskey(kwargs, :alias_b)
         aliases = LinearAliasSpecifier()
@@ -115,13 +114,18 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
     if verbose isa Bool
         #@warn "Using `true` or `false` for `verbose` is being deprecated. Please use a `LinearVerbosity` type to specify verbosity settings.
         # For details see the verbosity section of the common solver options documentation page."
+        init_cache_verb = verbose
         if verbose
-            verbose = LinearVerbosity()
+            verb_spec = LinearVerbosity()
         else
-            verbose = LinearVerbosity(Verbosity.None())
+            verb_spec = LinearVerbosity(SciMLLogging.None())
         end
-    elseif verbose isa Verbosity.Type
-        verbose = LinearVerbosity(verbose)
+    elseif verbose isa SciMLLogging.AbstractVerbosityPreset
+        verb_spec = LinearVerbosity(verbose)
+        init_cache_verb = verb_spec
+    else
+        verb_spec = verbose
+        init_cache_verb = verb_spec
     end
 
     A = A isa HYPREMatrix ? A : HYPREMatrix(A)
@@ -134,18 +138,17 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
     end
 
     # Initialize internal alg cache
-    cacheval = init_cacheval(alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, verbose,
+    cacheval = init_cacheval(alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, init_cache_verb,
         assumptions)
     Tc = typeof(cacheval)
     isfresh = true
     precsisfresh = false
-
     cache = LinearCache{
         typeof(A), typeof(b), typeof(u0), typeof(p), typeof(alg), Tc,
-        typeof(Pl), typeof(Pr), typeof(reltol),
+        typeof(Pl), typeof(Pr), typeof(reltol), typeof(verb_spec),
         typeof(__issquare(assumptions)), typeof(sensealg)
     }(A, b, u0, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
-        maxiters, verbose, assumptions, sensealg)
+        maxiters, verb_spec, assumptions, sensealg)
     return cache
 end
 
@@ -172,7 +175,7 @@ function create_solver(alg::HYPREAlgorithm, cache::LinearCache)
     solver = create_solver(alg.solver, comm)
 
     # Construct solver options
-    verbose = verbosity_to_int(cache.verbose.numerical.HYPRE_verbosity)
+    verbose = verbosity_to_int(cache.verbose.HYPRE_verbosity)
     solver_options = (;
         AbsoluteTol = cache.abstol,
         MaxIter = cache.maxiters,

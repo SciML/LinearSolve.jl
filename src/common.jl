@@ -105,7 +105,7 @@ The cache automatically tracks when matrix `A` or parameters `p` change by setti
 appropriate freshness flags. When `solve!` is called, stale cache entries are automatically
 recomputed as needed.
 """
-mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, S}
+mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, Tlv <: LinearVerbosity, issq, S}
     A::TA
     b::Tb
     u::Tu
@@ -119,7 +119,7 @@ mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, S}
     abstol::Ttol
     reltol::Ttol
     maxiters::Int
-    verbose::LinearVerbosity
+    verbose::Tlv
     assumptions::OperatorAssumptions{issq}
     sensealg::S
 end
@@ -232,6 +232,21 @@ default_alias_b(::AbstractSparseFactorization, ::Any, ::Any) = true
 
 DEFAULT_PRECS(A, p) = IdentityOperator(size(A)[1]), IdentityOperator(size(A)[2])
 
+# Default verbose setting (const for type stability)
+const DEFAULT_VERBOSE = LinearVerbosity()
+
+# Helper functions for processing verbose parameter with multiple dispatch (type-stable)
+@inline _process_verbose_param(verbose::LinearVerbosity) = (verbose, verbose)
+@inline function _process_verbose_param(verbose::SciMLLogging.AbstractVerbosityPreset)
+    verbose_spec = LinearVerbosity(verbose)
+    return (verbose_spec, verbose_spec)
+end
+@inline function _process_verbose_param(verbose::Bool)
+    # @warn "Using `true` or `false` for `verbose` is being deprecated."
+    verbose_spec = verbose ? DEFAULT_VERBOSE : LinearVerbosity(SciMLLogging.None())
+    return (verbose_spec, verbose)
+end
+
 """
     __init_u0_from_Ab(A, b)
 
@@ -321,20 +336,10 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
     elseif issparsematrixcsc(A)
         make_SparseMatrixCSC(A)
     else
-        deepcopy(A)
+        copy(A)
     end
 
-    if verbose isa Bool
-        #@warn "Using `true` or `false` for `verbose` is being deprecated. Please use a `LinearVerbosity` type to specify verbosity settings.
-        # For details see the verbosity section of the common solver options documentation page."
-        if verbose
-            verbose = LinearVerbosity()
-        else
-            verbose = LinearVerbosity(Verbosity.None())
-        end
-    elseif verbose isa Verbosity.Type
-        verbose = LinearVerbosity(verbose)
-    end
+    verbose_spec, init_cache_verb = _process_verbose_param(verbose)
 
     b = if issparsematrix(b) && !(A isa Diagonal)
         Array(b) # the solution to a linear solve will always be dense!
@@ -346,14 +351,14 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         # Extension must be loaded if issparsematrixcsc returns true
         make_SparseMatrixCSC(b)
     else
-        deepcopy(b)
+        copy(b)
     end
 
     u0_ = u0 !== nothing ? u0 : __init_u0_from_Ab(A, b)
 
     # Guard against type mismatch for user-specified reltol/abstol
-    reltol = real(eltype(prob.b))(reltol)
-    abstol = real(eltype(prob.b))(abstol)
+    reltol = real(eltype(prob.b))(SciMLBase.value(reltol))
+    abstol = real(eltype(prob.b))(SciMLBase.value(abstol))
 
     precs = if hasproperty(alg, :precs)
         isnothing(alg.precs) ? DEFAULT_PRECS : alg.precs
@@ -373,17 +378,17 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         # TODO: deprecate once all docs are updated to the new form
         #@warn "passing Preconditioners at `init`/`solve` time is deprecated. Instead add a `precs` function to your algorithm."
     end
-    cacheval = init_cacheval(alg, A, b, u0_, Pl, Pr, maxiters, abstol, reltol, verbose,
+    cacheval = init_cacheval(alg, A, b, u0_, Pl, Pr, maxiters, abstol, reltol, init_cache_verb,
         assumptions)
     isfresh = true
     precsisfresh = false
     Tc = typeof(cacheval)
 
     cache = LinearCache{typeof(A), typeof(b), typeof(u0_), typeof(p), typeof(alg), Tc,
-        typeof(Pl), typeof(Pr), typeof(reltol), typeof(assumptions.issq),
+        typeof(Pl), typeof(Pr), typeof(reltol), typeof(verbose_spec), typeof(assumptions.issq),
         typeof(sensealg)}(
         A, b, u0_, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
-        maxiters, verbose, assumptions, sensealg)
+        maxiters, verbose_spec, assumptions, sensealg)
     return cache
 end
 
@@ -472,4 +477,23 @@ function SciMLBase.solve(prob::StaticLinearProblem,
     end
     return SciMLBase.build_linear_solution(
         alg, u, nothing, prob; retcode = ReturnCode.Success)
+end
+
+function update_tolerances!(cache; abstol = nothing, reltol = nothing)
+    if abstol !== nothing
+        cache.abstol = abstol
+    end
+    if reltol !== nothing
+        cache.reltol = reltol
+    end
+    update_tolerances_internal!(cache, cache.alg, abstol, reltol)
+end
+
+
+function update_tolerances_internal!(cache, alg::AbstractFactorization, abstol, reltol)
+    error("Cannot update tolerances for factorization.")
+end
+
+function update_tolerances_internal!(cache, alg::AbstractKrylovSubspaceMethod, abstol, reltol)
+    @warn "Tolerance update for Krylov subspace method '$typeof(alg)' not implemented." maxlog = 1
 end

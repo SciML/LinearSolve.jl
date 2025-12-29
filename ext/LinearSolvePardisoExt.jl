@@ -3,8 +3,8 @@ module LinearSolvePardisoExt
 using Pardiso, LinearSolve
 using SparseArrays
 using SparseArrays: nonzeros, rowvals, getcolptr
-using LinearSolve: PardisoJL, @unpack, LinearVerbosity
-using SciMLLogging: @SciMLMessage, verbosity_to_bool
+using LinearSolve: PardisoJL, LinearVerbosity
+using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_bool
 using LinearSolve.SciMLBase
 
 LinearSolve.needs_concrete_A(alg::PardisoJL) = true
@@ -20,9 +20,9 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
         maxiters::Int,
         abstol,
         reltol,
-        verbose::LinearVerbosity,
+        verbose::Union{LinearVerbosity, Bool},
         assumptions::LinearSolve.OperatorAssumptions)
-    @unpack nprocs, solver_type, matrix_type, cache_analysis, iparm, dparm, vendor = alg
+    (; nprocs, solver_type, matrix_type, cache_analysis, iparm, dparm, vendor) = alg
     A = convert(AbstractMatrix, A)
 
     if isnothing(vendor)
@@ -73,11 +73,16 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
             error("Number type not supported by Pardiso")
         end
     end
-    
-    if verbosity_to_bool(verbose.numerical.pardiso_verbosity)
-        Pardiso.set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
+
+    if verbose isa Bool
+        verbose_spec = LinearVerbosity(pardiso_verbosity = SciMLLogging.Silent())
+    else
+        verbose_spec = verbose
     end
 
+    if verbosity_to_bool(verbose_spec.pardiso_verbosity)
+        Pardiso.set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
+    end
     #=
     Note: It is recommended to use IPARM(11)=1 (scaling) and IPARM(13)=1 (matchings) for
     highly indefinite symmetric matrices e.g. from interior point optimizations or saddle point problems.
@@ -132,7 +137,7 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
 end
 
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::PardisoJL; kwargs...)
-    @unpack A, b, u = cache
+    (; A, b, u) = cache
     A = convert(AbstractMatrix, A)
     if cache.isfresh
         phase = alg.cache_analysis ? Pardiso.NUM_FACT : Pardiso.ANALYSIS_NUM_FACT

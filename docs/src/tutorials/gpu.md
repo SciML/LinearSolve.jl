@@ -14,11 +14,11 @@ The offloading approach has the advantage of being simpler and requiring no chan
 existing CPU code, while having the disadvantage of having more overhead. In the following
 sections we will demonstrate how to use each of the approaches.
 
-!!! warn
+!!! warning
     
     GPUs are not always faster! Your matrices need to be sufficiently large in order for
-    GPU accelerations to actually be faster. For offloading it's around 1,000 x 1,000 matrices
-    and for Array type interface it's around 100 x 100. For sparse matrices, it is highly
+    GPU accelerations to actually be faster. For offloading it's around 1,000 × 1,000 matrices
+    and for Array type interface it's around 100 × 100. For sparse matrices, it is highly
     dependent on the sparsity pattern and the amount of fill-in.
 
 ## GPU-Offloading
@@ -91,7 +91,7 @@ Notice that the solution is a `CuArray`, and thus one must use `Array(sol.u)` if
 to return it to the CPU. This setup does no automated memory transfers and will thus only
 move things to CPU on command.
 
-!!! warn
+!!! warning
     
     Many GPU functionalities, such as `CUDA.cu`, have a built-in preference for `Float32`.
     Generally it is much faster to use 32-bit floating point operations on GPU than 64-bit

@@ -13,14 +13,14 @@ function LinearSolve.init_cacheval(
         ::SparspakFactorization, A::SparseMatrixCSC{Float64, Int}, b, u, Pl,
         Pr, maxiters::Int, abstol,
         reltol,
-        verbose::LinearVerbosity, assumptions::OperatorAssumptions)
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
     PREALLOCATED_SPARSEPAK
 end
 
 function LinearSolve.init_cacheval(
         ::SparspakFactorization, A::AbstractSparseMatrixCSC{Tv, Ti}, b, u, Pl, Pr, maxiters::Int, abstol,
         reltol,
-        verbose::LinearVerbosity, assumptions::OperatorAssumptions) where {Tv, Ti}
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions) where {Tv, Ti}
     if size(A, 1) == size(A, 2)
         A = convert(AbstractMatrix, A)
         if A isa SparseArrays.AbstractSparseArray
@@ -42,7 +42,7 @@ function SciMLBase.solve!(
         cache::LinearSolve.LinearCache, alg::SparspakFactorization; kwargs...)
     A = cache.A
     if cache.isfresh
-        if cache.cacheval !== nothing && alg.reuse_symbolic
+        if !(cache.cacheval === PREALLOCATED_SPARSEPAK) && alg.reuse_symbolic
             fact = sparspaklu!(LinearSolve.@get_cacheval(cache, :SparspakFactorization),
                 SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
                     nonzeros(A)))

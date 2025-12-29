@@ -254,6 +254,29 @@ function RFLUFactorization(; pivot = Val(true), thread = Val(true), throwerror =
     RFLUFactorization(pivot, thread; throwerror)
 end
 
+"""
+`ButterflyFactorization()`
+
+A fast pure Julia LU-factorization implementation
+using RecursiveFactorization.jl. This method utilizes a butterfly
+factorization approach rather than pivoting. 
+"""
+struct ButterflyFactorization{T} <: AbstractDenseFactorization
+    thread::Val{T}
+    function ButterflyFactorization(::Val{T}; throwerror = true) where {T}
+        if !userecursivefactorization(nothing)
+            throwerror &&
+                error("ButterflyFactorization requires that RecursiveFactorization.jl is loaded, i.e. `using RecursiveFactorization`")
+        end
+        new{T}()
+    end
+end
+
+function ButterflyFactorization(; thread = Val(true), throwerror = true)
+    ButterflyFactorization(thread; throwerror)
+end
+
+
 # There's no options like pivot here.
 # But I'm not sure it makes sense as a GenericFactorization
 # since it just uses `LAPACK.getrf!`.
@@ -809,7 +832,7 @@ alg = MKL32MixedLUFactorization()
 sol = solve(prob, alg)
 ```
 """
-struct MKL32MixedLUFactorization <: AbstractFactorization end
+struct MKL32MixedLUFactorization <: AbstractDenseFactorization end
 
 """
     AppleAccelerate32MixedLUFactorization()
@@ -833,4 +856,78 @@ alg = AppleAccelerate32MixedLUFactorization()
 sol = solve(prob, alg)
 ```
 """
-struct AppleAccelerate32MixedLUFactorization <: AbstractFactorization end
+struct AppleAccelerate32MixedLUFactorization <: AbstractDenseFactorization end
+
+"""
+    OpenBLAS32MixedLUFactorization()
+
+A mixed precision LU factorization using OpenBLAS that performs factorization in Float32
+precision while maintaining Float64 interface. This can provide significant speedups
+for large matrices when reduced precision is acceptable.
+
+## Performance Notes
+- Converts Float64 matrices to Float32 for factorization
+- Uses optimized OpenBLAS routines for the factorization
+- Can be 2x faster than full precision for memory-bandwidth limited problems
+- May have reduced accuracy compared to full Float64 precision
+
+## Requirements
+This solver requires OpenBLAS to be available through OpenBLAS_jll.
+
+## Example
+```julia
+alg = OpenBLAS32MixedLUFactorization()
+sol = solve(prob, alg)
+```
+"""
+struct OpenBLAS32MixedLUFactorization <: AbstractDenseFactorization end
+
+"""
+    RF32MixedLUFactorization{P, T}(; pivot = Val(true), thread = Val(true))
+
+A mixed precision LU factorization using RecursiveFactorization.jl that performs 
+factorization in Float32 precision while maintaining Float64 interface. This combines
+the speed benefits of RecursiveFactorization.jl with reduced precision computation
+for additional performance gains.
+
+## Type Parameters
+- `P`: Pivoting strategy as `Val{Bool}`. `Val{true}` enables partial pivoting for stability.
+- `T`: Threading strategy as `Val{Bool}`. `Val{true}` enables multi-threading for performance.
+
+## Constructor Arguments
+- `pivot = Val(true)`: Enable partial pivoting. Set to `Val{false}` to disable for speed 
+  at the cost of numerical stability.
+- `thread = Val(true)`: Enable multi-threading. Set to `Val{false}` for single-threaded 
+  execution.
+
+## Performance Notes
+- Converts Float64 matrices to Float32 for factorization
+- Leverages RecursiveFactorization.jl's optimized blocking strategies
+- Can provide significant speedups for small to medium matrices (< 500×500)
+- May have reduced accuracy compared to full Float64 precision
+
+## Requirements
+Using this solver requires that RecursiveFactorization.jl is loaded: `using RecursiveFactorization`
+
+## Example
+```julia
+using RecursiveFactorization
+# Fast mixed precision with pivoting
+alg1 = RF32MixedLUFactorization()
+# Fastest mixed precision (no pivoting), less stable
+alg2 = RF32MixedLUFactorization(pivot=Val(false))
+```
+"""
+struct RF32MixedLUFactorization{P, T} <: AbstractDenseFactorization
+    function RF32MixedLUFactorization(::Val{P}, ::Val{T}; throwerror = true) where {P, T}
+        if !userecursivefactorization(nothing)
+            throwerror &&
+                error("RF32MixedLUFactorization requires that RecursiveFactorization.jl is loaded, i.e. `using RecursiveFactorization`")
+        end
+        new{P, T}()
+    end
+end
+
+function RF32MixedLUFactorization(; pivot = Val(true), thread = Val(true), throwerror = true)
+    RF32MixedLUFactorization(pivot, thread; throwerror)
+end

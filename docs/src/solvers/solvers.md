@@ -17,9 +17,11 @@ the best choices, with SVD being the slowest but most precise.
 For efficiency, `RFLUFactorization` is the fastest for dense LU-factorizations until around
 150x150 matrices, though this can be dependent on the exact details of the hardware. After this
 point, `MKLLUFactorization` is usually faster on most hardware. Note that on Mac computers
-that `AppleAccelerateLUFactorization` is generally always the fastest. `LUFactorization` will
-use your base system BLAS which can be fast or slow depending on the hardware configuration.
-`SimpleLUFactorization` will be fast only on very small matrices but can cut down on compile times.
+that `AppleAccelerateLUFactorization` is generally always the fastest. `OpenBLASLUFactorization` 
+provides direct OpenBLAS calls without going through libblastrampoline and can be faster than 
+`LUFactorization` in some configurations. `LUFactorization` will use your base system BLAS which 
+can be fast or slow depending on the hardware configuration. `SimpleLUFactorization` will be fast 
+only on very small matrices but can cut down on compile times.
 
 For very large dense factorizations, offloading to the GPU can be preferred. Metal.jl can be used
 on Mac hardware to offload, and has a cutoff point of being faster at around size 20,000 x 20,000
@@ -83,8 +85,8 @@ factorization methods if a lower tolerance of the solution is required.
 Krylov.jl generally outperforms IterativeSolvers.jl and KrylovKit.jl, and is compatible
 with CPUs and GPUs, and thus is the generally preferred form for Krylov methods. The
 choice of Krylov method should be the one most constrained to the type of operator one
-has, for example if positive definite then `Krylov_CG()`, but if no good properties then
-use `Krylov_GMRES()`.
+has, for example if positive definite then `KrylovJL_CG()`, but if no good properties then
+use `KrylovJL_GMRES()`.
 
 Finally, a user can pass a custom function for handling the linear solve using
 `LS.LinearSolveFunction()` if existing solvers are not optimally suited for their application.
@@ -97,8 +99,8 @@ then using a Krylov method is preferred in order to not concretize the matrix.
 Krylov.jl generally outperforms IterativeSolvers.jl and KrylovKit.jl, and is compatible
 with CPUs and GPUs, and thus is the generally preferred form for Krylov methods. The
 choice of Krylov method should be the one most constrained to the type of operator one
-has, for example if positive definite then `Krylov_CG()`, but if no good properties then
-use `Krylov_GMRES()`.
+has, for example if positive definite then `KrylovJL_CG()`, but if no good properties then
+use `KrylovJL_GMRES()`.
 
 !!! tip
     
@@ -224,6 +226,12 @@ KrylovJL
 ```@docs
 MKLLUFactorization
 MKL32MixedLUFactorization
+```
+
+### OpenBLAS
+
+```@docs
+OpenBLASLUFactorization
 ```
 
 ### AppleAccelerate.jl

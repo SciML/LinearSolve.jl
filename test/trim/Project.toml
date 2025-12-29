@@ -1,0 +1,25 @@
+name = "TrimTest"
+uuid = "e59a8f5e-4b8c-4d8e-9c8e-8e8e8e8e8e8e"
+version = "0.1.0"
+
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
+RecursiveFactorization = "f2c3362d-daeb-58d1-803e-2bc74f2840b4"
+SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[extras]
+JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
+
+[targets]
+test = ["JET", "SafeTestsets"]
+
+[compat]
+LinearSolve = "3"
+RecursiveFactorization = "0.2"
+SciMLBase = "2"
+StaticArrays = "1"
+julia = "1.10"

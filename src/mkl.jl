@@ -8,11 +8,23 @@ to avoid allocations and does not require libblastrampoline.
 """
 struct MKLLUFactorization <: AbstractFactorization end
 
+# Check if MKL is available
+# MKL_jll < 2022.2 doesn't support the mixed LP64 and ILP64 interfaces that we make use of in LinearSolve
+# In particular, the `_64` APIs do not exist
+# https://www.intel.com/content/www/us/en/developer/articles/release-notes/onemkl-release-notes-2022.html
+@static if !@isdefined(MKL_jll) || !MKL_jll.is_available() ||
+           pkgversion(MKL_jll) < v"2022.2"
+    __mkl_isavailable() = false
+else
+    __mkl_isavailable() = true
+end
 
 function getrf!(A::AbstractMatrix{<:ComplexF64};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
         info = Ref{BlasInt}(),
         check = false)
+    __mkl_isavailable() ||
+        error("Error, MKL binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -21,7 +33,7 @@ function getrf!(A::AbstractMatrix{<:ComplexF64};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(zgetrf_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(zgetrf_), libmkl_rt), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -33,6 +45,8 @@ function getrf!(A::AbstractMatrix{<:ComplexF32};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
         info = Ref{BlasInt}(),
         check = false)
+    __mkl_isavailable() ||
+        error("Error, MKL binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -41,7 +55,7 @@ function getrf!(A::AbstractMatrix{<:ComplexF32};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(cgetrf_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(cgetrf_), libmkl_rt), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -53,6 +67,8 @@ function getrf!(A::AbstractMatrix{<:Float64};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
         info = Ref{BlasInt}(),
         check = false)
+    __mkl_isavailable() ||
+        error("Error, MKL binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -61,7 +77,7 @@ function getrf!(A::AbstractMatrix{<:Float64};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(dgetrf_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(dgetrf_), libmkl_rt), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -73,6 +89,8 @@ function getrf!(A::AbstractMatrix{<:Float32};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
         info = Ref{BlasInt}(),
         check = false)
+    __mkl_isavailable() ||
+        error("Error, MKL binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
     check && chkfinite(A)
     chkstride1(A)
@@ -81,7 +99,7 @@ function getrf!(A::AbstractMatrix{<:Float32};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(sgetrf_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(sgetrf_), libmkl_rt), Cvoid,
         (Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
         m, n, A, lda, ipiv, info)
@@ -94,6 +112,8 @@ function getrs!(trans::AbstractChar,
         ipiv::AbstractVector{BlasInt},
         B::AbstractVecOrMat{<:ComplexF64};
         info = Ref{BlasInt}())
+    __mkl_isavailable() ||
+        error("Error, MKL binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -105,7 +125,7 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall((@blasfunc(zgetrs_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(zgetrs_), libmkl_rt), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
@@ -119,6 +139,8 @@ function getrs!(trans::AbstractChar,
         ipiv::AbstractVector{BlasInt},
         B::AbstractVecOrMat{<:ComplexF32};
         info = Ref{BlasInt}())
+    __mkl_isavailable() ||
+        error("Error, MKL binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -130,7 +152,7 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall((@blasfunc(cgetrs_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(cgetrs_), libmkl_rt), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
@@ -144,6 +166,8 @@ function getrs!(trans::AbstractChar,
         ipiv::AbstractVector{BlasInt},
         B::AbstractVecOrMat{<:Float64};
         info = Ref{BlasInt}())
+    __mkl_isavailable() ||
+        error("Error, MKL binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -155,7 +179,7 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall((@blasfunc(dgetrs_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(dgetrs_), libmkl_rt), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{Float64}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
@@ -169,6 +193,8 @@ function getrs!(trans::AbstractChar,
         ipiv::AbstractVector{BlasInt},
         B::AbstractVecOrMat{<:Float32};
         info = Ref{BlasInt}())
+    __mkl_isavailable() ||
+        error("Error, MKL binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
     LinearAlgebra.LAPACK.chktrans(trans)
     chkstride1(A, B, ipiv)
@@ -180,7 +206,7 @@ function getrs!(trans::AbstractChar,
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall((@blasfunc(sgetrs_), MKL_jll.libmkl_rt), Cvoid,
+    ccall((@blasfunc(sgetrs_), libmkl_rt), Cvoid,
         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{Float32}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
@@ -198,14 +224,14 @@ const PREALLOCATED_MKL_LU = begin
 end
 
 function LinearSolve.init_cacheval(alg::MKLLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions)
     PREALLOCATED_MKL_LU
 end
 
 function LinearSolve.init_cacheval(alg::MKLLUFactorization,
         A::AbstractMatrix{<:Union{Float32, ComplexF32, ComplexF64}}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions)
     A = rand(eltype(A), 0, 0)
     ArrayInterface.lu_instance(A), Ref{BlasInt}()
@@ -213,15 +239,59 @@ end
 
 function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
         kwargs...)
+    __mkl_isavailable() ||
+        error("Error, MKL binary is missing but solve is being called. Report this issue")
     A = cache.A
     A = convert(AbstractMatrix, A)
+    verbose = cache.verbose
     if cache.isfresh
         cacheval = @get_cacheval(cache, :MKLLUFactorization)
         res = getrf!(A; ipiv = cacheval[1].ipiv, info = cacheval[2])
         fact = LU(res[1:3]...), res[4]
         cache.cacheval = fact
 
+        info_value = res[3]
+
+        if info_value != 0
+            if !isa(verbose.blas_info, SciMLLogging.Silent) ||
+               !isa(verbose.blas_errors, SciMLLogging.Silent) ||
+               !isa(verbose.blas_invalid_args, SciMLLogging.Silent)
+                op_info = get_blas_operation_info(:dgetrf, A, cache.b,
+                    condition = !isa(verbose.condition_number, SciMLLogging.Silent))
+                if cache.verbose.condition_number != Silent()
+                    if isinf(op_info.condition_number)
+                        @SciMLMessage("Matrix condition number calculation failed.",
+                            cache.verbose, :condition_number)
+                    else
+                        @SciMLMessage("Matrix condition number: $(round(op_info.condition_number, sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf",
+                            cache.verbose, :condition_number)
+                    end
+                end
+                verb_option,
+                message = blas_info_msg(
+                    :dgetrf, info_value; extra_context = op_info)
+                @SciMLMessage(message, verbose, verb_option)
+            end
+        else
+            if cache.verbose.blas_success != Silent()
+                op_info = get_blas_operation_info(:dgetrf, A, cache.b,
+                    condition = !isa(verbose.condition_number, SciMLLogging.Silent))
+                if cache.verbose.condition_number != Silent()
+                    if isinf(op_info.condition_number)
+                        @SciMLMessage("Matrix condition number calculation failed.",
+                            cache.verbose, :condition_number)
+                    else
+                        @SciMLMessage("Matrix condition number: $(round(op_info.condition_number, sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf",
+                            cache.verbose, :condition_number)
+                    end
+                end
+                @SciMLMessage("BLAS LU factorization (dgetrf) completed successfully for $(op_info.matrix_size) matrix",
+                    cache.verbose, :blas_success)
+            end
+        end
+
         if !LinearAlgebra.issuccess(fact[1])
+            @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
         end
@@ -240,7 +310,8 @@ function SciMLBase.solve!(cache::LinearCache, alg::MKLLUFactorization;
         getrs!('N', A.factors, A.ipiv, cache.u; info)
     end
 
-    SciMLBase.build_linear_solution(alg, cache.u, nothing, cache; retcode = ReturnCode.Success)
+    SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache; retcode = ReturnCode.Success)
 end
 
 # Mixed precision MKL implementation
@@ -253,68 +324,66 @@ const PREALLOCATED_MKL32_LU = begin
 end
 
 function LinearSolve.init_cacheval(alg::MKL32MixedLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions)
     # Pre-allocate appropriate 32-bit arrays based on input type
-    if eltype(A) <: Complex
-        A_32 = rand(ComplexF32, 0, 0)
-    else
-        A_32 = rand(Float32, 0, 0)
-    end
-    ArrayInterface.lu_instance(A_32), Ref{BlasInt}()
+    m, n = size(A)
+    T32 = eltype(A) <: Complex ? ComplexF32 : Float32
+    A_32 = similar(A, T32)
+    b_32 = similar(b, T32)
+    u_32 = similar(u, T32)
+    luinst = ArrayInterface.lu_instance(rand(T32, 0, 0))
+    # Return tuple with pre-allocated arrays
+    (luinst, Ref{BlasInt}(), A_32, b_32, u_32)
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::MKL32MixedLUFactorization;
         kwargs...)
+    __mkl_isavailable() ||
+        error("Error, MKL binary is missing but solve is being called. Report this issue")
     A = cache.A
     A = convert(AbstractMatrix, A)
-    
-    # Check if we have complex numbers
-    iscomplex = eltype(A) <: Complex
-    
+
     if cache.isfresh
-        cacheval = @get_cacheval(cache, :MKL32MixedLUFactorization)
-        # Convert to appropriate 32-bit type for factorization
-        if iscomplex
-            A_f32 = ComplexF32.(A)
-        else
-            A_f32 = Float32.(A)
-        end
-        res = getrf!(A_f32; ipiv = cacheval[1].ipiv, info = cacheval[2])
-        fact = LU(res[1:3]...), res[4]
+        # Get pre-allocated arrays from cacheval
+        luinst, info, A_32, b_32, u_32 = @get_cacheval(cache, :MKL32MixedLUFactorization)
+        # Compute 32-bit type on demand and copy A
+        T32 = eltype(A) <: Complex ? ComplexF32 : Float32
+        A_32 .= T32.(A)
+        res = getrf!(A_32; ipiv = luinst.ipiv, info = info)
+        fact = (LU(res[1:3]...), res[4], A_32, b_32, u_32)
         cache.cacheval = fact
 
         if !LinearAlgebra.issuccess(fact[1])
+            @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
         end
         cache.isfresh = false
     end
 
-    A_lu, info = @get_cacheval(cache, :MKL32MixedLUFactorization)
+    A_lu, info, A_32, b_32, u_32 = @get_cacheval(cache, :MKL32MixedLUFactorization)
     require_one_based_indexing(cache.u, cache.b)
     m, n = size(A_lu, 1), size(A_lu, 2)
-    
-    # Convert b to appropriate 32-bit type for solving
-    if iscomplex
-        b_f32 = ComplexF32.(cache.b)
-    else
-        b_f32 = Float32.(cache.b)
-    end
-    
+
+    # Compute types on demand for conversions
+    T32 = eltype(A) <: Complex ? ComplexF32 : Float32
+    Torig = eltype(cache.u)
+
+    # Copy b to pre-allocated 32-bit array
+    b_32 .= T32.(cache.b)
+
     if m > n
-        Bc = copy(b_f32)
-        getrs!('N', A_lu.factors, A_lu.ipiv, Bc; info)
+        getrs!('N', A_lu.factors, A_lu.ipiv, b_32; info)
         # Convert back to original precision
-        T = eltype(cache.u)
-        cache.u .= T.(Bc[1:n])
+        cache.u[1:n] .= Torig.(b_32[1:n])
     else
-        u_f32 = copy(b_f32)
-        getrs!('N', A_lu.factors, A_lu.ipiv, u_f32; info)
+        copyto!(u_32, b_32)
+        getrs!('N', A_lu.factors, A_lu.ipiv, u_32; info)
         # Convert back to original precision
-        T = eltype(cache.u)
-        cache.u .= T.(u_f32)
+        cache.u .= Torig.(u_32)
     end
 
-    SciMLBase.build_linear_solution(alg, cache.u, nothing, cache; retcode = ReturnCode.Success)
+    SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache; retcode = ReturnCode.Success)
 end

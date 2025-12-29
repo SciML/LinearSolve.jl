@@ -2,8 +2,7 @@ module LinearSolveAMDGPUExt
 
 using AMDGPU
 using LinearSolve: LinearSolve, LinearCache, AMDGPUOffloadLUFactorization,
-                   AMDGPUOffloadQRFactorization, init_cacheval, OperatorAssumptions,
-                   LinearVerbosity
+                   AMDGPUOffloadQRFactorization, init_cacheval, OperatorAssumptions, LinearVerbosity
 using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase
 
 # LU Factorization
@@ -26,7 +25,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::AMDGPUOffloadLUFa
 end
 
 function LinearSolve.init_cacheval(alg::AMDGPUOffloadLUFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions)
     AMDGPU.rocSOLVER.getrf!(AMDGPU.ROCArray(A))
 end
@@ -58,7 +57,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::AMDGPUOffloadQRFa
 end
 
 function LinearSolve.init_cacheval(alg::AMDGPUOffloadQRFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::LinearVerbosity,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions)
     A_gpu = AMDGPU.ROCArray(A)
     tau = AMDGPU.ROCVector{eltype(A_gpu)}(undef, min(size(A_gpu)...))

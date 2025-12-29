@@ -1,7 +1,6 @@
 using ForwardDiff
 using LinearSolve, LinearAlgebra, Test
 using FiniteDiff, RecursiveFactorization
-using LazyArrays: BroadcastArray
 using Mooncake
 
 # first test

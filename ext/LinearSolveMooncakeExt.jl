@@ -6,7 +6,6 @@ using LinearSolve: LinearSolve, SciMLLinearSolveAlgorithm, init, solve!, LinearP
     LinearCache, AbstractKrylovSubspaceMethod, DefaultLinearSolver, LinearSolveAdjoint,
     defaultalg_adjoint_eval, solve, LUFactorization
 using LinearSolve.LinearAlgebra
-using LazyArrays: @~, BroadcastArray
 using SciMLBase
 
 @from_chainrules MinimalCtx Tuple{typeof(SciMLBase.solve),LinearProblem,Nothing} true ReverseMode
@@ -113,7 +112,7 @@ function Mooncake.rrule!!(::CoDual{typeof(SciMLBase.solve!)}, _cache::CoDual{<:L
         end
 
         tu = adjoint(new_sol.u)
-        ∂A = BroadcastArray(@~ .-(λ .* tu))
+        ∂A = .-(λ .* tu)
         ∂b = λ
 
         if (iszero(∂b) || iszero(∂A)) && !iszero(tu)

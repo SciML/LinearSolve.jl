@@ -468,7 +468,7 @@ struct SVDFactorization{A} <: AbstractDenseFactorization
     alg::A
 end
 
-SVDFactorization() = SVDFactorization(false, LinearAlgebra.DivideAndConquer())
+SVDFactorization() = SVDFactorization(false, nothing)
 
 function do_factorization(alg::SVDFactorization, A, b, u)
     A = convert(AbstractMatrix, A)

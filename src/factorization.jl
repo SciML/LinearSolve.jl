@@ -455,48 +455,60 @@ end
 ## SVDFactorization
 
 """
-`SVDFactorization(full=false,alg=LinearAlgebra.DivideAndConquer())`
+    SVDFactorization(full=false, alg=nothing)
+Julia's built-in `svd`. Equivalent to `svd!(A)`.
 
-Julia's built in `svd`. Equivalent to `svd!(A)`.
-
-  - On dense matrices, this uses the current BLAS implementation of the user's computer
-    which by default is OpenBLAS but will use MKL if the user does `using MKL` in their
-    system.
+- On dense matrices, this uses the current BLAS implementation.
+- When `alg = nothing`, the backend default SVD algorithm is used
+  (required for CUDA compatibility).
 """
 struct SVDFactorization{A} <: AbstractDenseFactorization
     full::Bool
     alg::A
 end
 
-SVDFactorization() = SVDFactorization(false, LinearAlgebra.DivideAndConquer())
+SVDFactorization() = SVDFactorization(false, nothing)
 
 function do_factorization(alg::SVDFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
     if ArrayInterface.can_setindex(typeof(A))
-        fact = svd!(A; alg.full, alg.alg)
+        if alg.alg === nothing
+            return svd!(A; full = alg.full)
+        else
+            return svd!(A; full = alg.full, alg = alg.alg)
+        end
     else
-        fact = svd(A; alg.full)
+        if alg.alg === nothing
+            return svd(A; full = alg.full)
+        else
+            return svd(A; full = alg.full, alg = alg.alg)
+        end
     end
-    return fact
 end
 
 function init_cacheval(alg::SVDFactorization, A::Union{Matrix, SMatrix}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
-        assumptions::OperatorAssumptions)
+    maxiters::Int, abstol, reltol,
+    verbose::Union{LinearVerbosity, Bool},
+    assumptions::OperatorAssumptions
+)
     ArrayInterface.svd_instance(convert(AbstractMatrix, A))
 end
 
 const PREALLOCATED_SVD = ArrayInterface.svd_instance(rand(1, 1))
 
 function init_cacheval(alg::SVDFactorization, A::Matrix{Float64}, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
-        assumptions::OperatorAssumptions)
+    maxiters::Int, abstol, reltol,
+    verbose::Union{LinearVerbosity, Bool},
+    assumptions::OperatorAssumptions
+    )
     PREALLOCATED_SVD
 end
 
 function init_cacheval(alg::SVDFactorization, A, b, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
-        assumptions::OperatorAssumptions)
+    maxiters::Int, abstol, reltol,
+    verbose::Union{LinearVerbosity, Bool},
+    assumptions::OperatorAssumptions
+)
     nothing
 end
 

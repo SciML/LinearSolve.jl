@@ -32,7 +32,7 @@ using ProgressMeter
 using CPUSummary
 
 # Hard dependency to ensure RFLUFactorization others solvers are available
-using RecursiveFactorization  
+using RecursiveFactorization
 using blis_jll
 using LAPACK_jll
 using CUDA
@@ -65,7 +65,7 @@ function Base.show(io::IO, results::AutotuneResults)
     println(io, "="^60)
     println(io, "LinearSolve.jl Autotune Results")
     println(io, "="^60)
-    
+
     # System info summary
     println(io, "\n📊 System Information:")
     # Use cpu_model if available, otherwise fall back to cpu_name
@@ -78,47 +78,53 @@ function Base.show(io::IO, results::AutotuneResults)
     println(io, "  • OS: ", get(results.sysinfo, "os_name", "Unknown"), " (", get(results.sysinfo, "os", "Unknown"), ")")
     println(io, "  • Julia: ", get(results.sysinfo, "julia_version", "Unknown"))
     println(io, "  • Threads: ", get(results.sysinfo, "num_threads", "Unknown"), " (BLAS: ", get(results.sysinfo, "blas_num_threads", "Unknown"), ")")
-    
+
     # Results summary - include all results to show what was attempted
     all_results = results.results_df
     successful_results = filter(row -> row.success && !isnan(row.gflops), results.results_df)
     if nrow(successful_results) > 0
         println(io, "\n🏆 Top Performing Algorithms:")
-        summary = combine(groupby(successful_results, :algorithm),
+        summary = combine(
+            groupby(successful_results, :algorithm),
             :gflops => (x -> mean(filter(!isnan, x))) => :avg_gflops,
             :gflops => (x -> maximum(filter(!isnan, x))) => :max_gflops,
-            nrow => :num_tests)
+            nrow => :num_tests
+        )
         sort!(summary, :avg_gflops, rev = true)
-        
+
         # Show top 5
         for (i, row) in enumerate(eachrow(first(summary, 5)))
-            println(io, "  ", i, ". ", row.algorithm, ": ",
-                    @sprintf("%.2f GFLOPs avg", row.avg_gflops))
+            println(
+                io, "  ", i, ". ", row.algorithm, ": ",
+                @sprintf("%.2f GFLOPs avg", row.avg_gflops)
+            )
         end
     end
-    
+
     # Show algorithms that had failures/timeouts to make it clear what was attempted
     failed_results = filter(row -> !row.success, all_results)
     if nrow(failed_results) > 0
         failed_algs = unique(failed_results.algorithm)
         println(io, "\n⚠️  Algorithms with failures/timeouts: ", join(failed_algs, ", "))
     end
-    
+
     # Element types tested
     eltypes = unique(results.results_df.eltype)
     println(io, "\n🔬 Element Types Tested: ", join(eltypes, ", "))
-    
+
     # Matrix sizes tested
     sizes = unique(results.results_df.size)
-    println(io, "📏 Matrix Sizes: ", minimum(sizes), "×", minimum(sizes), 
-            " to ", maximum(sizes), "×", maximum(sizes))
-    
+    println(
+        io, "📏 Matrix Sizes: ", minimum(sizes), "×", minimum(sizes),
+        " to ", maximum(sizes), "×", maximum(sizes)
+    )
+
     # Report tests that exceeded maxtime if any
     exceeded_results = filter(row -> isnan(row.gflops) && contains(get(row, :error, ""), "Exceeded maxtime"), results.results_df)
     if nrow(exceeded_results) > 0
         println(io, "⏱️  Exceeded maxtime: ", nrow(exceeded_results), " tests exceeded time limit")
     end
-    
+
     # Call to action - reordered
     println(io, "\n" * "="^60)
     println(io, "🚀 For comprehensive results, consider running:")
@@ -130,38 +136,40 @@ function Base.show(io::IO, results::AutotuneResults)
     println(io, "   https://github.com/SciML/LinearSolve.jl/issues/725")
     println(io, "\n💡 To share your results with the community, run:")
     println(io, "   share_results(results)")
-    println(io, "="^60)
+    return println(io, "="^60)
 end
 
 # Plot method for AutotuneResults
 function Plots.plot(results::AutotuneResults; kwargs...)
     # Generate plots from the results data
     plots_dict = create_benchmark_plots(results.results_df)
-    
+
     if plots_dict === nothing || isempty(plots_dict)
         @warn "No data available for plotting"
         return nothing
     end
-    
+
     # Create a composite plot from all element type plots
     plot_list = []
     for (eltype_name, p) in plots_dict
         push!(plot_list, p)
     end
-    
+
     # Create composite plot
     n_plots = length(plot_list)
     if n_plots == 1
         return plot_list[1]
     elseif n_plots == 2
-        return plot(plot_list..., layout=(1, 2), size=(1200, 500); kwargs...)
+        return plot(plot_list..., layout = (1, 2), size = (1200, 500); kwargs...)
     elseif n_plots <= 4
-        return plot(plot_list..., layout=(2, 2), size=(1200, 900); kwargs...)
+        return plot(plot_list..., layout = (2, 2), size = (1200, 900); kwargs...)
     else
         ncols = ceil(Int, sqrt(n_plots))
         nrows = ceil(Int, n_plots / ncols)
-        return plot(plot_list..., layout=(nrows, ncols), 
-                   size=(400*ncols, 400*nrows); kwargs...)
+        return plot(
+            plot_list..., layout = (nrows, ncols),
+            size = (400 * ncols, 400 * nrows); kwargs...
+        )
     end
 end
 
@@ -235,7 +243,8 @@ function autotune_setup(;
         eltypes = (Float64,),
         skip_missing_algs::Bool = false,
         include_fastlapack::Bool = false,
-        maxtime::Float64 = 100.0)
+        maxtime::Float64 = 100.0
+    )
     @info "Starting LinearSolve.jl autotune setup..."
     @info "Configuration: sizes=$sizes, set_preferences=$set_preferences"
     @info "Element types to benchmark: $(join(eltypes, ", "))"
@@ -269,59 +278,70 @@ function autotune_setup(;
     # Run benchmarks
     @info "Running benchmarks (this may take several minutes)..."
     @info "Maximum time per algorithm test: $(maxtime)s"
-    results_df = benchmark_algorithms(matrix_sizes, all_algs, all_names, eltypes;
-        samples = samples, seconds = seconds, sizes = sizes, maxtime = maxtime)
+    results_df = benchmark_algorithms(
+        matrix_sizes, all_algs, all_names, eltypes;
+        samples = samples, seconds = seconds, sizes = sizes, maxtime = maxtime
+    )
 
     # Display results table - show all results including NaN values to indicate what was tested
     all_results = results_df
     successful_results = filter(row -> row.success && !isnan(row.gflops), results_df)
     exceeded_maxtime_results = filter(row -> isnan(row.gflops) && contains(get(row, :error, ""), "Exceeded maxtime"), results_df)
     skipped_results = filter(row -> contains(get(row, :error, ""), "Skipped"), results_df)
-    
+
     if nrow(exceeded_maxtime_results) > 0
         @info "$(nrow(exceeded_maxtime_results)) tests exceeded maxtime limit ($(maxtime)s)"
     end
-    
+
     if nrow(skipped_results) > 0
         # Count unique algorithms that were skipped
         skipped_algs = unique([row.algorithm for row in eachrow(skipped_results)])
         @info "$(length(skipped_algs)) algorithms skipped for larger matrices after exceeding maxtime"
     end
-    
+
     if nrow(successful_results) > 0
         @info "Benchmark completed successfully!"
 
         # Create summary table for display - include algorithms with NaN values to show what was tested
         # Create summary for all algorithms tested (not just successful ones)
-        full_summary = combine(groupby(all_results, :algorithm),
-            :gflops => (x -> begin
-                valid_vals = filter(!isnan, x)
-                length(valid_vals) > 0 ? mean(valid_vals) : NaN
-            end) => :avg_gflops,
-            :gflops => (x -> begin
-                valid_vals = filter(!isnan, x)
-                length(valid_vals) > 0 ? maximum(valid_vals) : NaN
-            end) => :max_gflops,
+        full_summary = combine(
+            groupby(all_results, :algorithm),
+            :gflops => (
+                x -> begin
+                    valid_vals = filter(!isnan, x)
+                    length(valid_vals) > 0 ? mean(valid_vals) : NaN
+                end
+            ) => :avg_gflops,
+            :gflops => (
+                x -> begin
+                    valid_vals = filter(!isnan, x)
+                    length(valid_vals) > 0 ? maximum(valid_vals) : NaN
+                end
+            ) => :max_gflops,
             :success => (x -> count(x)) => :successful_tests,
-            nrow => :total_tests)
-        
+            nrow => :total_tests
+        )
+
         # Sort by average GFLOPs, putting NaN values at the end
-        sort!(full_summary, [:avg_gflops], rev = true, lt = (a, b) -> begin
-            if isnan(a) && isnan(b)
-                return false
-            elseif isnan(a)
-                return false
-            elseif isnan(b)
-                return true
-            else
-                return a < b
+        sort!(
+            full_summary, [:avg_gflops], rev = true, lt = (a, b) -> begin
+                if isnan(a) && isnan(b)
+                    return false
+                elseif isnan(a)
+                    return false
+                elseif isnan(b)
+                    return true
+                else
+                    return a < b
+                end
             end
-        end)
+        )
 
         println("\n" * "="^60)
         println("BENCHMARK RESULTS SUMMARY (including failed attempts)")
         println("="^60)
-        pretty_table(full_summary,
+        pretty_table(
+            full_summary,
             header = ["Algorithm", "Avg GFLOPs", "Max GFLOPs", "Success", "Total"],
             formatters = (v, i, j) -> begin
                 if j in [2, 3] && isa(v, Float64)
@@ -330,7 +350,8 @@ function autotune_setup(;
                     return v
                 end
             end,
-            crop = :none)
+            crop = :none
+        )
     else
         @warn "No successful benchmark results!"
         # Still show what was attempted
@@ -413,22 +434,22 @@ share_results(results; auto_login = false)
 """
 function share_results(results::AutotuneResults; auto_login::Bool = true)
     @info "📤 Preparing to share benchmark results with the community..."
-    
+
     # Extract from AutotuneResults
     results_df = results.results_df
     sysinfo = results.sysinfo
-    
+
     # Get system info
     system_info = sysinfo
-    
+
     # Categorize results
     categories = categorize_results(results_df)
-    
+
     # Set up authentication (with auto-login prompt if enabled)
     @info "🔗 Checking GitHub authentication..."
-    
+
     github_auth = setup_github_authentication(; auto_login = auto_login)
-    
+
     if github_auth === nothing || github_auth[1] === nothing
         # Save results locally as fallback
         timestamp = replace(string(Dates.now()), ":" => "-")
@@ -442,14 +463,14 @@ function share_results(results::AutotuneResults; auto_login::Bool = true)
         @info "    https://github.com/SciML/LinearSolve.jl/issues/725"
         return
     end
-    
+
     # Format results
     markdown_content = format_results_for_github(results_df, system_info, categories)
-    
+
     # Upload to GitHub (without plots)
     upload_to_github(markdown_content, nothing, github_auth, results_df, system_info, categories)
-    
-    @info "✅ Thank you for contributing to the LinearSolve.jl community!"
+
+    return @info "✅ Thank you for contributing to the LinearSolve.jl community!"
 end
 
 end

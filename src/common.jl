@@ -58,9 +58,11 @@ struct OperatorAssumptions{T}
     condition::OperatorCondition.T
 end
 
-function OperatorAssumptions(issquare = nothing;
-        condition::OperatorCondition.T = OperatorCondition.IllConditioned)
-    OperatorAssumptions{typeof(issquare)}(issquare, condition)
+function OperatorAssumptions(
+        issquare = nothing;
+        condition::OperatorCondition.T = OperatorCondition.IllConditioned
+    )
+    return OperatorAssumptions{typeof(issquare)}(issquare, condition)
 end
 __issquare(assump::OperatorAssumptions) = assump.issq
 __conditioning(assump::OperatorAssumptions) = assump.condition
@@ -138,7 +140,7 @@ function Base.setproperty!(cache::LinearCache, name::Symbol, x)
         return __setfield!(cache.cacheval, cache.alg, x)
         # return setfield!(cache.cacheval, Symbol(cache.alg.alg), x)
     end
-    setfield!(cache, name, x)
+    return setfield!(cache, name, x)
 end
 
 function update_cacheval!(cache::LinearCache, name::Symbol, x)
@@ -164,7 +166,7 @@ Algorithm-specific cache value or `nothing` for algorithms that don't require ca
 init_cacheval(alg::SciMLLinearSolveAlgorithm, args...) = nothing
 
 function SciMLBase.init(prob::LinearProblem, args...; kwargs...)
-    SciMLBase.init(prob, nothing, args...; kwargs...)
+    return SciMLBase.init(prob, nothing, args...; kwargs...)
 end
 
 """
@@ -273,10 +275,11 @@ end
 __init_u0_from_Ab(::SMatrix{S1, S2}, b) where {S1, S2} = zeros(SVector{S2, eltype(b)})
 
 function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm, args...; kwargs...)
-    __init(prob, alg, args...; kwargs...)
+    return __init(prob, alg, args...; kwargs...)
 end
 
-function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
+function __init(
+        prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         args...;
         alias = LinearAliasSpecifier(),
         abstol = default_tol(real(eltype(prob.b))),
@@ -287,7 +290,8 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         Pr = nothing,
         assumptions = OperatorAssumptions(issquare(prob.A)),
         sensealg = LinearSolveAdjoint(),
-        kwargs...)
+        kwargs...
+    )
     (; A, b, u0, p) = prob
 
     if haskey(kwargs, :alias_A) || haskey(kwargs, :alias_b)
@@ -307,7 +311,8 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
             Base.depwarn(message, :init)
             Base.depwarn(message, :solve)
             aliases = LinearAliasSpecifier(
-                alias_A = aliases.alias_A, alias_b = values(kwargs).alias_b)
+                alias_A = aliases.alias_A, alias_b = values(kwargs).alias_b
+            )
         end
     else
         if alias isa Bool
@@ -378,26 +383,33 @@ function __init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         # TODO: deprecate once all docs are updated to the new form
         #@warn "passing Preconditioners at `init`/`solve` time is deprecated. Instead add a `precs` function to your algorithm."
     end
-    cacheval = init_cacheval(alg, A, b, u0_, Pl, Pr, maxiters, abstol, reltol, init_cache_verb,
-        assumptions)
+    cacheval = init_cacheval(
+        alg, A, b, u0_, Pl, Pr, maxiters, abstol, reltol, init_cache_verb,
+        assumptions
+    )
     isfresh = true
     precsisfresh = false
     Tc = typeof(cacheval)
 
-    cache = LinearCache{typeof(A), typeof(b), typeof(u0_), typeof(p), typeof(alg), Tc,
+    cache = LinearCache{
+        typeof(A), typeof(b), typeof(u0_), typeof(p), typeof(alg), Tc,
         typeof(Pl), typeof(Pr), typeof(reltol), typeof(verbose_spec), typeof(assumptions.issq),
-        typeof(sensealg)}(
+        typeof(sensealg),
+    }(
         A, b, u0_, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
-        maxiters, verbose_spec, assumptions, sensealg)
+        maxiters, verbose_spec, assumptions, sensealg
+    )
     return cache
 end
 
-function SciMLBase.reinit!(cache::LinearCache;
+function SciMLBase.reinit!(
+        cache::LinearCache;
         A = nothing,
         b = cache.b,
         u = cache.u,
         p = nothing,
-        reuse_precs = false)
+        reuse_precs = false
+    )
     (; alg, cacheval, abstol, reltol, maxiters, verbose, assumptions, sensealg) = cache
 
     isfresh = !isnothing(A)
@@ -420,44 +432,55 @@ function SciMLBase.reinit!(cache::LinearCache;
     cache.Pr = Pr
     cache.isfresh = true
     cache.precsisfresh = precsisfresh
-    nothing
+    return nothing
 end
 
 function SciMLBase.solve(prob::LinearProblem, args...; kwargs...)
     return solve(prob, nothing, args...; kwargs...)
 end
 
-function SciMLBase.solve(prob::LinearProblem, ::Nothing, args...;
-        assump = OperatorAssumptions(issquare(prob.A)), kwargs...)
+function SciMLBase.solve(
+        prob::LinearProblem, ::Nothing, args...;
+        assump = OperatorAssumptions(issquare(prob.A)), kwargs...
+    )
     return solve(prob, defaultalg(prob.A, prob.b, assump), args...; kwargs...)
 end
 
-function SciMLBase.solve(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
-        args...; kwargs...)
-    solve!(init(prob, alg, args...; kwargs...))
+function SciMLBase.solve(
+        prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
+        args...; kwargs...
+    )
+    return solve!(init(prob, alg, args...; kwargs...))
 end
 
 function SciMLBase.solve!(cache::LinearCache, args...; kwargs...)
-    solve!(cache, cache.alg, args...; kwargs...)
+    return solve!(cache, cache.alg, args...; kwargs...)
 end
 
 # Special Case for StaticArrays
-const StaticLinearProblem = LinearProblem{uType, iip, <:SMatrix,
-    <:Union{<:SMatrix, <:SVector}} where {uType, iip}
+const StaticLinearProblem = LinearProblem{
+    uType, iip, <:SMatrix,
+    <:Union{<:SMatrix, <:SVector},
+} where {uType, iip}
 
 function SciMLBase.solve(prob::StaticLinearProblem, args...; kwargs...)
     return SciMLBase.solve(prob, nothing, args...; kwargs...)
 end
 
-function SciMLBase.solve(prob::StaticLinearProblem,
-        alg::Nothing, args...; kwargs...)
+function SciMLBase.solve(
+        prob::StaticLinearProblem,
+        alg::Nothing, args...; kwargs...
+    )
     u = prob.A \ prob.b
     return SciMLBase.build_linear_solution(
-        alg, u, nothing, prob; retcode = ReturnCode.Success)
+        alg, u, nothing, prob; retcode = ReturnCode.Success
+    )
 end
 
-function SciMLBase.solve(prob::StaticLinearProblem,
-        alg::SciMLLinearSolveAlgorithm, args...; kwargs...)
+function SciMLBase.solve(
+        prob::StaticLinearProblem,
+        alg::SciMLLinearSolveAlgorithm, args...; kwargs...
+    )
     if alg === nothing || alg isa DirectLdiv!
         u = prob.A \ prob.b
     elseif alg isa LUFactorization
@@ -476,7 +499,8 @@ function SciMLBase.solve(prob::StaticLinearProblem,
         return solve!(cache)
     end
     return SciMLBase.build_linear_solution(
-        alg, u, nothing, prob; retcode = ReturnCode.Success)
+        alg, u, nothing, prob; retcode = ReturnCode.Success
+    )
 end
 
 function update_tolerances!(cache; abstol = nothing, reltol = nothing)
@@ -486,7 +510,7 @@ function update_tolerances!(cache; abstol = nothing, reltol = nothing)
     if reltol !== nothing
         cache.reltol = reltol
     end
-    update_tolerances_internal!(cache, cache.alg, abstol, reltol)
+    return update_tolerances_internal!(cache, cache.alg, abstol, reltol)
 end
 
 
@@ -495,5 +519,5 @@ function update_tolerances_internal!(cache, alg::AbstractFactorization, abstol, 
 end
 
 function update_tolerances_internal!(cache, alg::AbstractKrylovSubspaceMethod, abstol, reltol)
-    @warn "Tolerance update for Krylov subspace method '$typeof(alg)' not implemented." maxlog = 1
+    return @warn "Tolerance update for Krylov subspace method '$typeof(alg)' not implemented." maxlog = 1
 end

@@ -27,9 +27,11 @@ function interpret_blas_code(func::Symbol, info::Integer)
     if info == 0
         return (:success, "Operation completed successfully", "")
     elseif info < 0
-        return (:invalid_argument,
+        return (
+            :invalid_argument,
             "Invalid argument error",
-            "Argument $(-info) had an illegal value")
+            "Argument $(-info) had an illegal value",
+        )
     else
         # info > 0 means different things for different functions
         return interpret_positive_info(func, info)
@@ -41,64 +43,84 @@ function interpret_positive_info(func::Symbol, info::Integer)
 
     # LU factorization routines
     if occursin("getrf", func_str)
-        return (:singular_matrix,
+        return (
+            :singular_matrix,
             "Matrix is singular",
-            "U($info,$info) is exactly zero. The factorization has been completed, but U is singular and division by U will produce infinity.")
+            "U($info,$info) is exactly zero. The factorization has been completed, but U is singular and division by U will produce infinity.",
+        )
 
         # Cholesky factorization routines
     elseif occursin("potrf", func_str)
-        return (:not_positive_definite,
+        return (
+            :not_positive_definite,
             "Matrix is not positive definite",
-            "The leading minor of order $info is not positive definite, and the factorization could not be completed.")
+            "The leading minor of order $info is not positive definite, and the factorization could not be completed.",
+        )
 
         # QR factorization routines
     elseif occursin("geqrf", func_str) || occursin("geqrt", func_str)
-        return (:numerical_issue,
+        return (
+            :numerical_issue,
             "Numerical issue in QR factorization",
-            "Householder reflector $info could not be formed properly.")
+            "Householder reflector $info could not be formed properly.",
+        )
 
         # SVD routines
     elseif occursin("gesdd", func_str) || occursin("gesvd", func_str)
-        return (:convergence_failure,
+        return (
+            :convergence_failure,
             "SVD did not converge",
-            "The algorithm failed to compute singular values. $info off-diagonal elements of an intermediate bidiagonal form did not converge to zero.")
+            "The algorithm failed to compute singular values. $info off-diagonal elements of an intermediate bidiagonal form did not converge to zero.",
+        )
 
         # Symmetric/Hermitian eigenvalue routines
     elseif occursin("syev", func_str) || occursin("heev", func_str)
-        return (:convergence_failure,
+        return (
+            :convergence_failure,
             "Eigenvalue computation did not converge",
-            "$info off-diagonal elements of an intermediate tridiagonal form did not converge to zero.")
+            "$info off-diagonal elements of an intermediate tridiagonal form did not converge to zero.",
+        )
 
         # Bunch-Kaufman factorization
     elseif occursin("sytrf", func_str) || occursin("hetrf", func_str)
-        return (:singular_matrix,
+        return (
+            :singular_matrix,
             "Matrix is singular",
-            "D($info,$info) is exactly zero. The factorization has been completed, but the block diagonal matrix D is singular.")
+            "D($info,$info) is exactly zero. The factorization has been completed, but the block diagonal matrix D is singular.",
+        )
 
         # Solve routines (should not have positive info)
     elseif occursin("getrs", func_str) || occursin("potrs", func_str) ||
-           occursin("sytrs", func_str) || occursin("hetrs", func_str)
-        return (:unexpected_error,
+            occursin("sytrs", func_str) || occursin("hetrs", func_str)
+        return (
+            :unexpected_error,
             "Unexpected positive return code from solve routine",
-            "Solve routine $func returned info=$info which should not happen.")
+            "Solve routine $func returned info=$info which should not happen.",
+        )
 
         # General eigenvalue problem
     elseif occursin("ggev", func_str) || occursin("gges", func_str)
-        return (:convergence_failure,
+        return (
+            :convergence_failure,
             "Generalized eigenvalue computation failed",
-            "The algorithm failed to compute eigenvalues (info=$info). This may indicate QZ iteration failure or other numerical issues.")
+            "The algorithm failed to compute eigenvalues (info=$info). This may indicate QZ iteration failure or other numerical issues.",
+        )
 
         # LDLT factorization
     elseif occursin("ldlt", func_str)
-        return (:singular_matrix,
+        return (
+            :singular_matrix,
             "Matrix is singular",
-            "The $(info)-th pivot is zero. The factorization has been completed but division will produce infinity.")
+            "The $(info)-th pivot is zero. The factorization has been completed but division will produce infinity.",
+        )
 
         # Default case
     else
-        return (:unknown_error,
+        return (
+            :unknown_error,
             "Unknown positive return code",
-            "Function $func returned info=$info. Consult LAPACK documentation for details.")
+            "Function $func returned info=$info. Consult LAPACK documentation for details.",
+        )
     end
 end
 
@@ -118,7 +140,7 @@ function _format_blas_context(op_info::BlasOperationInfo)
 
     # Optional fields - check for sentinel values
     if !isinf(op_info.condition_number)
-        push!(parts, "Condition number: $(round(op_info.condition_number, sigdigits=4))")
+        push!(parts, "Condition number: $(round(op_info.condition_number, sigdigits = 4))")
     end
 
     if op_info.rhs_length > 0
@@ -139,13 +161,17 @@ end
 
 Log BLAS/LAPACK return code information with appropriate verbosity level.
 """
-function blas_info_msg(func::Symbol, info::Integer;
+function blas_info_msg(
+        func::Symbol, info::Integer;
         extra_context::BlasOperationInfo = BlasOperationInfo(
-            (0, 0), "", "", -Inf, 0, "", 0.0))
+            (0, 0), "", "", -Inf, 0, "", 0.0
+        )
+    )
     category, message, details = interpret_blas_code(func, info)
 
     verbosity_field = if category in [
-        :singular_matrix, :not_positive_definite, :convergence_failure]
+            :singular_matrix, :not_positive_definite, :convergence_failure,
+        ]
         :blas_errors
     elseif category == :invalid_argument
         :blas_invalid_args
@@ -177,7 +203,7 @@ function blas_info_msg(func::Symbol, info::Integer;
         "$msg_main (info=$msg_info)"
     end
 
-    verbosity_field, full_msg
+    return verbosity_field, full_msg
 end
 
 function get_blas_operation_info(func::Symbol, A, b; condition = false)

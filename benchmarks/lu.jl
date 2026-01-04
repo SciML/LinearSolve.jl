@@ -6,13 +6,13 @@ nc = min(Int(VectorizationBase.num_cores()), Threads.nthreads())
 BenchmarkTools.DEFAULT_PARAMETERS.seconds = 0.5
 
 function luflop(m, n = m; innerflop = 2)
-    sum(1:min(m, n)) do k
+    return sum(1:min(m, n)) do k
         invflop = 1
         scaleflop = isempty((k + 1):m) ? 0 : sum((k + 1):m)
         updateflop = isempty((k + 1):n) ? 0 :
-                     sum((k + 1):n) do j
-            isempty((k + 1):m) ? 0 : sum((k + 1):m) do i
-                innerflop
+            sum((k + 1):n) do j
+                isempty((k + 1):m) ? 0 : sum((k + 1):m) do i
+                    innerflop
             end
         end
         invflop + scaleflop + updateflop
@@ -26,7 +26,7 @@ algs = [
     MKLLUFactorization(),
     FastLUFactorization(),
     SimpleLUFactorization(),
-    ButterflyFactorization(Val(true))
+    ButterflyFactorization(Val(true)),
 ]
 res = [Float64[] for i in 1:length(algs)]
 ns = 4:8:500
@@ -39,11 +39,15 @@ for i in 1:length(ns)
     global u0 = rand(rng, n)
 
     for j in 1:length(algs)
-        bt = @belapsed solve(prob, $(algs[j])).u setup=(prob = LinearProblem(copy(A),
-            copy(b);
-            u0 = copy(u0),
-            alias = LinearAliasSpecifier(alias_A = true, alias_b = true)))
-        push!(res[j], luflop(n) / bt / 1e9)
+        bt = @belapsed solve(prob, $(algs[j])).u setup = (
+            prob = LinearProblem(
+                copy(A),
+                copy(b);
+                u0 = copy(u0),
+                alias = LinearAliasSpecifier(alias_A = true, alias_b = true)
+            )
+        )
+        push!(res[j], luflop(n) / bt / 1.0e9)
     end
 end
 
@@ -52,13 +56,15 @@ __parameterless_type(T) = Base.typename(T).wrapper
 parameterless_type(x) = __parameterless_type(typeof(x))
 parameterless_type(::Type{T}) where {T} = __parameterless_type(T)
 
-p = plot(ns,
+p = plot(
+    ns,
     res[1];
     ylabel = "GFLOPs",
     xlabel = "N",
     title = "GFLOPs for NxN LU Factorization",
     label = string(Symbol(parameterless_type(algs[1]))),
-    legend = :outertopright)
+    legend = :outertopright
+)
 for i in 2:length(res)
     plot!(p, ns, res[i]; label = string(Symbol(parameterless_type(algs[i]))))
 end
@@ -66,4 +72,3 @@ p
 
 savefig("lubench.png")
 savefig("lubench.pdf")
-

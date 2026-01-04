@@ -14,7 +14,7 @@ function f(A, b1; alg = LUFactorization())
     sol1 = solve(prob, alg)
 
     s1 = sol1.u
-    norm(s1)
+    return norm(s1)
 end
 
 f(A, b1) # Uses BLAS
@@ -32,19 +32,29 @@ dA = zeros(n, n);
 b1 = rand(n);
 db1 = zeros(n);
 
-_ff = (x,
-    y) -> f(x,
+_ff = (
+    x,
+    y,
+) -> f(
+    x,
     y;
-    alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization))
+    alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)
+)
 _ff(copy(A), copy(b1))
 
-Enzyme.autodiff(Reverse,
-    (x,
-        y) -> f(x,
+Enzyme.autodiff(
+    Reverse,
+    (
+        x,
+        y,
+    ) -> f(
+        x,
         y;
-        alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)),
+        alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)
+    ),
     Duplicated(copy(A), dA),
-    Duplicated(copy(b1), db1))
+    Duplicated(copy(b1), db1)
+)
 
 dA2 = ForwardDiff.gradient(x -> f(x, eltype(x).(b1)), copy(A))
 db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x), copy(b1))
@@ -72,7 +82,7 @@ function f(A, b1; alg = LUFactorization())
     prob = LinearProblem(A, b1)
     sol1 = solve(prob, alg)
     s1 = sol1.u
-    norm(s1)
+    return norm(s1)
 end
 
 function fbatch(y, A, b1; alg = LUFactorization())
@@ -80,14 +90,15 @@ function fbatch(y, A, b1; alg = LUFactorization())
     sol1 = solve(prob, alg)
     s1 = sol1.u
     y[1] = norm(s1)
-    nothing
+    return nothing
 end
 
 y = [0.0]
 dy1 = [1.0]
 dy2 = [1.0]
 Enzyme.autodiff(
-    Reverse, fbatch, Duplicated(y, dy1), Duplicated(copy(A), dA), Duplicated(copy(b1), db1))
+    Reverse, fbatch, Duplicated(y, dy1), Duplicated(copy(A), dA), Duplicated(copy(b1), db1)
+)
 
 @test y[1] ≈ f(copy(A), b1)
 dA_2 = ForwardDiff.gradient(x -> f(x, eltype(x).(b1)), copy(A))
@@ -103,8 +114,10 @@ dA .= 0
 dA2 .= 0
 db1 .= 0
 db12 .= 0
-Enzyme.autodiff(Reverse, fbatch, BatchDuplicated(y, (dy1, dy2)),
-    BatchDuplicated(copy(A), (dA, dA2)), BatchDuplicated(copy(b1), (db1, db12)))
+Enzyme.autodiff(
+    Reverse, fbatch, BatchDuplicated(y, (dy1, dy2)),
+    BatchDuplicated(copy(A), (dA, dA2)), BatchDuplicated(copy(b1), (db1, db12))
+)
 
 @test dA ≈ dA_2
 @test db1 ≈ db1_2
@@ -117,7 +130,7 @@ function f(A, b1, b2; alg = LUFactorization())
     s1 = copy(solve!(cache).u)
     cache.b = b2
     s2 = solve!(cache).u
-    norm(s1 + s2)
+    return norm(s1 + s2)
 end
 
 A = rand(n, n);
@@ -128,8 +141,10 @@ b2 = rand(n);
 db2 = zeros(n);
 
 f(A, b1, b2)
-Enzyme.autodiff(Reverse, f, Duplicated(copy(A), dA),
-    Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
+Enzyme.autodiff(
+    Reverse, f, Duplicated(copy(A), dA),
+    Duplicated(copy(b1), db1), Duplicated(copy(b2), db2)
+)
 
 dA2 = ForwardDiff.gradient(x -> f(x, eltype(x).(b1), eltype(x).(b2)), copy(A))
 db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x, eltype(x).(b2)), copy(b1))
@@ -145,15 +160,17 @@ function f2(A, b1, b2; alg = RFLUFactorization())
     s1 = copy(solve!(cache).u)
     cache.b = b2
     s2 = solve!(cache).u
-    norm(s1 + s2)
+    return norm(s1 + s2)
 end
 
 f2(A, b1, b2)
 dA = zeros(n, n);
 db1 = zeros(n);
 db2 = zeros(n);
-Enzyme.autodiff(Reverse, f2, Duplicated(copy(A), dA),
-    Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
+Enzyme.autodiff(
+    Reverse, f2, Duplicated(copy(A), dA),
+    Duplicated(copy(b1), db1), Duplicated(copy(b2), db2)
+)
 
 @test dA ≈ dA2
 @test db1 ≈ db12
@@ -165,16 +182,18 @@ function f3(A, b1, b2; alg = KrylovJL_GMRES())
     s1 = copy(solve!(cache).u)
     cache.b = b2
     s2 = solve!(cache).u
-    norm(s1 + s2)
+    return norm(s1 + s2)
 end
 
 dA = zeros(n, n);
 db1 = zeros(n);
 db2 = zeros(n);
-Enzyme.autodiff(set_runtime_activity(Reverse), f3, Duplicated(copy(A), dA),
-    Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
+Enzyme.autodiff(
+    set_runtime_activity(Reverse), f3, Duplicated(copy(A), dA),
+    Duplicated(copy(b1), db1), Duplicated(copy(b2), db2)
+)
 
-@test dA ≈ dA2 atol=5e-5
+@test dA ≈ dA2 atol = 5.0e-5
 @test db1 ≈ db12
 @test db2 ≈ db22
 
@@ -186,7 +205,7 @@ function f4(A, b1, b2; alg = LUFactorization())
     cache.b = b2
     solve!(cache)
     s2 = copy(cache.u)
-    norm(s1 + s2)
+    return norm(s1 + s2)
 end
 
 A = rand(n, n);
@@ -199,7 +218,8 @@ db2 = zeros(n);
 f4(A, b1, b2)
 @test_throws "Adjoint case currently not handled" Enzyme.autodiff(
     Reverse, f4, Duplicated(copy(A), dA),
-    Duplicated(copy(b1), db1), Duplicated(copy(b2), db2))
+    Duplicated(copy(b1), db1), Duplicated(copy(b2), db2)
+)
 
 #=
 dA2 = ForwardDiff.gradient(x -> f4(x, eltype(x).(b1), eltype(x).(b2)), copy(A))
@@ -222,21 +242,25 @@ function fnice(A, b, alg)
 end
 
 @testset for alg in (
-    LUFactorization(),
-    RFLUFactorization()    # KrylovJL_GMRES(), fails
-)
+        LUFactorization(),
+        RFLUFactorization(),    # KrylovJL_GMRES(), fails
+    )
     fb_closure = b -> fnice(A, b, alg)
 
     fd_jac = FiniteDiff.finite_difference_jacobian(fb_closure, b1) |> vec
     @show fd_jac
 
     en_jac = map(onehot(b1)) do db1
-        return only(Enzyme.autodiff(set_runtime_activity(Forward), fnice,
-            Const(A), Duplicated(b1, db1), Const(alg)))
+        return only(
+            Enzyme.autodiff(
+                set_runtime_activity(Forward), fnice,
+                Const(A), Duplicated(b1, db1), Const(alg)
+            )
+        )
     end |> collect
     @show en_jac
 
-    @test en_jac≈fd_jac rtol=1e-4
+    @test en_jac ≈ fd_jac rtol = 1.0e-4
 
     fA_closure = A -> fnice(A, b1, alg)
 
@@ -244,22 +268,27 @@ end
     @show fd_jac
 
     en_jac = map(onehot(A)) do dA
-        return only(Enzyme.autodiff(set_runtime_activity(Forward), fnice,
-            Duplicated(A, dA), Const(b1), Const(alg)))
+        return only(
+            Enzyme.autodiff(
+                set_runtime_activity(Forward), fnice,
+                Duplicated(A, dA), Const(b1), Const(alg)
+            )
+        )
     end |> collect
     @show en_jac
 
-    @test en_jac≈fd_jac rtol=1e-4
+    @test en_jac ≈ fd_jac rtol = 1.0e-4
 end
 
 # https://github.com/SciML/LinearSolve.jl/issues/479
 function testls(A, b, u)
     oa = OperatorAssumptions(
-        true, condition = LinearSolve.OperatorCondition.WellConditioned)
+        true, condition = LinearSolve.OperatorCondition.WellConditioned
+    )
     prob = LinearProblem(A, b)
     linsolve = init(prob, LUFactorization(), assumptions = oa)
     cache = solve!(linsolve)
-    sum(cache.u)
+    return sum(cache.u)
 end
 
 A = [1.0 2.0; 3.0 4.0]
@@ -272,11 +301,12 @@ Enzyme.autodiff(Reverse, testls, Duplicated(A, dA), Duplicated(b, db), Duplicate
 
 function testls(A, b, u)
     oa = OperatorAssumptions(
-        true, condition = LinearSolve.OperatorCondition.WellConditioned)
+        true, condition = LinearSolve.OperatorCondition.WellConditioned
+    )
     prob = LinearProblem(A, b)
     linsolve = init(prob, LUFactorization(), assumptions = oa)
     solve!(linsolve)
-    sum(linsolve.u)
+    return sum(linsolve.u)
 end
 A = [1.0 2.0; 3.0 4.0]
 b = [1.0, 2.0]

@@ -38,7 +38,7 @@ A5_ = A - 0.01Tridiagonal(ones(n, n)) + sparse([1], [8], 0.5, n, n)
 A5 = sparse(transpose(A5_) * A5_)
 x5 = zeros(n)
 u5 = ones(n)
-b5 = A5*u5
+b5 = A5 * u5
 
 prob1 = LinearProblem(A1, b1; u0 = x1)
 prob2 = LinearProblem(A2, b2; u0 = x2)
@@ -46,7 +46,7 @@ prob3 = LinearProblem(A3, b3; u0 = x3)
 prob4 = LinearProblem(A4, b4; u0 = x4)
 prob5 = LinearProblem(A5, b5)
 
-cache_kwargs = (; abstol = 1e-8, reltol = 1e-8, maxiter = 30)
+cache_kwargs = (; abstol = 1.0e-8, reltol = 1.0e-8, maxiter = 30)
 
 function test_interface(alg, prob1, prob2)
     A1, b1 = prob1.A, prob1.b
@@ -79,10 +79,10 @@ end
 
 function test_tolerance_update(alg, prob, u)
     cache = init(prob, alg)
-    LinearSolve.update_tolerances!(cache; reltol = 1e-2, abstol = 1e-8)
+    LinearSolve.update_tolerances!(cache; reltol = 1.0e-2, abstol = 1.0e-8)
     u1 = copy(solve!(cache).u)
 
-    LinearSolve.update_tolerances!(cache; reltol = 1e-8, abstol = 1e-8)
+    LinearSolve.update_tolerances!(cache; reltol = 1.0e-8, abstol = 1.0e-8)
     u2 = solve!(cache).u
 
     @test norm(u2 - u) < norm(u1 - u)
@@ -301,7 +301,7 @@ end
         # and that the default algorithm correctly selects it
         k = 100
         ρ = 0.95
-        A_tri = SymTridiagonal(ones(k) .+ ρ^2, -ρ * ones(k-1))
+        A_tri = SymTridiagonal(ones(k) .+ ρ^2, -ρ * ones(k - 1))
         b = rand(k)
 
         # Test with explicit LDLtFactorization
@@ -388,7 +388,7 @@ end
         QRFactorization(),
         SVDFactorization(),
         RFLUFactorization(),
-        LinearSolve.defaultalg(prob1.A, prob1.b)
+        LinearSolve.defaultalg(prob1.A, prob1.b),
     ]
 
     if LinearSolve.usemkl
@@ -419,15 +419,17 @@ end
     end
 
     @testset "Generic Factorizations" begin
-        for fact_alg in (lu, lu!,
-            qr, qr!,
-            cholesky,
-            # cholesky!,
-            # ldlt, ldlt!,
-            bunchkaufman, bunchkaufman!,
-            lq, lq!,
-            svd, svd!,
-            LinearAlgebra.factorize)
+        for fact_alg in (
+                lu, lu!,
+                qr, qr!,
+                cholesky,
+                # cholesky!,
+                # ldlt, ldlt!,
+                bunchkaufman, bunchkaufman!,
+                lq, lq!,
+                svd, svd!,
+                LinearAlgebra.factorize,
+            )
             @testset "fact_alg = $fact_alg" begin
                 alg = GenericFactorization(fact_alg = fact_alg)
                 test_interface(alg, prob1, prob2)
@@ -452,7 +454,7 @@ end
             ("FGMRES_prec", KrylovJL_FGMRES(; precs, ldiv = false, kwargs...)),
             # ("BICGSTAB",KrylovJL_BICGSTAB(kwargs...)),
             ("MINRES", KrylovJL_MINRES(kwargs...)),
-            ("MINARES", KrylovJL_MINARES(kwargs...))
+            ("MINARES", KrylovJL_MINARES(kwargs...)),
         )
         for (name, algorithm) in algorithms
             @testset "$name" begin
@@ -490,11 +492,12 @@ end
     if VERSION >= v"1.9-"
         @testset "IterativeSolversJL" begin
             kwargs = (; gmres_restart = 5)
-            for alg in (("Default", IterativeSolversJL(kwargs...)),
-                ("CG", IterativeSolversJL_CG(kwargs...)),
-                ("GMRES", IterativeSolversJL_GMRES(kwargs...)),
-                ("IDRS", IterativeSolversJL_IDRS(kwargs...))                #           ("BICGSTAB",IterativeSolversJL_BICGSTAB(kwargs...)),                #            ("MINRES",IterativeSolversJL_MINRES(kwargs...)),
-            )
+            for alg in (
+                    ("Default", IterativeSolversJL(kwargs...)),
+                    ("CG", IterativeSolversJL_CG(kwargs...)),
+                    ("GMRES", IterativeSolversJL_GMRES(kwargs...)),
+                    ("IDRS", IterativeSolversJL_IDRS(kwargs...)),                #           ("BICGSTAB",IterativeSolversJL_BICGSTAB(kwargs...)),                #            ("MINRES",IterativeSolversJL_MINRES(kwargs...)),
+                )
                 @testset "$(alg[1])" begin
                     test_interface(alg[2], prob1, prob2)
                     test_interface(alg[2], prob3, prob4)
@@ -507,9 +510,11 @@ end
     if VERSION > v"1.9-"
         @testset "KrylovKit" begin
             kwargs = (; gmres_restart = 5)
-            for alg in (("Default", KrylovKitJL(kwargs...)),
-                ("CG", KrylovKitJL_CG(kwargs...)),
-                ("GMRES", KrylovKitJL_GMRES(kwargs...)))
+            for alg in (
+                    ("Default", KrylovKitJL(kwargs...)),
+                    ("CG", KrylovKitJL_CG(kwargs...)),
+                    ("GMRES", KrylovKitJL_GMRES(kwargs...)),
+                )
                 @testset "$(alg[1])" begin
                     test_interface(alg[2], prob1, prob2)
                     test_interface(alg[2], prob3, prob4)
@@ -536,7 +541,7 @@ end
             # Enforce symmetry to use Cholesky, since A is symmetric and posdef
             prob2 = LinearProblem(Symmetric(A), b)
             sol2 = solve(prob2)
-            @test abs(norm(A * sol2.u .- b) - norm(A * sol.u .- b)) < 1e-12
+            @test abs(norm(A * sol2.u .- b) - norm(A * sol.u .- b)) < 1.0e-12
         end
     end
 
@@ -674,16 +679,20 @@ end
         x2 = zero(b1)
 
         @testset "LinearSolveFunction" begin
-            function sol_func(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,
-                    kwargs...)
+            function sol_func(
+                    A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,
+                    kwargs...
+                )
                 if verbose == true
                     println("out-of-place solve")
                 end
                 u .= A \ b
             end
 
-            function sol_func!(A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,
-                    kwargs...)
+            function sol_func!(
+                    A, b, u, p, newA, Pl, Pr, solverdata; verbose = true,
+                    kwargs...
+                )
                 if verbose == true
                     println("in-place solve")
                 end
@@ -693,8 +702,10 @@ end
             prob1 = LinearProblem(A1, b1; u0 = x1)
             prob2 = LinearProblem(A1, b1; u0 = x1)
 
-            for alg in (LinearSolveFunction(sol_func),
-                LinearSolveFunction(sol_func!))
+            for alg in (
+                    LinearSolveFunction(sol_func),
+                    LinearSolveFunction(sol_func!),
+                )
                 test_interface(alg, prob1, prob2)
             end
         end
@@ -737,13 +748,13 @@ end
             prob4 = LinearProblem(op2, b2; u0 = x2)
 
             @test LinearSolve.defaultalg(op1, x1).alg ===
-                  LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
+                LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
             @test LinearSolve.defaultalg(op2, x2).alg ===
-                  LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
+                LinearSolve.DefaultAlgorithmChoice.DirectLdiv!
             @test LinearSolve.defaultalg(op3, x1).alg ===
-                  LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
+                LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
             @test LinearSolve.defaultalg(op4, x2).alg ===
-                  LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
+                LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
             test_interface(DirectLdiv!(), prob1, prob2)
             test_interface(nothing, prob1, prob2)
             test_interface(KrylovJL_GMRES(), prob3, prob4)
@@ -815,7 +826,7 @@ end
     pr = LinearProblem(B, b)
 
     # test default algorithn
-    @time "solve MySparseMatrixCSC" u=solve(pr)
+    @time "solve MySparseMatrixCSC" u = solve(pr)
     @test norm(u - u0, Inf) < 1.0e-13
 
     # test Krylov algorithm with reinit!
@@ -861,7 +872,7 @@ end
 end
 
 @testset "ParallelSolves" begin
-    n=1000
+    n = 1000
     @info "ParallelSolves: Threads.nthreads()=$(Threads.nthreads())"
     A_sparse = 10I - sprand(n, n, 0.01)
     B = [rand(n), rand(n)]

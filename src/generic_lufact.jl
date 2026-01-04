@@ -1,10 +1,12 @@
 # From LinearAlgebra.lu.jl
 # Modified to be non-allocating
 @static if VERSION < v"1.11"
-    function generic_lufact!(A::AbstractMatrix{T},
+    function generic_lufact!(
+            A::AbstractMatrix{T},
             pivot::Union{RowMaximum, NoPivot, RowNonZero} = LinearAlgebra.lupivottype(T),
             ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...));
-            check::Bool = true, allowsingular::Bool = false) where {T}
+            check::Bool = true, allowsingular::Bool = false
+        ) where {T}
         check && LinearAlgebra.LAPACK.chkfinite(A)
         # Extract values
         m, n = size(A)
@@ -55,20 +57,23 @@
                 # Update the rest
                 for j in (k + 1):n
                     for i in (k + 1):m
-                        A[i, j] -= A[i, k]*A[k, j]
+                        A[i, j] -= A[i, k] * A[k, j]
                     end
                 end
             end
         end
         check && LinearAlgebra.checknonsingular(info, pivot)
         return LinearAlgebra.LU{T, typeof(A), typeof(ipiv)}(
-            A, ipiv, convert(LinearAlgebra.BlasInt, info))
+            A, ipiv, convert(LinearAlgebra.BlasInt, info)
+        )
     end
 elseif VERSION < v"1.13"
-    function generic_lufact!(A::AbstractMatrix{T},
+    function generic_lufact!(
+            A::AbstractMatrix{T},
             pivot::Union{RowMaximum, NoPivot, RowNonZero} = LinearAlgebra.lupivottype(T),
             ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...));
-            check::Bool = true, allowsingular::Bool = false) where {T}
+            check::Bool = true, allowsingular::Bool = false
+        ) where {T}
         check && LinearAlgebra.LAPACK.chkfinite(A)
         # Extract values
         m, n = size(A)
@@ -119,7 +124,7 @@ elseif VERSION < v"1.13"
                 # Update the rest
                 for j in (k + 1):n
                     for i in (k + 1):m
-                        A[i, j] -= A[i, k]*A[k, j]
+                        A[i, j] -= A[i, k] * A[k, j]
                     end
                 end
             end
@@ -131,7 +136,8 @@ elseif VERSION < v"1.13"
         end
         check && LinearAlgebra._check_lu_success(info, allowsingular)
         return LinearAlgebra.LU{T, typeof(A), typeof(ipiv)}(
-            A, ipiv, convert(LinearAlgebra.BlasInt, info))
+            A, ipiv, convert(LinearAlgebra.BlasInt, info)
+        )
     end
 else
     generic_lufact!(args...; kwargs...) = LinearAlgebra.generic_lufact!(args...; kwargs...)

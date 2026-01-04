@@ -40,16 +40,16 @@ end
         close(err.in)
         out = (
             stdout = String(read(out)), stderr = String(read(err)),
-            exitcode = process.exitcode
+            exitcode = process.exitcode,
         )
         return out
     end
 
     JULIAC = normpath(
         joinpath(
-        Sys.BINDIR, Base.DATAROOTDIR, "julia", "juliac",
-        "juliac.jl"
-    )
+            Sys.BINDIR, Base.DATAROOTDIR, "julia", "juliac",
+            "juliac.jl"
+        )
     )
     @test isfile(JULIAC)
 
@@ -57,7 +57,7 @@ end
     # Build list of tests to run, conditionally including MKL
     test_files = [
         ("main_lu.jl", true),
-        ("main_rf.jl", true)
+        ("main_rf.jl", true),
     ]
     if LinearSolve.usemkl
         push!(test_files, ("main_mkl.jl", true))

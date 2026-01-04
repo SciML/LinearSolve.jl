@@ -26,15 +26,15 @@ Returns an authentication method indicator if successful, nothing if setup fails
 function setup_github_authentication(; auto_login::Bool = true)
     # 1. Check for `gh` CLI (system or JLL)
     gh_cmd = get_gh_command()
-    
+
     # First check if already authenticated
     try
         # gh auth status outputs to stderr, not stdout
         io = IOBuffer()
-        run(pipeline(`$gh_cmd auth status`; stderr=io, stdout=devnull))
+        run(pipeline(`$gh_cmd auth status`; stderr = io, stdout = devnull))
         seekstart(io)
         auth_status_output = read(io, String)
-        
+
         if contains(auth_status_output, "Logged in to github.com")
             println("✅ Found active `gh` CLI session. Will use it for upload.")
             return (:gh_cli, "GitHub CLI")
@@ -59,12 +59,12 @@ function setup_github_authentication(; auto_login::Bool = true)
         println("\nWould you like to authenticate with GitHub now? (y/n)")
         print("> ")
         response = readline()
-        
+
         if lowercase(strip(response)) in ["y", "yes"]
             println("\n📝 Starting GitHub authentication...")
             println("   This will open your browser to authenticate with GitHub.")
             println("   Please follow the prompts to complete authentication.\n")
-            
+
             # Run gh auth login - it may fail to open browser but still succeed
             auth_login_success = false
             try
@@ -75,26 +75,26 @@ function setup_github_authentication(; auto_login::Bool = true)
                 println("\n⚠️  gh auth login reported an issue: $e")
                 println("   Checking if authentication succeeded anyway...")
             end
-            
+
             # Always check auth status, even if gh auth login appeared to fail
             # This handles cases where browser opening failed but user completed auth manually
             try
                 # Small delay to ensure auth is fully processed
                 sleep(0.5)
-                
+
                 # Check current authentication status
                 auth_status_output = ""
                 try
                     # gh auth status outputs to stderr, not stdout
                     io = IOBuffer()
-                    run(pipeline(`$gh_cmd auth status`; stderr=io, stdout=devnull))
+                    run(pipeline(`$gh_cmd auth status`; stderr = io, stdout = devnull))
                     seekstart(io)
                     auth_status_output = read(io, String)
                 catch
                     # If that fails, try capturing both streams
                     try
                         io = IOBuffer()
-                        run(pipeline(`$gh_cmd auth status`; stderr=io, stdout=io))
+                        run(pipeline(`$gh_cmd auth status`; stderr = io, stdout = io))
                         seekstart(io)
                         auth_status_output = read(io, String)
                     catch
@@ -102,7 +102,7 @@ function setup_github_authentication(; auto_login::Bool = true)
                         auth_status_output = ""
                     end
                 end
-                
+
                 if contains(auth_status_output, "Logged in to github.com")
                     println("\n✅ Authentication successful! You can now share results.")
                     return (:gh_cli, "GitHub CLI")
@@ -164,8 +164,11 @@ end
 
 Format benchmark results as a markdown table suitable for GitHub issues.
 """
-function format_results_for_github(df::DataFrame, system_info::Dict, categories::Dict{
-        String, String})
+function format_results_for_github(
+        df::DataFrame, system_info::Dict, categories::Dict{
+            String, String,
+        }
+    )
     # Include all results, both successful and failed (with NaN values)
     # This shows what algorithms were attempted, making it clear what was tested
     all_results_df = df
@@ -176,20 +179,20 @@ function format_results_for_github(df::DataFrame, system_info::Dict, categories:
     end
 
     markdown_content = """
-## LinearSolve.jl Autotune Benchmark Results
+    ## LinearSolve.jl Autotune Benchmark Results
 
-### Performance Summary by Size Range
-$(format_categories_markdown(categories))
+    ### Performance Summary by Size Range
+    $(format_categories_markdown(categories))
 
-### Detailed Results
-$(format_detailed_results_markdown(all_results_df))
+    ### Detailed Results
+    $(format_detailed_results_markdown(all_results_df))
 
-### System Information
-$(format_system_info_markdown(system_info))
+    ### System Information
+    $(format_system_info_markdown(system_info))
 
----
-*Generated automatically by LinearSolveAutotune.jl*
-"""
+    ---
+    *Generated automatically by LinearSolveAutotune.jl*
+    """
 
     return markdown_content
 end
@@ -208,7 +211,7 @@ function format_system_info_markdown(system_info::Dict)
     push!(lines, "- **OS**: $os_display ($os_kernel)")
     # Handle both "arch" and "architecture" keys
     push!(lines, "- **Architecture**: $(get(system_info, "architecture", get(system_info, "arch", "unknown")))")
-    
+
     # Enhanced CPU information
     cpu_model = get(system_info, "cpu_model", nothing)
     if cpu_model !== nothing && cpu_model != "unknown"
@@ -225,7 +228,7 @@ function format_system_info_markdown(system_info::Dict)
         # Fallback to legacy CPU name
         push!(lines, "- **CPU**: $(get(system_info, "cpu_name", "unknown"))")
     end
-    
+
     # Handle both "num_cores" and "cpu_cores" keys
     push!(lines, "- **Cores**: $(get(system_info, "cpu_cores", get(system_info, "num_cores", "unknown")))")
     # Handle both "num_threads" and "julia_threads" keys
@@ -237,7 +240,7 @@ function format_system_info_markdown(system_info::Dict)
     push!(lines, "- **CUDA Available**: $(get(system_info, "cuda_available", get(system_info, "has_cuda", false)))")
     # Handle both "has_metal" and "metal_available" keys
     push!(lines, "- **Metal Available**: $(get(system_info, "metal_available", get(system_info, "has_metal", false)))")
-    
+
     # GPU Information
     if haskey(system_info, "gpu_type")
         push!(lines, "- **GPU Type**: $(system_info["gpu_type"])")
@@ -254,16 +257,16 @@ function format_system_info_markdown(system_info::Dict)
             push!(lines, "- **All GPU Types**: $(join(system_info["gpu_types"], ", "))")
         end
     end
-    
+
     # Add package versions section
     if haskey(system_info, "package_versions")
         push!(lines, "")
         push!(lines, "### Package Versions")
         pkg_versions = system_info["package_versions"]
-        
+
         # Sort packages for consistent display
         sorted_packages = sort(collect(keys(pkg_versions)))
-        
+
         for pkg_name in sorted_packages
             version = pkg_versions[pkg_name]
             push!(lines, "- **$pkg_name**: $version")
@@ -284,14 +287,14 @@ function format_categories_markdown(categories::Dict{String, String})
     end
 
     lines = String[]
-    
+
     # Group categories by element type
     eltype_categories = Dict{String, Dict{String, String}}()
-    
+
     for (key, algorithm) in categories
         # Parse key like "Float64_tiny (5-20)" -> eltype="Float64", range="tiny (5-20)"
         if contains(key, "_")
-            eltype, range = split(key, "_", limit=2)
+            eltype, range = split(key, "_", limit = 2)
             if !haskey(eltype_categories, eltype)
                 eltype_categories[eltype] = Dict{String, String}()
             end
@@ -304,10 +307,10 @@ function format_categories_markdown(categories::Dict{String, String})
             eltype_categories["Mixed"][key] = algorithm
         end
     end
-    
+
     # Define the proper order for size ranges
     size_order = ["tiny (5-20)", "small (20-100)", "medium (100-300)", "large (300-1000)", "big (10000+)"]
-    
+
     # Custom sort function for ranges
     function sort_ranges(ranges_dict)
         sorted_pairs = []
@@ -324,7 +327,7 @@ function format_categories_markdown(categories::Dict{String, String})
         end
         return sorted_pairs
     end
-    
+
     # Format each element type
     for (eltype, ranges) in sort(eltype_categories)
         push!(lines, "#### Recommendations for $eltype")
@@ -349,36 +352,42 @@ Includes both summary statistics and raw performance data in collapsible section
 """
 function format_detailed_results_markdown(df::DataFrame)
     lines = String[]
-    
+
     # Get unique element types
     eltypes = unique(df.eltype)
-    
+
     for eltype in eltypes
         push!(lines, "#### Results for $eltype")
         push!(lines, "")
-        
+
         # Filter results for this element type
         eltype_df = filter(row -> row.eltype == eltype, df)
-        
+
         if nrow(eltype_df) == 0
             push!(lines, "No results for this element type.")
             push!(lines, "")
             continue
         end
-        
+
         # Create a summary table with average performance per algorithm for this element type
         # Include statistics that account for NaN values
-        summary = combine(groupby(eltype_df, :algorithm), 
-                         :gflops => (x -> begin
-                             valid_vals = filter(!isnan, x)
-                             length(valid_vals) > 0 ? mean(valid_vals) : NaN
-                         end) => :avg_gflops, 
-                         :gflops => (x -> begin
-                             valid_vals = filter(!isnan, x)
-                             length(valid_vals) > 1 ? std(valid_vals) : NaN
-                         end) => :std_gflops,
-                         :gflops => (x -> count(!isnan, x)) => :successful_tests,
-                         nrow => :total_tests)
+        summary = combine(
+            groupby(eltype_df, :algorithm),
+            :gflops => (
+                x -> begin
+                    valid_vals = filter(!isnan, x)
+                    length(valid_vals) > 0 ? mean(valid_vals) : NaN
+                end
+            ) => :avg_gflops,
+            :gflops => (
+                x -> begin
+                    valid_vals = filter(!isnan, x)
+                    length(valid_vals) > 1 ? std(valid_vals) : NaN
+                end
+            ) => :std_gflops,
+            :gflops => (x -> count(!isnan, x)) => :successful_tests,
+            nrow => :total_tests
+        )
         sort!(summary, :avg_gflops, rev = true)
 
         push!(lines, "##### Summary Statistics")
@@ -391,30 +400,30 @@ function format_detailed_results_markdown(df::DataFrame)
             std_str = isnan(row.std_gflops) ? "NaN" : @sprintf("%.2f", row.std_gflops)
             push!(lines, "| $(row.algorithm) | $avg_str | $std_str | $(row.successful_tests)/$(row.total_tests) |")
         end
-        
+
         push!(lines, "")
-        
+
         # Add raw performance data in collapsible details blocks for each algorithm
         push!(lines, "<details>")
         push!(lines, "<summary>Raw Performance Data</summary>")
         push!(lines, "")
-        
+
         # Get unique algorithms for this element type
         algorithms = unique(eltype_df.algorithm)
-        
+
         for algorithm in sort(algorithms)
             # Filter data for this algorithm
             algo_df = filter(row -> row.algorithm == algorithm, eltype_df)
-            
+
             # Sort by size for better readability
             sort!(algo_df, :size)
-            
+
 
             push!(lines, "##### $algorithm")
             push!(lines, "")
             push!(lines, "| Matrix Size | GFLOPs | Status |")
             push!(lines, "|-------------|--------|--------|")
-            
+
             for row in eachrow(algo_df)
                 gflops_str = if row.success
                     @sprintf("%.3f", row.gflops)
@@ -426,10 +435,10 @@ function format_detailed_results_markdown(df::DataFrame)
                 status = row.success ? "✅ Success" : "❌ Failed"
                 push!(lines, "| $(row.size) | $gflops_str | $status |")
             end
-            
+
             push!(lines, "")
         end
-        
+
         push!(lines, "</details>")
         push!(lines, "")
     end
@@ -444,9 +453,11 @@ end
 Create a GitHub issue with benchmark results for community data collection.
 Note: plot_files parameter is kept for compatibility but not used.
 """
-function upload_to_github(content::String, plot_files, auth_info::Tuple,
-                         results_df::DataFrame, system_info::Dict, categories::Dict)
-    
+function upload_to_github(
+        content::String, plot_files, auth_info::Tuple,
+        results_df::DataFrame, system_info::Dict, categories::Dict
+    )
+
     auth_method, auth_data = auth_info
 
     if auth_method === nothing
@@ -459,21 +470,21 @@ function upload_to_github(content::String, plot_files, auth_info::Tuple,
         @info "📁 Results saved locally to $fallback_file"
         return
     end
-    
+
     @info "📤 Preparing to upload benchmark results..."
 
-    try
+    return try
         target_repo = "SciML/LinearSolve.jl"
         issue_number = 725  # The existing issue for collecting autotune results
-        
+
         # Construct comment body - use cpu_model if available for more specific info
         cpu_display = get(system_info, "cpu_model", get(system_info, "cpu_name", "unknown"))
         os_name = get(system_info, "os", "unknown")
         timestamp = Dates.format(Dates.now(), "yyyy-mm-dd HH:MM")
-        
+
         comment_body = """
         ## Benchmark Results: $cpu_display on $os_name ($timestamp)
-        
+
         $content
 
         ---
@@ -487,7 +498,7 @@ function upload_to_github(content::String, plot_files, auth_info::Tuple,
         """
 
         @info "📝 Adding comment to issue #725..."
-        
+
         issue_url = nothing
         if auth_method == :gh_cli
             issue_url = comment_on_issue_gh(target_repo, issue_number, comment_body)
@@ -509,7 +520,7 @@ function upload_to_github(content::String, plot_files, auth_info::Tuple,
         @error "    Auth method: $auth_method"
         @error "    Error type: $(typeof(e))"
         @error "    Error message: $e"
-        
+
         # Provide specific guidance based on error type
         if occursin("403", string(e)) || occursin("forbidden", lowercase(string(e)))
             @info "📝 This appears to be a permissions issue. Possible causes:"
@@ -549,7 +560,7 @@ function upload_plots_to_gist(plot_files::Union{Nothing, Tuple, Dict}, auth, elt
     if plot_files === nothing
         return nothing, Dict{String, String}()
     end
-    
+
     try
         # Handle different plot_files formats
         files_to_upload = if isa(plot_files, Tuple)
@@ -560,96 +571,96 @@ function upload_plots_to_gist(plot_files::Union{Nothing, Tuple, Dict}, auth, elt
         else
             return nothing, Dict{String, String}()
         end
-        
+
         # Filter existing files
         existing_files = Dict(k => v for (k, v) in files_to_upload if isfile(v))
         if isempty(existing_files)
             return nothing, Dict{String, String}()
         end
-        
+
         # Create README content
         readme_content = """
-# LinearSolve.jl Benchmark Plots
+        # LinearSolve.jl Benchmark Plots
 
-**Element Type:** $eltype_str  
-**Generated:** $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))
+        **Element Type:** $eltype_str  
+        **Generated:** $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))
 
-## Files
+        ## Files
 
-"""
+        """
         for (name, _) in existing_files
             readme_content *= "- `$name`\n"
         end
-        
+
         readme_content *= """
 
-## Viewing the Plots
+        ## Viewing the Plots
 
-The PNG images can be viewed directly in the browser. Click on any `.png` file above to view it.
+        The PNG images can be viewed directly in the browser. Click on any `.png` file above to view it.
 
----
-*Generated automatically by LinearSolve.jl autotune system*
-"""
-        
+        ---
+        *Generated automatically by LinearSolve.jl autotune system*
+        """
+
         # Create initial gist with README
         timestamp = Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS")
         gist_desc = "LinearSolve.jl Benchmark Plots - $eltype_str - $timestamp"
-        
+
         gist_files = Dict{String, Any}()
         gist_files["README.md"] = Dict("content" => readme_content)
-        
+
         params = Dict(
             "description" => gist_desc,
             "public" => true,
             "files" => gist_files
         )
-        
+
         # Create the gist
-        gist = GitHub.create_gist(; params=params, auth=auth)
+        gist = GitHub.create_gist(; params = params, auth = auth)
         gist_url = gist.html_url
         gist_id = split(gist_url, "/")[end]
-        username = split(gist_url, "/")[end-1]
-        
+        username = split(gist_url, "/")[end - 1]
+
         # Now clone the gist and add the binary files
         temp_dir = mktempdir()
         try
             # Clone using HTTPS with token authentication
             clone_url = "https://$(auth.token)@gist.github.com/$gist_id.git"
             run(`git clone $clone_url $temp_dir`)
-            
+
             # Copy all plot files to the gist directory
             for (name, filepath) in existing_files
                 target_path = joinpath(temp_dir, name)
-                cp(filepath, target_path; force=true)
+                cp(filepath, target_path; force = true)
             end
-            
+
             # Configure git user for the commit
             cd(temp_dir) do
                 # Set a generic user for the commit
                 run(`git config user.email "linearsolve-autotune@example.com"`)
                 run(`git config user.name "LinearSolve Autotune"`)
-                
+
                 # Stage, commit and push the changes
                 run(`git add .`)
                 run(`git commit -m "Add benchmark plots"`)
                 run(`git push`)
             end
-            
+
             @info "✅ Successfully uploaded plots to gist: $gist_url"
-            
+
             # Construct raw URLs for the uploaded files
             raw_urls = Dict{String, String}()
             for (name, _) in existing_files
                 raw_urls[name] = "https://gist.githubusercontent.com/$username/$gist_id/raw/$name"
             end
-            
+
             return gist_url, raw_urls
-            
+
         finally
             # Clean up temporary directory
-            rm(temp_dir; recursive=true, force=true)
+            rm(temp_dir; recursive = true, force = true)
         end
-        
+
     catch e
         @warn "Failed to upload plots to gist via API: $e"
         # Fall back to HTML with embedded images
@@ -681,7 +692,7 @@ function upload_plots_to_gist_fallback(files::Dict, auth, eltype_str::String)
             <h1>LinearSolve.jl Benchmark Plots</h1>
             <h2>Element Type: $eltype_str</h2>
         """
-        
+
         # Read files and embed as base64
         for (name, filepath) in files
             if isfile(filepath) && endswith(filepath, ".png")
@@ -689,7 +700,7 @@ function upload_plots_to_gist_fallback(files::Dict, auth, eltype_str::String)
                 binary_content = read(filepath)
                 base64_content = base64encode(binary_content)
                 data_uri = "data:image/png;base64,$base64_content"
-                
+
                 # Add to HTML
                 html_content *= """
                 <div class="plot">
@@ -699,30 +710,30 @@ function upload_plots_to_gist_fallback(files::Dict, auth, eltype_str::String)
                 """
             end
         end
-        
+
         html_content *= """
         </body>
         </html>
         """
-        
+
         # Create gist with HTML file
         timestamp = Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS")
         gist_desc = "LinearSolve.jl Benchmark Plots - $eltype_str - $timestamp"
-        
+
         gist_files = Dict{String, Any}()
         gist_files["plots.html"] = Dict("content" => html_content)
-        
+
         params = Dict(
             "description" => gist_desc,
             "public" => true,
             "files" => gist_files
         )
-        
-        gist = GitHub.create_gist(; params=params, auth=auth)
-        
+
+        gist = GitHub.create_gist(; params = params, auth = auth)
+
         @info "✅ Uploaded plots to gist (HTML fallback): $(gist.html_url)"
         return gist.html_url, Dict{String, String}()
-        
+
     catch e
         @warn "Failed to upload plots to gist (fallback): $e"
         return nothing, Dict{String, String}()
@@ -738,7 +749,7 @@ function upload_plots_to_gist_gh(plot_files::Union{Nothing, Tuple, Dict}, eltype
     if plot_files === nothing
         return nothing, Dict{String, String}()
     end
-    
+
     try
         gh_cmd = get_gh_command()
         # Handle different plot_files formats
@@ -750,105 +761,105 @@ function upload_plots_to_gist_gh(plot_files::Union{Nothing, Tuple, Dict}, eltype
         else
             return nothing, Dict{String, String}()
         end
-        
+
         # Filter existing files
         existing_files = Dict(k => v for (k, v) in files_to_upload if isfile(v))
         if isempty(existing_files)
             return nothing, Dict{String, String}()
         end
-        
+
         # Create initial gist with a README
         timestamp = Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS")
         gist_desc = "LinearSolve.jl Benchmark Plots - $eltype_str - $timestamp"
-        
+
         # Create README content
         readme_content = """
-# LinearSolve.jl Benchmark Plots
+        # LinearSolve.jl Benchmark Plots
 
-**Element Type:** $eltype_str  
-**Generated:** $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))
+        **Element Type:** $eltype_str  
+        **Generated:** $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))
 
-## Files
+        ## Files
 
-"""
+        """
         for (name, _) in existing_files
             readme_content *= "- `$name`\n"
         end
-        
+
         readme_content *= """
 
-## Viewing the Plots
+        ## Viewing the Plots
 
-The PNG images can be viewed directly in the browser. Click on any `.png` file above to view it.
+        The PNG images can be viewed directly in the browser. Click on any `.png` file above to view it.
 
----
-*Generated automatically by LinearSolve.jl autotune system*
-"""
-        
+        ---
+        *Generated automatically by LinearSolve.jl autotune system*
+        """
+
         # Create temporary file for README
         readme_file = tempname() * "_README.md"
         open(readme_file, "w") do f
             write(f, readme_content)
         end
-        
+
         # Create initial gist with README
         out = Pipe()
         err = Pipe()
-        run(pipeline(`$gh_cmd gist create -d $gist_desc -p $readme_file`, stdout=out, stderr=err))
+        run(pipeline(`$gh_cmd gist create -d $gist_desc -p $readme_file`, stdout = out, stderr = err))
         close(out.in)
         close(err.in)
-        
+
         gist_url = strip(read(out, String))
         err_str = read(err, String)
-        
+
         if !startswith(gist_url, "https://gist.github.com/")
             error("gh gist create did not return a valid URL. Output: $gist_url. Error: $err_str")
         end
-        
+
         # Extract gist ID from URL
         gist_id = split(gist_url, "/")[end]
-        
+
         # Clone the gist
         temp_dir = mktempdir()
         try
             # Clone the gist
             run(`$gh_cmd gist clone $gist_id $temp_dir`)
-            
+
             # Copy all plot files to the gist directory
             for (name, filepath) in existing_files
                 target_path = joinpath(temp_dir, name)
-                cp(filepath, target_path; force=true)
+                cp(filepath, target_path; force = true)
             end
-            
+
             # Stage, commit and push the changes
             cd(temp_dir) do
                 run(`git add .`)
                 run(`git commit -m "Add benchmark plots"`)
                 run(`git push`)
             end
-            
+
             @info "✅ Successfully uploaded plots to gist: $gist_url"
-            
+
             # Get username for constructing raw URLs
             username_out = Pipe()
-            run(pipeline(`$gh_cmd api user --jq .login`, stdout=username_out))
+            run(pipeline(`$gh_cmd api user --jq .login`, stdout = username_out))
             close(username_out.in)
             username = strip(read(username_out, String))
-            
+
             # Construct raw URLs for the uploaded files
             raw_urls = Dict{String, String}()
             for (name, _) in existing_files
                 raw_urls[name] = "https://gist.githubusercontent.com/$username/$gist_id/raw/$name"
             end
-            
+
             return gist_url, raw_urls
-            
+
         finally
             # Clean up temporary directory
-            rm(temp_dir; recursive=true, force=true)
-            rm(readme_file; force=true)
+            rm(temp_dir; recursive = true, force = true)
+            rm(readme_file; force = true)
         end
-        
+
     catch e
         @warn "Failed to upload plots to gist via gh CLI: $e"
         return nothing, Dict{String, String}()
@@ -862,9 +873,9 @@ Add a comment to an existing GitHub issue using the GitHub API.
 """
 function comment_on_issue_api(target_repo, issue_number, body, auth)
     try
-        repo_obj = GitHub.repo(target_repo; auth=auth)
-        issue = GitHub.issue(repo_obj, issue_number; auth=auth)
-        comment = GitHub.create_comment(repo_obj, issue, body; auth=auth)
+        repo_obj = GitHub.repo(target_repo; auth = auth)
+        issue = GitHub.issue(repo_obj, issue_number; auth = auth)
+        comment = GitHub.create_comment(repo_obj, issue, body; auth = auth)
         @info "✅ Added comment to issue #$(issue_number) via API"
         return "https://github.com/$(target_repo)/issues/$(issue_number)#issuecomment-$(comment.id)"
     catch e
@@ -884,24 +895,24 @@ Add a comment to an existing GitHub issue using the `gh` CLI.
 function comment_on_issue_gh(target_repo, issue_number, body)
     err_str = ""
     out_str = ""
-    try
+    return try
         gh_cmd = get_gh_command()
         # Use a temporary file for the body to avoid command line length limits
         mktemp() do path, io
             write(io, body)
             flush(io)
-            
+
             # Construct and run the gh command
             cmd = `$gh_cmd issue comment $issue_number --repo $target_repo --body-file $path`
-            
+
             out = Pipe()
             err = Pipe()
-            run(pipeline(cmd, stdout=out, stderr=err))
+            run(pipeline(cmd, stdout = out, stderr = err))
             close(out)
             close(err)
             out_str = read(out, String)
             err_str = read(err, String)
-            
+
             @info "✅ Added comment to issue #$(issue_number) via `gh` CLI"
             return "https://github.com/$(target_repo)/issues/$(issue_number)"
         end
@@ -911,14 +922,14 @@ function comment_on_issue_gh(target_repo, issue_number, body)
         @debug "    Command stderr: $err_str"
         @debug "    Error type: $(typeof(e))"
         @debug "    Error details: $e"
-        
+
         # Create a more informative error message
         error_msg = if !isempty(err_str)
             "gh CLI error: $err_str"
         else
             "gh CLI command failed: $e"
         end
-        
+
         # Re-throw with more context
         error(error_msg)
     end
@@ -931,9 +942,9 @@ Create a GitHub issue using the GitHub.jl API.
 """
 function create_benchmark_issue_api(target_repo, title, body, auth)
     try
-        repo_obj = GitHub.repo(target_repo; auth=auth)
+        repo_obj = GitHub.repo(target_repo; auth = auth)
         params = Dict("title" => title, "body" => body, "labels" => ["benchmark-data"])
-        issue_result = GitHub.create_issue(repo_obj; params=params, auth=auth)
+        issue_result = GitHub.create_issue(repo_obj; params = params, auth = auth)
         @info "✅ Created benchmark results issue #$(issue_result.number) via API"
         return issue_result.html_url
     catch e
@@ -956,22 +967,22 @@ function create_benchmark_issue_gh(target_repo, title, body)
         mktemp() do path, io
             write(io, body)
             flush(io)
-            
+
             # Construct and run the gh command
             cmd = `$gh_cmd issue create --repo $target_repo --title $title --body-file $path --label benchmark-data`
-            
+
             out = Pipe()
             err = Pipe()
-            run(pipeline(cmd, stdout=out, stderr=err))
+            run(pipeline(cmd, stdout = out, stderr = err))
             closewrite(out)
             closewrite(err)
             out_str = read(out, String)
             err_str = read(err, String)
             # Capture output to get the issue URL
             issue_url = strip(out_str)
-            
+
             if !startswith(issue_url, "https://github.com/")
-                 error("gh CLI command did not return a valid URL. Output: $issue_url. Error: $err_str")
+                error("gh CLI command did not return a valid URL. Output: $issue_url. Error: $err_str")
             end
 
             @info "✅ Created benchmark results issue via `gh` CLI"

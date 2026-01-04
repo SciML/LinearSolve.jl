@@ -45,8 +45,10 @@ struct LinearSolveFunction{F} <: AbstractSolveFunction
     solve_func::F
 end
 
-function SciMLBase.solve!(cache::LinearCache, alg::LinearSolveFunction,
-        args...; kwargs...)
+function SciMLBase.solve!(
+        cache::LinearCache, alg::LinearSolveFunction,
+        args...; kwargs...
+    )
     (; A, b, u, p, isfresh, Pl, Pr, cacheval) = cache
     (; solve_func) = alg
 
@@ -92,7 +94,7 @@ alg = DirectLdiv!(Val(false))  # Never cache (may mutate A)
 """
 struct DirectLdiv!{cache} <: AbstractSolveFunction
     function DirectLdiv!(::Val{cache} = Val(true)) where {cache}
-        new{cache}()
+        return new{cache}()
     end
 end
 
@@ -116,22 +118,28 @@ end
 # We cache a copy of the Tridiagonal matrix and use that for the factorization.
 # See https://github.com/SciML/LinearSolve.jl/issues/825
 
-function init_cacheval(alg::DirectLdiv!{true}, A::Tridiagonal, b, u, Pl, Pr, maxiters::Int,
+function init_cacheval(
+        alg::DirectLdiv!{true}, A::Tridiagonal, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol, verbose::Union{LinearVerbosity, Bool},
-        assumptions::OperatorAssumptions)
+        assumptions::OperatorAssumptions
+    )
     # Allocate a copy of the Tridiagonal matrix to use as workspace for ldiv!
     return copy(A)
 end
 
-function init_cacheval(alg::DirectLdiv!{true}, A::SymTridiagonal, b, u, Pl, Pr,
+function init_cacheval(
+        alg::DirectLdiv!{true}, A::SymTridiagonal, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
-        assumptions::OperatorAssumptions)
+        assumptions::OperatorAssumptions
+    )
     # SymTridiagonal also gets mutated by ldiv!, cache a copy
     return copy(A)
 end
 
-function SciMLBase.solve!(cache::LinearCache{<:Tridiagonal}, alg::DirectLdiv!{true},
-        args...; kwargs...)
+function SciMLBase.solve!(
+        cache::LinearCache{<:Tridiagonal}, alg::DirectLdiv!{true},
+        args...; kwargs...
+    )
     (; A, b, u, cacheval) = cache
     # Copy current A values into the cached workspace (non-allocating)
     copyto!(cacheval.dl, A.dl)
@@ -142,8 +150,10 @@ function SciMLBase.solve!(cache::LinearCache{<:Tridiagonal}, alg::DirectLdiv!{tr
     return SciMLBase.build_linear_solution(alg, u, nothing, cache)
 end
 
-function SciMLBase.solve!(cache::LinearCache{<:SymTridiagonal}, alg::DirectLdiv!{true},
-        args...; kwargs...)
+function SciMLBase.solve!(
+        cache::LinearCache{<:SymTridiagonal}, alg::DirectLdiv!{true},
+        args...; kwargs...
+    )
     (; A, b, u, cacheval) = cache
     # Copy current A values into the cached workspace (non-allocating)
     copyto!(cacheval.dv, A.dv)

@@ -1,16 +1,18 @@
 module LinearSolveRecursiveFactorizationExt
 
 using LinearSolve: LinearSolve, userecursivefactorization, LinearCache, @get_cacheval,
-                   RFLUFactorization, ButterflyFactorization, RF32MixedLUFactorization, 
-                   default_alias_A, default_alias_b, LinearVerbosity
+    RFLUFactorization, ButterflyFactorization, RF32MixedLUFactorization,
+    default_alias_A, default_alias_b, LinearVerbosity
 using LinearSolve.LinearAlgebra, LinearSolve.ArrayInterface, RecursiveFactorization
 using SciMLBase: SciMLBase, ReturnCode
 using SciMLLogging: @SciMLMessage
 
 LinearSolve.userecursivefactorization(A::Union{Nothing, AbstractMatrix}) = true
 
-function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::RFLUFactorization{P, T};
-        kwargs...) where {P, T}
+function SciMLBase.solve!(
+        cache::LinearSolve.LinearCache, alg::RFLUFactorization{P, T};
+        kwargs...
+    ) where {P, T}
     A = cache.A
     A = convert(AbstractMatrix, A)
     fact, ipiv = LinearSolve.@get_cacheval(cache, :RFLUFactorization)
@@ -23,13 +25,14 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::RFLUFactorization
         if !LinearAlgebra.issuccess(fact)
             @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
+                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+            )
         end
 
         cache.isfresh = false
     end
     y = ldiv!(cache.u, LinearSolve.@get_cacheval(cache, :RFLUFactorization)[1], cache.b)
-    SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
+    return SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
 end
 
 # Mixed precision RecursiveFactorization implementation
@@ -42,9 +45,11 @@ const PREALLOCATED_RF32_LU = begin
     (luinst, Vector{LinearAlgebra.BlasInt}(undef, 0))
 end
 
-function LinearSolve.init_cacheval(alg::RF32MixedLUFactorization{P, T}, A, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(
+        alg::RF32MixedLUFactorization{P, T}, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
-        assumptions::LinearSolve.OperatorAssumptions) where {P, T}
+        assumptions::LinearSolve.OperatorAssumptions
+    ) where {P, T}
     # Pre-allocate appropriate 32-bit arrays based on input type
     m, n = size(A)
     T32 = eltype(A) <: Complex ? ComplexF32 : Float32
@@ -54,12 +59,13 @@ function LinearSolve.init_cacheval(alg::RF32MixedLUFactorization{P, T}, A, b, u,
     luinst = ArrayInterface.lu_instance(rand(T32, 0, 0))
     ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(m, n))
     # Return tuple with pre-allocated arrays
-    (luinst, ipiv, A_32, b_32, u_32)
+    return (luinst, ipiv, A_32, b_32, u_32)
 end
 
 function SciMLBase.solve!(
         cache::LinearSolve.LinearCache, alg::RF32MixedLUFactorization{P, T};
-        kwargs...) where {P, T}
+        kwargs...
+    ) where {P, T}
     A = cache.A
     A = convert(AbstractMatrix, A)
 
@@ -80,7 +86,8 @@ function SciMLBase.solve!(
 
         if !LinearAlgebra.issuccess(fact)
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
+                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+            )
         end
 
         cache.isfresh = false
@@ -88,11 +95,11 @@ function SciMLBase.solve!(
 
     # Get the factorization and pre-allocated arrays from the cache
     fact_cached, ipiv, A_32, b_32, u_32 = LinearSolve.@get_cacheval(cache, :RF32MixedLUFactorization)
-    
+
     # Compute types on demand for conversions
     T32 = eltype(cache.A) <: Complex ? ComplexF32 : Float32
     Torig = eltype(cache.u)
-    
+
     # Copy b to pre-allocated 32-bit array
     b_32 .= T32.(cache.b)
 
@@ -102,12 +109,15 @@ function SciMLBase.solve!(
     # Convert back to original precision
     cache.u .= Torig.(u_32)
 
-    SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache; retcode = ReturnCode.Success)
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+    )
 end
 
-function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::ButterflyFactorization;
-        kwargs...)
+function SciMLBase.solve!(
+        cache::LinearSolve.LinearCache, alg::ButterflyFactorization;
+        kwargs...
+    )
     cache_A = cache.A
     cache_A = convert(AbstractMatrix, cache_A)
     cache_b = cache.b
@@ -116,11 +126,11 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::ButterflyFactoriz
     thread = alg.thread
 
     if cache.isfresh
-        @assert M==N "A must be square"
+        @assert M == N "A must be square"
         if (size(workspace.A, 1) != M)
-            workspace = RecursiveFactorization.🦋workspace(cache_A, cache_b)    
+            workspace = RecursiveFactorization.🦋workspace(cache_A, cache_b)
         end
-        (;A, b, ws, U, V, out, tmp, n) = workspace
+        (; A, b, ws, U, V, out, tmp, n) = workspace
         RecursiveFactorization.🦋mul!(A, ws)
         F = RecursiveFactorization.lu!(A, Val(false), thread)
         cache.cacheval = (workspace, F)
@@ -128,22 +138,23 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::ButterflyFactoriz
     end
 
     workspace, F = cache.cacheval
-    (;A, b, ws, U, V, out, tmp, n) = workspace
+    (; A, b, ws, U, V, out, tmp, n) = workspace
     b[1:M] .= cache_b
     mul!(tmp, U', b)
 
     # TriangularSolve.ldiv!
     RecursiveFactorization.ldiv!(F, tmp, thread)
-  
+
     mul!(b, V, tmp)
     out .= @view b[1:n]
-    SciMLBase.build_linear_solution(alg, out, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, out, nothing, cache)
 end
 
-function LinearSolve.init_cacheval(alg::ButterflyFactorization, A, b, u, Pl, Pr, maxiters::Int,
-        abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::LinearSolve.OperatorAssumptions)
-    ws = RecursiveFactorization.🦋workspace(A, b), RecursiveFactorization.lu!(rand(1, 1), Val(false), alg.thread)
+function LinearSolve.init_cacheval(
+        alg::ButterflyFactorization, A, b, u, Pl, Pr, maxiters::Int,
+        abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::LinearSolve.OperatorAssumptions
+    )
+    return ws = RecursiveFactorization.🦋workspace(A, b), RecursiveFactorization.lu!(rand(1, 1), Val(false), alg.thread)
 end
 
 end
-

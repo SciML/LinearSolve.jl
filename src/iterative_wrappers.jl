@@ -19,12 +19,16 @@ struct KrylovJL{F, I, P, A, K} <: AbstractKrylovSubspaceMethod
     kwargs::K
 end
 
-function KrylovJL(args...; KrylovAlg = Krylov.gmres!,
+function KrylovJL(
+        args...; KrylovAlg = Krylov.gmres!,
         gmres_restart = 0, window = 0,
         precs = nothing,
-        kwargs...)
-    return KrylovJL(KrylovAlg, gmres_restart, window,
-        precs, args, kwargs)
+        kwargs...
+    )
+    return KrylovJL(
+        KrylovAlg, gmres_restart, window,
+        precs, args, kwargs
+    )
 end
 
 default_alias_A(::KrylovJL, ::Any, ::Any) = true
@@ -38,7 +42,7 @@ KrylovJL_CG(args...; kwargs...)
 A generic CG implementation for Hermitian and positive definite linear systems
 """
 function KrylovJL_CG(args...; kwargs...)
-    KrylovJL(args...; KrylovAlg = Krylov.cg!, kwargs...)
+    return KrylovJL(args...; KrylovAlg = Krylov.cg!, kwargs...)
 end
 
 """
@@ -49,7 +53,7 @@ KrylovJL_MINRES(args...; kwargs...)
 A generic MINRES implementation for Hermitian linear systems
 """
 function KrylovJL_MINRES(args...; kwargs...)
-    KrylovJL(args...; KrylovAlg = Krylov.minres!, kwargs...)
+    return KrylovJL(args...; KrylovAlg = Krylov.minres!, kwargs...)
 end
 
 """
@@ -60,7 +64,7 @@ KrylovJL_GMRES(args...; gmres_restart = 0, window = 0, kwargs...)
 A generic GMRES implementation for square non-Hermitian linear systems
 """
 function KrylovJL_GMRES(args...; kwargs...)
-    KrylovJL(args...; KrylovAlg = Krylov.gmres!, kwargs...)
+    return KrylovJL(args...; KrylovAlg = Krylov.gmres!, kwargs...)
 end
 
 """
@@ -71,7 +75,7 @@ KrylovJL_FGMRES(args...; gmres_restart = 0, window = 0, kwargs...)
 A generic FGMRES implementation for square non-Hermitian linear systems
 """
 function KrylovJL_FGMRES(args...; kwargs...)
-    KrylovJL(args...; KrylovAlg = Krylov.fgmres!, kwargs...)
+    return KrylovJL(args...; KrylovAlg = Krylov.fgmres!, kwargs...)
 end
 
 """
@@ -82,7 +86,7 @@ KrylovJL_BICGSTAB(args...; kwargs...)
 A generic BICGSTAB implementation for square non-Hermitian linear systems
 """
 function KrylovJL_BICGSTAB(args...; kwargs...)
-    KrylovJL(args...; KrylovAlg = Krylov.bicgstab!, kwargs...)
+    return KrylovJL(args...; KrylovAlg = Krylov.bicgstab!, kwargs...)
 end
 
 """
@@ -93,7 +97,7 @@ KrylovJL_LSMR(args...; kwargs...)
 A generic LSMR implementation for least-squares problems
 """
 function KrylovJL_LSMR(args...; kwargs...)
-    KrylovJL(args...; KrylovAlg = Krylov.lsmr!, kwargs...)
+    return KrylovJL(args...; KrylovAlg = Krylov.lsmr!, kwargs...)
 end
 
 """
@@ -104,7 +108,7 @@ KrylovJL_CRAIGMR(args...; kwargs...)
 A generic CRAIGMR implementation for least-norm problems
 """
 function KrylovJL_CRAIGMR(args...; kwargs...)
-    KrylovJL(args...; KrylovAlg = Krylov.craigmr!, kwargs...)
+    return KrylovJL(args...; KrylovAlg = Krylov.craigmr!, kwargs...)
 end
 
 """
@@ -115,7 +119,7 @@ KrylovJL_MINARES(args...; kwargs...)
 A generic MINARES implementation for Hermitian linear systems
 """
 function KrylovJL_MINARES(args...; kwargs...)
-    KrylovJL(args...; KrylovAlg = Krylov.minares!, kwargs...)
+    return KrylovJL(args...; KrylovAlg = Krylov.minares!, kwargs...)
 end
 
 function get_KrylovJL_solver(KrylovAlg)
@@ -195,17 +199,21 @@ function get_KrylovJL_solver(KrylovAlg)
 end
 
 # zeroinit allows for init_cacheval to start by initing with A (0,0)
-function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
-        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions; zeroinit = true)
+function init_cacheval(
+        alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions; zeroinit = true
+    )
     KS = get_KrylovJL_solver(alg.KrylovAlg)
 
     if zeroinit
-        solver = if (alg.KrylovAlg === Krylov.dqgmres! ||
-                     alg.KrylovAlg === Krylov.diom! ||
-                     alg.KrylovAlg === Krylov.gmres! ||
-                     alg.KrylovAlg === Krylov.fgmres! ||
-                     alg.KrylovAlg === Krylov.gpmr! ||
-                     alg.KrylovAlg === Krylov.fom!)
+        solver = if (
+                alg.KrylovAlg === Krylov.dqgmres! ||
+                    alg.KrylovAlg === Krylov.diom! ||
+                    alg.KrylovAlg === Krylov.gmres! ||
+                    alg.KrylovAlg === Krylov.fgmres! ||
+                    alg.KrylovAlg === Krylov.gpmr! ||
+                    alg.KrylovAlg === Krylov.fom!
+            )
             if issparsematrixcsc(A)
                 KS(makeempty_SparseMatrixCSC(A), eltype(b)[]; memory = 1)
             elseif A isa Matrix
@@ -225,18 +233,22 @@ function init_cacheval(alg::KrylovJL, A, b, u, Pl, Pr, maxiters::Int, abstol, re
     else
         memory = (alg.gmres_restart == 0) ? min(20, size(A, 1)) : alg.gmres_restart
 
-        solver = if (alg.KrylovAlg === Krylov.dqgmres! ||
-                     alg.KrylovAlg === Krylov.diom! ||
-                     alg.KrylovAlg === Krylov.gmres! ||
-                     alg.KrylovAlg === Krylov.fgmres! ||
-                     alg.KrylovAlg === Krylov.gpmr! ||
-                     alg.KrylovAlg === Krylov.fom!)
+        solver = if (
+                alg.KrylovAlg === Krylov.dqgmres! ||
+                    alg.KrylovAlg === Krylov.diom! ||
+                    alg.KrylovAlg === Krylov.gmres! ||
+                    alg.KrylovAlg === Krylov.fgmres! ||
+                    alg.KrylovAlg === Krylov.gpmr! ||
+                    alg.KrylovAlg === Krylov.fom!
+            )
             KS(A, b; memory)
-        elseif (alg.KrylovAlg === Krylov.minres! ||
-                alg.KrylovAlg === Krylov.symmlq! ||
-                alg.KrylovAlg === Krylov.lslq! ||
-                alg.KrylovAlg === Krylov.lsqr! ||
-                alg.KrylovAlg === Krylov.lsmr!)
+        elseif (
+                alg.KrylovAlg === Krylov.minres! ||
+                    alg.KrylovAlg === Krylov.symmlq! ||
+                    alg.KrylovAlg === Krylov.lslq! ||
+                    alg.KrylovAlg === Krylov.lsqr! ||
+                    alg.KrylovAlg === Krylov.lsmr!
+            )
             (alg.window != 0) ? KS(A, b; window = alg.window) : KS(A, b)
         else
             KS(A, b)
@@ -251,7 +263,8 @@ end
 # Krylov.jl tries to init with `ArrayPartition(undef, ...)`. Avoid hitting that!
 function init_cacheval(
         alg::LinearSolve.KrylovJL, A, b::RecursiveArrayTools.ArrayPartition, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, ::LinearSolve.OperatorAssumptions)
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, ::LinearSolve.OperatorAssumptions
+    )
     return nothing
 end
 
@@ -263,9 +276,11 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
         cache.precsisfresh = false
     end
     if cache.isfresh
-        solver = init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr,
+        solver = init_cacheval(
+            alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr,
             cache.maxiters, cache.abstol, cache.reltol, cache.verbose,
-            cache.assumptions, zeroinit = false)
+            cache.assumptions, zeroinit = false
+        )
         cache.cacheval = solver
         cache.isfresh = false
     end
@@ -298,13 +313,17 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     krylovJL_verbose = verbosity_to_int(verbose.KrylovJL_verbosity)
 
     args = (cacheval, cache.A, cache.b)
-    kwargs = (atol = atol, rtol, itmax, verbose = krylovJL_verbose,
-        ldiv = true, history = true, alg.kwargs...)
+    kwargs = (
+        atol = atol, rtol, itmax, verbose = krylovJL_verbose,
+        ldiv = true, history = true, alg.kwargs...,
+    )
 
     if cache.cacheval isa Krylov.CgWorkspace
         N !== I &&
-            @SciMLMessage("$(alg.KrylovAlg) doesn't support right preconditioning.",
-                verbose, :no_right_preconditioning)
+            @SciMLMessage(
+            "$(alg.KrylovAlg) doesn't support right preconditioning.",
+            verbose, :no_right_preconditioning
+        )
         Krylov.krylov_solve!(args...; M, kwargs...)
     elseif cache.cacheval isa Krylov.GmresWorkspace
         Krylov.krylov_solve!(args...; M, N, restart = alg.gmres_restart > 0, kwargs...)
@@ -312,8 +331,10 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
         Krylov.krylov_solve!(args...; M, N, kwargs...)
     elseif cache.cacheval isa Krylov.MinresWorkspace
         N !== I &&
-            @SciMLMessage("$(alg.KrylovAlg) doesn't support right preconditioning.",
-                verbose, :no_right_preconditioning)
+            @SciMLMessage(
+            "$(alg.KrylovAlg) doesn't support right preconditioning.",
+            verbose, :no_right_preconditioning
+        )
         Krylov.krylov_solve!(args...; M, kwargs...)
     else
         Krylov.krylov_solve!(args...; kwargs...)
@@ -321,7 +342,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
 
     stats = @get_cacheval(cache, :KrylovJL_GMRES).stats
     resid = !isempty(stats.residuals) ? last(stats.residuals) :
-            zero(eltype(stats.residuals))
+        zero(eltype(stats.residuals))
 
     retcode = if !stats.solved
         if stats.status == "maximum number of iterations exceeded"
@@ -346,8 +367,10 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
         cache.u = convert(typeof(cache.u), cacheval.x)
     end
 
-    return SciMLBase.build_linear_solution(alg, cache.u, Ref(resid), cache;
-        iters = stats.niter, retcode, stats)
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, Ref(resid), cache;
+        iters = stats.niter, retcode, stats
+    )
 end
 
 update_tolerances_internal!(cache, alg::KrylovJL, atol, rtol) = nothing

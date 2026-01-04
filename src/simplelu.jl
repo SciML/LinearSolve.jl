@@ -49,7 +49,7 @@ mutable struct LUSolver{T}
     info::Int
 
     function LUSolver{T}(n) where {T}
-        new(n, zeros(T, n, n), zeros(T, n), zeros(T, n), zeros(Int, n), zeros(Int, n), 0)
+        return new(n, zeros(T, n, n), zeros(T, n), zeros(T, n), zeros(Int, n), zeros(Int, n), 0)
     end
 end
 
@@ -57,7 +57,7 @@ function LUSolver(A::Matrix{T}) where {T}
     n = LinearAlgebra.checksquare(A)
     lu = LUSolver{eltype(A)}(n)
     lu.A .= A
-    lu
+    return lu
 end
 
 function LUSolver(A::Matrix{T}, b::Vector{T}) where {T}
@@ -66,13 +66,13 @@ function LUSolver(A::Matrix{T}, b::Vector{T}) where {T}
     lu = LUSolver{eltype(A)}(n)
     lu.A .= A
     lu.b .= b
-    lu
+    return lu
 end
 
 function simplelu_factorize!(lu::LUSolver{T}, pivot = true) where {T}
     A = lu.A
 
-    begin
+    return begin
         @inbounds for i in eachindex(lu.perms)
             lu.perms[i] = i
         end
@@ -147,7 +147,7 @@ function simplelu_solve!(lu::LUSolver{T}) where {T}
 
     copyto!(lu.b, lu.x)
 
-    lu.x
+    return lu.x
 end
 
 ### Wrapper
@@ -214,10 +214,12 @@ function SciMLBase.solve!(cache::LinearCache, alg::SimpleLUFactorization; kwargs
     cache.cacheval.b .= cache.b
     cache.cacheval.x .= cache.u
     y = simplelu_solve!(cache.cacheval)
-    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
-function init_cacheval(alg::SimpleLUFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
-        reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
-    LUSolver(convert(AbstractMatrix, A))
+function init_cacheval(
+        alg::SimpleLUFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
+        reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return LUSolver(convert(AbstractMatrix, A))
 end

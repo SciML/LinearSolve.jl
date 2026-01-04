@@ -46,10 +46,12 @@ end
 
 if GROUP == "LinearSolveAutotune"
     Pkg.activate(joinpath(dirname(@__DIR__), "lib", GROUP))
-    Pkg.test(GROUP,
+    Pkg.test(
+        GROUP,
         julia_args = ["--check-bounds=auto", "--compiled-modules=yes", "--depwarn=yes"],
         force_latest_compatible_version = false,
-        allow_reresolve = true)
+        allow_reresolve = true
+    )
 end
 
 if GROUP == "Preferences"

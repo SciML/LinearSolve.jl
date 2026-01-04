@@ -12,11 +12,13 @@ function __non_native_static_array_alg(alg)
     return alg isa SVDFactorization || alg isa KrylovJL
 end
 
-for alg in (nothing, LUFactorization(), SVDFactorization(), CholeskyFactorization(),
-    NormalCholeskyFactorization(), KrylovJL_GMRES())
+for alg in (
+        nothing, LUFactorization(), SVDFactorization(), CholeskyFactorization(),
+        NormalCholeskyFactorization(), KrylovJL_GMRES(),
+    )
     sol = solve(LinearProblem(A, b), alg)
     @inferred solve(LinearProblem(A, b), alg)
-    @test norm(A * sol .- b) < 1e-10
+    @test norm(A * sol .- b) < 1.0e-10
     if alg isa KrylovJL{typeof(LinearSolve.Krylov.gmres!)} && isempty(VERSION.prerelease)
         @test_broken __solve_no_alloc(A, b, alg) isa SciMLBase.LinearSolution
     else
@@ -24,7 +26,7 @@ for alg in (nothing, LUFactorization(), SVDFactorization(), CholeskyFactorizatio
     end
     cache = init(LinearProblem(A, b), alg)
     sol = solve!(cache)
-    @test norm(A * sol .- b) < 1e-10
+    @test norm(A * sol .- b) < 1.0e-10
 end
 
 A = SMatrix{7, 5}(rand(rng, 7, 5))

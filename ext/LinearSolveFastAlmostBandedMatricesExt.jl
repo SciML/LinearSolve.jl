@@ -2,8 +2,8 @@ module LinearSolveFastAlmostBandedMatricesExt
 
 using FastAlmostBandedMatrices, LinearAlgebra, LinearSolve
 import LinearSolve: defaultalg,
-                    do_factorization, init_cacheval, DefaultLinearSolver,
-                    DefaultAlgorithmChoice, LinearVerbosity
+    do_factorization, init_cacheval, DefaultLinearSolver,
+    DefaultAlgorithmChoice, LinearVerbosity
 
 function defaultalg(A::AlmostBandedMatrix, b, oa::OperatorAssumptions{Bool})
     if oa.issq
@@ -14,14 +14,18 @@ function defaultalg(A::AlmostBandedMatrix, b, oa::OperatorAssumptions{Bool})
 end
 
 # For BandedMatrix
-for alg in (:SVDFactorization, :MKLLUFactorization, :DiagonalFactorization,
-    :SparspakFactorization, :KLUFactorization, :UMFPACKFactorization,
-    :GenericLUFactorization, :RFLUFactorization, :BunchKaufmanFactorization,
-    :CHOLMODFactorization, :NormalCholeskyFactorization, :LDLtFactorization,
-    :AppleAccelerateLUFactorization, :CholeskyFactorization, :LUFactorization)
+for alg in (
+        :SVDFactorization, :MKLLUFactorization, :DiagonalFactorization,
+        :SparspakFactorization, :KLUFactorization, :UMFPACKFactorization,
+        :GenericLUFactorization, :RFLUFactorization, :BunchKaufmanFactorization,
+        :CHOLMODFactorization, :NormalCholeskyFactorization, :LDLtFactorization,
+        :AppleAccelerateLUFactorization, :CholeskyFactorization, :LUFactorization,
+    )
     @eval begin
-        function init_cacheval(::$(alg), ::AlmostBandedMatrix, b, u, Pl, Pr, maxiters::Int,
-                abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+        function init_cacheval(
+                ::$(alg), ::AlmostBandedMatrix, b, u, Pl, Pr, maxiters::Int,
+                abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+            )
             return nothing
         end
     end

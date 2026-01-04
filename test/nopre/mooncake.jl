@@ -12,7 +12,7 @@ function f(A, b1; alg = LUFactorization())
     prob = LinearProblem(A, b1)
     sol1 = solve(prob, alg)
     s1 = sol1.u
-    norm(s1)
+    return norm(s1)
 end
 
 f_primal = f(A, b1) # Uses BLAS
@@ -32,10 +32,14 @@ db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x), copy(b1))
 A = rand(n, n);
 b1 = rand(n);
 
-_ff = (x,
-    y) -> f(x,
+_ff = (
+    x,
+    y,
+) -> f(
+    x,
     y;
-    alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization))
+    alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)
+)
 f_primal = _ff(copy(A), copy(b1))
 
 cache = prepare_gradient_cache(_ff, (copy(A), copy(b1))...)
@@ -59,7 +63,7 @@ function f3(A, b1, b2; alg = KrylovJL_GMRES())
     sol1 = solve(prob, alg)
     prob = LinearProblem(A, b2)
     sol2 = solve(prob, alg)
-    norm(sol1.u .+ sol2.u)
+    return norm(sol1.u .+ sol2.u)
 end
 
 # Mooncake needs atomic Complex Number tangents instead of NamedTuples.
@@ -87,7 +91,7 @@ function f4(A, b1, b2; alg = LUFactorization())
     sol1 = solve(prob, alg; sensealg = LinearSolveAdjoint(; linsolve = KrylovJL_LSMR()))
     prob = LinearProblem(A, b2)
     sol2 = solve(prob, alg; sensealg = LinearSolveAdjoint(; linsolve = KrylovJL_GMRES()))
-    norm(sol1.u .+ sol2.u)
+    return norm(sol1.u .+ sol2.u)
 end
 
 cache = Mooncake.prepare_gradient_cache(f4, (copy(A), copy(b1), copy(b1))...)
@@ -106,17 +110,17 @@ db22 = ForwardDiff.gradient(x -> f4(eltype(x).(A), eltype(x).(b1), x), copy(b1))
 A = rand(n, n);
 b1 = rand(n);
 for alg in (
-    LUFactorization(),
-    RFLUFactorization(),
-    KrylovJL_GMRES()
-)
+        LUFactorization(),
+        RFLUFactorization(),
+        KrylovJL_GMRES(),
+    )
     @show alg
     function fb(b)
         prob = LinearProblem(A, b)
 
         sol1 = solve(prob, alg)
 
-        sum(sol1.u)
+        return sum(sol1.u)
     end
     fb(b1)
 
@@ -128,14 +132,14 @@ for alg in (
     @show results
 
     @test results[1] ≈ fb(b1)
-    @test results[2][2] ≈ fd_jac rtol = 1e-5
+    @test results[2][2] ≈ fd_jac rtol = 1.0e-5
 
     function fA(A)
         prob = LinearProblem(A, b1)
 
         sol1 = solve(prob, alg)
 
-        sum(sol1.u)
+        return sum(sol1.u)
     end
     fA(A)
 
@@ -148,7 +152,7 @@ for alg in (
     mooncake_gradient = results[2][2] |> vec
 
     @test results[1] ≈ fA(A)
-    @test mooncake_gradient ≈ fd_jac rtol = 1e-5
+    @test mooncake_gradient ≈ fd_jac rtol = 1.0e-5
 end
 
 # Tests for solve! and init rrules.
@@ -157,13 +161,13 @@ A = rand(n, n);
 b1 = rand(n);
 b2 = rand(n);
 
-function f_(A, b1, b2; alg=LUFactorization())
+function f_(A, b1, b2; alg = LUFactorization())
     prob = LinearProblem(A, b1)
     cache = init(prob, alg)
     s1 = copy(solve!(cache).u)
     cache.b = b2
     s2 = solve!(cache).u
-    norm(s1 + s2)
+    return norm(s1 + s2)
 end
 
 f_primal = f_(copy(A), copy(b1), copy(b2))
@@ -182,13 +186,13 @@ db22 = ForwardDiff.gradient(x -> f_(eltype(x).(A), eltype(x).(b1), x), copy(b2))
 @test gradient[3] ≈ db12
 @test gradient[4] ≈ db22
 
-function f_2(A, b1, b2; alg=RFLUFactorization())
+function f_2(A, b1, b2; alg = RFLUFactorization())
     prob = LinearProblem(A, b1)
     cache = init(prob, alg)
     s1 = copy(solve!(cache).u)
     cache.b = b2
     s2 = solve!(cache).u
-    norm(s1 + s2)
+    return norm(s1 + s2)
 end
 
 f_primal = f_2(copy(A), copy(b1), copy(b2))
@@ -207,13 +211,13 @@ db22 = ForwardDiff.gradient(x -> f_2(eltype(x).(A), eltype(x).(b1), x), copy(b2)
 @test gradient[3] ≈ db12
 @test gradient[4] ≈ db22
 
-function f_3(A, b1, b2; alg=KrylovJL_GMRES())
+function f_3(A, b1, b2; alg = KrylovJL_GMRES())
     prob = LinearProblem(A, b1)
     cache = init(prob, alg)
     s1 = copy(solve!(cache).u)
     cache.b = b2
     s2 = solve!(cache).u
-    norm(s1 + s2)
+    return norm(s1 + s2)
 end
 
 f_primal = f_3(copy(A), copy(b1), copy(b2))
@@ -232,7 +236,7 @@ db22 = ForwardDiff.gradient(x -> f_3(eltype(x).(A), eltype(x).(b1), x), copy(b2)
 @test gradient[3] ≈ db12
 @test gradient[4] ≈ db22
 
-function f_4(A, b1, b2; alg=LUFactorization())
+function f_4(A, b1, b2; alg = LUFactorization())
     prob = LinearProblem(A, b1)
     cache = init(prob, alg)
     solve!(cache)
@@ -240,7 +244,7 @@ function f_4(A, b1, b2; alg=LUFactorization())
     cache.b = b2
     solve!(cache)
     s2 = copy(cache.u)
-    norm(s1 + s2)
+    return norm(s1 + s2)
 end
 
 A = rand(n, n);
@@ -273,10 +277,10 @@ function fnice(A, b, alg)
 end
 
 @testset for alg in (
-    LUFactorization(),
-    RFLUFactorization(),
-    KrylovJL_GMRES()
-)
+        LUFactorization(),
+        RFLUFactorization(),
+        KrylovJL_GMRES(),
+    )
     # for B
     fb_closure = b -> fnice(A, b, alg)
     fd_jac_b = FiniteDiff.finite_difference_jacobian(fb_closure, b1) |> vec
@@ -285,11 +289,11 @@ end
         prepare_gradient_cache(fnice, copy(A), copy(b1), alg),
         fnice, copy(A), copy(b1), alg
     )
-    @test en_jac[3] ≈ fd_jac_b rtol = 1e-5
+    @test en_jac[3] ≈ fd_jac_b rtol = 1.0e-5
 
     # For A
     fA_closure = A -> fnice(A, b1, alg)
     fd_jac_A = FiniteDiff.finite_difference_jacobian(fA_closure, A) |> vec
     A_grad = en_jac[2] |> vec
-    @test A_grad ≈ fd_jac_A rtol = 1e-5
+    @test A_grad ≈ fd_jac_A rtol = 1.0e-5
 end

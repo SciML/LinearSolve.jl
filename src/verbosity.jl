@@ -15,7 +15,7 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
         :condition_number,
         :convergence_failure,
         :solver_failure,
-        :max_iters
+        :max_iters,
     )
 
     presets = (
@@ -35,7 +35,7 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
             condition_number = Silent(),
             convergence_failure = Silent(),
             solver_failure = Silent(),
-            max_iters = Silent()
+            max_iters = Silent(),
         ),
         Minimal = (
             default_lu_fallback = Silent(),
@@ -53,7 +53,7 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
             condition_number = Silent(),
             convergence_failure = Silent(),
             solver_failure = Silent(),
-            max_iters = Silent()
+            max_iters = Silent(),
         ),
         Standard = (
             default_lu_fallback = Silent(),
@@ -71,7 +71,7 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
             condition_number = Silent(),
             convergence_failure = WarnLevel(),
             solver_failure = WarnLevel(),
-            max_iters = WarnLevel()
+            max_iters = WarnLevel(),
         ),
         Detailed = (
             default_lu_fallback = WarnLevel(),
@@ -89,7 +89,7 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
             condition_number = Silent(),
             convergence_failure = WarnLevel(),
             solver_failure = WarnLevel(),
-            max_iters = WarnLevel()
+            max_iters = WarnLevel(),
         ),
         All = (
             default_lu_fallback = WarnLevel(),
@@ -107,17 +107,19 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
             condition_number = InfoLevel(),
             convergence_failure = WarnLevel(),
             solver_failure = WarnLevel(),
-            max_iters = WarnLevel()
-        )
+            max_iters = WarnLevel(),
+        ),
     )
 
     groups = (
         error_control = (:default_lu_fallback, :blas_errors, :blas_invalid_args),
         performance = (:no_right_preconditioning,),
-        numerical = (:using_IterativeSolvers, :IterativeSolvers_iterations,
+        numerical = (
+            :using_IterativeSolvers, :IterativeSolvers_iterations,
             :KrylovKit_verbosity, :KrylovJL_verbosity, :HYPRE_verbosity,
             :pardiso_verbosity, :blas_info, :blas_success, :condition_number,
-            :convergence_failure, :solver_failure, :max_iters)
+            :convergence_failure, :solver_failure, :max_iters,
+        ),
     )
 end
 
@@ -196,10 +198,12 @@ verbose = LinearVerbosity(
 # Group classifications (for backwards compatibility)
 const error_control_options = (:default_lu_fallback, :blas_errors, :blas_invalid_args)
 const performance_options = (:no_right_preconditioning,)
-const numerical_options = (:using_IterativeSolvers, :IterativeSolvers_iterations,
+const numerical_options = (
+    :using_IterativeSolvers, :IterativeSolvers_iterations,
     :KrylovKit_verbosity, :KrylovJL_verbosity, :HYPRE_verbosity,
     :pardiso_verbosity, :blas_info, :blas_success, :condition_number,
-    :convergence_failure, :solver_failure, :max_iters)
+    :convergence_failure, :solver_failure, :max_iters,
+)
 
 function option_group(option::Symbol)
     if option in error_control_options
@@ -216,14 +220,20 @@ end
 # Get all options in a group
 function group_options(verbosity::LinearVerbosity, group::Symbol)
     if group === :error_control
-        return NamedTuple{error_control_options}(getproperty(verbosity, opt)
-        for opt in error_control_options)
+        return NamedTuple{error_control_options}(
+            getproperty(verbosity, opt)
+                for opt in error_control_options
+        )
     elseif group === :performance
-        return NamedTuple{performance_options}(getproperty(verbosity, opt)
-        for opt in performance_options)
+        return NamedTuple{performance_options}(
+            getproperty(verbosity, opt)
+                for opt in performance_options
+        )
     elseif group === :numerical
-        return NamedTuple{numerical_options}(getproperty(verbosity, opt)
-        for opt in numerical_options)
+        return NamedTuple{numerical_options}(
+            getproperty(verbosity, opt)
+                for opt in numerical_options
+        )
     else
         error("Unknown group: $group")
     end

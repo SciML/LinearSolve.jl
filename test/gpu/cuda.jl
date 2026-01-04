@@ -6,19 +6,23 @@ using Test
     b = Float64[1, 2, 3, 4]
     b_gpu = CUDA.adapt(CuArray, b)
 
-    A = Float64[1 1 0 0
-                0 1 1 0
-                0 0 3 1
-                0 0 0 4]
+    A = Float64[
+        1 1 0 0
+        0 1 1 0
+        0 0 3 1
+        0 0 0 4
+    ]
     A_gpu_csr = CUDA.CUSPARSE.CuSparseMatrixCSR(sparse(A))
     A_gpu_csc = CUDA.CUSPARSE.CuSparseMatrixCSC(sparse(A))
     prob_csr = LinearProblem(A_gpu_csr, b_gpu)
     prob_csc = LinearProblem(A_gpu_csc, b_gpu)
 
-    A_sym = Float64[1 1 0 0
-                    1 0 0 2
-                    0 0 3 0
-                    0 2 0 0]
+    A_sym = Float64[
+        1 1 0 0
+        1 0 0 2
+        0 0 3 0
+        0 2 0 0
+    ]
     A_gpu_sym_csr = CUDA.CUSPARSE.CuSparseMatrixCSR(sparse(A_sym))
     A_gpu_sym_csc = CUDA.CUSPARSE.CuSparseMatrixCSC(sparse(A_sym))
     prob_sym_csr = LinearProblem(A_gpu_sym_csr, b_gpu)
@@ -75,7 +79,7 @@ x2 = zero(b);
 prob1 = LinearProblem(A1, b1; u0 = x1)
 prob2 = LinearProblem(A2, b2; u0 = x2)
 
-cache_kwargs = (;abstol = 1e-8, reltol = 1e-8, maxiter = 30)
+cache_kwargs = (; abstol = 1.0e-8, reltol = 1.0e-8, maxiter = 30)
 
 function test_interface(alg, prob1, prob2)
     A1 = prob1.A
@@ -86,19 +90,19 @@ function test_interface(alg, prob1, prob2)
     x2 = prob2.u0
 
     y = solve(prob1, alg; cache_kwargs...)
-    @test CUDA.@allowscalar(Array(A1 * y)≈Array(b1))
+    @test CUDA.@allowscalar(Array(A1 * y) ≈ Array(b1))
 
     cache = SciMLBase.init(prob1, alg; cache_kwargs...) # initialize cache
     solve!(cache)
-    @test CUDA.@allowscalar(Array(A1 * cache.u)≈Array(b1))
+    @test CUDA.@allowscalar(Array(A1 * cache.u) ≈ Array(b1))
 
     cache.A = copy(A2)
     solve!(cache)
-    @test CUDA.@allowscalar(Array(A2 * cache.u)≈Array(b1))
+    @test CUDA.@allowscalar(Array(A2 * cache.u) ≈ Array(b1))
 
     cache.b = copy(b2)
     solve!(cache)
-    @test CUDA.@allowscalar(Array(A2 * cache.u)≈Array(b2))
+    @test CUDA.@allowscalar(Array(A2 * cache.u) ≈ Array(b2))
 
     return
 end
@@ -141,14 +145,18 @@ b = rand(rng, 5) |> cu
 prob1 = LinearProblem(A', b)
 prob2 = LinearProblem(transpose(A), b)
 
-@testset "Adjoint/Transpose Type: $(alg)" for alg in (NormalCholeskyFactorization(),
-    CholeskyFactorization(), LUFactorization(), QRFactorization(), nothing)
-    sol = solve(prob1, alg;
-        alias = LinearAliasSpecifier(alias_A = false))
-    @test norm(A' * sol.u .- b) < 1e-5
+@testset "Adjoint/Transpose Type: $(alg)" for alg in (
+        NormalCholeskyFactorization(),
+        CholeskyFactorization(), LUFactorization(), QRFactorization(), nothing,
+    )
+    sol = solve(
+        prob1, alg;
+        alias = LinearAliasSpecifier(alias_A = false)
+    )
+    @test norm(A' * sol.u .- b) < 1.0e-5
 
     sol = solve(prob2, alg; alias = LinearAliasSpecifier(alias_A = false))
-    @test norm(transpose(A) * sol.u .- b) < 1e-5
+    @test norm(transpose(A) * sol.u .- b) < 1.0e-5
 end
 
 @testset "CUDSS" begin

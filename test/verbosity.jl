@@ -1,6 +1,6 @@
 using LinearSolve
 using LinearSolve: LinearVerbosity, option_group, group_options, BLISLUFactorization,
-                   __appleaccelerate_isavailable, __mkl_isavailable, __openblas_isavailable
+    __appleaccelerate_isavailable, __mkl_isavailable, __openblas_isavailable
 using SciMLLogging
 using Test
 
@@ -93,29 +93,40 @@ using Test
 end
 
 @testset "LinearVerbosity Logs Tests" begin
-    A = [1.0 0 0 0
-         0 1 0 0
-         0 0 1 0
-         0 0 0 0]
+    A = [
+        1.0 0 0 0
+        0 1 0 0
+        0 0 1 0
+        0 0 0 0
+    ]
     b = rand(4)
     prob = LinearProblem(A, b)
 
-    @test_logs (:warn,
-        r"LU factorization failed, falling back to QR factorization\. `A` is potentially rank-deficient\.") solve(
+    @test_logs (
+        :warn,
+        r"LU factorization failed, falling back to QR factorization\. `A` is potentially rank-deficient\.",
+    ) solve(
         prob,
-        verbose = LinearVerbosity(default_lu_fallback = WarnLevel()))
+        verbose = LinearVerbosity(default_lu_fallback = WarnLevel())
+    )
 
-    @test_logs (:info,
-        r"LU factorization failed, falling back to QR factorization\. `A` is potentially rank-deficient\.") solve(
+    @test_logs (
+        :info,
+        r"LU factorization failed, falling back to QR factorization\. `A` is potentially rank-deficient\.",
+    ) solve(
         prob,
-        verbose = LinearVerbosity(default_lu_fallback = InfoLevel()))
+        verbose = LinearVerbosity(default_lu_fallback = InfoLevel())
+    )
 
     verb = LinearVerbosity(default_lu_fallback = WarnLevel())
 
-    @test_logs (:warn,
-        r"LU factorization failed, falling back to QR factorization\. `A` is potentially rank-deficient\.") solve(
+    @test_logs (
+        :warn,
+        r"LU factorization failed, falling back to QR factorization\. `A` is potentially rank-deficient\.",
+    ) solve(
         prob,
-        verbose = verb)
+        verbose = verb
+    )
 end
 
 @testset "BLAS Return Code Interpretation" begin
@@ -164,7 +175,8 @@ end
         verbose_with_cond = LinearVerbosity(condition_number = InfoLevel())
         info_with_cond = LinearSolve.get_blas_operation_info(
             :dgetrf, A, b,
-            condition = !isa(verbose_with_cond.condition_number, SciMLLogging.Silent))
+            condition = !isa(verbose_with_cond.condition_number, SciMLLogging.Silent)
+        )
         @test !isinf(info_with_cond.condition_number)  # Should be computed (not -Inf)
     end
 
@@ -178,7 +190,7 @@ end
             (:dsyev, 5, :convergence_failure),
             (:dsytrf, 6, :singular_matrix),
             (:dgetrs, 1, :unexpected_error),
-            (:unknown_func, 1, :unknown_error)
+            (:unknown_func, 1, :unknown_error),
         ]
 
         for (func, code, expected_category) in test_cases
@@ -214,7 +226,8 @@ end
             )
 
             @test_logs (:info, r"BLAS LU factorization.*completed successfully") solve(
-                prob_good, BLISLUFactorization(); verbose = verbose_success)
+                prob_good, BLISLUFactorization(); verbose = verbose_success
+            )
 
             # Test singular matrix with error logging
             A_singular = [1.0 2.0; 2.0 4.0]
@@ -228,7 +241,8 @@ end
             )
 
             @test_logs (:warn, r"BLAS/LAPACK.*Matrix is singular") solve(
-                prob_singular, BLISLUFactorization(); verbose = verbose_errors)
+                prob_singular, BLISLUFactorization(); verbose = verbose_errors
+            )
 
             # Test with info logging enabled
             verbose_info = LinearVerbosity(
@@ -238,7 +252,8 @@ end
             )
 
             @test_logs (:info, r"BLAS/LAPACK.*Matrix is singular") solve(
-                prob_singular, BLISLUFactorization(); verbose = verbose_info)
+                prob_singular, BLISLUFactorization(); verbose = verbose_info
+            )
 
             # Test with all BLAS logging disabled - should produce no logs
             verbose_silent = LinearVerbosity(
@@ -249,8 +264,9 @@ end
                 solver_failure = Silent()
             )
 
-            @test_logs min_level=SciMLLogging.Logging.Warn solve(
-                prob_singular, BLISLUFactorization(); verbose = verbose_silent)
+            @test_logs min_level = SciMLLogging.Logging.Warn solve(
+                prob_singular, BLISLUFactorization(); verbose = verbose_silent
+            )
 
             # Test condition number logging if enabled
             verbose_with_cond = LinearVerbosity(
@@ -259,8 +275,9 @@ end
                 blas_errors = Silent()
             )
 
-            @test_logs (:info, r"Matrix condition number:.*for.*matrix") match_mode=:any solve(
-                prob_good, BLISLUFactorization(); verbose = verbose_with_cond)
+            @test_logs (:info, r"Matrix condition number:.*for.*matrix") match_mode = :any solve(
+                prob_good, BLISLUFactorization(); verbose = verbose_with_cond
+            )
         end
     end
 end
@@ -281,7 +298,8 @@ end
             )
 
             @test_logs (:info, r"BLAS LU factorization.*completed successfully") solve(
-                prob_good, OpenBLASLUFactorization(); verbose = verbose_success)
+                prob_good, OpenBLASLUFactorization(); verbose = verbose_success
+            )
 
             # Test singular matrix with error logging
             A_singular = [1.0 2.0; 2.0 4.0]
@@ -294,8 +312,9 @@ end
                 blas_info = Silent()
             )
 
-            @test_logs (:warn, r"BLAS/LAPACK.*Matrix is singular") match_mode=:any solve(
-                prob_singular, OpenBLASLUFactorization(); verbose = verbose_errors)
+            @test_logs (:warn, r"BLAS/LAPACK.*Matrix is singular") match_mode = :any solve(
+                prob_singular, OpenBLASLUFactorization(); verbose = verbose_errors
+            )
 
             # Test with info logging enabled
             verbose_info = LinearVerbosity(
@@ -304,8 +323,9 @@ end
                 blas_success = Silent()
             )
 
-            @test_logs (:info, r"BLAS/LAPACK.*Matrix is singular") match_mode=:any solve(
-                prob_singular, OpenBLASLUFactorization(); verbose = verbose_info)
+            @test_logs (:info, r"BLAS/LAPACK.*Matrix is singular") match_mode = :any solve(
+                prob_singular, OpenBLASLUFactorization(); verbose = verbose_info
+            )
 
             # Test with all BLAS logging disabled - should produce no logs
             verbose_silent = LinearVerbosity(
@@ -316,8 +336,9 @@ end
                 solver_failure = Silent()
             )
 
-            @test_logs min_level=SciMLLogging.Logging.Warn solve(
-                prob_singular, OpenBLASLUFactorization(); verbose = verbose_silent)
+            @test_logs min_level = SciMLLogging.Logging.Warn solve(
+                prob_singular, OpenBLASLUFactorization(); verbose = verbose_silent
+            )
 
             # Test condition number logging if enabled
             verbose_with_cond = LinearVerbosity(
@@ -326,8 +347,9 @@ end
                 blas_errors = Silent()
             )
 
-            @test_logs (:info, r"Matrix condition number:.*for.*matrix") match_mode=:any solve(
-                prob_good, OpenBLASLUFactorization(); verbose = verbose_with_cond)
+            @test_logs (:info, r"Matrix condition number:.*for.*matrix") match_mode = :any solve(
+                prob_good, OpenBLASLUFactorization(); verbose = verbose_with_cond
+            )
         else
             @info "Skipping OpenBLAS tests - OpenBLAS not available"
         end
@@ -350,7 +372,8 @@ end
             )
 
             @test_logs (:info, r"BLAS LU factorization.*completed successfully") solve(
-                prob_good, AppleAccelerateLUFactorization(); verbose = verbose_success)
+                prob_good, AppleAccelerateLUFactorization(); verbose = verbose_success
+            )
 
             # Test singular matrix with error logging
             A_singular = [1.0 2.0; 2.0 4.0]
@@ -364,7 +387,8 @@ end
             )
 
             @test_logs (:warn, r"BLAS/LAPACK.*Matrix is singular") solve(
-                prob_singular, AppleAccelerateLUFactorization(); verbose = verbose_errors)
+                prob_singular, AppleAccelerateLUFactorization(); verbose = verbose_errors
+            )
 
             # Test with info logging enabled
             verbose_info = LinearVerbosity(
@@ -374,7 +398,8 @@ end
             )
 
             @test_logs (:info, r"BLAS/LAPACK.*Matrix is singular") solve(
-                prob_singular, AppleAccelerateLUFactorization(); verbose = verbose_info)
+                prob_singular, AppleAccelerateLUFactorization(); verbose = verbose_info
+            )
 
             # Test with all BLAS logging disabled - should produce no logs
             verbose_silent = LinearVerbosity(
@@ -385,8 +410,9 @@ end
                 solver_failure = Silent()
             )
 
-            @test_logs min_level=SciMLLogging.Logging.Warn solve(
-                prob_singular, AppleAccelerateLUFactorization(); verbose = verbose_silent)
+            @test_logs min_level = SciMLLogging.Logging.Warn solve(
+                prob_singular, AppleAccelerateLUFactorization(); verbose = verbose_silent
+            )
 
             # Test condition number logging if enabled
             verbose_with_cond = LinearVerbosity(
@@ -395,8 +421,9 @@ end
                 blas_errors = Silent()
             )
 
-            @test_logs (:info, r"Matrix condition number:.*for.*matrix") match_mode=:any solve(
-                prob_good, AppleAccelerateLUFactorization(); verbose = verbose_with_cond)
+            @test_logs (:info, r"Matrix condition number:.*for.*matrix") match_mode = :any solve(
+                prob_good, AppleAccelerateLUFactorization(); verbose = verbose_with_cond
+            )
         else
             @info "Skipping AppleAccelerate tests - AppleAccelerate not available"
         end
@@ -418,8 +445,9 @@ end
                 blas_info = Silent()
             )
 
-            @test_logs (:info, r"BLAS LU factorization.*completed successfully") match_mode=:any solve(
-                prob_good, MKLLUFactorization(); verbose = verbose_success)
+            @test_logs (:info, r"BLAS LU factorization.*completed successfully") match_mode = :any solve(
+                prob_good, MKLLUFactorization(); verbose = verbose_success
+            )
 
             # Test singular matrix with error logging
             A_singular = [1.0 2.0; 2.0 4.0]
@@ -432,8 +460,9 @@ end
                 blas_info = Silent()
             )
 
-            @test_logs (:warn, r"BLAS/LAPACK.*Matrix is singular") match_mode=:any solve(
-                prob_singular, MKLLUFactorization(); verbose = verbose_errors)
+            @test_logs (:warn, r"BLAS/LAPACK.*Matrix is singular") match_mode = :any solve(
+                prob_singular, MKLLUFactorization(); verbose = verbose_errors
+            )
 
             # Test with info logging enabled
             verbose_info = LinearVerbosity(
@@ -442,8 +471,9 @@ end
                 blas_success = Silent()
             )
 
-            @test_logs (:info, r"BLAS/LAPACK.*Matrix is singular") match_mode=:any solve(
-                prob_singular, MKLLUFactorization(); verbose = verbose_info)
+            @test_logs (:info, r"BLAS/LAPACK.*Matrix is singular") match_mode = :any solve(
+                prob_singular, MKLLUFactorization(); verbose = verbose_info
+            )
 
             # Test with all BLAS logging disabled - should produce no logs
             verbose_silent = LinearVerbosity(
@@ -454,8 +484,9 @@ end
                 solver_failure = Silent()
             )
 
-            @test_logs min_level=SciMLLogging.Logging.Warn match_mode=:any solve(
-                prob_singular, MKLLUFactorization(); verbose = verbose_silent)
+            @test_logs min_level = SciMLLogging.Logging.Warn match_mode = :any solve(
+                prob_singular, MKLLUFactorization(); verbose = verbose_silent
+            )
 
             # Test condition number logging if enabled
             verbose_with_cond = LinearVerbosity(
@@ -464,8 +495,9 @@ end
                 blas_errors = Silent()
             )
 
-            @test_logs (:info, r"Matrix condition number:.*for.*matrix") match_mode=:any solve(
-                prob_good, MKLLUFactorization(); verbose = verbose_with_cond)
+            @test_logs (:info, r"Matrix condition number:.*for.*matrix") match_mode = :any solve(
+                prob_good, MKLLUFactorization(); verbose = verbose_with_cond
+            )
         else
             @info "Skipping MKL tests - MKL not available"
         end

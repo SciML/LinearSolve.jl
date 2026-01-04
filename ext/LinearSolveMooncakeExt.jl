@@ -8,11 +8,13 @@ using LinearSolve: LinearSolve, SciMLLinearSolveAlgorithm, init, solve!, LinearP
 using LinearSolve.LinearAlgebra
 using SciMLBase
 
-@from_chainrules MinimalCtx Tuple{typeof(SciMLBase.solve),LinearProblem,Nothing} true ReverseMode
+@from_chainrules MinimalCtx Tuple{typeof(SciMLBase.solve), LinearProblem, Nothing} true ReverseMode
 @from_chainrules MinimalCtx Tuple{
-    typeof(SciMLBase.solve),LinearProblem,SciMLLinearSolveAlgorithm} true ReverseMode
+    typeof(SciMLBase.solve), LinearProblem, SciMLLinearSolveAlgorithm,
+} true ReverseMode
 @from_chainrules MinimalCtx Tuple{
-    Type{<:LinearProblem},AbstractMatrix,AbstractVector,SciMLBase.NullParameters} true ReverseMode
+    Type{<:LinearProblem}, AbstractMatrix, AbstractVector, SciMLBase.NullParameters,
+} true ReverseMode
 
 function Mooncake.increment_and_get_rdata!(f, r::NoRData, t::LinearProblem)
     f.data.A .+= t.A
@@ -38,8 +40,8 @@ function Mooncake.increment_and_get_rdata!(f, r::NoRData, t::LinearCache)
 end
 
 # rrules for LinearCache
-@from_chainrules MinimalCtx Tuple{typeof(init),LinearProblem,SciMLLinearSolveAlgorithm} true ReverseMode
-@from_chainrules MinimalCtx Tuple{typeof(init),LinearProblem,Nothing} true ReverseMode
+@from_chainrules MinimalCtx Tuple{typeof(init), LinearProblem, SciMLLinearSolveAlgorithm} true ReverseMode
+@from_chainrules MinimalCtx Tuple{typeof(init), LinearProblem, Nothing} true ReverseMode
 
 # rrules for solve!
 # NOTE - Avoid Mooncake.prepare_gradient_cache, only use Mooncake.prepare_pullback_cache (and therefore Mooncake.value_and_pullback!!)
@@ -47,18 +49,23 @@ end
 # This because in Mooncake.prepare_gradient_cache we reset stacks + state by passing in zero gradient in the reverse pass once.
 # However, if one has a valid cache then they can directly use Mooncake.value_and_gradient!!.
 
-@is_primitive MinimalCtx Tuple{typeof(SciMLBase.solve!),LinearCache,SciMLLinearSolveAlgorithm,Vararg}
-@is_primitive MinimalCtx Tuple{typeof(SciMLBase.solve!),LinearCache,Nothing,Vararg}
+@is_primitive MinimalCtx Tuple{typeof(SciMLBase.solve!), LinearCache, SciMLLinearSolveAlgorithm, Vararg}
+@is_primitive MinimalCtx Tuple{typeof(SciMLBase.solve!), LinearCache, Nothing, Vararg}
 
-function Mooncake.rrule!!(sig::CoDual{typeof(SciMLBase.solve!)}, _cache::CoDual{<:LinearSolve.LinearCache}, _alg::CoDual{Nothing}, args::Vararg{Any,N}; kwargs...) where {N}
+function Mooncake.rrule!!(sig::CoDual{typeof(SciMLBase.solve!)}, _cache::CoDual{<:LinearSolve.LinearCache}, _alg::CoDual{Nothing}, args::Vararg{Any, N}; kwargs...) where {N}
     cache = primal(_cache)
     assump = OperatorAssumptions()
     _alg.x = defaultalg(cache.A, cache.b, assump)
-    Mooncake.rrule!!(sig, _cache, _alg, args...; kwargs...)
+    return Mooncake.rrule!!(sig, _cache, _alg, args...; kwargs...)
 end
 
-function Mooncake.rrule!!(::CoDual{typeof(SciMLBase.solve!)}, _cache::CoDual{<:LinearSolve.LinearCache}, _alg::CoDual{<:SciMLLinearSolveAlgorithm}, args::Vararg{Any,N}; alias_A=zero_fcodual(LinearSolve.default_alias_A(
-        _alg.x, _cache.x.A, _cache.x.b)), kwargs...) where {N}
+function Mooncake.rrule!!(
+        ::CoDual{typeof(SciMLBase.solve!)}, _cache::CoDual{<:LinearSolve.LinearCache}, _alg::CoDual{<:SciMLLinearSolveAlgorithm}, args::Vararg{Any, N}; alias_A = zero_fcodual(
+            LinearSolve.default_alias_A(
+                _alg.x, _cache.x.A, _cache.x.b
+            )
+        ), kwargs...
+    ) where {N}
 
     cache = primal(_cache)
     alg = primal(_alg)
@@ -72,8 +79,10 @@ function Mooncake.rrule!!(::CoDual{typeof(SciMLBase.solve!)}, _cache::CoDual{<:L
 
     # logic behind caching `A` and `b` for the reverse pass based on rrule above for SciMLBase.solve
     if sensealg.linsolve === missing
-        if !(alg isa LinearSolve.AbstractFactorization || alg isa LinearSolve.AbstractKrylovSubspaceMethod ||
-             alg isa LinearSolve.DefaultLinearSolver)
+        if !(
+                alg isa LinearSolve.AbstractFactorization || alg isa LinearSolve.AbstractKrylovSubspaceMethod ||
+                    alg isa LinearSolve.DefaultLinearSolver
+            )
             A_ = alias_A ? deepcopy(A) : A
         end
     else
@@ -108,7 +117,8 @@ function Mooncake.rrule!!(::CoDual{typeof(SciMLBase.solve!)}, _cache::CoDual{<:L
         else
             invprob = LinearProblem(adjoint(A_), ∂u) # We cached `A`
             λ = solve(
-                invprob, sensealg.linsolve; cache.abstol, cache.reltol, cache.verbose).u
+                invprob, sensealg.linsolve; cache.abstol, cache.reltol, cache.verbose
+            ).u
         end
 
         tu = adjoint(new_sol.u)

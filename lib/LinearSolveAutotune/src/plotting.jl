@@ -16,16 +16,16 @@ function create_benchmark_plots(df::DataFrame; title_base = "LinearSolve.jl LU F
     end
 
     plots_dict = Dict{String, Any}()
-    
+
     # Get unique element types
     eltypes = unique(successful_df.eltype)
-    
+
     for eltype in eltypes
         @info "Creating plot for element type: $eltype"
-        
+
         # Filter results for this element type
         eltype_df = filter(row -> row.eltype == eltype, successful_df)
-        
+
         if nrow(eltype_df) == 0
             continue
         end
@@ -36,11 +36,13 @@ function create_benchmark_plots(df::DataFrame; title_base = "LinearSolve.jl LU F
 
         # Create the plot for this element type
         title = "$title_base ($eltype)"
-        p = plot(title = title,
+        p = plot(
+            title = title,
             xlabel = "Matrix Size (N×N)",
             ylabel = "Performance (GFLOPs)",
             legend = :topleft,
-            dpi = 300)
+            dpi = 300
+        )
 
         # Plot each algorithm for this element type
         for alg in algorithms
@@ -48,14 +50,16 @@ function create_benchmark_plots(df::DataFrame; title_base = "LinearSolve.jl LU F
             if nrow(alg_df) > 0
                 # Sort by size for proper line plotting
                 sort!(alg_df, :size)
-                plot!(p, alg_df.size, alg_df.gflops,
+                plot!(
+                    p, alg_df.size, alg_df.gflops,
                     label = alg,
                     marker = :circle,
                     linewidth = 2,
-                    markersize = 4)
+                    markersize = 4
+                )
             end
         end
-        
+
         plots_dict[eltype] = p
     end
 
@@ -71,11 +75,11 @@ Maintains backward compatibility - uses first element type if multiple exist.
 function create_benchmark_plot(df::DataFrame; title = "LinearSolve.jl LU Factorization Benchmark")
     # For backward compatibility, create plots for all element types and return the first one
     plots_dict = create_benchmark_plots(df; title_base = title)
-    
+
     if isempty(plots_dict)
         return nothing
     end
-    
+
     # Return the first plot for backward compatibility
     return first(values(plots_dict))
 end
@@ -93,7 +97,7 @@ function save_benchmark_plots(plots_dict::Dict, filename_base = "autotune_benchm
     end
 
     saved_files = Dict{String, Tuple{String, String}}()
-    
+
     for (eltype, plot_obj) in plots_dict
         if plot_obj === nothing
             @warn "Cannot save plot for $eltype: plot is nothing"
@@ -114,7 +118,7 @@ function save_benchmark_plots(plots_dict::Dict, filename_base = "autotune_benchm
             @warn "Failed to save plots for $eltype: $e"
         end
     end
-    
+
     return saved_files
 end
 

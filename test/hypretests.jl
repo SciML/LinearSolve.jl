@@ -1,7 +1,7 @@
 using HYPRE
 using HYPRE.LibHYPRE: HYPRE_BigInt,
-                      HYPRE_Complex, HYPRE_IJMatrixGetValues,
-                      HYPRE_IJVectorGetValues, HYPRE_Int
+    HYPRE_Complex, HYPRE_IJMatrixGetValues,
+    HYPRE_IJVectorGetValues, HYPRE_Int
 using LinearAlgebra
 using LinearSolve
 using MPI
@@ -76,9 +76,9 @@ end
 function test_interface(alg; kw...)
     prob1, prob2, prob3, prob4 = generate_probs(alg)
 
-    atol = 1e-6
-    rtol = 1e-6
-    cache_kwargs = (;abstol = atol, reltol = rtol, maxiters = 50)
+    atol = 1.0e-6
+    rtol = 1.0e-6
+    cache_kwargs = (; abstol = atol, reltol = rtol, maxiters = 50)
     cache_kwargs = merge(cache_kwargs, kw)
 
     # prob1, prob3 with initial guess, prob2, prob4 without
@@ -87,19 +87,19 @@ function test_interface(alg; kw...)
 
         # Solve prob directly (without cache)
         y = solve(prob, alg; cache_kwargs..., Pl = HYPRE.BoomerAMG)
-        @test A*to_array(y.u)≈b atol=atol rtol=rtol
+        @test A * to_array(y.u) ≈ b atol = atol rtol = rtol
         @test y.iters > 0
         @test y.resid < rtol
 
         # Solve with cache
         cache = SciMLBase.init(prob, alg; cache_kwargs...)
         @test cache.isfresh == cache.cacheval.isfresh_A ==
-              cache.cacheval.isfresh_b == cache.cacheval.isfresh_u == true
+            cache.cacheval.isfresh_b == cache.cacheval.isfresh_u == true
         y = solve!(cache)
         cache = y.cache
         @test cache.isfresh == cache.cacheval.isfresh_A ==
-              cache.cacheval.isfresh_b == cache.cacheval.isfresh_u == false
-        @test A*to_array(y.u)≈b atol=atol rtol=rtol
+            cache.cacheval.isfresh_b == cache.cacheval.isfresh_u == false
+        @test A * to_array(y.u) ≈ b atol = atol rtol = rtol
 
         # Update A
         cache.A = A
@@ -108,8 +108,8 @@ function test_interface(alg; kw...)
         y = solve!(cache; cache_kwargs...)
         cache = y.cache
         @test cache.isfresh == cache.cacheval.isfresh_A ==
-              cache.cacheval.isfresh_b == cache.cacheval.isfresh_u == false
-        @test A*to_array(y.u)≈b atol=atol rtol=rtol
+            cache.cacheval.isfresh_b == cache.cacheval.isfresh_u == false
+        @test A * to_array(y.u) ≈ b atol = atol rtol = rtol
 
         # Update b
         b2 = 2 * to_array(b)
@@ -122,8 +122,8 @@ function test_interface(alg; kw...)
         y = solve!(cache; cache_kwargs...)
         cache = y.cache
         @test cache.isfresh == cache.cacheval.isfresh_A ==
-              cache.cacheval.isfresh_b == cache.cacheval.isfresh_u == false
-        @test A*to_array(y.u)≈to_array(b2) atol=atol rtol=rtol
+            cache.cacheval.isfresh_b == cache.cacheval.isfresh_u == false
+        @test A * to_array(y.u) ≈ to_array(b2) atol = atol rtol = rtol
     end
     return
 end

@@ -39,16 +39,22 @@ struct SimpleGMRES{UBD} <: AbstractKrylovSubspaceMethod
     blocksize::Int
     warm_start::Bool
 
-    function SimpleGMRES{UBD}(; restart::Bool = true, blocksize::Int = 0,
-            warm_start::Bool = false, memory::Int = 20) where {UBD}
+    function SimpleGMRES{UBD}(;
+            restart::Bool = true, blocksize::Int = 0,
+            warm_start::Bool = false, memory::Int = 20
+        ) where {UBD}
         UBD && @assert blocksize > 0
         return new{UBD}(restart, memory, blocksize, warm_start)
     end
 
-    function SimpleGMRES(; restart::Bool = true, blocksize::Int = 0,
-            warm_start::Bool = false, memory::Int = 20)
-        return SimpleGMRES{blocksize > 0}(; restart, memory, blocksize,
-            warm_start)
+    function SimpleGMRES(;
+            restart::Bool = true, blocksize::Int = 0,
+            warm_start::Bool = false, memory::Int = 20
+        )
+        return SimpleGMRES{blocksize > 0}(;
+            restart, memory, blocksize,
+            warm_start
+        )
     end
 end
 
@@ -147,9 +153,11 @@ default_alias_b(::SimpleGMRES, ::Any, ::Any) = false
 
 function SciMLBase.solve!(cache::LinearCache, alg::SimpleGMRES; kwargs...)
     if cache.isfresh
-        solver = init_cacheval(alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr,
+        solver = init_cacheval(
+            alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr,
             cache.maxiters, cache.abstol, cache.reltol, cache.verbose,
-            cache.assumptions; zeroinit = false)
+            cache.assumptions; zeroinit = false
+        )
         cache.cacheval = solver
         cache.isfresh = false
     end
@@ -160,22 +168,26 @@ function init_cacheval(alg::SimpleGMRES{UDB}, args...; kwargs...) where {UDB}
     return _init_cacheval(Val(UDB), alg, args...; kwargs...)
 end
 
-function _init_cacheval(::Val{false}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiters::Int,
-        abstol, reltol, ::Union{LinearVerbosity, Bool}, ::OperatorAssumptions; zeroinit = true, kwargs...)
+function _init_cacheval(
+        ::Val{false}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiters::Int,
+        abstol, reltol, ::Union{LinearVerbosity, Bool}, ::OperatorAssumptions; zeroinit = true, kwargs...
+    )
     (; memory, restart, blocksize, warm_start) = alg
 
     if zeroinit
-        return SimpleGMRESCache{false}(memory, 0, restart, maxiters, blocksize,
+        return SimpleGMRESCache{false}(
+            memory, 0, restart, maxiters, blocksize,
             zero(eltype(u)) * reltol + abstol, false, false, Pl, Pr, similar(u, 0),
             similar(u, 0), similar(u, 0), u, A, b, abstol, reltol, similar(u, 0),
             Vector{typeof(u)}(undef, 0), Vector{eltype(u)}(undef, 0),
             Vector{eltype(u)}(undef, 0), Vector{eltype(u)}(undef, 0),
-            Vector{eltype(u)}(undef, 0), zero(eltype(u)), warm_start)
+            Vector{eltype(u)}(undef, 0), zero(eltype(u)), warm_start
+        )
     end
 
     T = eltype(u)
     n = LinearAlgebra.checksquare(A)
-    @assert n==length(b) "The size of `A` and `b` must match."
+    @assert n == length(b) "The size of `A` and `b` must match."
     memory = min(memory, maxiters)
 
     PlisI = _no_preconditioner(Pl)
@@ -214,7 +226,8 @@ function _init_cacheval(::Val{false}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiter
 
     return SimpleGMRESCache{false}(
         memory, n, restart, maxiters, blocksize, ε, PlisI, PrisI,
-        Pl, Pr, Δx, q, p, x, A, b, abstol, reltol, w, V, s, c, z, R, β, warm_start)
+        Pl, Pr, Δx, q, p, x, A, b, abstol, reltol, w, V, s, c, z, R, β, warm_start
+    )
 end
 
 function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
@@ -227,8 +240,10 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
     xr = restart ? Δx : x
 
     if β == 0
-        return SciMLBase.build_linear_solution(lincache.alg, x, r₀, lincache;
-            retcode = ReturnCode.Success)
+        return SciMLBase.build_linear_solution(
+            lincache.alg, x, r₀, lincache;
+            retcode = ReturnCode.Success
+        )
     end
 
     rNorm = β
@@ -307,10 +322,13 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
             # Compute and apply current Givens reflection Ωₖ.
             # [cₖ  sₖ] [ r̄ₖ.ₖ ] = [rₖ.ₖ]
             # [s̄ₖ -cₖ] [hₖ₊₁.ₖ]   [ 0  ]
-            (c[inner_iter], s[inner_iter],
-                R[nr + inner_iter]) = _sym_givens(
+            (
+                c[inner_iter], s[inner_iter],
                 R[nr + inner_iter],
-                Hbis)
+            ) = _sym_givens(
+                R[nr + inner_iter],
+                Hbis
+            )
 
             # Update zₖ = (Qₖ)ᴴβe₁
             ζₖ₊₁ = conj(s[inner_iter]) * z[inner_iter]
@@ -332,7 +350,7 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
             breakdown = Hbis ≤ btol
             solved = resid_decrease_lim || resid_decrease_mach
             inner_tired = restart ? inner_iter ≥ min(memory, inner_maxiters) :
-                          inner_iter ≥ inner_maxiters
+                inner_iter ≥ inner_maxiters
 
             # Compute vₖ₊₁.
             if !(solved || inner_tired || breakdown)
@@ -387,26 +405,32 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
     warm_start && !restart && axpy!(one(T), Δx, x)
     cache.warm_start = false
 
-    return SciMLBase.build_linear_solution(lincache.alg, x, rNorm, lincache;
-        retcode = status, iters = iter)
+    return SciMLBase.build_linear_solution(
+        lincache.alg, x, rNorm, lincache;
+        retcode = status, iters = iter
+    )
 end
 
-function _init_cacheval(::Val{true}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiters::Int,
+function _init_cacheval(
+        ::Val{true}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol, ::Union{LinearVerbosity, Bool}, ::OperatorAssumptions; zeroinit = true,
-        blocksize = alg.blocksize)
+        blocksize = alg.blocksize
+    )
     (; memory, restart, warm_start) = alg
 
     if zeroinit
-        return SimpleGMRESCache{true}(memory, 0, restart, maxiters, blocksize,
+        return SimpleGMRESCache{true}(
+            memory, 0, restart, maxiters, blocksize,
             zero(eltype(u)) * reltol + abstol, false, false, Pl, Pr, similar(u, 0),
             similar(u, 0), similar(u, 0), u, A, b, abstol, reltol, similar(u, 0),
-            [u], [u], [u], [u], [u], zero(eltype(u)), warm_start)
+            [u], [u], [u], [u], [u], zero(eltype(u)), warm_start
+        )
     end
 
     T = eltype(u)
     n = LinearAlgebra.checksquare(A)
-    @assert mod(n, blocksize)==0 "The blocksize must divide the size of the matrix."
-    @assert n==length(b) "The size of `A` and `b` must match."
+    @assert mod(n, blocksize) == 0 "The blocksize must divide the size of the matrix."
+    @assert n == length(b) "The size of `A` and `b` must match."
     memory = min(memory, maxiters)
     bsize = n ÷ blocksize
 
@@ -444,8 +468,10 @@ function _init_cacheval(::Val{true}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiters
     rNorm = β
     ε = abstol + reltol * rNorm
 
-    return SimpleGMRESCache{true}(memory, n, restart, maxiters, blocksize, ε, PlisI, PrisI,
-        Pl, Pr, Δx, q, p, x, A, b, abstol, reltol, w, V, s, c, z, R, β, warm_start)
+    return SimpleGMRESCache{true}(
+        memory, n, restart, maxiters, blocksize, ε, PlisI, PrisI,
+        Pl, Pr, Δx, q, p, x, A, b, abstol, reltol, w, V, s, c, z, R, β, warm_start
+    )
 end
 
 function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
@@ -461,8 +487,10 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
     xr = restart ? Δx : x
 
     if β == 0
-        return SciMLBase.build_linear_solution(lincache.alg, x, r₀, lincache;
-            retcode = ReturnCode.Success)
+        return SciMLBase.build_linear_solution(
+            lincache.alg, x, r₀, lincache;
+            retcode = ReturnCode.Success
+        )
     end
 
     rNorm = β
@@ -564,7 +592,7 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
             breakdown = maximum(Hbis) ≤ btol
             solved = resid_decrease_lim || resid_decrease_mach
             inner_tired = restart ? inner_iter ≥ min(memory, inner_maxiters) :
-                          inner_iter ≥ inner_maxiters
+                inner_iter ≥ inner_maxiters
 
             # Compute vₖ₊₁.
             if !(solved || inner_tired || breakdown)
@@ -614,6 +642,8 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
     # Update x
     warm_start && !restart && axpy!(one(T), Δx, x)
 
-    return SciMLBase.build_linear_solution(lincache.alg, x, rNorm, lincache;
-        retcode = status, iters = iter)
+    return SciMLBase.build_linear_solution(
+        lincache.alg, x, rNorm, lincache;
+        retcode = status, iters = iter
+    )
 end

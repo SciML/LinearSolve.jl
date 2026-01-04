@@ -4,8 +4,8 @@ using LinearAlgebra
 using HYPRE.LibHYPRE: HYPRE_Complex
 using HYPRE: HYPRE, HYPREMatrix, HYPRESolver, HYPREVector
 using LinearSolve: HYPREAlgorithm, LinearCache, LinearProblem, LinearSolve,
-                   OperatorAssumptions, default_tol, init_cacheval, __issquare,
-                   __conditioning, LinearSolveAdjoint, LinearVerbosity
+    OperatorAssumptions, default_tol, init_cacheval, __issquare,
+    __conditioning, LinearSolveAdjoint, LinearVerbosity
 using SciMLLogging: SciMLLogging, verbosity_to_int, @SciMLMessage
 using SciMLBase: LinearProblem, LinearAliasSpecifier, SciMLBase
 using Setfield: @set!
@@ -20,9 +20,11 @@ mutable struct HYPRECache
     isfresh_u::Bool
 end
 
-function LinearSolve.init_cacheval(alg::HYPREAlgorithm, A, b, u, Pl, Pr, maxiters::Int,
+function LinearSolve.init_cacheval(
+        alg::HYPREAlgorithm, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol,
-        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
     return HYPRECache(nothing, nothing, nothing, nothing, true, true, true)
 end
 
@@ -43,7 +45,7 @@ function Base.setproperty!(cache::LinearCacheHYPRE, name::Symbol, x)
         setfield!(cache, :isfresh, true)
         return setfield!(cache, name, x isa HYPREVector ? x : HYPREVector(x))
     end
-    setfield!(cache, name, x)
+    return setfield!(cache, name, x)
 end
 
 # Note:
@@ -53,15 +55,20 @@ end
 # - The solution vector/initial guess u0 can't be created with
 #   fill!(similar(b, size(A, 2)), false) since HYPREArrays are not AbstractArrays.
 
-function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
+function SciMLBase.init(
+        prob::LinearProblem, alg::HYPREAlgorithm,
         args...;
         alias = LinearAliasSpecifier(),
         # TODO: Implement eltype for HYPREMatrix in HYPRE.jl? Looks useful
         #       even if it is not AbstractArray.
-        abstol = default_tol(prob.A isa HYPREMatrix ? HYPRE_Complex :
-                             eltype(prob.A)),
-        reltol = default_tol(prob.A isa HYPREMatrix ? HYPRE_Complex :
-                             eltype(prob.A)),
+        abstol = default_tol(
+            prob.A isa HYPREMatrix ? HYPRE_Complex :
+                eltype(prob.A)
+        ),
+        reltol = default_tol(
+            prob.A isa HYPREMatrix ? HYPRE_Complex :
+                eltype(prob.A)
+        ),
         # TODO: Implement length() for HYPREVector in HYPRE.jl?
         maxiters::Int = prob.b isa HYPREVector ? 1000 : length(prob.b),
         verbose = LinearVerbosity(SciMLLogging.None()),
@@ -69,7 +76,8 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
         Pr = LinearAlgebra.I,
         assumptions = OperatorAssumptions(),
         sensealg = LinearSolveAdjoint(),
-        kwargs...)
+        kwargs...
+    )
     (; A, b, u0, p) = prob
 
     if haskey(kwargs, :alias_A) || haskey(kwargs, :alias_b)
@@ -89,7 +97,8 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
             Base.depwarn(message, :init)
             Base.depwarn(message, :solve)
             aliases = LinearAliasSpecifier(
-                alias_A = aliases.alias_A, alias_b = values(kwargs).alias_b)
+                alias_A = aliases.alias_A, alias_b = values(kwargs).alias_b
+            )
         end
     else
         if alias isa Bool
@@ -138,23 +147,29 @@ function SciMLBase.init(prob::LinearProblem, alg::HYPREAlgorithm,
     end
 
     # Initialize internal alg cache
-    cacheval = init_cacheval(alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, init_cache_verb,
-        assumptions)
+    cacheval = init_cacheval(
+        alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, init_cache_verb,
+        assumptions
+    )
     Tc = typeof(cacheval)
     isfresh = true
     precsisfresh = false
     cache = LinearCache{
         typeof(A), typeof(b), typeof(u0), typeof(p), typeof(alg), Tc,
         typeof(Pl), typeof(Pr), typeof(reltol), typeof(verb_spec),
-        typeof(__issquare(assumptions)), typeof(sensealg)
-    }(A, b, u0, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
-        maxiters, verb_spec, assumptions, sensealg)
+        typeof(__issquare(assumptions)), typeof(sensealg),
+    }(
+        A, b, u0, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
+        maxiters, verb_spec, assumptions, sensealg
+    )
     return cache
 end
 
 # Solvers whose constructor requires passing the MPI communicator
-const COMM_SOLVERS = Union{HYPRE.BiCGSTAB, HYPRE.FlexGMRES, HYPRE.GMRES, HYPRE.ParaSails,
-    HYPRE.PCG}
+const COMM_SOLVERS = Union{
+    HYPRE.BiCGSTAB, HYPRE.FlexGMRES, HYPRE.GMRES, HYPRE.ParaSails,
+    HYPRE.PCG,
+}
 create_solver(::Type{S}, comm) where {S <: COMM_SOLVERS} = S(comm)
 
 # Solvers whose constructor should not be passed the MPI communicator
@@ -180,7 +195,8 @@ function create_solver(alg::HYPREAlgorithm, cache::LinearCache)
         AbsoluteTol = cache.abstol,
         MaxIter = cache.maxiters,
         PrintLevel = verbose,
-        Tol = cache.reltol)
+        Tol = cache.reltol,
+    )
 
     # Preconditioner (uses Pl even though it might not be a *left* preconditioner just *a*
     # preconditioner)
@@ -219,8 +235,10 @@ function SciMLBase.solve!(cache::LinearCache, alg::HYPREAlgorithm, args...; kwar
     # It is possible to reach here without HYPRE.Init() being called if HYPRE structures are
     # only to be created here internally (i.e. when cache.A::SparseMatrixCSC and not a
     # ::HYPREMatrix created externally by the user). Be nice to the user and call it :)
-    if !(cache.A isa HYPREMatrix || cache.b isa HYPREVector || cache.u isa HYPREVector ||
-         alg.solver isa HYPRESolver)
+    if !(
+            cache.A isa HYPREMatrix || cache.b isa HYPREVector || cache.u isa HYPREVector ||
+                alg.solver isa HYPRESolver
+        )
         HYPRE.Init()
     end
 
@@ -267,17 +285,23 @@ function SciMLBase.solve!(cache::LinearCache, alg::HYPREAlgorithm, args...; kwar
     retc = SciMLBase.ReturnCode.Default # TODO: Fetch from solver
     stats = nothing
 
-    ret = SciMLBase.LinearSolution{T, N, typeof(cache.u), typeof(resid), typeof(alg),
-        typeof(cache), typeof(stats)}(cache.u, resid, alg, retc,
-        iters, cache, stats)
+    ret = SciMLBase.LinearSolution{
+        T, N, typeof(cache.u), typeof(resid), typeof(alg),
+        typeof(cache), typeof(stats),
+    }(
+        cache.u, resid, alg, retc,
+        iters, cache, stats
+    )
 
     return ret
 end
 
 # HYPREArrays are not AbstractArrays so perform some type-piracy
-function SciMLBase.LinearProblem(A::HYPREMatrix, b::HYPREVector,
+function SciMLBase.LinearProblem(
+        A::HYPREMatrix, b::HYPREVector,
         p = SciMLBase.NullParameters();
-        u0::Union{HYPREVector, Nothing} = nothing, kwargs...)
+        u0::Union{HYPREVector, Nothing} = nothing, kwargs...
+    )
     return LinearProblem{true}(A, b, p; u0 = u0, kwargs)
 end
 

@@ -3,26 +3,30 @@ module LinearSolveMetalExt
 using Metal, LinearSolve
 using LinearAlgebra, SciMLBase
 using SciMLBase: AbstractSciMLOperator
-using LinearSolve: ArrayInterface, MKLLUFactorization, MetalOffload32MixedLUFactorization, 
-                   @get_cacheval, LinearCache, SciMLBase, OperatorAssumptions, LinearVerbosity
+using LinearSolve: ArrayInterface, MKLLUFactorization, MetalOffload32MixedLUFactorization,
+    @get_cacheval, LinearCache, SciMLBase, OperatorAssumptions, LinearVerbosity
 
 @static if Sys.isapple()
 
-LinearSolve.usemetal(x::Nothing) = true
+    LinearSolve.usemetal(x::Nothing) = true
 
 end
 
 default_alias_A(::MetalLUFactorization, ::Any, ::Any) = false
 default_alias_b(::MetalLUFactorization, ::Any, ::Any) = false
 
-function LinearSolve.init_cacheval(alg::MetalLUFactorization, A::AbstractArray, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(
+        alg::MetalLUFactorization, A::AbstractArray, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
-        assumptions::OperatorAssumptions)
-    ArrayInterface.lu_instance(convert(AbstractMatrix, A))
+        assumptions::OperatorAssumptions
+    )
+    return ArrayInterface.lu_instance(convert(AbstractMatrix, A))
 end
 
-function SciMLBase.solve!(cache::LinearCache, alg::MetalLUFactorization;
-        kwargs...)
+function SciMLBase.solve!(
+        cache::LinearCache, alg::MetalLUFactorization;
+        kwargs...
+    )
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
@@ -32,16 +36,18 @@ function SciMLBase.solve!(cache::LinearCache, alg::MetalLUFactorization;
         cache.isfresh = false
     end
     y = ldiv!(cache.u, @get_cacheval(cache, :MetalLUFactorization), cache.b)
-    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
 # Mixed precision Metal LU implementation
 default_alias_A(::MetalOffload32MixedLUFactorization, ::Any, ::Any) = false
 default_alias_b(::MetalOffload32MixedLUFactorization, ::Any, ::Any) = false
 
-function LinearSolve.init_cacheval(alg::MetalOffload32MixedLUFactorization, A, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(
+        alg::MetalOffload32MixedLUFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
-        assumptions::OperatorAssumptions)
+        assumptions::OperatorAssumptions
+    )
     # Pre-allocate with Float32 arrays
     m, n = size(A)
     T32 = eltype(A) <: Complex ? ComplexF32 : Float32
@@ -56,8 +62,10 @@ function LinearSolve.init_cacheval(alg::MetalOffload32MixedLUFactorization, A, b
     return (luinst, A_f32, b_f32, u_f32, A_mtl, b_mtl, u_mtl)
 end
 
-function SciMLBase.solve!(cache::LinearCache, alg::MetalOffload32MixedLUFactorization;
-        kwargs...)
+function SciMLBase.solve!(
+        cache::LinearCache, alg::MetalOffload32MixedLUFactorization;
+        kwargs...
+    )
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
@@ -72,23 +80,23 @@ function SciMLBase.solve!(cache::LinearCache, alg::MetalOffload32MixedLUFactoriz
         cache.cacheval = (fact, A_f32, b_f32, u_f32, A_mtl, b_mtl, u_mtl)
         cache.isfresh = false
     end
-    
+
     fact, A_f32, b_f32, u_f32, A_mtl, b_mtl, u_mtl = @get_cacheval(cache, :MetalOffload32MixedLUFactorization)
-    
+
     # Compute types on demand for conversions
     T32 = eltype(cache.A) <: Complex ? ComplexF32 : Float32
     Torig = eltype(cache.u)
-    
+
     # Convert b to 32-bit for solving
     b_f32 .= T32.(cache.b)
-    
+
     # Create a temporary Float32 LU factorization for solving
     fact_f32 = LU(T32.(fact.factors), fact.ipiv, fact.info)
     ldiv!(u_f32, fact_f32, b_f32)
-    
+
     # Convert back to original precision
     cache.u .= Torig.(u_f32)
-    SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
 end
 
 end

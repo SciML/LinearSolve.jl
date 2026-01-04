@@ -17,16 +17,18 @@ function test_algorithm_compatibility(alg, eltype::Type, test_size::Int = 4)
     # Define strict compatibility rules for BLAS-dependent algorithms
     # Standard BLAS algorithms that rely on LinearAlgebra.BLAS interface
     if !(eltype <: LinearAlgebra.BLAS.BlasFloat) && alg_name in [
-        "LUFactorization", "QRFactorization", "CHOLMODFactorization"]
+            "LUFactorization", "QRFactorization", "CHOLMODFactorization",
+        ]
         return false  # Standard BLAS algorithms not compatible with non-standard types
     end
 
     # Manual BLAS wrappers with explicit method signatures for specific types only
     # These bypass Julia's BLAS interface and have hardcoded ccall signatures
     if alg_name in [
-        "BLISLUFactorization", "MKLLUFactorization", "AppleAccelerateLUFactorization",
-        "OpenBLASLUFactorization"] &&
-       !(eltype in [Float32, Float64, ComplexF32, ComplexF64])
+            "BLISLUFactorization", "MKLLUFactorization", "AppleAccelerateLUFactorization",
+            "OpenBLASLUFactorization",
+        ] &&
+            !(eltype in [Float32, Float64, ComplexF32, ComplexF64])
         return false  # Manual BLAS wrappers only have methods for Float32/64, ComplexF32/64
     end
 
@@ -43,14 +45,15 @@ function test_algorithm_compatibility(alg, eltype::Type, test_size::Int = 4)
 
     # CUDA algorithms: Direct GPU algorithms don't support Float16, but mixed precision should work
     if alg_name in [
-        "CudaOffloadLUFactorization", "CudaOffloadQRFactorization", "CudaOffloadFactorization"] &&
-       eltype == Float16
+            "CudaOffloadLUFactorization", "CudaOffloadQRFactorization", "CudaOffloadFactorization",
+        ] &&
+            eltype == Float16
         return false  # cuSOLVER factorization routines don't support Float16
     end
 
     # AMD GPU algorithms: Direct GPU factorization doesn't support Float16
     if alg_name in ["AMDGPUOffloadLUFactorization", "AMDGPUOffloadQRFactorization"] &&
-       eltype == Float16
+            eltype == Float16
         return false  # rocSOLVER factorization Float16 support is limited
     end
 
@@ -60,9 +63,11 @@ function test_algorithm_compatibility(alg, eltype::Type, test_size::Int = 4)
     end
 
     # PARDISO algorithms: Only support single/double precision
-    if alg_name in ["MKLPardisoFactorize", "MKLPardisoIterate",
-        "PanuaPardisoFactorize", "PanuaPardisoIterate", "PardisoJL"] &&
-       eltype == Float16
+    if alg_name in [
+            "MKLPardisoFactorize", "MKLPardisoIterate",
+            "PanuaPardisoFactorize", "PanuaPardisoIterate", "PardisoJL",
+        ] &&
+            eltype == Float16
         return false  # PARDISO only supports Float32/Float64
     end
 
@@ -132,12 +137,14 @@ Returns a DataFrame with results including element type information.
   - `maxtime::Float64 = 100.0`: Maximum time in seconds for each algorithm test (including accuracy check).
     If the accuracy check exceeds this time, the run is skipped and recorded as NaN.
 """
-function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
+function benchmark_algorithms(
+        matrix_sizes, algorithms, alg_names, eltypes;
         samples = 5, seconds = 0.5, sizes = [:tiny, :small, :medium, :large],
-        check_correctness = true, correctness_tol = 1e0, maxtime = 100.0)
+        check_correctness = true, correctness_tol = 1.0e0, maxtime = 100.0
+    )
 
-    # Note: We pass benchmark parameters directly to @benchmark instead of 
-    # modifying BenchmarkTools.DEFAULT_PARAMETERS to avoid const assignment 
+    # Note: We pass benchmark parameters directly to @benchmark instead of
+    # modifying BenchmarkTools.DEFAULT_PARAMETERS to avoid const assignment
     # errors in Julia 1.12+
 
     # Initialize results DataFrame
@@ -156,171 +163,184 @@ function benchmark_algorithms(matrix_sizes, algorithms, alg_names, eltypes;
     end
 
     # Create progress bar
-    progress = Progress(total_benchmarks, desc = "Benchmarking: ",
-        barlen = 50, showspeed = true)
+    progress = Progress(
+        total_benchmarks, desc = "Benchmarking: ",
+        barlen = 50, showspeed = true
+    )
 
     for eltype in eltypes
-            # Initialize blocked algorithms dict for this element type
-            blocked_algorithms[string(eltype)] = Dict{String, Int}()
+        # Initialize blocked algorithms dict for this element type
+        blocked_algorithms[string(eltype)] = Dict{String, Int}()
 
-            # Filter algorithms for this element type
-            compatible_algs,
+        # Filter algorithms for this element type
+        compatible_algs,
             compatible_names = filter_compatible_algorithms(algorithms, alg_names, eltype)
 
-            if isempty(compatible_algs)
-                @warn "No algorithms compatible with $eltype, skipping..."
-                continue
+        if isempty(compatible_algs)
+            @warn "No algorithms compatible with $eltype, skipping..."
+            continue
+        end
+
+        for n in matrix_sizes
+            # Create test problem with specified element type
+            rng = MersenneTwister(123)  # Consistent seed for reproducibility
+            A = rand(rng, eltype, n, n)
+            b = rand(rng, eltype, n)
+            u0 = rand(rng, eltype, n)
+
+            # Compute reference solution with LUFactorization if correctness check is enabled
+            reference_solution = nothing
+            if check_correctness
+                try
+                    ref_prob = LinearProblem(copy(A), copy(b); u0 = copy(u0))
+                    reference_solution = solve(ref_prob, LinearSolve.LUFactorization())
+                catch e
+                    @warn "Failed to compute reference solution with LUFactorization for size $n, eltype $eltype: $e"
+                    check_correctness = false  # Disable for this size/type combination
+                end
             end
 
-            for n in matrix_sizes
-                # Create test problem with specified element type
-                rng = MersenneTwister(123)  # Consistent seed for reproducibility
-                A = rand(rng, eltype, n, n)
-                b = rand(rng, eltype, n)
-                u0 = rand(rng, eltype, n)
-
-                # Compute reference solution with LUFactorization if correctness check is enabled
-                reference_solution = nothing
-                if check_correctness
-                    try
-                        ref_prob = LinearProblem(copy(A), copy(b); u0 = copy(u0))
-                        reference_solution = solve(ref_prob, LinearSolve.LUFactorization())
-                    catch e
-                        @warn "Failed to compute reference solution with LUFactorization for size $n, eltype $eltype: $e"
-                        check_correctness = false  # Disable for this size/type combination
+            for (alg, name) in zip(compatible_algs, compatible_names)
+                # Skip this algorithm if it has exceeded maxtime for a smaller or equal size matrix
+                if haskey(blocked_algorithms[string(eltype)], name)
+                    max_allowed_size = blocked_algorithms[string(eltype)][name]
+                    if n > max_allowed_size
+                        # Clear progress line and show warning on new line
+                        println()  # Ensure we're on a new line
+                        @warn "Algorithm $name skipped for size $n (exceeded maxtime on size $max_allowed_size matrix)"
+                        # Still need to update progress bar
+                        ProgressMeter.next!(progress)
+                        # Record as skipped due to exceeding maxtime on smaller matrix
+                        push!(
+                            results_data,
+                            (
+                                size = n,
+                                algorithm = name,
+                                eltype = string(eltype),
+                                gflops = NaN,
+                                success = false,
+                                error = "Skipped: exceeded maxtime on size $max_allowed_size matrix",
+                            )
+                        )
+                        continue
                     end
                 end
 
-                for (alg, name) in zip(compatible_algs, compatible_names)
-                    # Skip this algorithm if it has exceeded maxtime for a smaller or equal size matrix
-                    if haskey(blocked_algorithms[string(eltype)], name)
-                        max_allowed_size = blocked_algorithms[string(eltype)][name]
-                        if n > max_allowed_size
-                            # Clear progress line and show warning on new line
-                            println()  # Ensure we're on a new line
-                            @warn "Algorithm $name skipped for size $n (exceeded maxtime on size $max_allowed_size matrix)"
-                            # Still need to update progress bar
-                            ProgressMeter.next!(progress)
-                            # Record as skipped due to exceeding maxtime on smaller matrix
-                            push!(results_data,
-                                (
-                                    size = n,
-                                    algorithm = name,
-                                    eltype = string(eltype),
-                                    gflops = NaN,
-                                    success = false,
-                                    error = "Skipped: exceeded maxtime on size $max_allowed_size matrix"
-                                ))
-                            continue
-                        end
-                    end
+                # Update progress description
+                ProgressMeter.update!(
+                    progress,
+                    desc = "Benchmarking $name on $(n)×$(n) $eltype matrix: "
+                )
 
-                    # Update progress description
-                    ProgressMeter.update!(progress,
-                        desc = "Benchmarking $name on $(n)×$(n) $eltype matrix: ")
+                gflops = NaN  # Use NaN for failed/timed out runs
+                success = true
+                error_msg = ""
+                passed_correctness = true
+                exceeded_maxtime = false
 
-                    gflops = NaN  # Use NaN for failed/timed out runs
-                    success = true
-                    error_msg = ""
-                    passed_correctness = true
-                    exceeded_maxtime = false
+                try
+                    # Create the linear problem for this test
+                    prob = LinearProblem(
+                        copy(A), copy(b);
+                        u0 = copy(u0),
+                        alias = LinearAliasSpecifier(alias_A = true, alias_b = true)
+                    )
 
-                    try
-                        # Create the linear problem for this test
-                        prob = LinearProblem(copy(A), copy(b);
-                            u0 = copy(u0),
-                            alias = LinearAliasSpecifier(alias_A = true, alias_b = true))
+                    # Time the warmup run and correctness check
+                    start_time = time()
 
-                        # Time the warmup run and correctness check
-                        start_time = time()
+                    # Warmup run and correctness check - no interruption, just timing
+                    warmup_sol = nothing
 
-                        # Warmup run and correctness check - no interruption, just timing
-                        warmup_sol = nothing
+                    # Simply run the solve and measure time
+                    warmup_sol = solve(prob, alg)
+                    elapsed_time = time() - start_time
 
-                        # Simply run the solve and measure time
-                        warmup_sol = solve(prob, alg)
-                        elapsed_time = time() - start_time
+                    # Check if we exceeded maxtime
+                    if elapsed_time > maxtime
+                        exceeded_maxtime = true
+                        # Block this algorithm for larger matrices
+                        # Store the last size that was allowed to complete
+                        blocked_algorithms[string(eltype)][name] = n
+                        @warn "Algorithm $name exceeded maxtime ($(round(elapsed_time, digits = 2))s > $(maxtime)s) for size $n, eltype $eltype. Will skip for larger matrices."
+                        success = false
+                        error_msg = "Exceeded maxtime ($(round(elapsed_time, digits = 2))s)"
+                        gflops = NaN
+                    else
+                        # Successful completion within time limit
 
-                        # Check if we exceeded maxtime
-                        if elapsed_time > maxtime
-                            exceeded_maxtime = true
-                            # Block this algorithm for larger matrices
-                            # Store the last size that was allowed to complete
-                            blocked_algorithms[string(eltype)][name] = n
-                            @warn "Algorithm $name exceeded maxtime ($(round(elapsed_time, digits=2))s > $(maxtime)s) for size $n, eltype $eltype. Will skip for larger matrices."
-                            success = false
-                            error_msg = "Exceeded maxtime ($(round(elapsed_time, digits=2))s)"
-                            gflops = NaN
-                        else
-                            # Successful completion within time limit
+                        # Check correctness if reference solution is available
+                        if check_correctness && reference_solution !== nothing
+                            # Compute relative error
+                            rel_error = norm(warmup_sol.u - reference_solution.u) /
+                                norm(reference_solution.u)
 
-                            # Check correctness if reference solution is available
-                            if check_correctness && reference_solution !== nothing
-                                # Compute relative error
-                                rel_error = norm(warmup_sol.u - reference_solution.u) /
-                                            norm(reference_solution.u)
-
-                                if rel_error > correctness_tol
-                                    passed_correctness = false
-                                    @warn "Algorithm $name failed correctness check for size $n, eltype $eltype. " *
-                                          "Relative error: $(round(rel_error, sigdigits=3)) > tolerance: $correctness_tol. " *
-                                          "Algorithm will be excluded from results."
-                                    success = false
-                                    error_msg = "Failed correctness check (rel_error = $(round(rel_error, sigdigits=3)))"
-                                    gflops = 0.0
-                                end
+                            if rel_error > correctness_tol
+                                passed_correctness = false
+                                @warn "Algorithm $name failed correctness check for size $n, eltype $eltype. " *
+                                    "Relative error: $(round(rel_error, sigdigits = 3)) > tolerance: $correctness_tol. " *
+                                    "Algorithm will be excluded from results."
+                                success = false
+                                error_msg = "Failed correctness check (rel_error = $(round(rel_error, sigdigits = 3)))"
+                                gflops = 0.0
                             end
+                        end
 
-                            # Only benchmark if correctness check passed and we didn't exceed maxtime
-                            if passed_correctness && !exceeded_maxtime
-                                # Check if we have enough time remaining for benchmarking
-                                # Allow at least 2x the warmup time for benchmarking
-                                remaining_time = maxtime - elapsed_time
-                                if remaining_time < 2 * elapsed_time
-                                    @warn "Algorithm $name: insufficient time remaining for benchmarking (warmup took $(round(elapsed_time, digits=2))s). Recording as NaN."
-                                    gflops = NaN
-                                    success = false
-                                    error_msg = "Insufficient time for benchmarking"
-                                else
-                                    # Actual benchmark
-                                    # Create benchmark with custom parameters
-                                    bench_params = BenchmarkTools.Parameters(;seconds=seconds, samples=samples)
-                                    _bench = @benchmarkable solve($prob, $alg) setup=(prob = LinearProblem(
+                        # Only benchmark if correctness check passed and we didn't exceed maxtime
+                        if passed_correctness && !exceeded_maxtime
+                            # Check if we have enough time remaining for benchmarking
+                            # Allow at least 2x the warmup time for benchmarking
+                            remaining_time = maxtime - elapsed_time
+                            if remaining_time < 2 * elapsed_time
+                                @warn "Algorithm $name: insufficient time remaining for benchmarking (warmup took $(round(elapsed_time, digits = 2))s). Recording as NaN."
+                                gflops = NaN
+                                success = false
+                                error_msg = "Insufficient time for benchmarking"
+                            else
+                                # Actual benchmark
+                                # Create benchmark with custom parameters
+                                bench_params = BenchmarkTools.Parameters(; seconds = seconds, samples = samples)
+                                _bench = @benchmarkable solve($prob, $alg) setup = (
+                                    prob = LinearProblem(
                                         copy($A), copy($b);
                                         u0 = copy($u0),
-                                        alias = LinearAliasSpecifier(alias_A = true, alias_b = true)))
-                                    bench = BenchmarkTools.run(_bench, bench_params)
+                                        alias = LinearAliasSpecifier(alias_A = true, alias_b = true)
+                                    )
+                                )
+                                bench = BenchmarkTools.run(_bench, bench_params)
 
-                                    # Calculate GFLOPs
-                                    min_time_sec = minimum(bench.times) / 1e9
-                                    flops = luflop(n, n)
-                                    gflops = flops / min_time_sec / 1e9
-                                end
+                                # Calculate GFLOPs
+                                min_time_sec = minimum(bench.times) / 1.0e9
+                                flops = luflop(n, n)
+                                gflops = flops / min_time_sec / 1.0e9
                             end
                         end
-
-                    catch e
-                        success = false
-                        error_msg = string(e)
-                        gflops = NaN
-                        # Don't warn for each failure, just record it
                     end
 
-                    # Store result with element type information
-                    push!(results_data,
-                        (
-                            size = n,
-                            algorithm = name,
-                            eltype = string(eltype),
-                            gflops = gflops,
-                            success = success,
-                            error = error_msg
-                        ))
-
-                    # Update progress
-                    ProgressMeter.next!(progress)
+                catch e
+                    success = false
+                    error_msg = string(e)
+                    gflops = NaN
+                    # Don't warn for each failure, just record it
                 end
+
+                # Store result with element type information
+                push!(
+                    results_data,
+                    (
+                        size = n,
+                        algorithm = name,
+                        eltype = string(eltype),
+                        gflops = gflops,
+                        success = success,
+                        error = error_msg,
+                    )
+                )
+
+                # Update progress
+                ProgressMeter.next!(progress)
             end
+        end
     end
 
     return DataFrame(results_data)
@@ -386,7 +406,7 @@ function categorize_results(df::DataFrame)
         ("small (20-100)", 21:100),
         ("medium (100-300)", 101:300),
         ("large (300-1000)", 301:1000),
-        ("big (1000+)", 1000:typemax(Int))
+        ("big (1000+)", 1000:typemax(Int)),
     ]
 
     # Get unique element types
@@ -411,8 +431,10 @@ function categorize_results(df::DataFrame)
             end
 
             # Calculate average GFLOPs for each algorithm in this range, excluding NaN values
-            avg_results = combine(groupby(range_df, :algorithm),
-                :gflops => (x -> mean(filter(!isnan, x))) => :avg_gflops)
+            avg_results = combine(
+                groupby(range_df, :algorithm),
+                :gflops => (x -> mean(filter(!isnan, x))) => :avg_gflops
+            )
 
             # Sort by performance
             sort!(avg_results, :avg_gflops, rev = true)
@@ -423,19 +445,21 @@ function categorize_results(df::DataFrame)
 
                 # For complex types, check if best is RFLU and we have alternatives
                 if (eltype == "ComplexF32" || eltype == "ComplexF64") &&
-                   (contains(best_alg, "RFLU") ||
-                    contains(best_alg, "RecursiveFactorization"))
+                        (
+                        contains(best_alg, "RFLU") ||
+                            contains(best_alg, "RecursiveFactorization")
+                    )
 
                     # Look for the best non-RFLU algorithm
                     for i in 2:nrow(avg_results)
                         alt_alg = avg_results.algorithm[i]
                         if !contains(alt_alg, "RFLU") &&
-                           !contains(alt_alg, "RecursiveFactorization")
+                                !contains(alt_alg, "RecursiveFactorization")
                             # Check if performance difference is not too large (within 20%)
                             perf_ratio = avg_results.avg_gflops[i] /
-                                         avg_results.avg_gflops[1]
+                                avg_results.avg_gflops[1]
                             if perf_ratio > 0.8
-                                @info "Using $alt_alg instead of $best_alg for $eltype at $range_name ($(round(100*perf_ratio, digits=1))% of RFLU performance) to avoid complex number issues"
+                                @info "Using $alt_alg instead of $best_alg for $eltype at $range_name ($(round(100 * perf_ratio, digits = 1))% of RFLU performance) to avoid complex number issues"
                                 best_alg = alt_alg
                                 break
                             else
@@ -448,7 +472,7 @@ function categorize_results(df::DataFrame)
                 category_key = "$(eltype)_$(range_name)"
                 categories[category_key] = best_alg
                 best_idx = findfirst(==(best_alg), avg_results.algorithm)
-                @info "Best algorithm for $eltype size range $range_name: $best_alg ($(round(avg_results.avg_gflops[best_idx], digits=2)) GFLOPs avg)"
+                @info "Best algorithm for $eltype size range $range_name: $best_alg ($(round(avg_results.avg_gflops[best_idx], digits = 2)) GFLOPs avg)"
             end
         end
     end

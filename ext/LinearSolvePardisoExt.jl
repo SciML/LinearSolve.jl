@@ -11,7 +11,8 @@ LinearSolve.needs_concrete_A(alg::PardisoJL) = true
 
 # TODO schur complement functionality
 
-function LinearSolve.init_cacheval(alg::PardisoJL,
+function LinearSolve.init_cacheval(
+        alg::PardisoJL,
         A,
         b,
         u,
@@ -21,7 +22,8 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
         abstol,
         reltol,
         verbose::Union{LinearVerbosity, Bool},
-        assumptions::LinearSolve.OperatorAssumptions)
+        assumptions::LinearSolve.OperatorAssumptions
+    )
     (; nprocs, solver_type, matrix_type, cache_analysis, iparm, dparm, vendor) = alg
     A = convert(AbstractMatrix, A)
 
@@ -127,10 +129,12 @@ function LinearSolve.init_cacheval(alg::PardisoJL,
 
     if cache_analysis
         Pardiso.set_phase!(solver, Pardiso.ANALYSIS)
-        Pardiso.pardiso(solver,
+        Pardiso.pardiso(
+            solver,
             u,
             SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
-            b)
+            b
+        )
     end
 
     return solver
@@ -142,14 +146,18 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::PardisoJL; kwargs
     if cache.isfresh
         phase = alg.cache_analysis ? Pardiso.NUM_FACT : Pardiso.ANALYSIS_NUM_FACT
         Pardiso.set_phase!(cache.cacheval, phase)
-        Pardiso.pardiso(cache.cacheval,
+        Pardiso.pardiso(
+            cache.cacheval,
             SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
-            eltype(A)[])
+            eltype(A)[]
+        )
         cache.isfresh = false
     end
     Pardiso.set_phase!(cache.cacheval, Pardiso.SOLVE_ITERATIVE_REFINE)
-    Pardiso.pardiso(cache.cacheval, u,
-        SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)), b)
+    Pardiso.pardiso(
+        cache.cacheval, u,
+        SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)), b
+    )
     return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
 end
 

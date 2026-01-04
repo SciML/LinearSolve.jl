@@ -40,10 +40,12 @@ else
     __openblas_isavailable() = OpenBLAS_jll.is_available()
 end
 
-function openblas_getrf!(A::AbstractMatrix{<:ComplexF64};
+function openblas_getrf!(
+        A::AbstractMatrix{<:ComplexF64};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
         info = Ref{BlasInt}(),
-        check = false)
+        check = false
+    )
     __openblas_isavailable() ||
         error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
@@ -54,18 +56,24 @@ function openblas_getrf!(A::AbstractMatrix{<:ComplexF64};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(zgetrf_), libopenblas), Cvoid,
-        (Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64},
-            Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
-        m, n, A, lda, ipiv, info)
+    ccall(
+        (@blasfunc(zgetrf_), libopenblas), Cvoid,
+        (
+            Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64},
+            Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt},
+        ),
+        m, n, A, lda, ipiv, info
+    )
     chkargsok(info[])
-    A, ipiv, info[], info #Error code is stored in LU factorization type
+    return A, ipiv, info[], info #Error code is stored in LU factorization type
 end
 
-function openblas_getrf!(A::AbstractMatrix{<:ComplexF32};
+function openblas_getrf!(
+        A::AbstractMatrix{<:ComplexF32};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
         info = Ref{BlasInt}(),
-        check = false)
+        check = false
+    )
     __openblas_isavailable() ||
         error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
@@ -76,18 +84,24 @@ function openblas_getrf!(A::AbstractMatrix{<:ComplexF32};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(cgetrf_), libopenblas), Cvoid,
-        (Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32},
-            Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
-        m, n, A, lda, ipiv, info)
+    ccall(
+        (@blasfunc(cgetrf_), libopenblas), Cvoid,
+        (
+            Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32},
+            Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt},
+        ),
+        m, n, A, lda, ipiv, info
+    )
     chkargsok(info[])
-    A, ipiv, info[], info #Error code is stored in LU factorization type
+    return A, ipiv, info[], info #Error code is stored in LU factorization type
 end
 
-function openblas_getrf!(A::AbstractMatrix{<:Float64};
+function openblas_getrf!(
+        A::AbstractMatrix{<:Float64};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
         info = Ref{BlasInt}(),
-        check = false)
+        check = false
+    )
     __openblas_isavailable() ||
         error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
@@ -98,18 +112,24 @@ function openblas_getrf!(A::AbstractMatrix{<:Float64};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(dgetrf_), libopenblas), Cvoid,
-        (Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64},
-            Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
-        m, n, A, lda, ipiv, info)
+    ccall(
+        (@blasfunc(dgetrf_), libopenblas), Cvoid,
+        (
+            Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64},
+            Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt},
+        ),
+        m, n, A, lda, ipiv, info
+    )
     chkargsok(info[])
-    A, ipiv, info[], info #Error code is stored in LU factorization type
+    return A, ipiv, info[], info #Error code is stored in LU factorization type
 end
 
-function openblas_getrf!(A::AbstractMatrix{<:Float32};
+function openblas_getrf!(
+        A::AbstractMatrix{<:Float32};
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2))),
         info = Ref{BlasInt}(),
-        check = false)
+        check = false
+    )
     __openblas_isavailable() ||
         error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A)
@@ -120,19 +140,25 @@ function openblas_getrf!(A::AbstractMatrix{<:Float32};
     if isempty(ipiv)
         ipiv = similar(A, BlasInt, min(size(A, 1), size(A, 2)))
     end
-    ccall((@blasfunc(sgetrf_), libopenblas), Cvoid,
-        (Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32},
-            Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
-        m, n, A, lda, ipiv, info)
+    ccall(
+        (@blasfunc(sgetrf_), libopenblas), Cvoid,
+        (
+            Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32},
+            Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt},
+        ),
+        m, n, A, lda, ipiv, info
+    )
     chkargsok(info[])
-    A, ipiv, info[], info #Error code is stored in LU factorization type
+    return A, ipiv, info[], info #Error code is stored in LU factorization type
 end
 
-function openblas_getrs!(trans::AbstractChar,
+function openblas_getrs!(
+        trans::AbstractChar,
         A::AbstractMatrix{<:ComplexF64},
         ipiv::AbstractVector{BlasInt},
         B::AbstractVecOrMat{<:ComplexF64};
-        info = Ref{BlasInt}())
+        info = Ref{BlasInt}()
+    )
     __openblas_isavailable() ||
         error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
@@ -140,26 +166,32 @@ function openblas_getrs!(trans::AbstractChar,
     chkstride1(A, B, ipiv)
     n = LinearAlgebra.checksquare(A)
     if n != size(B, 1)
-        throw(DimensionMismatch("B has leading dimension $(size(B,1)), but needs $n"))
+        throw(DimensionMismatch("B has leading dimension $(size(B, 1)), but needs $n"))
     end
     if n != length(ipiv)
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall((@blasfunc(zgetrs_), libopenblas), Cvoid,
-        (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt},
-            Ptr{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
+    ccall(
+        (@blasfunc(zgetrs_), libopenblas), Cvoid,
+        (
+            Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt},
+            Ptr{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt}, Ptr{BlasInt}, Clong,
+        ),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
-        1)
+        1
+    )
     LinearAlgebra.LAPACK.chklapackerror(BlasInt(info[]))
-    B
+    return B
 end
 
-function openblas_getrs!(trans::AbstractChar,
+function openblas_getrs!(
+        trans::AbstractChar,
         A::AbstractMatrix{<:ComplexF32},
         ipiv::AbstractVector{BlasInt},
         B::AbstractVecOrMat{<:ComplexF32};
-        info = Ref{BlasInt}())
+        info = Ref{BlasInt}()
+    )
     __openblas_isavailable() ||
         error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
@@ -167,26 +199,32 @@ function openblas_getrs!(trans::AbstractChar,
     chkstride1(A, B, ipiv)
     n = LinearAlgebra.checksquare(A)
     if n != size(B, 1)
-        throw(DimensionMismatch("B has leading dimension $(size(B,1)), but needs $n"))
+        throw(DimensionMismatch("B has leading dimension $(size(B, 1)), but needs $n"))
     end
     if n != length(ipiv)
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall((@blasfunc(cgetrs_), libopenblas), Cvoid,
-        (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt},
-            Ptr{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
+    ccall(
+        (@blasfunc(cgetrs_), libopenblas), Cvoid,
+        (
+            Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt},
+            Ptr{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt}, Ptr{BlasInt}, Clong,
+        ),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
-        1)
+        1
+    )
     LinearAlgebra.LAPACK.chklapackerror(BlasInt(info[]))
-    B
+    return B
 end
 
-function openblas_getrs!(trans::AbstractChar,
+function openblas_getrs!(
+        trans::AbstractChar,
         A::AbstractMatrix{<:Float64},
         ipiv::AbstractVector{BlasInt},
         B::AbstractVecOrMat{<:Float64};
-        info = Ref{BlasInt}())
+        info = Ref{BlasInt}()
+    )
     __openblas_isavailable() ||
         error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
@@ -194,26 +232,32 @@ function openblas_getrs!(trans::AbstractChar,
     chkstride1(A, B, ipiv)
     n = LinearAlgebra.checksquare(A)
     if n != size(B, 1)
-        throw(DimensionMismatch("B has leading dimension $(size(B,1)), but needs $n"))
+        throw(DimensionMismatch("B has leading dimension $(size(B, 1)), but needs $n"))
     end
     if n != length(ipiv)
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall((@blasfunc(dgetrs_), libopenblas), Cvoid,
-        (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64}, Ref{BlasInt},
-            Ptr{BlasInt}, Ptr{Float64}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
+    ccall(
+        (@blasfunc(dgetrs_), libopenblas), Cvoid,
+        (
+            Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64}, Ref{BlasInt},
+            Ptr{BlasInt}, Ptr{Float64}, Ref{BlasInt}, Ptr{BlasInt}, Clong,
+        ),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
-        1)
+        1
+    )
     LinearAlgebra.LAPACK.chklapackerror(BlasInt(info[]))
-    B
+    return B
 end
 
-function openblas_getrs!(trans::AbstractChar,
+function openblas_getrs!(
+        trans::AbstractChar,
         A::AbstractMatrix{<:Float32},
         ipiv::AbstractVector{BlasInt},
         B::AbstractVecOrMat{<:Float32};
-        info = Ref{BlasInt}())
+        info = Ref{BlasInt}()
+    )
     __openblas_isavailable() ||
         error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     require_one_based_indexing(A, ipiv, B)
@@ -221,19 +265,23 @@ function openblas_getrs!(trans::AbstractChar,
     chkstride1(A, B, ipiv)
     n = LinearAlgebra.checksquare(A)
     if n != size(B, 1)
-        throw(DimensionMismatch("B has leading dimension $(size(B,1)), but needs $n"))
+        throw(DimensionMismatch("B has leading dimension $(size(B, 1)), but needs $n"))
     end
     if n != length(ipiv)
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs to be $n"))
     end
     nrhs = size(B, 2)
-    ccall((@blasfunc(sgetrs_), libopenblas), Cvoid,
-        (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32}, Ref{BlasInt},
-            Ptr{BlasInt}, Ptr{Float32}, Ref{BlasInt}, Ptr{BlasInt}, Clong),
+    ccall(
+        (@blasfunc(sgetrs_), libopenblas), Cvoid,
+        (
+            Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32}, Ref{BlasInt},
+            Ptr{BlasInt}, Ptr{Float32}, Ref{BlasInt}, Ptr{BlasInt}, Clong,
+        ),
         trans, n, size(B, 2), A, max(1, stride(A, 2)), ipiv, B, max(1, stride(B, 2)), info,
-        1)
+        1
+    )
     LinearAlgebra.LAPACK.chklapackerror(BlasInt(info[]))
-    B
+    return B
 end
 
 default_alias_A(::OpenBLASLUFactorization, ::Any, ::Any) = false
@@ -244,22 +292,28 @@ const PREALLOCATED_OPENBLAS_LU = begin
     luinst = ArrayInterface.lu_instance(A), Ref{BlasInt}()
 end
 
-function LinearSolve.init_cacheval(alg::OpenBLASLUFactorization, A, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(
+        alg::OpenBLASLUFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
-        assumptions::OperatorAssumptions)
-    PREALLOCATED_OPENBLAS_LU
+        assumptions::OperatorAssumptions
+    )
+    return PREALLOCATED_OPENBLAS_LU
 end
 
-function LinearSolve.init_cacheval(alg::OpenBLASLUFactorization,
+function LinearSolve.init_cacheval(
+        alg::OpenBLASLUFactorization,
         A::AbstractMatrix{<:Union{Float32, ComplexF32, ComplexF64}}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
-        assumptions::OperatorAssumptions)
+        assumptions::OperatorAssumptions
+    )
     A = rand(eltype(A), 0, 0)
-    ArrayInterface.lu_instance(A), Ref{BlasInt}()
+    return ArrayInterface.lu_instance(A), Ref{BlasInt}()
 end
 
-function SciMLBase.solve!(cache::LinearCache, alg::OpenBLASLUFactorization;
-        kwargs...)
+function SciMLBase.solve!(
+        cache::LinearCache, alg::OpenBLASLUFactorization;
+        kwargs...
+    )
     __openblas_isavailable() ||
         error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     A = cache.A
@@ -275,31 +329,36 @@ function SciMLBase.solve!(cache::LinearCache, alg::OpenBLASLUFactorization;
 
         if info_value != 0
             if !isa(verbose.blas_info, SciMLLogging.Silent) ||
-               !isa(verbose.blas_errors, SciMLLogging.Silent) ||
-               !isa(verbose.blas_invalid_args, SciMLLogging.Silent)
-                op_info = get_blas_operation_info(:dgetrf, A, cache.b,
-                    condition = !isa(verbose.condition_number, SciMLLogging.Silent))
+                    !isa(verbose.blas_errors, SciMLLogging.Silent) ||
+                    !isa(verbose.blas_invalid_args, SciMLLogging.Silent)
+                op_info = get_blas_operation_info(
+                    :dgetrf, A, cache.b,
+                    condition = !isa(verbose.condition_number, SciMLLogging.Silent)
+                )
                 @SciMLMessage(cache.verbose, :condition_number) do
                     if isinf(op_info.condition_number)
                         return "Matrix condition number calculation failed."
                     else
-                        return "Matrix condition number: $(round(op_info.condition_number, sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf"
+                        return "Matrix condition number: $(round(op_info.condition_number, sigdigits = 4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf"
                     end
                 end
                 verb_option,
-                message = blas_info_msg(
-                    :dgetrf, info_value; extra_context = op_info)
+                    message = blas_info_msg(
+                    :dgetrf, info_value; extra_context = op_info
+                )
                 @SciMLMessage(message, verbose, verb_option)
             end
         else
             @SciMLMessage(cache.verbose, :blas_success) do
-                op_info = get_blas_operation_info(:dgetrf, A, cache.b,
-                    condition = !isa(verbose.condition_number, SciMLLogging.Silent))
+                op_info = get_blas_operation_info(
+                    :dgetrf, A, cache.b,
+                    condition = !isa(verbose.condition_number, SciMLLogging.Silent)
+                )
                 @SciMLMessage(cache.verbose, :condition_number) do
                     if isinf(op_info.condition_number)
                         return "Matrix condition number calculation failed."
                     else
-                        return "Matrix condition number: $(round(op_info.condition_number, sigdigits=4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf"
+                        return "Matrix condition number: $(round(op_info.condition_number, sigdigits = 4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf"
                     end
                 end
                 return "BLAS LU factorization (dgetrf) completed successfully for $(op_info.matrix_size) matrix"
@@ -309,7 +368,8 @@ function SciMLBase.solve!(cache::LinearCache, alg::OpenBLASLUFactorization;
         if !LinearAlgebra.issuccess(fact[1])
             @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
+                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+            )
         end
         cache.isfresh = false
     end
@@ -326,8 +386,9 @@ function SciMLBase.solve!(cache::LinearCache, alg::OpenBLASLUFactorization;
         openblas_getrs!('N', A.factors, A.ipiv, cache.u; info)
     end
 
-    SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache; retcode = ReturnCode.Success)
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+    )
 end
 
 # Mixed precision OpenBLAS implementation
@@ -339,9 +400,11 @@ const PREALLOCATED_OPENBLAS32_LU = begin
     luinst = ArrayInterface.lu_instance(A), Ref{BlasInt}()
 end
 
-function LinearSolve.init_cacheval(alg::OpenBLAS32MixedLUFactorization, A, b, u, Pl, Pr,
+function LinearSolve.init_cacheval(
+        alg::OpenBLAS32MixedLUFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
-        assumptions::OperatorAssumptions)
+        assumptions::OperatorAssumptions
+    )
     # Pre-allocate appropriate 32-bit arrays based on input type
     m, n = size(A)
     T32 = eltype(A) <: Complex ? ComplexF32 : Float32
@@ -350,11 +413,13 @@ function LinearSolve.init_cacheval(alg::OpenBLAS32MixedLUFactorization, A, b, u,
     u_32 = similar(u, T32)
     luinst = ArrayInterface.lu_instance(rand(T32, 0, 0))
     # Return tuple with pre-allocated arrays
-    (luinst, Ref{BlasInt}(), A_32, b_32, u_32)
+    return (luinst, Ref{BlasInt}(), A_32, b_32, u_32)
 end
 
-function SciMLBase.solve!(cache::LinearCache, alg::OpenBLAS32MixedLUFactorization;
-        kwargs...)
+function SciMLBase.solve!(
+        cache::LinearCache, alg::OpenBLAS32MixedLUFactorization;
+        kwargs...
+    )
     __openblas_isavailable() ||
         error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     A = cache.A
@@ -363,7 +428,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::OpenBLAS32MixedLUFactorizatio
     if cache.isfresh
         # Get pre-allocated arrays from cacheval
         luinst, info, A_32, b_32,
-        u_32 = @get_cacheval(cache, :OpenBLAS32MixedLUFactorization)
+            u_32 = @get_cacheval(cache, :OpenBLAS32MixedLUFactorization)
         # Compute 32-bit type on demand and copy A
         T32 = eltype(A) <: Complex ? ComplexF32 : Float32
         A_32 .= T32.(A)
@@ -374,7 +439,8 @@ function SciMLBase.solve!(cache::LinearCache, alg::OpenBLAS32MixedLUFactorizatio
         if !LinearAlgebra.issuccess(fact[1])
             @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure)
+                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+            )
         end
         cache.isfresh = false
     end
@@ -401,6 +467,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::OpenBLAS32MixedLUFactorizatio
         cache.u .= Torig.(u_32)
     end
 
-    SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache; retcode = ReturnCode.Success)
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+    )
 end

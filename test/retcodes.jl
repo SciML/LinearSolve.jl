@@ -9,7 +9,7 @@ alglist = (
     SVDFactorization,
     NormalCholeskyFactorization,
     KrylovJL_CRAIGMR,
-    KrylovJL_LSMR
+    KrylovJL_LSMR,
 )
 
 @testset "Success" begin
@@ -28,9 +28,10 @@ lualgs = (
     QRFactorization(),
     GenericLUFactorization(),
     LinearSolve.DefaultLinearSolver(
-        LinearSolve.DefaultAlgorithmChoice.LUFactorization; safetyfallback = false),
+        LinearSolve.DefaultAlgorithmChoice.LUFactorization; safetyfallback = false
+    ),
     RFLUFactorization(),
-    NormalCholeskyFactorization()
+    NormalCholeskyFactorization(),
 )
 @testset "Failure" begin
     for alg in lualgs
@@ -56,7 +57,7 @@ rankdeficientalgs = (
     SVDFactorization(),
     KrylovJL_CRAIGMR(),
     KrylovJL_LSMR(),
-    LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)
+    LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization),
 )
 
 @testset "Rank Deficient Success" begin
@@ -76,11 +77,11 @@ staticarrayalgs = (
     LUFactorization(),
     CholeskyFactorization(),
     NormalCholeskyFactorization(),
-    SVDFactorization()
+    SVDFactorization(),
 )
 @testset "StaticArray Success" begin
     A = Float64[1 2 3; 4 3.5 1.7; 5.2 1.8 9.7]
-    A = A*A'
+    A = A * A'
     b = Float64[2, 5, 8]
     prob1 = LinearProblem(SMatrix{3, 3}(A), SVector{3}(b))
     sol = solve(prob1)

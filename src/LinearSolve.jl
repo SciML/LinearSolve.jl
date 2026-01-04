@@ -1,6 +1,6 @@
 module LinearSolve
 if isdefined(Base, :Experimental) &&
-   isdefined(Base.Experimental, Symbol("@max_methods"))
+        isdefined(Base.Experimental, Symbol("@max_methods"))
     @eval Base.Experimental.@max_methods 1
 end
 
@@ -8,21 +8,21 @@ import PrecompileTools
 using ArrayInterface: ArrayInterface
 using Base: Bool, convert, copyto!, adjoint, transpose, /, \, require_one_based_indexing
 using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, BunchKaufman,
-                     ColumnNorm, cond, Diagonal, Factorization, Hermitian, I, LAPACK, NoPivot,
-                     RowMaximum, RowNonZero, SymTridiagonal, Symmetric, Transpose,
-                     Tridiagonal, UniformScaling, axpby!, axpy!, bunchkaufman,
-                     bunchkaufman!,
-                     cholesky, cholesky!, diagind, dot, inv, ldiv!, ldlt!, lu, lu!, mul!,
-                     norm,
-                     qr, qr!, svd, svd!
+    ColumnNorm, cond, Diagonal, Factorization, Hermitian, I, LAPACK, NoPivot,
+    RowMaximum, RowNonZero, SymTridiagonal, Symmetric, Transpose,
+    Tridiagonal, UniformScaling, axpby!, axpy!, bunchkaufman,
+    bunchkaufman!,
+    cholesky, cholesky!, diagind, dot, inv, ldiv!, ldlt!, lu, lu!, mul!,
+    norm,
+    qr, qr!, svd, svd!
 using SciMLBase: SciMLBase, LinearAliasSpecifier, AbstractSciMLOperator,
-                 init, solve!, reinit!, solve, ReturnCode, LinearProblem
+    init, solve!, reinit!, solve, ReturnCode, LinearProblem
 using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator,
-                      MatrixOperator,
-                      has_ldiv!, issquare, has_concretization
+    MatrixOperator,
+    has_ldiv!, issquare, has_concretization
 using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_int,
-                    AbstractVerbositySpecifier, AbstractMessageLevel, AbstractVerbosityPreset,
-                    Silent, InfoLevel, WarnLevel, CustomLevel, None, Minimal, Standard, Detailed, All
+    AbstractVerbositySpecifier, AbstractMessageLevel, AbstractVerbosityPreset,
+    Silent, InfoLevel, WarnLevel, CustomLevel, None, Minimal, Standard, Detailed, All
 using Setfield: @set, @set!
 using DocStringExtensions: DocStringExtensions
 using EnumX: EnumX, @enumx
@@ -36,7 +36,7 @@ import RecursiveArrayTools
 import StaticArraysCore: StaticArray, SVector, SMatrix
 
 using LinearAlgebra.LAPACK: chkfinite, chkstride1,
-                            @blasfunc, chkargsok
+    @blasfunc, chkargsok
 
 import GPUArraysCore
 import Preferences
@@ -48,19 +48,23 @@ import Krylov
 const CRC = ChainRulesCore
 
 if Int === Int64 && !Base.USE_BLAS64
-   error("Invalid installation of Julia detected.\n\n Detected that Julia was built in 64-bit version but with a 32-bit BLAS. This gives issues" *
-         " in LinearAlgebra.jl and LinearSolve.jl which can be unrecoverable and are thus not supported. Most likely this is due to a bad build" *
-         " of Julia, with the common reasons being an incorrect build script in the NixOS and ArchLinux package managers (and old versions of homebrew)." *
-         " To fix this issue, and many other potentially small issues that may be undetected, use get a valid version of Julia with the correct BLAS and" *
-         " LLVM versions by either installing via juliaup (recommended), or downloading the appropriate binary from https://julialang.org/install/" *
-         " If using a Unix machine with a bash terminal, `curl -fsSL https://install.julialang.org` | sh will install juliaup and `juliaup add latest` will" *
-         " then give the latest version.\n\n If you wish to help fix the incorrect package manager build, share the discussion on fixing the homebrew build" *
-         " https://github.com/Homebrew/homebrew-core/issues/246702 with the package manager of interest in order to improve the ecosystem.")
+    error(
+        "Invalid installation of Julia detected.\n\n Detected that Julia was built in 64-bit version but with a 32-bit BLAS. This gives issues" *
+            " in LinearAlgebra.jl and LinearSolve.jl which can be unrecoverable and are thus not supported. Most likely this is due to a bad build" *
+            " of Julia, with the common reasons being an incorrect build script in the NixOS and ArchLinux package managers (and old versions of homebrew)." *
+            " To fix this issue, and many other potentially small issues that may be undetected, use get a valid version of Julia with the correct BLAS and" *
+            " LLVM versions by either installing via juliaup (recommended), or downloading the appropriate binary from https://julialang.org/install/" *
+            " If using a Unix machine with a bash terminal, `curl -fsSL https://install.julialang.org` | sh will install juliaup and `juliaup add latest` will" *
+            " then give the latest version.\n\n If you wish to help fix the incorrect package manager build, share the discussion on fixing the homebrew build" *
+            " https://github.com/Homebrew/homebrew-core/issues/246702 with the package manager of interest in order to improve the ecosystem."
+    )
 end
 
 @static if Sys.ARCH === :x86_64 || Sys.ARCH === :i686
-    if Preferences.@load_preference("LoadMKL_JLL",
-        !occursin("EPYC", Sys.cpu_info()[1].model))
+    if Preferences.@load_preference(
+            "LoadMKL_JLL",
+            !occursin("EPYC", Sys.cpu_info()[1].model)
+        )
         # MKL_jll < 2022.2 doesn't support the mixed LP64 and ILP64 interfaces that we make use of in LinearSolve
         # In particular, the `_64` APIs do not exist
         # https://www.intel.com/content/www/us/en/developer/articles/release-notes/onemkl-release-notes-2022.html
@@ -74,10 +78,10 @@ else
 end
 
 @static if usemkl
-   using MKL_jll: libmkl_rt
+    using MKL_jll: libmkl_rt
 else
-   global libmkl_rt
-   nothing
+    global libmkl_rt
+    nothing
 end
 
 # OpenBLAS_jll is a standard library, but allow users to disable it via preferences
@@ -407,16 +411,21 @@ include("adjoint.jl")
 ## Deprecated, remove in July 2025
 
 @static if isdefined(SciMLBase, :DiffEqArrayOperator)
-    function defaultalg(A::SciMLBase.DiffEqArrayOperator, b,
-            assump::OperatorAssumptions{Bool})
+    function defaultalg(
+            A::SciMLBase.DiffEqArrayOperator, b,
+            assump::OperatorAssumptions{Bool}
+        )
         defaultalg(A.A, b, assump)
     end
 end
 
-@inline function _notsuccessful(F::LinearAlgebra.QRCompactWY{
-        T, A}) where {T, A <: GPUArraysCore.AnyGPUArray}
-    hasmethod(LinearAlgebra.issuccess, (typeof(F),)) ?
-    !LinearAlgebra.issuccess(F) : false
+@inline function _notsuccessful(
+        F::LinearAlgebra.QRCompactWY{
+            T, A,
+        }
+    ) where {T, A <: GPUArraysCore.AnyGPUArray}
+    return hasmethod(LinearAlgebra.issuccess, (typeof(F),)) ?
+        !LinearAlgebra.issuccess(F) : false
 end
 
 @inline function _notsuccessful(F::LinearAlgebra.QRCompactWY)
@@ -425,7 +434,7 @@ end
     return any(iszero, Iterators.reverse(@view U[diagind(U)]))
 end
 @inline _notsuccessful(F) = hasmethod(LinearAlgebra.issuccess, (typeof(F),)) ?
-                            !LinearAlgebra.issuccess(F) : false
+    !LinearAlgebra.issuccess(F) : false
 
 # Solver Specific Traits
 ## Needs Square Matrix
@@ -436,19 +445,23 @@ Returns `true` if the algorithm requires a square matrix.
 """
 needs_square_A(::Nothing) = false  # Linear Solve automatically will use a correct alg!
 needs_square_A(alg::SciMLLinearSolveAlgorithm) = true
-for alg in (:QRFactorization, :FastQRFactorization, :NormalCholeskyFactorization,
-    :NormalBunchKaufmanFactorization)
+for alg in (
+        :QRFactorization, :FastQRFactorization, :NormalCholeskyFactorization,
+        :NormalBunchKaufmanFactorization,
+    )
     @eval needs_square_A(::$(alg)) = false
 end
 for kralg in (Krylov.lsmr!, Krylov.craigmr!)
     @eval needs_square_A(::KrylovJL{$(typeof(kralg))}) = false
 end
-for alg in (:LUFactorization, :FastLUFactorization, :SVDFactorization,
-    :GenericFactorization, :GenericLUFactorization, :SimpleLUFactorization,
-    :RFLUFactorization, :ButterflyFactorization, :UMFPACKFactorization, :KLUFactorization, :SparspakFactorization,
-    :DiagonalFactorization, :CholeskyFactorization, :BunchKaufmanFactorization,
-    :CHOLMODFactorization, :LDLtFactorization, :AppleAccelerateLUFactorization,
-    :MKLLUFactorization, :MetalLUFactorization, :CUSOLVERRFFactorization)
+for alg in (
+        :LUFactorization, :FastLUFactorization, :SVDFactorization,
+        :GenericFactorization, :GenericLUFactorization, :SimpleLUFactorization,
+        :RFLUFactorization, :ButterflyFactorization, :UMFPACKFactorization, :KLUFactorization, :SparspakFactorization,
+        :DiagonalFactorization, :CholeskyFactorization, :BunchKaufmanFactorization,
+        :CHOLMODFactorization, :LDLtFactorization, :AppleAccelerateLUFactorization,
+        :MKLLUFactorization, :MetalLUFactorization, :CUSOLVERRFFactorization,
+    )
     @eval needs_square_A(::$(alg)) = true
 end
 
@@ -481,20 +494,20 @@ is_cusparse_csr(A) = false
 is_cusparse_csc(A) = false
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
-       GenericLUFactorization, SimpleLUFactorization, RFLUFactorization, ButterflyFactorization,
-       NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
-       UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization,
-       SparspakFactorization, DiagonalFactorization, CholeskyFactorization,
-       BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization,
-       CUSOLVERRFFactorization, CliqueTreesFactorization
+    GenericLUFactorization, SimpleLUFactorization, RFLUFactorization, ButterflyFactorization,
+    NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
+    UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization,
+    SparspakFactorization, DiagonalFactorization, CholeskyFactorization,
+    BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization,
+    CUSOLVERRFFactorization, CliqueTreesFactorization
 
 export LinearSolveFunction, DirectLdiv!, show_algorithm_choices
 
 export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
-       KrylovJL_BICGSTAB, KrylovJL_LSMR, KrylovJL_CRAIGMR, KrylovJL_FGMRES,
-       IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
-       IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES, IterativeSolversJL_IDRS,
-       KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES, KrylovJL_MINARES
+    KrylovJL_BICGSTAB, KrylovJL_LSMR, KrylovJL_CRAIGMR, KrylovJL_FGMRES,
+    IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
+    IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES, IterativeSolversJL_IDRS,
+    KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES, KrylovJL_MINARES
 
 export SimpleGMRES
 

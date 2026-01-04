@@ -5,15 +5,15 @@ using LinearSolve
 using SparseArrays
 
 function _symbolic(A::AbstractMatrix, alg::CliqueTreesFactorization)
-    return symbolic(A; alg=alg.alg, snd=alg.snd)
+    return symbolic(A; alg = alg.alg, snd = alg.snd)
 end
 
 function _symbolic(A::AbstractMatrix, alg::CliqueTreesFactorization{Nothing})
-    return symbolic(A; snd=alg.snd)
+    return symbolic(A; snd = alg.snd)
 end
 
 function _symbolic(A::AbstractMatrix, alg::CliqueTreesFactorization{<:Any, Nothing})
-    return symbolic(A; alg=alg.alg)
+    return symbolic(A; alg = alg.alg)
 end
 
 function _symbolic(A::AbstractMatrix, alg::CliqueTreesFactorization{Nothing, Nothing})
@@ -21,8 +21,9 @@ function _symbolic(A::AbstractMatrix, alg::CliqueTreesFactorization{Nothing, Not
 end
 
 function LinearSolve.init_cacheval(
-    alg::CliqueTreesFactorization, A::AbstractMatrix, b, u, Pl, Pr, maxiters::Int, abstol,
-    reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+        alg::CliqueTreesFactorization, A::AbstractMatrix, b, u, Pl, Pr, maxiters::Int, abstol,
+        reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
     symbfact = _symbolic(A, alg)
     cholfact, cholwork = cholinit(A, symbfact)
     linwork = lininit(1, cholfact)
@@ -49,20 +50,22 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CliqueTreesFactor
 
     cholfact, cholwork, linwork = cache.cacheval
     linsolve!(copyto!(u, b), linwork, cholfact, Val(false))
-    return SciMLBase.build_linear_solution(alg, u, nothing, cache) 
+    return SciMLBase.build_linear_solution(alg, u, nothing, cache)
 end
 
 LinearSolve.PrecompileTools.@compile_workload begin
-    A = sparse([
-        3 1 0 0 0 0 0 0
-        1 3 1 0 0 2 0 0
-        0 1 3 1 0 1 2 1
-        0 0 1 3 0 0 0 0
-        0 0 0 0 3 1 1 0
-        0 2 1 0 1 3 0 0
-        0 0 2 0 1 0 3 1
-        0 0 1 0 0 0 1 3
-    ])
+    A = sparse(
+        [
+            3 1 0 0 0 0 0 0
+            1 3 1 0 0 2 0 0
+            0 1 3 1 0 1 2 1
+            0 0 1 3 0 0 0 0
+            0 0 0 0 3 1 1 0
+            0 2 1 0 1 3 0 0
+            0 0 2 0 1 0 3 1
+            0 0 1 0 0 0 1 3
+        ]
+    )
 
     b = rand(8)
     prob = LinearProblem(A, b)

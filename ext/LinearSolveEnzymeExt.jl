@@ -1,8 +1,8 @@
 module LinearSolveEnzymeExt
 
 using LinearSolve: LinearSolve, SciMLLinearSolveAlgorithm, init, solve!, LinearProblem,
-                   LinearCache, AbstractKrylovSubspaceMethod, DefaultLinearSolver,
-                   defaultalg_adjoint_eval, solve
+    LinearCache, AbstractKrylovSubspaceMethod, DefaultLinearSolver,
+    defaultalg_adjoint_eval, solve
 using LinearSolve.LinearAlgebra
 using EnzymeCore
 using EnzymeCore: EnzymeRules
@@ -118,7 +118,8 @@ function _expand_colptr_to_col_indices(rows::Vector, colptr::Vector, n_cols::Int
 end
 
 function _expand_colptr_to_col_indices(
-        rows::AbstractVector, colptr::AbstractVector, n_cols::Integer)
+        rows::AbstractVector, colptr::AbstractVector, n_cols::Integer
+    )
     # GPU path - copy colptr to CPU, build indices, copy back
     # This avoids slow scalar indexing on GPU arrays
     colptr_cpu = collect(colptr)
@@ -143,9 +144,11 @@ function _sparse_outer_sub!(dA::AbstractArray, z::AbstractVector, y::AbstractVec
     return dA
 end
 
-function EnzymeRules.forward(config::EnzymeRules.FwdConfigWidth{1},
+function EnzymeRules.forward(
+        config::EnzymeRules.FwdConfigWidth{1},
         func::Const{typeof(LinearSolve.init)}, ::Type{RT}, prob::EnzymeCore.Annotation{LP},
-        alg::Const; kwargs...) where {RT, LP <: LinearSolve.LinearProblem}
+        alg::Const; kwargs...
+    ) where {RT, LP <: LinearSolve.LinearProblem}
     @assert !(prob isa Const)
     res = func.val(prob.val, alg.val; kwargs...)
     if RT <: Const
@@ -179,7 +182,8 @@ end
 function EnzymeRules.forward(
         config::EnzymeRules.FwdConfigWidth{1}, func::Const{typeof(LinearSolve.solve!)},
         ::Type{RT}, linsolve::EnzymeCore.Annotation{LP};
-        kwargs...) where {RT, LP <: LinearSolve.LinearCache}
+        kwargs...
+    ) where {RT, LP <: LinearSolve.LinearCache}
     @assert !(linsolve isa Const)
 
     res = func.val(linsolve.val; kwargs...)
@@ -216,7 +220,8 @@ end
 function EnzymeRules.augmented_primal(
         config, func::Const{typeof(LinearSolve.init)},
         ::Type{RT}, prob::EnzymeCore.Annotation{LP}, alg::Const;
-        kwargs...) where {RT, LP <: LinearSolve.LinearProblem}
+        kwargs...
+    ) where {RT, LP <: LinearSolve.LinearProblem}
     res = func.val(prob.val, alg.val; kwargs...)
     dres = if EnzymeRules.width(config) == 1
         func.val(prob.dval, alg.val; kwargs...)
@@ -254,7 +259,8 @@ end
 function EnzymeRules.reverse(
         config, func::Const{typeof(LinearSolve.init)}, ::Type{RT},
         cache, prob::EnzymeCore.Annotation{LP}, alg::Const;
-        kwargs...) where {RT, LP <: LinearSolve.LinearProblem}
+        kwargs...
+    ) where {RT, LP <: LinearSolve.LinearProblem}
     d_A, d_b, prob_d_A, prob_d_b = cache
 
     if EnzymeRules.width(config) == 1
@@ -289,7 +295,8 @@ end
 function EnzymeRules.augmented_primal(
         config, func::Const{typeof(LinearSolve.solve!)},
         ::Type{RT}, linsolve::EnzymeCore.Annotation{LP};
-        kwargs...) where {RT, LP <: LinearSolve.LinearCache}
+        kwargs...
+    ) where {RT, LP <: LinearSolve.LinearCache}
     res = func.val(linsolve.val; kwargs...)
 
     dres = if EnzymeRules.width(config) == 1
@@ -346,9 +353,11 @@ function EnzymeRules.augmented_primal(
     return EnzymeRules.AugmentedReturn(_res, _dres, cache)
 end
 
-function EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.solve!)},
+function EnzymeRules.reverse(
+        config, func::Const{typeof(LinearSolve.solve!)},
         ::Type{RT}, cache, linsolve::EnzymeCore.Annotation{LP};
-        kwargs...) where {RT, LP <: LinearSolve.LinearCache}
+        kwargs...
+    ) where {RT, LP <: LinearSolve.LinearCache}
     y, dys, _linsolve, dAs, dbs = cache
 
     @assert !(linsolve isa Const)
@@ -362,7 +371,7 @@ function EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.solve!)},
         end
     else
         dlinsolves = linsolve.dval
-        if any(x->(iszero(x.A) || iszero(x.b)) && !iszero(x.u), linsolve.dval)
+        if any(x -> (iszero(x.A) || iszero(x.b)) && !iszero(x.u), linsolve.dval)
             error("Adjoint case currently not handled. Instead of using `solve!(cache); s1 = copy(cache.u) ...`, use `sol = solve!(cache); s1 = copy(sol.u)`.")
         end
     end
@@ -379,10 +388,12 @@ function EnzymeRules.reverse(config, func::Const{typeof(LinearSolve.solve!)},
         elseif _linsolve.alg isa LinearSolve.AbstractKrylovSubspaceMethod
             # Doesn't modify `A`, so it's safe to just reuse it
             invprob = LinearSolve.LinearProblem(transpose(_linsolve.A), dy)
-            solve(invprob, _linsolve.alg;
+            solve(
+                invprob, _linsolve.alg;
                 abstol = _linsolve.abstol,
                 reltol = _linsolve.reltol,
-                verbose = _linsolve.verbose)
+                verbose = _linsolve.verbose
+            )
         elseif _linsolve.alg isa LinearSolve.DefaultLinearSolver
             LinearSolve.defaultalg_adjoint_eval(_linsolve, dy)
         else

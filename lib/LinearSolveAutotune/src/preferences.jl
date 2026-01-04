@@ -13,7 +13,7 @@ function is_always_loaded_algorithm(algorithm_name::String)
         "GenericLUFactorization",
         "MKLLUFactorization",  # Available if MKL is loaded
         "AppleAccelerateLUFactorization",  # Available on macOS
-        "SimpleLUFactorization"
+        "SimpleLUFactorization",
     ]
 
     return algorithm_name in always_loaded
@@ -44,19 +44,22 @@ function find_best_always_loaded_algorithm(results_df::DataFrame, eltype_str::St
     # Filter results for this element type and size range
     filtered_results = filter(
         row -> row.eltype == eltype_str &&
-               row.size in size_range &&
-               row.success &&
-               !isnan(row.gflops) &&
-               is_always_loaded_algorithm(row.algorithm),
-        results_df)
+            row.size in size_range &&
+            row.success &&
+            !isnan(row.gflops) &&
+            is_always_loaded_algorithm(row.algorithm),
+        results_df
+    )
 
     if nrow(filtered_results) == 0
         return nothing
     end
 
     # Calculate average GFLOPs for each always-loaded algorithm
-    avg_results = combine(groupby(filtered_results, :algorithm),
-        :gflops => (x -> mean(filter(!isnan, x))) => :avg_gflops)
+    avg_results = combine(
+        groupby(filtered_results, :algorithm),
+        :gflops => (x -> mean(filter(!isnan, x))) => :avg_gflops
+    )
 
     # Sort by performance and return the best
     sort!(avg_results, :avg_gflops, rev = true)
@@ -90,7 +93,8 @@ If results_df is provided, it will be used to determine the best always-loaded a
 from actual benchmark data. Otherwise, a fallback strategy is used.
 """
 function set_algorithm_preferences(
-        categories::Dict{String, String}, results_df::Union{DataFrame, Nothing} = nothing)
+        categories::Dict{String, String}, results_df::Union{DataFrame, Nothing} = nothing
+    )
     @info "Setting LinearSolve preferences based on benchmark results (dual preference system)..."
 
     # Define the size category names we use
@@ -162,46 +166,46 @@ function set_algorithm_preferences(
             if eltype == "Float64"
                 # Float64 should be directly benchmarked
                 if haskey(benchmarked, "Float64") &&
-                   haskey(benchmarked["Float64"], size_range)
+                        haskey(benchmarked["Float64"], size_range)
                     algorithm = benchmarked["Float64"][size_range]
                 end
             elseif eltype == "Float32"
                 # Float32: use Float32 results if available, else use Float64
                 if haskey(benchmarked, "Float32") &&
-                   haskey(benchmarked["Float32"], size_range)
+                        haskey(benchmarked["Float32"], size_range)
                     algorithm = benchmarked["Float32"][size_range]
                 elseif haskey(benchmarked, "Float64") &&
-                       haskey(benchmarked["Float64"], size_range)
+                        haskey(benchmarked["Float64"], size_range)
                     algorithm = benchmarked["Float64"][size_range]
                 end
             elseif eltype == "ComplexF32"
                 # ComplexF32: use ComplexF32 if available, else Float64 (avoiding RFLU)
                 if haskey(benchmarked, "ComplexF32") &&
-                   haskey(benchmarked["ComplexF32"], size_range)
+                        haskey(benchmarked["ComplexF32"], size_range)
                     algorithm = benchmarked["ComplexF32"][size_range]
                 elseif haskey(benchmarked, "Float64") &&
-                       haskey(benchmarked["Float64"], size_range)
+                        haskey(benchmarked["Float64"], size_range)
                     algorithm = benchmarked["Float64"][size_range]
                     # Check for RFLU and warn
                     if contains(algorithm, "RFLU") ||
-                       contains(algorithm, "RecursiveFactorization")
+                            contains(algorithm, "RecursiveFactorization")
                         @warn "Would use RFLUFactorization for ComplexF32 at $size_cat, but it has issues with complex numbers. Consider benchmarking ComplexF32 directly."
                     end
                 end
             elseif eltype == "ComplexF64"
                 # ComplexF64: use ComplexF64 if available, else ComplexF32, else Float64 (avoiding RFLU)
                 if haskey(benchmarked, "ComplexF64") &&
-                   haskey(benchmarked["ComplexF64"], size_range)
+                        haskey(benchmarked["ComplexF64"], size_range)
                     algorithm = benchmarked["ComplexF64"][size_range]
                 elseif haskey(benchmarked, "ComplexF32") &&
-                       haskey(benchmarked["ComplexF32"], size_range)
+                        haskey(benchmarked["ComplexF32"], size_range)
                     algorithm = benchmarked["ComplexF32"][size_range]
                 elseif haskey(benchmarked, "Float64") &&
-                       haskey(benchmarked["Float64"], size_range)
+                        haskey(benchmarked["Float64"], size_range)
                     algorithm = benchmarked["Float64"][size_range]
                     # Check for RFLU and warn
                     if contains(algorithm, "RFLU") ||
-                       contains(algorithm, "RecursiveFactorization")
+                            contains(algorithm, "RecursiveFactorization")
                         @warn "Would use RFLUFactorization for ComplexF64 at $size_cat, but it has issues with complex numbers. Consider benchmarking ComplexF64 directly."
                     end
                 end
@@ -251,7 +255,8 @@ function set_algorithm_preferences(
                 if best_always_loaded !== nothing
                     fallback_pref_key = "best_always_loaded_$(eltype)_$(size_cat)"
                     Preferences.set_preferences!(
-                        LinearSolve, fallback_pref_key => best_always_loaded; force = true)
+                        LinearSolve, fallback_pref_key => best_always_loaded; force = true
+                    )
                     @info "Set preference $fallback_pref_key = $best_always_loaded in LinearSolve.jl"
                 end
             end
@@ -273,7 +278,7 @@ function set_algorithm_preferences(
     # Set a timestamp for when these preferences were created
     Preferences.set_preferences!(LinearSolve, "autotune_timestamp" => string(Dates.now()); force = true)
 
-    @info "Preferences updated in LinearSolve.jl. You may need to restart Julia for changes to take effect."
+    return @info "Preferences updated in LinearSolve.jl. You may need to restart Julia for changes to take effect."
 end
 
 """
@@ -353,7 +358,7 @@ function clear_algorithm_preferences()
     Preferences.delete_preferences!(LinearSolve, "LoadMKL_JLL"; force = true)
     @info "Cleared MKL preference"
 
-    @info "Preferences cleared from LinearSolve.jl."
+    return @info "Preferences cleared from LinearSolve.jl."
 end
 
 """
@@ -408,5 +413,5 @@ function show_current_preferences()
     println("\nLast updated: $timestamp")
     println("\nNOTE: This uses the enhanced dual preference system where LinearSolve.jl")
     println("will try the best overall algorithm first, then fall back to the best")
-    println("always-loaded algorithm if extensions are not available.")
+    return println("always-loaded algorithm if extensions are not available.")
 end

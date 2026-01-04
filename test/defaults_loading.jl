@@ -27,7 +27,7 @@ mat = sparse(rows, cols, vals, n, n)
 rhs = big.(zeros(n))
 rhs[begin] = rhs[end] = -2
 prob = LinearProblem(mat, rhs)
-@test_throws ["SparspakFactorization required", "using Sparspak"] sol=solve(prob).u
+@test_throws ["SparspakFactorization required", "using Sparspak"] sol = solve(prob).u
 
 using Sparspak
 sol = solve(prob).u

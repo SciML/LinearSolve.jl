@@ -6,32 +6,40 @@ using Sparspak
 using Sparspak.SparseCSCInterface.SparseArrays
 using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
 
-const PREALLOCATED_SPARSEPAK = sparspaklu(SparseMatrixCSC(0, 0, [1], Int[], Float64[]),
-    factorize = false)
+const PREALLOCATED_SPARSEPAK = sparspaklu(
+    SparseMatrixCSC(0, 0, [1], Int[], Float64[]),
+    factorize = false
+)
 
 function LinearSolve.init_cacheval(
         ::SparspakFactorization, A::SparseMatrixCSC{Float64, Int}, b, u, Pl,
         Pr, maxiters::Int, abstol,
         reltol,
-        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
-    PREALLOCATED_SPARSEPAK
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return PREALLOCATED_SPARSEPAK
 end
 
 function LinearSolve.init_cacheval(
         ::SparspakFactorization, A::AbstractSparseMatrixCSC{Tv, Ti}, b, u, Pl, Pr, maxiters::Int, abstol,
         reltol,
-        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions) where {Tv, Ti}
-    if size(A, 1) == size(A, 2)
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    ) where {Tv, Ti}
+    return if size(A, 1) == size(A, 2)
         A = convert(AbstractMatrix, A)
         if A isa SparseArrays.AbstractSparseArray
             return sparspaklu(
-                SparseMatrixCSC{Tv, Ti}(size(A)..., getcolptr(A), rowvals(A),
-                    nonzeros(A)),
-                factorize = false)
+                SparseMatrixCSC{Tv, Ti}(
+                    size(A)..., getcolptr(A), rowvals(A),
+                    nonzeros(A)
+                ),
+                factorize = false
+            )
         else
             return sparspaklu(
                 SparseMatrixCSC{Tv, Ti}(zero(Ti), zero(Ti), [one(Ti)], Ti[], eltype(A)[]),
-                factorize = false)
+                factorize = false
+            )
         end
     else
         PREALLOCATED_SPARSEPAK
@@ -39,22 +47,31 @@ function LinearSolve.init_cacheval(
 end
 
 function SciMLBase.solve!(
-        cache::LinearSolve.LinearCache, alg::SparspakFactorization; kwargs...)
+        cache::LinearSolve.LinearCache, alg::SparspakFactorization; kwargs...
+    )
     A = cache.A
     if cache.isfresh
         if !(cache.cacheval === PREALLOCATED_SPARSEPAK) && alg.reuse_symbolic
-            fact = sparspaklu!(LinearSolve.@get_cacheval(cache, :SparspakFactorization),
-                SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                    nonzeros(A)))
+            fact = sparspaklu!(
+                LinearSolve.@get_cacheval(cache, :SparspakFactorization),
+                SparseMatrixCSC(
+                    size(A)..., getcolptr(A), rowvals(A),
+                    nonzeros(A)
+                )
+            )
         else
-            fact = sparspaklu(SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A),
-                nonzeros(A)))
+            fact = sparspaklu(
+                SparseMatrixCSC(
+                    size(A)..., getcolptr(A), rowvals(A),
+                    nonzeros(A)
+                )
+            )
         end
         cache.cacheval = fact
         cache.isfresh = false
     end
     y = ldiv!(cache.u, LinearSolve.@get_cacheval(cache, :SparspakFactorization), cache.b)
-    SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
 
 LinearSolve.PrecompileTools.@compile_workload begin

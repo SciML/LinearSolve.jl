@@ -246,12 +246,12 @@ struct RFLUFactorization{P, T} <: AbstractDenseFactorization
             throwerror &&
                 error("RFLUFactorization requires that RecursiveFactorization.jl is loaded, i.e. `using RecursiveFactorization`")
         end
-        new{P, T}()
+        return new{P, T}()
     end
 end
 
 function RFLUFactorization(; pivot = Val(true), thread = Val(true), throwerror = true)
-    RFLUFactorization(pivot, thread; throwerror)
+    return RFLUFactorization(pivot, thread; throwerror)
 end
 
 """
@@ -268,12 +268,12 @@ struct ButterflyFactorization{T} <: AbstractDenseFactorization
             throwerror &&
                 error("ButterflyFactorization requires that RecursiveFactorization.jl is loaded, i.e. `using RecursiveFactorization`")
         end
-        new{T}()
+        return new{T}()
     end
 end
 
 function ButterflyFactorization(; thread = Val(true), throwerror = true)
-    ButterflyFactorization(thread; throwerror)
+    return ButterflyFactorization(thread; throwerror)
 end
 
 
@@ -446,7 +446,8 @@ given the input types, and these keyword arguments are only for overriding the
 default handling process. This should not be required by most users.
 """
 PanuaPardisoFactorize(; kwargs...) = PardisoJL(;
-    vendor = :Panua, solver_type = 0, kwargs...)
+    vendor = :Panua, solver_type = 0, kwargs...
+)
 
 """
 ```julia
@@ -507,13 +508,15 @@ struct PardisoJL{T1, T2} <: AbstractSparseFactorization
     dparm::Union{Vector{Tuple{Int, Int}}, Nothing}
     vendor::Union{Symbol, Nothing}
 
-    function PardisoJL(; nprocs::Union{Int, Nothing} = nothing,
+    function PardisoJL(;
+            nprocs::Union{Int, Nothing} = nothing,
             solver_type = nothing,
             matrix_type = nothing,
             cache_analysis = false,
             iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
             dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
-            vendor::Union{Symbol, Nothing} = nothing)
+            vendor::Union{Symbol, Nothing} = nothing
+        )
         ext = Base.get_extension(@__MODULE__, :LinearSolvePardisoExt)
         if ext === nothing
             error("PardisoJL requires that Pardiso is loaded, i.e. `using Pardiso`")
@@ -523,7 +526,8 @@ struct PardisoJL{T1, T2} <: AbstractSparseFactorization
             @assert T1 <: Union{Int, Nothing, ext.Pardiso.Solver}
             @assert T2 <: Union{Int, Nothing, ext.Pardiso.MatrixType}
             return new{T1, T2}(
-                nprocs, solver_type, matrix_type, cache_analysis, iparm, dparm, vendor)
+                nprocs, solver_type, matrix_type, cache_analysis, iparm, dparm, vendor
+            )
         end
     end
 end
@@ -683,9 +687,9 @@ alg = MetalLUFactorization()
 sol = solve(prob, alg)
 ```
 """
-struct MetalLUFactorization <: AbstractFactorization 
+struct MetalLUFactorization <: AbstractFactorization
     function MetalLUFactorization(; throwerror = true)
-        @static if !Sys.isapple()
+        return @static if !Sys.isapple()
             if throwerror
                 error("MetalLUFactorization is only available on Apple platforms")
             else
@@ -727,7 +731,7 @@ sol = solve(prob, alg)
 """
 struct MetalOffload32MixedLUFactorization <: AbstractFactorization
     function MetalOffload32MixedLUFactorization(; throwerror = true)
-        @static if !Sys.isapple()
+        return @static if !Sys.isapple()
             if throwerror
                 error("MetalOffload32MixedLUFactorization is only available on Apple platforms")
             else
@@ -766,7 +770,7 @@ alg = BLISLUFactorization()
 sol = solve(prob, alg)
 ```
 """
-struct BLISLUFactorization <: AbstractFactorization 
+struct BLISLUFactorization <: AbstractFactorization
     function BLISLUFactorization(; throwerror = true)
         ext = Base.get_extension(@__MODULE__, :LinearSolveBLISExt)
         if ext === nothing && throwerror
@@ -924,10 +928,10 @@ struct RF32MixedLUFactorization{P, T} <: AbstractDenseFactorization
             throwerror &&
                 error("RF32MixedLUFactorization requires that RecursiveFactorization.jl is loaded, i.e. `using RecursiveFactorization`")
         end
-        new{P, T}()
+        return new{P, T}()
     end
 end
 
 function RF32MixedLUFactorization(; pivot = Val(true), thread = Val(true), throwerror = true)
-    RF32MixedLUFactorization(pivot, thread; throwerror)
+    return RF32MixedLUFactorization(pivot, thread; throwerror)
 end

@@ -24,20 +24,24 @@ adjoint solve. However, for specific structured matrices if ``A'`` is known to h
 specific structure distinct from ``A`` then passing in a `linsolve` will be more efficient.
 """
 @kwdef struct LinearSolveAdjoint{L} <:
-              SciMLBase.AbstractSensitivityAlgorithm{0, false, :central}
+    SciMLBase.AbstractSensitivityAlgorithm{0, false, :central}
     linsolve::L = missing
 end
 
 function CRC.rrule(
-        T::typeof(SciMLBase.solve), prob::LinearProblem, alg::Nothing, args...; kwargs...)
+        T::typeof(SciMLBase.solve), prob::LinearProblem, alg::Nothing, args...; kwargs...
+    )
     assump = OperatorAssumptions(issquare(prob.A))
     alg = defaultalg(prob.A, prob.b, assump)
-    CRC.rrule(T, prob, alg, args...; kwargs...)
+    return CRC.rrule(T, prob, alg, args...; kwargs...)
 end
 
-function CRC.rrule(::typeof(SciMLBase.solve), prob::LinearProblem,
+function CRC.rrule(
+        ::typeof(SciMLBase.solve), prob::LinearProblem,
         alg::SciMLLinearSolveAlgorithm, args...; alias_A = default_alias_A(
-            alg, prob.A, prob.b), kwargs...)
+            alg, prob.A, prob.b
+        ), kwargs...
+    )
     # sol = solve(prob, alg, args...; kwargs...)
     cache = init(prob, alg, args...; kwargs...)
     (; A, sensealg) = cache
@@ -49,8 +53,10 @@ function CRC.rrule(::typeof(SciMLBase.solve), prob::LinearProblem,
         # We can reuse the factorization so no copy is needed
         # Krylov Methods don't modify `A`, so it's safe to just reuse it
         # No Copy is needed even for the default case
-        if !(alg isa AbstractFactorization || alg isa AbstractKrylovSubspaceMethod ||
-             alg isa DefaultLinearSolver)
+        if !(
+                alg isa AbstractFactorization || alg isa AbstractKrylovSubspaceMethod ||
+                    alg isa DefaultLinearSolver
+            )
             A_ = alias_A ? deepcopy(A) : A
         end
     else
@@ -80,7 +86,8 @@ function CRC.rrule(::typeof(SciMLBase.solve), prob::LinearProblem,
         else
             invprob = LinearProblem(adjoint(A_), ∂u) # We cached `A`
             λ = solve(
-                invprob, sensealg.linsolve; cache.abstol, cache.reltol, cache.verbose).u
+                invprob, sensealg.linsolve; cache.abstol, cache.reltol, cache.verbose
+            ).u
         end
 
         tu = adjoint(sol.u)
@@ -103,10 +110,10 @@ end
 function CRC.rrule(T::typeof(LinearSolve.init), prob::LinearSolve.LinearProblem, alg::Nothing, args...; kwargs...)
     assump = OperatorAssumptions(issquare(prob.A))
     alg = defaultalg(prob.A, prob.b, assump)
-    CRC.rrule(T, prob, alg, args...; kwargs...)
+    return CRC.rrule(T, prob, alg, args...; kwargs...)
 end
 
-function CRC.rrule(::typeof(LinearSolve.init), prob::LinearSolve.LinearProblem, alg::Union{LinearSolve.SciMLLinearSolveAlgorithm,Nothing}, args...; kwargs...)
+function CRC.rrule(::typeof(LinearSolve.init), prob::LinearSolve.LinearProblem, alg::Union{LinearSolve.SciMLLinearSolveAlgorithm, Nothing}, args...; kwargs...)
     init_res = LinearSolve.init(prob, alg)
     function init_adjoint(∂init)
         ∂prob = LinearProblem(∂init.A, ∂init.b, NoTangent())

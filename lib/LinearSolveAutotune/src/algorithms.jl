@@ -61,8 +61,10 @@ function get_available_algorithms(; skip_missing_algs::Bool = false, include_fas
             if skip_missing_algs
                 @warn msg
             else
-                error(msg *
-                      ". Pass `skip_missing_algs=true` to continue with warning instead.")
+                error(
+                    msg *
+                        ". Pass `skip_missing_algs=true` to continue with warning instead."
+                )
             end
         end
     catch e
@@ -107,8 +109,10 @@ function get_gpu_algorithms(; skip_missing_algs::Bool = false)
             if skip_missing_algs
                 @warn msg
             else
-                error(msg *
-                      " Pass `skip_missing_algs=true` to continue with warning instead.")
+                error(
+                    msg *
+                        " Pass `skip_missing_algs=true` to continue with warning instead."
+                )
             end
         end
     end
@@ -123,8 +127,10 @@ function get_gpu_algorithms(; skip_missing_algs::Bool = false)
             if skip_missing_algs
                 @warn msg
             else
-                error(msg *
-                      " Pass `skip_missing_algs=true` to continue with warning instead.")
+                error(
+                    msg *
+                        " Pass `skip_missing_algs=true` to continue with warning instead."
+                )
             end
         end
     end
@@ -139,13 +145,13 @@ Calculate the number of floating point operations for LU factorization.
 From the existing LinearSolve benchmarks.
 """
 function luflop(m, n = m; innerflop = 2)
-    sum(1:min(m, n)) do k
+    return sum(1:min(m, n)) do k
         invflop = 1
         scaleflop = isempty((k + 1):m) ? 0 : sum((k + 1):m)
         updateflop = isempty((k + 1):n) ? 0 :
-                     sum((k + 1):n) do j
-            isempty((k + 1):m) ? 0 : sum((k + 1):m) do i
-                innerflop
+            sum((k + 1):n) do j
+                isempty((k + 1):m) ? 0 : sum((k + 1):m) do i
+                    innerflop
             end
         end
         invflop + scaleflop + updateflop

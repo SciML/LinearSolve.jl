@@ -38,14 +38,14 @@ function LinearAlgebra.ldiv!(A::ComposePreconditioner, x)
     (; inner, outer) = A
 
     ldiv!(inner, x)
-    ldiv!(outer, x)
+    return ldiv!(outer, x)
 end
 
 function LinearAlgebra.ldiv!(y, A::ComposePreconditioner, x)
     (; inner, outer) = A
 
     ldiv!(y, inner, x)
-    ldiv!(outer, y)
+    return ldiv!(outer, y)
 end
 
 """

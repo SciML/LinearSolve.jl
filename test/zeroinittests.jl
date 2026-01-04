@@ -5,9 +5,9 @@ b = rand(4)
 A = sparse(A)
 Anz = copy(A)
 C = copy(A)
-C[begin, end] = 1e-8
+C[begin, end] = 1.0e-8
 A.nzval .= 0
-cache_kwargs = (;abstol = 1e-8, reltol = 1e-8, maxiter = 30)
+cache_kwargs = (; abstol = 1.0e-8, reltol = 1.0e-8, maxiter = 30)
 
 function test_nonzero_init(alg = nothing)
     linprob = LinearProblem(A, b)
@@ -18,7 +18,7 @@ function test_nonzero_init(alg = nothing)
     @test sol.u == b
     cache.A = C
     sol = solve!(cache; cache_kwargs...)
-    @test sol.u ≈ b
+    return @test sol.u ≈ b
 end
 
 test_nonzero_init()

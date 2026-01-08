@@ -325,7 +325,7 @@ function __dual_init(
     ∂_A = partial_vals(A)
     ∂_b = partial_vals(b)
 
-    primal_prob = remake(prob; A = new_A, b = new_b, u0 = new_u0)
+    primal_prob = LinearProblem{SciMLBase.isinplace(prob)}(new_A, new_b; u0 = new_u0)
 
     if get_dual_type(prob.A) !== nothing
         dual_type = get_dual_type(prob.A)

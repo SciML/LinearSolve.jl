@@ -141,3 +141,43 @@ for alg in (
 
     @test zyg_jac ≈ fd_jac rtol = 1.0e-4
 end
+
+struct System end
+function update_A!(A, p::Vector{T}) where {T}
+    A[1, 1] = sum(p)
+    A[1, 2] = one(T)
+    A[2, 1] = 2one(T)
+    return A[2, 2] = 3one(T)
+end
+function update_b!(b, p::Vector{T}) where {T}
+    b[1] = p[1]
+    return b[2] = 2one(T)
+end
+
+function SciMLBase.get_new_A_b(::System, f, p, A, b; kw...)
+    if eltype(A) != eltype(p)
+        A = similar(A, eltype(p))
+        b = similar(b, eltype(p))
+    end
+    f.update_A!(A, p)
+    f.update_b!(b, p)
+    return A, b
+end
+
+
+@testset "Avoid stackoverflow with `SciMLBase.get_new_A_b` hook" begin
+    # See https://github.com/SciML/LinearSolve.jl/pull/868#issuecomment-3723338914
+    p = [1.0, 2.0, 3.0]
+    A = [6.0 1.0; 2.0 3.0]
+    b = [1.0, 2.0]
+    linfun = SciMLBase.SymbolicLinearInterface(update_A!, update_b!, System(), nothing, nothing)
+
+    prob = LinearProblem(A, b; f = linfun)
+    sol = solve(prob)
+
+    newp = [2.0, 3.0, 4.0]
+    @test_nowarn ForwardDiff.gradient(newp) do p
+        prob2 = remake(prob; p)
+        sum(solve(prob2).u)
+    end
+end

@@ -782,6 +782,28 @@ truesol = solve(lp, LUFactorization())
 krylovsol = solve(lp, KrylovJL_GMRES())
 @test truesol ≈ krylovsol
 
+# https://github.com/SciML/LinearSolve.jl/issues/869
+# Test that memory kwarg works for GMRES and DQGMRES (doesn't error)
+@testset "Krylov.jl memory kwarg (issue #869)" begin
+    A = sprand(100, 100, 0.1) + 10I  # Well-conditioned matrix
+    b = rand(100)
+
+    # Test GMRES with memory kwarg - should not error and should converge
+    prob = LinearProblem(A, b)
+    linsolve = init(prob, KrylovJL_GMRES(memory = 30))
+    sol = solve!(linsolve)
+    @test sol.retcode == ReturnCode.Success
+    @test norm(A * sol.u - b) < 1e-6
+
+    # Test DQGMRES with memory kwarg - main test is that it doesn't error
+    # when memory kwarg is passed (previously threw MethodError)
+    prob2 = LinearProblem(A, b)
+    linsolve2 = init(prob2, KrylovJL(KrylovAlg = Krylov.dqgmres!, memory = 30))
+    sol2 = solve!(linsolve2)
+    # DQGMRES may not always converge as well, just check it runs without error
+    @test sol2.u isa Vector
+end
+
 # Block Diagonals
 using BlockDiagonals
 

@@ -1,7 +1,7 @@
 module LinearSolveSparseArraysExt
 
 using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
-    @get_cacheval, CHOLMODFactorization, GenericFactorization,
+    CHOLMODFactorization, GenericFactorization,
     GenericLUFactorization,
     KLUFactorization, LUFactorization, NormalCholeskyFactorization,
     OperatorAssumptions, LinearVerbosity,

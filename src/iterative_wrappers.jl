@@ -231,7 +231,15 @@ function init_cacheval(
             end
         end
     else
-        memory = (alg.gmres_restart == 0) ? min(20, size(A, 1)) : alg.gmres_restart
+        # Check if memory is specified in kwargs, otherwise compute from gmres_restart
+        kwargs_nt = NamedTuple(alg.kwargs)
+        memory = if haskey(kwargs_nt, :memory)
+            kwargs_nt[:memory]
+        elseif alg.gmres_restart == 0
+            min(20, size(A, 1))
+        else
+            alg.gmres_restart
+        end
 
         solver = if (
                 alg.KrylovAlg === Krylov.dqgmres! ||
@@ -313,9 +321,13 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     krylovJL_verbose = verbosity_to_int(verbose.KrylovJL_verbosity)
 
     args = (cacheval, cache.A, cache.b)
+    # Filter out workspace creation parameters (memory, window) from kwargs
+    # These parameters are only used when creating the workspace, not when solving
+    kwargs_nt = NamedTuple(alg.kwargs)
+    filtered_kwargs = Base.structdiff(kwargs_nt, NamedTuple{(:memory, :window)})
     kwargs = (
         atol = atol, rtol, itmax, verbose = krylovJL_verbose,
-        ldiv = true, history = true, alg.kwargs...,
+        ldiv = true, history = true, filtered_kwargs...,
     )
 
     if cache.cacheval isa Krylov.CgWorkspace

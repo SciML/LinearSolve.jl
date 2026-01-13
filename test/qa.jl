@@ -37,10 +37,12 @@ end
         :AbstractVerbositySpecifier, :AbstractMessageLevel, :AbstractVerbosityPreset,
         :None, :Minimal, :Standard, :Detailed, :All,
     )
+    # @set! is used by extensions via LinearSolve.@set! but ExplicitImports can't detect this
+    extension_imports = (Symbol("@set!"),)
     @test check_no_stale_explicit_imports(
         LinearSolve;
         allow_unanalyzable = unanalyzable_mods,
-        ignore = sciml_logging_macro_imports
+        ignore = (sciml_logging_macro_imports..., extension_imports...)
     ) === nothing
     @test check_all_qualified_accesses_via_owners(LinearSolve) === nothing
 end

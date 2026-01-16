@@ -239,6 +239,7 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
     r₀ = PlisI ? w : q
     xr = restart ? Δx : x
 
+    # Early return check - note: @trace cannot wrap return statements
     if β == 0
         return SciMLBase.build_linear_solution(
             lincache.alg, x, r₀, lincache;
@@ -264,7 +265,8 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
     inner_tired = inner_iter ≥ inner_maxiters
     status = ReturnCode.Default
 
-    while !(solved || tired || breakdown)
+    # Data-dependent outer loop - use @trace for Reactant compatibility
+    @trace while !(solved || tired || breakdown)
         # Initialize workspace.
         nr = 0  # Number of coefficients stored in Rₖ.
 
@@ -286,7 +288,8 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
         inner_iter = 0
         inner_tired = false
 
-        while !(solved || inner_tired || breakdown)
+        # Data-dependent inner loop - use @trace for Reactant compatibility
+        @trace while !(solved || inner_tired || breakdown)
             # Update iteration index
             inner_iter += 1
             # Update workspace if more storage is required and restart is set to false
@@ -486,6 +489,7 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
     r₀ = PlisI ? w : q
     xr = restart ? Δx : x
 
+    # Early return check - note: @trace cannot wrap return statements
     if β == 0
         return SciMLBase.build_linear_solution(
             lincache.alg, x, r₀, lincache;
@@ -511,7 +515,8 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
     inner_tired = inner_iter ≥ inner_maxiters
     status = ReturnCode.Default
 
-    while !(solved || tired || breakdown)
+    # Data-dependent outer loop - use @trace for Reactant compatibility
+    @trace while !(solved || tired || breakdown)
         # Initialize workspace.
         # TODO: Check that not zeroing out (V, s, c, R, z) doesn't lead to incorrect results.
         nr = 0  # Number of coefficients stored in Rₖ.
@@ -534,7 +539,8 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
         inner_iter = 0
         inner_tired = false
 
-        while !(solved || inner_tired || breakdown)
+        # Data-dependent inner loop - use @trace for Reactant compatibility
+        @trace while !(solved || inner_tired || breakdown)
             # Update iteration index
             inner_iter += 1
             # Update workspace if more storage is required and restart is set to false

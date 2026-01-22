@@ -11,9 +11,9 @@ A \ b2
 then it would be more efficient to LU-factorize one time and reuse the factorization:
 
 ```julia
-LA.lu!(A)
-A \ b1
-A \ b2
+A_lu = LA.lu!(A)
+A_lu \ b1
+A_lu \ b2
 ```
 
 LinearSolve.jl's caching interface automates this process to use the most efficient

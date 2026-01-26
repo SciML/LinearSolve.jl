@@ -76,6 +76,13 @@ if Base.Sys.islinux() && (GROUP == "All" || GROUP == "LinearSolveHYPRE") && HAS_
     @time @safetestset "LinearSolveHYPRE" include("hypretests.jl")
 end
 
+if Base.Sys.islinux() && GROUP == "LinearSolvePETSc" && HAS_EXTENSIONS
+    Pkg.activate("petsc")
+    Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
+    Pkg.instantiate()
+    @time @safetestset "LinearSolvePETSc" include("petsctests.jl")
+end
+
 if GROUP == "Trim" && VERSION >= v"1.12.0"
     Pkg.activate("trim")
     Pkg.develop(PackageSpec(path = dirname(@__DIR__)))

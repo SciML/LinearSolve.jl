@@ -1,8 +1,8 @@
 module LinearSolvePETScExt
 
 using LinearAlgebra
-using MPI
 using PETSc
+using PETSc: MPI
 using PETSc: petsclibs, PetscScalar, PetscInt
 using SparseArrays: SparseMatrixCSC, sparse
 using LinearSolve: PETScAlgorithm, LinearCache, LinearProblem, LinearSolve,

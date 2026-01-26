@@ -3,7 +3,7 @@ module LinearSolvePETScExt
 using LinearAlgebra
 using PETSc
 using PETSc: MPI
-using PETSc: petsclibs, PetscScalar, PetscInt
+using PETSc: petsclibs
 using SparseArrays: SparseMatrixCSC, sparse
 using LinearSolve: PETScAlgorithm, LinearCache, LinearProblem, LinearSolve,
     OperatorAssumptions, default_tol, init_cacheval, __issquare,
@@ -13,11 +13,11 @@ using SciMLBase: LinearProblem, LinearAliasSpecifier, SciMLBase
 using Setfield: @set!
 
 mutable struct PETScCache
-    ksp::Union{PETSc.AbstractKSP, Nothing}
+    ksp::Any  # PETSc KSP object or nothing
     petsclib::Any
-    A::Union{PETSc.AbstractMat, Nothing}
-    b::Union{PETSc.AbstractVec, Nothing}
-    u::Union{PETSc.AbstractVec, Nothing}
+    A::Any    # PETSc Mat or nothing
+    b::Any    # PETSc Vec or nothing
+    u::Any    # PETSc Vec or nothing
     initialized::Bool
 end
 
@@ -41,21 +41,19 @@ function get_petsclib(T::Type = Float64)
     return first(PETSc.petsclibs)
 end
 
-# Convert Julia matrix to PETSc matrix
+# Convert Julia sparse matrix to PETSc matrix
 function to_petsc_mat(petsclib, A::SparseMatrixCSC{T}) where {T}
-    m, n = size(A)
-    mat = PETSc.MatSeqAIJ(petsclib, A)
-    return mat
+    return PETSc.MatCreateSeqAIJ(petsclib, MPI.COMM_SELF, A)
 end
 
+# Convert Julia dense matrix to PETSc matrix
 function to_petsc_mat(petsclib, A::AbstractMatrix{T}) where {T}
-    # Convert dense matrix to sparse first
-    return to_petsc_mat(petsclib, sparse(A))
+    return PETSc.MatSeqDense(petsclib, Matrix{T}(A))
 end
 
 # Convert Julia vector to PETSc vector
 function to_petsc_vec(petsclib, v::AbstractVector{T}) where {T}
-    return PETSc.VecSeq(petsclib, v)
+    return PETSc.VecSeq(petsclib, MPI.COMM_SELF, Vector{T}(v))
 end
 
 # Symbol to PETSc KSP type string
@@ -159,8 +157,10 @@ function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm, args...; kwar
     # Solve
     PETSc.solve!(pcache.u, pcache.ksp, pcache.b)
 
-    # Copy solution back to Julia vector
-    copy!(cache.u, pcache.u)
+    # Copy solution back to Julia vector using withlocalarray!
+    PETSc.withlocalarray!(pcache.u; read = true, write = false) do u_arr
+        copyto!(cache.u, u_arr)
+    end
 
     # Get convergence info
     iters = PETSc.getiterationnumber(pcache.ksp)

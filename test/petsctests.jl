@@ -23,32 +23,32 @@ PETSc.initialized(petsclib) || PETSc.initialize(petsclib)
 
     @testset "GMRES solver" begin
         alg = PETScAlgorithm(:gmres)
-        sol = solve(prob, alg; abstol = 1e-10, reltol = 1e-10)
-        @test norm(A * sol.u - b) / norm(b) < 1e-6
+        sol = solve(prob, alg; abstol = 1.0e-10, reltol = 1.0e-10)
+        @test norm(A * sol.u - b) / norm(b) < 1.0e-6
     end
 
     @testset "CG solver" begin
         alg = PETScAlgorithm(:cg)
-        sol = solve(prob, alg; abstol = 1e-10, reltol = 1e-10)
-        @test norm(A * sol.u - b) / norm(b) < 1e-6
+        sol = solve(prob, alg; abstol = 1.0e-10, reltol = 1.0e-10)
+        @test norm(A * sol.u - b) / norm(b) < 1.0e-6
     end
 
     @testset "BiCGSTAB solver" begin
         alg = PETScAlgorithm(:bcgs)
-        sol = solve(prob, alg; abstol = 1e-10, reltol = 1e-10)
-        @test norm(A * sol.u - b) / norm(b) < 1e-6
+        sol = solve(prob, alg; abstol = 1.0e-10, reltol = 1.0e-10)
+        @test norm(A * sol.u - b) / norm(b) < 1.0e-6
     end
 
     @testset "GMRES with Jacobi preconditioner" begin
         alg = PETScAlgorithm(:gmres; pc_type = :jacobi)
-        sol = solve(prob, alg; abstol = 1e-10, reltol = 1e-10)
-        @test norm(A * sol.u - b) / norm(b) < 1e-6
+        sol = solve(prob, alg; abstol = 1.0e-10, reltol = 1.0e-10)
+        @test norm(A * sol.u - b) / norm(b) < 1.0e-6
     end
 
     @testset "GMRES with ILU preconditioner" begin
         alg = PETScAlgorithm(:gmres; pc_type = :ilu)
-        sol = solve(prob, alg; abstol = 1e-10, reltol = 1e-10)
-        @test norm(A * sol.u - b) / norm(b) < 1e-6
+        sol = solve(prob, alg; abstol = 1.0e-10, reltol = 1.0e-10)
+        @test norm(A * sol.u - b) / norm(b) < 1.0e-6
     end
 end
 
@@ -60,8 +60,8 @@ end
 
     prob = LinearProblem(A, b)
     alg = PETScAlgorithm(:gmres)
-    sol = solve(prob, alg; abstol = 1e-10, reltol = 1e-10)
-    @test norm(A * sol.u - b) / norm(b) < 1e-6
+    sol = solve(prob, alg; abstol = 1.0e-10, reltol = 1.0e-10)
+    @test norm(A * sol.u - b) / norm(b) < 1.0e-6
 end
 
 @testset "PETScAlgorithm Cache Interface" begin
@@ -74,17 +74,17 @@ end
     alg = PETScAlgorithm(:gmres)
 
     # Initialize cache
-    cache = SciMLBase.init(prob, alg; abstol = 1e-10, reltol = 1e-10)
+    cache = SciMLBase.init(prob, alg; abstol = 1.0e-10, reltol = 1.0e-10)
 
     # First solve
     sol1 = solve!(cache)
-    @test norm(A * sol1.u - b1) / norm(b1) < 1e-6
+    @test norm(A * sol1.u - b1) / norm(b1) < 1.0e-6
 
     # Update b and solve again
     b2 = rand(n)
     cache.b = b2
     sol2 = solve!(cache)
-    @test norm(A * sol2.u - b2) / norm(b2) < 1e-6
+    @test norm(A * sol2.u - b2) / norm(b2) < 1.0e-6
 end
 
 PETSc.finalize(petsclib)

@@ -512,6 +512,7 @@ export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
 export SimpleGMRES
 
 export HYPREAlgorithm
+export PETScAlgorithm
 export CudaOffloadFactorization
 export CudaOffloadLUFactorization
 export CudaOffloadQRFactorization

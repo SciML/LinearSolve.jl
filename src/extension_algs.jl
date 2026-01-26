@@ -2,6 +2,63 @@
 # functionality is implemented as package extensions
 
 """
+`PETScAlgorithm(solver_type = :gmres; kwargs...)`
+
+[PETSc.jl](https://github.com/JuliaParallel/PETSc.jl) is a Julia wrapper for the Portable,
+Extensible Toolkit for Scientific Computation (PETSc). This algorithm provides access to
+PETSc's KSP (Krylov Subspace) linear solvers.
+
+!!! note
+
+    Using PETSc solvers requires Julia version 1.10 or higher, and that the packages
+    PETSc.jl and MPI.jl are installed: `using PETSc, MPI`
+
+## Positional Arguments
+
+The single positional argument `solver_type` specifies the KSP solver type. Common choices:
+
+  - `:gmres` (default): Generalized Minimal Residual method
+  - `:cg`: Conjugate Gradient (for symmetric positive definite systems)
+  - `:bicg`: BiConjugate Gradient
+  - `:bcgs`: BiConjugate Gradient Stabilized
+  - `:preonly`: Apply preconditioner only (no Krylov iteration)
+  - `:richardson`: Richardson iteration
+
+## Keyword Arguments
+
+  - `pc_type`: Preconditioner type (e.g., `:jacobi`, `:ilu`, `:lu`, `:gamg`, `:hypre`, `:none`)
+  - `ksp_options`: NamedTuple of additional KSP options
+
+## Example
+
+```julia
+using PETSc, MPI, SparseArrays
+A = sprand(100, 100, 0.1) + 10I
+b = rand(100)
+prob = LinearProblem(A, b)
+alg = PETScAlgorithm(:gmres; pc_type = :ilu)
+sol = solve(prob, alg)
+```
+"""
+struct PETScAlgorithm <: SciMLLinearSolveAlgorithm
+    solver_type::Symbol
+    pc_type::Symbol
+    ksp_options::NamedTuple
+    function PETScAlgorithm(
+            solver_type::Symbol = :gmres;
+            pc_type::Symbol = :none,
+            ksp_options::NamedTuple = NamedTuple()
+        )
+        ext = Base.get_extension(@__MODULE__, :LinearSolvePETScExt)
+        if ext === nothing
+            error("PETScAlgorithm requires that PETSc and MPI are loaded, i.e. `using PETSc, MPI`")
+        else
+            return new(solver_type, pc_type, ksp_options)
+        end
+    end
+end
+
+"""
 `HYPREAlgorithm(solver; Pl = nothing)`
 
 [HYPRE.jl](https://github.com/fredrikekre/HYPRE.jl) is an interface to

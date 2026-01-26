@@ -795,7 +795,7 @@ krylovsol = solve(lp, KrylovJL_GMRES())
     linsolve = init(prob, KrylovJL_GMRES(memory = 30))
     sol = solve!(linsolve)
     @test sol.retcode == ReturnCode.Success
-    @test norm(A * sol.u - b) < 1e-6
+    @test norm(A * sol.u - b) < 1.0e-6
 
     # Test with different memory values to ensure it's actually being used
     prob2 = LinearProblem(A, b)

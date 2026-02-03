@@ -41,6 +41,7 @@ using LinearAlgebra.LAPACK: chkfinite, chkstride1,
 import GPUArraysCore
 import Preferences
 import ConcreteStructs: @concrete
+import ReactantCore: @trace
 
 # wrap
 import Krylov

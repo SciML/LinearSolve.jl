@@ -30,6 +30,7 @@ end
 do_factorization(alg::QRFactorization, A::BandedMatrix, b, u) = alg.inplace ? qr!(A) : qr(A)
 
 function do_factorization(alg::LUFactorization, A::BandedMatrix, b, u)
+    # BandedMatrices.jl requires Val-based pivot argument for lu!
     _pivot = alg.pivot isa NoPivot ? Val(false) : Val(true)
     return lu!(A, _pivot; check = false)
 end

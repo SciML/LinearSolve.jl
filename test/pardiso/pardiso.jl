@@ -1,6 +1,8 @@
 using LinearSolve, SparseArrays, Random, LinearAlgebra
 import Pardiso
 
+Random.seed!(1234)
+
 A1 = sparse(
     [
         1.0 0 -2 3

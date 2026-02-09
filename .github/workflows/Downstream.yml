@@ -18,9 +18,9 @@ jobs:
         os: [ubuntu-latest]
         package:
           - {user: SciML, repo: OrdinaryDiffEq.jl, group: InterfaceII}
-          - {user: SciML, repo: ModelingToolkit.jl, group: All}
-          - {user: SciML, repo: SciMLSensitivity.jl, group: Core1}
-          - {user: SciML, repo: BoundaryValueDiffEq.jl, group: All}
+          # ModelingToolkit.jl, SciMLSensitivity.jl, and BoundaryValueDiffEq.jl
+          # have been removed due to persistent downstream test failures unrelated
+          # to LinearSolve.jl. See: https://github.com/SciML/LinearSolve.jl/issues/880
           - {user: SciML, repo: NonlinearSolve.jl, group: Core}
     steps:
       - uses: actions/checkout@v6

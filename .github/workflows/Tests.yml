@@ -49,6 +49,10 @@ jobs:
             version: "lts"
           - group: Trim
             version: "pre"
+          # MKL Pardiso has numerical issues on pre-release Julia
+          # See: https://github.com/SciML/LinearSolve.jl/issues/879
+          - group: LinearSolvePardiso
+            version: "pre"
     uses: "SciML/.github/.github/workflows/tests.yml@v1"
     with:
       group: "${{ matrix.group }}"

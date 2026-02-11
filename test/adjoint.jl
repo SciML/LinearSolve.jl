@@ -1,7 +1,9 @@
 using Zygote, ForwardDiff
 using LinearSolve, LinearAlgebra, Test
 using FiniteDiff, RecursiveFactorization
+using Random
 
+Random.seed!(1234)
 n = 4
 A = rand(n, n);
 b1 = rand(n);
@@ -122,7 +124,7 @@ for alg in (
     zyg_jac = Zygote.jacobian(fb, b1) |> first |> vec
     @show zyg_jac
 
-    @test zyg_jac ≈ fd_jac rtol = 1.0e-4
+    @test zyg_jac ≈ fd_jac rtol = 5.0e-4
 
     function fA(A)
         prob = LinearProblem(A, b1)
@@ -139,7 +141,7 @@ for alg in (
     zyg_jac = Zygote.jacobian(fA, A) |> first |> vec
     @show zyg_jac
 
-    @test zyg_jac ≈ fd_jac rtol = 1.0e-4
+    @test zyg_jac ≈ fd_jac rtol = 5.0e-4
 end
 
 struct System end

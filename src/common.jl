@@ -430,7 +430,7 @@ function SciMLBase.reinit!(
     cache.p = p
     cache.Pl = Pl
     cache.Pr = Pr
-    cache.isfresh = true
+    cache.isfresh = isfresh
     cache.precsisfresh = precsisfresh
     return nothing
 end

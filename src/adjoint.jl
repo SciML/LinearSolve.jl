@@ -103,24 +103,7 @@ end
 
 function CRC.rrule(::typeof(Base.getindex), sol::SciMLBase.LinearSolution, sym)
     if SciMLBase.symbolic_type(sym) != SciMLBase.NotSymbolic()
-        if SciMLBase.is_observed(sol, sym)
-            f = SciMLBase.observed(sol, sym)
-            p = SciMLBase.parameter_values(sol)
-            u = SciMLBase.state_values(sol)
-            t = nothing
-            val, back = Zygote.pullback(u, p) do u, p
-                f(u, p, t)
-            end
-            function LinearSolution_observed_pullback(Δ)
-                du, dp = back(Δ)
-                # This constructs a proper LinearSolution cotangent with the .u field populated
-                Δsol = SciMLBase.build_linear_solution(sol.cache.alg, du, sol.resid, sol.cache)
-                return (NoTangent(), Δsol, NoTangent())
-            end
-            return val, LinearSolution_observed_pullback
-        else
-            i = SciMLBase.variable_index(sol, sym)
-        end
+        i = SciMLBase.variable_index(sol, sym)
     else
         i = sym
     end

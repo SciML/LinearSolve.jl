@@ -68,7 +68,7 @@ function CRC.rrule(
     function ∇linear_solve(∂sol)
         ∂∅ = NoTangent()
 
-        ∂u = ∂sol.u
+        ∂u = hasproperty(∂sol, :u) ? ∂sol.u : ∂sol
         if sensealg.linsolve === missing
             λ = if cache.cacheval isa Factorization
                 cache.cacheval' \ ∂u
@@ -99,6 +99,47 @@ function CRC.rrule(
     end
 
     return sol, ∇linear_solve
+end
+
+function CRC.rrule(::typeof(Base.getindex), sol::SciMLBase.LinearSolution, sym)
+    if SciMLBase.symbolic_type(sym) != SciMLBase.NotSymbolic()
+        if SciMLBase.is_observed(sol, sym)
+            f = SciMLBase.observed(sol, sym)
+            p = SciMLBase.parameter_values(sol)
+            u = SciMLBase.state_values(sol)
+            t = try
+                SciMLBase.current_time(sol)
+            catch
+                nothing
+            end
+            val, back = Zygote.pullback(u, p) do u, p
+                f(u, p, t)
+            end
+            function LinearSolution_observed_pullback(Δ)
+                du, dp = back(Δ)
+                # This constructs a proper LinearSolution cotangent with the .u field populated
+                Δsol = SciMLBase.build_linear_solution(sol.cache.alg, du, sol.resid, sol.cache)
+                return (NoTangent(), Δsol, NoTangent())
+            end
+            return val, LinearSolution_observed_pullback
+        else
+            i = SciMLBase.variable_index(sol, sym)
+        end
+    else
+        i = sym
+    end
+
+    function LinearSolution_getindex_pullback(Δ)
+        du = zero(sol.u)
+        if i isa Integer
+            du[i] = Δ
+        else
+            du[i] = Δ
+        end
+        Δsol = SciMLBase.build_linear_solution(sol.cache.alg, du, sol.resid, sol.cache)
+        return NoTangent(), Δsol, NoTangent()
+    end
+    return sol[i], LinearSolution_getindex_pullback
 end
 
 function CRC.rrule(::Type{<:LinearProblem}, A, b, p; kwargs...)

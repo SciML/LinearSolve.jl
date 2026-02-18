@@ -144,6 +144,24 @@ for alg in (
     @test zyg_jac ≈ fd_jac rtol = 5.0e-4
 end
 
+@testset "Direct solution indexing without .u" begin
+    N = 2
+    Random.seed!(1234)
+    function test_func(x::AbstractVector{T}) where {T <: Real}
+        A = reshape(x[1:(N * N)], (N, N))
+        b = x[(N * N + 1):end]
+        prob = LinearProblem(A, b)
+        sol = solve(prob)
+        return sum(sol)
+    end
+
+    x0 = rand(N * N + N)
+
+    grad_zygote = Zygote.gradient(test_func, x0)
+    grad_forwarddiff = ForwardDiff.gradient(test_func, x0)
+    @test grad_zygote[1] ≈ grad_forwarddiff rtol = 1e-5
+end
+
 struct System end
 function update_A!(A, p::Vector{T}) where {T}
     A[1, 1] = sum(p)

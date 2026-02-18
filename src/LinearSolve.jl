@@ -402,6 +402,7 @@ include("simplelu.jl")
 include("simplegmres.jl")
 include("iterative_wrappers.jl")
 include("preconditioners.jl")
+include("algebraicmultigrid.jl")
 include("preferences.jl")
 include("solve_function.jl")
 include("default.jl")
@@ -507,7 +508,7 @@ export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
     KrylovJL_BICGSTAB, KrylovJL_LSMR, KrylovJL_CRAIGMR, KrylovJL_FGMRES,
     IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
     IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES, IterativeSolversJL_IDRS,
-    KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES, KrylovJL_MINARES
+    KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES, KrylovJL_MINARES, AlgebraicMultigridJL
 
 export SimpleGMRES
 

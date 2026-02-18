@@ -107,11 +107,7 @@ function CRC.rrule(::typeof(Base.getindex), sol::SciMLBase.LinearSolution, sym)
             f = SciMLBase.observed(sol, sym)
             p = SciMLBase.parameter_values(sol)
             u = SciMLBase.state_values(sol)
-            t = try
-                SciMLBase.current_time(sol)
-            catch
-                nothing
-            end
+            t = nothing
             val, back = Zygote.pullback(u, p) do u, p
                 f(u, p, t)
             end

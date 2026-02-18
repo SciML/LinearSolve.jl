@@ -159,7 +159,7 @@ end
 
     grad_zygote = Zygote.gradient(test_func, x0)
     grad_forwarddiff = ForwardDiff.gradient(test_func, x0)
-    @test grad_zygote[1] ≈ grad_forwarddiff rtol = 1e-5
+    @test grad_zygote[1] ≈ grad_forwarddiff rtol = 1.0e-5
 end
 
 struct System end

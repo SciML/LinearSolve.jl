@@ -233,3 +233,24 @@ cache_backup = init(prob_backup)
 @test cache_backup.cacheval.A_backup === prob_backup.A      # references prob.A
 solve!(cache_backup)
 @test prob_backup.A ≈ A_singular  # prob.A unchanged
+
+# Regression test for https://github.com/SciML/LinearSolve.jl/issues/890
+# WOperator with init_cacheval overload that unwraps A.J (as OrdinaryDiffEqDifferentiation does)
+using SciMLOperators: WOperator, MatrixOperator
+function LinearSolve.init_cacheval(
+        alg::LinearSolve.DefaultLinearSolver, A::WOperator, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{Bool, LinearSolve.LinearVerbosity},
+        assumptions::LinearSolve.OperatorAssumptions)
+    LinearSolve.init_cacheval(alg, A.J, b, u, Pl, Pr,
+        maxiters, abstol, reltol, verbose, assumptions)
+end
+
+A_w = sparse([-1.0 0.5; 0.3 -1.0])
+J_w = MatrixOperator(A_w)
+M_w = MatrixOperator(sparse([1.0 0.0; 0.0 1.0]))
+W = WOperator{true}(M_w, 1.0, J_w, [1.0, 0.5])
+prob_w = LinearProblem(W, [1.0, 2.0])
+sol_w = solve(prob_w)
+@test sol_w.retcode === ReturnCode.Success

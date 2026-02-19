@@ -498,10 +498,30 @@ end
 """
 cache.cacheval = NamedTuple(LUFactorization = cache of LUFactorization, ...)
 """
-@generated function init_cacheval(
+function init_cacheval(
         alg::DefaultLinearSolver, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assump::OperatorAssumptions
+    )
+    return _init_default_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol,
+        verbose, assump, A)
+end
+
+function init_cacheval(
+        alg::DefaultLinearSolver, A, b, u, Pl, Pr, maxiters::Int,
+        abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assump::OperatorAssumptions,
+        A_original
+    )
+    return _init_default_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol,
+        verbose, assump, A_original)
+end
+
+@generated function _init_default_cacheval(
+        alg::DefaultLinearSolver, A, b, u, Pl, Pr, maxiters::Int,
+        abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assump::OperatorAssumptions,
+        A_original
     )
     caches = map(first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))) do alg
         if alg === :KrylovJL_GMRES || alg === :KrylovJL_CRAIGMR || alg === :KrylovJL_LSMR
@@ -528,8 +548,7 @@ cache.cacheval = NamedTuple(LUFactorization = cache of LUFactorization, ...)
             end
         end
     end
-    # A_backup: initialized to A here, overwritten with prob.A in __init
-    return Expr(:call, :DefaultLinearSolverInit, caches..., :A)
+    return Expr(:call, :DefaultLinearSolverInit, caches..., :A_original)
 end
 
 function defaultalg_symbol(::Type{T}) where {T}

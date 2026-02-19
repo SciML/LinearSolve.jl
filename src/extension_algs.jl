@@ -1,60 +1,133 @@
 # This file only include the algorithm struct to be exported by LinearSolve.jl. The main
 # functionality is implemented as package extensions
-
 """
-`PETScAlgorithm(solver_type = :gmres; kwargs...)`
+    PETScAlgorithm(solver_type = :gmres; kwargs...)
 
-[PETSc.jl](https://github.com/JuliaParallel/PETSc.jl) is a Julia wrapper for the Portable,
-Extensible Toolkit for Scientific Computation (PETSc). This algorithm provides access to
-PETSc's KSP (Krylov Subspace) linear solvers.
+[PETSc.jl](https://github.com/JuliaParallel/PETSc.jl) wrapper providing access to
+PETSc's KSP (Krylov Subspace) linear solvers through the LinearSolve.jl interface.
 
 !!! note
+    Requires Julia ≥ 1.10 with PETSc.jl and MPI.jl loaded: `using PETSc, MPI`
 
-    Using PETSc solvers requires Julia version 1.10 or higher, and that the packages
-    PETSc.jl and MPI.jl are installed: `using PETSc, MPI`
+!!! warning "Memory management"
+    PETSc objects live in C-side memory that Julia's GC does not track.
+    Always call `cleanup_petsc_cache!` when done — it accepts a solution object,
+    a `LinearCache`, or the raw `PETScCache`:
+
+    ```julia
+    sol = solve(prob, PETScAlgorithm(:gmres))
+    cleanup_petsc_cache!(sol)
+    ```
+
+    A GC finalizer is registered as a safety net, but deterministic cleanup is
+    strongly recommended. Access the function via the extension module:
+
+    ```julia
+    PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
+    PETScExt.cleanup_petsc_cache!(sol)
+    ```
+
+!!! warning "MPI cleanup"
+    When using `comm` with multiple ranks, `cleanup_petsc_cache!` is collective:
+    **all ranks** must call it together (PETSc destroy operations are collective).
 
 ## Positional Arguments
 
-The single positional argument `solver_type` specifies the KSP solver type. Common choices:
-
-  - `:gmres` (default): Generalized Minimal Residual method
-  - `:cg`: Conjugate Gradient (for symmetric positive definite systems)
-  - `:bicg`: BiConjugate Gradient
-  - `:bcgs`: BiConjugate Gradient Stabilized
-  - `:preonly`: Apply preconditioner only (no Krylov iteration)
-  - `:richardson`: Richardson iteration
+  - `solver_type::Symbol`: KSP solver type. Common choices: `:gmres` (default),
+    `:cg`, `:bicg`, `:bcgs`, `:preonly`, `:richardson`.
 
 ## Keyword Arguments
 
-  - `pc_type`: Preconditioner type (e.g., `:jacobi`, `:ilu`, `:lu`, `:gamg`, `:hypre`, `:none`)
-  - `ksp_options`: NamedTuple of additional KSP options
+  - `pc_type::Symbol`: Preconditioner (`:jacobi`, `:ilu`, `:lu`, `:gamg`, `:hypre`,
+    `:none`, …). Default `:none`.
+  - `comm`: MPI communicator. Default `nothing` (→ `MPI.COMM_SELF` at solve time,
+    serial). Pass `MPI.COMM_WORLD` for parallel solves — every rank must hold the
+    full Julia matrix; each rank inserts only its owned rows into PETSc.
+  - `nullspace::Symbol`: Null-space handling (`:none`, `:constant`, `:custom`).
+  - `nullspace_vecs`: `Vector{Vector{T}}` of orthonormal null-space basis vectors;
+    required when `nullspace = :custom`.
+  - `prec_matrix`: Separate Julia matrix for building the preconditioner instead of `A`.
+  - `initial_guess_nonzero::Bool`: Start Krylov iteration from `cache.u` instead of
+    zero. Default `false`.
+  - `transposed::Bool`: Solve `Aᵀx = b` via `KSPSolveTranspose`. Default `false`.
+  - `ksp_options::NamedTuple`: Additional PETSc options forwarded to the PETSc
+    Options Database. Key names are automatically converted to PETSc flag format
+    (e.g., `ksp_monitor = ""` becomes `-ksp_monitor`).
 
-## Example
+## Common `ksp_options`
+
+| Option | Description |
+| :--- | :--- |
+| `ksp_monitor = ""` | Print residual norm at each iteration |
+| `ksp_view = ""` | Print solver summary at end of solve |
+| `ksp_rtol = 1e-12` | Relative convergence tolerance |
+| `pc_factor_levels = 2` | Levels of fill for ILU preconditioners |
+| `log_view = ""` | Print PETSc performance logging profile |
+
+## Examples
 
 ```julia
-using PETSc, MPI, SparseArrays
-A = sprand(100, 100, 0.1) + 10I
-b = rand(100)
+using PETSc, MPI, SparseArrays, LinearSolve, LinearAlgebra
+
+MPI.Init()
+n = 100
+A = sprand(n, n, 0.1); A = A + A' + 20I
+b = rand(n)
 prob = LinearProblem(A, b)
-alg = PETScAlgorithm(:gmres; pc_type = :ilu)
-sol = solve(prob, alg)
+PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
+
+# Serial solve with monitoring
+sol = solve(prob, PETScAlgorithm(:gmres; pc_type = :ilu, ksp_options = (ksp_monitor="",)))
+PETScExt.cleanup_petsc_cache!(sol)
+
+# MPI-parallel solve with GAMG
+sol = solve(prob, PETScAlgorithm(:gmres; pc_type = :gamg, comm = MPI.COMM_WORLD))
+PETScExt.cleanup_petsc_cache!(sol)
+MPI.Finalize()
 ```
 """
 struct PETScAlgorithm <: SciMLLinearSolveAlgorithm
-    solver_type::Symbol
-    pc_type::Symbol
-    ksp_options::NamedTuple
+    solver_type           :: Symbol
+    pc_type               :: Symbol
+    comm                  :: Any        # MPI.Comm — stored as Any to avoid MPI dep in LinearSolve
+    nullspace             :: Symbol     # :none | :constant | :custom
+    nullspace_vecs        :: Any        # nothing | Vector{Vector{T}}
+    prec_matrix           :: Any        # nothing | AbstractMatrix
+    initial_guess_nonzero :: Bool
+    transposed            :: Bool
+    ksp_options           :: NamedTuple
+
     function PETScAlgorithm(
-            solver_type::Symbol = :gmres;
-            pc_type::Symbol = :none,
-            ksp_options::NamedTuple = NamedTuple()
+            solver_type           :: Symbol     = :gmres;
+            pc_type               :: Symbol     = :none,
+            comm                                = nothing,   # nothing → MPI.COMM_SELF at solve time
+            nullspace             :: Symbol     = :none,
+            nullspace_vecs                      = nothing,
+            prec_matrix                         = nothing,
+            initial_guess_nonzero :: Bool       = false,
+            transposed            :: Bool       = false,
+            ksp_options           :: NamedTuple = NamedTuple(),
         )
         ext = Base.get_extension(@__MODULE__, :LinearSolvePETScExt)
         if ext === nothing
-            error("PETScAlgorithm requires that PETSc and MPI are loaded, i.e. `using PETSc, MPI`")
-        else
-            return new(solver_type, pc_type, ksp_options)
+            error("PETScAlgorithm requires that PETSc and MPI are loaded, \
+                   i.e. `using PETSc, MPI`")
         end
+        if nullspace ∉ (:none, :constant, :custom)
+            error("nullspace must be :none, :constant, or :custom (got :$nullspace)")
+        end
+        if nullspace == :custom && nullspace_vecs === nothing
+            error("nullspace = :custom requires nullspace_vecs to be provided")
+        end
+        return new(
+            solver_type, pc_type,
+            comm,
+            nullspace, nullspace_vecs,
+            prec_matrix,
+            initial_guess_nonzero,
+            transposed,
+            ksp_options,
+        )
     end
 end
 
@@ -143,9 +216,9 @@ end
 """
 `CUDAOffload32MixedLUFactorization()`
 
-A mixed precision GPU-accelerated LU factorization that converts matrices to Float32 
+A mixed precision GPU-accelerated LU factorization that converts matrices to Float32
 before offloading to CUDA GPU for factorization, then converts back for the solve.
-This can provide speedups when the reduced precision is acceptable and memory 
+This can provide speedups when the reduced precision is acceptable and memory
 bandwidth is a bottleneck.
 
 ## Performance Notes
@@ -262,10 +335,10 @@ end
 """
     RFLUFactorization{P, T}(; pivot = Val(true), thread = Val(true))
 
-A fast pure Julia LU-factorization implementation using RecursiveFactorization.jl. 
-This is by far the fastest LU-factorization implementation, usually outperforming 
-OpenBLAS and MKL for smaller matrices (<500x500), but currently optimized only for 
-Base `Array` with `Float32` or `Float64`. Additional optimization for complex matrices 
+A fast pure Julia LU-factorization implementation using RecursiveFactorization.jl.
+This is by far the fastest LU-factorization implementation, usually outperforming
+OpenBLAS and MKL for smaller matrices (<500x500), but currently optimized only for
+Base `Array` with `Float32` or `Float64`. Additional optimization for complex matrices
 is in the works.
 
 ## Type Parameters
@@ -273,9 +346,9 @@ is in the works.
 - `T`: Threading strategy as `Val{Bool}`. `Val{true}` enables multi-threading for performance.
 
 ## Constructor Arguments
-- `pivot = Val(true)`: Enable partial pivoting. Set to `Val{false}` to disable for speed 
+- `pivot = Val(true)`: Enable partial pivoting. Set to `Val{false}` to disable for speed
   at the cost of numerical stability.
-- `thread = Val(true)`: Enable multi-threading. Set to `Val{false}` for single-threaded 
+- `thread = Val(true)`: Enable multi-threading. Set to `Val{false}` for single-threaded
   execution.
 - `throwerror = true`: Whether to throw an error if RecursiveFactorization.jl is not loaded.
 
@@ -294,7 +367,7 @@ using RecursiveFactorization
 # Fast, stable (with pivoting)
 alg1 = RFLUFactorization()
 # Fastest (no pivoting), less stable
-alg2 = RFLUFactorization(pivot=Val(false))  
+alg2 = RFLUFactorization(pivot=Val(false))
 ```
 """
 struct RFLUFactorization{P, T} <: AbstractDenseFactorization
@@ -316,7 +389,7 @@ end
 
 A fast pure Julia LU-factorization implementation
 using RecursiveFactorization.jl. This method utilizes a butterfly
-factorization approach rather than pivoting. 
+factorization approach rather than pivoting.
 """
 struct ButterflyFactorization{T} <: AbstractDenseFactorization
     thread::Val{T}
@@ -404,7 +477,7 @@ Using this solver requires that FastLapackInterface.jl is loaded: `using FastLap
 ```julia
 using FastLapackInterface
 # QR with column pivoting
-alg1 = FastQRFactorization()  
+alg1 = FastQRFactorization()
 # QR without pivoting for speed
 alg2 = FastQRFactorization(pivot=nothing)
 # Custom block size
@@ -725,8 +798,8 @@ function IterativeSolversJL_MINRES end
 """
     MetalLUFactorization()
 
-A wrapper over Apple's Metal GPU library for LU factorization. Direct calls to Metal 
-in a way that pre-allocates workspace to avoid allocations and automatically offloads 
+A wrapper over Apple's Metal GPU library for LU factorization. Direct calls to Metal
+in a way that pre-allocates workspace to avoid allocations and automatically offloads
 to the GPU. This solver is optimized for Metal-capable Apple Silicon Macs.
 
 ## Requirements
@@ -808,8 +881,8 @@ end
 """
     BLISLUFactorization()
 
-An LU factorization implementation using the BLIS (BLAS-like Library Instantiation Software) 
-framework. BLIS provides high-performance dense linear algebra kernels optimized for various 
+An LU factorization implementation using the BLIS (BLAS-like Library Instantiation Software)
+framework. BLIS provides high-performance dense linear algebra kernels optimized for various
 CPU architectures.
 
 ## Requirements
@@ -842,7 +915,7 @@ end
 `CUSOLVERRFFactorization(; symbolic = :RF, reuse_symbolic = true)`
 
 A GPU-accelerated sparse LU factorization using NVIDIA's cusolverRF library.
-This solver is specifically designed for sparse matrices on CUDA GPUs and 
+This solver is specifically designed for sparse matrices on CUDA GPUs and
 provides high-performance factorization and solve capabilities.
 
 ## Keyword Arguments
@@ -850,11 +923,11 @@ provides high-performance factorization and solve capabilities.
   - `symbolic`: The symbolic factorization method to use. Options are:
     - `:RF` (default): Use cusolverRF's built-in symbolic analysis
     - `:KLU`: Use KLU for symbolic analysis
-  - `reuse_symbolic`: Whether to reuse the symbolic factorization when the 
+  - `reuse_symbolic`: Whether to reuse the symbolic factorization when the
     sparsity pattern doesn't change (default: `true`)
 
 !!! note
-    This solver requires CUSOLVERRF.jl to be loaded and only supports 
+    This solver requires CUSOLVERRF.jl to be loaded and only supports
     `Float64` element types with `Int32` indices.
 """
 struct CUSOLVERRFFactorization <: AbstractSparseFactorization
@@ -946,7 +1019,7 @@ struct OpenBLAS32MixedLUFactorization <: AbstractDenseFactorization end
 """
     RF32MixedLUFactorization{P, T}(; pivot = Val(true), thread = Val(true))
 
-A mixed precision LU factorization using RecursiveFactorization.jl that performs 
+A mixed precision LU factorization using RecursiveFactorization.jl that performs
 factorization in Float32 precision while maintaining Float64 interface. This combines
 the speed benefits of RecursiveFactorization.jl with reduced precision computation
 for additional performance gains.
@@ -956,9 +1029,9 @@ for additional performance gains.
 - `T`: Threading strategy as `Val{Bool}`. `Val{true}` enables multi-threading for performance.
 
 ## Constructor Arguments
-- `pivot = Val(true)`: Enable partial pivoting. Set to `Val{false}` to disable for speed 
+- `pivot = Val(true)`: Enable partial pivoting. Set to `Val{false}` to disable for speed
   at the cost of numerical stability.
-- `thread = Val(true)`: Enable multi-threading. Set to `Val{false}` for single-threaded 
+- `thread = Val(true)`: Enable multi-threading. Set to `Val{false}` for single-threaded
   execution.
 
 ## Performance Notes

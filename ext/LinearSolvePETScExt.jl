@@ -2,182 +2,249 @@ module LinearSolvePETScExt
 
 using LinearAlgebra
 using PETSc
-using PETSc: MPI
-using PETSc: petsclibs
-using SparseArrays: SparseMatrixCSC, sparse
-using LinearSolve: PETScAlgorithm, LinearCache, LinearProblem, LinearSolve,
-    OperatorAssumptions, default_tol, init_cacheval, __issquare,
-    __conditioning, LinearSolveAdjoint, LinearVerbosity
-using SciMLLogging: SciMLLogging, verbosity_to_int, @SciMLMessage
-using SciMLBase: LinearProblem, LinearAliasSpecifier, SciMLBase
-using Setfield: @set!
+using PETSc: MPI, LibPETSc
+using SparseArrays: SparseMatrixCSC, nzrange, sparse
+using LinearSolve: PETScAlgorithm, LinearCache, LinearSolve, OperatorAssumptions,
+                    init_cacheval, LinearVerbosity
+using SciMLBase: LinearSolution, build_linear_solution, ReturnCode, SciMLBase
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+resolve_comm(alg::PETScAlgorithm) = alg.comm === nothing ? MPI.COMM_SELF : alg.comm
+is_parallel(comm) = MPI.Comm_size(comm) > 1
+get_petsclib(::Type{T}=Float64) where T = PETSc.getlib(; PetscScalar=T)
+
+# ── Cache ─────────────────────────────────────────────────────────────────────
 
 mutable struct PETScCache
-    ksp::Any  # PETSc KSP object or nothing
+    ksp::Any
     petsclib::Any
-    A::Any    # PETSc Mat or nothing
-    b::Any    # PETSc Vec or nothing
-    u::Any    # PETSc Vec or nothing
+    comm::Any
+    petsc_A::Any
+    petsc_P::Any
+    nullspace_obj::Any
+    petsc_x::Any
+    petsc_b::Any
+    vec_n::Int
+    rstart::Int
+    rend::Int
+    sparsity_hash::UInt
     initialized::Bool
 end
 
-function LinearSolve.init_cacheval(
-        alg::PETScAlgorithm, A, b, u, Pl, Pr, maxiters::Int,
-        abstol, reltol,
-        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
-    )
-    return PETScCache(nothing, nothing, nothing, nothing, nothing, false)
+function _nullify_all!(pcache::PETScCache)
+    pcache.ksp = pcache.petsc_A = pcache.petsc_P = pcache.nullspace_obj = nothing
+    pcache.petsc_x = pcache.petsc_b = nothing
+    pcache.vec_n = pcache.rstart = pcache.rend = 0
+    pcache.sparsity_hash = UInt(0)
 end
 
-# Helper function to get or initialize the PETSc library
-function get_petsclib(T::Type = Float64)
-    # Find a petsclib that matches our scalar type
-    for lib in PETSc.petsclibs
-        if PETSc.scalartype(lib) === T
-            return lib
-        end
+function cleanup_petsc_cache!(pcache::PETScCache)
+    if pcache.petsclib === nothing || (pcache.initialized && !PETSc.initialized(pcache.petsclib))
+        _nullify_all!(pcache); return nothing
     end
-    # Fallback to first available
-    return first(PETSc.petsclibs)
+    try
+        pcache.petsc_x !== nothing && PETSc.destroy(pcache.petsc_x)
+        pcache.petsc_b !== nothing && PETSc.destroy(pcache.petsc_b)
+        pcache.nullspace_obj !== nothing &&
+            LibPETSc.MatNullSpaceDestroy(pcache.petsclib, pcache.nullspace_obj)
+        pcache.petsc_P !== nothing && pcache.petsc_P !== pcache.petsc_A &&
+            PETSc.destroy(pcache.petsc_P)
+        pcache.petsc_A !== nothing && PETSc.destroy(pcache.petsc_A)
+        pcache.ksp !== nothing && PETSc.destroy(pcache.ksp)
+    catch
+    end
+    _nullify_all!(pcache)
 end
 
-# Convert Julia sparse matrix to PETSc matrix
-function to_petsc_mat(petsclib, A::SparseMatrixCSC{T}) where {T}
-    return PETSc.MatCreateSeqAIJ(petsclib, MPI.COMM_SELF, A)
+cleanup_petsc_cache!(cache::LinearCache) = cleanup_petsc_cache!(cache.cacheval)
+cleanup_petsc_cache!(sol::LinearSolution) = cleanup_petsc_cache!(sol.cache.cacheval)
+
+# ── Cache init ────────────────────────────────────────────────────────────────
+
+function LinearSolve.init_cacheval(alg::PETScAlgorithm, A, b, u, Pl, Pr, maxiters::Int,
+                                   abstol, reltol, verbose::Union{LinearVerbosity,Bool},
+                                   assumptions::OperatorAssumptions)
+    pcache = PETScCache(nothing, nothing, nothing, nothing, nothing, nothing,
+                        nothing, nothing, 0, 0, 0, UInt(0), false)
+    finalizer(cleanup_petsc_cache!, pcache)
+    return pcache
 end
 
-# Convert Julia dense matrix to PETSc matrix
-function to_petsc_mat(petsclib, A::AbstractMatrix{T}) where {T}
-    return PETSc.MatSeqDense(petsclib, Matrix{T}(A))
+sparsity_fingerprint(A::SparseMatrixCSC) = hash(A.rowval, hash(A.colptr, hash(size(A))))
+sparsity_fingerprint(::AbstractMatrix) = UInt(0)
+
+# ── Matrix / Vector Helpers ───────────────────────────────────────────────────
+
+function to_petsc_mat_seq(petsclib, A)
+    if A isa SparseMatrixCSC
+        return PETSc.MatSeqAIJWithArrays(petsclib, MPI.COMM_SELF, A)
+    else
+        return PETSc.MatSeqDense(petsclib, A)
+    end
 end
 
-# Convert Julia vector to PETSc vector
-function to_petsc_vec(petsclib, v::AbstractVector{T}) where {T}
-    return PETSc.VecSeq(petsclib, MPI.COMM_SELF, Vector{T}(v))
+function to_petsc_mat_mpi(petsclib, A, comm)
+    A = sparse(A)
+    M, N = size(A)
+    PA = LibPETSc.MatCreate(petsclib, comm)
+    LibPETSc.MatSetSizes(petsclib, PA, petsclib.PetscInt(-1), petsclib.PetscInt(-1), petsclib.PetscInt(M), petsclib.PetscInt(N))
+    LibPETSc.MatSetFromOptions(petsclib, PA)
+    LibPETSc.MatSetUp(petsclib, PA)
+
+    rstart, rend = Int.(LibPETSc.MatGetOwnershipRange(petsclib, PA))
+    @inbounds for col in 1:N, idx in nzrange(A, col)
+        row = A.rowval[idx]
+        (row-1) in rstart:rend-1 && (PA[row,col] = A.nzval[idx])
+    end
+    PETSc.assemble!(PA)
+    return PA, rstart, rend
 end
 
-# Symbol to PETSc KSP type string
-function ksp_type_string(solver_type::Symbol)
-    ksp_types = Dict(
-        :gmres => "gmres",
-        :cg => "cg",
-        :bicg => "bicg",
-        :bcgs => "bcgs",
-        :bcgsl => "bcgsl",
-        :cgs => "cgs",
-        :tfqmr => "tfqmr",
-        :cr => "cr",
-        :gcr => "gcr",
-        :preonly => "preonly",
-        :richardson => "richardson",
-        :chebyshev => "chebyshev",
-        :minres => "minres",
-        :symmlq => "symmlq",
-        :lgmres => "lgmres",
-        :fgmres => "fgmres",
-    )
-    return get(ksp_types, solver_type, string(solver_type))
+to_petsc_mat(petsclib, A, comm) = is_parallel(comm) ? to_petsc_mat_mpi(petsclib, A, comm) : (to_petsc_mat_seq(petsclib, A), 0, size(A,1))
+
+# ── Distributed Vector Creation ──────────────────────────────────────────────
+
+function create_distributed_vec(petsclib, v::AbstractVector, rstart, rend, comm)
+    local_n = rend - rstart
+    pv = LibPETSc.VecCreateMPI(petsclib, comm, petsclib.PetscInt(local_n), petsclib.PetscInt(length(v)))
+    ptr = LibPETSc.VecGetArray(petsclib, pv)
+    @inbounds for i in 1:local_n
+        ptr[i] = v[rstart+i]
+    end
+    LibPETSc.VecRestoreArray(petsclib, pv, ptr)
+    LibPETSc.VecAssemblyBegin(petsclib, pv)
+    LibPETSc.VecAssemblyEnd(petsclib, pv)
+    return pv
 end
 
-# Symbol to PETSc PC type string
-function pc_type_string(pc_type::Symbol)
-    pc_types = Dict(
-        :none => "none",
-        :jacobi => "jacobi",
-        :sor => "sor",
-        :lu => "lu",
-        :ilu => "ilu",
-        :icc => "icc",
-        :cholesky => "cholesky",
-        :gamg => "gamg",
-        :hypre => "hypre",
-        :bjacobi => "bjacobi",
-        :asm => "asm",
-        :mg => "mg",
-    )
-    return get(pc_types, pc_type, string(pc_type))
+function ensure_distributed_vecs!(pcache, petsclib, n, u, b, rstart, rend, comm)
+    if pcache.vec_n != n || pcache.petsc_x === nothing || pcache.petsc_b === nothing
+        pcache.petsc_x !== nothing && PETSc.destroy(pcache.petsc_x)
+        pcache.petsc_b !== nothing && PETSc.destroy(pcache.petsc_b)
+        pcache.petsc_x = create_distributed_vec(petsclib, u, rstart, rend, comm)
+        pcache.petsc_b = create_distributed_vec(petsclib, b, rstart, rend, comm)
+        pcache.vec_n = n
+    end
+    return pcache.petsc_x, pcache.petsc_b
 end
+
+function copy_into_vec!(petsc_v, src::AbstractVector, petsclib, rstart, rend)
+    local_n = rend - rstart
+    ptr = LibPETSc.VecGetArray(petsclib, petsc_v)
+    @inbounds for i in 1:local_n
+        ptr[i] = src[rstart+i]
+    end
+    LibPETSc.VecRestoreArray(petsclib, petsc_v, ptr)
+    LibPETSc.VecAssemblyBegin(petsclib, petsc_v)
+    LibPETSc.VecAssemblyEnd(petsclib, petsc_v)
+end
+
+# ── Solution Gathering ───────────────────────────────────────────────────────
+
+function gather_solution!(dst::AbstractVector, petsc_v, pcache; gather_all::Bool=false)
+    rstart, rend = pcache.rstart, pcache.rend
+    local_n = rend - rstart
+    ptr = LibPETSc.VecGetArrayRead(pcache.petsclib, petsc_v)
+    @inbounds for i in 1:local_n
+        dst[rstart+i] = ptr[i]
+    end
+    LibPETSc.VecRestoreArrayRead(pcache.petsclib, petsc_v, ptr)
+
+    # Only gather full vector if explicitly requested
+    if gather_all && is_parallel(pcache.comm)
+        counts = MPI.Allgather(local_n, pcache.comm)
+        displs = cumsum([0; counts[1:end-1]])
+        recvbuf = MPI.VBuffer(dst, Int32.(counts), Int32.(displs))
+        MPI.Allgatherv!(dst[rstart+1:rend], recvbuf, pcache.comm)
+    end
+end
+
+# ── Null-space ────────────────────────────────────────────────────────────────
+
+function build_nullspace(petsclib, alg::PETScAlgorithm, comm)
+    alg.nullspace === :none && return nothing
+
+    if alg.nullspace === :constant
+        return LibPETSc.MatNullSpaceCreate(petsclib, comm,
+                   LibPETSc.PetscBool(true), 0, LibPETSc.PetscVec[])
+    else  # :custom
+        PScalar = petsclib.PetscScalar
+        petsc_vecs = LibPETSc.PetscVec[
+            create_distributed_vec(petsclib, PScalar.(v), 0, length(v), comm) for v in alg.nullspace_vecs
+        ]
+        ns = LibPETSc.MatNullSpaceCreate(petsclib, comm,
+                 LibPETSc.PetscBool(false), length(petsc_vecs), petsc_vecs)
+        foreach(PETSc.destroy, petsc_vecs)
+        return ns
+    end
+end
+
+function attach_nullspace!(petsclib, ksp, petsc_A, ns)
+    ns === nothing && return
+    LibPETSc.MatSetNullSpace(petsclib, petsc_A, ns)
+end
+
+# ── Solve ─────────────────────────────────────────────────────────────────────
 
 function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm, args...; kwargs...)
     pcache = cache.cacheval
+    comm = resolve_comm(alg)
+    petsclib = pcache.petsclib === nothing ? get_petsclib(eltype(cache.A)) : pcache.petsclib
+    PETSc.initialized(petsclib) || PETSc.initialize(petsclib)
+    pcache.petsclib = petsclib
+    pcache.comm = comm
+    pcache.initialized = true
 
-    # Get element type from the problem
-    T = eltype(cache.A)
+    # ── Build / reuse KSP & Matrices ─────────────────────────────────────────
+    rebuild_ksp = pcache.ksp === nothing || cache.isfresh
+    if rebuild_ksp
+        pcache.petsc_A, pcache.rstart, pcache.rend = to_petsc_mat(petsclib, cache.A, comm)
+        pcache.sparsity_hash = sparsity_fingerprint(cache.A)
+        pcache.petsc_P = alg.prec_matrix === nothing ? pcache.petsc_A :
+                         to_petsc_mat(petsclib, alg.prec_matrix, comm)[1]
 
-    # Initialize PETSc if needed
-    if !pcache.initialized
-        petsclib = get_petsclib(T)
-        if !PETSc.initialized(petsclib)
-            PETSc.initialize(petsclib)
-        end
-        pcache.petsclib = petsclib
-        pcache.initialized = true
-    end
+        pcache.ksp = PETSc.KSP(pcache.petsc_A, pcache.petsc_P;
+                               ksp_type = string(alg.solver_type),
+                               pc_type  = string(alg.pc_type),
+                               ksp_rtol = cache.reltol,
+                               ksp_atol = cache.abstol,
+                               ksp_max_it = cache.maxiters,
+                               alg.ksp_options...)
 
-    petsclib = pcache.petsclib
-
-    # Convert matrix if needed
-    if pcache.A === nothing || cache.isfresh
-        pcache.A = to_petsc_mat(petsclib, cache.A)
-    end
-
-    # Convert vectors
-    pcache.b = to_petsc_vec(petsclib, cache.b)
-    pcache.u = to_petsc_vec(petsclib, copy(cache.u))
-
-    # Create KSP solver if needed
-    if pcache.ksp === nothing
-        ksp = PETSc.KSP(petsclib, pcache.A; ksp_rtol = cache.reltol, ksp_atol = cache.abstol)
-
-        # Set KSP type
-        ksp_type = ksp_type_string(alg.solver_type)
-        PETSc.settype!(ksp, ksp_type)
-
-        # Set PC type
-        if alg.pc_type !== :none
-            pc = PETSc.PC(ksp)
-            pc_type = pc_type_string(alg.pc_type)
-            PETSc.settype!(pc, pc_type)
+        if alg.initial_guess_nonzero
+            LibPETSc.KSPSetInitialGuessNonzero(petsclib, pcache.ksp, LibPETSc.PetscBool(true))
         end
 
-        # Set max iterations
-        PETSc.settolerances!(ksp; maxits = cache.maxiters)
-
-        PETSc.setfromoptions!(ksp)
-        pcache.ksp = ksp
-    else
-        # Update operators if matrix changed
-        if cache.isfresh
-            PETSc.setoperators!(pcache.ksp, pcache.A, pcache.A)
-        end
+        pcache.nullspace_obj = alg.nullspace !== :none ? build_nullspace(petsclib, alg, comm) : nothing
+        attach_nullspace!(petsclib, pcache.ksp, pcache.petsc_A, pcache.nullspace_obj)
     end
 
     cache.isfresh = false
 
-    # Solve
-    PETSc.solve!(pcache.u, pcache.ksp, pcache.b)
+    # ── Build / reuse distributed PETSc vectors ──────────────────────────────
+    petsc_x, petsc_b = ensure_distributed_vecs!(pcache, petsclib, length(cache.b), cache.u, cache.b,
+                                                 pcache.rstart, pcache.rend, comm)
+    copy_into_vec!(petsc_x, cache.u, petsclib, pcache.rstart, pcache.rend)
+    copy_into_vec!(petsc_b, cache.b, petsclib, pcache.rstart, pcache.rend)
 
-    # Copy solution back to Julia vector using withlocalarray!
-    PETSc.withlocalarray!(pcache.u; read = true, write = false) do u_arr
-        copyto!(cache.u, u_arr)
-    end
-
-    # Get convergence info
-    iters = PETSc.getiterationnumber(pcache.ksp)
-    reason = PETSc.getconvergedreason(pcache.ksp)
-    resid = PETSc.getresidualnorm(pcache.ksp)
-
-    # Determine return code
-    retcode = if reason > 0
-        SciMLBase.ReturnCode.Success
-    elseif reason == 0
-        SciMLBase.ReturnCode.Default
+    # ── Solve ───────────────────────────────────────────────────────────────
+    if alg.transposed
+        LibPETSc.KSPSolveTranspose(petsclib, pcache.ksp, petsc_b, petsc_x)
     else
-        SciMLBase.ReturnCode.Failure
+        LibPETSc.KSPSolve(petsclib, pcache.ksp, petsc_b, petsc_x)
     end
 
-    stats = nothing
-    return SciMLBase.build_linear_solution(alg, cache.u, resid, cache; retcode, iters, stats)
+    # ── Gather only local solution (distributed by default) ────────────────
+    gather_solution!(cache.u, petsc_x, pcache; gather_all=false)
+
+    # ── Return metadata ─────────────────────────────────────────────────────
+    iters  = Int(LibPETSc.KSPGetIterationNumber(petsclib, pcache.ksp))
+    reason = Int(LibPETSc.KSPGetConvergedReason(petsclib, pcache.ksp))
+    resid  = Float64(LibPETSc.KSPGetResidualNorm(petsclib, pcache.ksp))
+    retcode = reason > 0 ? ReturnCode.Success : reason == 0 ? ReturnCode.Default : ReturnCode.Failure
+
+    return build_linear_solution(alg, cache.u, resid, cache; retcode, iters)
 end
 
-end # module LinearSolvePETScExt
+end

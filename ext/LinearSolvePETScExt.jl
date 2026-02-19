@@ -162,20 +162,26 @@ end
 
 # ── Null-space ────────────────────────────────────────────────────────────────
 
-function build_nullspace(petsclib, alg::PETScAlgorithm, comm)
+function build_nullspace(petsclib, alg::PETScAlgorithm, comm, rstart, rend)
     alg.nullspace === :none && return nothing
 
     if alg.nullspace === :constant
+        # Constant nullspace is handled internally by PETSc
         return LibPETSc.MatNullSpaceCreate(petsclib, comm,
                    LibPETSc.PetscBool(true), 0, LibPETSc.PetscVec[])
     else  # :custom
         PScalar = petsclib.PetscScalar
+        # IMPORTANT: Nullspace vectors must have the same distribution as the matrix
         petsc_vecs = LibPETSc.PetscVec[
-            create_distributed_vec(petsclib, PScalar.(v), 0, length(v), comm) for v in alg.nullspace_vecs
+            create_distributed_vec(petsclib, PScalar.(v), rstart, rend, comm) for v in alg.nullspace_vecs
         ]
         ns = LibPETSc.MatNullSpaceCreate(petsclib, comm,
                  LibPETSc.PetscBool(false), length(petsc_vecs), petsc_vecs)
-        foreach(PETSc.destroy, petsc_vecs)
+        
+        # PETSc increments reference count in MatNullSpaceCreate, so we can cleanup local handles
+        for v in petsc_vecs
+            LibPETSc.VecDestroy(petsclib, Ref(v))
+        end
         return ns
     end
 end
@@ -216,8 +222,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm, args...; kwar
             LibPETSc.KSPSetInitialGuessNonzero(petsclib, pcache.ksp, LibPETSc.PetscBool(true))
         end
 
-        pcache.nullspace_obj = alg.nullspace !== :none ? build_nullspace(petsclib, alg, comm) : nothing
-        attach_nullspace!(petsclib, pcache.ksp, pcache.petsc_A, pcache.nullspace_obj)
+        pcache.nullspace_obj = alg.nullspace !== :none ? build_nullspace(petsclib, alg, comm, pcache.rstart, pcache.rend) : nothing
     end
 
     cache.isfresh = false

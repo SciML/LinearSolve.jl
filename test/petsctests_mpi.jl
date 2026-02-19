@@ -111,7 +111,7 @@ end
     sol1 = solve!(cache)
 
     # Gather solution on all ranks
-    PETScExt.gather_solution!(sol1.u, cache.cacheval.petsc_x, cache.cacheval)
+    PETScExt.gather_solution!(sol1.u, cache.cacheval.petsc_x, cache.cacheval; gather_all=true)
 
     if MPI.Comm_rank(MPI.COMM_WORLD) == 0
         @test norm(A * sol1.u - b1) / norm(b1) < 1e-6
@@ -123,7 +123,7 @@ end
                    cache.cacheval.rstart, cache.cacheval.rend)
 
     sol2 = solve!(cache)
-    PETScExt.gather_solution!(sol2.u, cache.cacheval.petsc_x, cache.cacheval)
+    PETScExt.gather_solution!(sol2.u, cache.cacheval.petsc_x, cache.cacheval; gather_all=true)
 
     if MPI.Comm_rank(MPI.COMM_WORLD) == 0
         @test norm(A * sol2.u - b2) / norm(b2) < 1e-6
@@ -131,80 +131,90 @@ end
 
     PETScExt.cleanup_petsc_cache!(cache)
 end
-# @testset "MPI (comm_size=$comm_size): Transposed Solve" begin
-#     n = 100
-#     A = sprand(n, n, 0.1) + 5I; b = rand(n)
-#     alg = PETScAlgorithm(:gmres; transposed = true, comm = MPI.COMM_WORLD)
-#     sol = solve(LinearProblem(A, b), alg; abstol = 1e-10, reltol = 1e-10)
 
-#     @test norm(A' * sol.u - b) / norm(b) < 1e-6
-#     PETScExt.cleanup_petsc_cache!(sol)
-# end
+@testset "MPI (comm_size=$comm_size): Transposed Solve" begin
+    n = 100
+    A = sprand(n, n, 0.1) + 5I; b = rand(n)
+    alg = PETScAlgorithm(:gmres; transposed = true, comm = MPI.COMM_WORLD)
+    sol = solve(LinearProblem(A, b), alg; abstol = 1e-10, reltol = 1e-10)
+    PETScExt.gather_solution!(sol.u, sol.cache.cacheval.petsc_x, sol.cache.cacheval; gather_all=true)
 
-# @testset "MPI (comm_size=$comm_size): Nullspace Constant" begin
-#     n = 100
-#     D = sparse(1:n, 1:n, 2.0, n, n)
-#     D -= sparse(1:n-1, 2:n, 1.0, n, n)
-#     D -= sparse(2:n, 1:n-1, 1.0, n, n)
-#     D[1,1] = 1.0; D[end,end] = 1.0
-#     b = rand(n); b .-= sum(b)/n
+    if MPI.Comm_rank(MPI.COMM_WORLD) == 0
+        @test norm(A' * sol.u - b) / norm(b) < 1e-6
+    end
 
-#     alg = PETScAlgorithm(:cg; pc_type = :jacobi, nullspace = :constant,
-#                           comm = MPI.COMM_WORLD)
-#     sol = solve(LinearProblem(D, b), alg; abstol = 1e-10)
-#     @test sol.retcode == SciMLBase.ReturnCode.Success
-#     @test norm(D * sol.u - b) / norm(b) < 1e-6
-#     PETScExt.cleanup_petsc_cache!(sol)
-# end
+    PETScExt.cleanup_petsc_cache!(sol)
+end
 
-# @testset "MPI (comm_size=$comm_size): Warm Start" begin
-#     n = 200
-#     A = sprand(n, n, 0.02) + 10I; A = A'A; b = rand(n)
-#     prob = LinearProblem(A, b)
+@testset "MPI (comm_size=$comm_size): Nullspace Constant" begin
+    n = 100
+    D = sparse(1:n, 1:n, 2.0, n, n)
+    D -= sparse(1:n-1, 2:n, 1.0, n, n)
+    D -= sparse(2:n, 1:n-1, 1.0, n, n)
+    D[1,1] = 1.0; D[end,end] = 1.0
+    b = rand(n); b .-= sum(b)/n
 
-#     # Cold start baseline
-#     sol_cold = solve(prob,
-#         PETScAlgorithm(:cg; initial_guess_nonzero = false, comm = MPI.COMM_WORLD);
-#         reltol = 1e-12)
-#     iters_cold = sol_cold.iters
-#     PETScExt.cleanup_petsc_cache!(sol_cold)
+    alg = PETScAlgorithm(:cg; pc_type = :jacobi, nullspace = :constant,
+                          comm = MPI.COMM_WORLD)
+    sol = solve(LinearProblem(D, b), alg; abstol = 1e-10)
+    @test sol.retcode == SciMLBase.ReturnCode.Success
 
-#     # Warm start
-#     alg_warm = PETScAlgorithm(:cg; initial_guess_nonzero = true, comm = MPI.COMM_WORLD)
-#     cache_warm = SciMLBase.init(prob, alg_warm; reltol = 1e-12)
-#     solve!(cache_warm)
+    PETScExt.gather_solution!(sol.u, sol.cache.cacheval.petsc_x, sol.cache.cacheval; gather_all=true)
 
-#     cache_warm.b = b + rand(n) * 0.01
-#     sol_warm = solve!(cache_warm)
+    if MPI.Comm_rank(MPI.COMM_WORLD) == 0
+        @test norm(D * sol.u - b) / norm(b) < 1e-6
+    end
+    PETScExt.cleanup_petsc_cache!(sol)
+end
 
-#     @test sol_warm.iters < iters_cold
-#     PETScExt.cleanup_petsc_cache!(cache_warm)
-# end
+@testset "MPI (comm_size=$comm_size): Warm Start" begin
+    n = 200
+    A = sprand(n, n, 0.02) + 10I; A = A'A; b = rand(n)
+    prob = LinearProblem(A, b)
 
-# @testset "MPI (comm_size=$comm_size): Cleanup" begin
-#     n = 50
-#     A = sprand(n, n, 0.1) + 10I; A = A'A; b = rand(n)
-#     alg = PETScAlgorithm(:gmres; pc_type = :jacobi, comm = MPI.COMM_WORLD)
+    # Cold start baseline
+    sol_cold = solve(prob,
+        PETScAlgorithm(:cg; initial_guess_nonzero = false, comm = MPI.COMM_WORLD);
+        reltol = 1e-12)
+    iters_cold = sol_cold.iters
+    PETScExt.cleanup_petsc_cache!(sol_cold)
 
-#     sol = solve(LinearProblem(A, b), alg)
-#     pcache = sol.cache.cacheval
-#     @test pcache.ksp !== nothing
-#     @test pcache.comm !== nothing
+    # Warm start
+    alg_warm = PETScAlgorithm(:cg; initial_guess_nonzero = true, comm = MPI.COMM_WORLD)
+    cache_warm = SciMLBase.init(prob, alg_warm; reltol = 1e-12)
+    solve!(cache_warm)
 
-#     PETScExt.cleanup_petsc_cache!(sol)
-#     @test pcache.ksp === nothing
-#     @test pcache.petsc_A === nothing
+    cache_warm.b = b + rand(n) * 0.01
+    sol_warm = solve!(cache_warm)
 
-#     # Idempotent
-#     PETScExt.cleanup_petsc_cache!(sol)
-#     @test pcache.ksp === nothing
-# end
+    @test sol_warm.iters < iters_cold
+    PETScExt.cleanup_petsc_cache!(cache_warm)
+end
 
-# @testset "MPI (comm_size=$comm_size): Serial fallback (comm=nothing)" begin
-#     # Verify that comm=nothing still works identically to the old serial code
-#     n = 50
-#     A = sprand(n, n, 0.1) + 10I; A = A'A; b = rand(n)
-#     sol = solve(LinearProblem(A, b), PETScAlgorithm(:gmres); abstol = 1e-10)
-#     @test norm(A * sol.u - b) / norm(b) < 1e-6
-#     PETScExt.cleanup_petsc_cache!(sol)
-# end
+@testset "MPI (comm_size=$comm_size): Cleanup" begin
+    n = 50
+    A = sprand(n, n, 0.1) + 10I; A = A'A; b = rand(n)
+    alg = PETScAlgorithm(:gmres; pc_type = :jacobi, comm = MPI.COMM_WORLD)
+
+    sol = solve(LinearProblem(A, b), alg)
+    pcache = sol.cache.cacheval
+    @test pcache.ksp !== nothing
+    @test pcache.comm !== nothing
+
+    PETScExt.cleanup_petsc_cache!(sol)
+    @test pcache.ksp === nothing
+    @test pcache.petsc_A === nothing
+
+    # Idempotent
+    PETScExt.cleanup_petsc_cache!(sol)
+    @test pcache.ksp === nothing
+end
+
+@testset "MPI (comm_size=$comm_size): Serial fallback (comm=nothing)" begin
+    # Verify that comm=nothing still works identically to the old serial code
+    n = 50
+    A = sprand(n, n, 0.1) + 10I; A = A'A; b = rand(n)
+    sol = solve(LinearProblem(A, b), PETScAlgorithm(:gmres); abstol = 1e-10)
+    @test norm(A * sol.u - b) / norm(b) < 1e-6
+    PETScExt.cleanup_petsc_cache!(sol)
+end

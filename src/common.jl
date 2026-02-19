@@ -383,15 +383,19 @@ function __init(
         # TODO: deprecate once all docs are updated to the new form
         #@warn "passing Preconditioners at `init`/`solve` time is deprecated. Instead add a `precs` function to your algorithm."
     end
-    cacheval = init_cacheval(
-        alg, A, b, u0_, Pl, Pr, maxiters, abstol, reltol, init_cache_verb,
-        assumptions
-    )
-    # For DefaultLinearSolver, store reference to original prob.A for safety fallback.
-    # When alias_A=false (default), cache.A is a copy and prob.A is untouched,
-    # so prob.A serves as a zero-cost backup for restoring cache.A after in-place LU.
-    if cacheval isa DefaultLinearSolverInit
-        cacheval.A_backup = prob.A
+    # For DefaultLinearSolver, pass original prob.A so the A_backup field gets the
+    # correct type at construction time (prob.A may be e.g. WOperator while the
+    # converted A used for sub-caches may be a different concrete type).
+    cacheval = if alg isa DefaultLinearSolver
+        init_cacheval(
+            alg, A, b, u0_, Pl, Pr, maxiters, abstol, reltol, init_cache_verb,
+            assumptions, prob.A
+        )
+    else
+        init_cacheval(
+            alg, A, b, u0_, Pl, Pr, maxiters, abstol, reltol, init_cache_verb,
+            assumptions
+        )
     end
     isfresh = true
     precsisfresh = false

@@ -51,6 +51,7 @@ Pardiso = "46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2"
 RecursiveFactorization = "f2c3362d-daeb-58d1-803e-2bc74f2840b4"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Sparspak = "e56a9233-b9d6-4f03-8d0f-1825330902ac"
+Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 blis_jll = "6136c539-28a5-5bf0-87cc-b183200dce32"
 
 [extensions]
@@ -77,6 +78,7 @@ LinearSolvePardisoExt = ["Pardiso", "SparseArrays"]
 LinearSolveRecursiveFactorizationExt = "RecursiveFactorization"
 LinearSolveSparseArraysExt = "SparseArrays"
 LinearSolveSparspakExt = ["SparseArrays", "Sparspak"]
+LinearSolveZygoteExt = "Zygote"
 
 [compat]
 AMDGPU = "1.2, 2"

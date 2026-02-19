@@ -101,20 +101,10 @@ function CRC.rrule(
     return sol, ∇linear_solve
 end
 
-function CRC.rrule(::typeof(Base.getindex), sol::SciMLBase.LinearSolution, sym)
-    if SciMLBase.symbolic_type(sym) != SciMLBase.NotSymbolic()
-        i = SciMLBase.variable_index(sol, sym)
-    else
-        i = sym
-    end
-
+function CRC.rrule(::typeof(Base.getindex), sol::SciMLBase.LinearSolution, i::Integer)
     function LinearSolution_getindex_pullback(Δ)
         du = zero(sol.u)
-        if i isa Integer
-            du[i] = Δ
-        else
-            du[i] = Δ
-        end
+        du[i] = Δ
         Δsol = SciMLBase.build_linear_solution(sol.cache.alg, du, sol.resid, sol.cache)
         return NoTangent(), Δsol, NoTangent()
     end

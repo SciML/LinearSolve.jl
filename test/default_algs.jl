@@ -191,3 +191,45 @@ sol = solve(
 
 sol = solve(prob)
 @test sol.u ≈ svd(A) \ b
+
+# Test that QR fallback restores cache.A from prob.A after in-place LU corruption
+# (Regression test for https://github.com/SciML/LinearSolve.jl/issues/887)
+# In-place LU (MKL, AppleAccelerate, Generic, RF) corrupts cache.A via getrf!.
+# The fallback must restore cache.A from the backup before running QR.
+# Use a non-trivial singular matrix (not already in LU-factored form) so that
+# in-place LU actually changes cache.A.
+A_singular = Float64[
+    0.48 0.77 0.35 0.12
+    0.91 0.24 0.68 0.55
+    0.63 0.42 0.19 0.87
+    0.0 0.0 0.0 0.0
+]
+b_singular = Float64[0.31, 0.72, 0.56, 0.14]
+
+sol_qr = solve(
+    LinearProblem(copy(A_singular), copy(b_singular)), QRFactorization(ColumnNorm())
+)
+
+# Test through GenericLUFactorization explicitly (in-place via generic_lufact!)
+sol_generic = solve(
+    LinearProblem(copy(A_singular), copy(b_singular)),
+    LinearSolve.DefaultLinearSolver(
+        LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
+    )
+)
+@test sol_generic.retcode === ReturnCode.Success
+@test sol_generic.u ≈ sol_qr.u
+
+# Test through default solver (selects GenericLUFactorization for size ≤ 10)
+prob_singular = LinearProblem(copy(A_singular), copy(b_singular))
+sol_default = solve(prob_singular)
+@test sol_default.retcode === ReturnCode.Success
+@test sol_default.u ≈ sol_qr.u
+
+# Verify prob.A is not modified (serves as zero-cost backup)
+prob_backup = LinearProblem(copy(A_singular), copy(b_singular))
+cache_backup = init(prob_backup)
+@test !(cache_backup.A === cache_backup.cacheval.A_backup) # not aliased
+@test cache_backup.cacheval.A_backup === prob_backup.A      # references prob.A
+solve!(cache_backup)
+@test prob_backup.A ≈ A_singular  # prob.A unchanged

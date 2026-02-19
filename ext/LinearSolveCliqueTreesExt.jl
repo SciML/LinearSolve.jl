@@ -8,11 +8,11 @@ function makefactor(A::AbstractMatrix, alg, snd)
     if isnothing(alg) && isnothing(snd)
         F = ChordalCholesky(A)
     elseif isnothing(alg)
-        F = ChordalCholesky(A; snd=alg.snd)
+        F = ChordalCholesky(A; snd = alg.snd)
     elseif isnothing(snd)
-        F = ChordalCholesky(A; alg=alg.alg)
+        F = ChordalCholesky(A; alg = alg.alg)
     else
-        F = ChordalCholesky(A; alg=alg.alg, snd=snd.snd)
+        F = ChordalCholesky(A; alg = alg.alg, snd = snd.snd)
     end
 
     return F

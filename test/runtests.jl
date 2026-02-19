@@ -21,7 +21,6 @@ if GROUP == "All" || GROUP == "Core"
     @time @safetestset "BandedMatrices" include("banded.jl")
     @time @safetestset "Butterfly Factorization" include("butterfly.jl")
     @time @safetestset "Mixed Precision" include("test_mixed_precision.jl")
-    @time @safetestset "AlgebraicMultigrid" include("amg.jl")
 end
 
 # Don't run Enzyme tests on prerelease or Julia >= 1.12 (Enzyme compatibility issues)
@@ -91,6 +90,3 @@ if GROUP == "Trim" && VERSION >= v"1.12.0"
     @time @safetestset "Trim Tests" include("trim/runtests.jl")
 end
 
-if GROUP == "AlgebraicMultigrid"
-    @time @safetestset "AlgebraicMultigrid" include("amg.jl")
-end

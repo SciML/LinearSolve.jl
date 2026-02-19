@@ -81,7 +81,7 @@ LinearSolveSparseArraysExt = "SparseArrays"
 LinearSolveSparspakExt = ["SparseArrays", "Sparspak"]
 
 [compat]
-AlgebraicMultigrid = "0.4, 0.5, 1"
+AlgebraicMultigrid = "1"
 AMDGPU = "1.2, 2"
 AllocCheck = "0.2"
 Aqua = "0.8"

@@ -566,7 +566,10 @@ end
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
                     if cache.A === cache.cacheval.A_backup
-                        @warn "LU factorization failed but cannot safely fall back to QR: `alias_A` is set so the original matrix `A` is not available as a backup to restore after in-place LU modification. Set `alias_A=false` (the default) to enable safe fallbacks." maxlog = 1
+                        @SciMLMessage(
+                            "LU factorization failed but cannot safely fall back to QR: `alias_A` is set so the original matrix `A` is not available as a backup to restore after in-place LU modification. Set `alias_A=false` (the default) to enable safe fallbacks.",
+                            cache.verbose, :default_lu_fallback
+                        )
                         SciMLBase.build_linear_solution(
                             alg, sol.u, sol.resid, sol.cache;
                             retcode = sol.retcode,
@@ -605,7 +608,10 @@ end
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
                     if cache.A === cache.cacheval.A_backup
-                        @warn "LU factorization failed but cannot safely fall back to QR: `alias_A` is set so the original matrix `A` is not available as a backup to restore after in-place LU modification. Set `alias_A=false` (the default) to enable safe fallbacks." maxlog = 1
+                        @SciMLMessage(
+                            "LU factorization failed but cannot safely fall back to QR: `alias_A` is set so the original matrix `A` is not available as a backup to restore after in-place LU modification. Set `alias_A=false` (the default) to enable safe fallbacks.",
+                            cache.verbose, :default_lu_fallback
+                        )
                         SciMLBase.build_linear_solution(
                             alg, sol.u, sol.resid, sol.cache;
                             retcode = sol.retcode,
@@ -644,7 +650,10 @@ end
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
                     if cache.A === cache.cacheval.A_backup
-                        @warn "LU factorization failed but cannot safely fall back to QR: `alias_A` is set so the original matrix `A` is not available as a backup to restore after in-place LU modification. Set `alias_A=false` (the default) to enable safe fallbacks." maxlog = 1
+                        @SciMLMessage(
+                            "LU factorization failed but cannot safely fall back to QR: `alias_A` is set so the original matrix `A` is not available as a backup to restore after in-place LU modification. Set `alias_A=false` (the default) to enable safe fallbacks.",
+                            cache.verbose, :default_lu_fallback
+                        )
                         SciMLBase.build_linear_solution(
                             alg, sol.u, sol.resid, sol.cache;
                             retcode = sol.retcode,
@@ -683,7 +692,10 @@ end
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
                     if cache.A === cache.cacheval.A_backup
-                        @warn "LU factorization failed but cannot safely fall back to QR: `alias_A` is set so the original matrix `A` is not available as a backup to restore after in-place LU modification. Set `alias_A=false` (the default) to enable safe fallbacks." maxlog = 1
+                        @SciMLMessage(
+                            "LU factorization failed but cannot safely fall back to QR: `alias_A` is set so the original matrix `A` is not available as a backup to restore after in-place LU modification. Set `alias_A=false` (the default) to enable safe fallbacks.",
+                            cache.verbose, :default_lu_fallback
+                        )
                         SciMLBase.build_linear_solution(
                             alg, sol.u, sol.resid, sol.cache;
                             retcode = sol.retcode,
@@ -722,7 +734,10 @@ end
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
                     if cache.A === cache.cacheval.A_backup
-                        @warn "LU factorization failed but cannot safely fall back to QR: `alias_A` is set so the original matrix `A` is not available as a backup to restore after in-place LU modification. Set `alias_A=false` (the default) to enable safe fallbacks." maxlog = 1
+                        @SciMLMessage(
+                            "LU factorization failed but cannot safely fall back to QR: `alias_A` is set so the original matrix `A` is not available as a backup to restore after in-place LU modification. Set `alias_A=false` (the default) to enable safe fallbacks.",
+                            cache.verbose, :default_lu_fallback
+                        )
                         SciMLBase.build_linear_solution(
                             alg, sol.u, sol.resid, sol.cache;
                             retcode = sol.retcode,

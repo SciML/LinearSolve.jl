@@ -390,7 +390,7 @@ function __init(
     # For DefaultLinearSolver, store reference to original prob.A for safety fallback.
     # When alias_A=false (default), cache.A is a copy and prob.A is untouched,
     # so prob.A serves as a zero-cost backup for restoring cache.A after in-place LU.
-    if cacheval isa DefaultLinearSolverInit
+    if cacheval isa DefaultLinearSolverInit && prob.A isa typeof(cacheval.A_backup)
         cacheval.A_backup = prob.A
     end
     isfresh = true

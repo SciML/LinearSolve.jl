@@ -5,9 +5,9 @@ using LinearSolve: LinearCache, LinearVerbosity, OperatorAssumptions
 using SciMLBase: SciMLBase, ReturnCode
 
 function LinearSolve.init_cacheval(
-    alg::AlgebraicMultigridJL, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
-    verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
-)
+        alg::AlgebraicMultigridJL, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
     @assert size(A, 1) == size(A, 2) "AlgebraicMultigrid.jl requires a square matrix"
 
     amg_alg = if isempty(alg.args)
@@ -41,7 +41,8 @@ function SciMLBase.solve!(cache::LinearCache, alg::AlgebraicMultigridJL; kwargs.
     copyto!(cache.u, x)
 
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache; retcode = ReturnCode.Success)
+        alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+    )
 end
 
 end

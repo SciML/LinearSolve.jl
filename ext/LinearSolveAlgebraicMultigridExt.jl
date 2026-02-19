@@ -9,14 +9,14 @@ function LinearSolve.init_cacheval(
     verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
 )
     @assert size(A, 1) == size(A, 2) "AlgebraicMultigrid.jl requires a square matrix"
-    
-    method = if isempty(alg.args)
-        AlgebraicMultigrid.ruge_stuben
+
+    amg_alg = if isempty(alg.args)
+        AlgebraicMultigrid.RugeStubenAMG()
     else
         alg.args[1]
     end
-    
-    return method(A; alg.kwargs...)
+
+    return SciMLBase.init(amg_alg, A, b; alg.kwargs...)
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::AlgebraicMultigridJL; kwargs...)
@@ -28,26 +28,20 @@ function SciMLBase.solve!(cache::LinearCache, alg::AlgebraicMultigridJL; kwargs.
         )
         cache.isfresh = false
     end
-    
-    ml = cache.cacheval
 
-    # Use the tolerances from the cache
+    amg_solver = cache.cacheval
+
     tol = cache.reltol
     maxiter = cache.maxiters
-    
-    # AlgebraicMultigrid.jl doesn't export a public API for solving with a precomputed 
-    # MultiLevel object without rebuilding it or using the CommonSolve interface which 
-    # implies creating a new AMGSolver wrapper.
-    # However, `_solve!` is the internal function that does exactly what we want:
-    # in-place solve using the existing hierarchy.
-    AlgebraicMultigrid._solve!(cache.u, ml, cache.b; 
-        maxiter=maxiter, 
-        reltol=tol
-    )
-    
-    # Basic return code handling (AMG doesn't always return stats in the simple call)
-    # We assume success if it finishes.
-    return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache; retcode=ReturnCode.Success)
+
+    # Update b in the solver to reflect any changes since init
+    copyto!(amg_solver.b, cache.b)
+
+    x = SciMLBase.solve!(amg_solver; maxiter = maxiter, reltol = tol)
+    copyto!(cache.u, x)
+
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache; retcode = ReturnCode.Success)
 end
 
 end

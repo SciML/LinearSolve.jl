@@ -942,7 +942,7 @@ end
         @test norm(A_amg * sol_amg.u - b_amg) < 1e-6
 
         # Smoothed Aggregation
-        sol_amg = solve(prob_amg, AlgebraicMultigridJL(AlgebraicMultigrid.smoothed_aggregation))
+        sol_amg = solve(prob_amg, AlgebraicMultigridJL(AlgebraicMultigrid.SmoothedAggregationAMG()))
         @test norm(A_amg * sol_amg.u - b_amg) < 1e-6
 
         # With tighter tolerance

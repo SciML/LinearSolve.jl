@@ -12,6 +12,12 @@ catch LoadError
     # BLIS dependencies not available, tests will be skipped
 end
 
+try
+    using AlgebraicMultigrid
+catch
+    # AlgebraicMultigrid not available, AMG tests will be skipped
+end
+
 const Dual64 = ForwardDiff.Dual{Nothing, Float64, 1}
 
 n = 8
@@ -921,5 +927,31 @@ end
     end
     for i in 1:2
         @test sol[i] ≈ U[i]
+    end
+end
+
+@static if isdefined(@__MODULE__, :AlgebraicMultigrid)
+    @testset "AlgebraicMultigridJL" begin
+        n = 100
+        A_amg = spdiagm(-1 => -ones(n - 1), 0 => 2 * ones(n), 1 => -ones(n - 1))
+        b_amg = rand(n)
+        prob_amg = LinearProblem(A_amg, b_amg)
+
+        # Default (Ruge-Stuben)
+        sol_amg = solve(prob_amg, AlgebraicMultigridJL())
+        @test norm(A_amg * sol_amg.u - b_amg) < 1e-6
+
+        # Smoothed Aggregation
+        sol_amg = solve(prob_amg, AlgebraicMultigridJL(AlgebraicMultigrid.smoothed_aggregation))
+        @test norm(A_amg * sol_amg.u - b_amg) < 1e-6
+
+        # With tighter tolerance
+        sol_amg = solve(prob_amg, AlgebraicMultigridJL(), reltol = 1e-8)
+        @test norm(A_amg * sol_amg.u - b_amg) < 1e-8
+
+        # Non-square matrix should throw
+        A_rect = sparse([1.0 1.0 0.0; 0.0 1.0 1.0])
+        b_rect = [1.0, 1.0]
+        @test_throws AssertionError solve(LinearProblem(A_rect, b_rect), AlgebraicMultigridJL())
     end
 end

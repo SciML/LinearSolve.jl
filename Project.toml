@@ -28,6 +28,7 @@ Setfield = "efcf1570-3423-57d1-acb7-fd33fddbac46"
 StaticArraysCore = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
 
 [weakdeps]
+AlgebraicMultigrid = "2169fc97-5a83-5252-b627-83903c6c433c"
 AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
 BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
 BlockDiagonals = "0a1fb500-61f7-11e9-3c65-f5ef3456f9f0"
@@ -54,6 +55,7 @@ Sparspak = "e56a9233-b9d6-4f03-8d0f-1825330902ac"
 blis_jll = "6136c539-28a5-5bf0-87cc-b183200dce32"
 
 [extensions]
+LinearSolveAlgebraicMultigridExt = "AlgebraicMultigrid"
 LinearSolveAMDGPUExt = "AMDGPU"
 LinearSolveBLISExt = ["blis_jll", "LAPACK_jll"]
 LinearSolveBandedMatricesExt = "BandedMatrices"
@@ -79,6 +81,7 @@ LinearSolveSparseArraysExt = "SparseArrays"
 LinearSolveSparspakExt = ["SparseArrays", "Sparspak"]
 
 [compat]
+AlgebraicMultigrid = "1"
 AMDGPU = "1.2, 2"
 AllocCheck = "0.2"
 Aqua = "0.8"
@@ -143,6 +146,7 @@ blis_jll = "0.9.0"
 julia = "1.10"
 
 [extras]
+AlgebraicMultigrid = "2169fc97-5a83-5252-b627-83903c6c433c"
 AllocCheck = "9b6a8646-10ed-4001-bbdc-1d2f46dfbb1a"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
@@ -178,4 +182,4 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [targets]
-test = ["Aqua", "Test", "IterativeSolvers", "InteractiveUtils", "KrylovKit", "KrylovPreconditioners", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI", "PETSc", "BlockDiagonals", "FiniteDiff", "BandedMatrices", "FastAlmostBandedMatrices", "StaticArrays", "AllocCheck", "StableRNGs", "Zygote", "RecursiveFactorization", "Sparspak", "CliqueTrees", "FastLapackInterface", "SparseArrays", "ExplicitImports", "ComponentArrays"]
+test = ["AlgebraicMultigrid", "Aqua", "Test", "IterativeSolvers", "InteractiveUtils", "KrylovKit", "KrylovPreconditioners", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI", "PETSc", "BlockDiagonals", "FiniteDiff", "BandedMatrices", "FastAlmostBandedMatrices", "StaticArrays", "AllocCheck", "StableRNGs", "Zygote", "RecursiveFactorization", "Sparspak", "CliqueTrees", "FastLapackInterface", "SparseArrays", "ExplicitImports", "ComponentArrays"]

@@ -947,7 +947,7 @@ end
 
         # With tighter tolerance
         sol_amg = solve(prob_amg, AlgebraicMultigridJL(), reltol = 1.0e-8)
-+       @test norm(A_amg * sol_amg.u - b_amg) < 1.0e-8
+        @test norm(A_amg * sol_amg.u - b_amg) < 1.0e-8
 
         # Non-square matrix should throw
         A_rect = sparse([1.0 1.0 0.0; 0.0 1.0 1.0])

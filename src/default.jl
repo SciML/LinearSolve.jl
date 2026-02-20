@@ -503,8 +503,10 @@ function init_cacheval(
         abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assump::OperatorAssumptions
     )
-    return _init_default_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol,
-        verbose, assump, A)
+    return _init_default_cacheval(
+        alg, A, b, u, Pl, Pr, maxiters, abstol, reltol,
+        verbose, assump, A
+    )
 end
 
 function init_cacheval(
@@ -513,8 +515,10 @@ function init_cacheval(
         verbose::Union{LinearVerbosity, Bool}, assump::OperatorAssumptions,
         A_original
     )
-    return _init_default_cacheval(alg, A, b, u, Pl, Pr, maxiters, abstol, reltol,
-        verbose, assump, A_original)
+    return _init_default_cacheval(
+        alg, A, b, u, Pl, Pr, maxiters, abstol, reltol,
+        verbose, assump, A_original
+    )
 end
 
 @generated function _init_default_cacheval(

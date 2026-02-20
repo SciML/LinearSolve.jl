@@ -939,15 +939,15 @@ end
 
         # Default (Ruge-Stuben)
         sol_amg = solve(prob_amg, AlgebraicMultigridJL())
-        @test norm(A_amg * sol_amg.u - b_amg) < 1e-6
+        @test norm(A_amg * sol_amg.u - b_amg) < 1.0e-6
 
         # Smoothed Aggregation
         sol_amg = solve(prob_amg, AlgebraicMultigridJL(AlgebraicMultigrid.SmoothedAggregationAMG()))
-        @test norm(A_amg * sol_amg.u - b_amg) < 1e-6
+        @test norm(A_amg * sol_amg.u - b_amg) < 1.0e-6
 
         # With tighter tolerance
-        sol_amg = solve(prob_amg, AlgebraicMultigridJL(), reltol = 1e-8)
-        @test norm(A_amg * sol_amg.u - b_amg) < 1e-8
+        sol_amg = solve(prob_amg, AlgebraicMultigridJL(), reltol = 1.0e-8)
++       @test norm(A_amg * sol_amg.u - b_amg) < 1.0e-8
 
         # Non-square matrix should throw
         A_rect = sparse([1.0 1.0 0.0; 0.0 1.0 1.0])

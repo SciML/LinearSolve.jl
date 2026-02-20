@@ -242,9 +242,12 @@ function LinearSolve.init_cacheval(
         Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Union{Bool, LinearSolve.LinearVerbosity},
-        assumptions::LinearSolve.OperatorAssumptions)
-    LinearSolve.init_cacheval(alg, A.J, b, u, Pl, Pr,
-        maxiters, abstol, reltol, verbose, assumptions)
+        assumptions::LinearSolve.OperatorAssumptions
+    )
+    return LinearSolve.init_cacheval(
+        alg, A.J, b, u, Pl, Pr,
+        maxiters, abstol, reltol, verbose, assumptions
+    )
 end
 
 A_w = sparse([-1.0 0.5; 0.3 -1.0])

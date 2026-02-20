@@ -101,16 +101,6 @@ function CRC.rrule(
     return sol, ∇linear_solve
 end
 
-function CRC.rrule(::typeof(Base.getindex), sol::SciMLBase.LinearSolution, i::Integer)
-    function LinearSolution_getindex_pullback(Δ)
-        du = zero(sol.u)
-        du[i] = Δ
-        Δsol = SciMLBase.build_linear_solution(sol.cache.alg, du, sol.resid, sol.cache)
-        return NoTangent(), Δsol, NoTangent()
-    end
-    return sol[i], LinearSolution_getindex_pullback
-end
-
 function CRC.rrule(::Type{<:LinearProblem}, A, b, p; kwargs...)
     prob = LinearProblem(A, b, p)
     ∇prob(∂prob) = (NoTangent(), ∂prob.A, ∂prob.b, ∂prob.p)

@@ -150,26 +150,26 @@ PETScExt.cleanup_petsc_cache!(sol)
 ```
 """
 struct PETScAlgorithm <: SciMLLinearSolveAlgorithm
-    solver_type           :: Symbol
-    pc_type               :: Symbol
-    comm                  :: Any        # MPI.Comm — stored as Any to avoid MPI dep in LinearSolve
-    nullspace             :: Symbol     # :none | :constant | :custom
-    nullspace_vecs        :: Any        # nothing | Vector{Vector{T}}
-    prec_matrix           :: Any        # nothing | AbstractMatrix
-    initial_guess_nonzero :: Bool
-    transposed            :: Bool
-    ksp_options           :: NamedTuple
+    solver_type::Symbol
+    pc_type::Symbol
+    comm::Any        # MPI.Comm — stored as Any to avoid MPI dep in LinearSolve
+    nullspace::Symbol     # :none | :constant | :custom
+    nullspace_vecs::Any        # nothing | Vector{Vector{T}}
+    prec_matrix::Any        # nothing | AbstractMatrix
+    initial_guess_nonzero::Bool
+    transposed::Bool
+    ksp_options::NamedTuple
 
     function PETScAlgorithm(
-            solver_type           :: Symbol     = :gmres;
-            pc_type               :: Symbol     = :none,
-            comm                                = nothing,   # nothing → MPI.COMM_SELF at solve time
-            nullspace             :: Symbol     = :none,
-            nullspace_vecs                      = nothing,
-            prec_matrix                         = nothing,
-            initial_guess_nonzero :: Bool       = false,
-            transposed            :: Bool       = false,
-            ksp_options           :: NamedTuple = NamedTuple(),
+            solver_type::Symbol = :gmres;
+            pc_type::Symbol = :none,
+            comm = nothing,   # nothing → MPI.COMM_SELF at solve time
+            nullspace::Symbol = :none,
+            nullspace_vecs = nothing,
+            prec_matrix = nothing,
+            initial_guess_nonzero::Bool = false,
+            transposed::Bool = false,
+            ksp_options::NamedTuple = NamedTuple(),
         )
         ext = Base.get_extension(@__MODULE__, :LinearSolvePETScExt)
         if ext === nothing

@@ -11,8 +11,8 @@ Random.seed!(1234)
 MPI.Init()
 
 const PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
-const rank     = MPI.Comm_rank(MPI.COMM_WORLD)
-const comm_size   = MPI.Comm_size(MPI.COMM_WORLD)
+const rank = MPI.Comm_rank(MPI.COMM_WORLD)
+const comm_size = MPI.Comm_size(MPI.COMM_WORLD)
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  MPI-PARALLEL TESTS  (comm = MPI.COMM_WORLD)
@@ -49,11 +49,11 @@ end
     prob = LinearProblem(A, b)
     alg = PETScAlgorithm(:gmres; pc_type = :jacobi, comm = MPI.COMM_WORLD)
 
-    sol = solve(prob, alg; abstol = 1e-10, reltol = 1e-10)
+    sol = solve(prob, alg; abstol = 1.0e-10, reltol = 1.0e-10)
 
     # solve! now auto-gathers — sol.u is the full solution on all ranks
     if rank == 0
-        @test norm(A * sol.u - b) / norm(b) < 1e-6
+        @test norm(A * sol.u - b) / norm(b) < 1.0e-6
     end
 
     PETScExt.cleanup_petsc_cache!(sol)
@@ -64,10 +64,10 @@ end
     A = sprand(n, n, 0.05) + 10I; A = A'A; b = rand(n)
     prob = LinearProblem(A, b)
     alg = PETScAlgorithm(:cg; pc_type = :jacobi, comm = MPI.COMM_WORLD)
-    sol = solve(prob, alg; abstol = 1e-10, reltol = 1e-10)
+    sol = solve(prob, alg; abstol = 1.0e-10, reltol = 1.0e-10)
 
     if rank == 0
-        @test norm(A * sol.u - b) / norm(b) < 1e-6
+        @test norm(A * sol.u - b) / norm(b) < 1.0e-6
     end
 
     PETScExt.cleanup_petsc_cache!(sol)
@@ -78,10 +78,10 @@ end
     A = rand(n, n) + 10I; A = A'A; b = rand(n)
     prob = LinearProblem(A, b)
     alg = PETScAlgorithm(:gmres; pc_type = :jacobi, comm = MPI.COMM_WORLD)
-    sol = solve(prob, alg; abstol = 1e-10, reltol = 1e-10)
+    sol = solve(prob, alg; abstol = 1.0e-10, reltol = 1.0e-10)
 
     if rank == 0
-        @test norm(A * sol.u - b) / norm(b) < 1e-6
+        @test norm(A * sol.u - b) / norm(b) < 1.0e-6
     end
     PETScExt.cleanup_petsc_cache!(sol)
 end
@@ -92,12 +92,12 @@ end
     b1 = rand(n); b2 = rand(n)
     alg = PETScAlgorithm(:gmres; pc_type = :jacobi, comm = MPI.COMM_WORLD)
 
-    cache = SciMLBase.init(LinearProblem(A, b1), alg; abstol = 1e-10)
+    cache = SciMLBase.init(LinearProblem(A, b1), alg; abstol = 1.0e-10)
     sol1 = solve!(cache)
 
     # No manual gather needed — solve! auto-gathers the full solution
     if rank == 0
-        @test norm(A * sol1.u - b1) / norm(b1) < 1e-6
+        @test norm(A * sol1.u - b1) / norm(b1) < 1.0e-6
     end
 
     # Update b and re-solve
@@ -105,7 +105,7 @@ end
     sol2 = solve!(cache)
 
     if rank == 0
-        @test norm(A * sol2.u - b2) / norm(b2) < 1e-6
+        @test norm(A * sol2.u - b2) / norm(b2) < 1.0e-6
     end
 
     PETScExt.cleanup_petsc_cache!(cache)

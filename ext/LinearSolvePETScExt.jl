@@ -9,25 +9,8 @@ using SciMLBase: LinearSolution, build_linear_solution, ReturnCode, SciMLBase
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-"""
-    resolve_comm(alg::PETScAlgorithm)
-
-Return the MPI communicator used by `alg`. Defaults to `MPI.COMM_SELF` if none specified.
-"""
 resolve_comm(alg::PETScAlgorithm) = alg.comm === nothing ? MPI.COMM_SELF : alg.comm
-
-"""
-    is_parallel(comm)
-
-Return `true` if the communicator has more than one rank.
-"""
 is_parallel(comm) = MPI.Comm_size(comm) > 1
-
-"""
-    get_petsclib(::Type{T}=Float64)
-
-Return the PETSc library handle for scalar type `T`.
-"""
 get_petsclib(::Type{T}=Float64) where T = PETSc.getlib(; PetscScalar=T)
 
 # ── Sparsity fingerprint ──────────────────────────────────────────────────────

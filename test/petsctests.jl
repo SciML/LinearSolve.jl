@@ -4,6 +4,7 @@ using MPI
 using PETSc
 using SparseArrays
 using Random
+using Statistics
 using Test
 
 MPI.Init()
@@ -94,6 +95,19 @@ end
     @test sol.retcode == SciMLBase.ReturnCode.Success
     @test norm(D * sol.u - b) / norm(b) < 1e-6
     PETScExt.cleanup_petsc_cache!(sol)
+end
+
+@testset "Serial: Nullspace Custom" begin
+    n = 50
+    A = spdiagm(0 => 2*ones(n), 1 => -ones(n-1), -1 => -ones(n-1)) # exact Laplacian
+    b = rand(n); b .-= sum(b)/n
+
+    # Custom null-space vector = constant
+    alg = PETScAlgorithm(:gmres; pc_type=:ilu, nullspace_vecs=[ones(n)])
+    sol = solve(LinearProblem(A, b), alg; abstol=1e-10)
+
+    @test sol.retcode == SciMLBase.ReturnCode.Success
+    @test norm(A * sol.u - b) / norm(b) < 1e-6
 end
 
 @testset "Serial: Transposed Solve" begin
@@ -216,5 +230,148 @@ end
         ce = SciMLBase.init(prob, alg)
         PETScExt.cleanup_petsc_cache!(ce)
         @test ce.cacheval.ksp === nothing
+    end
+end
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  MATRIX REBUILD LOGIC TESTS
+#  Exercises the three cases in solve!:
+#    Case 1 — first solve (no KSP)
+#    Case 2 — sparsity changed → full rebuild
+#    Case 3 — same sparsity, values only → in-place update + reuse preconditioner
+# ══════════════════════════════════════════════════════════════════════════════
+
+@testset "Serial: Matrix Rebuild Logic" begin
+    n = 50
+    Random.seed!(42)
+
+    # Helper: build a random SPD sparse matrix with a FIXED sparsity pattern
+    # by taking the same pattern and changing only values.
+    base = sprand(n, n, 0.1); base = base + base' + 10I
+    pattern_I, pattern_J, _ = findnz(base)
+
+    function make_spd_with_pattern(scale)
+        vals = abs.(randn(length(pattern_I))) .* scale
+        # ensure diagonal dominance
+        A = sparse(pattern_I, pattern_J, vals, n, n)
+        A = A + A'
+        # set diagonal to sum of off-diagonal abs + scale to ensure SPD
+        d = vec(sum(abs.(A), dims=2)) .+ scale
+        for i in 1:n; A[i,i] = d[i]; end
+        return A
+    end
+
+    @testset "Case 1: first solve builds KSP" begin
+        A = make_spd_with_pattern(10.0)
+        b = rand(n)
+        cache = SciMLBase.init(LinearProblem(A, b), PETScAlgorithm(:cg; pc_type = :jacobi);
+                               abstol = 1e-10)
+        # Before first solve, ksp should be nothing
+        @test cache.cacheval.ksp === nothing
+        sol = solve!(cache)
+        # After first solve, ksp should exist and solution should be correct
+        @test cache.cacheval.ksp !== nothing
+        @test norm(A * sol.u - b) / norm(b) < 1e-6
+        # sparsity_hash should be set
+        @test cache.cacheval.sparsity_hash != UInt(0)
+        PETScExt.cleanup_petsc_cache!(cache)
+    end
+
+    @testset "Case 3: same sparsity, values only — KSP object is reused" begin
+        A1 = make_spd_with_pattern(10.0)
+        b1 = rand(n)
+        cache = SciMLBase.init(LinearProblem(A1, b1), PETScAlgorithm(:cg; pc_type = :jacobi);
+                               abstol = 1e-10)
+        sol1 = solve!(cache)
+        @test norm(A1 * sol1.u - b1) / norm(b1) < 1e-6
+
+        ksp_before  = cache.cacheval.ksp
+        hash_before = cache.cacheval.sparsity_hash
+
+        # Update to a new matrix with the SAME sparsity pattern but different values
+        A2 = make_spd_with_pattern(20.0)
+        @test PETScExt.sparsity_fingerprint(A1) == PETScExt.sparsity_fingerprint(A2)
+
+        b2 = rand(n)
+        SciMLBase.reinit!(cache; A = A2, b = b2)
+        sol2 = solve!(cache)
+
+        # KSP object should be the same (reused, not rebuilt)
+        @test cache.cacheval.ksp === ksp_before
+        # sparsity hash should be unchanged (same pattern)
+        @test cache.cacheval.sparsity_hash == hash_before
+        # Solution should be correct with the new matrix
+        @test norm(A2 * sol2.u - b2) / norm(b2) < 1e-6
+        PETScExt.cleanup_petsc_cache!(cache)
+    end
+
+    @testset "Case 2: sparsity changed — KSP object is replaced" begin
+        A1 = make_spd_with_pattern(10.0)
+        b1 = rand(n)
+        cache = SciMLBase.init(LinearProblem(A1, b1), PETScAlgorithm(:cg; pc_type = :jacobi);
+                               abstol = 1e-10)
+        sol1 = solve!(cache)
+        @test norm(A1 * sol1.u - b1) / norm(b1) < 1e-6
+
+        ksp_before = cache.cacheval.ksp
+
+        # Build a matrix with a DIFFERENT sparsity pattern
+        A3 = sprand(n, n, 0.2) + 15I; A3 = A3 + A3'
+        @test PETScExt.sparsity_fingerprint(A1) != PETScExt.sparsity_fingerprint(A3)
+
+        b3 = rand(n)
+        SciMLBase.reinit!(cache; A = A3, b = b3)
+        sol3 = solve!(cache)
+
+        # KSP object should be different (rebuilt)
+        @test cache.cacheval.ksp !== ksp_before
+        # sparsity hash should have been updated
+        @test cache.cacheval.sparsity_hash == PETScExt.sparsity_fingerprint(A3)
+        # Solution should be correct with the new matrix
+        @test norm(A3 * sol3.u - b3) / norm(b3) < 1e-6
+        PETScExt.cleanup_petsc_cache!(cache)
+    end
+
+    @testset "Case 2: dense matrix always rebuilds KSP" begin
+        # Dense matrices always trigger a full rebuild because MatSeqDense does
+        # not reliably propagate in-place Julia buffer mutations through PETSc's
+        # internal preconditioner caches.  In practice this is not a limitation
+        # since NonlinearSolve.jl always produces SparseMatrixCSC Jacobians.
+        A1 = Matrix(make_spd_with_pattern(10.0))
+        b1 = rand(n)
+        cache = SciMLBase.init(LinearProblem(A1, b1), PETScAlgorithm(:gmres);
+                               abstol = 1e-10)
+        sol1 = solve!(cache)
+        @test norm(A1 * sol1.u - b1) / norm(b1) < 1e-6
+
+        ksp_before = cache.cacheval.ksp
+
+        A2 = Matrix(make_spd_with_pattern(20.0))
+        b2 = rand(n)
+        SciMLBase.reinit!(cache; A = A2, b = b2)
+        sol2 = solve!(cache)
+
+        # Dense always triggers full rebuild — KSP is a new object
+        @test cache.cacheval.ksp !== ksp_before
+        @test norm(A2 * sol2.u - b2) / norm(b2) < 1e-6
+        PETScExt.cleanup_petsc_cache!(cache)
+    end
+
+    @testset "Case 3: correctness over multiple value-only updates" begin
+        # Verify that repeated in-place sparse updates accumulate no error
+        A = make_spd_with_pattern(10.0)
+        b = rand(n)
+        cache = SciMLBase.init(LinearProblem(A, b), PETScAlgorithm(:cg; pc_type = :jacobi);
+                               abstol = 1e-10)
+        solve!(cache)
+
+        for _ in 1:5
+            A_new = make_spd_with_pattern(10.0 + rand())
+            b_new = rand(n)
+            SciMLBase.reinit!(cache; A = A_new, b = b_new)
+            sol = solve!(cache)
+            @test norm(A_new * sol.u - b_new) / norm(b_new) < 1e-6
+        end
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end

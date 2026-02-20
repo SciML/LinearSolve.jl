@@ -3,66 +3,124 @@
 """
     PETScAlgorithm(solver_type = :gmres; kwargs...)
 
-[PETSc.jl](https://github.com/JuliaParallel/PETSc.jl) wrapper providing access to
-PETSc's KSP (Krylov Subspace) linear solvers through the LinearSolve.jl interface.
+A `LinearSolve.jl` algorithm that wraps the
+[PETSc.jl](https://github.com/JuliaParallel/PETSc.jl) interface to PETSc’s
+KSP (Krylov Subspace) linear solvers.
 
-!!! note
-    Requires Julia ≥ 1.10 with PETSc.jl and MPI.jl loaded: `using PETSc, MPI`
+This algorithm enables the use of PETSc’s scalable iterative solvers and
+preconditioners from within the SciML linear solve ecosystem, supporting both
+serial and MPI-parallel workflows while preserving the `LinearSolve.solve`
+API.
 
-!!! warning "Memory management"
-    PETSc objects live in C-side memory that Julia's GC does not track.
-    Always call `cleanup_petsc_cache!` when done — it accepts a solution object,
-    a `LinearCache`, or the raw `PETScCache`:
+`PETScAlgorithm` constructs and manages PETSc matrices, vectors, KSP solvers,
+and optional null-space objects behind the scenes. It can be used as a drop-in
+replacement for other `SciMLLinearSolveAlgorithm`s when access to PETSc
+features such as algebraic multigrid, domain decomposition, or advanced solver
+monitoring is required.
 
-    ```julia
+!!! compat
+    Requires Julia ≥ 1.10 with `PETSc.jl` and `MPI.jl` loaded:
+    using PETSc, MPI
+
+---
+
+## Capabilities
+
+* Access to PETSc Krylov solvers (GMRES, CG, BiCGStab, Richardson, etc.)
+* Integration with PETSc preconditioners (ILU, LU, GAMG, Hypre, …)
+* Serial and MPI-distributed solves using the same API
+* Support for null-space specification (e.g. pressure Poisson problems)
+* Optional separate preconditioner matrix
+* Forwarding of arbitrary PETSc Options Database flags
+* Solve of transposed systems via PETSc
+* Reuse of initial guesses across nonlinear or time-stepping workflows
+
+---
+
+## Memory Management
+
+PETSc objects live in C-side memory that Julia’s garbage collector does not
+track.
+
+Always call `cleanup_petsc_cache!` after finishing with a solution, cache, or
+algorithm instance:
+
     sol = solve(prob, PETScAlgorithm(:gmres))
     cleanup_petsc_cache!(sol)
-    ```
 
-    A GC finalizer is registered as a safety net, but deterministic cleanup is
-    strongly recommended. Access the function via the extension module:
+A GC finalizer is registered as a safety net, but deterministic cleanup is
+strongly recommended.
 
-    ```julia
-    PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
-    PETScExt.cleanup_petsc_cache!(sol)
-    ```
+Access the cleanup helper via the extension module:
+
+```julia
+PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
+PETScExt.cleanup_petsc_cache!(sol)
+````
 
 !!! warning "MPI cleanup"
-    When using `comm` with multiple ranks, `cleanup_petsc_cache!` is collective:
-    **all ranks** must call it together (PETSc destroy operations are collective).
+    When using multiple MPI ranks, cleanup is collective — all ranks must
+    call it together.
+
+---
 
 ## Positional Arguments
 
-  - `solver_type::Symbol`: KSP solver type. Common choices: `:gmres` (default),
-    `:cg`, `:bicg`, `:bcgs`, `:preonly`, `:richardson`.
+- `solver_type::Symbol`: PETSc KSP solver type. Common values include
+  `:gmres` (default), `:cg`, `:bicg`, `:bcgs`, `:preonly`, and `:richardson`.
+
+---
 
 ## Keyword Arguments
 
-  - `pc_type::Symbol`: Preconditioner (`:jacobi`, `:ilu`, `:lu`, `:gamg`, `:hypre`,
-    `:none`, …). Default `:none`.
-  - `comm`: MPI communicator. Default `nothing` (→ `MPI.COMM_SELF` at solve time,
-    serial). Pass `MPI.COMM_WORLD` for parallel solves — every rank must hold the
-    full Julia matrix; each rank inserts only its owned rows into PETSc.
-  - `nullspace::Symbol`: Null-space handling (`:none`, `:constant`, `:custom`).
-  - `nullspace_vecs`: `Vector{Vector{T}}` of orthonormal null-space basis vectors;
-    required when `nullspace = :custom`.
-  - `prec_matrix`: Separate Julia matrix for building the preconditioner instead of `A`.
-  - `initial_guess_nonzero::Bool`: Start Krylov iteration from `cache.u` instead of
-    zero. Default `false`.
-  - `transposed::Bool`: Solve `Aᵀx = b` via `KSPSolveTranspose`. Default `false`.
-  - `ksp_options::NamedTuple`: Additional PETSc options forwarded to the PETSc
-    Options Database. Key names are automatically converted to PETSc flag format
-    (e.g., `ksp_monitor = ""` becomes `-ksp_monitor`).
+- `pc_type::Symbol`
+  PETSc preconditioner type. Examples: `:jacobi`, `:ilu`, `:lu`, `:gamg`,
+  `:hypre`, `:none`.
+
+- `comm`
+  MPI communicator.
+  Defaults to `nothing`, which maps to `MPI.COMM_SELF` at solve time (serial).
+  Use `MPI.COMM_WORLD` for distributed solves.
+
+  Each rank must own the full Julia matrix structure, but inserts only its
+  locally owned rows into PETSc.
+
+- `nullspace::Symbol`
+  Null-space handling strategy:
+  `:none`, `:constant`, or `:custom`.
+
+- `nullspace_vecs`
+  Vector of orthonormal null-space basis vectors used when
+  `nullspace = :custom`.
+
+- `prec_matrix`
+  Optional matrix used only for constructing the preconditioner, allowing
+  different operator and preconditioning discretizations.
+
+- `initial_guess_nonzero::Bool`
+  If `true`, PETSc uses the existing solution vector as the initial Krylov
+  guess instead of zero.
+
+- `transposed::Bool`
+  Solve the transposed system `Aᵀx = b` using PETSc’s transpose solve.
+
+- `ksp_options::NamedTuple`
+  Additional PETSc Options Database flags forwarded automatically.
+  Keys are converted to PETSc CLI-style flags.
+
+---
 
 ## Common `ksp_options`
 
 | Option | Description |
 | :--- | :--- |
-| `ksp_monitor = ""` | Print residual norm at each iteration |
-| `ksp_view = ""` | Print solver summary at end of solve |
+| `ksp_monitor = ""` | Print residual norm each iteration |
+| `ksp_view = ""` | Print solver configuration summary |
 | `ksp_rtol = 1e-12` | Relative convergence tolerance |
-| `pc_factor_levels = 2` | Levels of fill for ILU preconditioners |
-| `log_view = ""` | Print PETSc performance logging profile |
+| `pc_factor_levels = 2` | ILU fill levels |
+| `log_view = ""` | PETSc performance logging |
+
+---
 
 ## Examples
 
@@ -70,20 +128,25 @@ PETSc's KSP (Krylov Subspace) linear solvers through the LinearSolve.jl interfac
 using PETSc, MPI, SparseArrays, LinearSolve, LinearAlgebra
 
 MPI.Init()
+
 n = 100
 A = sprand(n, n, 0.1); A = A + A' + 20I
 b = rand(n)
+
 prob = LinearProblem(A, b)
+
 PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
 
-# Serial solve with monitoring
-sol = solve(prob, PETScAlgorithm(:gmres; pc_type = :ilu, ksp_options = (ksp_monitor="",)))
+# Serial solve
+sol = solve(prob, PETScAlgorithm(:gmres; pc_type = :ilu,
+                                 ksp_options = (ksp_monitor="",)))
 PETScExt.cleanup_petsc_cache!(sol)
 
-# MPI-parallel solve with GAMG
-sol = solve(prob, PETScAlgorithm(:gmres; pc_type = :gamg, comm = MPI.COMM_WORLD))
+# MPI-parallel solve
+sol = solve(prob, PETScAlgorithm(:gmres; pc_type = :gamg,
+                                 comm = MPI.COMM_WORLD))
 PETScExt.cleanup_petsc_cache!(sol)
-MPI.Finalize()
+
 ```
 """
 struct PETScAlgorithm <: SciMLLinearSolveAlgorithm

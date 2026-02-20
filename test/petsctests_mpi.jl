@@ -100,11 +100,8 @@ end
         @test norm(A * sol1.u - b1) / norm(b1) < 1e-6
     end
 
-    # Update b and re-solve (copy_into_vec! still available for manual updates)
+    # Update b and re-solve
     cache.b .= b2
-    PETScExt.copy_into_vec!(cache.cacheval.petsc_b, cache.b, cache.cacheval.petsclib,
-                   cache.cacheval.rstart, cache.cacheval.rend)
-
     sol2 = solve!(cache)
 
     if rank == 0
@@ -112,4 +109,6 @@ end
     end
 
     PETScExt.cleanup_petsc_cache!(cache)
+    PETScExt.cleanup_petsc_cache!(sol1)
+    PETScExt.cleanup_petsc_cache!(sol2)
 end

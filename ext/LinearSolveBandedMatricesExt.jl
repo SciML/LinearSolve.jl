@@ -8,7 +8,7 @@ import LinearSolve: defaultalg,
 # Defaults for BandedMatrices
 function defaultalg(A::BandedMatrix, b, oa::OperatorAssumptions{Bool})
     if oa.issq
-        return DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
+        return DefaultLinearSolver(DefaultAlgorithmChoice.LUFactorization)
     elseif LinearSolve.is_underdetermined(A)
         error("No solver for underdetermined `A::BandedMatrix` is currently implemented!")
     else
@@ -26,8 +26,15 @@ function defaultalg(A::Symmetric{<:Number, <:BandedMatrix}, b, ::OperatorAssumpt
     return DefaultLinearSolver(DefaultAlgorithmChoice.CholeskyFactorization)
 end
 
-# BandedMatrices `qr` doesn't allow other args without causing an ambiguity
-do_factorization(alg::QRFactorization, A::BandedMatrix, b, u) = alg.inplace ? qr!(A) : qr(A)
+# BandedMatrices `qr` doesn't support column pivoting, so convert to dense when
+# pivoting is requested (e.g. ColumnNorm fallback from singular LU).
+function do_factorization(alg::QRFactorization, A::BandedMatrix, b, u)
+    if alg.pivot isa NoPivot
+        return alg.inplace ? qr!(A) : qr(A)
+    else
+        return qr!(Matrix(A), alg.pivot)
+    end
+end
 
 function do_factorization(alg::LUFactorization, A::BandedMatrix, b, u)
     # BandedMatrices.jl requires Val-based pivot argument for lu!
@@ -59,6 +66,15 @@ function init_cacheval(
     ) where {T}
     (T <: BigFloat) && return qr(similar(A, 0, 0))
     return lu(similar(A, 0, 0))
+end
+
+# Column-pivoted QR on BandedMatrix converts to dense, so cache a dense QRPivoted
+function init_cacheval(
+        ::QRFactorization{ColumnNorm}, A::BandedMatrix, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions
+    )
+    return LinearAlgebra.qr(Matrix{eltype(A)}(undef, 0, 0), ColumnNorm())
 end
 
 # For Symmetric BandedMatrix

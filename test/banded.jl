@@ -53,6 +53,13 @@ A[band(0)] .+= 1:n
 
 @test_nowarn solve(LinearProblem(A, b))
 
+# Singular BandedMatrix - should gracefully fall back to pivoted QR instead of throwing
+A_singular = BandedMatrix(zeros(n, n), (2, 2))
+A_singular[band(0)] .= [1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0]
+b_singular = ones(n)
+sol_singular = solve(LinearProblem(A_singular, b_singular))
+@test sol_singular.retcode == LinearSolve.ReturnCode.Success
+
 # Workaround for no lu from BandedMatrices
 A = BandedMatrix{BigFloat}(ones(3, 3), (0, 0))
 b = BigFloat[1, 2, 3]

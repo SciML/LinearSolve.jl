@@ -1,33 +1,29 @@
 module LinearSolveCliqueTreesExt
 
-using CliqueTrees: symbolic, cholinit, lininit, cholesky!, linsolve!
+using CliqueTrees.Multifrontal: cholesky!, ldiv!, ChordalCholesky
 using LinearSolve
 using SparseArrays
 
-function _symbolic(A::AbstractMatrix, alg::CliqueTreesFactorization)
-    return symbolic(A; alg = alg.alg, snd = alg.snd)
-end
+function makefactor(A::AbstractMatrix, alg, snd)
+    if isnothing(alg) && isnothing(snd)
+        F = ChordalCholesky(A)
+    elseif isnothing(alg)
+        F = ChordalCholesky(A; snd = alg.snd)
+    elseif isnothing(snd)
+        F = ChordalCholesky(A; alg = alg.alg)
+    else
+        F = ChordalCholesky(A; alg = alg.alg, snd = snd.snd)
+    end
 
-function _symbolic(A::AbstractMatrix, alg::CliqueTreesFactorization{Nothing})
-    return symbolic(A; snd = alg.snd)
-end
-
-function _symbolic(A::AbstractMatrix, alg::CliqueTreesFactorization{<:Any, Nothing})
-    return symbolic(A; alg = alg.alg)
-end
-
-function _symbolic(A::AbstractMatrix, alg::CliqueTreesFactorization{Nothing, Nothing})
-    return symbolic(A)
+    return F
 end
 
 function LinearSolve.init_cacheval(
-        alg::CliqueTreesFactorization, A::AbstractMatrix, b, u, Pl, Pr, maxiters::Int, abstol,
-        reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
-    )
-    symbfact = _symbolic(A, alg)
-    cholfact, cholwork = cholinit(A, symbfact)
-    linwork = lininit(1, cholfact)
-    return (cholfact, cholwork, linwork)
+        alg::CliqueTreesFactorization{ALG, SND}, A::AbstractMatrix,
+        b, u, Pl, Pr, maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions
+    ) where {ALG, SND}
+    return makefactor(A, alg.alg, alg.snd)
 end
 
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CliqueTreesFactorization; kwargs...)
@@ -37,25 +33,20 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CliqueTreesFactor
 
     if cache.isfresh
         if isnothing(cache.cacheval) || !alg.reuse_symbolic
-            symbfact = _symbolic(A, alg)
-            cholfact, cholwork = cholinit(A, symbfact)
-            linwork = lininit(1, cholfact)
-            cache.cacheval = (cholfact, cholwork, linwork)
+            cache.cacheval = makefactor(A, alg.alg, alg.snd)
         end
 
-        cholfact, cholwork, linwork = cache.cacheval
-        cholesky!(cholfact, cholwork, A)
+        cholesky!(copy!(cache.cacheval, A))
         cache.isfresh = false
     end
 
-    cholfact, cholwork, linwork = cache.cacheval
-    linsolve!(copyto!(u, b), linwork, cholfact, Val(false))
+    ldiv!(u, cache.cacheval, b)
     return SciMLBase.build_linear_solution(alg, u, nothing, cache)
 end
 
 LinearSolve.PrecompileTools.@compile_workload begin
     A = sparse(
-        [
+        Float64[
             3 1 0 0 0 0 0 0
             1 3 1 0 0 2 0 0
             0 1 3 1 0 1 2 1
@@ -68,8 +59,8 @@ LinearSolve.PrecompileTools.@compile_workload begin
     )
 
     b = rand(8)
-    prob = LinearProblem(A, b)
-    sol = solve(prob, CliqueTreesFactorization())
+    prb = LinearProblem(A, b)
+    sol = solve(prb, CliqueTreesFactorization())
 end
 
 end

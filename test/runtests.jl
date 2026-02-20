@@ -89,4 +89,3 @@ if GROUP == "Trim" && VERSION >= v"1.12.0"
     Pkg.instantiate()
     @time @safetestset "Trim Tests" include("trim/runtests.jl")
 end
-

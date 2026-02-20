@@ -90,7 +90,7 @@ end
     D[1,1] = 1.0; D[end,end] = 1.0
     b = rand(n); b .-= sum(b)/n
 
-    alg = PETScAlgorithm(:cg; pc_type = :jacobi, nullspace = :custom, nullspace_vecs = [ones(n)])
+    alg = PETScAlgorithm(:cg; pc_type = :jacobi, nullspace = :constant)
     sol = solve(LinearProblem(D, b), alg; abstol = 1e-10)
     @test sol.retcode == SciMLBase.ReturnCode.Success
     @test norm(D * sol.u - b) / norm(b) < 1e-6
@@ -103,7 +103,7 @@ end
     b = rand(n); b .-= sum(b)/n
 
     # Custom null-space vector = constant
-    alg = PETScAlgorithm(:gmres; pc_type=:ilu, nullspace_vecs=[ones(n)])
+    alg = PETScAlgorithm(:gmres; pc_type=:ilu, nullspace = :custom, nullspace_vecs = [ones(n)])
     sol = solve(LinearProblem(A, b), alg; abstol=1e-10)
 
     @test sol.retcode == SciMLBase.ReturnCode.Success

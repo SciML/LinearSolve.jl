@@ -992,3 +992,44 @@ end
 function RF32MixedLUFactorization(; pivot = Val(true), thread = Val(true), throwerror = true)
     return RF32MixedLUFactorization(pivot, thread; throwerror)
 end
+
+"""
+    AlgebraicMultigridJL(args...; kwargs...)
+
+A wrapper for [AlgebraicMultigrid.jl](https://github.com/JuliaLinearAlgebra/AlgebraicMultigrid.jl)
+solvers.
+
+## Positional Arguments
+
+The first positional argument (if given) is the AMG algorithm type. If omitted,
+defaults to `AlgebraicMultigrid.RugeStubenAMG()`.
+
+## Keyword Arguments
+
+All keyword arguments are forwarded to the AMG hierarchy constructor.
+
+## Example
+
+```julia
+using LinearSolve, AlgebraicMultigrid
+# Default (Ruge-Stuben)
+alg = AlgebraicMultigridJL()
+# Smoothed Aggregation
+alg = AlgebraicMultigridJL(AlgebraicMultigrid.SmoothedAggregationAMG())
+```
+
+!!! note
+
+    Using this solver requires adding the package AlgebraicMultigrid.jl,
+    i.e. `using AlgebraicMultigrid`
+"""
+struct AlgebraicMultigridJL{A, K} <: SciMLLinearSolveAlgorithm
+    args::A
+    kwargs::K
+end
+
+function AlgebraicMultigridJL(args...; kwargs...)
+    return AlgebraicMultigridJL(args, kwargs)
+end
+
+needs_concrete_A(::AlgebraicMultigridJL) = true

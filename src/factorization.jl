@@ -151,16 +151,32 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
     A = convert(AbstractMatrix, A)
     if cache.isfresh
         cacheval = @get_cacheval(cache, :LUFactorization)
-        if issparsematrix(A) && alg.reuse_symbolic
-            # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
-            # If SparseMatrixCSC, check if the pattern has changed
-            if alg.check_pattern && pattern_changed(cacheval, A)
-                fact = lu(A, check = false)
+        local fact
+        try
+            if issparsematrix(A) && alg.reuse_symbolic
+                # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
+                # If SparseMatrixCSC, check if the pattern has changed
+                if alg.check_pattern && pattern_changed(cacheval, A)
+                    fact = lu(A, check = false)
+                else
+                    fact = lu!(cacheval, A, check = false)
+                end
             else
-                fact = lu!(cacheval, A, check = false)
+                fact = lu(A, check = false)
             end
-        else
-            fact = lu(A, check = false)
+        catch e
+            # Some matrix types (e.g. BandedMatrix) throw LAPACKException on singular
+            # matrices even with check=false, because their LAPACK wrappers don't
+            # respect the check flag. Catch these and return Failure.
+            if e isa LinearAlgebra.LAPACKException ||
+                    e isa LinearAlgebra.SingularException
+                @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
+                return SciMLBase.build_linear_solution(
+                    alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                )
+            else
+                rethrow(e)
+            end
         end
         cache.cacheval = fact
 

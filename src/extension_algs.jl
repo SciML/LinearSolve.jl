@@ -1001,13 +1001,12 @@ solvers.
 
 ## Positional Arguments
 
-The first positional argument (if given) is the AMG method constructor. If omitted,
-defaults to `AlgebraicMultigrid.ruge_stuben`. Any further positional arguments are
-forwarded to that constructor.
+The first positional argument (if given) is the AMG algorithm type. If omitted,
+defaults to `AlgebraicMultigrid.RugeStubenAMG()`.
 
 ## Keyword Arguments
 
-All keyword arguments are forwarded to the AMG method constructor.
+All keyword arguments are forwarded to the AMG hierarchy constructor.
 
 ## Example
 
@@ -1016,7 +1015,7 @@ using LinearSolve, AlgebraicMultigrid
 # Default (Ruge-Stuben)
 alg = AlgebraicMultigridJL()
 # Smoothed Aggregation
-alg = AlgebraicMultigridJL(AlgebraicMultigrid.smoothed_aggregation)
+alg = AlgebraicMultigridJL(AlgebraicMultigrid.SmoothedAggregationAMG())
 ```
 
 !!! note

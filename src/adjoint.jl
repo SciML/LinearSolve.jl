@@ -68,7 +68,7 @@ function CRC.rrule(
     function ∇linear_solve(∂sol)
         ∂∅ = NoTangent()
 
-        ∂u = ∂sol.u
+        ∂u = hasproperty(∂sol, :u) ? ∂sol.u : ∂sol
         if sensealg.linsolve === missing
             λ = if cache.cacheval isa Factorization
                 cache.cacheval' \ ∂u

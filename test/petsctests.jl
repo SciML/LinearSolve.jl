@@ -167,6 +167,35 @@ end
         PETScExt.cleanup_petsc_cache!(sol32)
     end
 
+    @testset "ComplexF64 sparse" begin
+        # Build a complex Hermitian positive-definite sparse matrix:
+        #   A = B'B + 10I  where B has complex entries
+        # Hermitian positive-definite ensures CG convergence.
+        B = sprand(ComplexF64, n, n, 0.1)
+        Ac = B' * B + 10I
+        bc = rand(ComplexF64, n)
+
+        sol = solve(
+            LinearProblem(Ac, bc), PETScAlgorithm(:gmres); abstol = 1.0e-10
+        )
+        @test eltype(sol.u) == ComplexF64
+        @test norm(Ac * sol.u - bc) / norm(bc) < 1.0e-6
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
+
+    @testset "ComplexF32 sparse" begin
+        B32 = sparse(ComplexF32.(Matrix(sprand(ComplexF64, n, n, 0.1))))
+        Ac32 = B32' * B32 + 10I
+        bc32 = rand(ComplexF32, n)
+
+        sol32 = solve(
+            LinearProblem(Ac32, bc32), PETScAlgorithm(:gmres); abstol = 1.0f-5
+        )
+        @test eltype(sol32.u) == ComplexF32
+        @test norm(Ac32 * sol32.u - bc32) / norm(bc32) < 1.0f-3
+        PETScExt.cleanup_petsc_cache!(sol32)
+    end
+
     @testset "Unsupported type errors" begin
         A_big = BigFloat.(Matrix(sprand(n, n, 0.1) + 10I))
         b_big = BigFloat.(rand(n))

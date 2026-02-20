@@ -420,7 +420,8 @@ function build_nullspace(petsclib, alg::PETScAlgorithm, comm)
         return nothing
     elseif alg.nullspace === :constant
         return LibPETSc.MatNullSpaceCreate(
-            petsclib, comm, LibPETSc.PetscBool(true), 0, LibPETSc.PetscVec[])
+            petsclib, comm, LibPETSc.PetscBool(true), 0, LibPETSc.PetscVec[]
+        )
     else  # :custom
         PScalar = petsclib.PetscScalar
         # Wrap each Julia basis vector in a temporary PETSc Vec, hand them to
@@ -431,7 +432,8 @@ function build_nullspace(petsclib, alg::PETScAlgorithm, comm)
         ]
         ns = LibPETSc.MatNullSpaceCreate(
             petsclib, comm, LibPETSc.PetscBool(false),
-            length(petsc_vecs), petsc_vecs)
+            length(petsc_vecs), petsc_vecs
+        )
         foreach(PETSc.destroy, petsc_vecs)
         return ns
     end
@@ -470,10 +472,10 @@ function build_ksp!(pcache, petsclib, cache, alg, comm)
 
     pcache.ksp = PETSc.KSP(
         pcache.petsc_A, pcache.petsc_P;
-        ksp_type   = string(alg.solver_type),
-        pc_type    = string(alg.pc_type),
-        ksp_rtol   = cache.reltol,
-        ksp_atol   = cache.abstol,
+        ksp_type = string(alg.solver_type),
+        pc_type = string(alg.pc_type),
+        ksp_rtol = cache.reltol,
+        ksp_atol = cache.abstol,
         ksp_max_it = cache.maxiters,
         alg.ksp_options...          # forwarded verbatim to the PETSc Options DB
     )
@@ -549,7 +551,8 @@ function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm; kwargs...)
         update_mat_values!(petsclib, pcache.petsc_A, cache.A, pcache.rstart, pcache.rend)
         if alg.prec_matrix !== nothing
             update_mat_values!(
-                petsclib, pcache.petsc_P, alg.prec_matrix, pcache.rstart, pcache.rend)
+                petsclib, pcache.petsc_P, alg.prec_matrix, pcache.rstart, pcache.rend
+            )
         end
         # Preconditioner reuse follows the LinearSolve.jl convention:
         #   reinit!(cache)                   sets precsisfresh = true  (default)
@@ -559,7 +562,8 @@ function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm; kwargs...)
         #       very little, e.g. near Newton convergence)
         if !cache.precsisfresh
             LibPETSc.KSPSetReusePreconditioner(
-                petsclib, pcache.ksp, LibPETSc.PetscBool(true))
+                petsclib, pcache.ksp, LibPETSc.PetscBool(true)
+            )
         end
     end
     cache.isfresh = false

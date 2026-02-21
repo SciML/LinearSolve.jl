@@ -1033,3 +1033,54 @@ function AlgebraicMultigridJL(args...; kwargs...)
 end
 
 needs_concrete_A(::AlgebraicMultigridJL) = true
+
+"""
+`ParUFactorization(;reuse_symbolic=true)`
+
+A parallel sparse LU factorization from SuiteSparse's
+[ParU](https://github.com/DrTimothyAldenDavis/SuiteSparse) library.
+ParU is a multithreaded direct solver for sparse systems of linear equations
+using OpenMP task parallelism for the numeric factorization phase.
+
+ParU calls UMFPACK for its symbolic analysis phase (computing fill-reducing
+column ordering and symbolic factorization), then performs a parallel numeric
+factorization exploiting dense frontal matrices. It can outperform UMFPACK on
+larger systems where the parallelism can be exploited.
+
+Only supports `Float64` element type.
+
+## Keyword Arguments
+
+  - `reuse_symbolic`: Cache and reuse the symbolic factorization across solves
+    when the sparsity pattern of `A` does not change. Defaults to `true`.
+
+!!! note
+
+    Using this solver requires loading the package `ParU_jll`, i.e.:
+    ```julia
+    import ParU_jll
+    using LinearSolve, SparseArrays
+    ```
+
+## Example
+
+```julia
+import ParU_jll
+using LinearSolve, SparseArrays
+
+A = sprand(100, 100, 0.1) + 10I
+b = rand(100)
+prob = LinearProblem(A, b)
+sol = solve(prob, ParUFactorization())
+```
+"""
+struct ParUFactorization <: AbstractSparseFactorization
+    reuse_symbolic::Bool
+    function ParUFactorization(; reuse_symbolic::Bool = true)
+        ext = Base.get_extension(@__MODULE__, :LinearSolveParUExt)
+        if ext === nothing
+            error("ParUFactorization requires that ParU_jll and SparseArrays are loaded, i.e. `import ParU_jll; using SparseArrays`")
+        end
+        return new(reuse_symbolic)
+    end
+end

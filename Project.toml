@@ -172,7 +172,6 @@ Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
 Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
 MultiFloats = "bdf0d083-296b-4888-a5b6-7498122e68a5"
 PETSc = "ace2c81b-2b5f-4b1e-a30d-d662738edfe0"
-ParU_jll = "9e0b026c-e8ce-559c-a2c4-6a3d5c955bc9"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 RecursiveArrayTools = "731186ca-8d62-57ce-b412-fbd966d074cd"
@@ -186,4 +185,4 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [targets]
-test = ["AlgebraicMultigrid", "Aqua", "Test", "IterativeSolvers", "InteractiveUtils", "KrylovKit", "KrylovPreconditioners", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI", "PETSc", "ParU_jll", "BlockDiagonals", "FiniteDiff", "BandedMatrices", "FastAlmostBandedMatrices", "StaticArrays", "AllocCheck", "StableRNGs", "Zygote", "RecursiveFactorization", "Sparspak", "CliqueTrees", "FastLapackInterface", "SparseArrays", "ExplicitImports", "ComponentArrays"]
+test = ["AlgebraicMultigrid", "Aqua", "Test", "IterativeSolvers", "InteractiveUtils", "KrylovKit", "KrylovPreconditioners", "Pkg", "Random", "SafeTestsets", "MultiFloats", "ForwardDiff", "HYPRE", "MPI", "PETSc", "BlockDiagonals", "FiniteDiff", "BandedMatrices", "FastAlmostBandedMatrices", "StaticArrays", "AllocCheck", "StableRNGs", "Zygote", "RecursiveFactorization", "Sparspak", "CliqueTrees", "FastLapackInterface", "SparseArrays", "ExplicitImports", "ComponentArrays"]

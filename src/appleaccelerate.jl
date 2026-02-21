@@ -300,7 +300,7 @@ function LinearSolve.init_cacheval(
 end
 
 function SciMLBase.solve!(
-        cache::LinearCache, alg::AppleAccelerateLUFactorization;
+        cache::LinearCacheType, alg::AppleAccelerateLUFactorization;
         kwargs...
     )
     __appleaccelerate_isavailable() ||
@@ -407,7 +407,7 @@ function LinearSolve.init_cacheval(
 end
 
 function SciMLBase.solve!(
-        cache::LinearCache, alg::AppleAccelerate32MixedLUFactorization;
+        cache::LinearCacheType, alg::AppleAccelerate32MixedLUFactorization;
         kwargs...
     )
     __appleaccelerate_isavailable() ||

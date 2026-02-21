@@ -276,7 +276,7 @@ function init_cacheval(
     return nothing
 end
 
-function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
+function SciMLBase.solve!(cache::LinearCacheType, alg::KrylovJL; kwargs...)
     if cache.precsisfresh && !isnothing(alg.precs)
         Pl, Pr = alg.precs(cache.A, cache.p)
         cache.Pl = Pl

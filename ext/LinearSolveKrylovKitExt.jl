@@ -1,7 +1,7 @@
 module LinearSolveKrylovKitExt
 
 using LinearSolve, KrylovKit, LinearAlgebra
-using LinearSolve: LinearCache, DEFAULT_PRECS
+using LinearSolve: LinearCache, LinearCacheType, DEFAULT_PRECS
 using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_int
 
 function LinearSolve.KrylovKitJL(
@@ -24,7 +24,7 @@ end
 LinearSolve.default_alias_A(::KrylovKitJL, ::Any, ::Any) = true
 LinearSolve.default_alias_b(::KrylovKitJL, ::Any, ::Any) = true
 
-function SciMLBase.solve!(cache::LinearCache, alg::KrylovKitJL; kwargs...)
+function SciMLBase.solve!(cache::LinearCacheType, alg::KrylovKitJL; kwargs...)
     atol = float(cache.abstol)
     rtol = float(cache.reltol)
     maxiter = cache.maxiters

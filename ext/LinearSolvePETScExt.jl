@@ -5,7 +5,7 @@ using PETSc
 using PETSc: MPI
 using PETSc: petsclibs
 using SparseArrays: SparseMatrixCSC, sparse
-using LinearSolve: PETScAlgorithm, LinearCache, LinearProblem, LinearSolve,
+using LinearSolve: PETScAlgorithm, LinearCache, LinearCacheType, LinearProblem, LinearSolve,
     OperatorAssumptions, default_tol, init_cacheval, __issquare,
     __conditioning, LinearSolveAdjoint, LinearVerbosity
 using SciMLLogging: SciMLLogging, verbosity_to_int, @SciMLMessage
@@ -98,7 +98,7 @@ function pc_type_string(pc_type::Symbol)
     return get(pc_types, pc_type, string(pc_type))
 end
 
-function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm, args...; kwargs...)
+function SciMLBase.solve!(cache::LinearCacheType, alg::PETScAlgorithm, args...; kwargs...)
     pcache = cache.cacheval
 
     # Get element type from the problem

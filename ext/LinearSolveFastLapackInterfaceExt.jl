@@ -21,7 +21,7 @@ function LinearSolve.init_cacheval(
 end
 
 function SciMLBase.solve!(
-        cache::LinearSolve.LinearCache, alg::FastLUFactorization; kwargs...
+        cache::LinearSolve.LinearCacheType, alg::FastLUFactorization; kwargs...
     )
     A = cache.A
     A = convert(AbstractMatrix, A)
@@ -78,7 +78,7 @@ function LinearSolve.init_cacheval(
 end
 
 function SciMLBase.solve!(
-        cache::LinearSolve.LinearCache, alg::FastQRFactorization{P};
+        cache::LinearSolve.LinearCacheType, alg::FastQRFactorization{P};
         kwargs...
     ) where {P}
     A = cache.A

@@ -311,7 +311,7 @@ function LinearSolve.init_cacheval(
 end
 
 function SciMLBase.solve!(
-        cache::LinearCache, alg::OpenBLASLUFactorization;
+        cache::LinearCacheType, alg::OpenBLASLUFactorization;
         kwargs...
     )
     __openblas_isavailable() ||
@@ -417,7 +417,7 @@ function LinearSolve.init_cacheval(
 end
 
 function SciMLBase.solve!(
-        cache::LinearCache, alg::OpenBLAS32MixedLUFactorization;
+        cache::LinearCacheType, alg::OpenBLAS32MixedLUFactorization;
         kwargs...
     )
     __openblas_isavailable() ||

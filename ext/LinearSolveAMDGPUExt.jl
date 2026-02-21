@@ -7,7 +7,7 @@ using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase
 
 # LU Factorization
 function SciMLBase.solve!(
-        cache::LinearSolve.LinearCache, alg::AMDGPUOffloadLUFactorization;
+        cache::LinearSolve.LinearCacheType, alg::AMDGPUOffloadLUFactorization;
         kwargs...
     )
     if cache.isfresh
@@ -36,7 +36,7 @@ end
 
 # QR Factorization
 function SciMLBase.solve!(
-        cache::LinearSolve.LinearCache, alg::AMDGPUOffloadQRFactorization;
+        cache::LinearSolve.LinearCacheType, alg::AMDGPUOffloadQRFactorization;
         kwargs...
     )
     if cache.isfresh

@@ -46,7 +46,7 @@ struct LinearSolveFunction{F} <: AbstractSolveFunction
 end
 
 function SciMLBase.solve!(
-        cache::LinearCache, alg::LinearSolveFunction,
+        cache::LinearCacheType, alg::LinearSolveFunction,
         args...; kwargs...
     )
     (; A, b, u, p, isfresh, Pl, Pr, cacheval) = cache
@@ -99,7 +99,7 @@ struct DirectLdiv!{cache} <: AbstractSolveFunction
 end
 
 # Default solve! for non-caching or matrix types that don't need caching
-function SciMLBase.solve!(cache::LinearCache, alg::DirectLdiv!{false}, args...; kwargs...)
+function SciMLBase.solve!(cache::LinearCacheType, alg::DirectLdiv!{false}, args...; kwargs...)
     (; A, b, u) = cache
     ldiv!(u, A, b)
     return SciMLBase.build_linear_solution(alg, u, nothing, cache)
@@ -107,7 +107,7 @@ end
 
 # For caching DirectLdiv! with general matrices, just use regular ldiv!
 # (caching is only needed for specific matrix types like Tridiagonal)
-function SciMLBase.solve!(cache::LinearCache, alg::DirectLdiv!{true}, args...; kwargs...)
+function SciMLBase.solve!(cache::LinearCacheType, alg::DirectLdiv!{true}, args...; kwargs...)
     (; A, b, u) = cache
     ldiv!(u, A, b)
     return SciMLBase.build_linear_solution(alg, u, nothing, cache)

@@ -205,7 +205,7 @@ end
 default_alias_A(::SimpleLUFactorization, ::Any, ::Any) = true
 default_alias_b(::SimpleLUFactorization, ::Any, ::Any) = true
 
-function SciMLBase.solve!(cache::LinearCache, alg::SimpleLUFactorization; kwargs...)
+function SciMLBase.solve!(cache::LinearCacheType, alg::SimpleLUFactorization; kwargs...)
     if cache.isfresh
         cache.cacheval.A .= cache.A
         simplelu_factorize!(cache.cacheval, alg.pivot)

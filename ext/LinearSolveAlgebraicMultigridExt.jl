@@ -1,7 +1,7 @@
 module LinearSolveAlgebraicMultigridExt
 
 using LinearSolve, AlgebraicMultigrid, LinearAlgebra
-using LinearSolve: LinearCache, LinearVerbosity, OperatorAssumptions
+using LinearSolve: LinearCache, LinearCacheType, LinearVerbosity, OperatorAssumptions
 using SciMLBase: SciMLBase, ReturnCode
 
 function LinearSolve.init_cacheval(
@@ -19,7 +19,7 @@ function LinearSolve.init_cacheval(
     return SciMLBase.init(amg_alg, A, b; alg.kwargs...)
 end
 
-function SciMLBase.solve!(cache::LinearCache, alg::AlgebraicMultigridJL; kwargs...)
+function SciMLBase.solve!(cache::LinearCacheType, alg::AlgebraicMultigridJL; kwargs...)
     if cache.isfresh
         cache.cacheval = LinearSolve.init_cacheval(
             alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr,

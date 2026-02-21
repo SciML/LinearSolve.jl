@@ -26,7 +26,7 @@ function LinearSolve.init_cacheval(
     return makefactor(A, alg.alg, alg.snd)
 end
 
-function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CliqueTreesFactorization; kwargs...)
+function SciMLBase.solve!(cache::LinearSolve.LinearCacheType, alg::CliqueTreesFactorization; kwargs...)
     A = cache.A
     u = cache.u
     b = cache.b

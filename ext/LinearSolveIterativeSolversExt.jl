@@ -1,7 +1,7 @@
 module LinearSolveIterativeSolversExt
 
 using LinearSolve, LinearAlgebra
-using LinearSolve: LinearCache, DEFAULT_PRECS, LinearVerbosity
+using LinearSolve: LinearCache, LinearCacheType, DEFAULT_PRECS, LinearVerbosity
 import LinearSolve: IterativeSolversJL
 using SciMLLogging: SciMLLogging, @SciMLMessage
 
@@ -132,7 +132,7 @@ function LinearSolve.init_cacheval(
     return iterable
 end
 
-function SciMLBase.solve!(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
+function SciMLBase.solve!(cache::LinearCacheType, alg::IterativeSolversJL; kwargs...)
     if cache.precsisfresh && !isnothing(alg.precs)
         Pl, Pr = alg.precs(cache.Pl, cache.Pr)
         cache.Pl = Pl

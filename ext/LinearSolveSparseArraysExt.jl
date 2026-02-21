@@ -233,7 +233,7 @@ end
     end
 
     function SciMLBase.solve!(
-            cache::LinearSolve.LinearCache, alg::UMFPACKFactorization; kwargs...
+            cache::LinearSolve.LinearCacheType, alg::UMFPACKFactorization; kwargs...
         )
         A = cache.A
         A = convert(AbstractMatrix, A)
@@ -284,7 +284,7 @@ end
 
 else
     function SciMLBase.solve!(
-            cache::LinearSolve.LinearCache, alg::UMFPACKFactorization; kwargs...
+            cache::LinearSolve.LinearCacheType, alg::UMFPACKFactorization; kwargs...
         )
         error("UMFPACKFactorization requires GPL libraries (UMFPACK). Rebuild Julia with USE_GPL_LIBS=1 or use an alternative algorithm like SparspakFactorization")
     end
@@ -399,7 +399,7 @@ function LinearSolve.init_cacheval(
     end
 end
 
-function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization; kwargs...)
+function SciMLBase.solve!(cache::LinearSolve.LinearCacheType, alg::KLUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh

@@ -47,7 +47,7 @@ function LinearSolve.init_cacheval(
 end
 
 function SciMLBase.solve!(
-        cache::LinearSolve.LinearCache, alg::SparspakFactorization; kwargs...
+        cache::LinearSolve.LinearCacheType, alg::SparspakFactorization; kwargs...
     )
     A = cache.A
     if cache.isfresh

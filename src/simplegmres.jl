@@ -87,7 +87,7 @@ end
     warm_start::Bool
 end
 
-function update_cacheval!(cache::LinearCache, cacheval::SimpleGMRESCache, name::Symbol, x)
+function update_cacheval!(cache::LinearCacheType, cacheval::SimpleGMRESCache, name::Symbol, x)
     (name != :b || cache.isfresh) && return cacheval
     vec(cacheval.w) .= vec(x)
     fill!(cacheval.x, 0)
@@ -151,7 +151,7 @@ _norm2(x, dims) = .√(sum(abs2, x; dims))
 default_alias_A(::SimpleGMRES, ::Any, ::Any) = false
 default_alias_b(::SimpleGMRES, ::Any, ::Any) = false
 
-function SciMLBase.solve!(cache::LinearCache, alg::SimpleGMRES; kwargs...)
+function SciMLBase.solve!(cache::LinearCacheType, alg::SimpleGMRES; kwargs...)
     if cache.isfresh
         solver = init_cacheval(
             alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr,
@@ -230,7 +230,7 @@ function _init_cacheval(
     )
 end
 
-function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
+function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCacheType)
     (; memory, n, restart, maxiters, blocksize, ε, PlisI, PrisI, Pl, Pr) = cache
     (; Δx, q, p, x, A, b, abstol, reltol, w, V, s, c, z, R, β, warm_start) = cache
 
@@ -474,7 +474,7 @@ function _init_cacheval(
     )
 end
 
-function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
+function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCacheType)
     (; memory, n, restart, maxiters, blocksize, ε, PlisI, PrisI, Pl, Pr) = cache
     (; Δx, q, p, x, A, b, abstol, reltol, w, V, s, c, z, R, β, warm_start) = cache
     bsize = n ÷ blocksize

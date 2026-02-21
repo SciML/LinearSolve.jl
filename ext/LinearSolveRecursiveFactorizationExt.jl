@@ -10,7 +10,7 @@ using SciMLLogging: @SciMLMessage
 LinearSolve.userecursivefactorization(A::Union{Nothing, AbstractMatrix}) = true
 
 function SciMLBase.solve!(
-        cache::LinearSolve.LinearCache, alg::RFLUFactorization{P, T};
+        cache::LinearSolve.LinearCacheType, alg::RFLUFactorization{P, T};
         kwargs...
     ) where {P, T}
     A = cache.A
@@ -63,7 +63,7 @@ function LinearSolve.init_cacheval(
 end
 
 function SciMLBase.solve!(
-        cache::LinearSolve.LinearCache, alg::RF32MixedLUFactorization{P, T};
+        cache::LinearSolve.LinearCacheType, alg::RF32MixedLUFactorization{P, T};
         kwargs...
     ) where {P, T}
     A = cache.A
@@ -115,7 +115,7 @@ function SciMLBase.solve!(
 end
 
 function SciMLBase.solve!(
-        cache::LinearSolve.LinearCache, alg::ButterflyFactorization;
+        cache::LinearSolve.LinearCacheType, alg::ButterflyFactorization;
         kwargs...
     )
     cache_A = cache.A

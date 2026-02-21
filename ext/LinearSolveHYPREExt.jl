@@ -3,7 +3,7 @@ module LinearSolveHYPREExt
 using LinearAlgebra
 using HYPRE.LibHYPRE: HYPRE_Complex
 using HYPRE: HYPRE, HYPREMatrix, HYPRESolver, HYPREVector
-using LinearSolve: HYPREAlgorithm, LinearCache, LinearProblem, LinearSolve,
+using LinearSolve: HYPREAlgorithm, LinearCache, LinearCacheType, LinearProblem, LinearSolve,
     OperatorAssumptions, default_tol, init_cacheval, __issquare,
     __conditioning, LinearSolveAdjoint, LinearVerbosity
 using SciMLLogging: SciMLLogging, verbosity_to_int, @SciMLMessage
@@ -176,7 +176,7 @@ create_solver(::Type{S}, comm) where {S <: COMM_SOLVERS} = S(comm)
 const NO_COMM_SOLVERS = Union{HYPRE.BoomerAMG, HYPRE.Hybrid, HYPRE.ILU}
 create_solver(::Type{S}, comm) where {S <: NO_COMM_SOLVERS} = S()
 
-function create_solver(alg::HYPREAlgorithm, cache::LinearCache)
+function create_solver(alg::HYPREAlgorithm, cache::LinearCacheType)
     # If the solver is already instantiated, return it directly
     if alg.solver isa HYPRE.HYPRESolver
         return alg.solver
@@ -231,7 +231,7 @@ function create_solver(alg::HYPREAlgorithm, cache::LinearCache)
 end
 
 # TODO: How are args... and kwargs... supposed to be used here?
-function SciMLBase.solve!(cache::LinearCache, alg::HYPREAlgorithm, args...; kwargs...)
+function SciMLBase.solve!(cache::LinearCacheType, alg::HYPREAlgorithm, args...; kwargs...)
     # It is possible to reach here without HYPRE.Init() being called if HYPRE structures are
     # only to be created here internally (i.e. when cache.A::SparseMatrixCSC and not a
     # ::HYPREMatrix created externally by the user). Be nice to the user and call it :)

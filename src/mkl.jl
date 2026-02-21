@@ -290,7 +290,7 @@ function LinearSolve.init_cacheval(
 end
 
 function SciMLBase.solve!(
-        cache::LinearCache, alg::MKLLUFactorization;
+        cache::LinearCacheType, alg::MKLLUFactorization;
         kwargs...
     )
     __mkl_isavailable() ||
@@ -411,7 +411,7 @@ function LinearSolve.init_cacheval(
 end
 
 function SciMLBase.solve!(
-        cache::LinearCache, alg::MKL32MixedLUFactorization;
+        cache::LinearCacheType, alg::MKL32MixedLUFactorization;
         kwargs...
     )
     __mkl_isavailable() ||

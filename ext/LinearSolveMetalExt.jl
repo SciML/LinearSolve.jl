@@ -4,7 +4,7 @@ using Metal, LinearSolve
 using LinearAlgebra, SciMLBase
 using SciMLBase: AbstractSciMLOperator
 using LinearSolve: ArrayInterface, MKLLUFactorization, MetalOffload32MixedLUFactorization,
-    @get_cacheval, LinearCache, SciMLBase, OperatorAssumptions, LinearVerbosity
+    @get_cacheval, LinearCache, LinearCacheType, SciMLBase, OperatorAssumptions, LinearVerbosity
 
 @static if Sys.isapple()
 
@@ -24,7 +24,7 @@ function LinearSolve.init_cacheval(
 end
 
 function SciMLBase.solve!(
-        cache::LinearCache, alg::MetalLUFactorization;
+        cache::LinearCacheType, alg::MetalLUFactorization;
         kwargs...
     )
     A = cache.A
@@ -63,7 +63,7 @@ function LinearSolve.init_cacheval(
 end
 
 function SciMLBase.solve!(
-        cache::LinearCache, alg::MetalOffload32MixedLUFactorization;
+        cache::LinearCacheType, alg::MetalOffload32MixedLUFactorization;
         kwargs...
     )
     A = cache.A

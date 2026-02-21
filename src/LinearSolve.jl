@@ -388,6 +388,9 @@ end
 const BLASELTYPES = Union{Float32, Float64, ComplexF32, ComplexF64}
 
 function defaultalg_symbol end
+function defaultalg_symbol(::Type{T}) where {T}
+    return Base.typename(SciMLBase.parameterless_type(T)).name
+end
 
 include("verbosity.jl")
 include("blas_logging.jl")
@@ -405,6 +408,7 @@ include("preconditioners.jl")
 include("preferences.jl")
 include("solve_function.jl")
 include("default.jl")
+include("vf64_types.jl")
 include("init.jl")
 include("adjoint.jl")
 
@@ -536,5 +540,7 @@ export OperatorAssumptions, OperatorCondition
 export LinearSolveAdjoint
 
 export LinearVerbosity
+
+export LinearCacheVF64, LinearCacheType, DefaultLinearSolverInitVF64, DefaultLinearSolverInitType
 
 end

@@ -31,7 +31,7 @@ function LinearSolve.init_cacheval(
     return RFLU(A_gpu; nrhs = nrhs, symbolic = symbolic)
 end
 
-function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::LinearSolve.CUSOLVERRFFactorization; kwargs...)
+function SciMLBase.solve!(cache::LinearSolve.LinearCacheType, alg::LinearSolve.CUSOLVERRFFactorization; kwargs...)
     A = cache.A
 
     # Convert to appropriate GPU format if needed

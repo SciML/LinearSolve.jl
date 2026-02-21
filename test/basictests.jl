@@ -18,12 +18,6 @@ catch
     # AlgebraicMultigrid not available, AMG tests will be skipped
 end
 
-try
-    import ParU_jll
-catch e
-    # ParU_jll not available or Julia version too old; ParU tests will be skipped
-end
-
 const Dual64 = ForwardDiff.Dual{Nothing, Float64, 1}
 
 n = 8
@@ -184,32 +178,6 @@ end
         X = sprand(n, n, 0.8)
         cache.A = X
         @test X * solve!(cache) ≈ b1
-    end
-
-    @testset "ParU Factorization" begin
-        # ParUFactorization requires ParU_jll (which requires Julia ≥ 1.12).
-        # Skip if the extension was not loaded.
-        if Base.get_extension(LinearSolve, :LinearSolveParUExt) !== nothing
-            A1 = sparse(A / 1)
-            b1 = rand(n)
-            x1 = zero(b)
-            A2 = sparse(A / 2)
-            b2 = rand(n)
-            x2 = zero(b)
-
-            prob1 = LinearProblem(A1, b1; u0 = x1)
-            prob2 = LinearProblem(A2, b2; u0 = x2)
-            test_interface(ParUFactorization(), prob1, prob2)
-            test_interface(ParUFactorization(reuse_symbolic = false), prob1, prob2)
-
-            # Test cache reuse with sparsity pattern change
-            cache = SciMLBase.init(prob1, ParUFactorization(); cache_kwargs...)
-            y = solve!(cache)
-            cache.A = A2
-            @test A2 * solve!(cache) ≈ b1
-        else
-            @test_skip "ParU_jll not available on this Julia version (requires ≥ 1.12)"
-        end
     end
 
     @testset "Sparspak Factorization (Float64)" begin

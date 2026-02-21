@@ -35,7 +35,6 @@ jobs:
           - "DefaultsLoading"
           - "LinearSolveHYPRE"
           - "LinearSolvePardiso"
-          - "LinearSolveParU"
           - "NoPre"
           - "LinearSolveAutotune"
           - "Preferences"
@@ -54,9 +53,6 @@ jobs:
           # See: https://github.com/SciML/LinearSolve.jl/issues/879
           - group: LinearSolvePardiso
             version: "pre"
-          # ParU_jll requires Julia >= 1.12 (incompatible SuiteSparse_jll on older versions)
-          - group: LinearSolveParU
-            version: "lts"
     uses: "SciML/.github/.github/workflows/tests.yml@v1"
     with:
       group: "${{ matrix.group }}"

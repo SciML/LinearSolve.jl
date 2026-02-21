@@ -72,6 +72,13 @@ if GROUP == "LinearSolvePardiso"
     @time @safetestset "Pardiso" include("pardiso/pardiso.jl")
 end
 
+if GROUP == "LinearSolveParU"
+    Pkg.activate("paru")
+    Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
+    Pkg.instantiate()
+    @time @safetestset "ParU" include("paru/paru.jl")
+end
+
 if Base.Sys.islinux() && (GROUP == "All" || GROUP == "LinearSolveHYPRE") && HAS_EXTENSIONS
     @time @safetestset "LinearSolveHYPRE" include("hypretests.jl")
 end

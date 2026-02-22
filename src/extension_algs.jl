@@ -753,7 +753,7 @@ including OpenMP, CUDA, HIP, and SYCL, making it suitable for both CPU and GPU c
 ## Example
 
 ```julia
-using Ginkgo, SparseArrays
+using LinearSolve, Ginkgo, SparseArrays
 A = sprand(Float32, 100, 100, 0.1)
 A = A'A + 30I  # make SPD
 b = rand(Float32, 100)

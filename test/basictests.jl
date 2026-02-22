@@ -973,12 +973,12 @@ end
         prob_gko = LinearProblem(A_gko, b_gko)
 
         # Default constructor (CG, OMP)
-        sol_gko = solve(prob_gko, GinkgoJL(); reltol = 1.0e-4f0, maxiter = 500)
+        sol_gko = solve(prob_gko, GinkgoJL(); reltol = 1.0e-4f0, maxiters = 500)
         @test norm(A_gko * sol_gko.u - b_gko) / norm(b_gko) < 5.0e-3
 
         # GinkgoJL_CG convenience alias
         @test GinkgoJL_CG() isa GinkgoJL
-        sol_gko2 = solve(prob_gko, GinkgoJL_CG(); reltol = 1.0e-4f0, maxiter = 500)
+        sol_gko2 = solve(prob_gko, GinkgoJL_CG(); reltol = 1.0e-4f0, maxiters = 500)
         @test norm(A_gko * sol_gko2.u - b_gko) / norm(b_gko) < 5.0e-3
     end
 end

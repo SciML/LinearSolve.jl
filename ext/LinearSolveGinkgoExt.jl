@@ -4,7 +4,6 @@ using LinearSolve, LinearAlgebra, SparseArrays
 using LinearSolve: LinearCache, LinearVerbosity, OperatorAssumptions
 import SciMLBase
 import Ginkgo
-using Ginkgo: GkoExecutor, GkoCsr, GkoDense
 
 # -----------------------------------------------------------------------
 # Constructors (defined here so they can use Ginkgo.jl types directly)
@@ -73,39 +72,39 @@ function _write_dense_vec_mtx(v::AbstractVector, filename::AbstractString)
 end
 
 # -----------------------------------------------------------------------
-# Convert a Julia AbstractMatrix to GkoCsr{Float32, Int32}
+# Convert a Julia AbstractMatrix to SparseMatrixCsr{Float32, Int32}
 # -----------------------------------------------------------------------
 
-function _to_gko_csr(A, exec::GkoExecutor)
+function _to_gko_csr(A, exec)
     A_sparse = A isa SparseMatrixCSC ? A : sparse(A)
     tmpfile = tempname() * ".mtx"
     try
         _write_sparse_mtx(SparseMatrixCSC{Float32, Int32}(A_sparse), tmpfile)
-        return GkoCsr{Float32, Int32}(tmpfile, exec)
+        return Ginkgo.SparseMatrixCsr{Float32, Int32}(tmpfile, exec)
     finally
         rm(tmpfile, force = true)
     end
 end
 
 # -----------------------------------------------------------------------
-# Convert a Julia AbstractVector to GkoDense{Float32}
+# Convert a Julia AbstractVector to Dense{Float32}
 # -----------------------------------------------------------------------
 
-function _to_gko_dense(v::AbstractVector, exec::GkoExecutor)
+function _to_gko_dense(v::AbstractVector, exec)
     tmpfile = tempname() * ".mtx"
     try
         _write_dense_vec_mtx(v, tmpfile)
-        return GkoDense{Float32}(tmpfile, exec)
+        return Ginkgo.Dense{Float32}(tmpfile, exec)
     finally
         rm(tmpfile, force = true)
     end
 end
 
 # -----------------------------------------------------------------------
-# Copy a GkoDense{Float32} result back into a Julia vector
+# Copy a Dense{Float32} result back into a Julia vector
 # -----------------------------------------------------------------------
 
-function _copy_gko_dense_to!(dest::AbstractVector, src::GkoDense{Float32})
+function _copy_gko_dense_to!(dest::AbstractVector, src::Ginkgo.Dense{Float32})
     n = length(dest)
     for i in 1:n
         dest[i] = src[i, 1]
@@ -142,7 +141,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::GinkgoJL; kwargs...)
     # ---- Dispatch to solver ----------------------------------------
     if alg.KrylovAlg === :cg
         Ginkgo.cg!(
-            gko_x, gko_A, gko_b, exec;
+            exec, gko_x, gko_A, gko_b;
             maxiter = cache.maxiters,
             reduction = Float64(cache.reltol),
             alg.kwargs...

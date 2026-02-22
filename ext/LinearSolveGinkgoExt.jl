@@ -26,50 +26,6 @@ LinearSolve.default_alias_A(::GinkgoJL, ::Any, ::Any) = true
 LinearSolve.default_alias_b(::GinkgoJL, ::Any, ::Any) = true
 LinearSolve.needs_concrete_A(::GinkgoJL) = true
 
-# Julia CSC (1-indexed, col-major) → Ginkgo CSR (0-indexed, row-major).
-# The get_const_* accessors return raw writable pointers; unsafe_copyto! fills
-# Ginkgo's internal buffers directly — same pattern as Ginkgo.nonzeros() etc.
-
-"""
-    _csc_to_csr_arrays(A)
-
-Convert a `SparseMatrixCSC{Float32,Int32}` to the three CSR arrays required
-by Ginkgo (all 0-indexed): `rowptr` (length m+1), `col_idxs` (length nnz),
-`vals` (length nnz).
-"""
-function _csc_to_csr_arrays(A::SparseMatrixCSC{Float32, Int32})
-    m, n = size(A)
-    nz = nnz(A)
-    rvals = rowvals(A)
-    nzv = nonzeros(A)
-
-    row_counts = zeros(Int32, m)
-    for r in rvals
-        row_counts[r] += Int32(1)
-    end
-
-    rowptr = Vector{Int32}(undef, m + 1)
-    rowptr[1] = Int32(0)
-    for i in 1:m
-        rowptr[i + 1] = rowptr[i] + row_counts[i]
-    end
-
-    col_idxs = Vector{Int32}(undef, nz)
-    vals = Vector{Float32}(undef, nz)
-    fill!(row_counts, Int32(0))
-    for j in 1:n
-        for k in nzrange(A, j)
-            r = rvals[k]
-            pos = rowptr[r] + row_counts[r] + 1
-            col_idxs[pos] = Int32(j - 1)  # 0-indexed
-            vals[pos] = nzv[k]
-            row_counts[r] += Int32(1)
-        end
-    end
-
-    return rowptr, col_idxs, vals
-end
-
 """
     _to_gko_csr_inmem(A, exec) -> gko_matrix_csr_f32_i32
 
@@ -82,7 +38,10 @@ function _to_gko_csr_inmem(A, exec)
     m, n = size(A_f32)
     nz = nnz(A_f32)
 
-    rowptr, col_idxs, vals = _csc_to_csr_arrays(A_f32)
+    At = SparseMatrixCSC{Float32, Int32}(sparse(transpose(A_f32)))
+    rowptr = At.colptr .- Int32(1)
+    col_idxs = At.rowval .- Int32(1)
+    vals = At.nzval
 
     dim = Ginkgo.API.ginkgo_dim2_create(m, n)
     mat_ptr = Ginkgo.API.ginkgo_matrix_csr_f32_i32_create(exec, dim, nz)

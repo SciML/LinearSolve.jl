@@ -77,7 +77,7 @@ Build a Ginkgo CSR matrix from `A` entirely in memory (no files, no MTX
 serialisation).  Returns a raw `gko_matrix_csr_f32_i32` pointer; the caller
 **must** call `Ginkgo.API.ginkgo_matrix_csr_f32_i32_delete` when done.
 """
-function _to_gko_csr_inmem(A, exec::Ginkgo.GkoExecutor)
+function _to_gko_csr_inmem(A, exec)
     A_f32 = SparseMatrixCSC{Float32, Int32}(A isa SparseMatrixCSC ? A : sparse(A))
     m, n = size(A_f32)
     nz = nnz(A_f32)
@@ -85,7 +85,7 @@ function _to_gko_csr_inmem(A, exec::Ginkgo.GkoExecutor)
     rowptr, col_idxs, vals = _csc_to_csr_arrays(A_f32)
 
     dim = Ginkgo.API.ginkgo_dim2_create(m, n)
-    mat_ptr = Ginkgo.API.ginkgo_matrix_csr_f32_i32_create(exec.ptr, dim, nz)
+    mat_ptr = Ginkgo.API.ginkgo_matrix_csr_f32_i32_create(exec, dim, nz)
 
     val_raw = Ginkgo.API.ginkgo_matrix_csr_f32_i32_get_const_values(mat_ptr)
     col_raw = Ginkgo.API.ginkgo_matrix_csr_f32_i32_get_const_col_idxs(mat_ptr)
@@ -112,7 +112,7 @@ Write `v` to a temp file in MTX array format and read it into a Ginkgo Dense
 n×1 matrix.  Returns a raw `gko_matrix_dense_f32` pointer; the caller
 **must** call `Ginkgo.API.ginkgo_matrix_dense_f32_delete` when done.
 """
-function _to_gko_dense(v::AbstractVector, exec::Ginkgo.GkoExecutor)
+function _to_gko_dense(v::AbstractVector, exec)
     n = length(v)
     buf = IOBuffer()
     println(buf, "%%MatrixMarket matrix array real general")
@@ -123,7 +123,7 @@ function _to_gko_dense(v::AbstractVector, exec::Ginkgo.GkoExecutor)
     tmpfile = tempname() * ".mtx"
     try
         write(tmpfile, take!(buf))
-        return Ginkgo.API.ginkgo_matrix_dense_f32_read(tmpfile, exec.ptr)
+        return Ginkgo.API.ginkgo_matrix_dense_f32_read(tmpfile, exec)
     finally
         rm(tmpfile, force = true)
     end
@@ -158,7 +158,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::GinkgoJL; kwargs...)
     try
         if alg.KrylovAlg === :cg
             Ginkgo.API.ginkgo_solver_cg_solve(
-                exec.ptr, A_ptr, b_ptr, x_ptr,
+                exec, A_ptr, b_ptr, x_ptr,
                 Cint(cache.maxiters), Cdouble(cache.reltol)
             )
         elseif alg.KrylovAlg === :gmres

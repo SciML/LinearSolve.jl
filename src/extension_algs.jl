@@ -723,6 +723,65 @@ A wrapper over the IterativeSolvers.jl MINRES.
 function IterativeSolversJL_MINRES end
 
 """
+```julia
+GinkgoJL(args...; KrylovAlg = :cg, executor = :omp, kwargs...)
+```
+
+A generic wrapper over [Ginkgo.jl](https://github.com/youwuyou/Ginkgo.jl) iterative solvers.
+Ginkgo is a high-performance numerical linear algebra library that supports multiple backends
+including OpenMP, CUDA, HIP, and SYCL, making it suitable for both CPU and GPU computation.
+
+!!! note
+
+    Using this solver requires adding the package Ginkgo.jl, i.e. `using Ginkgo`
+
+## Keyword Arguments
+
+  - `KrylovAlg`: The Ginkgo solver to use. Currently supported:
+    - `:cg` (default): Conjugate Gradient — for symmetric positive definite systems
+  - `executor`: The Ginkgo backend executor. Options:
+    - `:omp` (default): OpenMP CPU executor
+    - `:cuda`: NVIDIA GPU executor
+    - `:reference`: Reference (single-threaded) executor
+
+!!! warning
+
+    Ginkgo.jl currently only supports `Float32` element types with `Int32` indices for sparse
+    matrices. The input matrix and vectors will be converted to `Float32` automatically.
+    The CG solver requires a symmetric positive definite matrix.
+
+## Example
+
+```julia
+using Ginkgo, SparseArrays
+A = sprand(Float32, 100, 100, 0.1)
+A = A'A + 30I  # make SPD
+b = rand(Float32, 100)
+prob = LinearProblem(A, b)
+sol = solve(prob, GinkgoJL())
+```
+"""
+struct GinkgoJL{F, E, A, K} <: LinearSolve.AbstractKrylovSubspaceMethod
+    KrylovAlg::F
+    executor::E
+    args::A
+    kwargs::K
+end
+
+"""
+```julia
+GinkgoJL_CG(args...; executor = :omp, kwargs...)
+```
+
+A CG solver via Ginkgo.jl for symmetric positive definite systems.
+
+!!! note
+
+    Using this solver requires adding the package Ginkgo.jl, i.e. `using Ginkgo`
+"""
+function GinkgoJL_CG end
+
+"""
     MetalLUFactorization()
 
 A wrapper over Apple's Metal GPU library for LU factorization. Direct calls to Metal 

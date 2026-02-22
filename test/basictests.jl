@@ -18,6 +18,12 @@ catch
     # AlgebraicMultigrid not available, AMG tests will be skipped
 end
 
+try
+    using Ginkgo
+catch
+    # Ginkgo not available, Ginkgo tests will be skipped
+end
+
 const Dual64 = ForwardDiff.Dual{Nothing, Float64, 1}
 
 n = 8
@@ -953,5 +959,26 @@ end
         A_rect = sparse([1.0 1.0 0.0; 0.0 1.0 1.0])
         b_rect = [1.0, 1.0]
         @test_throws AssertionError solve(LinearProblem(A_rect, b_rect), AlgebraicMultigridJL())
+    end
+end
+
+@static if isdefined(@__MODULE__, :Ginkgo)
+    @testset "GinkgoJL" begin
+        # Build a Float32 SPD sparse matrix (Ginkgo.jl requires Float32 / Int32)
+        n_gko = 20
+        A_gko = let B = sprandn(Float32, n_gko, n_gko, 0.3)
+            SparseMatrixCSC{Float32, Int32}(B' * B + Float32(n_gko) * I)
+        end
+        b_gko = rand(Float32, n_gko)
+        prob_gko = LinearProblem(A_gko, b_gko)
+
+        # Default constructor (CG, OMP)
+        sol_gko = solve(prob_gko, GinkgoJL(); reltol = 1.0e-4f0, maxiter = 500)
+        @test norm(A_gko * sol_gko.u - b_gko) / norm(b_gko) < 5.0e-3
+
+        # GinkgoJL_CG convenience alias
+        @test GinkgoJL_CG() isa GinkgoJL
+        sol_gko2 = solve(prob_gko, GinkgoJL_CG(); reltol = 1.0e-4f0, maxiter = 500)
+        @test norm(A_gko * sol_gko2.u - b_gko) / norm(b_gko) < 5.0e-3
     end
 end

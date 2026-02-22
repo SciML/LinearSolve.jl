@@ -955,4 +955,3 @@ end
         @test_throws AssertionError solve(LinearProblem(A_rect, b_rect), AlgebraicMultigridJL())
     end
 end
-

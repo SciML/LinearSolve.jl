@@ -103,7 +103,7 @@ function LinearSolve.init_cacheval(
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
     exec = Ginkgo.create(alg.executor)
-    return (; exec = exec.ptr)
+    return (; exec)
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::GinkgoJL; kwargs...)

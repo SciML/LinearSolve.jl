@@ -35,6 +35,7 @@ jobs:
           - "DefaultsLoading"
           - "LinearSolveHYPRE"
           - "LinearSolvePardiso"
+          - "LinearSolveGinkgo"
           - "NoPre"
           - "LinearSolveAutotune"
           - "Preferences"
@@ -53,6 +54,9 @@ jobs:
           # See: https://github.com/SciML/LinearSolve.jl/issues/879
           - group: LinearSolvePardiso
             version: "pre"
+          # Ginkgo.jl is not available on Windows
+          - group: LinearSolveGinkgo
+            os: windows-latest
     uses: "SciML/.github/.github/workflows/tests.yml@v1"
     with:
       group: "${{ matrix.group }}"

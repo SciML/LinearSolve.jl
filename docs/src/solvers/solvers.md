@@ -361,3 +361,16 @@ KrylovKitJL
 ```@docs
 HYPREAlgorithm
 ```
+
+### Ginkgo.jl
+
+!!! note
+    
+    Using these solvers requires adding the package Ginkgo.jl, i.e. `using Ginkgo`.
+    Ginkgo.jl currently only supports `Float32` element types with `Int32` sparse indices.
+
+```@docs
+GinkgoJL
+GinkgoJL_CG
+GinkgoJL_GMRES
+```

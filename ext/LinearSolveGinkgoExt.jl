@@ -77,7 +77,7 @@ Build a Ginkgo CSR matrix from `A` entirely in memory (no files, no MTX
 serialisation).  Returns a raw `gko_matrix_csr_f32_i32` pointer; the caller
 **must** call `Ginkgo.API.ginkgo_matrix_csr_f32_i32_delete` when done.
 """
-function _to_gko_csr_inmem(A, exec::Ptr)
+function _to_gko_csr_inmem(A, exec)
     A_f32 = SparseMatrixCSC{Float32, Int32}(A isa SparseMatrixCSC ? A : sparse(A))
     m, n = size(A_f32)
     nz = nnz(A_f32)
@@ -112,7 +112,7 @@ Write `v` to a temp file in MTX array format and read it into a Ginkgo Dense
 n×1 matrix.  Returns a raw `gko_matrix_dense_f32` pointer; the caller
 **must** call `Ginkgo.API.ginkgo_matrix_dense_f32_delete` when done.
 """
-function _to_gko_dense(v::AbstractVector, exec::Ptr)
+function _to_gko_dense(v::AbstractVector, exec)
     n = length(v)
     buf = IOBuffer()
     println(buf, "%%MatrixMarket matrix array real general")

@@ -724,7 +724,7 @@ function IterativeSolversJL_MINRES end
 
 """
 ```julia
-GinkgoJL(args...; KrylovAlg = :cg, executor = :omp, kwargs...)
+GinkgoJL(args...; KrylovAlg = :gmres, executor = :omp, kwargs...)
 ```
 
 A generic wrapper over [Ginkgo.jl](https://github.com/youwuyou/Ginkgo.jl) iterative solvers.
@@ -737,8 +737,10 @@ including OpenMP, CUDA, HIP, and SYCL, making it suitable for both CPU and GPU c
 
 ## Keyword Arguments
 
-  - `KrylovAlg`: The Ginkgo solver to use. Currently supported:
-    - `:cg` (default): Conjugate Gradient — for symmetric positive definite systems
+  - `KrylovAlg`: The Ginkgo solver to use. Supported values:
+    - `:gmres` (default): GMRES — for general non-symmetric systems
+      (not yet exposed by Ginkgo.jl v1; use `GinkgoJL_CG()` in the meantime)
+    - `:cg`: Conjugate Gradient — for symmetric positive definite systems only
   - `executor`: The Ginkgo backend executor. Options:
     - `:omp` (default): OpenMP CPU executor
     - `:cuda`: NVIDIA GPU executor
@@ -748,17 +750,16 @@ including OpenMP, CUDA, HIP, and SYCL, making it suitable for both CPU and GPU c
 
     Ginkgo.jl currently only supports `Float32` element types with `Int32` indices for sparse
     matrices. The input matrix and vectors will be converted to `Float32` automatically.
-    The CG solver requires a symmetric positive definite matrix.
 
 ## Example
 
 ```julia
 using LinearSolve, Ginkgo, SparseArrays
 A = sprand(Float32, 100, 100, 0.1)
-A = A'A + 30I  # make SPD
+A = A'A + 30I  # make symmetric positive definite
 b = rand(Float32, 100)
 prob = LinearProblem(A, b)
-sol = solve(prob, GinkgoJL())
+sol = solve(prob, GinkgoJL_CG())
 ```
 """
 struct GinkgoJL{F, E, A, K} <: LinearSolve.AbstractKrylovSubspaceMethod
@@ -780,6 +781,21 @@ A CG solver via Ginkgo.jl for symmetric positive definite systems.
     Using this solver requires adding the package Ginkgo.jl, i.e. `using Ginkgo`
 """
 function GinkgoJL_CG end
+
+"""
+```julia
+GinkgoJL_GMRES(args...; executor = :omp, kwargs...)
+```
+
+A GMRES solver via Ginkgo.jl for general non-symmetric systems.
+
+!!! note
+
+    Using this solver requires adding the package Ginkgo.jl, i.e. `using Ginkgo`.
+    GMRES is not yet exposed by Ginkgo.jl v1. This stub is provided for forward compatibility;
+    an error will be raised at solve time until Ginkgo.jl adds GMRES support.
+"""
+function GinkgoJL_GMRES end
 
 """
     MetalLUFactorization()

@@ -372,4 +372,5 @@ HYPREAlgorithm
 ```@docs
 GinkgoJL
 GinkgoJL_CG
+GinkgoJL_GMRES
 ```

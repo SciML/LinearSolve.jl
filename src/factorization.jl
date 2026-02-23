@@ -1,5 +1,5 @@
 @generated function SciMLBase.solve!(
-        cache::LinearCache, alg::AbstractFactorization;
+        cache::LinearCacheType, alg::AbstractFactorization;
         kwargs...
     )
     return quote
@@ -146,7 +146,7 @@ end
 
 GenericLUFactorization() = GenericLUFactorization(RowMaximum())
 
-function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
+function SciMLBase.solve!(cache::LinearCacheType, alg::LUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
@@ -229,7 +229,7 @@ function init_cacheval(
 end
 
 function SciMLBase.solve!(
-        cache::LinearSolve.LinearCache, alg::GenericLUFactorization;
+        cache::LinearSolve.LinearCacheType, alg::GenericLUFactorization;
         kwargs...
     )
     A = cache.A
@@ -1129,7 +1129,7 @@ function init_cacheval(
     return nothing
 end
 
-function SciMLBase.solve!(cache::LinearCache, alg::CHOLMODFactorization; kwargs...)
+function SciMLBase.solve!(cache::LinearCacheType, alg::CHOLMODFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
 
@@ -1220,7 +1220,7 @@ function init_cacheval(
     return nothing
 end
 
-function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization; kwargs...)
+function SciMLBase.solve!(cache::LinearCacheType, alg::NormalCholeskyFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     if cache.isfresh
@@ -1286,7 +1286,7 @@ function init_cacheval(
 end
 
 function SciMLBase.solve!(
-        cache::LinearCache, alg::NormalBunchKaufmanFactorization;
+        cache::LinearCacheType, alg::NormalBunchKaufmanFactorization;
         kwargs...
     )
     A = cache.A
@@ -1317,7 +1317,7 @@ function init_cacheval(
 end
 
 function SciMLBase.solve!(
-        cache::LinearCache, alg::DiagonalFactorization;
+        cache::LinearCacheType, alg::DiagonalFactorization;
         kwargs...
     )
     A = convert(AbstractMatrix, cache.A)
@@ -1466,3 +1466,8 @@ for alg in vcat(
         )
     end
 end
+
+# Specialized defaultalg_symbol overloads (must be after GenericFactorization and
+# QRFactorization are defined, but before any @generated code is invoked for these types)
+defaultalg_symbol(::Type{<:GenericFactorization{typeof(ldlt!)}}) = :LDLtFactorization
+defaultalg_symbol(::Type{<:QRFactorization{ColumnNorm}}) = :QRFactorizationPivoted

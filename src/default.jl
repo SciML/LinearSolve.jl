@@ -476,7 +476,7 @@ function SciMLBase.init(
 end
 
 function SciMLBase.solve!(
-        cache::LinearCache, alg::Nothing,
+        cache::LinearCacheType, alg::Nothing,
         args...; assump::OperatorAssumptions = OperatorAssumptions(),
         kwargs...
     )
@@ -555,12 +555,10 @@ end
     return Expr(:call, :DefaultLinearSolverInit, caches..., :A_original)
 end
 
-function defaultalg_symbol(::Type{T}) where {T}
-    return Base.typename(SciMLBase.parameterless_type(T)).name
-end
-defaultalg_symbol(::Type{<:GenericFactorization{typeof(ldlt!)}}) = :LDLtFactorization
-
-defaultalg_symbol(::Type{<:QRFactorization{ColumnNorm}}) = :QRFactorizationPivoted
+## NOTE: The generic defaultalg_symbol(::Type{T}) method is defined in LinearSolve.jl
+## before factorization.jl is included, so that @generated functions can use it.
+## The specialized overloads below are at the end of factorization.jl (after the
+## types they dispatch on are defined).
 
 const _SPARSE_ONLY_ALGORITHMS = Symbol.(
     (
@@ -579,7 +577,7 @@ else
 end
 """
 @generated function SciMLBase.solve!(
-        cache::LinearCache, alg::DefaultLinearSolver,
+        cache::LinearCacheType, alg::DefaultLinearSolver,
         args...;
         assump::OperatorAssumptions = OperatorAssumptions(),
         kwargs...
@@ -849,7 +847,7 @@ else
 end
 ```
 """
-@generated function defaultalg_adjoint_eval(cache::LinearCache, dy)
+@generated function defaultalg_adjoint_eval(cache::LinearCacheType, dy)
     ex = :()
     for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))
         newex = if alg in Symbol.(

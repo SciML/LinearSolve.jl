@@ -58,7 +58,7 @@ function LinearSolve.error_no_cudss_lu(A::CUDA.CUSPARSE.CuSparseMatrixCSR)
 end
 
 function SciMLBase.solve!(
-        cache::LinearSolve.LinearCache, alg::CudaOffloadLUFactorization;
+        cache::LinearSolve.LinearCacheType, alg::CudaOffloadLUFactorization;
         kwargs...
     )
     if cache.isfresh
@@ -92,7 +92,7 @@ function LinearSolve.init_cacheval(
 end
 
 function SciMLBase.solve!(
-        cache::LinearSolve.LinearCache, alg::CudaOffloadQRFactorization;
+        cache::LinearSolve.LinearCacheType, alg::CudaOffloadQRFactorization;
         kwargs...
     )
     if cache.isfresh
@@ -120,7 +120,7 @@ end
 
 # Keep the deprecated CudaOffloadFactorization working by forwarding to QR
 function SciMLBase.solve!(
-        cache::LinearSolve.LinearCache, alg::CudaOffloadFactorization;
+        cache::LinearSolve.LinearCacheType, alg::CudaOffloadFactorization;
         kwargs...
     )
     if cache.isfresh
@@ -164,7 +164,7 @@ end
 
 # Mixed precision CUDA LU implementation
 function SciMLBase.solve!(
-        cache::LinearSolve.LinearCache, alg::CUDAOffload32MixedLUFactorization;
+        cache::LinearSolve.LinearCacheType, alg::CUDAOffload32MixedLUFactorization;
         kwargs...
     )
     if cache.isfresh

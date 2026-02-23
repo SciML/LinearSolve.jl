@@ -140,7 +140,7 @@ function LinearSolve.init_cacheval(
     return solver
 end
 
-function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::PardisoJL; kwargs...)
+function SciMLBase.solve!(cache::LinearSolve.LinearCacheType, alg::PardisoJL; kwargs...)
     (; A, b, u) = cache
     A = convert(AbstractMatrix, A)
     if cache.isfresh

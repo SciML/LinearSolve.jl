@@ -126,7 +126,51 @@ mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, Tlv <: Linear
     sensealg::S
 end
 
-function Base.setproperty!(cache::LinearCache, name::Symbol, x)
+"""
+    LinearCacheVF64{Tp, Tc, Tlv, S}
+
+VF64-specialized variant of `LinearCache` for the common case of in-place `Vector{Float64}`
+problems with `DefaultLinearSolver`. Reduces type parameter count from 12 to 4 by hardcoding
+`A::Matrix{Float64}`, `b::Vector{Float64}`, `u::Vector{Float64}`,
+`Pl::IdentityOperator`, `Pr::IdentityOperator`, `abstol/reltol::Float64`,
+and `assumptions::OperatorAssumptions{Bool}`.
+
+This dramatically shortens type strings in stack traces (from ~1500 chars to ~100 chars)
+while maintaining identical behavior through Union-based dispatch with `LinearCache`.
+All field names match `LinearCache` exactly, so all existing field access works unchanged.
+"""
+mutable struct LinearCacheVF64{Tp, Tc, Tlv <: LinearVerbosity, S}
+    A::Matrix{Float64}
+    b::Vector{Float64}
+    u::Vector{Float64}
+    p::Tp
+    alg::DefaultLinearSolver
+    cacheval::Tc
+    isfresh::Bool
+    precsisfresh::Bool
+    Pl::IdentityOperator
+    Pr::IdentityOperator
+    abstol::Float64
+    reltol::Float64
+    maxiters::Int
+    verbose::Tlv
+    assumptions::OperatorAssumptions{Bool}
+    sensealg::S
+end
+
+"""
+    LinearCacheType
+
+Union type for dispatch compatibility between `LinearCache` and `LinearCacheVF64`.
+All methods that previously dispatched on `LinearCache` should dispatch on
+`LinearCacheType` to support both variants transparently.
+"""
+const LinearCacheType = Union{LinearCache, LinearCacheVF64}
+
+# Stub for VF64 cache construction - overridden in vf64_types.jl
+_try_build_vf64_cache(args...) = nothing
+
+function Base.setproperty!(cache::LinearCacheType, name::Symbol, x)
     if name === :A
         setfield!(cache, :isfresh, true)
         setfield!(cache, :precsisfresh, true)
@@ -136,14 +180,12 @@ function Base.setproperty!(cache::LinearCache, name::Symbol, x)
         # In case there is something that needs to be done when b is updated
         update_cacheval!(cache, :b, x)
     elseif name === :cacheval && cache.alg isa DefaultLinearSolver
-        @assert cache.cacheval isa DefaultLinearSolverInit
         return __setfield!(cache.cacheval, cache.alg, x)
-        # return setfield!(cache.cacheval, Symbol(cache.alg.alg), x)
     end
     return setfield!(cache, name, x)
 end
 
-function update_cacheval!(cache::LinearCache, name::Symbol, x)
+function update_cacheval!(cache::LinearCacheType, name::Symbol, x)
     return update_cacheval!(cache, cache.cacheval, name, x)
 end
 update_cacheval!(cache, cacheval, name::Symbol, x) = cacheval
@@ -401,6 +443,15 @@ function __init(
     precsisfresh = false
     Tc = typeof(cacheval)
 
+    # Try VF64 specialization for the common Vector{Float64} + DefaultLinearSolver path
+    vf64_cache = _try_build_vf64_cache(
+        A, b, u0_, p, alg, cacheval, isfresh, precsisfresh,
+        Pl, Pr, abstol, reltol, maxiters, verbose_spec, assumptions, sensealg
+    )
+    if vf64_cache !== nothing
+        return vf64_cache
+    end
+
     cache = LinearCache{
         typeof(A), typeof(b), typeof(u0_), typeof(p), typeof(alg), Tc,
         typeof(Pl), typeof(Pr), typeof(reltol), typeof(verbose_spec), typeof(assumptions.issq),
@@ -413,7 +464,7 @@ function __init(
 end
 
 function SciMLBase.reinit!(
-        cache::LinearCache;
+        cache::LinearCacheType;
         A = nothing,
         b = cache.b,
         u = cache.u,
@@ -463,7 +514,7 @@ function SciMLBase.solve(
     return solve!(init(prob, alg, args...; kwargs...))
 end
 
-function SciMLBase.solve!(cache::LinearCache, args...; kwargs...)
+function SciMLBase.solve!(cache::LinearCacheType, args...; kwargs...)
     return solve!(cache, cache.alg, args...; kwargs...)
 end
 

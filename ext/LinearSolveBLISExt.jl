@@ -9,7 +9,7 @@ using LinearSolve
 using LinearAlgebra: BlasInt, LU
 using LinearAlgebra.LAPACK: require_one_based_indexing, chkfinite, chkstride1,
     @blasfunc, chkargsok
-using LinearSolve: ArrayInterface, BLISLUFactorization, @get_cacheval, LinearCache, SciMLBase, LinearVerbosity, get_blas_operation_info, blas_info_msg
+using LinearSolve: ArrayInterface, BLISLUFactorization, @get_cacheval, LinearCache, LinearCacheType, SciMLBase, LinearVerbosity, get_blas_operation_info, blas_info_msg
 using SciMLLogging: SciMLLogging, @SciMLMessage
 using SciMLBase: ReturnCode
 
@@ -272,7 +272,7 @@ function LinearSolve.init_cacheval(
 end
 
 function SciMLBase.solve!(
-        cache::LinearCache, alg::BLISLUFactorization;
+        cache::LinearCacheType, alg::BLISLUFactorization;
         kwargs...
     )
     A = cache.A

@@ -374,3 +374,18 @@ GinkgoJL
 GinkgoJL_CG
 GinkgoJL_GMRES
 ```
+
+### LinearSolvePyAMG.jl
+
+!!! note
+
+    `LinearSolvePyAMG` is a sub-library of LinearSolve.jl. Using these solvers
+    requires adding it: `using LinearSolvePyAMG`. The Python
+    [PyAMG](https://pyamg.readthedocs.io) library is installed automatically via
+    CondaPkg.jl; no manual Python setup is required.
+
+`PyAMGJL(; method = :RugeStuben, accel = nothing, kwargs...)` — Algebraic Multigrid
+solver. `method` can be `:RugeStuben` (default) or `:SmoothedAggregation`. The optional
+`accel` keyword (`"cg"`, `"gmres"`, `"bicgstab"`, …) wraps the AMG cycle in a Krylov
+solver. Convenience constructors `PyAMGJL_RugeStuben` and `PyAMGJL_SmoothedAggregation`
+are also provided.

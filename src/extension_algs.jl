@@ -3,159 +3,105 @@
 """
     PETScAlgorithm(solver_type = :gmres; kwargs...)
 
-A `LinearSolve.jl` algorithm that wraps the
-[PETSc.jl](https://github.com/JuliaParallel/PETSc.jl) interface to PETSc’s
-KSP (Krylov Subspace) linear solvers.
-
-This algorithm enables the use of PETSc’s scalable iterative solvers and
-preconditioners from within the SciML linear solve ecosystem, supporting both
-serial and MPI-parallel workflows while preserving the `LinearSolve.solve`
-API.
-
-`PETScAlgorithm` constructs and manages PETSc matrices, vectors, KSP solvers,
-and optional null-space objects behind the scenes. It can be used as a drop-in
-replacement for other `SciMLLinearSolveAlgorithm`s when access to PETSc
-features such as algebraic multigrid, domain decomposition, or advanced solver
-monitoring is required.
+A `LinearSolve.jl` algorithm that wraps PETSc's KSP (Krylov Subspace) linear
+solvers via [PETSc.jl](https://github.com/JuliaParallel/PETSc.jl).
 
 !!! compat
-    Requires Julia ≥ 1.10 with `PETSc.jl` and `MPI.jl` loaded:
+    Requires `PETSc.jl` and `MPI.jl` to be loaded:
+    ```julia
     using PETSc, MPI
+    MPI.Init()
+    ```
 
----
-
-## Capabilities
-
-* Access to PETSc Krylov solvers (GMRES, CG, BiCGStab, Richardson, etc.)
-* Integration with PETSc preconditioners (ILU, LU, GAMG, Hypre, …)
-* Serial and MPI-distributed solves using the same API
-* Support for null-space specification (e.g. pressure Poisson problems)
-* Optional separate preconditioner matrix
-* Forwarding of arbitrary PETSc Options Database flags
-* Solve of transposed systems via PETSc
-* Reuse of initial guesses across nonlinear or time-stepping workflows
-
----
-
-## Memory Management
-
-PETSc objects live in C-side memory that Julia’s garbage collector does not
-track.
-
-Always call `cleanup_petsc_cache!` after finishing with a solution, cache, or
-algorithm instance:
-
-    sol = solve(prob, PETScAlgorithm(:gmres))
-    cleanup_petsc_cache!(sol)
-
-A GC finalizer is registered as a safety net, but deterministic cleanup is
-strongly recommended.
-
-Access the cleanup helper via the extension module:
-
-```julia
-PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
-PETScExt.cleanup_petsc_cache!(sol)
-````
-
-!!! warning "MPI cleanup"
-    When using multiple MPI ranks, cleanup is collective — all ranks must
-    call it together.
+!!! warning "Serial only"
+    Currently supports only serial solves (`MPI.COMM_SELF`). Passing a
+    multi-rank communicator will raise an error. MPI-parallel support is
+    planned for a future release.
 
 ---
 
 ## Positional Arguments
 
-- `solver_type::Symbol`: PETSc KSP solver type. Common values include
-  `:gmres` (default), `:cg`, `:bicg`, `:bcgs`, `:preonly`, and `:richardson`.
+- `solver_type::Symbol` — PETSc KSP solver type.
+  Common values: `:gmres` (default), `:cg`, `:bcgs`, `:bicg`, `:preonly`,
+  `:richardson`.
 
 ---
 
 ## Keyword Arguments
 
-- `pc_type::Symbol`
-  PETSc preconditioner type. Examples: `:jacobi`, `:ilu`, `:lu`, `:gamg`,
-  `:hypre`, `:none`.
+| Keyword | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `pc_type` | `Symbol` | `:none` | Preconditioner type: `:jacobi`, `:ilu`, `:lu`, `:gamg`, `:hypre`, … |
+| `comm` | `MPI.Comm` | `nothing` | MPI communicator. `nothing` maps to `MPI.COMM_SELF` at solve time. |
+| `nullspace` | `Symbol` | `:none` | Null-space strategy: `:none`, `:constant`, or `:custom`. |
+| `nullspace_vecs` | `Vector` | `nothing` | Orthonormal null-space basis; required when `nullspace = :custom`. |
+| `prec_matrix` | `AbstractMatrix` | `nothing` | Separate matrix used only for building the preconditioner. |
+| `initial_guess_nonzero` | `Bool` | `false` | Use the current solution vector as the initial Krylov guess. |
+| `transposed` | `Bool` | `false` | Solve the transposed system `Aᵀx = b`. |
+| `ksp_options` | `NamedTuple` | `(;)` | Extra PETSc Options Database flags (see table below). |
 
-- `comm`
-  MPI communicator.
-  Defaults to `nothing`, which maps to `MPI.COMM_SELF` at solve time (serial).
-  Use `MPI.COMM_WORLD` for distributed solves.
-
-  Each rank must own the full Julia matrix structure, but inserts only its
-  locally owned rows into PETSc.
-
-- `nullspace::Symbol`
-  Null-space handling strategy:
-  `:none`, `:constant`, or `:custom`.
-
-- `nullspace_vecs`
-  Vector of orthonormal null-space basis vectors used when
-  `nullspace = :custom`.
-
-- `prec_matrix`
-  Optional matrix used only for constructing the preconditioner, allowing
-  different operator and preconditioning discretizations.
-
-- `initial_guess_nonzero::Bool`
-  If `true`, PETSc uses the existing solution vector as the initial Krylov
-  guess instead of zero.
-
-- `transposed::Bool`
-  Solve the transposed system `Aᵀx = b` using PETSc’s transpose solve.
-
-- `ksp_options::NamedTuple`
-  Additional PETSc Options Database flags forwarded automatically.
-  Keys are converted to PETSc CLI-style flags.
-
----
-
-## Common `ksp_options`
+### Common `ksp_options`
 
 | Option | Description |
 | :--- | :--- |
-| `ksp_monitor = ""` | Print residual norm each iteration |
-| `ksp_view = ""` | Print solver configuration summary |
-| `ksp_rtol = 1e-12` | Relative convergence tolerance |
-| `pc_factor_levels = 2` | ILU fill levels |
-| `log_view = ""` | PETSc performance logging |
+| `ksp_monitor = ""` | Print residual norm each iteration. |
+| `ksp_view = ""` | Print solver configuration after setup. |
+| `pc_factor_levels = 2` | Fill levels for ILU. |
+| `log_view = ""` | PETSc performance logging summary. |
 
 ---
 
-## Examples
+## Memory Management
+
+PETSc objects live in C-side memory outside Julia's GC. Call
+`cleanup_petsc_cache!` explicitly when finished with a solve to release
+resources promptly:
 
 ```julia
-using PETSc, MPI, SparseArrays, LinearSolve, LinearAlgebra
+PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
+
+sol = solve(prob, PETScAlgorithm(:gmres))
+PETScExt.cleanup_petsc_cache!(sol)
+
+# Or via the cache directly:
+cache = SciMLBase.init(prob, PETScAlgorithm(:cg))
+solve!(cache)
+PETScExt.cleanup_petsc_cache!(cache)
+```
+
+A GC finalizer is registered as a safety net, but explicit cleanup is
+strongly preferred for deterministic, timely resource release.
+
+---
+
+## Example
+
+```julia
+using LinearSolve, PETSc, MPI, SparseArrays, LinearAlgebra
 
 MPI.Init()
+PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
 
 n = 100
 A = sprand(n, n, 0.1); A = A + A' + 20I
 b = rand(n)
 
-prob = LinearProblem(A, b)
-
-PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
-
-# Serial solve
-sol = solve(prob, PETScAlgorithm(:gmres; pc_type = :ilu,
-                                 ksp_options = (ksp_monitor="",)))
+sol = solve(
+    LinearProblem(A, b),
+    PETScAlgorithm(:gmres; pc_type = :ilu, ksp_options = (ksp_monitor = "",))
+)
+println("Residual: ", norm(A * sol.u - b) / norm(b))
 PETScExt.cleanup_petsc_cache!(sol)
-
-# MPI-parallel solve
-sol = solve(prob, PETScAlgorithm(:gmres; pc_type = :gamg,
-                                 comm = MPI.COMM_WORLD))
-PETScExt.cleanup_petsc_cache!(sol)
-
 ```
 """
 struct PETScAlgorithm <: SciMLLinearSolveAlgorithm
     solver_type::Symbol
     pc_type::Symbol
-    comm::Any        # MPI.Comm — stored as Any to avoid MPI dep in LinearSolve
+    comm::Any             # MPI.Comm, stored as Any to avoid an MPI.jl dependency in LinearSolve
     nullspace::Symbol     # :none | :constant | :custom
-    nullspace_vecs::Any        # nothing | Vector{Vector{T}}
-    prec_matrix::Any        # nothing | AbstractMatrix
+    nullspace_vecs::Any   # nothing | Vector of AbstractVectors
+    prec_matrix::Any      # nothing | AbstractMatrix
     initial_guess_nonzero::Bool
     transposed::Bool
     ksp_options::NamedTuple
@@ -163,7 +109,7 @@ struct PETScAlgorithm <: SciMLLinearSolveAlgorithm
     function PETScAlgorithm(
             solver_type::Symbol = :gmres;
             pc_type::Symbol = :none,
-            comm = nothing,   # nothing → MPI.COMM_SELF at solve time
+            comm = nothing,
             nullspace::Symbol = :none,
             nullspace_vecs = nothing,
             prec_matrix = nothing,
@@ -171,24 +117,20 @@ struct PETScAlgorithm <: SciMLLinearSolveAlgorithm
             transposed::Bool = false,
             ksp_options::NamedTuple = NamedTuple(),
         )
-        ext = Base.get_extension(@__MODULE__, :LinearSolvePETScExt)
-        if ext === nothing
-            error("PETScAlgorithm requires that PETSc and MPI are loaded, \
-                   i.e. `using PETSc, MPI`")
-        end
-        if nullspace ∉ (:none, :constant, :custom)
-            error("nullspace must be :none, :constant, or :custom (got :$nullspace)")
-        end
-        if nullspace == :custom && nullspace_vecs === nothing
-            error("nullspace = :custom requires nullspace_vecs to be provided")
-        end
+        Base.get_extension(@__MODULE__, :LinearSolvePETScExt) === nothing && error(
+            "PETScAlgorithm requires PETSc and MPI to be loaded: `using PETSc, MPI`"
+        )
+        nullspace ∈ (:none, :constant, :custom) || error(
+            "nullspace must be :none, :constant, or :custom (got :$nullspace)"
+        )
+        nullspace == :custom && nullspace_vecs === nothing && error(
+            "nullspace = :custom requires nullspace_vecs to be provided"
+        )
         return new(
-            solver_type, pc_type,
-            comm,
+            solver_type, pc_type, comm,
             nullspace, nullspace_vecs,
             prec_matrix,
-            initial_guess_nonzero,
-            transposed,
+            initial_guess_nonzero, transposed,
             ksp_options,
         )
     end

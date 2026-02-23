@@ -562,6 +562,15 @@ defaultalg_symbol(::Type{<:GenericFactorization{typeof(ldlt!)}}) = :LDLtFactoriz
 
 defaultalg_symbol(::Type{<:QRFactorization{ColumnNorm}}) = :QRFactorizationPivoted
 
+const _SPARSE_ONLY_ALGORITHMS = Symbol.(
+    (
+        DefaultAlgorithmChoice.KLUFactorization,
+        DefaultAlgorithmChoice.UMFPACKFactorization,
+        DefaultAlgorithmChoice.SparspakFactorization,
+        DefaultAlgorithmChoice.CHOLMODFactorization,
+    )
+)
+
 """
 if alg.alg === DefaultAlgorithmChoice.LUFactorization
 SciMLBase.solve!(cache, LUFactorization(), args...; kwargs...))
@@ -791,13 +800,31 @@ end
                 end
             end
         else
-            newex = quote
-                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
-                SciMLBase.build_linear_solution(
-                    alg, sol.u, sol.resid, sol.cache;
-                    retcode = sol.retcode,
-                    iters = sol.iters, stats = sol.stats
-                )
+            if alg in LinearSolve._SPARSE_ONLY_ALGORITHMS
+                newex = quote
+                    if !(cache.A isa Array)
+                        sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
+                        SciMLBase.build_linear_solution(
+                            alg, sol.u, sol.resid, sol.cache;
+                            retcode = sol.retcode,
+                            iters = sol.iters, stats = sol.stats
+                        )
+                    else
+                        error(
+                            "Sparse algorithm " * $(string(alg)) *
+                                " called on non-sparse matrix. This shouldn't happen."
+                        )
+                    end
+                end
+            else
+                newex = quote
+                    sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
+                    SciMLBase.build_linear_solution(
+                        alg, sol.u, sol.resid, sol.cache;
+                        retcode = sol.retcode,
+                        iters = sol.iters, stats = sol.stats
+                    )
+                end
             end
         end
         alg_enum = getproperty(LinearSolve.DefaultAlgorithmChoice, alg)

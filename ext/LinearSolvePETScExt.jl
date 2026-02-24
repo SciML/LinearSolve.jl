@@ -24,11 +24,16 @@ end
 get_petsclib(::Type{T} = Float64) where {T} = PETSc.getlib(; PetscScalar = T)
 
 # ── Sparsity pattern check ────────────────────────────────────────────────────
-function sparsity_pattern_changed(old_colptr, old_rowval, A::SparseMatrixCSC)
-    # If the pointers are the same, the content is the same (Case 3 or no change)
-    old_colptr === A.colptr && old_rowval === A.rowval && return false
-    # Otherwise, check if the content differs
-    return old_colptr != A.colptr || old_rowval != A.rowval
+
+function sparsity_pattern_changed(old_colptr, old_rowval, new_A::SparseMatrixCSC)
+    # 1. Quick length checks
+    if length(old_colptr) != length(new_A.colptr) || length(old_rowval) != length(new_A.rowval)
+        return true
+    end
+
+    # 2. Vectorized comparison (very fast in Julia)
+    # This checks both sizes and element-wise equality
+    return old_colptr != new_A.colptr || old_rowval != new_A.rowval
 end
 
 # ── Cache ─────────────────────────────────────────────────────────────────────
@@ -445,8 +450,8 @@ rebuild_ksp = pcache.ksp === nothing   # Case 1
             else
                 # Compare stored pointers/arrays directly against the new matrix
                 rebuild_ksp = sparsity_pattern_changed(
-                    pcache.prev_colptr, 
-                    pcache.prev_rowval, 
+                    pcache.prev_colptr,
+                    pcache.prev_rowval,
                     cache.A
                 )
             end

@@ -262,7 +262,6 @@ end
 #    Case 2 — structure changed → full KSP rebuild
 #    Case 3 — same structure, values only → in-place update, KSP reused
 # ══════════════════════════════════════════════════════════════════════════════
-
 @testset "Serial: Matrix Rebuild Logic" begin
     n = 50
     Random.seed!(42)
@@ -289,7 +288,6 @@ end
         @test cache.cacheval.ksp === nothing
         sol = solve!(cache)
         @test cache.cacheval.ksp !== nothing
-        @test cache.cacheval.sparsity_hash != UInt(0)
         @test norm(A * sol.u - b) / norm(b) < 1.0e-6
         PETScExt.cleanup_petsc_cache!(cache)
     end
@@ -302,17 +300,13 @@ end
         )
         solve!(cache)
         ksp_before = cache.cacheval.ksp
-        hash_before = cache.cacheval.sparsity_hash
 
         A2 = make_spd_with_pattern(20.0)
-        @test PETScExt.sparsity_fingerprint(A1) == PETScExt.sparsity_fingerprint(A2)
-
         b2 = rand(n)
         SciMLBase.reinit!(cache; A = A2, b = b2)
         sol2 = solve!(cache)
 
         @test cache.cacheval.ksp === ksp_before
-        @test cache.cacheval.sparsity_hash == hash_before
         @test norm(A2 * sol2.u - b2) / norm(b2) < 1.0e-6
         PETScExt.cleanup_petsc_cache!(cache)
     end
@@ -327,14 +321,11 @@ end
         ksp_before = cache.cacheval.ksp
 
         A3 = sprand(n, n, 0.2) + 15I; A3 = A3 + A3'
-        @test PETScExt.sparsity_fingerprint(A1) != PETScExt.sparsity_fingerprint(A3)
-
         b3 = rand(n)
         SciMLBase.reinit!(cache; A = A3, b = b3)
         sol3 = solve!(cache)
 
         @test cache.cacheval.ksp !== ksp_before
-        @test cache.cacheval.sparsity_hash == PETScExt.sparsity_fingerprint(A3)
         @test norm(A3 * sol3.u - b3) / norm(b3) < 1.0e-6
         PETScExt.cleanup_petsc_cache!(cache)
     end

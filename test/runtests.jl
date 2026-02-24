@@ -21,6 +21,14 @@ if GROUP == "All" || GROUP == "Core"
     @time @safetestset "BandedMatrices" include("banded.jl")
     @time @safetestset "Butterfly Factorization" include("butterfly.jl")
     @time @safetestset "Mixed Precision" include("test_mixed_precision.jl")
+    # ParU_jll requires Julia >= 1.12 (SuiteSparse_jll in older stdlib is incompatible)
+    if VERSION >= v"1.12.0-"
+        Pkg.activate("paru")
+        Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
+        Pkg.instantiate()
+        @time @safetestset "ParU" include("paru/paru.jl")
+        Pkg.activate(".")
+    end
 end
 
 # Don't run Enzyme tests on prerelease or Julia >= 1.12 (Enzyme compatibility issues)
@@ -70,6 +78,13 @@ if GROUP == "LinearSolvePardiso"
     Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
     Pkg.instantiate()
     @time @safetestset "Pardiso" include("pardiso/pardiso.jl")
+end
+
+if !Base.Sys.iswindows() && GROUP == "LinearSolveGinkgo"
+    Pkg.activate("ginkgo")
+    Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
+    Pkg.instantiate()
+    @time @safetestset "Ginkgo" include("ginkgo/ginkgo.jl")
 end
 
 if Base.Sys.islinux() && (GROUP == "All" || GROUP == "LinearSolveHYPRE") && HAS_EXTENSIONS

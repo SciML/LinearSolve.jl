@@ -63,6 +63,10 @@ when reduced precision is acceptable for the factorization step.
 
 For sparse LU-factorizations, `KLUFactorization` if there is less structure
 to the sparsity pattern and `UMFPACKFactorization` if there is more structure.
+`ParUFactorization` (from SuiteSparse's ParU library) provides a parallel
+alternative to `UMFPACKFactorization` that exploits OpenMP task parallelism
+for the numeric factorization phase, which can give speedups on multicore systems
+for larger sparse problems.
 Pardiso.jl's methods are also known to be very efficient sparse linear solvers.
 
 For GPU-accelerated sparse LU-factorizations, there are two high-performance options.
@@ -187,6 +191,20 @@ FastQRFactorization
 ```@docs
 KLUFactorization
 UMFPACKFactorization
+```
+
+### ParU (SuiteSparse)
+
+!!! note
+    
+    Using this solver requires loading `ParU_jll` (available on Julia ≥ 1.12):
+    ```julia
+    import ParU_jll
+    using LinearSolve, SparseArrays
+    ```
+
+```@docs
+ParUFactorization
 ```
 
 ### Sparspak.jl
@@ -342,4 +360,17 @@ KrylovKitJL
 
 ```@docs
 HYPREAlgorithm
+```
+
+### Ginkgo.jl
+
+!!! note
+    
+    Using these solvers requires adding the package Ginkgo.jl, i.e. `using Ginkgo`.
+    Ginkgo.jl currently only supports `Float32` element types with `Int32` sparse indices.
+
+```@docs
+GinkgoJL
+GinkgoJL_CG
+GinkgoJL_GMRES
 ```

@@ -156,6 +156,7 @@ computational cost compared to dense factorizations.
   - `KLUFactorization`: Sparse LU optimized for circuit simulation
   - `CHOLMODFactorization`: Sparse Cholesky for positive definite systems
   - `SparspakFactorization`: Envelope/profile method for sparse systems
+  - `ParUFactorization`: Parallel sparse LU using OpenMP (requires `import ParU_jll`)
 """
 abstract type AbstractSparseFactorization <: AbstractFactorization end
 
@@ -460,7 +461,7 @@ for alg in (
         :RFLUFactorization, :ButterflyFactorization, :UMFPACKFactorization, :KLUFactorization, :SparspakFactorization,
         :DiagonalFactorization, :CholeskyFactorization, :BunchKaufmanFactorization,
         :CHOLMODFactorization, :LDLtFactorization, :AppleAccelerateLUFactorization,
-        :MKLLUFactorization, :MetalLUFactorization, :CUSOLVERRFFactorization,
+        :MKLLUFactorization, :MetalLUFactorization, :CUSOLVERRFFactorization, :ParUFactorization,
     )
     @eval needs_square_A(::$(alg)) = true
 end
@@ -499,7 +500,7 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
     UMFPACKFactorization, KLUFactorization, FastLUFactorization, FastQRFactorization,
     SparspakFactorization, DiagonalFactorization, CholeskyFactorization,
     BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization,
-    CUSOLVERRFFactorization, CliqueTreesFactorization
+    CUSOLVERRFFactorization, CliqueTreesFactorization, ParUFactorization
 
 export LinearSolveFunction, DirectLdiv!, show_algorithm_choices
 
@@ -508,6 +509,8 @@ export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
     IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
     IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES, IterativeSolversJL_IDRS,
     KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES, KrylovJL_MINARES, AlgebraicMultigridJL
+
+export GinkgoJL, GinkgoJL_CG, GinkgoJL_GMRES
 
 export SimpleGMRES
 

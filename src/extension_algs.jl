@@ -801,6 +801,81 @@ A wrapper over the IterativeSolvers.jl MINRES.
 function IterativeSolversJL_MINRES end
 
 """
+```julia
+GinkgoJL(args...; KrylovAlg = :gmres, executor = :omp, kwargs...)
+```
+
+A generic wrapper over [Ginkgo.jl](https://github.com/youwuyou/Ginkgo.jl) iterative solvers.
+Ginkgo is a high-performance numerical linear algebra library that supports multiple backends
+including OpenMP, CUDA, HIP, and SYCL, making it suitable for both CPU and GPU computation.
+
+!!! note
+
+    Using this solver requires adding the package Ginkgo.jl, i.e. `using Ginkgo`
+
+## Keyword Arguments
+
+  - `KrylovAlg`: The Ginkgo solver to use. Supported values:
+    - `:gmres` (default): GMRES — for general non-symmetric systems
+      (not yet exposed by Ginkgo.jl v1; use `GinkgoJL_CG()` in the meantime)
+    - `:cg`: Conjugate Gradient — for symmetric positive definite systems only
+  - `executor`: The Ginkgo backend executor. Options:
+    - `:omp` (default): OpenMP CPU executor
+    - `:cuda`: NVIDIA GPU executor
+    - `:reference`: Reference (single-threaded) executor
+
+!!! warning
+
+    Ginkgo.jl currently only supports `Float32` element types with `Int32` indices for sparse
+    matrices. The input matrix and vectors will be converted to `Float32` automatically.
+
+## Example
+
+```julia
+using LinearSolve, Ginkgo, SparseArrays
+A = sprand(Float32, 100, 100, 0.1)
+A = A'A + 30I  # make symmetric positive definite
+b = rand(Float32, 100)
+prob = LinearProblem(A, b)
+sol = solve(prob, GinkgoJL_CG())
+```
+"""
+struct GinkgoJL{F, E, A, K} <: LinearSolve.AbstractKrylovSubspaceMethod
+    KrylovAlg::F
+    executor::E
+    args::A
+    kwargs::K
+end
+
+"""
+```julia
+GinkgoJL_CG(args...; executor = :omp, kwargs...)
+```
+
+A CG solver via Ginkgo.jl for symmetric positive definite systems.
+
+!!! note
+
+    Using this solver requires adding the package Ginkgo.jl, i.e. `using Ginkgo`
+"""
+function GinkgoJL_CG end
+
+"""
+```julia
+GinkgoJL_GMRES(args...; executor = :omp, kwargs...)
+```
+
+A GMRES solver via Ginkgo.jl for general non-symmetric systems.
+
+!!! note
+
+    Using this solver requires adding the package Ginkgo.jl, i.e. `using Ginkgo`.
+    GMRES is not yet exposed by Ginkgo.jl v1. This stub is provided for forward compatibility;
+    an error will be raised at solve time until Ginkgo.jl adds GMRES support.
+"""
+function GinkgoJL_GMRES end
+
+"""
     MetalLUFactorization()
 
 A wrapper over Apple's Metal GPU library for LU factorization. Direct calls to Metal
@@ -1111,3 +1186,54 @@ function AlgebraicMultigridJL(args...; kwargs...)
 end
 
 needs_concrete_A(::AlgebraicMultigridJL) = true
+
+"""
+`ParUFactorization(;reuse_symbolic=true)`
+
+A parallel sparse LU factorization from SuiteSparse's
+[ParU](https://github.com/DrTimothyAldenDavis/SuiteSparse) library.
+ParU is a multithreaded direct solver for sparse systems of linear equations
+using OpenMP task parallelism for the numeric factorization phase.
+
+ParU calls UMFPACK for its symbolic analysis phase (computing fill-reducing
+column ordering and symbolic factorization), then performs a parallel numeric
+factorization exploiting dense frontal matrices. It can outperform UMFPACK on
+larger systems where the parallelism can be exploited.
+
+Only supports `Float64` element type.
+
+## Keyword Arguments
+
+  - `reuse_symbolic`: Cache and reuse the symbolic factorization across solves
+    when the sparsity pattern of `A` does not change. Defaults to `true`.
+
+!!! note
+
+    Using this solver requires loading the package `ParU_jll`, i.e.:
+    ```julia
+    import ParU_jll
+    using LinearSolve, SparseArrays
+    ```
+
+## Example
+
+```julia
+import ParU_jll
+using LinearSolve, SparseArrays
+
+A = sprand(100, 100, 0.1) + 10I
+b = rand(100)
+prob = LinearProblem(A, b)
+sol = solve(prob, ParUFactorization())
+```
+"""
+struct ParUFactorization <: AbstractSparseFactorization
+    reuse_symbolic::Bool
+    function ParUFactorization(; reuse_symbolic::Bool = true)
+        ext = Base.get_extension(@__MODULE__, :LinearSolveParUExt)
+        if ext === nothing
+            error("ParUFactorization requires that ParU_jll and SparseArrays are loaded, i.e. `import ParU_jll; using SparseArrays`")
+        end
+        return new(reuse_symbolic)
+    end
+end

@@ -4,7 +4,6 @@ using MPI
 using PETSc
 using SparseArrays
 using Random
-using Statistics
 using Test
 
 MPI.Init()

@@ -15,7 +15,7 @@ function resolve_comm(alg::PETScAlgorithm)
     comm = alg.comm === nothing ? MPI.COMM_SELF : alg.comm
     comm == MPI.COMM_SELF || error(
         "PETScAlgorithm currently only supports MPI.COMM_SELF (serial solves). " *
-        "Pass `comm = nothing` or `comm = MPI.COMM_SELF` to use serial mode."
+            "Pass `comm = nothing` or `comm = MPI.COMM_SELF` to use serial mode."
     )
     return comm
 end
@@ -120,7 +120,7 @@ function cleanup_petsc_cache!(pcache::PETScCache)
         return
     end
     try
-        pcache.ksp           !== nothing && PETSc.destroy(pcache.ksp)
+        pcache.ksp !== nothing && PETSc.destroy(pcache.ksp)
         pcache.nullspace_obj !== nothing &&
             LibPETSc.MatNullSpaceDestroy(pcache.petsclib, pcache.nullspace_obj)
         pcache.petsc_x !== nothing && PETSc.destroy(pcache.petsc_x)
@@ -135,7 +135,7 @@ function cleanup_petsc_cache!(pcache::PETScCache)
     return _nullify_all!(pcache)
 end
 
-cleanup_petsc_cache!(cache::LinearCache)  = cleanup_petsc_cache!(cache.cacheval)
+cleanup_petsc_cache!(cache::LinearCache) = cleanup_petsc_cache!(cache.cacheval)
 cleanup_petsc_cache!(sol::LinearSolution) = cleanup_petsc_cache!(sol.cache.cacheval)
 
 # ── Cache initialisation ──────────────────────────────────────────────────────
@@ -196,9 +196,9 @@ end
 # This is mimicking MatSeqAIJWithArrays without rebuilding the matrix itself.
 # This is currently the limiting factor for computing large system.
 function _csc_to_csr_perm!(perm::Vector{Int}, scratch::Vector{Int}, A::SparseMatrixCSC)
-    m, n     = size(A)
-    row_ptr  = view(scratch, 1:m+1)
-    fill_pos = view(scratch, m+2:2*(m+1))
+    m, n = size(A)
+    row_ptr = view(scratch, 1:(m + 1))
+    fill_pos = view(scratch, (m + 2):(2 * (m + 1)))
 
     fill!(row_ptr, 0)
     # Pass 1: Count
@@ -209,11 +209,11 @@ function _csc_to_csr_perm!(perm::Vector{Int}, scratch::Vector{Int}, A::SparseMat
     # Pass 2: Cumulative sum (The "Compact" way)
     count = 1
     @inbounds for r in 1:m
-        tmp = row_ptr[r+1]
+        tmp = row_ptr[r + 1]
         row_ptr[r] = count
         count += tmp
     end
-    row_ptr[m+1] = count
+    row_ptr[m + 1] = count
 
     copyto!(fill_pos, row_ptr)
 
@@ -274,7 +274,7 @@ end
 
 function write_vec!(pv, src::AbstractVector, petsclib)
     ptr = LibPETSc.VecGetArray(petsclib, pv)
-    try
+    return try
         copyto!(ptr, src) # Use vectorized copy
     finally
         LibPETSc.VecRestoreArray(petsclib, pv, ptr)
@@ -283,7 +283,7 @@ end
 
 function read_vec!(dst::AbstractVector, pv, petsclib)
     ptr = LibPETSc.VecGetArrayRead(petsclib, pv)
-    try
+    return try
         copyto!(dst, ptr)
     finally
         LibPETSc.VecRestoreArrayRead(petsclib, pv, ptr)
@@ -305,7 +305,7 @@ function ensure_vecs!(pcache, petsclib, u, b)
         pcache.petsc_b !== nothing && PETSc.destroy(pcache.petsc_b)
         pcache.petsc_x = create_seq_vec(petsclib, u)
         pcache.petsc_b = create_seq_vec(petsclib, b)
-        pcache.vec_n   = n
+        pcache.vec_n = n
     end
     return pcache.petsc_x, pcache.petsc_b
 end
@@ -326,7 +326,7 @@ function build_nullspace(petsclib, alg::PETScAlgorithm)
         petsclib, MPI.COMM_SELF, LibPETSc.PetscBool(true), 0, LibPETSc.PetscVec[]
     )
     # :custom
-    PScalar    = petsclib.PetscScalar
+    PScalar = petsclib.PetscScalar
     petsc_vecs = LibPETSc.PetscVec[
         create_seq_vec(petsclib, eltype(v) == PScalar ? v : PScalar.(v))
             for v in alg.nullspace_vecs
@@ -357,15 +357,15 @@ end
 # vec_n is reset to 0 so ensure_vecs! unconditionally recreates petsc_x and
 # petsc_b after every rebuild — required when the problem size changes.
 function build_ksp!(pcache, petsclib, cache, alg)
-    pcache.vec_n   = 0
+    pcache.vec_n = 0
     pcache.petsc_A = to_petsc_mat(petsclib, cache.A)
 
     if cache.A isa SparseMatrixCSC
         nnz = length(cache.A.nzval)
-        m   = size(cache.A, 1)
+        m = size(cache.A, 1)
         # Reallocate only when nnz changes (implies a structural change).
         if pcache.sparse_perm === nothing || length(pcache.sparse_perm) != nnz
-            pcache.sparse_perm    = Vector{Int}(undef, nnz)
+            pcache.sparse_perm = Vector{Int}(undef, nnz)
             pcache.sparse_scratch = Vector{Int}(undef, 2 * (m + 1))
         end
         _csc_to_csr_perm!(pcache.sparse_perm, pcache.sparse_scratch, cache.A)
@@ -373,7 +373,7 @@ function build_ksp!(pcache, petsclib, cache, alg)
         pcache.prev_colptr = cache.A.colptr
         pcache.prev_rowval = cache.A.rowval
     else
-        pcache.sparse_perm    = nothing
+        pcache.sparse_perm = nothing
         pcache.sparse_scratch = nothing
         pcache.prev_size = size(cache.A)
     end
@@ -384,10 +384,10 @@ function build_ksp!(pcache, petsclib, cache, alg)
 
     pcache.ksp = PETSc.KSP(
         pcache.petsc_A, pcache.petsc_P;
-        ksp_type   = string(alg.solver_type),
-        pc_type    = string(alg.pc_type),
-        ksp_rtol   = cache.reltol,
-        ksp_atol   = cache.abstol,
+        ksp_type = string(alg.solver_type),
+        pc_type = string(alg.pc_type),
+        ksp_rtol = cache.reltol,
+        ksp_atol = cache.abstol,
         ksp_max_it = cache.maxiters,
         alg.ksp_options...
     )
@@ -429,12 +429,12 @@ structural fingerprint:
 function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm; kwargs...)
 
     pcache = cache.cacheval
-    comm   = resolve_comm(alg)
+    comm = resolve_comm(alg)
 
     petsclib = pcache.petsclib === nothing ? get_petsclib(eltype(cache.A)) : pcache.petsclib
     PETSc.initialized(petsclib) || PETSc.initialize(petsclib)
-    pcache.petsclib    = petsclib
-    pcache.comm        = comm
+    pcache.petsclib = petsclib
+    pcache.comm = comm
     pcache.initialized = true
 
     # ── Decide: rebuild, update in-place, or reuse ────────────────────────────
@@ -462,8 +462,10 @@ function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm; kwargs...)
     elseif cache.isfresh
         # Case 3: same structure — update values without touching the KSP object.
         if cache.A isa SparseMatrixCSC
-            update_mat_values!(petsclib, pcache.petsc_A, cache.A, pcache.sparse_perm;
-                   assemble = cache.precsisfresh)
+            update_mat_values!(
+                petsclib, pcache.petsc_A, cache.A, pcache.sparse_perm;
+                assemble = cache.precsisfresh
+            )
         else
             update_mat_values!(petsclib, pcache.petsc_A, cache.A)
         end
@@ -500,13 +502,13 @@ function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm; kwargs...)
     read_vec!(cache.u, petsc_x, petsclib)
 
     # ── Convergence metadata ──────────────────────────────────────────────────
-    iters  = Int(LibPETSc.KSPGetIterationNumber(petsclib, pcache.ksp))
+    iters = Int(LibPETSc.KSPGetIterationNumber(petsclib, pcache.ksp))
     reason = Int(LibPETSc.KSPGetConvergedReason(petsclib, pcache.ksp))
-    resid  = Float64(LibPETSc.KSPGetResidualNorm(petsclib, pcache.ksp))
+    resid = Float64(LibPETSc.KSPGetResidualNorm(petsclib, pcache.ksp))
     # reason > 0 → converged; reason == 0 → iteration limit not yet hit;
     # reason < 0 → diverged or other failure.
     retcode = reason > 0 ? ReturnCode.Success :
-              reason == 0 ? ReturnCode.Default : ReturnCode.Failure
+        reason == 0 ? ReturnCode.Default : ReturnCode.Failure
 
     return build_linear_solution(alg, cache.u, resid, cache; retcode, iters)
 end

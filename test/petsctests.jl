@@ -275,7 +275,9 @@ end
         A = sparse(pattern_I, pattern_J, vals, n, n)
         A = A + A'
         d = vec(sum(abs.(A), dims = 2)) .+ scale
-        for i in 1:n; A[i, i] = d[i]; end
+        for i in 1:n
+            A[i, i] = d[i]
+        end
         return A
     end
 
@@ -406,12 +408,14 @@ end
     @testset "Sparse operator: backing arrays not copied" begin
         A = make_spd_sparse(n)
         b = rand(n)
-        ptr_nzval  = pointer(A.nzval)
+        ptr_nzval = pointer(A.nzval)
         ptr_colptr = pointer(A.colptr)
-        sol = solve(LinearProblem(A, b), PETScAlgorithm(:gmres; pc_type = :ilu);
-                    abstol = 1e-10)
-        @test norm(A * sol.u - b) / norm(b) < 1e-6
-        @test pointer(A.nzval)  === ptr_nzval
+        sol = solve(
+            LinearProblem(A, b), PETScAlgorithm(:gmres; pc_type = :ilu);
+            abstol = 1.0e-10
+        )
+        @test norm(A * sol.u - b) / norm(b) < 1.0e-6
+        @test pointer(A.nzval) === ptr_nzval
         @test pointer(A.colptr) === ptr_colptr
         PETScExt.cleanup_petsc_cache!(sol)
     end
@@ -420,9 +424,11 @@ end
         A = make_spd_dense(n)
         b = rand(n)
         ptr_before = pointer(A)
-        sol = solve(LinearProblem(A, b), PETScAlgorithm(:gmres; pc_type = :jacobi);
-                    abstol = 1e-10)
-        @test norm(A * sol.u - b) / norm(b) < 1e-6
+        sol = solve(
+            LinearProblem(A, b), PETScAlgorithm(:gmres; pc_type = :jacobi);
+            abstol = 1.0e-10
+        )
+        @test norm(A * sol.u - b) / norm(b) < 1.0e-6
         @test pointer(A) === ptr_before
         PETScExt.cleanup_petsc_cache!(sol)
     end
@@ -434,25 +440,27 @@ end
             vals = abs.(randn(length(I_idx))) .* scale
             A = sparse(I_idx, J_idx, vals, n, n); A = A + A'
             d = vec(sum(abs.(A), dims = 2)) .+ scale
-            for i in 1:n; A[i, i] = d[i]; end
+            for i in 1:n
+                A[i, i] = d[i]
+            end
             return A
         end
 
         A1 = make_with_pattern(10.0)
         cache = SciMLBase.init(
-            LinearProblem(A1, rand(n)), PETScAlgorithm(:cg; pc_type = :jacobi); abstol = 1e-10
+            LinearProblem(A1, rand(n)), PETScAlgorithm(:cg; pc_type = :jacobi); abstol = 1.0e-10
         )
         solve!(cache)
 
         A2 = make_with_pattern(20.0)
-        ptr_nzval  = pointer(A2.nzval)
+        ptr_nzval = pointer(A2.nzval)
         ptr_colptr = pointer(A2.colptr)
         b2 = rand(n)
         SciMLBase.reinit!(cache; A = A2, b = b2)
         sol = solve!(cache)
 
-        @test norm(A2 * sol.u - b2) / norm(b2) < 1e-6
-        @test pointer(A2.nzval)  === ptr_nzval
+        @test norm(A2 * sol.u - b2) / norm(b2) < 1.0e-6
+        @test pointer(A2.nzval) === ptr_nzval
         @test pointer(A2.colptr) === ptr_colptr
         PETScExt.cleanup_petsc_cache!(cache)
     end
@@ -466,15 +474,15 @@ end
         alg = PETScAlgorithm(:preonly; pc_type = :cholesky, prec_matrix = P)
 
         b1 = rand(n)
-        cache = SciMLBase.init(LinearProblem(A, b1), alg; abstol = 1e-10)
+        cache = SciMLBase.init(LinearProblem(A, b1), alg; abstol = 1.0e-10)
         sol1 = solve!(cache)
-        @test norm(A * sol1.u - b1) / norm(b1) < 1e-6
+        @test norm(A * sol1.u - b1) / norm(b1) < 1.0e-6
         @test P == P_snapshot   # first solve must not mutate P
 
         b2 = rand(n)
         SciMLBase.reinit!(cache; b = b2)
         sol2 = solve!(cache)
-        @test norm(A * sol2.u - b2) / norm(b2) < 1e-6
+        @test norm(A * sol2.u - b2) / norm(b2) < 1.0e-6
         @test P == P_snapshot   # second solve must not mutate P either
         PETScExt.cleanup_petsc_cache!(cache)
     end
@@ -486,9 +494,11 @@ end
         A = make_spd_dense(n)
         A_snapshot = copy(A)
         b = rand(n)
-        sol = solve(LinearProblem(A, b), PETScAlgorithm(:preonly; pc_type = :lu);
-                    abstol = 1e-10)
-        @test norm(A_snapshot * sol.u - b) / norm(b) < 1e-6
+        sol = solve(
+            LinearProblem(A, b), PETScAlgorithm(:preonly; pc_type = :lu);
+            abstol = 1.0e-10
+        )
+        @test norm(A_snapshot * sol.u - b) / norm(b) < 1.0e-6
         # A may have been overwritten by LU — that's expected, no assertion on A's values
         PETScExt.cleanup_petsc_cache!(sol)
     end

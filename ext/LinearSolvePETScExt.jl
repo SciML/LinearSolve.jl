@@ -69,18 +69,18 @@ Fields
 mutable struct PETScCache{T}
     ksp::Any
     petsclib::Any
-    comm::Any             # MPI.Comm, stored as Any to avoid an MPI.jl dependency
+    comm::Union{MPI.Comm, Nothing}
     petsc_A::Any
     petsc_P::Any
     nullspace_obj::Any
     petsc_x::Any
     petsc_b::Any
     vec_n::Int
-    prev_colptr::Any      # Previous matrix's colptr array (for sparse matrices)
-    prev_rowval::Any      # Previous matrix's rowval array (for sparse matrices)
-    prev_size::Any        # Previous matrix's size (for dense matrices)
-    sparse_perm::Any      # Vector{Int} of length nnz, or nothing for dense
-    sparse_scratch::Any   # Vector{Int} of length 2*(m+1), or nothing for dense
+    prev_colptr::Union{Vector{Int}, Nothing}
+    prev_rowval::Union{Vector{Int}, Nothing}
+    prev_size::Union{NTuple{2, Int}, Nothing}
+    sparse_perm::Union{Vector{Int}, Nothing}
+    sparse_scratch::Union{Vector{Int}, Nothing}
     initialized::Bool
 end
 
@@ -161,10 +161,8 @@ end
 
 # Convert a Julia matrix to a PETSc sequential matrix.
 #
-# Sparse (SparseMatrixCSC) → MatSeqAIJWithArrays (zero-copy):
-#   PETSc holds raw C pointers into Julia's colptr/rowval/nzval arrays.
-#   Factorising preconditioners (ILU, LU) work on PETSc's own internal CSR
-#   copy, so the Julia arrays are never overwritten.
+# Sparse (SparseMatrixCSC) → MatSeqAIJWithArrays :
+#   Internally converts CSR format, so quite inefficient to construct from CSC.
 #
 # Dense (AbstractMatrix) → MatSeqDense:
 #   PETSc allocates its own buffer and copies the values in on construction.
@@ -187,9 +185,6 @@ end
 #
 #   petsc_vals[csr_idx] = A.nzval[perm[csr_idx]]
 #
-# This function computes that permutation in-place into pre-allocated buffers
-# with zero heap allocations.
-#
 # scratch must have length 2*(m+1) and is used as two consecutive views:
 #   scratch[1 : m+1]       → row_ptr   (CSR row start positions, 1-based)
 #   scratch[m+2 : 2*(m+1)] → fill_pos  (current write cursor per row)
@@ -197,7 +192,9 @@ end
 # Walking the CSC columns in ascending order guarantees that within each row,
 # columns are visited in ascending order — matching PETSc's sorted-column
 # requirement for CSR storage.
-
+#
+# This is mimicking MatSeqAIJWithArrays without rebuilding the matrix itself.
+# This is currently the limiting factor for computing large system.
 function _csc_to_csr_perm!(perm::Vector{Int}, scratch::Vector{Int}, A::SparseMatrixCSC)
     m, n     = size(A)
     row_ptr  = view(scratch, 1:m+1)
@@ -239,13 +236,12 @@ end
 # overhead per element, no allocation.
 # assemble! bumps PETSc's modification counter, triggering preconditioner
 # recomputation on the next KSPSolve without an explicit KSPSetOperators call.
-function update_mat_values!(petsclib, PA, A::SparseMatrixCSC, perm::Vector{Int};
-                            assemble::Bool = true)
+function update_mat_values!(petsclib, PA, A::SparseMatrixCSC, perm::Vector{Int}; assemble::Bool = true)
     vals = LibPETSc.MatSeqAIJGetArray(petsclib, PA)
     nzval = A.nzval
     try
-        @inbounds for csr_idx in eachindex(vals)
-            vals[csr_idx] = nzval[perm[csr_idx]]
+        @inbounds for i in eachindex(vals)
+            vals[i] = nzval[perm[i]]
         end
     finally
         LibPETSc.MatSeqAIJRestoreArray(petsclib, PA, vals)
@@ -442,7 +438,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm; kwargs...)
     pcache.initialized = true
 
     # ── Decide: rebuild, update in-place, or reuse ────────────────────────────
-rebuild_ksp = pcache.ksp === nothing   # Case 1
+    rebuild_ksp = pcache.ksp === nothing   # Case 1
     if !rebuild_ksp && cache.isfresh
         if cache.A isa SparseMatrixCSC
             if pcache.prev_colptr === nothing || pcache.prev_rowval === nothing

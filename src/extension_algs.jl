@@ -1,60 +1,138 @@
 # This file only include the algorithm struct to be exported by LinearSolve.jl. The main
 # functionality is implemented as package extensions
-
 """
-`PETScAlgorithm(solver_type = :gmres; kwargs...)`
+    PETScAlgorithm(solver_type = :gmres; kwargs...)
 
-[PETSc.jl](https://github.com/JuliaParallel/PETSc.jl) is a Julia wrapper for the Portable,
-Extensible Toolkit for Scientific Computation (PETSc). This algorithm provides access to
-PETSc's KSP (Krylov Subspace) linear solvers.
+A `LinearSolve.jl` algorithm that wraps PETSc's KSP (Krylov Subspace) linear
+solvers via [PETSc.jl](https://github.com/JuliaParallel/PETSc.jl).
 
-!!! note
+!!! compat
+    Requires `PETSc.jl` and `MPI.jl` to be loaded:
+    ```julia
+    using PETSc, MPI
+    MPI.Init()
+    ```
 
-    Using PETSc solvers requires Julia version 1.10 or higher, and that the packages
-    PETSc.jl and MPI.jl are installed: `using PETSc, MPI`
+!!! warning "Serial only"
+    Currently supports only serial solves (`MPI.COMM_SELF`). Passing a
+    multi-rank communicator will raise an error. MPI-parallel support is
+    planned for a future release.
+
+---
 
 ## Positional Arguments
 
-The single positional argument `solver_type` specifies the KSP solver type. Common choices:
+- `solver_type::Symbol` — PETSc KSP solver type.
+  Common values: `:gmres` (default), `:cg`, `:bcgs`, `:bicg`, `:preonly`,
+  `:richardson`.
 
-  - `:gmres` (default): Generalized Minimal Residual method
-  - `:cg`: Conjugate Gradient (for symmetric positive definite systems)
-  - `:bicg`: BiConjugate Gradient
-  - `:bcgs`: BiConjugate Gradient Stabilized
-  - `:preonly`: Apply preconditioner only (no Krylov iteration)
-  - `:richardson`: Richardson iteration
+---
 
 ## Keyword Arguments
 
-  - `pc_type`: Preconditioner type (e.g., `:jacobi`, `:ilu`, `:lu`, `:gamg`, `:hypre`, `:none`)
-  - `ksp_options`: NamedTuple of additional KSP options
+| Keyword | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `pc_type` | `Symbol` | `:none` | Preconditioner type: `:jacobi`, `:ilu`, `:lu`, `:gamg`, `:hypre`, … |
+| `comm` | `MPI.Comm` | `nothing` | MPI communicator. `nothing` maps to `MPI.COMM_SELF` at solve time. |
+| `nullspace` | `Symbol` | `:none` | Null-space strategy: `:none`, `:constant`, or `:custom`. |
+| `nullspace_vecs` | `Vector` | `nothing` | Orthonormal null-space basis; required when `nullspace = :custom`. |
+| `prec_matrix` | `AbstractMatrix` | `nothing` | Separate matrix used only for building the preconditioner. |
+| `initial_guess_nonzero` | `Bool` | `false` | Use the current solution vector as the initial Krylov guess. |
+| `transposed` | `Bool` | `false` | Solve the transposed system `Aᵀx = b`. |
+| `ksp_options` | `NamedTuple` | `(;)` | Extra PETSc Options Database flags (see table below). |
+
+### Common `ksp_options`
+
+| Option | Description |
+| :--- | :--- |
+| `ksp_monitor = ""` | Print residual norm each iteration. |
+| `ksp_view = ""` | Print solver configuration after setup. |
+| `pc_factor_levels = 2` | Fill levels for ILU. |
+| `log_view = ""` | PETSc performance logging summary. |
+
+---
+
+## Memory Management
+
+PETSc objects live in C-side memory outside Julia's GC. Call
+`cleanup_petsc_cache!` explicitly when finished with a solve to release
+resources promptly:
+
+```julia
+PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
+
+sol = solve(prob, PETScAlgorithm(:gmres))
+PETScExt.cleanup_petsc_cache!(sol)
+
+# Or via the cache directly:
+cache = SciMLBase.init(prob, PETScAlgorithm(:cg))
+solve!(cache)
+PETScExt.cleanup_petsc_cache!(cache)
+```
+
+A GC finalizer is registered as a safety net, but explicit cleanup is
+strongly preferred for deterministic, timely resource release.
+
+---
 
 ## Example
 
 ```julia
-using PETSc, MPI, SparseArrays
-A = sprand(100, 100, 0.1) + 10I
-b = rand(100)
-prob = LinearProblem(A, b)
-alg = PETScAlgorithm(:gmres; pc_type = :ilu)
-sol = solve(prob, alg)
+using LinearSolve, PETSc, MPI, SparseArrays, LinearAlgebra
+
+MPI.Init()
+PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
+
+n = 100
+A = sprand(n, n, 0.1); A = A + A' + 20I
+b = rand(n)
+
+sol = solve(
+    LinearProblem(A, b),
+    PETScAlgorithm(:gmres; pc_type = :ilu, ksp_options = (ksp_monitor = "",))
+)
+println("Residual: ", norm(A * sol.u - b) / norm(b))
+PETScExt.cleanup_petsc_cache!(sol)
 ```
 """
 struct PETScAlgorithm <: SciMLLinearSolveAlgorithm
     solver_type::Symbol
     pc_type::Symbol
+    comm::Any             # MPI.Comm, stored as Any to avoid an MPI.jl dependency in LinearSolve
+    nullspace::Symbol     # :none | :constant | :custom
+    nullspace_vecs::Any   # nothing | Vector of AbstractVectors
+    prec_matrix::Any      # nothing | AbstractMatrix
+    initial_guess_nonzero::Bool
+    transposed::Bool
     ksp_options::NamedTuple
+
     function PETScAlgorithm(
             solver_type::Symbol = :gmres;
             pc_type::Symbol = :none,
-            ksp_options::NamedTuple = NamedTuple()
+            comm = nothing,
+            nullspace::Symbol = :none,
+            nullspace_vecs = nothing,
+            prec_matrix = nothing,
+            initial_guess_nonzero::Bool = false,
+            transposed::Bool = false,
+            ksp_options::NamedTuple = NamedTuple(),
         )
-        ext = Base.get_extension(@__MODULE__, :LinearSolvePETScExt)
-        if ext === nothing
-            error("PETScAlgorithm requires that PETSc and MPI are loaded, i.e. `using PETSc, MPI`")
-        else
-            return new(solver_type, pc_type, ksp_options)
-        end
+        Base.get_extension(@__MODULE__, :LinearSolvePETScExt) === nothing && error(
+            "PETScAlgorithm requires PETSc and MPI to be loaded: `using PETSc, MPI`"
+        )
+        nullspace ∈ (:none, :constant, :custom) || error(
+            "nullspace must be :none, :constant, or :custom (got :$nullspace)"
+        )
+        nullspace == :custom && nullspace_vecs === nothing && error(
+            "nullspace = :custom requires nullspace_vecs to be provided"
+        )
+        return new(
+            solver_type, pc_type, comm,
+            nullspace, nullspace_vecs,
+            prec_matrix,
+            initial_guess_nonzero, transposed,
+            ksp_options,
+        )
     end
 end
 
@@ -143,9 +221,9 @@ end
 """
 `CUDAOffload32MixedLUFactorization()`
 
-A mixed precision GPU-accelerated LU factorization that converts matrices to Float32 
+A mixed precision GPU-accelerated LU factorization that converts matrices to Float32
 before offloading to CUDA GPU for factorization, then converts back for the solve.
-This can provide speedups when the reduced precision is acceptable and memory 
+This can provide speedups when the reduced precision is acceptable and memory
 bandwidth is a bottleneck.
 
 ## Performance Notes
@@ -262,10 +340,10 @@ end
 """
     RFLUFactorization{P, T}(; pivot = Val(true), thread = Val(true))
 
-A fast pure Julia LU-factorization implementation using RecursiveFactorization.jl. 
-This is by far the fastest LU-factorization implementation, usually outperforming 
-OpenBLAS and MKL for smaller matrices (<500x500), but currently optimized only for 
-Base `Array` with `Float32` or `Float64`. Additional optimization for complex matrices 
+A fast pure Julia LU-factorization implementation using RecursiveFactorization.jl.
+This is by far the fastest LU-factorization implementation, usually outperforming
+OpenBLAS and MKL for smaller matrices (<500x500), but currently optimized only for
+Base `Array` with `Float32` or `Float64`. Additional optimization for complex matrices
 is in the works.
 
 ## Type Parameters
@@ -273,9 +351,9 @@ is in the works.
 - `T`: Threading strategy as `Val{Bool}`. `Val{true}` enables multi-threading for performance.
 
 ## Constructor Arguments
-- `pivot = Val(true)`: Enable partial pivoting. Set to `Val{false}` to disable for speed 
+- `pivot = Val(true)`: Enable partial pivoting. Set to `Val{false}` to disable for speed
   at the cost of numerical stability.
-- `thread = Val(true)`: Enable multi-threading. Set to `Val{false}` for single-threaded 
+- `thread = Val(true)`: Enable multi-threading. Set to `Val{false}` for single-threaded
   execution.
 - `throwerror = true`: Whether to throw an error if RecursiveFactorization.jl is not loaded.
 
@@ -294,7 +372,7 @@ using RecursiveFactorization
 # Fast, stable (with pivoting)
 alg1 = RFLUFactorization()
 # Fastest (no pivoting), less stable
-alg2 = RFLUFactorization(pivot=Val(false))  
+alg2 = RFLUFactorization(pivot=Val(false))
 ```
 """
 struct RFLUFactorization{P, T} <: AbstractDenseFactorization
@@ -316,7 +394,7 @@ end
 
 A fast pure Julia LU-factorization implementation
 using RecursiveFactorization.jl. This method utilizes a butterfly
-factorization approach rather than pivoting. 
+factorization approach rather than pivoting.
 """
 struct ButterflyFactorization{T} <: AbstractDenseFactorization
     thread::Val{T}
@@ -404,7 +482,7 @@ Using this solver requires that FastLapackInterface.jl is loaded: `using FastLap
 ```julia
 using FastLapackInterface
 # QR with column pivoting
-alg1 = FastQRFactorization()  
+alg1 = FastQRFactorization()
 # QR without pivoting for speed
 alg2 = FastQRFactorization(pivot=nothing)
 # Custom block size
@@ -800,8 +878,8 @@ function GinkgoJL_GMRES end
 """
     MetalLUFactorization()
 
-A wrapper over Apple's Metal GPU library for LU factorization. Direct calls to Metal 
-in a way that pre-allocates workspace to avoid allocations and automatically offloads 
+A wrapper over Apple's Metal GPU library for LU factorization. Direct calls to Metal
+in a way that pre-allocates workspace to avoid allocations and automatically offloads
 to the GPU. This solver is optimized for Metal-capable Apple Silicon Macs.
 
 ## Requirements
@@ -883,8 +961,8 @@ end
 """
     BLISLUFactorization()
 
-An LU factorization implementation using the BLIS (BLAS-like Library Instantiation Software) 
-framework. BLIS provides high-performance dense linear algebra kernels optimized for various 
+An LU factorization implementation using the BLIS (BLAS-like Library Instantiation Software)
+framework. BLIS provides high-performance dense linear algebra kernels optimized for various
 CPU architectures.
 
 ## Requirements
@@ -917,7 +995,7 @@ end
 `CUSOLVERRFFactorization(; symbolic = :RF, reuse_symbolic = true)`
 
 A GPU-accelerated sparse LU factorization using NVIDIA's cusolverRF library.
-This solver is specifically designed for sparse matrices on CUDA GPUs and 
+This solver is specifically designed for sparse matrices on CUDA GPUs and
 provides high-performance factorization and solve capabilities.
 
 ## Keyword Arguments
@@ -925,11 +1003,11 @@ provides high-performance factorization and solve capabilities.
   - `symbolic`: The symbolic factorization method to use. Options are:
     - `:RF` (default): Use cusolverRF's built-in symbolic analysis
     - `:KLU`: Use KLU for symbolic analysis
-  - `reuse_symbolic`: Whether to reuse the symbolic factorization when the 
+  - `reuse_symbolic`: Whether to reuse the symbolic factorization when the
     sparsity pattern doesn't change (default: `true`)
 
 !!! note
-    This solver requires CUSOLVERRF.jl to be loaded and only supports 
+    This solver requires CUSOLVERRF.jl to be loaded and only supports
     `Float64` element types with `Int32` indices.
 """
 struct CUSOLVERRFFactorization <: AbstractSparseFactorization
@@ -1021,7 +1099,7 @@ struct OpenBLAS32MixedLUFactorization <: AbstractDenseFactorization end
 """
     RF32MixedLUFactorization{P, T}(; pivot = Val(true), thread = Val(true))
 
-A mixed precision LU factorization using RecursiveFactorization.jl that performs 
+A mixed precision LU factorization using RecursiveFactorization.jl that performs
 factorization in Float32 precision while maintaining Float64 interface. This combines
 the speed benefits of RecursiveFactorization.jl with reduced precision computation
 for additional performance gains.
@@ -1031,9 +1109,9 @@ for additional performance gains.
 - `T`: Threading strategy as `Val{Bool}`. `Val{true}` enables multi-threading for performance.
 
 ## Constructor Arguments
-- `pivot = Val(true)`: Enable partial pivoting. Set to `Val{false}` to disable for speed 
+- `pivot = Val(true)`: Enable partial pivoting. Set to `Val{false}` to disable for speed
   at the cost of numerical stability.
-- `thread = Val(true)`: Enable multi-threading. Set to `Val{false}` for single-threaded 
+- `thread = Val(true)`: Enable multi-threading. Set to `Val{false}` for single-threaded
   execution.
 
 ## Performance Notes

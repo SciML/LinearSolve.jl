@@ -23,23 +23,13 @@ end
 # Select the PETSc C library that matches the scalar type of the system matrix.
 get_petsclib(::Type{T} = Float64) where {T} = PETSc.getlib(; PetscScalar = T)
 
-# ── Sparsity fingerprint ──────────────────────────────────────────────────────
-#
-# A cheap structural hash to detect whether the matrix's sparsity pattern
-# changed between successive solves — without comparing every entry.
-#
-# SparseMatrixCSC: hashes colptr, rowval, and size.  Two matrices with the
-#   same pattern but different values hash identically, which is exactly what
-#   we need to distinguish Case 2 (pattern changed) from Case 3 (values only).
-#
-# AbstractMatrix (dense): hashes size only.  Two same-size dense matrices hash
-#   identically → Case 3 (in-place value update).  Different sizes → Case 2
-#   (full rebuild).
-
-sparsity_fingerprint(A::SparseMatrixCSC) =
-    hash(:Sparse, hash(A.rowval, hash(A.colptr, hash(size(A)))))
-sparsity_fingerprint(A::AbstractMatrix) =
-    hash(:Dense, hash(size(A)))
+# ── Sparsity pattern check ────────────────────────────────────────────────────
+function sparsity_pattern_changed(old_colptr, old_rowval, A::SparseMatrixCSC)
+    # If the pointers are the same, the content is the same (Case 3 or no change)
+    old_colptr === A.colptr && old_rowval === A.rowval && return false
+    # Otherwise, check if the content differs
+    return old_colptr != A.colptr || old_rowval != A.rowval
+end
 
 # ── Cache ─────────────────────────────────────────────────────────────────────
 
@@ -61,9 +51,9 @@ Fields
 - `petsc_x`        — Solution vector.
 - `petsc_b`        — Right-hand side vector.
 - `vec_n`          — Length of the currently allocated vectors; used to detect resizing.
-- `sparsity_hash`  — Fingerprint of the last assembled matrix's structure.
-                     Compared at the start of each solve to choose between a full
-                     KSP rebuild (Case 2) and an in-place value update (Case 3).
+- `prev_colptr`    — Previous matrix's colptr array (for sparse matrices).
+- `prev_rowval`    — Previous matrix's rowval array (for sparse matrices).
+- `prev_size`      — Previous matrix's size (for dense matrices).
 - `sparse_perm`    — Permutation vector of length `nnz` mapping PETSc's internal
                      CSR index to Julia's CSC `nzval` index.  Allocated once per
                      KSP build and reused on every Case 3 update with zero allocations.
@@ -81,7 +71,9 @@ mutable struct PETScCache{T}
     petsc_x::Any
     petsc_b::Any
     vec_n::Int
-    sparsity_hash::UInt
+    prev_colptr::Any      # Previous matrix's colptr array (for sparse matrices)
+    prev_rowval::Any      # Previous matrix's rowval array (for sparse matrices)
+    prev_size::Any        # Previous matrix's size (for dense matrices)
     sparse_perm::Any      # Vector{Int} of length nnz, or nothing for dense
     sparse_scratch::Any   # Vector{Int} of length 2*(m+1), or nothing for dense
     initialized::Bool
@@ -94,7 +86,7 @@ function _nullify_all!(pcache::PETScCache)
     pcache.petsc_x = pcache.petsc_b = nothing
     pcache.sparse_perm = pcache.sparse_scratch = nothing
     pcache.vec_n = 0
-    pcache.sparsity_hash = UInt(0)
+    pcache.prev_colptr = pcache.prev_rowval = pcache.prev_size = nothing
     return pcache.initialized = false
 end
 
@@ -154,7 +146,7 @@ function LinearSolve.init_cacheval(
     T = eltype(A)
     pcache = PETScCache{T}(
         nothing, nothing, nothing, nothing, nothing, nothing,
-        nothing, nothing, 0, UInt(0), nothing, nothing, false
+        nothing, nothing, 0, nothing, nothing, nothing, nothing, nothing, false
     )
     finalizer(cleanup_petsc_cache!, pcache)
     return pcache
@@ -376,9 +368,13 @@ function build_ksp!(pcache, petsclib, cache, alg)
             pcache.sparse_scratch = Vector{Int}(undef, 2 * (m + 1))
         end
         _csc_to_csr_perm!(pcache.sparse_perm, pcache.sparse_scratch, cache.A)
+        # Store the current sparsity pattern
+        pcache.prev_colptr = cache.A.colptr
+        pcache.prev_rowval = cache.A.rowval
     else
         pcache.sparse_perm    = nothing
         pcache.sparse_scratch = nothing
+        pcache.prev_size = size(cache.A)
     end
 
     # petsc_P aliases petsc_A when no separate preconditioner matrix is given.
@@ -441,15 +437,27 @@ function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm; kwargs...)
     pcache.initialized = true
 
     # ── Decide: rebuild, update in-place, or reuse ────────────────────────────
-    rebuild_ksp = pcache.ksp === nothing   # Case 1
+rebuild_ksp = pcache.ksp === nothing   # Case 1
     if !rebuild_ksp && cache.isfresh
-        new_hash    = sparsity_fingerprint(cache.A)
-        rebuild_ksp = new_hash != pcache.sparsity_hash   # Case 2 vs Case 3
+        if cache.A isa SparseMatrixCSC
+            if pcache.prev_colptr === nothing || pcache.prev_rowval === nothing
+                rebuild_ksp = true
+            else
+                # Compare stored pointers/arrays directly against the new matrix
+                rebuild_ksp = sparsity_pattern_changed(
+                    pcache.prev_colptr, 
+                    pcache.prev_rowval, 
+                    cache.A
+                )
+            end
+        else
+            # For dense matrices, check if the size has changed
+            rebuild_ksp = pcache.prev_size !== nothing && size(cache.A) != pcache.prev_size
+        end
     end
 
     if rebuild_ksp
         build_ksp!(pcache, petsclib, cache, alg)
-        pcache.sparsity_hash = sparsity_fingerprint(cache.A)
     elseif cache.isfresh
         # Case 3: same structure — update values without touching the KSP object.
         if cache.A isa SparseMatrixCSC
@@ -472,7 +480,6 @@ function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm; kwargs...)
         #   reinit!(cache; reuse_precs=true) → skip recomputation
         if !cache.precsisfresh
             LibPETSc.KSPSetReusePreconditioner(petsclib, pcache.ksp, LibPETSc.PetscBool(true))
-
         end
     end
     cache.isfresh = false

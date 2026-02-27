@@ -130,6 +130,12 @@ function Base.setproperty!(cache::LinearCache, name::Symbol, x)
     if name === :A
         setfield!(cache, :isfresh, true)
         setfield!(cache, :precsisfresh, true)
+        if cache.cacheval isa DefaultLinearSolverInit
+            A_backup = cache.cacheval.A_backup
+            if x === getfield(cache, :A) && !(x === A_backup)
+                copyto!(A_backup, x)
+            end
+        end
     elseif name === :p
         setfield!(cache, :precsisfresh, true)
     elseif name === :b

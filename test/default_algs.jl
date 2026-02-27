@@ -234,6 +234,34 @@ cache_backup = init(prob_backup)
 solve!(cache_backup)
 @test prob_backup.A ≈ A_singular  # prob.A unchanged
 
+# Regression test: A_backup must be updated from cache.A before each LU solve.
+# When a caller (e.g. NonlinearSolve) reuses the cache with a different matrix via
+# copyto!(cache.A, new_J), the QR fallback must use the current matrix, not the
+# stale initial one.
+prob_reuse = LinearProblem(copy(A_singular), copy(b_singular))
+cache_reuse = init(prob_reuse)
+sol1 = solve!(cache_reuse)
+@test sol1.retcode === ReturnCode.Success
+
+# Now update cache.A with a different singular matrix (same size) and re-solve.
+# This simulates NonlinearSolve updating the Jacobian between Newton steps.
+A_singular2 = Float64[
+    0.0 0.0 0.0 0.0
+    0.0 2.0 0.0 0.0
+    0.0 0.0 3.0 0.0
+    0.0 0.0 0.0 0.0
+]
+b_singular2 = Float64[0.0, 4.0, 9.0, 0.0]
+copyto!(cache_reuse.A, A_singular2)
+cache_reuse.A = cache_reuse.A  # trigger setproperty! to sync A_backup
+copyto!(cache_reuse.b, b_singular2)
+sol2 = solve!(cache_reuse)
+@test sol2.retcode === ReturnCode.Success
+sol_qr2 = solve(
+    LinearProblem(copy(A_singular2), copy(b_singular2)), QRFactorization(ColumnNorm())
+)
+@test sol2.u ≈ sol_qr2.u
+
 # Regression test for https://github.com/SciML/LinearSolve.jl/issues/890
 # WOperator with init_cacheval overload that unwraps A.J (as OrdinaryDiffEqDifferentiation does)
 using SciMLOperators: WOperator, MatrixOperator

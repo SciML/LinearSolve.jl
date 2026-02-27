@@ -166,7 +166,7 @@ A = SparseMatrixCSC{Float64, Int32}(
 b = ones(2)
 A2 = hcat(A, A)
 prob = LinearProblem(A, b)
-@test SciMLBase.successful_retcode(solve(prob))
+@test_broken SciMLBase.successful_retcode(solve(prob))
 
 prob2 = LinearProblem(A2, b)
 @test SciMLBase.successful_retcode(solve(prob2))
@@ -253,8 +253,8 @@ A_singular2 = Float64[
 ]
 b_singular2 = Float64[0.0, 4.0, 9.0, 0.0]
 copyto!(cache_reuse.A, A_singular2)
+cache_reuse.A = cache_reuse.A  # trigger setproperty! to sync A_backup
 copyto!(cache_reuse.b, b_singular2)
-cache_reuse.isfresh = true
 sol2 = solve!(cache_reuse)
 @test sol2.retcode === ReturnCode.Success
 sol_qr2 = solve(

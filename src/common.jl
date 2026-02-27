@@ -138,6 +138,10 @@ function Base.setproperty!(cache::LinearCache, name::Symbol, x)
                 else
                     setfield!(cache.cacheval, :A_backup, copy(x))
                 end
+                cache.cacheval.a_backup_synced = true
+            elseif !(x === getfield(cache, :A))
+                # A was replaced by a different object; A_backup is now stale
+                cache.cacheval.a_backup_synced = false
             end
         end
     elseif name === :p

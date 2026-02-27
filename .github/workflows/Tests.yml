@@ -34,6 +34,7 @@ jobs:
           - "Core"
           - "DefaultsLoading"
           - "LinearSolveHYPRE"
+          - "LinearSolvePETSc"
           - "LinearSolvePardiso"
           - "LinearSolveGinkgo"
           - "NoPre"

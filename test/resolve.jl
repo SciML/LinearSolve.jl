@@ -47,9 +47,16 @@ for alg in vcat(
             (!(alg == MKL32MixedLUFactorization) || LinearSolve.usemkl) &&
             (!(alg == AppleAccelerate32MixedLUFactorization) || Sys.isapple()) &&
             (!(alg == OpenBLAS32MixedLUFactorization) || LinearSolve.useopenblas) &&
-            (!(alg == SparspakFactorization) || false)
+            (!(alg == SparspakFactorization) || false) &&
+            (
+            !(alg == ParUFactorization) ||
+                Base.get_extension(LinearSolve, :LinearSolveParUExt) !== nothing
+        )
         A = [1.0 2.0; 3.0 4.0]
-        alg in [KLUFactorization, UMFPACKFactorization, SparspakFactorization] &&
+        alg in [
+            KLUFactorization, UMFPACKFactorization, SparspakFactorization,
+            ParUFactorization,
+        ] &&
             (A = sparse(A))
         A = A' * A
         @show A
@@ -75,7 +82,10 @@ for alg in vcat(
         end
 
         A = [1.0 2.0; 3.0 4.0]
-        alg in [KLUFactorization, UMFPACKFactorization, SparspakFactorization] &&
+        alg in [
+            KLUFactorization, UMFPACKFactorization, SparspakFactorization,
+            ParUFactorization,
+        ] &&
             (A = sparse(A))
         A = A' * A
         alg in [CHOLMODFactorization] && (A = sparse(Symmetric(A, :L)))

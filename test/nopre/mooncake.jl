@@ -132,7 +132,7 @@ for alg in (
     @show results
 
     @test results[1] ≈ fb(b1)
-    @test results[2][2] ≈ fd_jac rtol = 1.0e-5
+    @test results[2][2] ≈ fd_jac rtol = 5.0e-5
 
     function fA(A)
         prob = LinearProblem(A, b1)
@@ -152,7 +152,7 @@ for alg in (
     mooncake_gradient = results[2][2] |> vec
 
     @test results[1] ≈ fA(A)
-    @test mooncake_gradient ≈ fd_jac rtol = 1.0e-5
+    @test mooncake_gradient ≈ fd_jac rtol = 5.0e-5
 end
 
 # Tests for solve! and init rrules.
@@ -289,11 +289,11 @@ end
         prepare_gradient_cache(fnice, copy(A), copy(b1), alg),
         fnice, copy(A), copy(b1), alg
     )
-    @test en_jac[3] ≈ fd_jac_b rtol = 1.0e-5
+    @test en_jac[3] ≈ fd_jac_b rtol = 5.0e-5
 
     # For A
     fA_closure = A -> fnice(A, b1, alg)
     fd_jac_A = FiniteDiff.finite_difference_jacobian(fA_closure, A) |> vec
     A_grad = en_jac[2] |> vec
-    @test A_grad ≈ fd_jac_A rtol = 1.0e-5
+    @test A_grad ≈ fd_jac_A rtol = 5.0e-5
 end

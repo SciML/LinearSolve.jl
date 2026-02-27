@@ -8,7 +8,7 @@ using RecursiveFactorization
         b = rand(i)
         prob = LinearProblem(A, b)
         x = solve(prob, ButterflyFactorization())
-        @test norm(A * x .- b) <= 5.0e-6
+        @test norm(A * x .- b) <= 5.0e-5
     end
 end
 

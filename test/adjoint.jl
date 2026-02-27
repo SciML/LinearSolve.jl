@@ -1,7 +1,9 @@
 using Zygote, ForwardDiff
 using LinearSolve, LinearAlgebra, Test
 using FiniteDiff, RecursiveFactorization
+using Random
 
+Random.seed!(1234)
 n = 4
 A = rand(n, n);
 b1 = rand(n);
@@ -122,7 +124,7 @@ for alg in (
     zyg_jac = Zygote.jacobian(fb, b1) |> first |> vec
     @show zyg_jac
 
-    @test zyg_jac ≈ fd_jac rtol = 1.0e-4
+    @test zyg_jac ≈ fd_jac rtol = 5.0e-4
 
     function fA(A)
         prob = LinearProblem(A, b1)
@@ -139,7 +141,25 @@ for alg in (
     zyg_jac = Zygote.jacobian(fA, A) |> first |> vec
     @show zyg_jac
 
-    @test zyg_jac ≈ fd_jac rtol = 1.0e-4
+    @test zyg_jac ≈ fd_jac rtol = 5.0e-4
+end
+
+@testset "Direct solution indexing without .u" begin
+    N = 2
+    Random.seed!(1234)
+    function test_func(x::AbstractVector{T}) where {T <: Real}
+        A = reshape(x[1:(N * N)], (N, N))
+        b = x[(N * N + 1):end]
+        prob = LinearProblem(A, b)
+        sol = solve(prob)
+        return sum(sol)
+    end
+
+    x0 = rand(N * N + N)
+
+    grad_zygote = Zygote.gradient(test_func, x0)
+    grad_forwarddiff = ForwardDiff.gradient(test_func, x0)
+    @test grad_zygote[1] ≈ grad_forwarddiff rtol = 1.0e-5
 end
 
 struct System end

@@ -41,6 +41,12 @@ macro get_cacheval(cache, algsym)
     end
 end
 
+# Normalize deprecated Val-based pivot arguments to PivotingStrategy types.
+# Julia 1.12 deprecated Val(true)/Val(false) in favor of RowMaximum()/NoPivot().
+_normalize_pivot(pivot::LinearAlgebra.PivotingStrategy) = pivot
+_normalize_pivot(::Val{true}) = RowMaximum()
+_normalize_pivot(::Val{false}) = NoPivot()
+
 const PREALLOCATED_IPIV = Vector{LinearAlgebra.BlasInt}(undef, 0)
 
 _ldiv!(x, A, b) = ldiv!(x, A, b)
@@ -145,16 +151,32 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
     A = convert(AbstractMatrix, A)
     if cache.isfresh
         cacheval = @get_cacheval(cache, :LUFactorization)
-        if issparsematrix(A) && alg.reuse_symbolic
-            # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
-            # If SparseMatrixCSC, check if the pattern has changed
-            if alg.check_pattern && pattern_changed(cacheval, A)
-                fact = lu(A, check = false)
+        local fact
+        try
+            if issparsematrix(A) && alg.reuse_symbolic
+                # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
+                # If SparseMatrixCSC, check if the pattern has changed
+                if alg.check_pattern && pattern_changed(cacheval, A)
+                    fact = lu(A, check = false)
+                else
+                    fact = lu!(cacheval, A, check = false)
+                end
             else
-                fact = lu!(cacheval, A, check = false)
+                fact = lu(A, check = false)
             end
-        else
-            fact = lu(A, check = false)
+        catch e
+            # Some matrix types (e.g. BandedMatrix) throw LAPACKException on singular
+            # matrices even with check=false, because their LAPACK wrappers don't
+            # respect the check flag. Catch these and return Failure.
+            if e isa LinearAlgebra.LAPACKException ||
+                    e isa LinearAlgebra.SingularException
+                @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
+                return SciMLBase.build_linear_solution(
+                    alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                )
+            else
+                rethrow(e)
+            end
         end
         cache.cacheval = fact
 
@@ -176,14 +198,15 @@ end
 
 function do_factorization(alg::LUFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
+    pivot = _normalize_pivot(alg.pivot)
     if issparsematrixcsc(A)
         fact = handle_sparsematrixcsc_lu(A)
     elseif A isa GPUArraysCore.AnyGPUArray
         fact = lu(A; check = false)
     elseif !ArrayInterface.can_setindex(typeof(A))
-        fact = lu(A, alg.pivot, check = false)
+        fact = lu(A, pivot; check = false)
     else
-        fact = lu!(A, alg.pivot, check = false)
+        fact = lu!(A, pivot; check = false)
     end
     return fact
 end
@@ -413,14 +436,15 @@ end
 
 function do_factorization(alg::CholeskyFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
+    pivot = _normalize_pivot(alg.pivot)
     if issparsematrixcsc(A)
         fact = cholesky(A; shift = alg.shift, check = false, perm = alg.perm)
     elseif A isa GPUArraysCore.AnyGPUArray
         fact = cholesky(A; check = false)
-    elseif alg.pivot === Val(false) || alg.pivot === NoPivot()
-        fact = cholesky!(A, alg.pivot; check = false)
+    elseif pivot === NoPivot()
+        fact = cholesky!(A, pivot; check = false)
     else
-        fact = cholesky!(A, alg.pivot; tol = alg.tol, check = false)
+        fact = cholesky!(A, pivot; tol = alg.tol, check = false)
     end
     return fact
 end
@@ -449,7 +473,7 @@ function init_cacheval(
     elseif LinearSolve.is_cusparse_csr(A) && !LinearSolve.cudss_loaded(A)
         nothing
     else
-        ArrayInterface.cholesky_instance(convert(AbstractMatrix, A), alg.pivot)
+        ArrayInterface.cholesky_instance(convert(AbstractMatrix, A), _normalize_pivot(alg.pivot))
     end
 end
 
@@ -1172,7 +1196,7 @@ function init_cacheval(
     )
     A_ = convert(AbstractMatrix, A)
     return ArrayInterface.cholesky_instance(
-        Symmetric(Matrix{eltype(A)}(undef, 0, 0)), alg.pivot
+        Symmetric(Matrix{eltype(A)}(undef, 0, 0)), _normalize_pivot(alg.pivot)
     )
 end
 
@@ -1203,7 +1227,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization; 
         if issparsematrixcsc(A) || A isa GPUArraysCore.AnyGPUArray || A isa SMatrix
             fact = cholesky(Symmetric((A)' * A); check = false)
         else
-            fact = cholesky(Symmetric((A)' * A), alg.pivot; check = false)
+            fact = cholesky(Symmetric((A)' * A), _normalize_pivot(alg.pivot); check = false)
         end
         cache.cacheval = fact
 

@@ -285,3 +285,56 @@ W = WOperator{true}(M_w, 1.0, J_w, [1.0, 0.5])
 prob_w = LinearProblem(W, [1.0, 2.0])
 sol_w = solve(prob_w)
 @test sol_w.retcode === ReturnCode.Success
+
+# Post-solve residual check: near-singular matrix where LU "succeeds" but gives garbage
+# LU doesn't flag near-zero pivots, only exact zeros. The residual check catches this.
+using Random
+Random.seed!(42)
+n = 20
+U = qr(randn(n, n)).Q * Diagonal(vcat(cbrt(eps(Float64)), ones(n - 1)))  # one near-zero singular value
+A_nearsing = Matrix(U * Diagonal(ones(n)) * U')
+# Make it clearly near-singular but with no exact zero pivot
+A_nearsing .+= eps(Float64) * randn(n, n)
+b_nearsing = randn(n)
+
+# Without safetyfallback, LU result is returned as-is (may be garbage)
+sol_nosafe = solve(
+    LinearProblem(copy(A_nearsing), copy(b_nearsing)),
+    LinearSolve.DefaultLinearSolver(
+        LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization; safetyfallback = false
+    )
+)
+# With safetyfallback (default), residual check should trigger QR fallback
+sol_safe = solve(
+    LinearProblem(copy(A_nearsing), copy(b_nearsing)),
+    LinearSolve.DefaultLinearSolver(
+        LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
+    )
+)
+sol_qr_ref = solve(
+    LinearProblem(copy(A_nearsing), copy(b_nearsing)),
+    QRFactorization(ColumnNorm())
+)
+# The safe fallback should give a much better solution than raw LU
+resid_nosafe = norm(A_nearsing * sol_nosafe.u - b_nearsing)
+resid_safe = norm(A_nearsing * sol_safe.u - b_nearsing)
+resid_qr = norm(A_nearsing * sol_qr_ref.u - b_nearsing)
+@test resid_safe <= 10 * resid_qr || resid_safe < 1e-10  # safe is close to QR quality
+@test sol_safe.retcode === ReturnCode.Success
+
+# Well-conditioned matrix: residual check should NOT trigger fallback
+A_wellcond = Float64[4 1; 1 3]
+b_wellcond = Float64[1.0, 2.0]
+sol_well = solve(LinearProblem(copy(A_wellcond), copy(b_wellcond)))
+@test sol_well.retcode === ReturnCode.Success
+@test sol_well.u ≈ A_wellcond \ b_wellcond
+
+# safetyfallback=false skips residual check entirely
+sol_no_fallback = solve(
+    LinearProblem(copy(A_nearsing), copy(b_nearsing)),
+    LinearSolve.DefaultLinearSolver(
+        LinearSolve.DefaultAlgorithmChoice.LUFactorization; safetyfallback = false
+    )
+)
+# Should return without fallback (no error, but possibly bad solution)
+@test sol_no_fallback.retcode === ReturnCode.Success

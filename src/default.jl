@@ -28,7 +28,7 @@ mutable struct DefaultLinearSolverInit{
     BLISLUFactorization::T22
     CudaOffloadLUFactorization::T23
     MetalLUFactorization::T24
-    A_backup::TA  # reference to original prob.A for restoring cache.A after in-place LU
+    A_backup::TA  # backup of cache.A for restoring after in-place LU; updated before each LU solve
 end
 
 @generated function __setfield!(cache::DefaultLinearSolverInit, alg::DefaultLinearSolver, v)
@@ -595,6 +595,12 @@ end
                 )
             )
             newex = quote
+                # Save current A before in-place LU may destroy it (A_backup may
+                # be stale if the caller updated cache.A since init, e.g.
+                # NonlinearSolve updating the Jacobian each Newton step).
+                if !(cache.A === cache.cacheval.A_backup)
+                    copyto!(cache.cacheval.A_backup, cache.A)
+                end
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
                     if cache.A === cache.cacheval.A_backup
@@ -637,6 +643,9 @@ end
                     error("Default algorithm calling solve on RecursiveFactorization without the package being loaded. This shouldn't happen.")
                 end
 
+                if !(cache.A === cache.cacheval.A_backup)
+                    copyto!(cache.cacheval.A_backup, cache.A)
+                end
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
                     if cache.A === cache.cacheval.A_backup
@@ -679,6 +688,9 @@ end
                     error("Default algorithm calling solve on BLISLUFactorization without the extension being loaded. This shouldn't happen.")
                 end
 
+                if !(cache.A === cache.cacheval.A_backup)
+                    copyto!(cache.cacheval.A_backup, cache.A)
+                end
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
                     if cache.A === cache.cacheval.A_backup
@@ -721,6 +733,9 @@ end
                     error("Default algorithm calling solve on CudaOffloadLUFactorization without CUDA.jl being loaded. This shouldn't happen.")
                 end
 
+                if !(cache.A === cache.cacheval.A_backup)
+                    copyto!(cache.cacheval.A_backup, cache.A)
+                end
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
                     if cache.A === cache.cacheval.A_backup
@@ -763,6 +778,9 @@ end
                     error("Default algorithm calling solve on MetalLUFactorization without Metal.jl being loaded. This shouldn't happen.")
                 end
 
+                if !(cache.A === cache.cacheval.A_backup)
+                    copyto!(cache.cacheval.A_backup, cache.A)
+                end
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
                 if sol.retcode === ReturnCode.Failure && alg.safetyfallback
                     if cache.A === cache.cacheval.A_backup

@@ -8,3 +8,4 @@ LocalPreferences.toml
 *.swp
 .vscode
 wip
+.CondaPkg/

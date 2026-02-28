@@ -134,13 +134,23 @@ The following preconditioners match the interface of LinearSolve.jl.
     
       + `AlgebraicMultigrid.ruge_stuben(A)`
       + `AlgebraicMultigrid.smoothed_aggregation(A)`
-  - [PyAMG](https://github.com/cortner/PyAMG.jl):
-    Implementations of the algebraic multigrid method. Must be converted to a
-    preconditioner via `PyAMG.aspreconditioner(PyAMG.precmethod(A))`.
-    Requires `A` as a `AbstractMatrix`. Provides the following methods:
-    
-      + `PyAMG.RugeStubenSolver(A)`
-      + `PyAMG.SmoothedAggregationSolver(A)`
+  - [PyAMG via LinearSolvePyAMG.jl](https://github.com/SciML/LinearSolve.jl/tree/main/lib/LinearSolvePyAMG):
+    Implementations of the algebraic multigrid method backed by the Python
+    [PyAMG](https://pyamg.readthedocs.io) library via PythonCall.jl.
+    The Python dependency is installed automatically via CondaPkg.jl.
+    Provides the following solvers through the standard LinearSolve interface:
+
+      + `PyAMG()` — Ruge–Stüben AMG (default)
+      + `PyAMG(method = :SmoothedAggregation)` — smoothed-aggregation AMG
+      + `PyAMG(accel = "cg")` — AMG preconditioned CG
+      + `PyAMG_RugeStuben()` and `PyAMG_SmoothedAggregation()` shortcuts
+
+    ```julia
+    using LinearSolvePyAMG, LinearSolve, SparseArrays
+    A = spdiagm(-1 => -ones(99), 0 => 2ones(100), 1 => -ones(99))
+    b = rand(100)
+    sol = solve(LinearProblem(A, b), PyAMG(accel = "cg"))
+    ```
   - [ILUZero.ILU0Precon(A::SparseMatrixCSC{T,N}, b_type = T)](https://github.com/mcovalt/ILUZero.jl):
     An incomplete LU implementation. Requires `A` as a `SparseMatrixCSC`.
   - [LimitedLDLFactorizations.lldl](https://github.com/JuliaSmoothOptimizers/LimitedLDLFactorizations.jl):

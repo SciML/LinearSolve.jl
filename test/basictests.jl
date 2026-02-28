@@ -18,6 +18,12 @@ catch
     # AlgebraicMultigrid not available, AMG tests will be skipped
 end
 
+try
+    using LinearSolvePyAMG
+catch
+    # LinearSolvePyAMG not available, PyAMG tests will be skipped
+end
+
 const Dual64 = ForwardDiff.Dual{Nothing, Float64, 1}
 
 n = 8
@@ -953,5 +959,38 @@ end
         A_rect = sparse([1.0 1.0 0.0; 0.0 1.0 1.0])
         b_rect = [1.0, 1.0]
         @test_throws AssertionError solve(LinearProblem(A_rect, b_rect), AlgebraicMultigridJL())
+    end
+end
+
+@static if isdefined(@__MODULE__, :LinearSolvePyAMG)
+    @testset "PyAMG" begin
+        n = 100
+        A_pyamg = spdiagm(-1 => -ones(n - 1), 0 => 2 * ones(n), 1 => -ones(n - 1))
+        b_pyamg = rand(n)
+        prob_pyamg = LinearProblem(A_pyamg, b_pyamg)
+
+        # Ruge-Stuben (default)
+        sol_pyamg = solve(prob_pyamg, PyAMG())
+        @test norm(A_pyamg * sol_pyamg.u - b_pyamg) < 1.0e-6
+
+        # Smoothed Aggregation
+        sol_pyamg = solve(prob_pyamg, PyAMG_SmoothedAggregation())
+        @test norm(A_pyamg * sol_pyamg.u - b_pyamg) < 1.0e-6
+
+        # CG acceleration
+        sol_pyamg = solve(prob_pyamg, PyAMG(accel = "cg"), reltol = 1.0e-8)
+        @test norm(A_pyamg * sol_pyamg.u - b_pyamg) < 1.0e-8
+
+        # GMRES acceleration
+        sol_pyamg = solve(prob_pyamg, PyAMG(accel = "gmres"), reltol = 1.0e-6)
+        @test norm(A_pyamg * sol_pyamg.u - b_pyamg) < 1.0e-6
+
+        # Re-solve with different b, same A
+        b_pyamg2 = rand(n)
+        cache_pyamg = init(prob_pyamg, PyAMG(accel = "cg"))
+        solve!(cache_pyamg)
+        reinit!(cache_pyamg; b = b_pyamg2)
+        sol_pyamg2 = solve!(cache_pyamg)
+        @test norm(A_pyamg * sol_pyamg2.u - b_pyamg2) < 1.0e-6
     end
 end

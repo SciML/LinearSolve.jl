@@ -85,14 +85,18 @@ using LinearSolve, LinearAlgebra, Test
             X' * X + 5I
         end
         prob = LinearProblem(A_init, rand(3))
-        cache = init(prob, CholeskyFactorization();
-            alias = LinearAliasSpecifier(alias_A = false, alias_b = false))
+        cache = init(
+            prob, CholeskyFactorization();
+            alias = LinearAliasSpecifier(alias_A = false, alias_b = false)
+        )
         solve!(cache)
 
         resize!(cache, 6)
         @test cache.isfresh == true
 
-        A_new = let X = rand(6, 6); X' * X + 5I end
+        A_new = let X = rand(6, 6)
+            X' * X + 5I
+        end
         b_new = rand(6)
         expected = A_new \ b_new
         cache.A = A_new
@@ -106,7 +110,7 @@ using LinearSolve, LinearAlgebra, Test
     end
 
     @testset "SimpleGMRES" begin
-        test_resize(SimpleGMRES(); atol = 1e-6, maxiters = 100)
+        test_resize(SimpleGMRES(); atol = 1.0e-6, maxiters = 100)
     end
 
     @testset "DefaultLinearSolverInit A_backup resize" begin
@@ -127,8 +131,10 @@ using LinearSolve, LinearAlgebra, Test
         A = rand(3, 3) + 5I
         b = rand(3)
         prob = LinearProblem(A, b)
-        cache = init(prob, nothing;
-            alias = LinearAliasSpecifier(alias_A = false, alias_b = false))
+        cache = init(
+            prob, nothing;
+            alias = LinearAliasSpecifier(alias_A = false, alias_b = false)
+        )
 
         sol = solve!(cache)
         @test sol.retcode == ReturnCode.Success
@@ -158,8 +164,10 @@ using LinearSolve, LinearAlgebra, Test
         A = rand(3, 3) + 5I
         b = rand(3)
         prob = LinearProblem(A, b)
-        cache = init(prob, LUFactorization();
-            alias = LinearAliasSpecifier(alias_A = false, alias_b = false))
+        cache = init(
+            prob, LUFactorization();
+            alias = LinearAliasSpecifier(alias_A = false, alias_b = false)
+        )
 
         sol = solve!(cache)
         @test sol.retcode == ReturnCode.Success

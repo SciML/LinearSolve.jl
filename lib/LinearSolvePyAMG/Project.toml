@@ -1,7 +1,7 @@
 name = "LinearSolvePyAMG"
 uuid = "7a56c47d-7ab1-4e99-b0e3-2952e463d64a"
 authors = ["SciML"]
-version = "0.1.0"
+version = "1.0.0"
 
 [sources]
 LinearSolve = {path = "../.."}

@@ -58,15 +58,15 @@ dual_prob = LinearProblem(A, b)
     # Working tests - these pass JET optimization checks
     JET.@test_opt init(prob, nothing)
 
-    # LUFactorization has runtime dispatch in Base.CoreLogging on Julia < 1.11
-    # Fixed in Julia 1.11+
+    # LUFactorization and GenericLUFactorization have runtime dispatch in
+    # LinearAlgebra.mul! (used by residualsafety check) on Julia < 1.11
     if VERSION < v"1.11"
         JET.@test_opt solve(prob, LUFactorization()) broken = true
+        JET.@test_opt solve(prob, GenericLUFactorization()) broken = true
     else
         JET.@test_opt solve(prob, LUFactorization())
+        JET.@test_opt solve(prob, GenericLUFactorization())
     end
-
-    JET.@test_opt solve(prob, GenericLUFactorization())
     JET.@test_opt solve(prob, DiagonalFactorization())
     JET.@test_opt solve(prob, SimpleLUFactorization())
     # JET.@test_opt solve(prob_spd, NormalCholeskyFactorization())

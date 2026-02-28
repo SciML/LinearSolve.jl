@@ -291,10 +291,10 @@ sol_w = solve(prob_w)
 using Random
 Random.seed!(42)
 n = 20
-U = qr(randn(n, n)).Q * Diagonal(vcat(cbrt(eps(Float64)), ones(n - 1)))  # one near-zero singular value
+U = qr(randn(n, n)).Q * Diagonal(vcat(1e-15, ones(n - 1)))  # one near-zero singular value
 A_nearsing = Matrix(U * Diagonal(ones(n)) * U')
 # Make it clearly near-singular but with no exact zero pivot
-A_nearsing .+= eps(Float64) * randn(n, n)
+A_nearsing .+= 1e-16 * randn(n, n)
 b_nearsing = randn(n)
 
 # Without safetyfallback, LU result is returned as-is (may be garbage)
@@ -338,3 +338,33 @@ sol_no_fallback = solve(
 )
 # Should return without fallback (no error, but possibly bad solution)
 @test sol_no_fallback.retcode === ReturnCode.Success
+
+# Individual LU algorithm residualsafety tests
+# LUFactorization(residualsafety=true) on near-singular matrix → ReturnCode.Failure
+sol_lu_rs = solve(
+    LinearProblem(copy(A_nearsing), copy(b_nearsing)),
+    LUFactorization(residualsafety = true)
+)
+@test sol_lu_rs.retcode === ReturnCode.Failure
+
+# GenericLUFactorization(residualsafety=true) on near-singular matrix → ReturnCode.Failure
+sol_glu_rs = solve(
+    LinearProblem(copy(A_nearsing), copy(b_nearsing)),
+    GenericLUFactorization(residualsafety = true)
+)
+@test sol_glu_rs.retcode === ReturnCode.Failure
+
+# Default LUFactorization() on near-singular matrix → ReturnCode.Success (no check)
+sol_lu_default = solve(
+    LinearProblem(copy(A_nearsing), copy(b_nearsing)),
+    LUFactorization()
+)
+@test sol_lu_default.retcode === ReturnCode.Success
+
+# Well-conditioned matrix: residualsafety=true should still succeed
+sol_lu_well_rs = solve(
+    LinearProblem(copy(A_wellcond), copy(b_wellcond)),
+    LUFactorization(residualsafety = true)
+)
+@test sol_lu_well_rs.retcode === ReturnCode.Success
+@test sol_lu_well_rs.u ≈ A_wellcond \ b_wellcond

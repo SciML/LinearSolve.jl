@@ -208,12 +208,13 @@ Requires a sufficiently large `A` to overcome the data transfer costs.
     Using this solver requires adding the package CUDA.jl, i.e. `using CUDA`
 """
 struct CudaOffloadLUFactorization <: AbstractFactorization
-    function CudaOffloadLUFactorization(; throwerror = true)
+    residualsafety::Bool
+    function CudaOffloadLUFactorization(; throwerror = true, residualsafety::Bool = false)
         ext = Base.get_extension(@__MODULE__, :LinearSolveCUDAExt)
         if ext === nothing && throwerror
             error("CudaOffloadLUFactorization requires that CUDA is loaded, i.e. `using CUDA`")
         else
-            return new()
+            return new(residualsafety)
         end
     end
 end
@@ -376,17 +377,18 @@ alg2 = RFLUFactorization(pivot=Val(false))
 ```
 """
 struct RFLUFactorization{P, T} <: AbstractDenseFactorization
-    function RFLUFactorization(::Val{P}, ::Val{T}; throwerror = true) where {P, T}
+    residualsafety::Bool
+    function RFLUFactorization(::Val{P}, ::Val{T}; throwerror = true, residualsafety::Bool = false) where {P, T}
         if !userecursivefactorization(nothing)
             throwerror &&
                 error("RFLUFactorization requires that RecursiveFactorization.jl is loaded, i.e. `using RecursiveFactorization`")
         end
-        return new{P, T}()
+        return new{P, T}(residualsafety)
     end
 end
 
-function RFLUFactorization(; pivot = Val(true), thread = Val(true), throwerror = true)
-    return RFLUFactorization(pivot, thread; throwerror)
+function RFLUFactorization(; pivot = Val(true), thread = Val(true), throwerror = true, residualsafety::Bool = false)
+    return RFLUFactorization(pivot, thread; throwerror, residualsafety)
 end
 
 """
@@ -898,19 +900,20 @@ sol = solve(prob, alg)
 ```
 """
 struct MetalLUFactorization <: AbstractFactorization
-    function MetalLUFactorization(; throwerror = true)
+    residualsafety::Bool
+    function MetalLUFactorization(; throwerror = true, residualsafety::Bool = false)
         return @static if !Sys.isapple()
             if throwerror
                 error("MetalLUFactorization is only available on Apple platforms")
             else
-                return new()
+                return new(residualsafety)
             end
         else
             ext = Base.get_extension(@__MODULE__, :LinearSolveMetalExt)
             if ext === nothing && throwerror
                 error("MetalLUFactorization requires that Metal.jl is loaded, i.e. `using Metal`")
             else
-                return new()
+                return new(residualsafety)
             end
         end
     end
@@ -981,12 +984,13 @@ sol = solve(prob, alg)
 ```
 """
 struct BLISLUFactorization <: AbstractFactorization
-    function BLISLUFactorization(; throwerror = true)
+    residualsafety::Bool
+    function BLISLUFactorization(; throwerror = true, residualsafety::Bool = false)
         ext = Base.get_extension(@__MODULE__, :LinearSolveBLISExt)
         if ext === nothing && throwerror
             error("BLISLUFactorization requires that the BLIS extension is loaded and blis_jll is available")
         else
-            return new()
+            return new(residualsafety)
         end
     end
 end

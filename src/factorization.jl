@@ -3,6 +3,8 @@
         kwargs...
     )
     return quote
+        A_original = _get_residualsafety(alg) && cache.isfresh ? copy(cache.A) : nothing
+
         if cache.isfresh
             fact = do_factorization(alg, cache.A, cache.b, cache.u)
             cache.cacheval = fact
@@ -25,6 +27,12 @@
             cache.u, @get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
             cache.b
         )
+
+        if A_original !== nothing
+            failed = _check_residual_safety(cache, alg, A_original, y)
+            failed !== nothing && return failed
+        end
+
         return SciMLBase.build_linear_solution(
             alg, y, nothing, cache; retcode = ReturnCode.Success
         )
@@ -48,6 +56,33 @@ _normalize_pivot(::Val{true}) = RowMaximum()
 _normalize_pivot(::Val{false}) = NoPivot()
 
 const PREALLOCATED_IPIV = Vector{LinearAlgebra.BlasInt}(undef, 0)
+
+# Trait for checking if an algorithm has residualsafety enabled
+_get_residualsafety(alg) = false
+# Methods for extension_algs.jl types (defined before this file is included)
+_get_residualsafety(alg::RFLUFactorization) = alg.residualsafety
+_get_residualsafety(alg::BLISLUFactorization) = alg.residualsafety
+_get_residualsafety(alg::CudaOffloadLUFactorization) = alg.residualsafety
+_get_residualsafety(alg::MetalLUFactorization) = alg.residualsafety
+
+"""
+    _check_residual_safety(cache::LinearCache, alg, A_original, y)
+
+Post-solve residual check for LU algorithms with `residualsafety=true`.
+Computes `‖A*y - b‖` and returns a `Failure` solution if it exceeds
+`abstol + reltol * ‖b‖`. Returns `nothing` if the residual is acceptable.
+"""
+function _check_residual_safety(cache::LinearCache, alg, A_original, y)
+    r = A_original * y - cache.b
+    res_norm = norm(r)
+    b_norm = norm(cache.b)
+    tol = cache.abstol + cache.reltol * b_norm
+    if res_norm > tol
+        return SciMLBase.build_linear_solution(
+            alg, y, nothing, cache; retcode = ReturnCode.Failure)
+    end
+    return nothing
+end
 
 _ldiv!(x, A, b) = ldiv!(x, A, b)
 
@@ -123,6 +158,7 @@ Base.@kwdef struct LUFactorization{P} <: AbstractDenseFactorization
     pivot::P = LinearAlgebra.RowMaximum()
     reuse_symbolic::Bool = true
     check_pattern::Bool = true # Check factorization re-use
+    residualsafety::Bool = false
 end
 
 # Legacy dispatch
@@ -142,13 +178,19 @@ Has low overhead and is good for small matrices.
 """
 struct GenericLUFactorization{P} <: AbstractDenseFactorization
     pivot::P
+    residualsafety::Bool
 end
 
-GenericLUFactorization() = GenericLUFactorization(RowMaximum())
+GenericLUFactorization(pivot = RowMaximum(); residualsafety::Bool = false) = GenericLUFactorization(pivot, residualsafety)
+
+# Trait methods for types defined in this file (must come after struct definitions)
+_get_residualsafety(alg::LUFactorization) = alg.residualsafety
+_get_residualsafety(alg::GenericLUFactorization) = alg.residualsafety
 
 function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
+    A_original = alg.residualsafety && cache.isfresh ? copy(A) : nothing
     if cache.isfresh
         cacheval = @get_cacheval(cache, :LUFactorization)
         local fact
@@ -193,6 +235,12 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
 
     F = @get_cacheval(cache, :LUFactorization)
     y = _ldiv!(cache.u, F, cache.b)
+
+    if A_original !== nothing
+        failed = _check_residual_safety(cache, alg, A_original, y)
+        failed !== nothing && return failed
+    end
+
     return SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
 end
 
@@ -234,6 +282,7 @@ function SciMLBase.solve!(
     )
     A = cache.A
     A = convert(AbstractMatrix, A)
+    A_original = alg.residualsafety && cache.isfresh ? copy(A) : nothing
     fact, ipiv = LinearSolve.@get_cacheval(cache, :GenericLUFactorization)
 
     if cache.isfresh
@@ -254,6 +303,12 @@ function SciMLBase.solve!(
     y = ldiv!(
         cache.u, LinearSolve.@get_cacheval(cache, :GenericLUFactorization)[1], cache.b
     )
+
+    if A_original !== nothing
+        failed = _check_residual_safety(cache, alg, A_original, y)
+        failed !== nothing && return failed
+    end
+
     return SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
 end
 

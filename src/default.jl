@@ -561,7 +561,7 @@ end
             end
         end
     end
-    return Expr(:call, :DefaultLinearSolverInit, caches..., :A_original, :(similar(b)), true)
+    return Expr(:call, :DefaultLinearSolverInit, caches..., :A_original, :(similar(b, 0)), true)
 end
 
 function defaultalg_symbol(::Type{T}) where {T}
@@ -585,7 +585,7 @@ const _SPARSE_ONLY_ALGORITHMS = Symbol.(
 
 Check whether the LU solution has an unacceptably large residual `‖A*x - b‖`.
 Uses `A_backup` and the pre-allocated `residual_buf` in `cache.cacheval` to avoid allocations.
-Returns `true` if the residual exceeds `cbrt(eps(T)) * ‖b‖`.
+Returns `true` if the residual exceeds `abstol + reltol * ‖b‖`.
 Returns `false` (skip check) if `A_backup` is stale (user replaced `cache.A` with a new object).
 """
 function _residual_check_failed(cache::LinearCache, sol)
@@ -597,14 +597,17 @@ function _residual_check_failed(cache::LinearCache, sol)
     buf = cache.cacheval.residual_buf
     u = sol.u
     b = cache.b
+    # Lazily resize the residual buffer on first use (initialized empty to avoid allocation)
+    if length(buf) != length(b)
+        resize!(buf, length(b))
+    end
     # buf = A_backup * u  (in-place)
     mul!(buf, A_backup, u)
     # buf = buf - b  (in-place)
     axpy!(-one(eltype(buf)), b, buf)
     res_norm = norm(buf)
     b_norm = norm(b)
-    T = real(eltype(b))
-    tol = cbrt(eps(T)) * b_norm
+    tol = cache.abstol + cache.reltol * b_norm
     return res_norm > tol
 end
 

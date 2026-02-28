@@ -225,5 +225,5 @@ function init_cacheval(
 end
 
 function resize_cacheval!(cache, cacheval::LUSolver{T}, i) where {T}
-    setfield!(cache, :cacheval, LUSolver{T}(i))
+    return setfield!(cache, :cacheval, LUSolver{T}(i))
 end

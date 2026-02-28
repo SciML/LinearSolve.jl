@@ -3,6 +3,12 @@
         kwargs...
     )
     return quote
+        if _get_residualsafety(alg) && cache.isfresh
+            A_original = _copy_A_for_safety(cache)
+        else
+            A_original = nothing
+        end
+
         if cache.isfresh
             fact = do_factorization(alg, cache.A, cache.b, cache.u)
             cache.cacheval = fact
@@ -25,6 +31,12 @@
             cache.u, @get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
             cache.b
         )
+
+        if A_original !== nothing
+            failed = _check_residual_safety(cache, alg, A_original, y)
+            failed !== nothing && return failed
+        end
+
         return SciMLBase.build_linear_solution(
             alg, y, nothing, cache; retcode = ReturnCode.Success
         )
@@ -48,6 +60,79 @@ _normalize_pivot(::Val{true}) = RowMaximum()
 _normalize_pivot(::Val{false}) = NoPivot()
 
 const PREALLOCATED_IPIV = Vector{LinearAlgebra.BlasInt}(undef, 0)
+const PREALLOCATED_RESIDUAL = Vector{Float64}(undef, 0)
+
+# Trait for checking if an algorithm has residualsafety enabled
+_get_residualsafety(alg) = false
+# Methods for extension_algs.jl types (defined before this file is included)
+_get_residualsafety(alg::RFLUFactorization) = alg.residualsafety
+_get_residualsafety(alg::BLISLUFactorization) = alg.residualsafety
+_get_residualsafety(alg::CudaOffloadLUFactorization) = alg.residualsafety
+_get_residualsafety(alg::MetalLUFactorization) = alg.residualsafety
+
+"""
+    _copy_A_for_safety(cache::LinearCache)
+
+Save a copy of `cache.A` before in-place LU factorization modifies it, for use in
+post-solve residual checking and QR fallback restoration.
+
+When inside `DefaultLinearSolver`, reuses `A_backup` in `DefaultLinearSolverInit`.
+On the first call, `A_backup` aliases `cache.A` (for type stability at init), so a
+separate buffer is allocated and stored. Subsequent calls reuse this buffer via
+`copyto!` (non-allocating after warmup). For standalone use, allocates a copy.
+"""
+function _copy_A_for_safety(cache::LinearCache)
+    if cache.alg isa DefaultLinearSolver
+        cv = cache.cacheval
+        A = cache.A
+        if !cv.a_backup_allocated || size(cv.A_backup) != size(A)
+            # First call or size mismatch: allocate a private buffer.
+            # A_backup initially aliases prob.A so we must not copyto! into it.
+            cv.A_backup = copy(A)
+            cv.a_backup_allocated = true
+        else
+            # Reuse existing private buffer (non-allocating).
+            copyto!(cv.A_backup, A)
+        end
+        cv.a_backup_synced = true
+        return cv.A_backup
+    else
+        return copy(cache.A)
+    end
+end
+
+"""
+    _check_residual_safety(cache::LinearCache, alg, A_original, y)
+
+Post-solve residual check for LU algorithms with `residualsafety=true`.
+Computes `‖A*y - b‖` and returns an `APosterioriSafetyFailure` solution if it
+exceeds `abstol + reltol * ‖b‖`. Returns `nothing` if the residual is acceptable.
+
+When inside `DefaultLinearSolver`, uses the pre-allocated `residual_buf` from
+`DefaultLinearSolverInit` (non-allocating). For standalone use, allocates a buffer.
+"""
+function _check_residual_safety(cache::LinearCache, alg, A_original, y)
+    b = cache.b
+    if cache.alg isa DefaultLinearSolver
+        buf = cache.cacheval.residual_buf
+        if length(buf) != length(b)
+            resize!(buf, length(b))
+        end
+    else
+        buf = similar(b)
+    end
+    mul!(buf, A_original, y)
+    axpy!(-one(eltype(buf)), b, buf)
+    res_norm = norm(buf)
+    b_norm = norm(b)
+    tol = cache.abstol + cache.reltol * b_norm
+    if res_norm > tol
+        return SciMLBase.build_linear_solution(
+            alg, y, nothing, cache; retcode = ReturnCode.APosterioriSafetyFailure
+        )
+    end
+    return nothing
+end
 
 _ldiv!(x, A, b) = ldiv!(x, A, b)
 
@@ -123,6 +208,7 @@ Base.@kwdef struct LUFactorization{P} <: AbstractDenseFactorization
     pivot::P = LinearAlgebra.RowMaximum()
     reuse_symbolic::Bool = true
     check_pattern::Bool = true # Check factorization re-use
+    residualsafety::Bool = false
 end
 
 # Legacy dispatch
@@ -142,13 +228,23 @@ Has low overhead and is good for small matrices.
 """
 struct GenericLUFactorization{P} <: AbstractDenseFactorization
     pivot::P
+    residualsafety::Bool
 end
 
-GenericLUFactorization() = GenericLUFactorization(RowMaximum())
+GenericLUFactorization(pivot = RowMaximum(); residualsafety::Bool = false) = GenericLUFactorization(pivot, residualsafety)
+
+# Trait methods for types defined in this file (must come after struct definitions)
+_get_residualsafety(alg::LUFactorization) = alg.residualsafety
+_get_residualsafety(alg::GenericLUFactorization) = alg.residualsafety
 
 function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
+    if alg.residualsafety && cache.isfresh
+        A_original = _copy_A_for_safety(cache)
+    else
+        A_original = nothing
+    end
     if cache.isfresh
         cacheval = @get_cacheval(cache, :LUFactorization)
         local fact
@@ -193,6 +289,12 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
 
     F = @get_cacheval(cache, :LUFactorization)
     y = _ldiv!(cache.u, F, cache.b)
+
+    if A_original !== nothing
+        failed = _check_residual_safety(cache, alg, A_original, y)
+        failed !== nothing && return failed
+    end
+
     return SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
 end
 
@@ -234,6 +336,11 @@ function SciMLBase.solve!(
     )
     A = cache.A
     A = convert(AbstractMatrix, A)
+    if alg.residualsafety && cache.isfresh
+        A_original = _copy_A_for_safety(cache)
+    else
+        A_original = nothing
+    end
     fact, ipiv = LinearSolve.@get_cacheval(cache, :GenericLUFactorization)
 
     if cache.isfresh
@@ -254,6 +361,12 @@ function SciMLBase.solve!(
     y = ldiv!(
         cache.u, LinearSolve.@get_cacheval(cache, :GenericLUFactorization)[1], cache.b
     )
+
+    if A_original !== nothing
+        failed = _check_residual_safety(cache, alg, A_original, y)
+        failed !== nothing && return failed
+    end
+
     return SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
 end
 

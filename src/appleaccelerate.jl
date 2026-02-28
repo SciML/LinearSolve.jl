@@ -11,7 +11,11 @@ AppleAccelerateLUFactorization()
 A wrapper over Apple's Accelerate Library. Direct calls to Acceelrate in a way that pre-allocates workspace
 to avoid allocations and does not require libblastrampoline.
 """
-struct AppleAccelerateLUFactorization <: AbstractFactorization end
+struct AppleAccelerateLUFactorization <: AbstractFactorization
+    residualsafety::Bool
+end
+
+AppleAccelerateLUFactorization(; residualsafety::Bool = false) = AppleAccelerateLUFactorization(residualsafety)
 
 # To make Enzyme happy, this has to be static
 @static if !Sys.isapple()
@@ -271,6 +275,8 @@ function aa_getrs!(
     return B
 end
 
+_get_residualsafety(alg::AppleAccelerateLUFactorization) = alg.residualsafety
+
 default_alias_A(::AppleAccelerateLUFactorization, ::Any, ::Any) = false
 default_alias_b(::AppleAccelerateLUFactorization, ::Any, ::Any) = false
 
@@ -307,6 +313,11 @@ function SciMLBase.solve!(
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
     A = cache.A
     A = convert(AbstractMatrix, A)
+    if alg.residualsafety && cache.isfresh
+        A_original = _copy_A_for_safety(cache)
+    else
+        A_original = nothing
+    end
     verbose = cache.verbose
     if cache.isfresh
         cacheval = @get_cacheval(cache, :AppleAccelerateLUFactorization)
@@ -369,10 +380,15 @@ function SciMLBase.solve!(
     if m > n
         Bc = copy(cache.b)
         aa_getrs!('N', A.factors, A.ipiv, Bc; info)
-        return copyto!(cache.u, 1, Bc, 1, n)
+        copyto!(cache.u, 1, Bc, 1, n)
     else
         copyto!(cache.u, cache.b)
         aa_getrs!('N', A.factors, A.ipiv, cache.u; info)
+    end
+
+    if A_original !== nothing
+        failed = _check_residual_safety(cache, alg, A_original, cache.u)
+        failed !== nothing && return failed
     end
 
     return SciMLBase.build_linear_solution(

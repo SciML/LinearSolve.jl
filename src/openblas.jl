@@ -31,7 +31,11 @@ prob = LinearProblem(A, b)
 sol = solve(prob, OpenBLASLUFactorization())
 ```
 """
-struct OpenBLASLUFactorization <: AbstractFactorization end
+struct OpenBLASLUFactorization <: AbstractFactorization
+    residualsafety::Bool
+end
+
+OpenBLASLUFactorization(; residualsafety::Bool = false) = OpenBLASLUFactorization(residualsafety)
 
 # Check if OpenBLAS is available
 @static if !@isdefined(OpenBLAS_jll)
@@ -284,6 +288,8 @@ function openblas_getrs!(
     return B
 end
 
+_get_residualsafety(alg::OpenBLASLUFactorization) = alg.residualsafety
+
 default_alias_A(::OpenBLASLUFactorization, ::Any, ::Any) = false
 default_alias_b(::OpenBLASLUFactorization, ::Any, ::Any) = false
 
@@ -318,6 +324,11 @@ function SciMLBase.solve!(
         error("Error, OpenBLAS binary is missing but solve is being called. Report this issue")
     A = cache.A
     A = convert(AbstractMatrix, A)
+    if alg.residualsafety && cache.isfresh
+        A_original = _copy_A_for_safety(cache)
+    else
+        A_original = nothing
+    end
     verbose = cache.verbose
     if cache.isfresh
         cacheval = @get_cacheval(cache, :OpenBLASLUFactorization)
@@ -384,6 +395,11 @@ function SciMLBase.solve!(
     else
         copyto!(cache.u, cache.b)
         openblas_getrs!('N', A.factors, A.ipiv, cache.u; info)
+    end
+
+    if A_original !== nothing
+        failed = _check_residual_safety(cache, alg, A_original, cache.u)
+        failed !== nothing && return failed
     end
 
     return SciMLBase.build_linear_solution(

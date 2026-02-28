@@ -25,26 +25,26 @@ b = rand(n)
 prob = LinearProblem(A, b)
 
 # Ruge–Stüben AMG (plain V-cycle)
-sol = solve(prob, PyAMGJL())
+sol = solve(prob, PyAMG())
 
 # Smoothed-aggregation AMG with CG acceleration
-sol = solve(prob, PyAMGJL_SmoothedAggregation(accel = "cg"))
+sol = solve(prob, PyAMG_SmoothedAggregation(accel = "cg"))
 
 # Ruge–Stüben AMG with GMRES acceleration
-sol = solve(prob, PyAMGJL(accel = "gmres"))
+sol = solve(prob, PyAMG(accel = "gmres"))
 ```
 
 ## Solvers
 
 | Constructor | Description |
 |---|---|
-| `PyAMGJL()` | Ruge–Stüben AMG (default); plain V-cycle |
-| `PyAMGJL(method = :SmoothedAggregation)` | Smoothed-aggregation AMG |
-| `PyAMGJL(accel = "cg")` | AMG + CG acceleration |
-| `PyAMGJL(accel = "gmres")` | AMG + GMRES acceleration |
-| `PyAMGJL(accel = "bicgstab")` | AMG + BiCGSTAB acceleration |
-| `PyAMGJL_RugeStuben(; kwargs...)` | Shortcut for Ruge–Stüben |
-| `PyAMGJL_SmoothedAggregation(; kwargs...)` | Shortcut for smoothed aggregation |
+| `PyAMG()` | Ruge–Stüben AMG (default); plain V-cycle |
+| `PyAMG(method = :SmoothedAggregation)` | Smoothed-aggregation AMG |
+| `PyAMG(accel = "cg")` | AMG + CG acceleration |
+| `PyAMG(accel = "gmres")` | AMG + GMRES acceleration |
+| `PyAMG(accel = "bicgstab")` | AMG + BiCGSTAB acceleration |
+| `PyAMG_RugeStuben(; kwargs...)` | Shortcut for Ruge–Stüben |
+| `PyAMG_SmoothedAggregation(; kwargs...)` | Shortcut for smoothed aggregation |
 
 Additional keyword arguments are forwarded to the PyAMG solver constructor
 (e.g. `max_levels`, `max_coarse`, `strength`).

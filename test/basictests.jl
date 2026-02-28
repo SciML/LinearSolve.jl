@@ -963,31 +963,31 @@ end
 end
 
 @static if isdefined(@__MODULE__, :LinearSolvePyAMG)
-    @testset "PyAMGJL" begin
+    @testset "PyAMG" begin
         n = 100
         A_pyamg = spdiagm(-1 => -ones(n - 1), 0 => 2 * ones(n), 1 => -ones(n - 1))
         b_pyamg = rand(n)
         prob_pyamg = LinearProblem(A_pyamg, b_pyamg)
 
         # Ruge-Stuben (default)
-        sol_pyamg = solve(prob_pyamg, PyAMGJL())
+        sol_pyamg = solve(prob_pyamg, PyAMG())
         @test norm(A_pyamg * sol_pyamg.u - b_pyamg) < 1.0e-6
 
         # Smoothed Aggregation
-        sol_pyamg = solve(prob_pyamg, PyAMGJL_SmoothedAggregation())
+        sol_pyamg = solve(prob_pyamg, PyAMG_SmoothedAggregation())
         @test norm(A_pyamg * sol_pyamg.u - b_pyamg) < 1.0e-6
 
         # CG acceleration
-        sol_pyamg = solve(prob_pyamg, PyAMGJL(accel = "cg"), reltol = 1.0e-8)
+        sol_pyamg = solve(prob_pyamg, PyAMG(accel = "cg"), reltol = 1.0e-8)
         @test norm(A_pyamg * sol_pyamg.u - b_pyamg) < 1.0e-8
 
         # GMRES acceleration
-        sol_pyamg = solve(prob_pyamg, PyAMGJL(accel = "gmres"), reltol = 1.0e-6)
+        sol_pyamg = solve(prob_pyamg, PyAMG(accel = "gmres"), reltol = 1.0e-6)
         @test norm(A_pyamg * sol_pyamg.u - b_pyamg) < 1.0e-6
 
         # Re-solve with different b, same A
         b_pyamg2 = rand(n)
-        cache_pyamg = init(prob_pyamg, PyAMGJL(accel = "cg"))
+        cache_pyamg = init(prob_pyamg, PyAMG(accel = "cg"))
         solve!(cache_pyamg)
         reinit!(cache_pyamg; b = b_pyamg2)
         sol_pyamg2 = solve!(cache_pyamg)

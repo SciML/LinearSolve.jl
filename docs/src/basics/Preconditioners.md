@@ -140,16 +140,16 @@ The following preconditioners match the interface of LinearSolve.jl.
     The Python dependency is installed automatically via CondaPkg.jl.
     Provides the following solvers through the standard LinearSolve interface:
 
-      + `PyAMGJL()` — Ruge–Stüben AMG (default)
-      + `PyAMGJL(method = :SmoothedAggregation)` — smoothed-aggregation AMG
-      + `PyAMGJL(accel = "cg")` — AMG preconditioned CG
-      + `PyAMGJL_RugeStuben()` and `PyAMGJL_SmoothedAggregation()` shortcuts
+      + `PyAMG()` — Ruge–Stüben AMG (default)
+      + `PyAMG(method = :SmoothedAggregation)` — smoothed-aggregation AMG
+      + `PyAMG(accel = "cg")` — AMG preconditioned CG
+      + `PyAMG_RugeStuben()` and `PyAMG_SmoothedAggregation()` shortcuts
 
     ```julia
     using LinearSolvePyAMG, LinearSolve, SparseArrays
     A = spdiagm(-1 => -ones(99), 0 => 2ones(100), 1 => -ones(99))
     b = rand(100)
-    sol = solve(LinearProblem(A, b), PyAMGJL(accel = "cg"))
+    sol = solve(LinearProblem(A, b), PyAMG(accel = "cg"))
     ```
   - [ILUZero.ILU0Precon(A::SparseMatrixCSC{T,N}, b_type = T)](https://github.com/mcovalt/ILUZero.jl):
     An incomplete LU implementation. Requires `A` as a `SparseMatrixCSC`.

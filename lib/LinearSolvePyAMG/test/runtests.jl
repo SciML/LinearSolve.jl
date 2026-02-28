@@ -15,30 +15,30 @@ end
 @testset "LinearSolvePyAMG" begin
     @testset "constructors" begin
         # Default constructor
-        alg = PyAMGJL()
+        alg = PyAMG()
         @test alg.method === :RugeStuben
         @test alg.accel === nothing
 
         # Named method
-        alg2 = PyAMGJL(method = :SmoothedAggregation)
+        alg2 = PyAMG(method = :SmoothedAggregation)
         @test alg2.method === :SmoothedAggregation
 
         # Accelerated
-        alg3 = PyAMGJL(accel = "cg")
+        alg3 = PyAMG(accel = "cg")
         @test alg3.accel == "cg"
 
         # Convenience constructors
-        @test PyAMGJL_RugeStuben().method === :RugeStuben
-        @test PyAMGJL_SmoothedAggregation().method === :SmoothedAggregation
+        @test PyAMG_RugeStuben().method === :RugeStuben
+        @test PyAMG_SmoothedAggregation().method === :SmoothedAggregation
 
         # Bad method throws
-        @test_throws ArgumentError PyAMGJL(method = :BadMethod)
+        @test_throws ArgumentError PyAMG(method = :BadMethod)
     end
 
     @testset "RugeStuben – plain V-cycle" begin
         A, b = poisson1d(100)
         prob = LinearProblem(A, b)
-        sol = solve(prob, PyAMGJL())
+        sol = solve(prob, PyAMG())
 
         @test sol.retcode == ReturnCode.Success
         @test norm(A * sol.u - b) / norm(b) < 1.0e-5
@@ -47,7 +47,7 @@ end
     @testset "SmoothedAggregation – plain V-cycle" begin
         A, b = poisson1d(100)
         prob = LinearProblem(A, b)
-        sol = solve(prob, PyAMGJL_SmoothedAggregation())
+        sol = solve(prob, PyAMG_SmoothedAggregation())
 
         @test sol.retcode == ReturnCode.Success
         @test norm(A * sol.u - b) / norm(b) < 1.0e-5
@@ -56,7 +56,7 @@ end
     @testset "RugeStuben – CG acceleration" begin
         A, b = poisson1d(100)
         prob = LinearProblem(A, b)
-        sol = solve(prob, PyAMGJL(accel = "cg"))
+        sol = solve(prob, PyAMG(accel = "cg"))
 
         @test sol.retcode == ReturnCode.Success
         @test norm(A * sol.u - b) / norm(b) < 1.0e-8
@@ -65,7 +65,7 @@ end
     @testset "RugeStuben – GMRES acceleration" begin
         A, b = poisson1d(100)
         prob = LinearProblem(A, b)
-        sol = solve(prob, PyAMGJL(accel = "gmres"))
+        sol = solve(prob, PyAMG(accel = "gmres"))
 
         @test sol.retcode == ReturnCode.Success
         @test norm(A * sol.u - b) / norm(b) < 1.0e-6
@@ -75,7 +75,7 @@ end
         A, b1 = poisson1d(80)
         b2 = rand(80)
         prob = LinearProblem(A, b1)
-        cache = init(prob, PyAMGJL(accel = "cg"))
+        cache = init(prob, PyAMG(accel = "cg"))
 
         sol1 = solve!(cache)
         @test norm(A * sol1.u - b1) / norm(b1) < 1.0e-8
@@ -90,7 +90,7 @@ end
         # A2 is a scaled version (still SPD)
         A2 = 2.0 * A1
         prob = LinearProblem(A1, b)
-        cache = init(prob, PyAMGJL())
+        cache = init(prob, PyAMG())
 
         sol1 = solve!(cache)
         @test norm(A1 * sol1.u - b) / norm(b) < 1.0e-5

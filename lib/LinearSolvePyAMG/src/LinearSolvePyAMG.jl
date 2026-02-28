@@ -16,13 +16,13 @@ b = rand(100)
 prob = LinearProblem(A, b)
 
 # Ruge–Stüben AMG (default)
-sol = solve(prob, PyAMGJL())
+sol = solve(prob, PyAMG())
 
 # Smoothed-aggregation AMG
-sol = solve(prob, PyAMGJL_SmoothedAggregation())
+sol = solve(prob, PyAMG_SmoothedAggregation())
 
 # With GMRES acceleration
-sol = solve(prob, PyAMGJL(accel = "gmres"))
+sol = solve(prob, PyAMG(accel = "gmres"))
 ```
 """
 module LinearSolvePyAMG
@@ -41,7 +41,7 @@ import LinearSolve: LinearCache, LinearVerbosity, OperatorAssumptions
 # ---------------------------------------------------------------------------
 
 """
-    PyAMGJL(; method = :RugeStuben, accel = nothing, kwargs...)
+    PyAMG(; method = :RugeStuben, accel = nothing, kwargs...)
 
 Algebraic Multigrid solver backed by [PyAMG](https://pyamg.readthedocs.io)
 (Python) via PythonCall.jl.
@@ -81,52 +81,52 @@ b = rand(n)
 prob = LinearProblem(A, b)
 
 # Plain AMG V-cycle (Ruge–Stüben)
-sol = solve(prob, PyAMGJL())
+sol = solve(prob, PyAMG())
 
 # AMG preconditioned CG
-sol = solve(prob, PyAMGJL(accel = "cg"))
+sol = solve(prob, PyAMG(accel = "cg"))
 
 # Smoothed-aggregation with GMRES acceleration
-sol = solve(prob, PyAMGJL_SmoothedAggregation(accel = "gmres"))
+sol = solve(prob, PyAMG_SmoothedAggregation(accel = "gmres"))
 ```
 """
-struct PyAMGJL{K} <: LinearSolve.SciMLLinearSolveAlgorithm
+struct PyAMG{K} <: LinearSolve.SciMLLinearSolveAlgorithm
     method::Symbol
     accel::Union{String, Nothing}
     kwargs::K
 end
 
-function PyAMGJL(; method::Symbol = :RugeStuben, accel = nothing, kwargs...)
+function PyAMG(; method::Symbol = :RugeStuben, accel = nothing, kwargs...)
     if method ∉ (:RugeStuben, :SmoothedAggregation)
         throw(
             ArgumentError(
-                "PyAMGJL: unsupported `method` = $method. " *
+                "PyAMG: unsupported `method` = $method. " *
                     "Choose :RugeStuben or :SmoothedAggregation."
             )
         )
     end
-    return PyAMGJL(method, accel isa String ? accel : nothing, kwargs)
+    return PyAMG(method, accel isa String ? accel : nothing, kwargs)
 end
 
 """
-    PyAMGJL_RugeStuben(; kwargs...)
+    PyAMG_RugeStuben(; kwargs...)
 
 Ruge–Stüben AMG solver via PyAMG. Equivalent to
-`PyAMGJL(method = :RugeStuben; kwargs...)`.
+`PyAMG(method = :RugeStuben; kwargs...)`.
 """
-PyAMGJL_RugeStuben(; kwargs...) = PyAMGJL(; method = :RugeStuben, kwargs...)
+PyAMG_RugeStuben(; kwargs...) = PyAMG(; method = :RugeStuben, kwargs...)
 
 """
-    PyAMGJL_SmoothedAggregation(; kwargs...)
+    PyAMG_SmoothedAggregation(; kwargs...)
 
 Smoothed-aggregation AMG solver via PyAMG. Equivalent to
-`PyAMGJL(method = :SmoothedAggregation; kwargs...)`.
+`PyAMG(method = :SmoothedAggregation; kwargs...)`.
 """
-PyAMGJL_SmoothedAggregation(; kwargs...) = PyAMGJL(; method = :SmoothedAggregation, kwargs...)
+PyAMG_SmoothedAggregation(; kwargs...) = PyAMG(; method = :SmoothedAggregation, kwargs...)
 
-LinearSolve.needs_concrete_A(::PyAMGJL) = true
-LinearSolve.default_alias_A(::PyAMGJL, ::Any, ::Any) = true
-LinearSolve.default_alias_b(::PyAMGJL, ::Any, ::Any) = true
+LinearSolve.needs_concrete_A(::PyAMG) = true
+LinearSolve.default_alias_A(::PyAMG, ::Any, ::Any) = true
+LinearSolve.default_alias_b(::PyAMG, ::Any, ::Any) = true
 
 # ---------------------------------------------------------------------------
 # Lazy Python imports (imported once, cached in module-level Refs)
@@ -196,7 +196,7 @@ function _build_hierarchy(A::AbstractMatrix, method::Symbol, extra_kwargs)
     elseif method === :SmoothedAggregation
         return pyamg.smoothed_aggregation_solver(pyA; extra_kwargs...)
     else
-        error("PyAMGJL: unreachable method=$method")
+        error("PyAMG: unreachable method=$method")
     end
 end
 
@@ -205,14 +205,14 @@ end
 # ---------------------------------------------------------------------------
 
 function LinearSolve.init_cacheval(
-        alg::PyAMGJL, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
+        alg::PyAMG, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
     ml = _build_hierarchy(A, alg.method, alg.kwargs)
     return (; ml)
 end
 
-function SciMLBase.solve!(cache::LinearCache, alg::PyAMGJL; kwargs...)
+function SciMLBase.solve!(cache::LinearCache, alg::PyAMG; kwargs...)
     # Rebuild the AMG hierarchy if A has changed since the last solve
     if cache.isfresh
         cache.cacheval = LinearSolve.init_cacheval(
@@ -252,12 +252,12 @@ function SciMLBase.solve!(cache::LinearCache, alg::PyAMGJL; kwargs...)
     )
 end
 
-LinearSolve.update_tolerances_internal!(cache, ::PyAMGJL, atol, rtol) = nothing
+LinearSolve.update_tolerances_internal!(cache, ::PyAMG, atol, rtol) = nothing
 
 # ---------------------------------------------------------------------------
 # Exports
 # ---------------------------------------------------------------------------
 
-export PyAMGJL, PyAMGJL_RugeStuben, PyAMGJL_SmoothedAggregation
+export PyAMG, PyAMG_RugeStuben, PyAMG_SmoothedAggregation
 
 end # module LinearSolvePyAMG

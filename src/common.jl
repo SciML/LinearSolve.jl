@@ -154,15 +154,12 @@ function Base.setproperty!(cache::LinearCache, name::Symbol, x)
 end
 
 function Base.resize!(cache::LinearCache, i::Int)
-    if cache.cacheval isa DefaultLinearSolverInit
-        A_backup = cache.cacheval.A_backup
-        if A_backup isa AbstractMatrix
-            setfield!(cache.cacheval, :A_backup, similar(A_backup, i, i))
-        end
-    end
+    resize_cacheval!(cache, cache.cacheval, i)
     setfield!(cache, :isfresh, true)
     return cache
 end
+
+resize_cacheval!(cache, cacheval, i) = nothing
 
 function update_cacheval!(cache::LinearCache, name::Symbol, x)
     return update_cacheval!(cache, cache.cacheval, name, x)

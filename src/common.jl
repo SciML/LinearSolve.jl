@@ -133,7 +133,11 @@ function Base.setproperty!(cache::LinearCache, name::Symbol, x)
         if cache.cacheval isa DefaultLinearSolverInit
             A_backup = cache.cacheval.A_backup
             if x === getfield(cache, :A) && !(x === A_backup)
-                copyto!(A_backup, x)
+                if size(A_backup) == size(x)
+                    copyto!(A_backup, x)
+                else
+                    setfield!(cache.cacheval, :A_backup, copy(x))
+                end
             end
         end
     elseif name === :p
@@ -147,6 +151,17 @@ function Base.setproperty!(cache::LinearCache, name::Symbol, x)
         # return setfield!(cache.cacheval, Symbol(cache.alg.alg), x)
     end
     return setfield!(cache, name, x)
+end
+
+function Base.resize!(cache::LinearCache, i::Int)
+    if cache.cacheval isa DefaultLinearSolverInit
+        A_backup = cache.cacheval.A_backup
+        if A_backup isa AbstractMatrix
+            setfield!(cache.cacheval, :A_backup, similar(A_backup, i, i))
+        end
+    end
+    setfield!(cache, :isfresh, true)
+    return cache
 end
 
 function update_cacheval!(cache::LinearCache, name::Symbol, x)

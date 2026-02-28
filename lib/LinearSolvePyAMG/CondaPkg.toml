@@ -1,2 +1,2 @@
-[pip.deps]
-pyamg = ">=4"
+[deps]
+pyamg = ">=4,<6"

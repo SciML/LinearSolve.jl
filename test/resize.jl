@@ -2,14 +2,18 @@ using LinearSolve, LinearAlgebra, Test
 
 @testset "LinearCache resize!" begin
     # Helper: create a cache with a given algorithm, resize it, and solve
-    function test_resize(alg; n_init = 3, n_new = 6, atol = 1e-10,
-            check_retcode = true, kwargs...)
+    function test_resize(
+            alg; n_init = 3, n_new = 6, atol = 1.0e-10,
+            check_retcode = true, kwargs...
+        )
         A_init = rand(n_init, n_init) + 5I
         b_init = rand(n_init)
         prob = LinearProblem(A_init, b_init)
-        cache = init(prob, alg;
+        cache = init(
+            prob, alg;
             alias = LinearAliasSpecifier(alias_A = false, alias_b = false),
-            kwargs...)
+            kwargs...
+        )
 
         # Solve at original size to populate cacheval
         sol1 = solve!(cache)
@@ -64,7 +68,7 @@ using LinearSolve, LinearAlgebra, Test
     end
 
     @testset "KrylovJL_GMRES" begin
-        test_resize(KrylovJL_GMRES(); atol = 1e-6, maxiters = 100)
+        test_resize(KrylovJL_GMRES(); atol = 1.0e-6, maxiters = 100)
     end
 
     @testset "SimpleLUFactorization" begin
@@ -77,7 +81,9 @@ using LinearSolve, LinearAlgebra, Test
 
     @testset "CholeskyFactorization" begin
         # Cholesky requires SPD matrix — custom test
-        A_init = let X = rand(3, 3); X' * X + 5I end
+        A_init = let X = rand(3, 3)
+            X' * X + 5I
+        end
         prob = LinearProblem(A_init, rand(3))
         cache = init(prob, CholeskyFactorization();
             alias = LinearAliasSpecifier(alias_A = false, alias_b = false))

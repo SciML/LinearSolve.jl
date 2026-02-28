@@ -36,7 +36,7 @@ end
 
 function resize_cacheval!(cache, cacheval::DefaultLinearSolverInit, i)
     A_backup = cacheval.A_backup
-    if A_backup isa AbstractMatrix
+    return if A_backup isa AbstractMatrix
         setfield!(cacheval, :A_backup, similar(A_backup, i, i))
         cacheval.a_backup_allocated = true
         cacheval.a_backup_synced = false

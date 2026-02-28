@@ -377,16 +377,19 @@ is called. It's a polyalgorithm that detects the optimal method for a given
 ## Keyword Arguments
 
   - `safetyfallback`: determines whether to fallback to a column-pivoted QR factorization
-    when an LU factorization fails. This can be required if `A` is rank-deficient. Defaults
-    to true.
+    when an LU factorization fails. When `true`, the inner LU algorithm is given
+    `residualsafety=true`, which makes it compute the post-solve residual `‖A*x - b‖` and
+    return `ReturnCode.APosterioriSafetyFailure` if it exceeds `abstol + reltol * ‖b‖`.
+    The default solver then falls back to column-pivoted QR. Defaults to `true`.
 
 ## Residual Safety
 
 Individual LU algorithms (e.g. `LUFactorization`, `GenericLUFactorization`, etc.) support a
 `residualsafety` keyword argument. When `residualsafety=true`, the algorithm computes the
-post-solve residual `‖A*x - b‖` and returns `ReturnCode.Failure` if it exceeds
-`abstol + reltol * ‖b‖`. No QR fallback is performed — only `DefaultLinearSolver`'s
-`safetyfallback` orchestrates fallbacks.
+post-solve residual `‖A*x - b‖` and returns `ReturnCode.APosterioriSafetyFailure` if it
+exceeds `abstol + reltol * ‖b‖`. When used standalone (not through `DefaultLinearSolver`),
+no QR fallback is performed — the caller receives the failure retcode and can decide how to
+handle it.
 """
 struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm
     alg::DefaultAlgorithmChoice.T

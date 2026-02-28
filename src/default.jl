@@ -28,15 +28,18 @@ mutable struct DefaultLinearSolverInit{
     BLISLUFactorization::T22
     CudaOffloadLUFactorization::T23
     MetalLUFactorization::T24
-    A_backup::TA  # reference to original prob.A for restoring cache.A after in-place LU
+    A_backup::TA  # backup of cache.A for restoring after in-place LU and QR fallback
     residual_buf::Tb  # pre-allocated buffer for post-solve residual check (same size/type as b)
     a_backup_synced::Bool  # true if A_backup content matches cache.A (before LU modifies it)
+    a_backup_allocated::Bool  # true once A_backup has been replaced with a private buffer
 end
 
 function resize_cacheval!(cache, cacheval::DefaultLinearSolverInit, i)
     A_backup = cacheval.A_backup
     if A_backup isa AbstractMatrix
         setfield!(cacheval, :A_backup, similar(A_backup, i, i))
+        cacheval.a_backup_allocated = true
+        cacheval.a_backup_synced = false
     end
 end
 
@@ -561,7 +564,10 @@ end
             end
         end
     end
-    return Expr(:call, :DefaultLinearSolverInit, caches..., :A_original, :(similar(b, 0)), true)
+    return Expr(
+        :call, :DefaultLinearSolverInit, caches...,
+        :A_original, :(similar(b)), true, false
+    )
 end
 
 function defaultalg_symbol(::Type{T}) where {T}
@@ -579,37 +585,6 @@ const _SPARSE_ONLY_ALGORITHMS = Symbol.(
         DefaultAlgorithmChoice.CHOLMODFactorization,
     )
 )
-
-"""
-    _residual_check_failed(cache::LinearCache, sol)
-
-Check whether the LU solution has an unacceptably large residual `‖A*x - b‖`.
-Uses `A_backup` and the pre-allocated `residual_buf` in `cache.cacheval` to avoid allocations.
-Returns `true` if the residual exceeds `abstol + reltol * ‖b‖`.
-Returns `false` (skip check) if `A_backup` is stale (user replaced `cache.A` with a new object).
-"""
-function _residual_check_failed(cache::LinearCache, sol)
-    # If A_backup doesn't match the current A, skip the residual check
-    # (A_backup is only synced on in-place mutations via cache.A = cache.A)
-    cache.cacheval.a_backup_synced || return false
-
-    A_backup = cache.cacheval.A_backup
-    buf = cache.cacheval.residual_buf
-    u = sol.u
-    b = cache.b
-    # Lazily resize the residual buffer on first use (initialized empty to avoid allocation)
-    if length(buf) != length(b)
-        resize!(buf, length(b))
-    end
-    # buf = A_backup * u  (in-place)
-    mul!(buf, A_backup, u)
-    # buf = buf - b  (in-place)
-    axpy!(-one(eltype(buf)), b, buf)
-    res_norm = norm(buf)
-    b_norm = norm(b)
-    tol = cache.abstol + cache.reltol * b_norm
-    return res_norm > tol
-end
 
 """
     _do_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol, args...; kwargs...)
@@ -652,18 +627,18 @@ end
 """
     _default_lu_solve_with_fallback(cache::LinearCache, alg::DefaultLinearSolver, sol, args...; kwargs...)
 
-Post-process an LU solve result: if LU explicitly failed or the residual is too large,
-fall back to column-pivoted QR. Otherwise return the LU solution directly.
+Post-process an LU solve result: if LU explicitly failed or the residual check returned
+`APosterioriSafetyFailure`, fall back to column-pivoted QR. Otherwise return the LU
+solution directly.
 """
 function _default_lu_solve_with_fallback(
-        cache::LinearCache, alg::DefaultLinearSolver, sol, args...; kwargs...)
+        cache::LinearCache, alg::DefaultLinearSolver, sol, args...; kwargs...
+    )
     if alg.safetyfallback
-        # If LU explicitly failed, try QR fallback
         if sol.retcode === ReturnCode.Failure
             return _do_qr_fallback(cache, alg, sol, :lu_failure, args...; kwargs...)
         end
-        # If LU "succeeded" but residual is bad, also try QR fallback
-        if sol.retcode === ReturnCode.Success && _residual_check_failed(cache, sol)
+        if sol.retcode === ReturnCode.APosterioriSafetyFailure
             return _do_qr_fallback(cache, alg, sol, :residual_check, args...; kwargs...)
         end
     end
@@ -671,6 +646,36 @@ function _default_lu_solve_with_fallback(
         alg, sol.u, sol.resid, sol.cache;
         retcode = sol.retcode, iters = sol.iters, stats = sol.stats
     )
+end
+
+"""
+    _algchoice_to_alg_with_safety(alg::Symbol)
+
+Like `algchoice_to_alg`, but generates an expression that passes
+`residualsafety = alg.safetyfallback` at runtime. Used in the `@generated solve!`
+so that the inner LU algorithm does its own residual check when the default solver
+has `safetyfallback=true`.
+"""
+function _algchoice_to_alg_with_safety(alg::Symbol)
+    return if alg === :LUFactorization
+        :(LUFactorization(residualsafety = alg.safetyfallback))
+    elseif alg === :GenericLUFactorization
+        :(GenericLUFactorization(residualsafety = alg.safetyfallback))
+    elseif alg === :MKLLUFactorization
+        :(MKLLUFactorization(residualsafety = alg.safetyfallback))
+    elseif alg === :AppleAccelerateLUFactorization
+        :(AppleAccelerateLUFactorization(residualsafety = alg.safetyfallback))
+    elseif alg === :RFLUFactorization
+        :(RFLUFactorization(throwerror = false, residualsafety = alg.safetyfallback))
+    elseif alg === :BLISLUFactorization
+        :(BLISLUFactorization(throwerror = false, residualsafety = alg.safetyfallback))
+    elseif alg === :CudaOffloadLUFactorization
+        :(CudaOffloadLUFactorization(throwerror = false, residualsafety = alg.safetyfallback))
+    elseif alg === :MetalLUFactorization
+        :(MetalLUFactorization(throwerror = false, residualsafety = alg.safetyfallback))
+    else
+        error("Algorithm $alg does not support residualsafety")
+    end
 end
 
 """
@@ -696,40 +701,47 @@ end
                     DefaultAlgorithmChoice.GenericLUFactorization,
                 )
             )
+            # Pass residualsafety = alg.safetyfallback so the inner algorithm does
+            # its own residual check and returns APosterioriSafetyFailure if needed.
+            inner_alg_expr = _algchoice_to_alg_with_safety(alg)
             newex = quote
-                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
+                sol = SciMLBase.solve!(cache, $inner_alg_expr, args...; kwargs...)
                 _default_lu_solve_with_fallback(cache, alg, sol, args...; kwargs...)
             end
         elseif alg == Symbol(DefaultAlgorithmChoice.RFLUFactorization)
+            inner_alg_expr = _algchoice_to_alg_with_safety(alg)
             newex = quote
                 if !userecursivefactorization(nothing)
                     error("Default algorithm calling solve on RecursiveFactorization without the package being loaded. This shouldn't happen.")
                 end
-                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
+                sol = SciMLBase.solve!(cache, $inner_alg_expr, args...; kwargs...)
                 _default_lu_solve_with_fallback(cache, alg, sol, args...; kwargs...)
             end
         elseif alg == Symbol(DefaultAlgorithmChoice.BLISLUFactorization)
+            inner_alg_expr = _algchoice_to_alg_with_safety(alg)
             newex = quote
                 if !useblis(nothing)
                     error("Default algorithm calling solve on BLISLUFactorization without the extension being loaded. This shouldn't happen.")
                 end
-                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
+                sol = SciMLBase.solve!(cache, $inner_alg_expr, args...; kwargs...)
                 _default_lu_solve_with_fallback(cache, alg, sol, args...; kwargs...)
             end
         elseif alg == Symbol(DefaultAlgorithmChoice.CudaOffloadLUFactorization)
+            inner_alg_expr = _algchoice_to_alg_with_safety(alg)
             newex = quote
                 if !usecuda(nothing)
                     error("Default algorithm calling solve on CudaOffloadLUFactorization without CUDA.jl being loaded. This shouldn't happen.")
                 end
-                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
+                sol = SciMLBase.solve!(cache, $inner_alg_expr, args...; kwargs...)
                 _default_lu_solve_with_fallback(cache, alg, sol, args...; kwargs...)
             end
         elseif alg == Symbol(DefaultAlgorithmChoice.MetalLUFactorization)
+            inner_alg_expr = _algchoice_to_alg_with_safety(alg)
             newex = quote
                 if !usemetal(nothing)
                     error("Default algorithm calling solve on MetalLUFactorization without Metal.jl being loaded. This shouldn't happen.")
                 end
-                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
+                sol = SciMLBase.solve!(cache, $inner_alg_expr, args...; kwargs...)
                 _default_lu_solve_with_fallback(cache, alg, sol, args...; kwargs...)
             end
         else

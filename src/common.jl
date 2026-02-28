@@ -131,8 +131,8 @@ function Base.setproperty!(cache::LinearCache, name::Symbol, x)
         setfield!(cache, :isfresh, true)
         setfield!(cache, :precsisfresh, true)
         if cache.cacheval isa DefaultLinearSolverInit
-            A_backup = cache.cacheval.A_backup
-            if x === getfield(cache, :A) && !(x === A_backup)
+            if x === getfield(cache, :A) && cache.cacheval.a_backup_allocated
+                A_backup = cache.cacheval.A_backup
                 if size(A_backup) == size(x)
                     copyto!(A_backup, x)
                 else

@@ -291,10 +291,10 @@ sol_w = solve(prob_w)
 using Random
 Random.seed!(42)
 n = 20
-U = qr(randn(n, n)).Q * Diagonal(vcat(1e-15, ones(n - 1)))  # one near-zero singular value
+U = qr(randn(n, n)).Q * Diagonal(vcat(1.0e-15, ones(n - 1)))  # one near-zero singular value
 A_nearsing = Matrix(U * Diagonal(ones(n)) * U')
 # Make it clearly near-singular but with no exact zero pivot
-A_nearsing .+= 1e-16 * randn(n, n)
+A_nearsing .+= 1.0e-16 * randn(n, n)
 b_nearsing = randn(n)
 
 # Without safetyfallback, LU result is returned as-is (may be garbage)
@@ -319,7 +319,7 @@ sol_qr_ref = solve(
 resid_nosafe = norm(A_nearsing * sol_nosafe.u - b_nearsing)
 resid_safe = norm(A_nearsing * sol_safe.u - b_nearsing)
 resid_qr = norm(A_nearsing * sol_qr_ref.u - b_nearsing)
-@test resid_safe <= 10 * resid_qr || resid_safe < 1e-10  # safe is close to QR quality
+@test resid_safe <= 10 * resid_qr || resid_safe < 1.0e-10  # safe is close to QR quality
 @test sol_safe.retcode === ReturnCode.Success
 
 # Well-conditioned matrix: residual check should NOT trigger fallback
@@ -340,19 +340,19 @@ sol_no_fallback = solve(
 @test sol_no_fallback.retcode === ReturnCode.Success
 
 # Individual LU algorithm residualsafety tests
-# LUFactorization(residualsafety=true) on near-singular matrix → ReturnCode.Failure
+# LUFactorization(residualsafety=true) on near-singular matrix → APosterioriSafetyFailure
 sol_lu_rs = solve(
     LinearProblem(copy(A_nearsing), copy(b_nearsing)),
     LUFactorization(residualsafety = true)
 )
-@test sol_lu_rs.retcode === ReturnCode.Failure
+@test sol_lu_rs.retcode === ReturnCode.APosterioriSafetyFailure
 
-# GenericLUFactorization(residualsafety=true) on near-singular matrix → ReturnCode.Failure
+# GenericLUFactorization(residualsafety=true) on near-singular matrix → APosterioriSafetyFailure
 sol_glu_rs = solve(
     LinearProblem(copy(A_nearsing), copy(b_nearsing)),
     GenericLUFactorization(residualsafety = true)
 )
-@test sol_glu_rs.retcode === ReturnCode.Failure
+@test sol_glu_rs.retcode === ReturnCode.APosterioriSafetyFailure
 
 # Default LUFactorization() on near-singular matrix → ReturnCode.Success (no check)
 sol_lu_default = solve(

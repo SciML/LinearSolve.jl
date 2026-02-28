@@ -31,6 +31,13 @@ mutable struct DefaultLinearSolverInit{
     A_backup::TA  # reference to original prob.A for restoring cache.A after in-place LU
 end
 
+function resize_cacheval!(cache, cacheval::DefaultLinearSolverInit, i)
+    A_backup = cacheval.A_backup
+    if A_backup isa AbstractMatrix
+        setfield!(cacheval, :A_backup, similar(A_backup, i, i))
+    end
+end
+
 @generated function __setfield!(cache::DefaultLinearSolverInit, alg::DefaultLinearSolver, v)
     ex = :()
     for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))

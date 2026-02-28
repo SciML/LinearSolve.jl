@@ -223,3 +223,7 @@ function init_cacheval(
     )
     return LUSolver(convert(AbstractMatrix, A))
 end
+
+function resize_cacheval!(cache, cacheval::LUSolver{T}, i) where {T}
+    setfield!(cache, :cacheval, LUSolver{T}(i))
+end

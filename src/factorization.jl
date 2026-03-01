@@ -3,11 +3,9 @@
         kwargs...
     )
     return quote
-        if _get_residualsafety(alg) && cache.isfresh
-            A_original = _copy_A_for_safety(cache)
-        else
-            A_original = nothing
-        end
+        A = convert(AbstractMatrix, cache.A)
+        check_safety = _get_residualsafety(alg) && cache.isfresh
+        A_original = check_safety ? _copy_A_for_safety(cache) : A
 
         if cache.isfresh
             fact = do_factorization(alg, cache.A, cache.b, cache.u)
@@ -32,7 +30,7 @@
             cache.b
         )
 
-        if A_original !== nothing
+        if check_safety
             failed = _check_residual_safety(cache, alg, A_original, y)
             failed !== nothing && return failed
         end
@@ -240,11 +238,8 @@ _get_residualsafety(alg::GenericLUFactorization) = alg.residualsafety
 function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
-    if alg.residualsafety && cache.isfresh
-        A_original = _copy_A_for_safety(cache)
-    else
-        A_original = nothing
-    end
+    check_safety = alg.residualsafety && cache.isfresh
+    A_original = check_safety ? _copy_A_for_safety(cache) : A
     if cache.isfresh
         cacheval = @get_cacheval(cache, :LUFactorization)
         local fact
@@ -290,7 +285,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
     F = @get_cacheval(cache, :LUFactorization)
     y = _ldiv!(cache.u, F, cache.b)
 
-    if A_original !== nothing
+    if check_safety
         failed = _check_residual_safety(cache, alg, A_original, y)
         failed !== nothing && return failed
     end
@@ -336,11 +331,8 @@ function SciMLBase.solve!(
     )
     A = cache.A
     A = convert(AbstractMatrix, A)
-    if alg.residualsafety && cache.isfresh
-        A_original = _copy_A_for_safety(cache)
-    else
-        A_original = nothing
-    end
+    check_safety = alg.residualsafety && cache.isfresh
+    A_original = check_safety ? _copy_A_for_safety(cache) : A
     fact, ipiv = LinearSolve.@get_cacheval(cache, :GenericLUFactorization)
 
     if cache.isfresh
@@ -362,7 +354,7 @@ function SciMLBase.solve!(
         cache.u, LinearSolve.@get_cacheval(cache, :GenericLUFactorization)[1], cache.b
     )
 
-    if A_original !== nothing
+    if check_safety
         failed = _check_residual_safety(cache, alg, A_original, y)
         failed !== nothing && return failed
     end

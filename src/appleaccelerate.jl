@@ -313,11 +313,8 @@ function SciMLBase.solve!(
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
     A = cache.A
     A = convert(AbstractMatrix, A)
-    if alg.residualsafety && cache.isfresh
-        A_original = _copy_A_for_safety(cache)
-    else
-        A_original = nothing
-    end
+    check_safety = alg.residualsafety && cache.isfresh
+    A_original = check_safety ? _copy_A_for_safety(cache) : A
     verbose = cache.verbose
     if cache.isfresh
         cacheval = @get_cacheval(cache, :AppleAccelerateLUFactorization)
@@ -386,7 +383,7 @@ function SciMLBase.solve!(
         aa_getrs!('N', A.factors, A.ipiv, cache.u; info)
     end
 
-    if A_original !== nothing
+    if check_safety
         failed = _check_residual_safety(cache, alg, A_original, cache.u)
         failed !== nothing && return failed
     end

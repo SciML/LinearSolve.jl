@@ -62,7 +62,12 @@ function LinearSolve.init_cacheval(
         alg::ElementalJL, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
-    return nothing
+    # Must return a properly typed factorization so that LinearCache is
+    # parameterized with the correct cacheval type.  solve! will re-factorize
+    # immediately (isfresh = true on the first call) and overwrite this value.
+    T = _elemental_eltype(A)
+    A_el = _to_elemental_matrix(A, T)
+    return _elemental_factorize(alg, A_el)
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::ElementalJL; kwargs...)

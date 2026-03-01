@@ -130,6 +130,8 @@ LinearSolve.DefaultLinearSolver
 
 ```@docs
 RFLUFactorization
+ButterflyFactorization
+RF32MixedLUFactorization
 ```
 
 ### Base.LinearAlgebra
@@ -142,9 +144,11 @@ customized per-package, details given below describe a subset of important array
 ```@docs
 LUFactorization
 GenericLUFactorization
+GenericFactorization
 QRFactorization
 SVDFactorization
 CholeskyFactorization
+LDLtFactorization
 BunchKaufmanFactorization
 CHOLMODFactorization
 NormalCholeskyFactorization
@@ -232,7 +236,9 @@ CliqueTreesFactorization
 ```@docs
 KrylovJL_CG
 KrylovJL_MINRES
+KrylovJL_MINARES
 KrylovJL_GMRES
+KrylovJL_FGMRES
 KrylovJL_BICGSTAB
 KrylovJL_LSMR
 KrylovJL_CRAIGMR
@@ -250,6 +256,7 @@ MKL32MixedLUFactorization
 
 ```@docs
 OpenBLASLUFactorization
+OpenBLAS32MixedLUFactorization
 ```
 
 ### AppleAccelerate.jl
@@ -283,6 +290,8 @@ MetalOffload32MixedLUFactorization
 ```@docs
 MKLPardisoFactorize
 MKLPardisoIterate
+PanuaPardisoFactorize
+PanuaPardisoIterate
 LinearSolve.PardisoJL
 ```
 
@@ -296,6 +305,7 @@ The following are non-standard GPU factorization routines.
     Using these solvers requires adding the package CUDA.jl, i.e. `using CUDA`
 
 ```@docs
+CudaOffloadFactorization
 CudaOffloadLUFactorization
 CudaOffloadQRFactorization
 CUDAOffload32MixedLUFactorization
@@ -362,6 +372,37 @@ KrylovKitJL
 HYPREAlgorithm
 ```
 
+### BLIS
+
+!!! note
+    
+    Using this solver requires adding the packages blis_jll and LAPACK_jll, i.e. `using blis_jll, LAPACK_jll`
+
+```@docs
+LinearSolve.BLISLUFactorization
+```
+
+### AlgebraicMultigrid.jl
+
+!!! note
+    
+    Using this solver requires adding the package AlgebraicMultigrid.jl, i.e. `using AlgebraicMultigrid`
+
+```@docs
+AlgebraicMultigridJL
+```
+
+### PETSc.jl
+
+!!! note
+    
+    Using PETSc solvers requires Julia version 1.10 or higher, and that the packages
+    PETSc.jl and SparseArrays.jl are loaded.
+
+```@docs
+PETScAlgorithm
+```
+
 ### Ginkgo.jl
 
 !!! note
@@ -373,4 +414,10 @@ HYPREAlgorithm
 GinkgoJL
 GinkgoJL_CG
 GinkgoJL_GMRES
+```
+
+### Sensitivity / Adjoint
+
+```@docs
+LinearSolveAdjoint
 ```

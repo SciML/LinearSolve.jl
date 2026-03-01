@@ -107,6 +107,7 @@ These trait functions help determine algorithm capabilities and requirements:
 
 ```@docs
 LinearSolve.needs_concrete_A
+LinearSolve.needs_square_A
 ```
 
 ## Utility Functions
@@ -122,11 +123,10 @@ LinearSolve.__init_u0_from_Ab
 
 ## Solve Functions
 
-For custom solving strategies:
+The default solver dispatch and adjoint evaluation internals:
 
 ```@docs
-LinearSolve.LinearSolveFunction
-LinearSolve.DirectLdiv!
+LinearSolve.defaultalg_adjoint_eval
 ```
 
 ## Preconditioner Infrastructure
@@ -143,8 +143,24 @@ LinearSolve.InvPreconditioner
 These are internal algorithm implementations:
 
 ```@docs
-LinearSolve.SimpleLUFactorization
 LinearSolve.LUSolver
+```
+
+## BLAS Logging Internals
+
+The BLAS logging system provides diagnostic information about BLAS operations:
+
+```@docs
+LinearSolve.BlasOperationInfo
+LinearSolve.interpret_blas_code
+LinearSolve.blas_info_msg
+LinearSolve._format_blas_context
+```
+
+## SimpleGMRES Internals
+
+```@docs
+LinearSolve._sym_givens
 ```
 
 ## Developer Notes

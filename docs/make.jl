@@ -11,9 +11,8 @@ include("pages.jl")
 makedocs(
     sitename = "LinearSolve.jl",
     authors = "Chris Rackauckas",
-    modules = [LinearSolve, LinearSolve.SciMLBase],
+    modules = [LinearSolve],
     clean = true, doctest = false, linkcheck = true,
-    warnonly = [:docs_block, :missing_docs],
     linkcheck_ignore = [
         "https://cli.github.com/manual/installation",
     ],

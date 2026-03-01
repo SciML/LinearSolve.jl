@@ -118,8 +118,6 @@ This function is primarily used internally by `solve(::LinearProblem)` when no
 explicit algorithm is provided. For manual algorithm selection, users can
 directly instantiate specific algorithm types.
 """
-# Legacy fallback
-# For SciML algorithms already using `defaultalg`, all assume square matrix.
 defaultalg(A, b) = defaultalg(A, b, OperatorAssumptions(true))
 
 function defaultalg(
@@ -562,13 +560,8 @@ defaultalg_symbol(::Type{<:GenericFactorization{typeof(ldlt!)}}) = :LDLtFactoriz
 
 defaultalg_symbol(::Type{<:QRFactorization{ColumnNorm}}) = :QRFactorizationPivoted
 
-"""
-if alg.alg === DefaultAlgorithmChoice.LUFactorization
-SciMLBase.solve!(cache, LUFactorization(), args...; kwargs...))
-else
-...
-end
-"""
+# Generated dispatch: routes to the specific solver based on alg.alg,
+# with automatic fallback to column-pivoted QR when LU factorization fails.
 @generated function SciMLBase.solve!(
         cache::LinearCache, alg::DefaultLinearSolver,
         args...;
@@ -814,13 +807,15 @@ end
 end
 
 """
-```
-elseif DefaultAlgorithmChoice.LUFactorization === cache.alg
-    (cache.cacheval.LUFactorization)' \\ dy
-else
-    ...
-end
-```
+    defaultalg_adjoint_eval(cache::LinearCache, dy)
+
+Generated function that dispatches the adjoint (transpose) linear solve for the
+default solver polyalgorithm. Given the cached factorization from the forward
+solve, computes `A' \\ dy` using the appropriate factorization stored in
+`cache.cacheval`.
+
+This is used internally by the adjoint rule for `LinearSolve` to compute
+sensitivities efficiently.
 """
 @generated function defaultalg_adjoint_eval(cache::LinearCache, dy)
     ex = :()

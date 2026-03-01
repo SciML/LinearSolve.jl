@@ -96,6 +96,37 @@ end
 
 @reexport using SciMLBase
 
+# Attach LinearProblem docstring to LinearSolve module for Documenter.jl
+# (LinearProblem is defined in SciMLBase but reexported here)
+@doc """
+    LinearProblem(A, b; u0 = nothing, p = nothing)
+    LinearProblem{iip}(A, b; u0 = nothing, p = nothing)
+
+Define a linear system problem ``Au = b``.
+
+## Arguments
+
+  - `A`: The coefficient matrix or linear operator. Can be a dense matrix, sparse matrix,
+    or any `AbstractSciMLOperator`.
+  - `b`: The right-hand side vector.
+  - `u0`: (optional) Initial guess for iterative solvers. Defaults to `nothing`.
+  - `p`: (optional) Parameters for the problem. Defaults to `nothing`.
+
+## Example
+
+```julia
+using LinearSolve
+
+A = [1.0 2.0; 3.0 4.0]
+b = [5.0, 6.0]
+prob = LinearProblem(A, b)
+sol = solve(prob)
+sol.u  # solution vector
+```
+
+For more details, see the [SciMLBase LinearProblem documentation](https://docs.sciml.ai/SciMLBase/stable/).
+""" LinearProblem
+
 """
     SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm
 

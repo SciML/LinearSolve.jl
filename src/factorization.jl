@@ -498,6 +498,27 @@ end
 
 ## LDLtFactorization
 
+"""
+    LDLtFactorization(shift = 0.0, perm = nothing)
+
+A wrapper around `LinearAlgebra.ldlt!` for `LDLt` factorization of symmetric
+(or Hermitian) positive semi-definite tridiagonal matrices (e.g. `SymTridiagonal`).
+
+## Keyword Arguments
+
+  - `shift`: Diagonal shift applied before factoring. Defaults to `0.0`.
+  - `perm`: Optional permutation vector. Defaults to `nothing`.
+
+## Example
+
+```julia
+using LinearSolve, LinearAlgebra
+A = SymTridiagonal([4.0, 5.0, 6.0], [1.0, 2.0])
+b = [1.0, 2.0, 3.0]
+prob = LinearProblem(A, b)
+sol = solve(prob, LDLtFactorization())
+```
+"""
 struct LDLtFactorization{T} <: AbstractDenseFactorization
     shift::Float64
     perm::T

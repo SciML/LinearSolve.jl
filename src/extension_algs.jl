@@ -1241,3 +1241,70 @@ struct ParUFactorization <: AbstractSparseFactorization
         return new(reuse_symbolic)
     end
 end
+
+"""
+    ElementalJL(; method = :LU)
+
+A wrapper for [Elemental.jl](https://github.com/JuliaParallel/Elemental.jl),
+providing distributed-memory dense linear algebra solvers built on the
+[Elemental](https://github.com/elemental/Elemental) C++ library by Jack Poulson.
+(LLNL maintains an active GPU-focused fork of Elemental called
+[Hydrogen](https://github.com/LLNL/Elemental).)
+
+## Keyword Arguments
+
+  - `method`: The factorization method to use. Options:
+    - `:LU` (default) — LU factorization with partial pivoting. Suitable for
+      general square systems.
+    - `:QR` — QR factorization. Suitable for square or overdetermined systems.
+    - `:LQ` — LQ factorization. Suitable for underdetermined systems.
+    - `:Cholesky` — Cholesky factorization. Requires the matrix to be Hermitian
+      positive definite.
+
+## Supported Element Types
+
+`Float32`, `Float64`, `ComplexF32`, `ComplexF64`. Matrices with other element
+types are promoted to `Float64` (real) or `ComplexF64` (complex) before being
+passed to Elemental.
+
+## Notes
+
+  - Serial `Elemental.Matrix` values are accepted directly as the problem
+    matrix `A`; they are copied before factorization so the original is
+    never mutated.
+  - When `A` is a standard Julia `AbstractMatrix`, it is copied into an
+    `Elemental.Matrix` for the factorization.
+  - The factorization is cached across repeated solves with the same matrix
+    (i.e. when `isfresh = false`).
+
+!!! note
+
+    Using this solver requires adding the package Elemental.jl:
+    ```julia
+    using Elemental
+    ```
+    Elemental.jl automatically initialises MPI when loaded; no explicit
+    `MPI.Init()` call is needed for serial usage.
+
+## Example
+
+```julia
+using LinearSolve, Elemental
+
+A = rand(100, 100); A = A + A' + 100I  # well-conditioned
+b = rand(100)
+prob = LinearProblem(A, b)
+
+# LU (default)
+sol = solve(prob, ElementalJL())
+# Cholesky (symmetric positive definite)
+sol = solve(prob, ElementalJL(method = :Cholesky))
+```
+"""
+struct ElementalJL <: AbstractDenseFactorization
+    method::Symbol
+end
+
+function ElementalJL(; method::Symbol = :LU)
+    return ElementalJL(method)
+end

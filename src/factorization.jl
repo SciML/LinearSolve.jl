@@ -3,11 +3,9 @@
         kwargs...
     )
     return quote
-        if _get_residualsafety(alg) && cache.isfresh
-            A_original = _copy_A_for_safety(cache)
-        else
-            A_original = nothing
-        end
+        A = convert(AbstractMatrix, cache.A)
+        check_safety = _get_residualsafety(alg) && cache.isfresh
+        A_original = check_safety ? _copy_A_for_safety(cache) : A
 
         if cache.isfresh
             fact = do_factorization(alg, cache.A, cache.b, cache.u)
@@ -32,7 +30,7 @@
             cache.b
         )
 
-        if A_original !== nothing
+        if check_safety
             failed = _check_residual_safety(cache, alg, A_original, y)
             failed !== nothing && return failed
         end

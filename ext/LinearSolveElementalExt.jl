@@ -15,7 +15,7 @@ function _to_elemental_matrix(A::Base.AbstractVecOrMat, ::Type{T}) where {T}
     return convert(Elemental.Matrix{T}, Matrix{T}(A))
 end
 
-# Always copy: lu!/qr!/lq!/cholesky! are in-place. Returning A directly would
+# Always copy: lu!/qr!/cholesky! are in-place. Returning A directly would
 # corrupt the user's matrix and cause reinit! + re-solve to factorize garbage.
 function _to_elemental_matrix(A::Elemental.Matrix, ::Type{T}) where {T}
     B = Elemental.Matrix(T)

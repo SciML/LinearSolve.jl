@@ -521,6 +521,8 @@ export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
     IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES, IterativeSolversJL_IDRS,
     KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES, KrylovJL_MINARES, AlgebraicMultigridJL
 
+export ElementalJL
+
 export GinkgoJL, GinkgoJL_CG, GinkgoJL_GMRES
 
 export SimpleGMRES

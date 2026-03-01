@@ -51,14 +51,17 @@ function _elemental_factorize(alg::ElementalJL, A_el::Elemental.Matrix)
         # CholeskyMatrix{T} which has \ → ElSolveAfterCholesky.
         return LinearAlgebra.cholesky!(A_el)
     else
-        error("Unknown method $(alg.method) for ElementalJL. " *
-              "Valid choices are :LU (default), :QR, :LQ, or :Cholesky.")
+        error(
+            "Unknown method $(alg.method) for ElementalJL. " *
+                "Valid choices are :LU (default), :QR, :LQ, or :Cholesky."
+        )
     end
 end
 
 function LinearSolve.init_cacheval(
         alg::ElementalJL, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
-        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions)
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
     return nothing
 end
 

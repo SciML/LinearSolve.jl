@@ -16,7 +16,6 @@ makedocs(
     warnonly = [:docs_block, :missing_docs],
     linkcheck_ignore = [
         "https://cli.github.com/manual/installation",
-        "https://github.com/SciML/LinearSolve.jl/tree/main/lib/LinearSolvePyAMG",
     ],
     format = Documenter.HTML(
         assets = ["assets/favicon.ico"],

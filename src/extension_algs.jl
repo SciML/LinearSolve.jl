@@ -1257,7 +1257,6 @@ providing distributed-memory dense linear algebra solvers built on the
     - `:LU` (default) — LU factorization with partial pivoting. Suitable for
       general square systems.
     - `:QR` — QR factorization. Suitable for square or overdetermined systems.
-    - `:LQ` — LQ factorization. Suitable for underdetermined systems.
     - `:Cholesky` — Cholesky factorization. Requires the matrix to be Hermitian
       positive definite.
 

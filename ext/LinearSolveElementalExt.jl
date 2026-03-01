@@ -41,8 +41,6 @@ function _elemental_factorize(alg::ElementalJL, A_el::Elemental.Matrix)
         return LinearAlgebra.lu!(A_el)
     elseif alg.method === :QR
         return LinearAlgebra.qr!(A_el)
-    elseif alg.method === :LQ
-        return LinearAlgebra.lq!(A_el)
     elseif alg.method === :Cholesky
         # Must call cholesky!(A_el) directly, not cholesky!(Hermitian(A_el)).
         # The Hermitian path returns LinearAlgebra.Cholesky whose .factors is a
@@ -53,7 +51,7 @@ function _elemental_factorize(alg::ElementalJL, A_el::Elemental.Matrix)
     else
         error(
             "Unknown method $(alg.method) for ElementalJL. " *
-                "Valid choices are :LU (default), :QR, :LQ, or :Cholesky."
+                "Valid choices are :LU (default), :QR, or :Cholesky."
         )
     end
 end

@@ -19,10 +19,6 @@ using Elemental
     sol_qr = solve(prob_el, ElementalJL(method = :QR))
     @test A_el * sol_qr.u ≈ b_el atol = 1.0e-8
 
-    # LQ factorization
-    sol_lq = solve(prob_el, ElementalJL(method = :LQ))
-    @test A_el * sol_lq.u ≈ b_el atol = 1.0e-8
-
     # ── Symmetric positive definite system → Cholesky ─────────────────────────
     B_spd = rand(rng, n, n)
     A_spd = B_spd * B_spd' + n * I  # guaranteed SPD

@@ -325,7 +325,9 @@ function SciMLBase.solve!(
     A = cache.A
     A = convert(AbstractMatrix, A)
     check_safety = alg.residualsafety && cache.isfresh
-    A_original = check_safety ? _copy_A_for_safety(cache) : A
+    needs_backup = check_safety ||
+        (cache.alg isa DefaultLinearSolver && cache.alg.safetyfallback && cache.isfresh)
+    A_original = needs_backup ? _copy_A_for_safety(cache) : A
     verbose = cache.verbose
     if cache.isfresh
         cacheval = @get_cacheval(cache, :OpenBLASLUFactorization)

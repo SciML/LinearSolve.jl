@@ -32,6 +32,7 @@ mutable struct DefaultLinearSolverInit{
     residual_buf::Tb  # pre-allocated buffer for post-solve residual check (same size/type as b)
     a_backup_synced::Bool  # true if A_backup content matches cache.A (before LU modifies it)
     a_backup_allocated::Bool  # true once A_backup has been replaced with a private buffer
+    fell_back_to_qr::Bool  # true after QR fallback; reuse QR until matrix is refreshed
 end
 
 function resize_cacheval!(cache, cacheval::DefaultLinearSolverInit, i)
@@ -566,7 +567,7 @@ end
     end
     return Expr(
         :call, :DefaultLinearSolverInit, caches...,
-        :A_original, :(similar(b)), true, false
+        :A_original, :(similar(b)), true, false, false
     )
 end
 
@@ -618,6 +619,23 @@ function _do_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol, args...; 
     copyto!(cache.A, cache.cacheval.A_backup)
     cache.isfresh = true
     sol = SciMLBase.solve!(cache, QRFactorization(ColumnNorm()), args...; kwargs...)
+    cache.cacheval.fell_back_to_qr = true
+    return SciMLBase.build_linear_solution(
+        alg, sol.u, sol.resid, sol.cache;
+        retcode = sol.retcode, iters = sol.iters, stats = sol.stats
+    )
+end
+
+"""
+    _reuse_qr_fallback(cache::LinearCache, alg, args...; kwargs...)
+
+Reuse the cached QR factorization from a previous QR fallback. Called when
+`fell_back_to_qr` is `true` and `isfresh` is `false`, meaning the matrix hasn't
+changed since the QR fallback and we should keep using QR instead of the
+(potentially corrupted) LU factorization.
+"""
+function _reuse_qr_fallback(cache::LinearCache, alg, args...; kwargs...)
+    sol = SciMLBase.solve!(cache, QRFactorization(ColumnNorm()), args...; kwargs...)
     return SciMLBase.build_linear_solution(
         alg, sol.u, sol.resid, sol.cache;
         retcode = sol.retcode, iters = sol.iters, stats = sol.stats
@@ -652,27 +670,27 @@ end
     _algchoice_to_alg_with_safety(alg::Symbol)
 
 Like `algchoice_to_alg`, but generates an expression that passes
-`residualsafety = alg.safetyfallback` at runtime. Used in the `@generated solve!`
+`residualsafety = alg.residualsafety` at runtime. Used in the `@generated solve!`
 so that the inner LU algorithm does its own residual check when the default solver
-has `safetyfallback=true`.
+has `residualsafety=true`.
 """
 function _algchoice_to_alg_with_safety(alg::Symbol)
     return if alg === :LUFactorization
-        :(LUFactorization(residualsafety = alg.safetyfallback))
+        :(LUFactorization(residualsafety = alg.residualsafety))
     elseif alg === :GenericLUFactorization
-        :(GenericLUFactorization(residualsafety = alg.safetyfallback))
+        :(GenericLUFactorization(residualsafety = alg.residualsafety))
     elseif alg === :MKLLUFactorization
-        :(MKLLUFactorization(residualsafety = alg.safetyfallback))
+        :(MKLLUFactorization(residualsafety = alg.residualsafety))
     elseif alg === :AppleAccelerateLUFactorization
-        :(AppleAccelerateLUFactorization(residualsafety = alg.safetyfallback))
+        :(AppleAccelerateLUFactorization(residualsafety = alg.residualsafety))
     elseif alg === :RFLUFactorization
-        :(RFLUFactorization(throwerror = false, residualsafety = alg.safetyfallback))
+        :(RFLUFactorization(throwerror = false, residualsafety = alg.residualsafety))
     elseif alg === :BLISLUFactorization
-        :(BLISLUFactorization(throwerror = false, residualsafety = alg.safetyfallback))
+        :(BLISLUFactorization(throwerror = false, residualsafety = alg.residualsafety))
     elseif alg === :CudaOffloadLUFactorization
-        :(CudaOffloadLUFactorization(throwerror = false, residualsafety = alg.safetyfallback))
+        :(CudaOffloadLUFactorization(throwerror = false, residualsafety = alg.residualsafety))
     elseif alg === :MetalLUFactorization
-        :(MetalLUFactorization(throwerror = false, residualsafety = alg.safetyfallback))
+        :(MetalLUFactorization(throwerror = false, residualsafety = alg.residualsafety))
     else
         error("Algorithm $alg does not support residualsafety")
     end
@@ -701,7 +719,7 @@ end
                     DefaultAlgorithmChoice.GenericLUFactorization,
                 )
             )
-            # Pass residualsafety = alg.safetyfallback so the inner algorithm does
+            # Pass residualsafety = alg.residualsafety so the inner algorithm does
             # its own residual check and returns APosterioriSafetyFailure if needed.
             inner_alg_expr = _algchoice_to_alg_with_safety(alg)
             newex = quote
@@ -782,7 +800,15 @@ end
             Expr(:elseif, :(alg.alg == $(alg_enum)), newex, ex)
         end
     end
-    return ex = Expr(:if, ex.args...)
+    alg_dispatch = Expr(:if, ex.args...)
+    return quote
+        if cache.cacheval isa DefaultLinearSolverInit &&
+                cache.cacheval.fell_back_to_qr && !cache.isfresh
+            _reuse_qr_fallback(cache, alg, args...; kwargs...)
+        else
+            $alg_dispatch
+        end
+    end
 end
 
 """

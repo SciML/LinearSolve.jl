@@ -304,11 +304,12 @@ sol_nosafe = solve(
         LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization; safetyfallback = false
     )
 )
-# With safetyfallback (default), residual check should trigger QR fallback
+# With residualsafety=true, residual check should trigger QR fallback
 sol_safe = solve(
     LinearProblem(copy(A_nearsing), copy(b_nearsing)),
     LinearSolve.DefaultLinearSolver(
-        LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
+        LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization;
+        residualsafety = true
     )
 )
 sol_qr_ref = solve(
@@ -368,3 +369,31 @@ sol_lu_well_rs = solve(
 )
 @test sol_lu_well_rs.retcode === ReturnCode.Success
 @test sol_lu_well_rs.u ≈ A_wellcond \ b_wellcond
+
+# QR fallback reuse: after QR fallback, subsequent solves with the same matrix
+# should use QR (not the corrupted in-place LU cache).
+# Regression test for https://github.com/SciML/LinearSolve.jl/issues/911
+# Simulates the ODE solver pattern: first solve triggers QR fallback,
+# then subsequent stages reuse the factorization without updating A.
+A_illcond = copy(A_nearsing)
+b1 = randn(n)
+b2 = randn(n)
+prob_reuse_qr = LinearProblem(A_illcond, b1)
+alg_reuse = LinearSolve.DefaultLinearSolver(
+    LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization;
+    residualsafety = true
+)
+cache_qr_reuse = init(prob_reuse_qr, alg_reuse)
+sol_stage1 = solve!(cache_qr_reuse)
+@test sol_stage1.retcode === ReturnCode.Success
+@test cache_qr_reuse.cacheval.fell_back_to_qr
+# Stage 2: only change b, not A (simulates Rosenbrock stage reuse)
+cache_qr_reuse.b = b2
+sol_stage2 = solve!(cache_qr_reuse)
+@test sol_stage2.retcode === ReturnCode.Success
+# Verify the solution matches a fresh QR solve (not corrupted by LU)
+sol_qr_stage2_ref = solve(LinearProblem(copy(A_nearsing), copy(b2)), QRFactorization(ColumnNorm()))
+@test sol_stage2.u ≈ sol_qr_stage2_ref.u
+# After setting a new A, fell_back_to_qr should be reset
+cache_qr_reuse.A = copy(A_nearsing)  # triggers setproperty! for :A
+@test !cache_qr_reuse.cacheval.fell_back_to_qr

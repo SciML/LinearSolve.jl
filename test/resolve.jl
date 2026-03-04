@@ -51,6 +51,10 @@ for alg in vcat(
             (
             !(alg == ParUFactorization) ||
                 Base.get_extension(LinearSolve, :LinearSolveParUExt) !== nothing
+        ) &&
+            (
+            !(alg == ElementalJL) ||
+                Base.get_extension(LinearSolve, :LinearSolveElementalExt) !== nothing
         )
         A = [1.0 2.0; 3.0 4.0]
         alg in [

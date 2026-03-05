@@ -234,6 +234,34 @@ cache_backup = init(prob_backup)
 solve!(cache_backup)
 @test prob_backup.A ≈ A_singular  # prob.A unchanged
 
+# Regression test: A_backup must be updated from cache.A before each LU solve.
+# When a caller (e.g. NonlinearSolve) reuses the cache with a different matrix via
+# copyto!(cache.A, new_J), the QR fallback must use the current matrix, not the
+# stale initial one.
+prob_reuse = LinearProblem(copy(A_singular), copy(b_singular))
+cache_reuse = init(prob_reuse)
+sol1 = solve!(cache_reuse)
+@test sol1.retcode === ReturnCode.Success
+
+# Now update cache.A with a different singular matrix (same size) and re-solve.
+# This simulates NonlinearSolve updating the Jacobian between Newton steps.
+A_singular2 = Float64[
+    0.0 0.0 0.0 0.0
+    0.0 2.0 0.0 0.0
+    0.0 0.0 3.0 0.0
+    0.0 0.0 0.0 0.0
+]
+b_singular2 = Float64[0.0, 4.0, 9.0, 0.0]
+copyto!(cache_reuse.A, A_singular2)
+cache_reuse.A = cache_reuse.A  # trigger setproperty! to sync A_backup
+copyto!(cache_reuse.b, b_singular2)
+sol2 = solve!(cache_reuse)
+@test sol2.retcode === ReturnCode.Success
+sol_qr2 = solve(
+    LinearProblem(copy(A_singular2), copy(b_singular2)), QRFactorization(ColumnNorm())
+)
+@test sol2.u ≈ sol_qr2.u
+
 # Regression test for https://github.com/SciML/LinearSolve.jl/issues/890
 # WOperator with init_cacheval overload that unwraps A.J (as OrdinaryDiffEqDifferentiation does)
 using SciMLOperators: WOperator, MatrixOperator
@@ -257,3 +285,115 @@ W = WOperator{true}(M_w, 1.0, J_w, [1.0, 0.5])
 prob_w = LinearProblem(W, [1.0, 2.0])
 sol_w = solve(prob_w)
 @test sol_w.retcode === ReturnCode.Success
+
+# Post-solve residual check: near-singular matrix where LU "succeeds" but gives garbage
+# LU doesn't flag near-zero pivots, only exact zeros. The residual check catches this.
+using Random
+Random.seed!(42)
+n = 20
+U = qr(randn(n, n)).Q * Diagonal(vcat(1.0e-15, ones(n - 1)))  # one near-zero singular value
+A_nearsing = Matrix(U * Diagonal(ones(n)) * U')
+# Make it clearly near-singular but with no exact zero pivot
+A_nearsing .+= 1.0e-16 * randn(n, n)
+b_nearsing = randn(n)
+
+# Without safetyfallback, LU result is returned as-is (may be garbage)
+sol_nosafe = solve(
+    LinearProblem(copy(A_nearsing), copy(b_nearsing)),
+    LinearSolve.DefaultLinearSolver(
+        LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization; safetyfallback = false
+    )
+)
+# With residualsafety=true, residual check should trigger QR fallback
+sol_safe = solve(
+    LinearProblem(copy(A_nearsing), copy(b_nearsing)),
+    LinearSolve.DefaultLinearSolver(
+        LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization;
+        residualsafety = true
+    )
+)
+sol_qr_ref = solve(
+    LinearProblem(copy(A_nearsing), copy(b_nearsing)),
+    QRFactorization(ColumnNorm())
+)
+# The safe fallback should give a much better solution than raw LU
+resid_nosafe = norm(A_nearsing * sol_nosafe.u - b_nearsing)
+resid_safe = norm(A_nearsing * sol_safe.u - b_nearsing)
+resid_qr = norm(A_nearsing * sol_qr_ref.u - b_nearsing)
+@test resid_safe <= 10 * resid_qr || resid_safe < 1.0e-10  # safe is close to QR quality
+@test sol_safe.retcode === ReturnCode.Success
+
+# Well-conditioned matrix: residual check should NOT trigger fallback
+A_wellcond = Float64[4 1; 1 3]
+b_wellcond = Float64[1.0, 2.0]
+sol_well = solve(LinearProblem(copy(A_wellcond), copy(b_wellcond)))
+@test sol_well.retcode === ReturnCode.Success
+@test sol_well.u ≈ A_wellcond \ b_wellcond
+
+# safetyfallback=false skips residual check entirely
+sol_no_fallback = solve(
+    LinearProblem(copy(A_nearsing), copy(b_nearsing)),
+    LinearSolve.DefaultLinearSolver(
+        LinearSolve.DefaultAlgorithmChoice.LUFactorization; safetyfallback = false
+    )
+)
+# Should return without fallback (no error, but possibly bad solution)
+@test sol_no_fallback.retcode === ReturnCode.Success
+
+# Individual LU algorithm residualsafety tests
+# LUFactorization(residualsafety=true) on near-singular matrix → APosterioriSafetyFailure
+sol_lu_rs = solve(
+    LinearProblem(copy(A_nearsing), copy(b_nearsing)),
+    LUFactorization(residualsafety = true)
+)
+@test sol_lu_rs.retcode === ReturnCode.APosterioriSafetyFailure
+
+# GenericLUFactorization(residualsafety=true) on near-singular matrix → APosterioriSafetyFailure
+sol_glu_rs = solve(
+    LinearProblem(copy(A_nearsing), copy(b_nearsing)),
+    GenericLUFactorization(residualsafety = true)
+)
+@test sol_glu_rs.retcode === ReturnCode.APosterioriSafetyFailure
+
+# Default LUFactorization() on near-singular matrix → ReturnCode.Success (no check)
+sol_lu_default = solve(
+    LinearProblem(copy(A_nearsing), copy(b_nearsing)),
+    LUFactorization()
+)
+@test sol_lu_default.retcode === ReturnCode.Success
+
+# Well-conditioned matrix: residualsafety=true should still succeed
+sol_lu_well_rs = solve(
+    LinearProblem(copy(A_wellcond), copy(b_wellcond)),
+    LUFactorization(residualsafety = true)
+)
+@test sol_lu_well_rs.retcode === ReturnCode.Success
+@test sol_lu_well_rs.u ≈ A_wellcond \ b_wellcond
+
+# QR fallback reuse: after QR fallback, subsequent solves with the same matrix
+# should use QR (not the corrupted in-place LU cache).
+# Regression test for https://github.com/SciML/LinearSolve.jl/issues/911
+# Simulates the ODE solver pattern: first solve triggers QR fallback,
+# then subsequent stages reuse the factorization without updating A.
+A_illcond = copy(A_nearsing)
+b1 = randn(n)
+b2 = randn(n)
+prob_reuse_qr = LinearProblem(A_illcond, b1)
+alg_reuse = LinearSolve.DefaultLinearSolver(
+    LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization;
+    residualsafety = true
+)
+cache_qr_reuse = init(prob_reuse_qr, alg_reuse)
+sol_stage1 = solve!(cache_qr_reuse)
+@test sol_stage1.retcode === ReturnCode.Success
+@test cache_qr_reuse.cacheval.fell_back_to_qr
+# Stage 2: only change b, not A (simulates Rosenbrock stage reuse)
+cache_qr_reuse.b = b2
+sol_stage2 = solve!(cache_qr_reuse)
+@test sol_stage2.retcode === ReturnCode.Success
+# Verify the solution matches a fresh QR solve (not corrupted by LU)
+sol_qr_stage2_ref = solve(LinearProblem(copy(A_nearsing), copy(b2)), QRFactorization(ColumnNorm()))
+@test sol_stage2.u ≈ sol_qr_stage2_ref.u
+# After setting a new A, fell_back_to_qr should be reset
+cache_qr_reuse.A = copy(A_nearsing)  # triggers setproperty! for :A
+@test !cache_qr_reuse.cacheval.fell_back_to_qr

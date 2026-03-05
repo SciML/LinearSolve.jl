@@ -2,7 +2,7 @@ needs_concrete_A(alg::DefaultLinearSolver) = true
 mutable struct DefaultLinearSolverInit{
         T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12,
         T13, T14, T15, T16, T17, T18, T19, T20, T21, T22, T23, T24,
-        TA,
+        TA, Tb,
     }
     LUFactorization::T1
     QRFactorization::T2
@@ -28,7 +28,20 @@ mutable struct DefaultLinearSolverInit{
     BLISLUFactorization::T22
     CudaOffloadLUFactorization::T23
     MetalLUFactorization::T24
-    A_backup::TA  # reference to original prob.A for restoring cache.A after in-place LU
+    A_backup::TA  # backup of cache.A for restoring after in-place LU and QR fallback
+    residual_buf::Tb  # pre-allocated buffer for post-solve residual check (same size/type as b)
+    a_backup_synced::Bool  # true if A_backup content matches cache.A (before LU modifies it)
+    a_backup_allocated::Bool  # true once A_backup has been replaced with a private buffer
+    fell_back_to_qr::Bool  # true after QR fallback; reuse QR until matrix is refreshed
+end
+
+function resize_cacheval!(cache, cacheval::DefaultLinearSolverInit, i)
+    A_backup = cacheval.A_backup
+    return if A_backup isa AbstractMatrix
+        setfield!(cacheval, :A_backup, similar(A_backup, i, i))
+        cacheval.a_backup_allocated = true
+        cacheval.a_backup_synced = false
+    end
 end
 
 @generated function __setfield!(cache::DefaultLinearSolverInit, alg::DefaultLinearSolver, v)
@@ -552,7 +565,10 @@ end
             end
         end
     end
-    return Expr(:call, :DefaultLinearSolverInit, caches..., :A_original)
+    return Expr(
+        :call, :DefaultLinearSolverInit, caches...,
+        :A_original, :(similar(b)), true, false, false
+    )
 end
 
 function defaultalg_symbol(::Type{T}) where {T}
@@ -570,6 +586,115 @@ const _SPARSE_ONLY_ALGORITHMS = Symbol.(
         DefaultAlgorithmChoice.CHOLMODFactorization,
     )
 )
+
+"""
+    _do_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol, args...; kwargs...)
+
+Perform QR fallback after LU failure or residual check failure. Restores `cache.A`
+from `A_backup` (since LU may have modified it in-place) and solves with column-pivoted QR.
+`reason` is `:lu_failure` or `:residual_check` for appropriate log messages.
+"""
+function _do_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol, args...; kwargs...)
+    if cache.A === cache.cacheval.A_backup
+        @SciMLMessage(
+            "LU factorization failed but cannot safely fall back to QR: `alias_A` is set so the original matrix `A` is not available as a backup to restore after in-place LU modification. Set `alias_A=false` (the default) to enable safe fallbacks.",
+            cache.verbose, :default_lu_fallback
+        )
+        return SciMLBase.build_linear_solution(
+            alg, sol.u, sol.resid, sol.cache;
+            retcode = sol.retcode, iters = sol.iters, stats = sol.stats
+        )
+    end
+    if reason === :residual_check
+        @SciMLMessage(
+            "LU solve residual check failed, falling back to QR factorization. `A` is potentially ill-conditioned.",
+            cache.verbose, :default_lu_fallback
+        )
+    else
+        @SciMLMessage(
+            "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.",
+            cache.verbose, :default_lu_fallback
+        )
+    end
+    copyto!(cache.A, cache.cacheval.A_backup)
+    cache.isfresh = true
+    sol = SciMLBase.solve!(cache, QRFactorization(ColumnNorm()), args...; kwargs...)
+    cache.cacheval.fell_back_to_qr = true
+    return SciMLBase.build_linear_solution(
+        alg, sol.u, sol.resid, sol.cache;
+        retcode = sol.retcode, iters = sol.iters, stats = sol.stats
+    )
+end
+
+"""
+    _reuse_qr_fallback(cache::LinearCache, alg, args...; kwargs...)
+
+Reuse the cached QR factorization from a previous QR fallback. Called when
+`fell_back_to_qr` is `true` and `isfresh` is `false`, meaning the matrix hasn't
+changed since the QR fallback and we should keep using QR instead of the
+(potentially corrupted) LU factorization.
+"""
+function _reuse_qr_fallback(cache::LinearCache, alg, args...; kwargs...)
+    sol = SciMLBase.solve!(cache, QRFactorization(ColumnNorm()), args...; kwargs...)
+    return SciMLBase.build_linear_solution(
+        alg, sol.u, sol.resid, sol.cache;
+        retcode = sol.retcode, iters = sol.iters, stats = sol.stats
+    )
+end
+
+"""
+    _default_lu_solve_with_fallback(cache::LinearCache, alg::DefaultLinearSolver, sol, args...; kwargs...)
+
+Post-process an LU solve result: if LU explicitly failed or the residual check returned
+`APosterioriSafetyFailure`, fall back to column-pivoted QR. Otherwise return the LU
+solution directly.
+"""
+function _default_lu_solve_with_fallback(
+        cache::LinearCache, alg::DefaultLinearSolver, sol, args...; kwargs...
+    )
+    if alg.safetyfallback
+        if sol.retcode === ReturnCode.Failure
+            return _do_qr_fallback(cache, alg, sol, :lu_failure, args...; kwargs...)
+        end
+        if sol.retcode === ReturnCode.APosterioriSafetyFailure
+            return _do_qr_fallback(cache, alg, sol, :residual_check, args...; kwargs...)
+        end
+    end
+    return SciMLBase.build_linear_solution(
+        alg, sol.u, sol.resid, sol.cache;
+        retcode = sol.retcode, iters = sol.iters, stats = sol.stats
+    )
+end
+
+"""
+    _algchoice_to_alg_with_safety(alg::Symbol)
+
+Like `algchoice_to_alg`, but generates an expression that passes
+`residualsafety = alg.residualsafety` at runtime. Used in the `@generated solve!`
+so that the inner LU algorithm does its own residual check when the default solver
+has `residualsafety=true`.
+"""
+function _algchoice_to_alg_with_safety(alg::Symbol)
+    return if alg === :LUFactorization
+        :(LUFactorization(residualsafety = alg.residualsafety))
+    elseif alg === :GenericLUFactorization
+        :(GenericLUFactorization(residualsafety = alg.residualsafety))
+    elseif alg === :MKLLUFactorization
+        :(MKLLUFactorization(residualsafety = alg.residualsafety))
+    elseif alg === :AppleAccelerateLUFactorization
+        :(AppleAccelerateLUFactorization(residualsafety = alg.residualsafety))
+    elseif alg === :RFLUFactorization
+        :(RFLUFactorization(throwerror = false, residualsafety = alg.residualsafety))
+    elseif alg === :BLISLUFactorization
+        :(BLISLUFactorization(throwerror = false, residualsafety = alg.residualsafety))
+    elseif alg === :CudaOffloadLUFactorization
+        :(CudaOffloadLUFactorization(throwerror = false, residualsafety = alg.residualsafety))
+    elseif alg === :MetalLUFactorization
+        :(MetalLUFactorization(throwerror = false, residualsafety = alg.residualsafety))
+    else
+        error("Algorithm $alg does not support residualsafety")
+    end
+end
 
 """
 if alg.alg === DefaultAlgorithmChoice.LUFactorization
@@ -594,210 +719,48 @@ end
                     DefaultAlgorithmChoice.GenericLUFactorization,
                 )
             )
+            # Pass residualsafety = alg.residualsafety so the inner algorithm does
+            # its own residual check and returns APosterioriSafetyFailure if needed.
+            inner_alg_expr = _algchoice_to_alg_with_safety(alg)
             newex = quote
-                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
-                if sol.retcode === ReturnCode.Failure && alg.safetyfallback
-                    if cache.A === cache.cacheval.A_backup
-                        @SciMLMessage(
-                            "LU factorization failed but cannot safely fall back to QR: `alias_A` is set so the original matrix `A` is not available as a backup to restore after in-place LU modification. Set `alias_A=false` (the default) to enable safe fallbacks.",
-                            cache.verbose, :default_lu_fallback
-                        )
-                        SciMLBase.build_linear_solution(
-                            alg, sol.u, sol.resid, sol.cache;
-                            retcode = sol.retcode,
-                            iters = sol.iters, stats = sol.stats
-                        )
-                    else
-                        @SciMLMessage(
-                            "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.",
-                            cache.verbose, :default_lu_fallback
-                        )
-                        copyto!(cache.A, cache.cacheval.A_backup)
-                        cache.isfresh = true
-                        sol = SciMLBase.solve!(
-                            cache, QRFactorization(ColumnNorm()), args...; kwargs...
-                        )
-                        SciMLBase.build_linear_solution(
-                            alg, sol.u, sol.resid, sol.cache;
-                            retcode = sol.retcode,
-                            iters = sol.iters, stats = sol.stats
-                        )
-                    end
-                else
-                    SciMLBase.build_linear_solution(
-                        alg, sol.u, sol.resid, sol.cache;
-                        retcode = sol.retcode,
-                        iters = sol.iters, stats = sol.stats
-                    )
-                end
+                sol = SciMLBase.solve!(cache, $inner_alg_expr, args...; kwargs...)
+                _default_lu_solve_with_fallback(cache, alg, sol, args...; kwargs...)
             end
         elseif alg == Symbol(DefaultAlgorithmChoice.RFLUFactorization)
+            inner_alg_expr = _algchoice_to_alg_with_safety(alg)
             newex = quote
                 if !userecursivefactorization(nothing)
                     error("Default algorithm calling solve on RecursiveFactorization without the package being loaded. This shouldn't happen.")
                 end
-
-                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
-                if sol.retcode === ReturnCode.Failure && alg.safetyfallback
-                    if cache.A === cache.cacheval.A_backup
-                        @SciMLMessage(
-                            "LU factorization failed but cannot safely fall back to QR: `alias_A` is set so the original matrix `A` is not available as a backup to restore after in-place LU modification. Set `alias_A=false` (the default) to enable safe fallbacks.",
-                            cache.verbose, :default_lu_fallback
-                        )
-                        SciMLBase.build_linear_solution(
-                            alg, sol.u, sol.resid, sol.cache;
-                            retcode = sol.retcode,
-                            iters = sol.iters, stats = sol.stats
-                        )
-                    else
-                        @SciMLMessage(
-                            "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.",
-                            cache.verbose, :default_lu_fallback
-                        )
-                        copyto!(cache.A, cache.cacheval.A_backup)
-                        cache.isfresh = true
-                        sol = SciMLBase.solve!(
-                            cache, QRFactorization(ColumnNorm()), args...; kwargs...
-                        )
-                        SciMLBase.build_linear_solution(
-                            alg, sol.u, sol.resid, sol.cache;
-                            retcode = sol.retcode,
-                            iters = sol.iters, stats = sol.stats
-                        )
-                    end
-                else
-                    SciMLBase.build_linear_solution(
-                        alg, sol.u, sol.resid, sol.cache;
-                        retcode = sol.retcode,
-                        iters = sol.iters, stats = sol.stats
-                    )
-                end
+                sol = SciMLBase.solve!(cache, $inner_alg_expr, args...; kwargs...)
+                _default_lu_solve_with_fallback(cache, alg, sol, args...; kwargs...)
             end
         elseif alg == Symbol(DefaultAlgorithmChoice.BLISLUFactorization)
+            inner_alg_expr = _algchoice_to_alg_with_safety(alg)
             newex = quote
                 if !useblis(nothing)
                     error("Default algorithm calling solve on BLISLUFactorization without the extension being loaded. This shouldn't happen.")
                 end
-
-                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
-                if sol.retcode === ReturnCode.Failure && alg.safetyfallback
-                    if cache.A === cache.cacheval.A_backup
-                        @SciMLMessage(
-                            "LU factorization failed but cannot safely fall back to QR: `alias_A` is set so the original matrix `A` is not available as a backup to restore after in-place LU modification. Set `alias_A=false` (the default) to enable safe fallbacks.",
-                            cache.verbose, :default_lu_fallback
-                        )
-                        SciMLBase.build_linear_solution(
-                            alg, sol.u, sol.resid, sol.cache;
-                            retcode = sol.retcode,
-                            iters = sol.iters, stats = sol.stats
-                        )
-                    else
-                        @SciMLMessage(
-                            "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.",
-                            cache.verbose, :default_lu_fallback
-                        )
-                        copyto!(cache.A, cache.cacheval.A_backup)
-                        cache.isfresh = true
-                        sol = SciMLBase.solve!(
-                            cache, QRFactorization(ColumnNorm()), args...; kwargs...
-                        )
-                        SciMLBase.build_linear_solution(
-                            alg, sol.u, sol.resid, sol.cache;
-                            retcode = sol.retcode,
-                            iters = sol.iters, stats = sol.stats
-                        )
-                    end
-                else
-                    SciMLBase.build_linear_solution(
-                        alg, sol.u, sol.resid, sol.cache;
-                        retcode = sol.retcode,
-                        iters = sol.iters, stats = sol.stats
-                    )
-                end
+                sol = SciMLBase.solve!(cache, $inner_alg_expr, args...; kwargs...)
+                _default_lu_solve_with_fallback(cache, alg, sol, args...; kwargs...)
             end
         elseif alg == Symbol(DefaultAlgorithmChoice.CudaOffloadLUFactorization)
+            inner_alg_expr = _algchoice_to_alg_with_safety(alg)
             newex = quote
                 if !usecuda(nothing)
                     error("Default algorithm calling solve on CudaOffloadLUFactorization without CUDA.jl being loaded. This shouldn't happen.")
                 end
-
-                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
-                if sol.retcode === ReturnCode.Failure && alg.safetyfallback
-                    if cache.A === cache.cacheval.A_backup
-                        @SciMLMessage(
-                            "LU factorization failed but cannot safely fall back to QR: `alias_A` is set so the original matrix `A` is not available as a backup to restore after in-place LU modification. Set `alias_A=false` (the default) to enable safe fallbacks.",
-                            cache.verbose, :default_lu_fallback
-                        )
-                        SciMLBase.build_linear_solution(
-                            alg, sol.u, sol.resid, sol.cache;
-                            retcode = sol.retcode,
-                            iters = sol.iters, stats = sol.stats
-                        )
-                    else
-                        @SciMLMessage(
-                            "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.",
-                            cache.verbose, :default_lu_fallback
-                        )
-                        copyto!(cache.A, cache.cacheval.A_backup)
-                        cache.isfresh = true
-                        sol = SciMLBase.solve!(
-                            cache, QRFactorization(ColumnNorm()), args...; kwargs...
-                        )
-                        SciMLBase.build_linear_solution(
-                            alg, sol.u, sol.resid, sol.cache;
-                            retcode = sol.retcode,
-                            iters = sol.iters, stats = sol.stats
-                        )
-                    end
-                else
-                    SciMLBase.build_linear_solution(
-                        alg, sol.u, sol.resid, sol.cache;
-                        retcode = sol.retcode,
-                        iters = sol.iters, stats = sol.stats
-                    )
-                end
+                sol = SciMLBase.solve!(cache, $inner_alg_expr, args...; kwargs...)
+                _default_lu_solve_with_fallback(cache, alg, sol, args...; kwargs...)
             end
         elseif alg == Symbol(DefaultAlgorithmChoice.MetalLUFactorization)
+            inner_alg_expr = _algchoice_to_alg_with_safety(alg)
             newex = quote
                 if !usemetal(nothing)
                     error("Default algorithm calling solve on MetalLUFactorization without Metal.jl being loaded. This shouldn't happen.")
                 end
-
-                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)), args...; kwargs...)
-                if sol.retcode === ReturnCode.Failure && alg.safetyfallback
-                    if cache.A === cache.cacheval.A_backup
-                        @SciMLMessage(
-                            "LU factorization failed but cannot safely fall back to QR: `alias_A` is set so the original matrix `A` is not available as a backup to restore after in-place LU modification. Set `alias_A=false` (the default) to enable safe fallbacks.",
-                            cache.verbose, :default_lu_fallback
-                        )
-                        SciMLBase.build_linear_solution(
-                            alg, sol.u, sol.resid, sol.cache;
-                            retcode = sol.retcode,
-                            iters = sol.iters, stats = sol.stats
-                        )
-                    else
-                        @SciMLMessage(
-                            "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.",
-                            cache.verbose, :default_lu_fallback
-                        )
-                        copyto!(cache.A, cache.cacheval.A_backup)
-                        cache.isfresh = true
-                        sol = SciMLBase.solve!(
-                            cache, QRFactorization(ColumnNorm()), args...; kwargs...
-                        )
-                        SciMLBase.build_linear_solution(
-                            alg, sol.u, sol.resid, sol.cache;
-                            retcode = sol.retcode,
-                            iters = sol.iters, stats = sol.stats
-                        )
-                    end
-                else
-                    SciMLBase.build_linear_solution(
-                        alg, sol.u, sol.resid, sol.cache;
-                        retcode = sol.retcode,
-                        iters = sol.iters, stats = sol.stats
-                    )
-                end
+                sol = SciMLBase.solve!(cache, $inner_alg_expr, args...; kwargs...)
+                _default_lu_solve_with_fallback(cache, alg, sol, args...; kwargs...)
             end
         else
             if alg in LinearSolve._SPARSE_ONLY_ALGORITHMS
@@ -837,7 +800,15 @@ end
             Expr(:elseif, :(alg.alg == $(alg_enum)), newex, ex)
         end
     end
-    return ex = Expr(:if, ex.args...)
+    alg_dispatch = Expr(:if, ex.args...)
+    return quote
+        if cache.cacheval isa DefaultLinearSolverInit &&
+                cache.cacheval.fell_back_to_qr && !cache.isfresh
+            _reuse_qr_fallback(cache, alg, args...; kwargs...)
+        else
+            $alg_dispatch
+        end
+    end
 end
 
 """

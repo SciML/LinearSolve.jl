@@ -6,7 +6,11 @@ MKLLUFactorization()
 A wrapper over Intel's Math Kernel Library (MKL). Direct calls to MKL in a way that pre-allocates workspace
 to avoid allocations and does not require libblastrampoline.
 """
-struct MKLLUFactorization <: AbstractFactorization end
+struct MKLLUFactorization <: AbstractFactorization
+    residualsafety::Bool
+end
+
+MKLLUFactorization(; residualsafety::Bool = false) = MKLLUFactorization(residualsafety)
 
 # Check if MKL is available
 # MKL_jll < 2022.2 doesn't support the mixed LP64 and ILP64 interfaces that we make use of in LinearSolve
@@ -263,6 +267,8 @@ function getrs!(
     return B
 end
 
+_get_residualsafety(alg::MKLLUFactorization) = alg.residualsafety
+
 default_alias_A(::MKLLUFactorization, ::Any, ::Any) = false
 default_alias_b(::MKLLUFactorization, ::Any, ::Any) = false
 
@@ -297,6 +303,10 @@ function SciMLBase.solve!(
         error("Error, MKL binary is missing but solve is being called. Report this issue")
     A = cache.A
     A = convert(AbstractMatrix, A)
+    check_safety = alg.residualsafety && cache.isfresh
+    needs_backup = check_safety ||
+        (cache.alg isa DefaultLinearSolver && cache.alg.safetyfallback && cache.isfresh)
+    A_original = needs_backup ? _copy_A_for_safety(cache) : A
     verbose = cache.verbose
     if cache.isfresh
         cacheval = @get_cacheval(cache, :MKLLUFactorization)
@@ -378,6 +388,11 @@ function SciMLBase.solve!(
     else
         copyto!(cache.u, cache.b)
         getrs!('N', A.factors, A.ipiv, cache.u; info)
+    end
+
+    if check_safety
+        failed = _check_residual_safety(cache, alg, A_original, cache.u)
+        failed !== nothing && return failed
     end
 
     return SciMLBase.build_linear_solution(

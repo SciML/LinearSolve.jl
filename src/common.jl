@@ -130,6 +130,21 @@ function Base.setproperty!(cache::LinearCache, name::Symbol, x)
     if name === :A
         setfield!(cache, :isfresh, true)
         setfield!(cache, :precsisfresh, true)
+        if cache.cacheval isa DefaultLinearSolverInit
+            cache.cacheval.fell_back_to_qr = false
+            if x === getfield(cache, :A) && cache.cacheval.a_backup_allocated
+                A_backup = cache.cacheval.A_backup
+                if size(A_backup) == size(x)
+                    copyto!(A_backup, x)
+                else
+                    setfield!(cache.cacheval, :A_backup, copy(x))
+                end
+                cache.cacheval.a_backup_synced = true
+            elseif !(x === getfield(cache, :A))
+                # A was replaced by a different object; A_backup is now stale
+                cache.cacheval.a_backup_synced = false
+            end
+        end
     elseif name === :p
         setfield!(cache, :precsisfresh, true)
     elseif name === :b
@@ -142,6 +157,14 @@ function Base.setproperty!(cache::LinearCache, name::Symbol, x)
     end
     return setfield!(cache, name, x)
 end
+
+function Base.resize!(cache::LinearCache, i::Int)
+    resize_cacheval!(cache, cache.cacheval, i)
+    setfield!(cache, :isfresh, true)
+    return cache
+end
+
+resize_cacheval!(cache, cacheval, i) = nothing
 
 function update_cacheval!(cache::LinearCache, name::Symbol, x)
     return update_cacheval!(cache, cache.cacheval, name, x)

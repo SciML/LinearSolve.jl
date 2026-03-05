@@ -21,6 +21,7 @@ if GROUP == "All" || GROUP == "Core"
     @time @safetestset "BandedMatrices" include("banded.jl")
     @time @safetestset "Butterfly Factorization" include("butterfly.jl")
     @time @safetestset "Mixed Precision" include("test_mixed_precision.jl")
+    @time @safetestset "Resize" include("resize.jl")
     # ParU_jll requires Julia >= 1.12 (SuiteSparse_jll in older stdlib is incompatible)
     if VERSION >= v"1.12.0-"
         Pkg.activate("paru")
@@ -53,6 +54,16 @@ if GROUP == "DefaultsLoading"
 end
 
 if GROUP == "LinearSolveAutotune"
+    Pkg.activate(joinpath(dirname(@__DIR__), "lib", GROUP))
+    Pkg.test(
+        GROUP,
+        julia_args = ["--check-bounds=auto", "--compiled-modules=yes", "--depwarn=yes"],
+        force_latest_compatible_version = false,
+        allow_reresolve = true
+    )
+end
+
+if GROUP == "LinearSolvePyAMG"
     Pkg.activate(joinpath(dirname(@__DIR__), "lib", GROUP))
     Pkg.test(
         GROUP,

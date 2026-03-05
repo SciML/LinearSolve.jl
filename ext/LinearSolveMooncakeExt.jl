@@ -23,14 +23,6 @@ function Mooncake.increment_and_get_rdata!(f, r::NoRData, t::LinearProblem)
     return NoRData()
 end
 
-function Mooncake.to_cr_tangent(x::Mooncake.PossiblyUninitTangent{T}) where {T}
-    if Mooncake.is_init(x)
-        return Mooncake.to_cr_tangent(x.tangent)
-    else
-        error("Trying to convert uninitialized tangent to ChainRules tangent.")
-    end
-end
-
 function Mooncake.increment_and_get_rdata!(f, r::NoRData, t::LinearCache)
     f.fields.A .+= t.A
     f.fields.b .+= t.b

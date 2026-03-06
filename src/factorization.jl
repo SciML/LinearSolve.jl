@@ -143,14 +143,6 @@ _ldiv!(x, A, b::SVector) = (x .= A \ b)
 _ldiv!(::SVector, A, b::SVector) = (A \ b)
 _ldiv!(::SVector, A, b) = (A \ b)
 
-function _ldiv!(x::Vector, A::Factorization, b::Vector)
-    # workaround https://github.com/JuliaLang/julia/issues/43507
-    # Fallback if working with non-square matrices
-    length(x) != length(b) && return ldiv!(x, A, b)
-    copyto!(x, b)
-    return ldiv!(A, x)
-end
-
 # RF Bad fallback: will fail if `A` is just a stand-in
 # This should instead just create the factorization type.
 function init_cacheval(

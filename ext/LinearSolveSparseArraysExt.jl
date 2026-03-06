@@ -8,7 +8,7 @@ using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
     QRFactorization, RFLUFactorization, UMFPACKFactorization, solve
 using SciMLOperators: AbstractSciMLOperator, has_concretization
 using ArrayInterface: ArrayInterface
-using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!, QR
+using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!
 using SparseArrays: SparseArrays, AbstractSparseArray, AbstractSparseMatrixCSC,
     SparseMatrixCSC,
     nonzeros, rowvals, getcolptr, sparse, sprand
@@ -501,22 +501,6 @@ function LinearSolve.init_cacheval(
     end
 end
 
-# Specialize QR for the non-square case
-# Missing ldiv! definitions: https://github.com/JuliaSparse/SparseArrays.jl/issues/242
-function LinearSolve._ldiv!(
-        x::Vector,
-        A::Union{QR, LinearAlgebra.QRCompactWY}, b::Vector
-    )
-    return x .= A \ b
-end
-
-function LinearSolve._ldiv!(
-        x::AbstractVector,
-        A::Union{QR, LinearAlgebra.QRCompactWY}, b::AbstractVector
-    )
-    return x .= A \ b
-end
-
 # Ambiguity removal
 function LinearSolve._ldiv!(
         ::SVector,
@@ -534,19 +518,36 @@ function LinearSolve._ldiv!(
 end
 
 @static if Base.USE_GPL_LIBS
-    # SPQR and CHOLMOD Factor support
+    # ldiv!() for CHOLMOD was added in 1.12: https://github.com/JuliaSparse/SparseArrays.jl/pull/547
+    @static if VERSION < v"1.12"
+        function LinearSolve._ldiv!(
+                x::Vector,
+                A::SparseArrays.CHOLMOD.Factor, b::Vector
+            )
+            x .= A \ b
+        end
+        function LinearSolve._ldiv!(
+                x::AbstractVector,
+                A::SparseArrays.CHOLMOD.Factor, b::AbstractVector
+            )
+            x .= A \ b
+        end
+    end
+
+    # ldiv!() for SPQR should be in Julia 1.13: https://github.com/JuliaSparse/SparseArrays.jl/pull/676
     function LinearSolve._ldiv!(
             x::Vector,
-            A::Union{SparseArrays.SPQR.QRSparse, SparseArrays.CHOLMOD.Factor}, b::Vector
+            A::SparseArrays.SPQR.QRSparse, b::Vector
         )
         x .= A \ b
     end
     function LinearSolve._ldiv!(
             x::AbstractVector,
-            A::Union{SparseArrays.SPQR.QRSparse, SparseArrays.CHOLMOD.Factor}, b::AbstractVector
+            A::SparseArrays.SPQR.QRSparse, b::AbstractVector
         )
         x .= A \ b
     end
+
     function LinearSolve._ldiv!(
             ::SVector,
             A::Union{SparseArrays.CHOLMOD.Factor, SparseArrays.SPQR.QRSparse},

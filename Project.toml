@@ -1,6 +1,6 @@
 name = "LinearSolve"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
-version = "3.62.0"
+version = "3.64.0"
 authors = ["SciML"]
 
 [deps]
@@ -126,7 +126,7 @@ MKL_jll = "2019, 2020, 2021, 2022, 2023, 2024, 2025"
 MPI = "0.20"
 Markdown = "1.10"
 Metal = "1.4"
-Mooncake = "0.4, 0.5"
+Mooncake = "0.5.15"
 MultiFloats = "2.3, 3"
 OpenBLAS_jll = "0.3"
 PETSc = "0.4.6"

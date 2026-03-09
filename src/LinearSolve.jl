@@ -368,7 +368,7 @@ function is_algorithm_available(alg::DefaultAlgorithmChoice.T)
 end
 
 """
-    DefaultLinearSolver(;safetyfallback=true)
+    DefaultLinearSolver(;safetyfallback=true, residualsafety=false)
 
 The default linear solver. This is the algorithm chosen when `solve(prob)`
 is called. It's a polyalgorithm that detects the optimal method for a given
@@ -377,10 +377,11 @@ is called. It's a polyalgorithm that detects the optimal method for a given
 ## Keyword Arguments
 
   - `safetyfallback`: determines whether to fallback to a column-pivoted QR factorization
-    when an LU factorization fails. When `true`, the inner LU algorithm is given
-    `residualsafety=true`, which makes it compute the post-solve residual `‖A*x - b‖` and
-    return `ReturnCode.APosterioriSafetyFailure` if it exceeds `abstol + reltol * ‖b‖`.
-    The default solver then falls back to column-pivoted QR. Defaults to `true`.
+    when an LU factorization fails. Defaults to `true`.
+  - `residualsafety`: when `true`, the inner LU algorithm computes the post-solve residual
+    `‖A*x - b‖` and returns `ReturnCode.APosterioriSafetyFailure` if it exceeds
+    `abstol + reltol * ‖b‖`. The default solver then falls back to column-pivoted QR.
+    Defaults to `false`.
 
 ## Residual Safety
 
@@ -394,7 +395,8 @@ handle it.
 struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm
     alg::DefaultAlgorithmChoice.T
     safetyfallback::Bool
-    DefaultLinearSolver(alg; safetyfallback = true) = new(alg, safetyfallback)
+    residualsafety::Bool
+    DefaultLinearSolver(alg; safetyfallback = true, residualsafety = false) = new(alg, safetyfallback, residualsafety)
 end
 
 const BLASELTYPES = Union{Float32, Float64, ComplexF32, ComplexF64}

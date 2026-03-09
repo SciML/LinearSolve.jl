@@ -23,14 +23,6 @@ function Mooncake.increment_and_get_rdata!(f, r::NoRData, t::LinearProblem)
     return NoRData()
 end
 
-function Mooncake.to_cr_tangent(x::Mooncake.PossiblyUninitTangent{T}) where {T}
-    if Mooncake.is_init(x)
-        return Mooncake.to_cr_tangent(x.tangent)
-    else
-        error("Trying to convert uninitialized tangent to ChainRules tangent.")
-    end
-end
-
 function Mooncake.increment_and_get_rdata!(f, r::NoRData, t::LinearCache)
     f.fields.A .+= t.A
     f.fields.b .+= t.b
@@ -46,7 +38,7 @@ end
 # rrules for solve!
 # NOTE - Avoid Mooncake.prepare_gradient_cache, only use Mooncake.prepare_pullback_cache (and therefore Mooncake.value_and_pullback!!)
 # calling Mooncake.prepare_gradient_cache for functions with solve! will activate unsupported Adjoint case exception for below rrules
-# This because in Mooncake.prepare_gradient_cache we reset stacks + state by passing in zero gradient in the reverse pass once.
+# This is because in Mooncake.prepare_gradient_cache we reset stacks + state by passing in zero gradient in the reverse pass once.
 # However, if one has a valid cache then they can directly use Mooncake.value_and_gradient!!.
 
 @is_primitive MinimalCtx Tuple{typeof(SciMLBase.solve!), LinearCache, SciMLLinearSolveAlgorithm, Vararg}

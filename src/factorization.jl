@@ -5,7 +5,12 @@
     return quote
         A = convert(AbstractMatrix, cache.A)
         check_safety = _get_residualsafety(alg) && cache.isfresh
-        A_original = check_safety ? _copy_A_for_safety(cache) : A
+        # Back up A before in-place LU when:
+        #   - residualsafety is enabled (for residual check using original A), OR
+        #   - the default solver has safetyfallback (for restoring A after LU failure)
+        needs_backup = check_safety ||
+            (cache.alg isa DefaultLinearSolver && cache.alg.safetyfallback && cache.isfresh)
+        A_original = needs_backup ? _copy_A_for_safety(cache) : A
 
         if cache.isfresh
             fact = do_factorization(alg, cache.A, cache.b, cache.u)
@@ -239,7 +244,9 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
     check_safety = alg.residualsafety && cache.isfresh
-    A_original = check_safety ? _copy_A_for_safety(cache) : A
+    needs_backup = check_safety ||
+        (cache.alg isa DefaultLinearSolver && cache.alg.safetyfallback && cache.isfresh)
+    A_original = needs_backup ? _copy_A_for_safety(cache) : A
     if cache.isfresh
         cacheval = @get_cacheval(cache, :LUFactorization)
         local fact
@@ -332,7 +339,9 @@ function SciMLBase.solve!(
     A = cache.A
     A = convert(AbstractMatrix, A)
     check_safety = alg.residualsafety && cache.isfresh
-    A_original = check_safety ? _copy_A_for_safety(cache) : A
+    needs_backup = check_safety ||
+        (cache.alg isa DefaultLinearSolver && cache.alg.safetyfallback && cache.isfresh)
+    A_original = needs_backup ? _copy_A_for_safety(cache) : A
     fact, ipiv = LinearSolve.@get_cacheval(cache, :GenericLUFactorization)
 
     if cache.isfresh

@@ -505,10 +505,12 @@ end
         @testset "IterativeSolversJL" begin
             kwargs = (; gmres_restart = 5)
             for alg in (
-                    ("Default", IterativeSolversJL(kwargs...)),
-                    ("CG", IterativeSolversJL_CG(kwargs...)),
-                    ("GMRES", IterativeSolversJL_GMRES(kwargs...)),
-                    ("IDRS", IterativeSolversJL_IDRS(kwargs...)),                #           ("BICGSTAB",IterativeSolversJL_BICGSTAB(kwargs...)),                #            ("MINRES",IterativeSolversJL_MINRES(kwargs...)),
+                    ("Default", IterativeSolversJL(; kwargs...)),
+                    ("CG", IterativeSolversJL_CG(; kwargs...)),
+                    ("GMRES", IterativeSolversJL_GMRES(; kwargs...)),
+                    ("IDRS", IterativeSolversJL_IDRS(; kwargs...)),
+                    # ("BICGSTAB",IterativeSolversJL_BICGSTAB(; kwargs...)),
+                    # ("MINRES",IterativeSolversJL_MINRES(; kwargs...)),
                 )
                 @testset "$(alg[1])" begin
                     test_interface(alg[2], prob1, prob2)

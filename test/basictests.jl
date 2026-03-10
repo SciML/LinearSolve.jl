@@ -458,15 +458,15 @@ end
         kwargs = (; gmres_restart = 5)
         precs = (A, p = nothing) -> (BlockJacobiPreconditioner(A, 2), I)
         algorithms = (
-            ("Default", KrylovJL(kwargs...)),
-            ("CG", KrylovJL_CG(kwargs...)),
-            ("GMRES", KrylovJL_GMRES(kwargs...)),
-            ("FGMRES", KrylovJL_FGMRES(kwargs...)),
+            ("Default", KrylovJL(; kwargs...)),
+            ("CG", KrylovJL_CG(; kwargs...)),
+            ("GMRES", KrylovJL_GMRES(; kwargs...)),
+            ("FGMRES", KrylovJL_FGMRES(; kwargs...)),
             ("GMRES_prec", KrylovJL_GMRES(; precs, ldiv = false, kwargs...)),
             ("FGMRES_prec", KrylovJL_FGMRES(; precs, ldiv = false, kwargs...)),
-            # ("BICGSTAB",KrylovJL_BICGSTAB(kwargs...)),
-            ("MINRES", KrylovJL_MINRES(kwargs...)),
-            ("MINARES", KrylovJL_MINARES(kwargs...)),
+            # ("BICGSTAB",KrylovJL_BICGSTAB(; kwargs...)),
+            ("MINRES", KrylovJL_MINRES(; kwargs...)),
+            ("MINARES", KrylovJL_MINARES(; kwargs...)),
         )
         for (name, algorithm) in algorithms
             @testset "$name" begin

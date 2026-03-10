@@ -509,6 +509,7 @@ end
                     ("CG", IterativeSolversJL_CG(; kwargs...)),
                     ("GMRES", IterativeSolversJL_GMRES(; kwargs...)),
                     ("IDRS", IterativeSolversJL_IDRS(; kwargs...)),
+                    ("IDRS(2)", IterativeSolversJL_IDRS(; idrs_s = 2, kwargs...)),
                     # ("BICGSTAB",IterativeSolversJL_BICGSTAB(; kwargs...)),
                     # ("MINRES",IterativeSolversJL_MINRES(; kwargs...)),
                 )

@@ -75,7 +75,7 @@ function LinearSolve.init_cacheval(
         verbosity = verbose
     end
     restart = (alg.gmres_restart == 0) ? min(20, size(A, 1)) : alg.gmres_restart
-    s = :idrs_s in keys(alg.kwargs) ? alg.kwargs.idrs_s : 4 # shadow space
+    s = get(alg.kwargs, :idrs_s, 4) # shadow space
 
     kwargs = (
         abstol = abstol, reltol = reltol, maxiter = maxiters,
@@ -106,9 +106,10 @@ function LinearSolve.init_cacheval(
         history = IterativeSolvers.ConvergenceHistory(partial = true)
         history[:abstol] = abstol
         history[:reltol] = reltol
+        filter_kwargs(; idrs_s = 0, kwargs...) = kwargs
         IterativeSolvers.idrs_iterable!(
             history, u, A, b, s, Pl, abstol, reltol, maxiters;
-            alg.kwargs...
+            filter_kwargs(; alg.kwargs...)...
         )
     elseif alg.generate_iterator === IterativeSolvers.bicgstabl_iterator!
         !!LinearSolve._isidentity_struct(Pr) &&

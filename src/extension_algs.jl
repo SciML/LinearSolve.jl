@@ -765,7 +765,7 @@ function IterativeSolversJL_GMRES end
 
 """
 ```julia
-IterativeSolversJL_IDRS(args...; Pl = nothing, kwargs...)
+IterativeSolversJL_IDRS(args...; Pl = nothing, idrs_s = 4, kwargs...)
 ```
 
 A wrapper over the IterativeSolvers.jl IDR(S).

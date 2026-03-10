@@ -368,7 +368,7 @@ function is_algorithm_available(alg::DefaultAlgorithmChoice.T)
 end
 
 """
-    DefaultLinearSolver(;safetyfallback=true, residualsafety=false)
+    DefaultLinearSolver(;safetyfallback=true, residualsafety=safetyfallback)
 
 The default linear solver. This is the algorithm chosen when `solve(prob)`
 is called. It's a polyalgorithm that detects the optimal method for a given
@@ -381,7 +381,7 @@ is called. It's a polyalgorithm that detects the optimal method for a given
   - `residualsafety`: when `true`, the inner LU algorithm computes the post-solve residual
     `‖A*x - b‖` and returns `ReturnCode.APosterioriSafetyFailure` if it exceeds
     `abstol + reltol * ‖b‖`. The default solver then falls back to column-pivoted QR.
-    Defaults to `false`.
+    Defaults to the value of `safetyfallback` (i.e. `true` by default).
 
 ## Residual Safety
 
@@ -396,7 +396,7 @@ struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm
     alg::DefaultAlgorithmChoice.T
     safetyfallback::Bool
     residualsafety::Bool
-    DefaultLinearSolver(alg; safetyfallback = true, residualsafety = false) = new(alg, safetyfallback, residualsafety)
+    DefaultLinearSolver(alg; safetyfallback = true, residualsafety = safetyfallback) = new(alg, safetyfallback, residualsafety)
 end
 
 const BLASELTYPES = Union{Float32, Float64, ComplexF32, ComplexF64}

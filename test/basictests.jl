@@ -525,9 +525,9 @@ end
         @testset "KrylovKit" begin
             kwargs = (; gmres_restart = 5)
             for alg in (
-                    ("Default", KrylovKitJL(kwargs...)),
-                    ("CG", KrylovKitJL_CG(kwargs...)),
-                    ("GMRES", KrylovKitJL_GMRES(kwargs...)),
+                    ("Default", KrylovKitJL(; kwargs...)),
+                    ("CG", KrylovKitJL_CG(; kwargs...)),
+                    ("GMRES", KrylovKitJL_GMRES(; kwargs...)),
                 )
                 @testset "$(alg[1])" begin
                     test_interface(alg[2], prob1, prob2)

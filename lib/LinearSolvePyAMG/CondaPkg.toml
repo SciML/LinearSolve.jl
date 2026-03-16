@@ -1,2 +1,4 @@
 [deps]
+
+[pip.deps]
 pyamg = ">=5.3,<6"

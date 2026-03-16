@@ -110,11 +110,21 @@ linsolve = init(
     prob, DiagonalFactorization(),
     alias = LinearAliasSpecifier(alias_A = false, alias_b = false)
 )
-@test solve!(linsolve).u ≈ [1.0, 0.5]
-@test solve!(linsolve).u ≈ [1.0, 0.5]
+sol = solve!(linsolve)
+@test sol.u ≈ [1.0, 0.5]
+@test sol.retcode == ReturnCode.Success
+sol = solve!(linsolve)
+@test sol.u ≈ [1.0, 0.5]
+@test sol.retcode == ReturnCode.Success
 A = Diagonal([1.0, 4.0])
 linsolve.A = A
 @test solve!(linsolve).u ≈ [1.0, 0.5]
+
+# Test retcode for default algorithm with Diagonal
+prob_diag = LinearProblem(Diagonal(ones(2)), ones(2))
+sol_diag = solve(prob_diag)
+@test sol_diag.u ≈ ones(2)
+@test sol_diag.retcode == ReturnCode.Success
 
 A = Symmetric(
     [

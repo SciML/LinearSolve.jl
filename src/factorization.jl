@@ -1250,7 +1250,10 @@ function SciMLBase.solve!(cache::LinearCache, alg::CHOLMODFactorization; kwargs.
     end
 
     cache.u .= @get_cacheval(cache, :CHOLMODFactorization) \ cache.b
-    return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache;
+        retcode = ReturnCode.Success
+    )
 end
 
 ## NormalCholeskyFactorization
@@ -1403,7 +1406,10 @@ function SciMLBase.solve!(
         cache.isfresh = false
     end
     y = ldiv!(cache.u, @get_cacheval(cache, :NormalBunchKaufmanFactorization), A' * cache.b)
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(
+        alg, y, nothing, cache;
+        retcode = ReturnCode.Success
+    )
 end
 
 ## DiagonalFactorization
@@ -1434,7 +1440,10 @@ function SciMLBase.solve!(
     else
         cache.u .= A.diag .\ cache.b
     end
-    return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache;
+        retcode = ReturnCode.Success
+    )
 end
 
 ## SparspakFactorization is here since it's MIT licensed, not GPL

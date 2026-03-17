@@ -458,15 +458,15 @@ end
         kwargs = (; gmres_restart = 5)
         precs = (A, p = nothing) -> (BlockJacobiPreconditioner(A, 2), I)
         algorithms = (
-            ("Default", KrylovJL(kwargs...)),
-            ("CG", KrylovJL_CG(kwargs...)),
-            ("GMRES", KrylovJL_GMRES(kwargs...)),
-            ("FGMRES", KrylovJL_FGMRES(kwargs...)),
+            ("Default", KrylovJL(; kwargs...)),
+            ("CG", KrylovJL_CG(; kwargs...)),
+            ("GMRES", KrylovJL_GMRES(; kwargs...)),
+            ("FGMRES", KrylovJL_FGMRES(; kwargs...)),
             ("GMRES_prec", KrylovJL_GMRES(; precs, ldiv = false, kwargs...)),
             ("FGMRES_prec", KrylovJL_FGMRES(; precs, ldiv = false, kwargs...)),
-            # ("BICGSTAB",KrylovJL_BICGSTAB(kwargs...)),
-            ("MINRES", KrylovJL_MINRES(kwargs...)),
-            ("MINARES", KrylovJL_MINARES(kwargs...)),
+            # ("BICGSTAB",KrylovJL_BICGSTAB(; kwargs...)),
+            ("MINRES", KrylovJL_MINRES(; kwargs...)),
+            ("MINARES", KrylovJL_MINARES(; kwargs...)),
         )
         for (name, algorithm) in algorithms
             @testset "$name" begin
@@ -505,10 +505,13 @@ end
         @testset "IterativeSolversJL" begin
             kwargs = (; gmres_restart = 5)
             for alg in (
-                    ("Default", IterativeSolversJL(kwargs...)),
-                    ("CG", IterativeSolversJL_CG(kwargs...)),
-                    ("GMRES", IterativeSolversJL_GMRES(kwargs...)),
-                    ("IDRS", IterativeSolversJL_IDRS(kwargs...)),                #           ("BICGSTAB",IterativeSolversJL_BICGSTAB(kwargs...)),                #            ("MINRES",IterativeSolversJL_MINRES(kwargs...)),
+                    ("Default", IterativeSolversJL(; kwargs...)),
+                    ("CG", IterativeSolversJL_CG(; kwargs...)),
+                    ("GMRES", IterativeSolversJL_GMRES(; kwargs...)),
+                    ("IDRS", IterativeSolversJL_IDRS(; kwargs...)),
+                    ("IDRS(2)", IterativeSolversJL_IDRS(; idrs_s = 2, kwargs...)),
+                    # ("BICGSTAB",IterativeSolversJL_BICGSTAB(; kwargs...)),
+                    # ("MINRES",IterativeSolversJL_MINRES(; kwargs...)),
                 )
                 @testset "$(alg[1])" begin
                     test_interface(alg[2], prob1, prob2)
@@ -523,9 +526,9 @@ end
         @testset "KrylovKit" begin
             kwargs = (; gmres_restart = 5)
             for alg in (
-                    ("Default", KrylovKitJL(kwargs...)),
-                    ("CG", KrylovKitJL_CG(kwargs...)),
-                    ("GMRES", KrylovKitJL_GMRES(kwargs...)),
+                    ("Default", KrylovKitJL(; kwargs...)),
+                    ("CG", KrylovKitJL_CG(; kwargs...)),
+                    ("GMRES", KrylovKitJL_GMRES(; kwargs...)),
                 )
                 @testset "$(alg[1])" begin
                     test_interface(alg[2], prob1, prob2)

@@ -110,12 +110,10 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    # Check if CUDA is functional before creating CUDA arrays
-    if !CUDA.functional()
-        return nothing
-    end
-
-    return qr(CUDA.CuArray(A))
+    # Return nothing for lazy initialization - the QR factorization will be
+    # computed on first solve! when cache.isfresh is true. This avoids
+    # unnecessary GPU memory allocation during default solver initialization.
+    return nothing
 end
 
 # Keep the deprecated CudaOffloadFactorization working by forwarding to QR
@@ -138,7 +136,8 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    return qr(CUDA.CuArray(A))
+    # Return nothing for lazy initialization - same as CudaOffloadQRFactorization
+    return nothing
 end
 
 function LinearSolve.init_cacheval(
@@ -167,10 +166,13 @@ function SciMLBase.solve!(
         cache::LinearSolve.LinearCache, alg::CUDAOffload32MixedLUFactorization;
         kwargs...
     )
+    T32 = eltype(cache.A) <: Complex ? ComplexF32 : Float32
     if cache.isfresh
-        fact, A_gpu_f32, b_gpu_f32, u_gpu_f32 = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
-        # Compute 32-bit type on demand and convert
-        T32 = eltype(cache.A) <: Complex ? ComplexF32 : Float32
+        # Allocate full-size GPU arrays on first use
+        m, n = size(cache.A)
+        A_gpu_f32 = CuMatrix{T32}(undef, m, n)
+        b_gpu_f32 = CuVector{T32}(undef, size(cache.b, 1))
+        u_gpu_f32 = CuVector{T32}(undef, size(cache.u, 1))
         A_f32 = T32.(cache.A)
         copyto!(A_gpu_f32, A_f32)
         fact = lu(A_gpu_f32)
@@ -179,8 +181,6 @@ function SciMLBase.solve!(
     end
     fact, A_gpu_f32, b_gpu_f32, u_gpu_f32 = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
 
-    # Compute types on demand for conversions
-    T32 = eltype(cache.A) <: Complex ? ComplexF32 : Float32
     Torig = eltype(cache.u)
 
     # Convert b to Float32, solve, then convert back to original precision
@@ -198,17 +198,22 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    # Pre-allocate with Float32 arrays
-    m, n = size(A)
+    # Check if CUDA is functional before creating CUDA arrays
+    if !CUDA.functional()
+        return nothing
+    end
+
+    # Use zero-size placeholder arrays to avoid GPU memory pressure during
+    # default solver initialization. Real arrays are allocated on first solve!.
     T32 = eltype(A) <: Complex ? ComplexF32 : Float32
     noUnitT = typeof(zero(T32))
     luT = LinearAlgebra.lutype(noUnitT)
-    ipiv = CuVector{Int32}(undef, min(m, n))
+    ipiv = CuVector{Int32}(undef, 0)
     info = zero(LinearAlgebra.BlasInt)
-    fact = LU{luT}(CuMatrix{T32}(undef, m, n), ipiv, info)
-    A_gpu_f32 = CuMatrix{T32}(undef, m, n)
-    b_gpu_f32 = CuVector{T32}(undef, size(b, 1))
-    u_gpu_f32 = CuVector{T32}(undef, size(u, 1))
+    fact = LU{luT}(CuMatrix{T32}(undef, 0, 0), ipiv, info)
+    A_gpu_f32 = CuMatrix{T32}(undef, 0, 0)
+    b_gpu_f32 = CuVector{T32}(undef, 0)
+    u_gpu_f32 = CuVector{T32}(undef, 0)
     return (fact, A_gpu_f32, b_gpu_f32, u_gpu_f32)
 end
 

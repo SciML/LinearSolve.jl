@@ -115,6 +115,10 @@ end
     test_interface(SimpleGMRES(; restart), prob1, prob2)
 end
 
+# Reclaim GPU memory before default solver test (which initializes all algorithm caches)
+GC.gc(true)
+CUDA.reclaim()
+
 A1 = prob1.A;
 b1 = prob1.b;
 x1 = prob1.u0;

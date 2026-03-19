@@ -593,20 +593,19 @@ const _SPARSE_ONLY_ALGORITHMS = Symbol.(
 Choose the appropriate QR pivot strategy for fallback. Uses NoPivot for GPU arrays
 (since ColumnNorm requires scalar indexing), ColumnNorm otherwise.
 """
-_qr_fallback_pivot(A) = ColumnNorm()
 _qr_fallback_pivot(A::GPUArraysCore.AnyGPUArray) = NoPivot()
-# Handle sparse GPU matrices (wrapped in CUSPARSE types that contain GPU arrays)
-function _qr_fallback_pivot(A::AbstractSparseMatrix)
+function _qr_fallback_pivot(A)
+    # GPU arrays need NoPivot (ColumnNorm requires scalar indexing)
+    # Also check for GPU sparse matrices (e.g., CUSPARSE types)
     if _is_gpu_sparse(A)
         return NoPivot()
     else
         return ColumnNorm()
     end
 end
-# Check if a sparse matrix uses GPU storage
-_is_gpu_sparse(A) = false
-function _is_gpu_sparse(A::AbstractSparseMatrix)
-    # Check if rowvals/nzval use GPU arrays
+# Check if a matrix uses GPU storage (handles sparse GPU matrices)
+function _is_gpu_sparse(A)
+    # Check if nzVal/rowVal fields contain GPU arrays (CUSPARSE types)
     hasfield(typeof(A), :nzVal) && return A.nzVal isa GPUArraysCore.AnyGPUArray
     hasfield(typeof(A), :rowVal) && return A.rowVal isa GPUArraysCore.AnyGPUArray
     return false

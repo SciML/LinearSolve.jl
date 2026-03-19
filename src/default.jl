@@ -588,10 +588,36 @@ const _SPARSE_ONLY_ALGORITHMS = Symbol.(
 )
 
 """
+    _qr_fallback_pivot(A)
+
+Choose the appropriate QR pivot strategy for fallback. Uses NoPivot for GPU arrays
+(since ColumnNorm requires scalar indexing), ColumnNorm otherwise.
+"""
+_qr_fallback_pivot(A) = ColumnNorm()
+_qr_fallback_pivot(A::GPUArraysCore.AnyGPUArray) = NoPivot()
+# Handle sparse GPU matrices (wrapped in CUSPARSE types that contain GPU arrays)
+function _qr_fallback_pivot(A::AbstractSparseMatrix)
+    if _is_gpu_sparse(A)
+        return NoPivot()
+    else
+        return ColumnNorm()
+    end
+end
+# Check if a sparse matrix uses GPU storage
+_is_gpu_sparse(A) = false
+function _is_gpu_sparse(A::AbstractSparseMatrix)
+    # Check if rowvals/nzval use GPU arrays
+    hasfield(typeof(A), :nzVal) && return A.nzVal isa GPUArraysCore.AnyGPUArray
+    hasfield(typeof(A), :rowVal) && return A.rowVal isa GPUArraysCore.AnyGPUArray
+    return false
+end
+
+"""
     _do_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol, args...; kwargs...)
 
 Perform QR fallback after LU failure or residual check failure. Restores `cache.A`
-from `A_backup` (since LU may have modified it in-place) and solves with column-pivoted QR.
+from `A_backup` (since LU may have modified it in-place) and solves with column-pivoted QR
+(or NoPivot for GPU arrays which don't support scalar indexing).
 `reason` is `:lu_failure` or `:residual_check` for appropriate log messages.
 """
 function _do_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol, args...; kwargs...)
@@ -618,7 +644,8 @@ function _do_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol, args...; 
     end
     copyto!(cache.A, cache.cacheval.A_backup)
     cache.isfresh = true
-    sol = SciMLBase.solve!(cache, QRFactorization(ColumnNorm()), args...; kwargs...)
+    pivot = _qr_fallback_pivot(cache.A)
+    sol = SciMLBase.solve!(cache, QRFactorization(pivot), args...; kwargs...)
     cache.cacheval.fell_back_to_qr = true
     return SciMLBase.build_linear_solution(
         alg, sol.u, sol.resid, sol.cache;
@@ -635,7 +662,8 @@ changed since the QR fallback and we should keep using QR instead of the
 (potentially corrupted) LU factorization.
 """
 function _reuse_qr_fallback(cache::LinearCache, alg, args...; kwargs...)
-    sol = SciMLBase.solve!(cache, QRFactorization(ColumnNorm()), args...; kwargs...)
+    pivot = _qr_fallback_pivot(cache.A)
+    sol = SciMLBase.solve!(cache, QRFactorization(pivot), args...; kwargs...)
     return SciMLBase.build_linear_solution(
         alg, sol.u, sol.resid, sol.cache;
         retcode = sol.retcode, iters = sol.iters, stats = sol.stats

@@ -19,8 +19,10 @@ try
         dev = CUDA.device()
         println("Device: ", CUDA.name(dev))
         println("Compute capability: ", CUDA.capability(dev))
-        println("GPU memory free/total: ", CUDA.available_memory() ÷ 1024^2, " MiB / ",
-            CUDA.total_memory() ÷ 1024^2, " MiB")
+        println(
+            "GPU memory free/total: ", CUDA.available_memory() ÷ 1024^2, " MiB / ",
+            CUDA.total_memory() ÷ 1024^2, " MiB"
+        )
         GC.gc(true)
         CUDA.reclaim()
         println("After reclaim - GPU memory free: ", CUDA.available_memory() ÷ 1024^2, " MiB")
@@ -40,8 +42,8 @@ end
 
 if !GPU_HAS_MEMORY
     @error "Insufficient GPU memory (< $(MIN_GPU_MEMORY_MIB) MiB free) or CUDA not functional. " *
-           "Another process may be consuming GPU memory on this runner. " *
-           "Check nvidia-smi output above."
+        "Another process may be consuming GPU memory on this runner. " *
+        "Check nvidia-smi output above."
     error("Cannot run GPU tests: insufficient GPU memory")
 end
 

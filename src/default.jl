@@ -620,6 +620,17 @@ from `A_backup` (since LU may have modified it in-place) and solves with column-
 `reason` is `:lu_failure` or `:residual_check` for appropriate log messages.
 """
 function _do_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol, args...; kwargs...)
+    # QR fallback is not possible for GPU sparse matrices (no QR support)
+    if is_cusparse(cache.A)
+        @SciMLMessage(
+            "LU factorization failed for GPU sparse matrix but QR fallback is not supported for CuSparse. Returning LU failure.",
+            cache.verbose, :default_lu_fallback
+        )
+        return SciMLBase.build_linear_solution(
+            alg, sol.u, sol.resid, sol.cache;
+            retcode = sol.retcode, iters = sol.iters, stats = sol.stats
+        )
+    end
     if cache.A === cache.cacheval.A_backup
         @SciMLMessage(
             "LU factorization failed but cannot safely fall back to QR: `alias_A` is set so the original matrix `A` is not available as a backup to restore after in-place LU modification. Set `alias_A=false` (the default) to enable safe fallbacks.",

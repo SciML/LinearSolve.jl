@@ -461,7 +461,8 @@ end
 function do_factorization(alg::QRFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
     if ArrayInterface.can_setindex(typeof(A))
-        if alg.inplace && !issparsematrixcsc(A) && !(A isa GPUArraysCore.AnyGPUArray)
+        if alg.inplace && !issparsematrixcsc(A) && !(A isa GPUArraysCore.AnyGPUArray) &&
+                !is_cusparse(A)
             if A isa Symmetric
                 fact = qr(A, alg.pivot)
             else

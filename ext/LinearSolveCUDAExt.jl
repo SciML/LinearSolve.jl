@@ -110,10 +110,12 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    # Return nothing for lazy initialization - the QR factorization will be
-    # computed on first solve! when cache.isfresh is true. This avoids
-    # unnecessary GPU memory allocation during default solver initialization.
-    return nothing
+    # Check if CUDA is functional before creating CUDA arrays
+    if !CUDA.functional()
+        return nothing
+    end
+
+    return qr(CUDA.CuArray(A))
 end
 
 # Keep the deprecated CudaOffloadFactorization working by forwarding to QR
@@ -136,15 +138,26 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    # Return nothing for lazy initialization - same as CudaOffloadQRFactorization
-    return nothing
+    return qr(CUDA.CuArray(A))
 end
 
-function LinearSolve.init_cacheval(
-        ::SparspakFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
-        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
-    )
-    return nothing
+# Return nothing for algorithms that don't support CuSparse matrices to avoid
+# scalar indexing errors during default solver initialization
+for AlgType in (SparspakFactorization, LinearSolve.QRFactorization)
+    @eval function LinearSolve.init_cacheval(
+            ::$AlgType, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
+            Pl, Pr, maxiters::Int, abstol, reltol,
+            verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+        )
+        return nothing
+    end
+    @eval function LinearSolve.init_cacheval(
+            ::$AlgType, A::CUDA.CUSPARSE.CuSparseMatrixCSC, b, u,
+            Pl, Pr, maxiters::Int, abstol, reltol,
+            verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+        )
+        return nothing
+    end
 end
 
 function LinearSolve.init_cacheval(

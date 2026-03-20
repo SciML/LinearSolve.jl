@@ -2,6 +2,32 @@ using LinearSolve, CUDA, LinearAlgebra, SparseArrays, StableRNGs
 using CUDA.CUSPARSE
 using Test
 
+# Print CUDA diagnostics for debugging GPU memory issues on self-hosted runners
+println("=== CUDA Diagnostics ===")
+try
+    run(`nvidia-smi`)
+catch e
+    println("nvidia-smi failed: ", e)
+end
+println("CUDA functional: ", CUDA.functional())
+println("CUDA runtime version: ", CUDA.runtime_version())
+println("CUDA driver version: ", CUDA.driver_version())
+try
+    if CUDA.functional()
+        dev = CUDA.device()
+        println("Device: ", CUDA.name(dev))
+        println("Compute capability: ", CUDA.capability(dev))
+        println("GPU memory free/total: ", CUDA.available_memory() ÷ 1024^2, " MiB / ",
+            CUDA.total_memory() ÷ 1024^2, " MiB")
+        GC.gc(true)
+        CUDA.reclaim()
+        println("After reclaim - GPU memory free: ", CUDA.available_memory() ÷ 1024^2, " MiB")
+    end
+catch e
+    println("CUDA diagnostics failed: ", e)
+end
+println("========================")
+
 @testset "Test default solver choice for CuSparse" begin
     b = Float64[1, 2, 3, 4]
     b_gpu = CUDA.adapt(CuArray, b)

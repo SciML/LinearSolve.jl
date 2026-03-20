@@ -20,7 +20,7 @@ concurrency:
 jobs:
   gpu-tests:
     name: "LinearSolveCUDA"
-    runs-on: [self-hosted, Linux, X64, gpu]
+    runs-on: [self-hosted, gpu-v100]
     timeout-minutes: 180
     steps:
       - name: Check GPU availability and clean stale processes

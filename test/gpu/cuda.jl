@@ -2,51 +2,6 @@ using LinearSolve, CUDA, LinearAlgebra, SparseArrays, StableRNGs
 using CUDA.CUSPARSE
 using Test
 
-# Print CUDA diagnostics for debugging GPU memory issues on self-hosted runners
-println("=== CUDA Diagnostics ===")
-try
-    run(`nvidia-smi`)
-catch e
-    println("nvidia-smi failed: ", e)
-end
-println("CUDA functional: ", CUDA.functional())
-if CUDA.functional()
-    println("CUDA runtime version: ", CUDA.runtime_version())
-    println("CUDA driver version: ", CUDA.driver_version())
-end
-try
-    if CUDA.functional()
-        dev = CUDA.device()
-        println("Device: ", CUDA.name(dev))
-        println("Compute capability: ", CUDA.capability(dev))
-        println(
-            "GPU memory free/total: ", CUDA.available_memory() ÷ 1024^2, " MiB / ",
-            CUDA.total_memory() ÷ 1024^2, " MiB"
-        )
-        GC.gc(true)
-        CUDA.reclaim()
-        println("After reclaim - GPU memory free: ", CUDA.available_memory() ÷ 1024^2, " MiB")
-    end
-catch e
-    println("CUDA diagnostics failed: ", e)
-end
-println("========================")
-
-# Require at least 512 MiB free GPU memory to run tests
-const MIN_GPU_MEMORY_MIB = 512
-const GPU_HAS_MEMORY = try
-    CUDA.functional() && (CUDA.available_memory() ÷ 1024^2) >= MIN_GPU_MEMORY_MIB
-catch
-    false
-end
-
-if !GPU_HAS_MEMORY
-    @error "Insufficient GPU memory (< $(MIN_GPU_MEMORY_MIB) MiB free) or CUDA not functional. " *
-        "Another process may be consuming GPU memory on this runner. " *
-        "Check nvidia-smi output above."
-    error("Cannot run GPU tests: insufficient GPU memory")
-end
-
 @testset "Test default solver choice for CuSparse" begin
     b = Float64[1, 2, 3, 4]
     b_gpu = CUDA.adapt(CuArray, b)
@@ -159,10 +114,6 @@ end
 @testset "Simple GMRES: restart = $restart" for restart in (true, false)
     test_interface(SimpleGMRES(; restart), prob1, prob2)
 end
-
-# Reclaim GPU memory before default solver test (which initializes all algorithm caches)
-GC.gc(true)
-CUDA.reclaim()
 
 A1 = prob1.A;
 b1 = prob1.b;

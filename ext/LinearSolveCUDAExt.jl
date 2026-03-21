@@ -141,8 +141,6 @@ function LinearSolve.init_cacheval(
     return qr(CUDA.CuArray(A))
 end
 
-# Return nothing for algorithms that don't support CuSparse matrices to avoid
-# scalar indexing errors during default solver initialization
 for AlgType in (SparspakFactorization, LinearSolve.QRFactorization)
     @eval function LinearSolve.init_cacheval(
             ::$AlgType, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
@@ -182,7 +180,6 @@ function SciMLBase.solve!(
     T32 = eltype(cache.A) <: Complex ? ComplexF32 : Float32
     if cache.isfresh
         fact, A_gpu_f32, b_gpu_f32, u_gpu_f32 = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
-        # Only allocate GPU arrays on first use (when placeholders are empty)
         if isempty(A_gpu_f32)
             m, n = size(cache.A)
             A_gpu_f32 = CuMatrix{T32}(undef, m, n)
@@ -214,13 +211,10 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    # Check if CUDA is functional before creating CUDA arrays
     if !CUDA.functional()
         return nothing
     end
 
-    # Use zero-size placeholder arrays to avoid GPU memory pressure during
-    # default solver initialization. Real arrays are allocated on first solve!.
     T32 = eltype(A) <: Complex ? ComplexF32 : Float32
     noUnitT = typeof(zero(T32))
     luT = LinearAlgebra.lutype(noUnitT)

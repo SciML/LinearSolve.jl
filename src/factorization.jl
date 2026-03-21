@@ -73,13 +73,6 @@ _get_residualsafety(alg::BLISLUFactorization) = alg.residualsafety
 _get_residualsafety(alg::CudaOffloadLUFactorization) = alg.residualsafety
 _get_residualsafety(alg::MetalLUFactorization) = alg.residualsafety
 
-"""
-    _typed_copy(A)
-
-Copy a matrix while preserving Adjoint/Transpose wrapper types. Regular `copy`
-materializes Adjoint/Transpose into a dense array, which causes type mismatches
-when the cached backup field has a specific wrapped type.
-"""
 _typed_copy(A) = copy(A)
 _typed_copy(A::Adjoint) = adjoint(copy(parent(A)))
 _typed_copy(A::Transpose) = transpose(copy(parent(A)))
@@ -102,7 +95,6 @@ function _copy_A_for_safety(cache::LinearCache)
         if !cv.a_backup_allocated || size(cv.A_backup) != size(A)
             # First call or size mismatch: allocate a private buffer.
             # A_backup initially aliases prob.A so we must not copyto! into it.
-            # Use _typed_copy to preserve Adjoint/Transpose wrappers.
             cv.A_backup = _typed_copy(A)
             cv.a_backup_allocated = true
         else

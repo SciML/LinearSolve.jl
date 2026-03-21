@@ -12,11 +12,10 @@ using Test
         return
     end
 
-    # Test with a small sparse matrix (seeded for reproducibility)
     using StableRNGs
     rng = StableRNG(42)
     n = 100
-    A = sprand(rng, n, n, 0.1) + 5I  # 5I for better conditioning
+    A = sprand(rng, n, n, 0.1) + 5I
     b = rand(rng, n)
 
     # Test with CPU sparse matrix (should auto-convert to GPU)

@@ -23,13 +23,6 @@ jobs:
     runs-on: [self-hosted, gpu-v100]
     timeout-minutes: 180
     steps:
-      - name: Check GPU availability and clean stale processes
-        run: |
-          echo "=== GPU Status Before Cleanup ==="
-          nvidia-smi || true
-          echo "================================="
-          # Try to identify and report GPU-consuming processes
-          nvidia-smi --query-compute-apps=pid,name,used_memory --format=csv,noheader 2>/dev/null || true
       - uses: actions/checkout@v6
       - uses: julia-actions/setup-julia@v2
         with:

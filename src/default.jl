@@ -587,25 +587,16 @@ const _SPARSE_ONLY_ALGORITHMS = Symbol.(
     )
 )
 
-"""
-    _qr_fallback_pivot(A)
-
-Choose the appropriate QR pivot strategy for fallback. Uses NoPivot for GPU arrays
-(since ColumnNorm requires scalar indexing), ColumnNorm otherwise.
-"""
 _qr_fallback_pivot(A::GPUArraysCore.AnyGPUArray) = NoPivot()
 function _qr_fallback_pivot(A)
-    # GPU arrays need NoPivot (ColumnNorm requires scalar indexing)
-    # Also check for GPU sparse matrices (e.g., CUSPARSE types)
     if _is_gpu_sparse(A)
         return NoPivot()
     else
         return ColumnNorm()
     end
 end
-# Check if a matrix uses GPU storage (handles sparse GPU matrices)
+
 function _is_gpu_sparse(A)
-    # Check if nzVal/rowVal fields contain GPU arrays (CUSPARSE types)
     hasfield(typeof(A), :nzVal) && return A.nzVal isa GPUArraysCore.AnyGPUArray
     hasfield(typeof(A), :rowVal) && return A.rowVal isa GPUArraysCore.AnyGPUArray
     return false
@@ -620,7 +611,6 @@ from `A_backup` (since LU may have modified it in-place) and solves with column-
 `reason` is `:lu_failure` or `:residual_check` for appropriate log messages.
 """
 function _do_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol, args...; kwargs...)
-    # QR fallback is not possible for GPU sparse matrices (no QR support)
     if is_cusparse(cache.A)
         @SciMLMessage(
             "LU factorization failed for GPU sparse matrix but QR fallback is not supported for CuSparse. Returning LU failure.",

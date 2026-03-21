@@ -364,10 +364,8 @@ function __init(
     elseif issparsematrixcsc(A)
         make_SparseMatrixCSC(A)
     elseif A isa Adjoint
-        # Preserve Adjoint wrapper - copy() on GPU Adjoint may materialize
         adjoint(copy(parent(A)))
     elseif A isa Transpose
-        # Preserve Transpose wrapper - copy() on GPU Transpose may materialize
         transpose(copy(parent(A)))
     else
         copy(A)

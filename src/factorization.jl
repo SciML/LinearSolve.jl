@@ -400,7 +400,7 @@ function init_cacheval(
     error_no_cudss_lu(A)
     A isa GPUArraysCore.AnyGPUArray && return nothing
     ipiv = Vector{LinearAlgebra.BlasInt}(undef, 0)
-    return LinearAlgebra.generic_lufact!(copy(A), alg.pivot; check = false), ipiv
+    return LinearAlgebra.generic_lufact!(_typed_copy(A), alg.pivot; check = false), ipiv
 end
 
 const PREALLOCATED_LU = ArrayInterface.lu_instance(rand(1, 1))

@@ -181,11 +181,14 @@ function SciMLBase.solve!(
     )
     T32 = eltype(cache.A) <: Complex ? ComplexF32 : Float32
     if cache.isfresh
-        # Allocate full-size GPU arrays on first use
-        m, n = size(cache.A)
-        A_gpu_f32 = CuMatrix{T32}(undef, m, n)
-        b_gpu_f32 = CuVector{T32}(undef, size(cache.b, 1))
-        u_gpu_f32 = CuVector{T32}(undef, size(cache.u, 1))
+        fact, A_gpu_f32, b_gpu_f32, u_gpu_f32 = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
+        # Only allocate GPU arrays on first use (when placeholders are empty)
+        if isempty(A_gpu_f32)
+            m, n = size(cache.A)
+            A_gpu_f32 = CuMatrix{T32}(undef, m, n)
+            b_gpu_f32 = CuVector{T32}(undef, size(cache.b, 1))
+            u_gpu_f32 = CuVector{T32}(undef, size(cache.u, 1))
+        end
         A_f32 = T32.(cache.A)
         copyto!(A_gpu_f32, A_f32)
         fact = lu(A_gpu_f32)

@@ -1,9 +1,7 @@
 module LinearSolveSTRUMPACKExt
 
-using LinearSolve
-using LinearSolve: LinearVerbosity, OperatorAssumptions
-using SparseArrays
-using SparseArrays: AbstractSparseMatrixCSC, getcolptr, rowvals, nonzeros
+using LinearSolve: LinearSolve, LinearVerbosity, OperatorAssumptions
+using SparseArrays: SparseArrays, AbstractSparseMatrixCSC, getcolptr, rowvals, nonzeros
 using SciMLBase: SciMLBase, ReturnCode
 using SciMLLogging: @SciMLMessage
 using Libdl: Libdl

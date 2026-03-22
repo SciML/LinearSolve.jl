@@ -53,6 +53,10 @@ if GROUP == "DefaultsLoading"
     @time @safetestset "Defaults Loading Tests" include("defaults_loading.jl")
 end
 
+if GROUP == "All" || GROUP == "LinearSolveSTRUMPACK"
+    @time @safetestset "LinearSolveSTRUMPACK" include("strumpack/strumpack.jl")
+end
+
 if GROUP == "LinearSolveAutotune"
     Pkg.activate(joinpath(dirname(@__DIR__), "lib", GROUP))
     Pkg.test(

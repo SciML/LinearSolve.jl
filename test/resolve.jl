@@ -4,6 +4,9 @@ using LinearSolve: AbstractDenseFactorization, AbstractSparseFactorization,
     AMDGPUOffloadLUFactorization, AMDGPUOffloadQRFactorization,
     SparspakFactorization
 
+const STRUMPACKExt = Base.get_extension(LinearSolve, :LinearSolveSTRUMPACKExt)
+const HAS_STRUMPACK = STRUMPACKExt !== nothing && STRUMPACKExt.strumpack_isavailable()
+
 # Function to check if an algorithm is mixed precision
 function is_mixed_precision_alg(alg)
     alg_name = string(alg)
@@ -48,6 +51,7 @@ for alg in vcat(
             (!(alg == AppleAccelerate32MixedLUFactorization) || Sys.isapple()) &&
             (!(alg == OpenBLAS32MixedLUFactorization) || LinearSolve.useopenblas) &&
             (!(alg == SparspakFactorization) || false) &&
+            (!(alg == STRUMPACKFactorization) || HAS_STRUMPACK) &&
             (
             !(alg == ParUFactorization) ||
                 Base.get_extension(LinearSolve, :LinearSolveParUExt) !== nothing
@@ -55,7 +59,7 @@ for alg in vcat(
         A = [1.0 2.0; 3.0 4.0]
         alg in [
             KLUFactorization, UMFPACKFactorization, SparspakFactorization,
-            ParUFactorization,
+            ParUFactorization, STRUMPACKFactorization,
         ] &&
             (A = sparse(A))
         A = A' * A
@@ -84,7 +88,7 @@ for alg in vcat(
         A = [1.0 2.0; 3.0 4.0]
         alg in [
             KLUFactorization, UMFPACKFactorization, SparspakFactorization,
-            ParUFactorization,
+            ParUFactorization, STRUMPACKFactorization,
         ] &&
             (A = sparse(A))
         A = A' * A

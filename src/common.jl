@@ -363,6 +363,10 @@ function __init(
         copy(A)
     elseif issparsematrixcsc(A)
         make_SparseMatrixCSC(A)
+    elseif A isa Adjoint
+        adjoint(copy(parent(A)))
+    elseif A isa Transpose
+        transpose(copy(parent(A)))
     else
         copy(A)
     end

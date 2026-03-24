@@ -53,3 +53,25 @@ b = rand(ComplexF64, 10)
 
 cache = init(LinearProblem(A, b, UMFPACKFactorization()))
 sol = solve!(cache)
+
+# Complex sparse matrix support for KLU
+# https://github.com/SciML/OrdinaryDiffEq.jl/issues/2892
+@testset "Complex sparse KLU" begin
+    for T in (ComplexF64,)
+        n = 10
+        A = sprand(T, n, n, 0.5) + I
+        b = rand(T, n)
+        prob = LinearProblem(A, b)
+        sol = solve(prob, KLUFactorization())
+        @test sol.u ≈ A \ b
+
+        # Test refactorization path
+        cache = init(prob, KLUFactorization())
+        sol1 = solve!(cache)
+        @test sol1.u ≈ A \ b
+        A2 = sprand(T, n, n, 0.5) + I
+        cache.A = A2
+        sol2 = solve!(cache)
+        @test A2 * sol2.u ≈ b
+    end
+end

@@ -313,7 +313,7 @@ function _check_supported_forwarddiff_partials!(∂_A, ∂_b)
     if nA === 0 || nb === 0
         throw(ArgumentError(
             "LinearSolve does not support ForwardDiff.Dual values with zero partials (N = 0). " *
-            "Use primal values with ForwardDiff.value(...) or construct Dual numbers with at least one partial."
+            "Use primal values (non-Dual numbers) or construct Dual numbers with at least one partial."
         ))
     end
     return nothing

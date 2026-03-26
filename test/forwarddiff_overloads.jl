@@ -348,4 +348,4 @@ backslash_large = A_large_dual \ b_large_dual
 zero_partials_dual = ForwardDiff.Dual{Nothing}(1.0, ForwardDiff.Partials{0, Float64}(()))
 prob_zero_partials = LinearProblem([zero_partials_dual], [zero_partials_dual])
 
-@test_throws ArgumentError("LinearSolve does not support ForwardDiff.Dual values with zero partials (N = 0). Use primal values with ForwardDiff.value(...) or construct Dual numbers with at least one partial.") init(prob_zero_partials, LUFactorization())
+@test_throws ArgumentError("LinearSolve does not support ForwardDiff.Dual values with zero partials (N = 0). Use primal values (non-Dual numbers) or construct Dual numbers with at least one partial.") init(prob_zero_partials, LUFactorization())

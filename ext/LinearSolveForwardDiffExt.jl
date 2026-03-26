@@ -303,6 +303,22 @@ function SciMLBase.init(
     )
 end
 
+_npartials(::Nothing) = nothing
+_npartials(partials::Partials) = length(partials)
+_npartials(partials::AbstractArray{<:Partials}) = isempty(partials) ? 0 : length(first(partials))
+
+function _check_supported_forwarddiff_partials!(∂_A, ∂_b)
+    nA = _npartials(∂_A)
+    nb = _npartials(∂_b)
+    if nA === 0 || nb === 0
+        throw(ArgumentError(
+            "LinearSolve does not support ForwardDiff.Dual values with zero partials (N = 0). " *
+            "Use primal values with ForwardDiff.value(...) or construct Dual numbers with at least one partial."
+        ))
+    end
+    return nothing
+end
+
 function __dual_init(
         prob::DualAbstractLinearProblem, alg::SciMLLinearSolveAlgorithm,
         args...;
@@ -324,6 +340,7 @@ function __dual_init(
 
     ∂_A = partial_vals(A)
     ∂_b = partial_vals(b)
+    _check_supported_forwarddiff_partials!(∂_A, ∂_b)
 
     primal_prob = LinearProblem{SciMLBase.isinplace(prob)}(new_A, new_b; u0 = new_u0)
 

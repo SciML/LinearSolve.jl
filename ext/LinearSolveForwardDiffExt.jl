@@ -325,7 +325,8 @@ function __dual_init(
     ∂_A = partial_vals(A)
     ∂_b = partial_vals(b)
 
-    primal_prob = LinearProblem{SciMLBase.isinplace(prob)}(new_A, new_b; u0 = new_u0)
+    new_p = nodual_value(p)
+    primal_prob = LinearProblem{SciMLBase.isinplace(prob)}(new_A, new_b, new_p; u0 = new_u0)
 
     if get_dual_type(prob.A) !== nothing
         dual_type = get_dual_type(prob.A)
@@ -517,7 +518,7 @@ function SciMLBase.reinit!(
     end
 
     if !isnothing(p)
-        cache.linear_cache.p = p
+        cache.linear_cache.p = nodual_value(p)
     end
 
     isfresh = !isnothing(A)
@@ -538,6 +539,8 @@ function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)
         setb!(dc, val)
     elseif sym === :u
         setu!(dc, val)
+    elseif sym === :p
+        setproperty!(dc.linear_cache, :p, nodual_value(val))
     elseif hasfield(DualLinearCache, sym)
         setfield!(dc, sym, val)
     elseif hasfield(LinearSolve.LinearCache, sym)
@@ -578,6 +581,7 @@ partial_vals!(out, x) = map!(partial_vals, out, x) # Update in-place
 nodual_value(x) = x
 nodual_value(x::Dual{T, V, P}) where {T, V <: AbstractFloat, P} = ForwardDiff.value(x)
 nodual_value(x::Dual{T, V, P}) where {T, V <: Dual, P} = x.value  # Keep the inner dual intact
+nodual_value(x::Tuple) = map(nodual_value, x)
 function nodual_value(x::AbstractArray{<:Dual})
     return nodual_value!(similar(x, typeof(nodual_value(first(x)))), x)
 end

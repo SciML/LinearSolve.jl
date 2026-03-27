@@ -314,7 +314,7 @@ function _check_supported_forwarddiff_partials!(∂_A, ∂_b)
         throw(
             ArgumentError(
                 "LinearSolve does not support ForwardDiff.Dual values with zero partials (N = 0). " *
-                "Use primal values (non-Dual numbers) or construct Dual numbers with at least one partial."
+                    "Use primal values (non-Dual numbers) or construct Dual numbers with at least one partial."
             )
         )
     end

@@ -1,11 +1,10 @@
 name = "LinearSolve"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
-version = "3.68.0"
+version = "3.69.0"
 authors = ["SciML"]
 
 [deps]
 ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
-ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 ConcreteStructs = "2569d6c7-a4a2-43d3-a901-331e8e4be471"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 EnumX = "4e289a0a-7415-4d19-859d-a7e5c4648b56"
@@ -29,6 +28,7 @@ StaticArraysCore = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
 
 [weakdeps]
 AlgebraicMultigrid = "2169fc97-5a83-5252-b627-83903c6c433c"
+ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
 BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
 BlockDiagonals = "0a1fb500-61f7-11e9-3c65-f5ef3456f9f0"
@@ -66,6 +66,7 @@ LinearSolveCUDAExt = "CUDA"
 LinearSolveCUDSSExt = "CUDSS"
 LinearSolveCUSOLVERRFExt = ["CUSOLVERRF", "SparseArrays"]
 LinearSolveCliqueTreesExt = ["CliqueTrees", "SparseArrays"]
+LinearSolveChainRulesCoreExt = "ChainRulesCore"
 LinearSolveEnzymeExt = ["EnzymeCore", "SparseArrays"]
 LinearSolveFastAlmostBandedMatricesExt = "FastAlmostBandedMatrices"
 LinearSolveFastLapackInterfaceExt = "FastLapackInterface"

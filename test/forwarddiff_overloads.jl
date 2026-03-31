@@ -343,3 +343,41 @@ backslash_large = A_large_dual \ b_large_dual
 
 # Test partials match
 @test ForwardDiff.partials.(sol_large.u) ≈ ForwardDiff.partials.(backslash_large)
+
+# Test that DualLinearCache preserves p through init and reinit!
+# This is needed by OrdinaryDiffEq which passes ODE state as p to LinearProblem
+# for preconditioner access.
+@testset "DualLinearCache preserves p parameter" begin
+    function solve_with_p(params)
+        A = [params[1] 1.0; 0.0 params[2]]
+        b = [params[1] + 1.0, params[2] * 2.0]
+        p = (nothing, params, 0.0)
+        prob = LinearProblem(A, b, p)
+        cache = init(prob, nothing)
+        sol = solve!(cache)
+        # p on DualLinearCache returns de-dualed values from inner cache
+        @test cache.p == (nothing, ForwardDiff.value.(params), 0.0)
+        return sum(sol.u)
+    end
+
+    # Test that ForwardDiff can differentiate through solve with p
+    grad = ForwardDiff.gradient(solve_with_p, [2.0, 3.0])
+    @test length(grad) == 2
+
+    # Test reinit! with new p value on DualLinearCache
+    A_dual, b_dual = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+    p_init = (nothing, [1.0, 2.0], 0.0)
+    prob_p = LinearProblem(A_dual, b_dual, p_init)
+    cache_p = init(prob_p, nothing)
+    sol1 = solve!(cache_p)
+
+    # reinit! with a new p should not error
+    new_p = (nothing, [3.0, 4.0], 1.0)
+    @test_nowarn LinearSolve.reinit!(cache_p; A = A_dual, p = new_p)
+    @test cache_p.p == new_p
+
+    # setproperty! for p should also work
+    another_p = (nothing, [5.0, 6.0], 2.0)
+    @test_nowarn (cache_p.p = another_p)
+    @test cache_p.p == another_p
+end

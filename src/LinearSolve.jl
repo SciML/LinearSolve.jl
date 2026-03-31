@@ -27,7 +27,6 @@ using Setfield: Setfield, @set!
 using DocStringExtensions: DocStringExtensions
 using EnumX: EnumX
 using Markdown: Markdown, @doc_str
-using ChainRulesCore: ChainRulesCore, NoTangent
 using Reexport: Reexport, @reexport
 using Libdl: Libdl
 import InteractiveUtils
@@ -44,8 +43,6 @@ import ConcreteStructs: @concrete
 
 # wrap
 import Krylov
-
-const CRC = ChainRulesCore
 
 if Int === Int64 && !Base.USE_BLAS64
     error(
@@ -420,7 +417,7 @@ include("preferences.jl")
 include("solve_function.jl")
 include("default.jl")
 include("init.jl")
-include("adjoint.jl")
+include("adjoint.jl") # LinearSolveAdjoint struct definition only; rrules are in ChainRulesCore ext
 
 ## Deprecated, remove in July 2025
 

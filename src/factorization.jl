@@ -73,6 +73,10 @@ _get_residualsafety(alg::BLISLUFactorization) = alg.residualsafety
 _get_residualsafety(alg::CudaOffloadLUFactorization) = alg.residualsafety
 _get_residualsafety(alg::MetalLUFactorization) = alg.residualsafety
 
+_typed_copy(A) = copy(A)
+_typed_copy(A::Adjoint) = adjoint(copy(parent(A)))
+_typed_copy(A::Transpose) = transpose(copy(parent(A)))
+
 """
     _copy_A_for_safety(cache::LinearCache)
 
@@ -91,7 +95,7 @@ function _copy_A_for_safety(cache::LinearCache)
         if !cv.a_backup_allocated || size(cv.A_backup) != size(A)
             # First call or size mismatch: allocate a private buffer.
             # A_backup initially aliases prob.A so we must not copyto! into it.
-            cv.A_backup = copy(A)
+            cv.A_backup = _typed_copy(A)
             cv.a_backup_allocated = true
         else
             # Reuse existing private buffer (non-allocating).
@@ -100,7 +104,7 @@ function _copy_A_for_safety(cache::LinearCache)
         cv.a_backup_synced = true
         return cv.A_backup
     else
-        return copy(cache.A)
+        return _typed_copy(cache.A)
     end
 end
 
@@ -142,14 +146,6 @@ _ldiv!(x, A, b) = ldiv!(x, A, b)
 _ldiv!(x, A, b::SVector) = (x .= A \ b)
 _ldiv!(::SVector, A, b::SVector) = (A \ b)
 _ldiv!(::SVector, A, b) = (A \ b)
-
-function _ldiv!(x::Vector, A::Factorization, b::Vector)
-    # workaround https://github.com/JuliaLang/julia/issues/43507
-    # Fallback if working with non-square matrices
-    length(x) != length(b) && return ldiv!(x, A, b)
-    copyto!(x, b)
-    return ldiv!(A, x)
-end
 
 # RF Bad fallback: will fail if `A` is just a stand-in
 # This should instead just create the factorization type.
@@ -396,7 +392,7 @@ function init_cacheval(
     error_no_cudss_lu(A)
     A isa GPUArraysCore.AnyGPUArray && return nothing
     ipiv = Vector{LinearAlgebra.BlasInt}(undef, 0)
-    return LinearAlgebra.generic_lufact!(copy(A), alg.pivot; check = false), ipiv
+    return LinearAlgebra.generic_lufact!(_typed_copy(A), alg.pivot; check = false), ipiv
 end
 
 const PREALLOCATED_LU = ArrayInterface.lu_instance(rand(1, 1))
@@ -457,7 +453,8 @@ end
 function do_factorization(alg::QRFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
     if ArrayInterface.can_setindex(typeof(A))
-        if alg.inplace && !issparsematrixcsc(A) && !(A isa GPUArraysCore.AnyGPUArray)
+        if alg.inplace && !issparsematrixcsc(A) && !(A isa GPUArraysCore.AnyGPUArray) &&
+                !is_cusparse(A)
             if A isa Symmetric
                 fact = qr(A, alg.pivot)
             else
@@ -1258,7 +1255,10 @@ function SciMLBase.solve!(cache::LinearCache, alg::CHOLMODFactorization; kwargs.
     end
 
     cache.u .= @get_cacheval(cache, :CHOLMODFactorization) \ cache.b
-    return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache;
+        retcode = ReturnCode.Success
+    )
 end
 
 ## NormalCholeskyFactorization
@@ -1411,7 +1411,10 @@ function SciMLBase.solve!(
         cache.isfresh = false
     end
     y = ldiv!(cache.u, @get_cacheval(cache, :NormalBunchKaufmanFactorization), A' * cache.b)
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(
+        alg, y, nothing, cache;
+        retcode = ReturnCode.Success
+    )
 end
 
 ## DiagonalFactorization
@@ -1442,7 +1445,10 @@ function SciMLBase.solve!(
     else
         cache.u .= A.diag .\ cache.b
     end
-    return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache;
+        retcode = ReturnCode.Success
+    )
 end
 
 ## SparspakFactorization is here since it's MIT licensed, not GPL

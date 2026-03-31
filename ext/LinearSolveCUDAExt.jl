@@ -141,11 +141,21 @@ function LinearSolve.init_cacheval(
     return qr(CUDA.CuArray(A))
 end
 
-function LinearSolve.init_cacheval(
-        ::SparspakFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
-        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
-    )
-    return nothing
+for AlgType in (SparspakFactorization, LinearSolve.QRFactorization)
+    @eval function LinearSolve.init_cacheval(
+            ::$AlgType, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
+            Pl, Pr, maxiters::Int, abstol, reltol,
+            verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+        )
+        return nothing
+    end
+    @eval function LinearSolve.init_cacheval(
+            ::$AlgType, A::CUDA.CUSPARSE.CuSparseMatrixCSC, b, u,
+            Pl, Pr, maxiters::Int, abstol, reltol,
+            verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+        )
+        return nothing
+    end
 end
 
 function LinearSolve.init_cacheval(
@@ -167,10 +177,15 @@ function SciMLBase.solve!(
         cache::LinearSolve.LinearCache, alg::CUDAOffload32MixedLUFactorization;
         kwargs...
     )
+    T32 = eltype(cache.A) <: Complex ? ComplexF32 : Float32
     if cache.isfresh
         fact, A_gpu_f32, b_gpu_f32, u_gpu_f32 = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
-        # Compute 32-bit type on demand and convert
-        T32 = eltype(cache.A) <: Complex ? ComplexF32 : Float32
+        if isempty(A_gpu_f32)
+            m, n = size(cache.A)
+            A_gpu_f32 = CuMatrix{T32}(undef, m, n)
+            b_gpu_f32 = CuVector{T32}(undef, size(cache.b, 1))
+            u_gpu_f32 = CuVector{T32}(undef, size(cache.u, 1))
+        end
         A_f32 = T32.(cache.A)
         copyto!(A_gpu_f32, A_f32)
         fact = lu(A_gpu_f32)
@@ -179,8 +194,6 @@ function SciMLBase.solve!(
     end
     fact, A_gpu_f32, b_gpu_f32, u_gpu_f32 = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
 
-    # Compute types on demand for conversions
-    T32 = eltype(cache.A) <: Complex ? ComplexF32 : Float32
     Torig = eltype(cache.u)
 
     # Convert b to Float32, solve, then convert back to original precision
@@ -198,17 +211,19 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    # Pre-allocate with Float32 arrays
-    m, n = size(A)
+    if !CUDA.functional()
+        return nothing
+    end
+
     T32 = eltype(A) <: Complex ? ComplexF32 : Float32
     noUnitT = typeof(zero(T32))
     luT = LinearAlgebra.lutype(noUnitT)
-    ipiv = CuVector{Int32}(undef, min(m, n))
+    ipiv = CuVector{Int32}(undef, 0)
     info = zero(LinearAlgebra.BlasInt)
-    fact = LU{luT}(CuMatrix{T32}(undef, m, n), ipiv, info)
-    A_gpu_f32 = CuMatrix{T32}(undef, m, n)
-    b_gpu_f32 = CuVector{T32}(undef, size(b, 1))
-    u_gpu_f32 = CuVector{T32}(undef, size(u, 1))
+    fact = LU{luT}(CuMatrix{T32}(undef, 0, 0), ipiv, info)
+    A_gpu_f32 = CuMatrix{T32}(undef, 0, 0)
+    b_gpu_f32 = CuVector{T32}(undef, 0)
+    u_gpu_f32 = CuVector{T32}(undef, 0)
     return (fact, A_gpu_f32, b_gpu_f32, u_gpu_f32)
 end
 

@@ -8,7 +8,7 @@ using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
     QRFactorization, RFLUFactorization, UMFPACKFactorization, solve
 using SciMLOperators: AbstractSciMLOperator, has_concretization
 using ArrayInterface: ArrayInterface
-using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!, QR
+using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!
 using SparseArrays: SparseArrays, AbstractSparseArray, AbstractSparseMatrixCSC,
     SparseMatrixCSC,
     nonzeros, rowvals, getcolptr, sparse, sprand
@@ -324,6 +324,20 @@ function LinearSolve.init_cacheval(
     return PREALLOCATED_KLU
 end
 
+# KLU supports Float64 and ComplexF64 (KLUTypes)
+function LinearSolve.init_cacheval(
+        alg::KLUFactorization, A::AbstractSparseArray{T, Int64}, b, u, Pl, Pr,
+        maxiters::Int, abstol,
+        reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    ) where {T <: KLU.KLUTypes}
+    return KLU.KLUFactorization(
+        SparseMatrixCSC{T, Int64}(
+            0, 0, [Int64(1)], Int64[], T[]
+        )
+    )
+end
+
 function LinearSolve.init_cacheval(
         alg::KLUFactorization, A::AbstractSparseArray{Float64, Int32}, b, u, Pl, Pr,
         maxiters::Int, abstol,
@@ -333,6 +347,19 @@ function LinearSolve.init_cacheval(
     return KLU.KLUFactorization(
         SparseMatrixCSC{Float64, Int32}(
             0, 0, [Int32(1)], Int32[], Float64[]
+        )
+    )
+end
+
+function LinearSolve.init_cacheval(
+        alg::KLUFactorization, A::AbstractSparseArray{T, Int32}, b, u, Pl, Pr,
+        maxiters::Int, abstol,
+        reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    ) where {T <: KLU.KLUTypes}
+    return KLU.KLUFactorization(
+        SparseMatrixCSC{T, Int32}(
+            0, 0, [Int32(1)], Int32[], T[]
         )
     )
 end
@@ -501,22 +528,6 @@ function LinearSolve.init_cacheval(
     end
 end
 
-# Specialize QR for the non-square case
-# Missing ldiv! definitions: https://github.com/JuliaSparse/SparseArrays.jl/issues/242
-function LinearSolve._ldiv!(
-        x::Vector,
-        A::Union{QR, LinearAlgebra.QRCompactWY}, b::Vector
-    )
-    return x .= A \ b
-end
-
-function LinearSolve._ldiv!(
-        x::AbstractVector,
-        A::Union{QR, LinearAlgebra.QRCompactWY}, b::AbstractVector
-    )
-    return x .= A \ b
-end
-
 # Ambiguity removal
 function LinearSolve._ldiv!(
         ::SVector,
@@ -534,19 +545,36 @@ function LinearSolve._ldiv!(
 end
 
 @static if Base.USE_GPL_LIBS
-    # SPQR and CHOLMOD Factor support
+    # ldiv!() for CHOLMOD was added in 1.12: https://github.com/JuliaSparse/SparseArrays.jl/pull/547
+    @static if VERSION < v"1.12"
+        function LinearSolve._ldiv!(
+                x::Vector,
+                A::SparseArrays.CHOLMOD.Factor, b::Vector
+            )
+            x .= A \ b
+        end
+        function LinearSolve._ldiv!(
+                x::AbstractVector,
+                A::SparseArrays.CHOLMOD.Factor, b::AbstractVector
+            )
+            x .= A \ b
+        end
+    end
+
+    # ldiv!() for SPQR should be in Julia 1.13: https://github.com/JuliaSparse/SparseArrays.jl/pull/676
     function LinearSolve._ldiv!(
             x::Vector,
-            A::Union{SparseArrays.SPQR.QRSparse, SparseArrays.CHOLMOD.Factor}, b::Vector
+            A::SparseArrays.SPQR.QRSparse, b::Vector
         )
         x .= A \ b
     end
     function LinearSolve._ldiv!(
             x::AbstractVector,
-            A::Union{SparseArrays.SPQR.QRSparse, SparseArrays.CHOLMOD.Factor}, b::AbstractVector
+            A::SparseArrays.SPQR.QRSparse, b::AbstractVector
         )
         x .= A \ b
     end
+
     function LinearSolve._ldiv!(
             ::SVector,
             A::Union{SparseArrays.CHOLMOD.Factor, SparseArrays.SPQR.QRSparse},

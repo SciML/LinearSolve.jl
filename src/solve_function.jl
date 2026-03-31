@@ -53,7 +53,10 @@ function SciMLBase.solve!(
     (; solve_func) = alg
 
     u = solve_func(A, b, u, p, isfresh, Pl, Pr, cacheval; kwargs...)
-    return SciMLBase.build_linear_solution(alg, u, nothing, cache)
+    return SciMLBase.build_linear_solution(
+        alg, u, nothing, cache;
+        retcode = ReturnCode.Success
+    )
 end
 
 """
@@ -102,7 +105,10 @@ end
 function SciMLBase.solve!(cache::LinearCache, alg::DirectLdiv!{false}, args...; kwargs...)
     (; A, b, u) = cache
     ldiv!(u, A, b)
-    return SciMLBase.build_linear_solution(alg, u, nothing, cache)
+    return SciMLBase.build_linear_solution(
+        alg, u, nothing, cache;
+        retcode = ReturnCode.Success
+    )
 end
 
 # For caching DirectLdiv! with general matrices, just use regular ldiv!
@@ -110,7 +116,10 @@ end
 function SciMLBase.solve!(cache::LinearCache, alg::DirectLdiv!{true}, args...; kwargs...)
     (; A, b, u) = cache
     ldiv!(u, A, b)
-    return SciMLBase.build_linear_solution(alg, u, nothing, cache)
+    return SciMLBase.build_linear_solution(
+        alg, u, nothing, cache;
+        retcode = ReturnCode.Success
+    )
 end
 
 # Specialized handling for Tridiagonal matrices to avoid mutating cache.A
@@ -147,7 +156,10 @@ function SciMLBase.solve!(
     copyto!(cacheval.du, A.du)
     # Perform ldiv! on the copy, preserving the original A
     ldiv!(u, cacheval, b)
-    return SciMLBase.build_linear_solution(alg, u, nothing, cache)
+    return SciMLBase.build_linear_solution(
+        alg, u, nothing, cache;
+        retcode = ReturnCode.Success
+    )
 end
 
 function SciMLBase.solve!(
@@ -160,5 +172,8 @@ function SciMLBase.solve!(
     copyto!(cacheval.ev, A.ev)
     # Perform ldiv! on the copy, preserving the original A
     ldiv!(u, cacheval, b)
-    return SciMLBase.build_linear_solution(alg, u, nothing, cache)
+    return SciMLBase.build_linear_solution(
+        alg, u, nothing, cache;
+        retcode = ReturnCode.Success
+    )
 end

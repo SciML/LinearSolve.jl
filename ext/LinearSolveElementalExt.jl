@@ -15,7 +15,7 @@ function _to_elemental_matrix(A::Base.AbstractVecOrMat, ::Type{T}) where {T}
     return convert(Elemental.Matrix{T}, Matrix{T}(A))
 end
 
-# Always copy: lu!/qr!/cholesky! are in-place. Returning A directly would
+# Always copy: lu!/qr!/lq!/cholesky! are in-place. Returning A directly would
 # corrupt the user's matrix and cause reinit! + re-solve to factorize garbage.
 function _to_elemental_matrix(A::Elemental.Matrix, ::Type{T}) where {T}
     B = Elemental.Matrix(T)
@@ -41,6 +41,8 @@ function _elemental_factorize(alg::ElementalJL, A_el::Elemental.Matrix)
         return LinearAlgebra.lu!(A_el)
     elseif alg.method === :QR
         return LinearAlgebra.qr!(A_el)
+    elseif alg.method === :LQ
+        return LinearAlgebra.lq!(A_el)
     elseif alg.method === :Cholesky
         # Must call cholesky!(A_el) directly, not cholesky!(Hermitian(A_el)).
         # The Hermitian path returns LinearAlgebra.Cholesky whose .factors is a
@@ -51,7 +53,7 @@ function _elemental_factorize(alg::ElementalJL, A_el::Elemental.Matrix)
     else
         error(
             "Unknown method $(alg.method) for ElementalJL. " *
-                "Valid choices are :LU (default), :QR, or :Cholesky."
+                "Valid choices are :LU (default), :QR, :LQ, or :Cholesky."
         )
     end
 end

@@ -7,5 +7,5 @@ SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
-Elemental = "0.6"
+Elemental = "0.6.1"
 julia = "1.10"

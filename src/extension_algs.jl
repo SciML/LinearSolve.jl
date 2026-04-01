@@ -1257,6 +1257,7 @@ providing distributed-memory dense linear algebra solvers built on the
     - `:LU` (default) — LU factorization with partial pivoting. Suitable for
       general square systems.
     - `:QR` — QR factorization. Suitable for square or overdetermined systems.
+        - `:LQ` — LQ factorization. Suitable for square or underdetermined systems.
     - `:Cholesky` — Cholesky factorization. Requires the matrix to be Hermitian
       positive definite.
 
@@ -1296,6 +1297,8 @@ prob = LinearProblem(A, b)
 
 # LU (default)
 sol = solve(prob, ElementalJL())
+# LQ
+sol = solve(prob, ElementalJL(method = :LQ))
 # Cholesky (symmetric positive definite)
 sol = solve(prob, ElementalJL(method = :Cholesky))
 ```

@@ -67,11 +67,8 @@ LinearSolveCUDAExt = "CUDA"
 LinearSolveCUDSSExt = "CUDSS"
 LinearSolveCUSOLVERRFExt = ["CUSOLVERRF", "SparseArrays"]
 LinearSolveCliqueTreesExt = ["CliqueTrees", "SparseArrays"]
-<<<<<<< fix/47
 LinearSolveElementalExt = "Elemental"
-=======
 LinearSolveChainRulesCoreExt = "ChainRulesCore"
->>>>>>> main
 LinearSolveEnzymeExt = ["EnzymeCore", "SparseArrays"]
 LinearSolveFastAlmostBandedMatricesExt = "FastAlmostBandedMatrices"
 LinearSolveFastLapackInterfaceExt = "FastLapackInterface"

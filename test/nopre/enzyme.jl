@@ -319,3 +319,23 @@ Enzyme.autodiff(Reverse, testls, Duplicated(A, dA2), Duplicated(b, db2), Duplica
 @test dA == dA2
 @test db == db2
 @test du == du2
+
+# https://github.com/SciML/LinearSolve.jl/issues/929
+@testset "Symmetric BunchKaufman reverse" begin
+
+    function bk_solve(b)
+        A = Symmetric(Float64[4 1 0.5; 1 3 0.2; 0.5 0.2 2])
+        prob = LinearProblem(A, copy(b))
+        sol = solve(prob, BunchKaufmanFactorization())
+        return sum(sol.u)
+    end
+
+    b = Float64[1.0, 2.0, 3.0]
+    db = zero(b)
+
+    Enzyme.autodiff(Reverse, Const(bk_solve), Active, Duplicated(copy(b), db))
+
+    A = Symmetric(Float64[4 1 0.5; 1 3 0.2; 0.5 0.2 2])
+    expected = A \ ones(3)
+    @test db ≈ expected rtol = 1.0e-12 atol = 1.0e-12
+end

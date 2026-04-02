@@ -37,6 +37,7 @@ jobs:
           - "LinearSolvePETSc"
           - "LinearSolvePardiso"
           - "LinearSolveGinkgo"
+          - "LinearSolveElemental"
           - "NoPre"
           - "LinearSolveAutotune"
           - "LinearSolvePyAMG"
@@ -58,6 +59,9 @@ jobs:
             version: "pre"
           # Ginkgo.jl is not available on Windows
           - group: LinearSolveGinkgo
+            os: windows-latest
+          # Elemental_jll has no Windows binary
+          - group: LinearSolveElemental
             os: windows-latest
     uses: "SciML/.github/.github/workflows/tests.yml@v1"
     with:

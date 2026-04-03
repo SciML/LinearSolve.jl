@@ -27,14 +27,14 @@ Setfield = "efcf1570-3423-57d1-acb7-fd33fddbac46"
 StaticArraysCore = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
 
 [weakdeps]
-AlgebraicMultigrid = "2169fc97-5a83-5252-b627-83903c6c433c"
-ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
+AlgebraicMultigrid = "2169fc97-5a83-5252-b627-83903c6c433c"
 BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
 BlockDiagonals = "0a1fb500-61f7-11e9-3c65-f5ef3456f9f0"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 CUDSS = "45b445bb-4962-46a0-9369-b4df9d0f772e"
 CUSOLVERRF = "a8cc9031-bad2-4722-94f5-40deabb4245c"
+ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 CliqueTrees = "60701a23-6482-424a-84db-faee86b9b1f8"
 EnzymeCore = "f151be2c-9106-41f4-ab19-57ee4f262869"
 FastAlmostBandedMatrices = "9d29842c-ecb8-4973-b1e9-a27b1157504e"
@@ -57,16 +57,16 @@ Sparspak = "e56a9233-b9d6-4f03-8d0f-1825330902ac"
 blis_jll = "6136c539-28a5-5bf0-87cc-b183200dce32"
 
 [extensions]
-LinearSolveAlgebraicMultigridExt = "AlgebraicMultigrid"
 LinearSolveAMDGPUExt = "AMDGPU"
+LinearSolveAlgebraicMultigridExt = "AlgebraicMultigrid"
 LinearSolveBLISExt = ["blis_jll", "LAPACK_jll"]
 LinearSolveBandedMatricesExt = "BandedMatrices"
 LinearSolveBlockDiagonalsExt = "BlockDiagonals"
 LinearSolveCUDAExt = "CUDA"
 LinearSolveCUDSSExt = "CUDSS"
 LinearSolveCUSOLVERRFExt = ["CUSOLVERRF", "SparseArrays"]
-LinearSolveCliqueTreesExt = ["CliqueTrees", "SparseArrays"]
 LinearSolveChainRulesCoreExt = "ChainRulesCore"
+LinearSolveCliqueTreesExt = ["CliqueTrees", "SparseArrays"]
 LinearSolveEnzymeExt = ["EnzymeCore", "SparseArrays"]
 LinearSolveFastAlmostBandedMatricesExt = "FastAlmostBandedMatrices"
 LinearSolveFastLapackInterfaceExt = "FastLapackInterface"
@@ -86,8 +86,8 @@ LinearSolveSparseArraysExt = "SparseArrays"
 LinearSolveSparspakExt = ["SparseArrays", "Sparspak"]
 
 [compat]
-AlgebraicMultigrid = "1"
 AMDGPU = "1.2, 2"
+AlgebraicMultigrid = "1"
 AllocCheck = "0.2"
 Aqua = "0.8"
 ArrayInterface = "7.19"
@@ -134,7 +134,7 @@ Pkg = "1.10"
 PrecompileTools = "1.2"
 Preferences = "1.4"
 Random = "1.10"
-RecursiveArrayTools = "3.37"
+RecursiveArrayTools = "3.37, 4"
 RecursiveFactorization = "0.2.26"
 Reexport = "1.2.2"
 SafeTestsets = "0.1"

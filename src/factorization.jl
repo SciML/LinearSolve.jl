@@ -1482,6 +1482,52 @@ struct SparspakFactorization <: AbstractSparseFactorization
     end
 end
 
+"""
+`STRUMPACKFactorization(; use_initial_guess = false)`
+
+A sparse direct solver based on
+[STRUMPACK](https://github.com/pghysels/STRUMPACK) via the
+`LinearSolveSTRUMPACKExt` extension.
+
+This wrapper targets the single-node (`MT`) sparse interface and currently supports
+real sparse matrices (`AbstractSparseMatrixCSC{<:AbstractFloat}`), solving in
+`Float64` precision.
+
+!!! note
+
+    Using this solver requires:
+    1. `using SparseArrays` (to enable sparse matrix support), and
+    2. a system installation of `libstrumpack` discoverable by the dynamic loader.
+"""
+struct STRUMPACKFactorization <: AbstractSparseFactorization
+    use_initial_guess::Bool
+
+    function STRUMPACKFactorization(; use_initial_guess = false, throwerror = true)
+        ext = Base.get_extension(@__MODULE__, :LinearSolveSTRUMPACKExt)
+        return if throwerror && (ext === nothing || !ext.strumpack_isavailable())
+            error("STRUMPACKFactorization requires a discoverable STRUMPACK shared library (`libstrumpack`) and `using SparseArrays`")
+        else
+            new(use_initial_guess)
+        end
+    end
+end
+
+function init_cacheval(
+        ::STRUMPACKFactorization,
+        ::Union{AbstractMatrix, Nothing, AbstractSciMLOperator}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
+function init_cacheval(
+        ::STRUMPACKFactorization, ::StaticArray, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
 function init_cacheval(
         alg::SparspakFactorization,
         A::Union{AbstractMatrix, Nothing, AbstractSciMLOperator}, b, u, Pl, Pr,

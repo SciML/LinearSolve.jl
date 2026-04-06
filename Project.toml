@@ -1,6 +1,6 @@
 name = "LinearSolve"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
-version = "3.69.0"
+version = "3.70.0"
 authors = ["SciML"]
 
 [deps]
@@ -137,7 +137,7 @@ Pkg = "1.10"
 PrecompileTools = "1.2"
 Preferences = "1.4"
 Random = "1.10"
-RecursiveArrayTools = "3.37"
+RecursiveArrayTools = "3.37, 4"
 RecursiveFactorization = "0.2.26"
 Reexport = "1.2.2"
 SafeTestsets = "0.1"

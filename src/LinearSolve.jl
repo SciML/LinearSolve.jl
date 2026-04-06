@@ -462,7 +462,11 @@ for alg in (
     )
     @eval needs_square_A(::$(alg)) = false
 end
-for kralg in (Krylov.lsmr!, Krylov.craigmr!)
+for kralg in (
+        Krylov.lsmr!, Krylov.craigmr!, Krylov.lsqr!, Krylov.cgls!,
+        Krylov.crls!, Krylov.cgne!, Krylov.craig!, Krylov.lslq!,
+        Krylov.crmr!, Krylov.lnlq!,
+    )
     @eval needs_square_A(::KrylovJL{$(typeof(kralg))}) = false
 end
 for alg in (

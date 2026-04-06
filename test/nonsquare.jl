@@ -1,5 +1,6 @@
 using LinearSolve, Test
 using SparseArrays, LinearAlgebra
+using Krylov
 
 m, n = 13, 3
 
@@ -14,6 +15,14 @@ res = A \ b
 @test solve(prob, FastQRFactorization()) ≈ res
 @test !LinearSolve.needs_square_A(KrylovJL_LSMR())
 @test solve(prob, KrylovJL_LSMR()) ≈ res
+@test !LinearSolve.needs_square_A(KrylovJL(KrylovAlg = Krylov.lsqr!))
+@test solve(prob, KrylovJL(KrylovAlg = Krylov.lsqr!)) ≈ res
+@test !LinearSolve.needs_square_A(KrylovJL(KrylovAlg = Krylov.cgls!))
+@test solve(prob, KrylovJL(KrylovAlg = Krylov.cgls!)) ≈ res
+@test !LinearSolve.needs_square_A(KrylovJL(KrylovAlg = Krylov.crls!))
+@test solve(prob, KrylovJL(KrylovAlg = Krylov.crls!)) ≈ res
+@test !LinearSolve.needs_square_A(KrylovJL(KrylovAlg = Krylov.lslq!))
+@test solve(prob, KrylovJL(KrylovAlg = Krylov.lslq!)) ≈ res
 
 A = sprand(m, n, 0.5)
 b = rand(m)
@@ -29,6 +38,14 @@ prob = LinearProblem(A, b)
 res = Matrix(A) \ b
 @test !LinearSolve.needs_square_A(KrylovJL_CRAIGMR())
 @test solve(prob, KrylovJL_CRAIGMR()) ≈ res
+@test !LinearSolve.needs_square_A(KrylovJL(KrylovAlg = Krylov.cgne!))
+@test solve(prob, KrylovJL(KrylovAlg = Krylov.cgne!)) ≈ res
+@test !LinearSolve.needs_square_A(KrylovJL(KrylovAlg = Krylov.craig!))
+@test solve(prob, KrylovJL(KrylovAlg = Krylov.craig!)) ≈ res
+@test !LinearSolve.needs_square_A(KrylovJL(KrylovAlg = Krylov.crmr!))
+@test solve(prob, KrylovJL(KrylovAlg = Krylov.crmr!)) ≈ res
+@test !LinearSolve.needs_square_A(KrylovJL(KrylovAlg = Krylov.lnlq!))
+@test solve(prob, KrylovJL(KrylovAlg = Krylov.lnlq!)) ≈ res
 
 A = sprandn(1000, 100, 0.1)
 b = randn(1001)

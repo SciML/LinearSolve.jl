@@ -98,6 +98,13 @@ if !Base.Sys.iswindows() && GROUP == "LinearSolveGinkgo"
     @time @safetestset "Ginkgo" include("ginkgo/ginkgo.jl")
 end
 
+if !Base.Sys.iswindows() && GROUP == "LinearSolveElemental"
+    Pkg.activate("elemental")
+    Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
+    Pkg.instantiate()
+    @time @safetestset "Elemental" include("elemental/elemental.jl")
+end
+
 if Base.Sys.islinux() && (GROUP == "All" || GROUP == "LinearSolveHYPRE") && HAS_EXTENSIONS
     @time @safetestset "LinearSolveHYPRE" include("hypretests.jl")
 end

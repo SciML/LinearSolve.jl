@@ -673,15 +673,26 @@ end
 """
     _default_lu_solve_with_fallback(cache::LinearCache, alg::DefaultLinearSolver, sol, args...; kwargs...)
 
-Post-process an LU solve result: if LU explicitly failed or the residual check returned
-`APosterioriSafetyFailure`, fall back to column-pivoted QR. Otherwise return the LU
-solution directly.
+Post-process an LU solve result: if LU explicitly failed, the solution contains NaN/Inf,
+or the residual check returned `APosterioriSafetyFailure`, fall back to column-pivoted QR.
+Otherwise return the LU solution directly.
+
+The NaN/Inf check catches floating-point-near-singular matrices where LU "succeeds"
+(no exact zero pivot) but produces non-finite solution components from dividing by
+near-zero pivots. This is O(n) and has zero false positives.
 """
 function _default_lu_solve_with_fallback(
         cache::LinearCache, alg::DefaultLinearSolver, sol, args...; kwargs...
     )
     if alg.safetyfallback
         if sol.retcode === ReturnCode.Failure
+            return _do_qr_fallback(cache, alg, sol, :lu_failure, args...; kwargs...)
+        end
+        if sol.retcode === ReturnCode.Success && any(!isfinite, sol.u)
+            @SciMLMessage(
+                "LU solve produced non-finite values (NaN/Inf), falling back to QR. Matrix is likely near-singular.",
+                cache.verbose, :default_lu_fallback
+            )
             return _do_qr_fallback(cache, alg, sol, :lu_failure, args...; kwargs...)
         end
         if sol.retcode === ReturnCode.APosterioriSafetyFailure

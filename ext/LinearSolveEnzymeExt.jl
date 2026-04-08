@@ -165,10 +165,10 @@ function _sparse_outer_sub!(
     # `Symmetric` disallows writing off-diagonal entries via `setindex!` on the wrapper.
     # Accumulate directly into the parent storage while preserving symmetry by updating
     # only the stored triangle with the reduced gradient for unique symmetric entries.
-    Aparent = parent(dA)
-    n = size(Aparent, 1)
+    A_parent = parent(dA)
+    n = size(A_parent, 1)
 
-    @assert size(Aparent, 1) == size(Aparent, 2)
+    @assert size(A_parent, 1) == size(A_parent, 2)
     @assert length(z) == n
     @assert length(y) == n
 
@@ -177,17 +177,17 @@ function _sparse_outer_sub!(
             zj = z[j]
             yj = y[j]
             for i in 1:(j - 1)
-                Aparent[i, j] -= z[i] * yj + zj * y[i]
+                A_parent[i, j] -= z[i] * yj + zj * y[i]
             end
-            Aparent[j, j] -= zj * yj
+            A_parent[j, j] -= zj * yj
         end
     else
         @inbounds for j in 1:n
             zj = z[j]
             yj = y[j]
-            Aparent[j, j] -= zj * yj
+            A_parent[j, j] -= zj * yj
             for i in (j + 1):n
-                Aparent[i, j] -= z[i] * yj + zj * y[i]
+                A_parent[i, j] -= z[i] * yj + zj * y[i]
             end
         end
     end

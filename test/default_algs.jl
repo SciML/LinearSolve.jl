@@ -321,7 +321,10 @@ resid_nosafe = norm(A_nearsing * sol_nosafe.u - b_nearsing)
 resid_safe = norm(A_nearsing * sol_safe.u - b_nearsing)
 resid_qr = norm(A_nearsing * sol_qr_ref.u - b_nearsing)
 @test resid_safe <= 10 * resid_qr || resid_safe < 1.0e-10  # safe is close to QR quality
-@test sol_safe.retcode === ReturnCode.Success
+# The fallback returns APosterioriSafetyFailure when no candidate (LU, truncated QR,
+# non-truncated QR) achieves a residual below tolerance. This is more informative than
+# returning Success with a bad residual — ODE solvers can use this to adapt step size.
+@test sol_safe.retcode === ReturnCode.APosterioriSafetyFailure
 
 # Well-conditioned matrix: residual check should NOT trigger fallback
 A_wellcond = Float64[4 1; 1 3]
@@ -385,12 +388,13 @@ alg_reuse = LinearSolve.DefaultLinearSolver(
 )
 cache_qr_reuse = init(prob_reuse_qr, alg_reuse)
 sol_stage1 = solve!(cache_qr_reuse)
-@test sol_stage1.retcode === ReturnCode.Success
+# Near-singular matrix: no candidate meets tolerance, so APosterioriSafetyFailure
+@test sol_stage1.retcode === ReturnCode.APosterioriSafetyFailure
 @test cache_qr_reuse.cacheval.fell_back_to_qr
 # Stage 2: only change b, not A (simulates Rosenbrock stage reuse)
 cache_qr_reuse.b = b2
 sol_stage2 = solve!(cache_qr_reuse)
-@test sol_stage2.retcode === ReturnCode.Success
+@test sol_stage2.retcode === ReturnCode.APosterioriSafetyFailure
 # Verify the solution matches a fresh QR solve (not corrupted by LU)
 sol_qr_stage2_ref = solve(LinearProblem(copy(A_nearsing), copy(b2)), QRFactorization(ColumnNorm()))
 @test sol_stage2.u ≈ sol_qr_stage2_ref.u

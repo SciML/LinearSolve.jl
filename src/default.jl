@@ -603,12 +603,130 @@ function _is_gpu_sparse(A)
 end
 
 """
+    _residual_norm!(buf, A, x, b)
+
+Compute ‖A*x - b‖ using `buf` as scratch space. Non-allocating after warmup.
+"""
+function _residual_norm!(buf, A, x, b)
+    mul!(buf, A, x)
+    axpy!(-one(eltype(buf)), b, buf)
+    return norm(buf)
+end
+
+"""
+    _non_truncated_qr_solve!(x, F::LinearAlgebra.QRPivoted, b)
+
+Solve A*x = b using the QR factorization `F` without rank truncation.
+Julia's `QRPivoted \\ b` applies rank-revealing truncation via `LAPACK.laic1!` which
+can discard meaningful components of ill-conditioned (but full-rank) matrices.
+This function performs the straightforward `x[p] = R \\ (Q'*b)` instead.
+"""
+function _non_truncated_qr_solve!(x, F::LinearAlgebra.QRPivoted, b)
+    Qtb = F.Q' * b  # allocates a copy; fine for the fallback path
+    ldiv!(UpperTriangular(F.factors), Qtb)  # in-place triangular solve, no truncation
+    @inbounds for i in eachindex(F.jpvt)
+        x[F.jpvt[i]] = Qtb[i]
+    end
+    return x
+end
+
+"""
+    _best_qr_solve!(cache::LinearCache, alg, qr_sol, lu_u, reason::Symbol)
+
+After a (truncated) QR solve, also try the non-truncated solve using the same
+factorization and return whichever of {LU, truncated QR, non-truncated QR} has
+the lowest residual. The retcode is `Success` if the best residual is within
+tolerance, or `APosterioriSafetyFailure` otherwise.
+
+Julia's `QRPivoted \\ b` uses `rcond = n * eps` for rank-revealing truncation.
+This is correct for genuinely rank-deficient matrices but can discard meaningful
+components when the matrix is merely ill-conditioned, producing a much larger
+residual. By trying both and comparing, we get the best of both worlds:
+truncation when it helps, full solve when it doesn't.
+
+Only applies to `QRPivoted` (column-pivoted QR); for GPU/NoPivot QR there is
+no truncation so the dual solve is unnecessary.
+"""
+function _best_qr_solve!(cache::LinearCache, alg, qr_sol, lu_u, reason::Symbol)
+    A_orig = cache.cacheval.A_backup
+    b = cache.b
+    buf = cache.cacheval.residual_buf
+    if length(buf) != length(b)
+        resize!(buf, length(b))
+    end
+    tol = cache.abstol + cache.reltol * norm(b)
+
+    # Candidate 1: truncated QR (already computed in qr_sol.u = cache.u)
+    qr_trunc_res = _residual_norm!(buf, A_orig, cache.u, b)
+
+    if qr_trunc_res <= tol
+        @SciMLMessage(cache.verbose, :default_lu_fallback) do
+            return "QR fallback (truncated) passed residual check: ‖A*x - b‖ = $(qr_trunc_res), tol = $(tol)"
+        end
+        return SciMLBase.build_linear_solution(
+            alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+        )
+    end
+
+    # Truncated QR didn't pass tolerance. Try non-truncated QR using the same factorization.
+    F_qr = cache.cacheval.QRFactorizationPivoted
+    if F_qr isa LinearAlgebra.QRPivoted
+        qr_full_u = similar(cache.u)
+        _non_truncated_qr_solve!(qr_full_u, F_qr, b)
+        qr_full_res = _residual_norm!(buf, A_orig, qr_full_u, b)
+
+        # Pick the best among all candidates
+        best_u = cache.u
+        best_res = qr_trunc_res
+        best_label = "truncated QR"
+
+        if qr_full_res < best_res
+            best_u = qr_full_u
+            best_res = qr_full_res
+            best_label = "non-truncated QR"
+        end
+
+        # Also compare with LU solution if available (residual_check case)
+        if reason === :residual_check && lu_u !== nothing
+            lu_res = _residual_norm!(buf, A_orig, lu_u, b)
+            if lu_res < best_res
+                best_u = lu_u
+                best_res = lu_res
+                best_label = "LU"
+            end
+        end
+
+        copyto!(cache.u, best_u)
+        retcode = best_res <= tol ? ReturnCode.Success : ReturnCode.APosterioriSafetyFailure
+
+        @SciMLMessage(cache.verbose, :default_lu_fallback) do
+            return "QR fallback best candidate: $(best_label) with ‖A*x - b‖ = $(best_res), tol = $(tol), retcode = $(retcode)"
+        end
+
+        return SciMLBase.build_linear_solution(
+            alg, cache.u, nothing, cache; retcode = retcode
+        )
+    end
+
+    # Non-pivoted QR (GPU path): no truncation issue, just return the QR result
+    return SciMLBase.build_linear_solution(
+        alg, qr_sol.u, qr_sol.resid, qr_sol.cache;
+        retcode = qr_sol.retcode, iters = qr_sol.iters, stats = qr_sol.stats
+    )
+end
+
+"""
     _do_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol, args...; kwargs...)
 
 Perform QR fallback after LU failure or residual check failure. Restores `cache.A`
 from `A_backup` (since LU may have modified it in-place) and solves with column-pivoted QR
 (or NoPivot for GPU arrays which don't support scalar indexing).
 `reason` is `:lu_failure` or `:residual_check` for appropriate log messages.
+
+After the initial (truncated) QR solve, also tries a non-truncated QR solve using the
+same factorization and returns whichever candidate has the lowest residual. This handles
+the case where Julia's rank-revealing truncation in `QRPivoted \\ b` discards meaningful
+components of an ill-conditioned (but full-rank) matrix.
 """
 function _do_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol, args...; kwargs...)
     if is_cusparse(cache.A)
@@ -642,15 +760,30 @@ function _do_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol, args...; 
             cache.verbose, :default_lu_fallback
         )
     end
+
+    # Save LU solution before QR solve overwrites cache.u
+    lu_u = reason === :residual_check ? copy(sol.u) : nothing
+
     copyto!(cache.A, cache.cacheval.A_backup)
     cache.isfresh = true
     pivot = _qr_fallback_pivot(cache.A)
-    sol = SciMLBase.solve!(cache, QRFactorization(pivot), args...; kwargs...)
+    qr_sol = SciMLBase.solve!(cache, QRFactorization(pivot), args...; kwargs...)
     cache.cacheval.fell_back_to_qr = true
-    return SciMLBase.build_linear_solution(
-        alg, sol.u, sol.resid, sol.cache;
-        retcode = sol.retcode, iters = sol.iters, stats = sol.stats
-    )
+
+    if reason === :residual_check
+        # LU succeeded but residual was too large. The matrix is likely ill-conditioned
+        # but full-rank. Compare truncated QR, non-truncated QR, and LU solutions to
+        # find the best one. Non-truncated QR avoids Julia's rank-revealing truncation
+        # which can discard meaningful components of ill-conditioned matrices.
+        return _best_qr_solve!(cache, alg, qr_sol, lu_u, reason)
+    else
+        # LU failed entirely (rank-deficient matrix). The truncated QR solution is
+        # appropriate here — non-truncated QR would divide by near-zero R diagonals.
+        return SciMLBase.build_linear_solution(
+            alg, qr_sol.u, qr_sol.resid, qr_sol.cache;
+            retcode = qr_sol.retcode, iters = qr_sol.iters, stats = qr_sol.stats
+        )
+    end
 end
 
 """
@@ -660,14 +793,13 @@ Reuse the cached QR factorization from a previous QR fallback. Called when
 `fell_back_to_qr` is `true` and `isfresh` is `false`, meaning the matrix hasn't
 changed since the QR fallback and we should keep using QR instead of the
 (potentially corrupted) LU factorization.
+
+Also tries the non-truncated QR solve and returns whichever has the lower residual.
 """
 function _reuse_qr_fallback(cache::LinearCache, alg, args...; kwargs...)
     pivot = _qr_fallback_pivot(cache.A)
-    sol = SciMLBase.solve!(cache, QRFactorization(pivot), args...; kwargs...)
-    return SciMLBase.build_linear_solution(
-        alg, sol.u, sol.resid, sol.cache;
-        retcode = sol.retcode, iters = sol.iters, stats = sol.stats
-    )
+    qr_sol = SciMLBase.solve!(cache, QRFactorization(pivot), args...; kwargs...)
+    return _best_qr_solve!(cache, alg, qr_sol, nothing, :qr_reuse)
 end
 
 """

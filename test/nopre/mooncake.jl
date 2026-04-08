@@ -295,5 +295,5 @@ end
     fA_closure = A -> fnice(A, b1, alg)
     fd_jac_A = FiniteDiff.finite_difference_jacobian(fA_closure, A) |> vec
     A_grad = en_jac[2] |> vec
-    @test A_grad ≈ fd_jac_A rtol = 1e-4
+    @test A_grad ≈ fd_jac_A rtol = 1.0e-4
 end

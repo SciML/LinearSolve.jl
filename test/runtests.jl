@@ -114,6 +114,7 @@ if Base.Sys.islinux() && GROUP == "LinearSolvePETSc" && HAS_EXTENSIONS
     Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
     Pkg.instantiate()
     @time @safetestset "LinearSolvePETSc" include("petsctests.jl")
+    @time @safetestset "LinearSolvePETScMPI" include("petsctests_mpi.jl")
 end
 
 if GROUP == "Trim" && VERSION >= v"1.12.0"

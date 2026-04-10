@@ -53,41 +53,35 @@ end
     )
     @test isfile(JULIAC)
 
-    has_supported_c_compiler = any(c -> !isnothing(Sys.which(c)), ["gcc", "clang"])
-    if !has_supported_c_compiler
-        @test_skip "No supported C compiler found (expected one of: gcc, clang)"
-    else
+    using LinearSolve
+    # Build list of tests to run, conditionally including MKL
+    test_files = [
+        ("main_lu.jl", true),
+        ("main_rf.jl", true),
+    ]
+    if LinearSolve.usemkl
+        push!(test_files, ("main_mkl.jl", true))
+    end
 
-        using LinearSolve
-        # Build list of tests to run, conditionally including MKL
-        test_files = [
-            ("main_lu.jl", true),
-            ("main_rf.jl", true),
-        ]
-        if LinearSolve.usemkl
-            push!(test_files, ("main_mkl.jl", true))
+    for (mainfile, expectedtopass) in test_files
+        binpath = tempname()
+        cmd = `$(Base.julia_cmd()) --project=. --depwarn=error $(JULIAC) --experimental --trim=unsafe-warn --output-exe $(binpath) $(mainfile)`
+
+        # since we are calling Julia from Julia, we first need to clean some
+        # environment variables
+        clean_env = copy(ENV)
+        delete!(clean_env, "JULIA_PROJECT")
+        delete!(clean_env, "JULIA_LOAD_PATH")
+        # We could just check for success, but then failures are hard to debug.
+        # Instead we use `_execute` to also capture `stdout` and `stderr`.
+        # @test success(setenv(cmd, clean_env))
+        trimcall = _execute(setenv(cmd, clean_env; dir = @__DIR__))
+        if trimcall.exitcode != 0 && expectedtopass
+            @show trimcall.stdout
+            @show trimcall.stderr
         end
-
-        for (mainfile, expectedtopass) in test_files
-            binpath = tempname()
-            cmd = `$(Base.julia_cmd()) --project=. --depwarn=error $(JULIAC) --experimental --trim=unsafe-warn --output-exe $(binpath) $(mainfile)`
-
-            # since we are calling Julia from Julia, we first need to clean some
-            # environment variables
-            clean_env = copy(ENV)
-            delete!(clean_env, "JULIA_PROJECT")
-            delete!(clean_env, "JULIA_LOAD_PATH")
-            # We could just check for success, but then failures are hard to debug.
-            # Instead we use `_execute` to also capture `stdout` and `stderr`.
-            # @test success(setenv(cmd, clean_env))
-            trimcall = _execute(setenv(cmd, clean_env; dir = @__DIR__))
-            if trimcall.exitcode != 0 && expectedtopass
-                @show trimcall.stdout
-                @show trimcall.stderr
-            end
-            @test trimcall.exitcode == 0 broken = !expectedtopass
-            @test isfile(binpath) broken = !expectedtopass
-            @test success(`$(binpath) 1.0`) broken = !expectedtopass
-        end
+        @test trimcall.exitcode == 0 broken = !expectedtopass
+        @test isfile(binpath) broken = !expectedtopass
+        @test success(`$(binpath) 1.0`) broken = !expectedtopass
     end
 end

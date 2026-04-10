@@ -3,6 +3,7 @@ using LinearSolve
 using MPI
 using PETSc
 using SparseArrays
+using SparseMatricesCSR
 using Random
 using Test
 
@@ -500,5 +501,153 @@ end
         @test norm(A_snapshot * sol.u - b) / norm(b) < 1.0e-6
         # A may have been overwritten by LU — that's expected, no assertion on A's values
         PETScExt.cleanup_petsc_cache!(sol)
+    end
+end
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  CSR MATRIX TESTS (SparseMatrixCSR via SparseMatricesCSR.jl)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@testset "Serial: CSR Basic Solvers" begin
+    n = 100
+    A_csc = sprand(n, n, 0.05) + 10I
+    A_csc = A_csc'A_csc
+    A_csr = SparseMatrixCSR(A_csc)
+    b = rand(n)
+
+    @testset "GMRES (CSR)" begin
+        sol = solve(
+            LinearProblem(A_csr, b), PETScAlgorithm(:gmres); abstol = 1.0e-10, reltol = 1.0e-10
+        )
+        @test norm(A_csc * sol.u - b) / norm(b) < 1.0e-6
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
+
+    @testset "CG (CSR)" begin
+        sol = solve(
+            LinearProblem(A_csr, b), PETScAlgorithm(:cg); abstol = 1.0e-10, reltol = 1.0e-10
+        )
+        @test norm(A_csc * sol.u - b) / norm(b) < 1.0e-6
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
+
+    @testset "GMRES + ILU (CSR)" begin
+        sol = solve(
+            LinearProblem(A_csr, b), PETScAlgorithm(:gmres; pc_type = :ilu);
+            abstol = 1.0e-10, reltol = 1.0e-10
+        )
+        @test norm(A_csc * sol.u - b) / norm(b) < 1.0e-6
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
+end
+
+@testset "Serial: CSR Cache Interface" begin
+    n = 100
+    A_csc = sprand(n, n, 0.05) + 10I; A_csc = A_csc'A_csc
+    A_csr = SparseMatrixCSR(A_csc)
+    b = rand(n)
+
+    cache = SciMLBase.init(
+        LinearProblem(A_csr, b), PETScAlgorithm(:gmres); abstol = 1.0e-10, reltol = 1.0e-10
+    )
+    sol1 = solve!(cache)
+    @test norm(A_csc * sol1.u - b) / norm(b) < 1.0e-6
+
+    b2 = rand(n)
+    cache.b = b2
+    sol2 = solve!(cache)
+    @test norm(A_csc * sol2.u - b2) / norm(b2) < 1.0e-6
+    PETScExt.cleanup_petsc_cache!(cache)
+end
+
+@testset "Serial: CSR Matrix Rebuild Logic" begin
+    n = 50
+    Random.seed!(123)
+
+    base = sprand(n, n, 0.1); base = base + base' + 10I
+    pattern_I, pattern_J, _ = findnz(base)
+
+    function make_csr_spd_with_pattern(scale)
+        vals = abs.(randn(length(pattern_I))) .* scale
+        A = sparse(pattern_I, pattern_J, vals, n, n)
+        A = A + A'
+        d = vec(sum(abs.(A), dims = 2)) .+ scale
+        for i in 1:n
+            A[i, i] = d[i]
+        end
+        return SparseMatrixCSR(A)
+    end
+
+    @testset "Case 1: first solve builds KSP (CSR)" begin
+        A = make_csr_spd_with_pattern(10.0)
+        A_dense = Matrix(A)
+        b = rand(n)
+        cache = SciMLBase.init(
+            LinearProblem(A, b), PETScAlgorithm(:cg; pc_type = :jacobi); abstol = 1.0e-10
+        )
+        @test cache.cacheval.ksp === nothing
+        sol = solve!(cache)
+        @test cache.cacheval.ksp !== nothing
+        @test norm(A_dense * sol.u - b) / norm(b) < 1.0e-6
+        PETScExt.cleanup_petsc_cache!(cache)
+    end
+
+    @testset "Case 3: same sparsity — KSP reused, values updated (CSR)" begin
+        A1 = make_csr_spd_with_pattern(10.0)
+        b1 = rand(n)
+        cache = SciMLBase.init(
+            LinearProblem(A1, b1), PETScAlgorithm(:cg; pc_type = :jacobi); abstol = 1.0e-10
+        )
+        solve!(cache)
+        ksp_before = cache.cacheval.ksp
+
+        A2 = make_csr_spd_with_pattern(20.0)
+        A2_dense = Matrix(A2)
+        b2 = rand(n)
+        SciMLBase.reinit!(cache; A = A2, b = b2)
+        sol2 = solve!(cache)
+
+        @test cache.cacheval.ksp === ksp_before  # KSP reused
+        @test norm(A2_dense * sol2.u - b2) / norm(b2) < 1.0e-6
+        PETScExt.cleanup_petsc_cache!(cache)
+    end
+
+    @testset "Case 2: sparsity changed — KSP rebuilt (CSR)" begin
+        A1 = make_csr_spd_with_pattern(10.0)
+        b1 = rand(n)
+        cache = SciMLBase.init(
+            LinearProblem(A1, b1), PETScAlgorithm(:cg; pc_type = :jacobi); abstol = 1.0e-10
+        )
+        solve!(cache)
+        ksp_before = cache.cacheval.ksp
+
+        A3_csc = sprand(n, n, 0.2) + 15I; A3_csc = A3_csc + A3_csc'
+        A3 = SparseMatrixCSR(A3_csc)
+        A3_dense = Matrix(A3)
+        b3 = rand(n)
+        SciMLBase.reinit!(cache; A = A3, b = b3)
+        sol3 = solve!(cache)
+
+        @test cache.cacheval.ksp !== ksp_before  # KSP rebuilt
+        @test norm(A3_dense * sol3.u - b3) / norm(b3) < 1.0e-6
+        PETScExt.cleanup_petsc_cache!(cache)
+    end
+
+    @testset "Case 3: correctness over multiple value-only updates (CSR)" begin
+        A = make_csr_spd_with_pattern(10.0)
+        b = rand(n)
+        cache = SciMLBase.init(
+            LinearProblem(A, b), PETScAlgorithm(:cg; pc_type = :jacobi); abstol = 1.0e-10
+        )
+
+        for i in 1:5
+            A_new = make_csr_spd_with_pattern(10.0 + i)
+            A_new_dense = Matrix(A_new)
+            b_new = rand(n)
+            SciMLBase.reinit!(cache; A = A_new, b = b_new)
+            sol = solve!(cache)
+            @test norm(A_new_dense * sol.u - b_new) / norm(b_new) < 1.0e-6
+        end
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end

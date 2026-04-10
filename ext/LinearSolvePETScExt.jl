@@ -159,15 +159,19 @@ end
 
 # ── Matrix conversion ─────────────────────────────────────────────────────────
 
+# Trait function: is A a sparse format that PETSc can handle as an AIJ matrix?
+# Overloaded by LinearSolvePETScCSRExt to also return true for SparseMatrixCSR.
+is_sparse_petsc(A) = A isa SparseMatrixCSC
+
 # Convert a Julia matrix to a PETSc sequential matrix.
 #
 # Sparse (SparseMatrixCSC) → MatSeqAIJWithArrays :
-#   Internally converts CSR format, so quite inefficient to construct from CSC.
-#
+#   Internally converts to CSR format.
 # Dense (AbstractMatrix) → MatSeqDense:
 #   PETSc allocates its own buffer and copies the values in on construction.
 #   This protects the Julia array even when a factorising preconditioner is
 #   used without a separate `prec_matrix`.
+# SparseMatrixCSR → handled by LinearSolvePETScCSRExt via to_petsc_mat overload.
 function to_petsc_mat(petsclib, A)
     if A isa SparseMatrixCSC
         return PETSc.MatSeqAIJWithArrays(petsclib, MPI.COMM_SELF, A)
@@ -262,6 +266,33 @@ function update_mat_values!(petsclib, PA, A::AbstractMatrix)
     return PETSc.assemble!(PA)
 end
 
+# ── Extensible sparse dispatch ───────────────────────────────────────────────
+#
+# These functions are overloaded by LinearSolvePETScCSRExt to add CSR support.
+# They abstract over the sparse format so build_ksp! and solve! don't need
+# hardcoded `isa SparseMatrixCSC` checks.
+
+function store_sparse_pattern!(pcache, A::SparseMatrixCSC)
+    nnz_val = length(A.nzval)
+    m = size(A, 1)
+    if pcache.sparse_perm === nothing || length(pcache.sparse_perm) != nnz_val
+        pcache.sparse_perm = Vector{Int}(undef, nnz_val)
+        pcache.sparse_scratch = Vector{Int}(undef, 2 * (m + 1))
+    end
+    _csc_to_csr_perm!(pcache.sparse_perm, pcache.sparse_scratch, A)
+    pcache.prev_colptr = A.colptr
+    pcache.prev_rowval = A.rowval
+end
+
+function check_pattern_changed(pcache, A::SparseMatrixCSC)
+    pcache.prev_colptr === nothing && return true
+    return sparsity_pattern_changed(pcache.prev_colptr, pcache.prev_rowval, A)
+end
+
+function update_sparse_values!(petsclib, PA, pcache, A::SparseMatrixCSC; assemble::Bool = true)
+    return update_mat_values!(petsclib, PA, A, pcache.sparse_perm; assemble = assemble)
+end
+
 # ── Vector I/O ────────────────────────────────────────────────────────────────
 #
 # VecGetArray / VecGetArrayRead return Julia Arrays wrapping PETSc's internal
@@ -350,9 +381,8 @@ end
 # optionally attach a null space.  Called on Case 1 (first solve) and Case 2
 # (structure changed).
 #
-# For sparse matrices, the CSC→CSR permutation is computed here once and stored
-# in pcache for reuse on all subsequent Case 3 value-only updates. The buffers
-# are only reallocated when nnz changes (which implies a Case 2 rebuild anyway).
+# For sparse matrices, the sparsity pattern and any permutation data are stored
+# in pcache for reuse on all subsequent Case 3 value-only updates.
 #
 # vec_n is reset to 0 so ensure_vecs! unconditionally recreates petsc_x and
 # petsc_b after every rebuild — required when the problem size changes.
@@ -360,18 +390,8 @@ function build_ksp!(pcache, petsclib, cache, alg)
     pcache.vec_n = 0
     pcache.petsc_A = to_petsc_mat(petsclib, cache.A)
 
-    if cache.A isa SparseMatrixCSC
-        nnz = length(cache.A.nzval)
-        m = size(cache.A, 1)
-        # Reallocate only when nnz changes (implies a structural change).
-        if pcache.sparse_perm === nothing || length(pcache.sparse_perm) != nnz
-            pcache.sparse_perm = Vector{Int}(undef, nnz)
-            pcache.sparse_scratch = Vector{Int}(undef, 2 * (m + 1))
-        end
-        _csc_to_csr_perm!(pcache.sparse_perm, pcache.sparse_scratch, cache.A)
-        # Store the current sparsity pattern
-        pcache.prev_colptr = cache.A.colptr
-        pcache.prev_rowval = cache.A.rowval
+    if is_sparse_petsc(cache.A)
+        store_sparse_pattern!(pcache, cache.A)
     else
         pcache.sparse_perm = nothing
         pcache.sparse_scratch = nothing
@@ -440,17 +460,8 @@ function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm; kwargs...)
     # ── Decide: rebuild, update in-place, or reuse ────────────────────────────
     rebuild_ksp = pcache.ksp === nothing   # Case 1
     if !rebuild_ksp && cache.isfresh
-        if cache.A isa SparseMatrixCSC
-            if pcache.prev_colptr === nothing || pcache.prev_rowval === nothing
-                rebuild_ksp = true
-            else
-                # Compare stored pointers/arrays directly against the new matrix
-                rebuild_ksp = sparsity_pattern_changed(
-                    pcache.prev_colptr,
-                    pcache.prev_rowval,
-                    cache.A
-                )
-            end
+        if is_sparse_petsc(cache.A)
+            rebuild_ksp = check_pattern_changed(pcache, cache.A)
         else
             # For dense matrices, check if the size has changed
             rebuild_ksp = pcache.prev_size !== nothing && size(cache.A) != pcache.prev_size
@@ -461,18 +472,17 @@ function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm; kwargs...)
         build_ksp!(pcache, petsclib, cache, alg)
     elseif cache.isfresh
         # Case 3: same structure — update values without touching the KSP object.
-        if cache.A isa SparseMatrixCSC
-            update_mat_values!(
-                petsclib, pcache.petsc_A, cache.A, pcache.sparse_perm;
+        if is_sparse_petsc(cache.A)
+            update_sparse_values!(
+                petsclib, pcache.petsc_A, pcache, cache.A;
                 assemble = cache.precsisfresh
             )
         else
             update_mat_values!(petsclib, pcache.petsc_A, cache.A)
         end
         if alg.prec_matrix !== nothing
-            if alg.prec_matrix isa SparseMatrixCSC
-                # Preconditioner shares the pattern with A — reuse the permutation.
-                update_mat_values!(petsclib, pcache.petsc_P, alg.prec_matrix, pcache.sparse_perm)
+            if is_sparse_petsc(alg.prec_matrix)
+                update_sparse_values!(petsclib, pcache.petsc_P, pcache, alg.prec_matrix)
             else
                 update_mat_values!(petsclib, pcache.petsc_P, alg.prec_matrix)
             end

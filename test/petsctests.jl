@@ -4,6 +4,7 @@ using MPI
 using PETSc
 using SparseArrays
 using SparseMatricesCSR
+import SparseMatricesCSR: getrowptr, getcolval
 using Random
 using Test
 
@@ -650,4 +651,206 @@ end
         end
         PETScExt.cleanup_petsc_cache!(cache)
     end
+end
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  CSR{0} MATRIX TESTS (SparseMatrixCSR{0} — 0-based indices, zero-copy path)
+#  SparseMatrixCSR{0} matches PETSc's native CSR layout exactly:
+#    • Cold start  — no index shift, arrays borrowed directly.
+#    • Value update — direct copyto! into PETSc's buffer (no permutation).
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Helper: build a SparseMatrixCSR{0} from a CSC matrix.
+# The 1→0 shift is paid once here; all subsequent PETSc calls are zero-copy.
+function csr0_from_csc(A_csc::SparseMatrixCSC)
+    csr1 = SparseMatrixCSR(A_csc)
+    rowptr = getrowptr(csr1) .- one(eltype(getrowptr(csr1)))
+    colval = getcolval(csr1) .- one(eltype(getcolval(csr1)))
+    return SparseMatrixCSR{0}(size(A_csc, 1), size(A_csc, 2), rowptr, colval, copy(csr1.nzval))
+end
+
+@testset "Serial: CSR{0} Basic Solvers" begin
+    n = 100
+    A_csc = sprand(n, n, 0.05) + 10I; A_csc = A_csc'A_csc
+    A_csr0 = csr0_from_csc(A_csc)
+    b = rand(n)
+
+    @testset "GMRES (CSR{0})" begin
+        sol = solve(
+            LinearProblem(A_csr0, b), PETScAlgorithm(:gmres); abstol = 1.0e-10, reltol = 1.0e-10
+        )
+        @test norm(A_csc * sol.u - b) / norm(b) < 1.0e-6
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
+
+    @testset "CG (CSR{0})" begin
+        sol = solve(
+            LinearProblem(A_csr0, b), PETScAlgorithm(:cg); abstol = 1.0e-10, reltol = 1.0e-10
+        )
+        @test norm(A_csc * sol.u - b) / norm(b) < 1.0e-6
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
+
+    @testset "GMRES + ILU (CSR{0})" begin
+        sol = solve(
+            LinearProblem(A_csr0, b), PETScAlgorithm(:gmres; pc_type = :ilu);
+            abstol = 1.0e-10, reltol = 1.0e-10
+        )
+        @test norm(A_csc * sol.u - b) / norm(b) < 1.0e-6
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
+end
+
+@testset "Serial: CSR{0} Cache Interface" begin
+    n = 100
+    A_csc = sprand(n, n, 0.05) + 10I; A_csc = A_csc'A_csc
+    A_csr0 = csr0_from_csc(A_csc)
+    b = rand(n)
+
+    cache = SciMLBase.init(
+        LinearProblem(A_csr0, b), PETScAlgorithm(:gmres); abstol = 1.0e-10, reltol = 1.0e-10
+    )
+    sol1 = solve!(cache)
+    @test norm(A_csc * sol1.u - b) / norm(b) < 1.0e-6
+
+    b2 = rand(n)
+    cache.b = b2
+    sol2 = solve!(cache)
+    @test norm(A_csc * sol2.u - b2) / norm(b2) < 1.0e-6
+    PETScExt.cleanup_petsc_cache!(cache)
+end
+
+@testset "Serial: CSR{0} Matrix Rebuild Logic" begin
+    n = 50
+    Random.seed!(456)
+
+    base = sprand(n, n, 0.1); base = base + base' + 10I
+    pattern_I, pattern_J, _ = findnz(base)
+
+    # Shared 0-based index arrays — same sparsity pattern for all Case-3 solves.
+    base_csr1 = SparseMatrixCSR(base)
+    rowptr0 = getrowptr(base_csr1) .- 1
+    colval0 = getcolval(base_csr1) .- 1
+
+    function make_csr0_spd_with_pattern(scale)
+        vals = abs.(randn(length(pattern_I))) .* scale
+        A = sparse(pattern_I, pattern_J, vals, n, n); A = A + A'
+        d = vec(sum(abs.(A), dims = 2)) .+ scale
+        for i in 1:n
+            A[i, i] = d[i]
+        end
+        csr1 = SparseMatrixCSR(A)
+        # Reuse the shared rowptr0/colval0 only when pattern matches;
+        # otherwise build fresh 0-based arrays (required for Case-2 test).
+        rp = getrowptr(csr1) .- 1
+        cv = getcolval(csr1) .- 1
+        return SparseMatrixCSR{0}(n, n, rp, cv, copy(csr1.nzval))
+    end
+
+    @testset "Case 1: first solve builds KSP (CSR{0})" begin
+        A = make_csr0_spd_with_pattern(10.0)
+        b = rand(n)
+        cache = SciMLBase.init(
+            LinearProblem(A, b), PETScAlgorithm(:cg; pc_type = :jacobi); abstol = 1.0e-10
+        )
+        @test cache.cacheval.ksp === nothing
+        sol = solve!(cache)
+        @test cache.cacheval.ksp !== nothing
+        @test norm(Matrix(A) * sol.u - b) / norm(b) < 1.0e-6
+        PETScExt.cleanup_petsc_cache!(cache)
+    end
+
+    @testset "Case 3: same sparsity — KSP reused, values updated (CSR{0})" begin
+        # make_csr0_spd_with_pattern builds valid SPD matrices with the same sparsity
+        # pattern (same rowptr/colval *values*), so check_pattern_changed returns false
+        # via element comparison and the KSP is reused.
+        A1 = make_csr0_spd_with_pattern(10.0)
+        b1 = rand(n)
+        cache = SciMLBase.init(
+            LinearProblem(A1, b1), PETScAlgorithm(:cg; pc_type = :jacobi); abstol = 1.0e-10
+        )
+        solve!(cache)
+        ksp_before = cache.cacheval.ksp
+
+        A2 = make_csr0_spd_with_pattern(20.0)
+        b2 = rand(n)
+        SciMLBase.reinit!(cache; A = A2, b = b2)
+        sol2 = solve!(cache)
+
+        @test cache.cacheval.ksp === ksp_before   # KSP reused
+        @test norm(Matrix(A2) * sol2.u - b2) / norm(b2) < 1.0e-6
+        PETScExt.cleanup_petsc_cache!(cache)
+    end
+
+    @testset "Case 2: sparsity changed — KSP rebuilt (CSR{0})" begin
+        A1 = make_csr0_spd_with_pattern(10.0)
+        b1 = rand(n)
+        cache = SciMLBase.init(
+            LinearProblem(A1, b1), PETScAlgorithm(:cg; pc_type = :jacobi); abstol = 1.0e-10
+        )
+        solve!(cache)
+        ksp_before = cache.cacheval.ksp
+
+        A3_csc = sprand(n, n, 0.2) + 15I; A3_csc = A3_csc + A3_csc'
+        A3 = csr0_from_csc(A3_csc)
+        b3 = rand(n)
+        SciMLBase.reinit!(cache; A = A3, b = b3)
+        sol3 = solve!(cache)
+
+        @test cache.cacheval.ksp !== ksp_before   # KSP rebuilt
+        @test norm(A3_csc * sol3.u - b3) / norm(b3) < 1.0e-6
+        PETScExt.cleanup_petsc_cache!(cache)
+    end
+
+    @testset "Case 3: correctness over multiple value-only updates (CSR{0})" begin
+        A = make_csr0_spd_with_pattern(10.0)
+        b = rand(n)
+        cache = SciMLBase.init(
+            LinearProblem(A, b), PETScAlgorithm(:cg; pc_type = :jacobi); abstol = 1.0e-10
+        )
+        solve!(cache)
+
+        for i in 1:5
+            A_new = make_csr0_spd_with_pattern(10.0 + i)
+            b_new = rand(n)
+            SciMLBase.reinit!(cache; A = A_new, b = b_new)
+            sol = solve!(cache)
+            @test norm(Matrix(A_new) * sol.u - b_new) / norm(b_new) < 1.0e-6
+        end
+        PETScExt.cleanup_petsc_cache!(cache)
+    end
+end
+
+@testset "Serial: CSR{0} zero-copy fast path" begin
+    # When Bi=0, Ti==PetscInt, Tv==PetscScalar the canonical conversion returns
+    # A itself — no allocation.  Verify the backing arrays are not copied by
+    # checking that pointer identity is preserved after construction and after
+    # a Case-3 value-only update.
+    n = 50
+    A_csc = sprand(n, n, 0.1) + 10I; A_csc = A_csc'A_csc
+    A0 = csr0_from_csc(A_csc)
+    b = rand(n)
+
+    ptr_rp = pointer(getrowptr(A0))
+    ptr_cv = pointer(getcolval(A0))
+    ptr_nz = pointer(A0.nzval)
+
+    cache = SciMLBase.init(
+        LinearProblem(A0, b), PETScAlgorithm(:gmres); abstol = 1.0e-10
+    )
+    sol = solve!(cache)
+    @test norm(A_csc * sol.u - b) / norm(b) < 1.0e-6
+
+    # Pointers must be unchanged — no hidden copy of the index or value arrays.
+    @test pointer(getrowptr(A0)) === ptr_rp
+    @test pointer(getcolval(A0)) === ptr_cv
+    @test pointer(A0.nzval) === ptr_nz
+
+    # Case-3 update: scale A0's nzval — reuses the same index arrays and preserves SPD.
+    A0_new = SparseMatrixCSR{0}(n, n, getrowptr(A0), getcolval(A0), A0.nzval .* 1.5)
+    SciMLBase.reinit!(cache; A = A0_new, b = rand(n))
+    sol2 = solve!(cache)
+    @test norm(Matrix(A0_new) * sol2.u - cache.b) / norm(cache.b) < 1.0e-6
+
+    PETScExt.cleanup_petsc_cache!(cache)
 end

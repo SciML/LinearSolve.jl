@@ -120,6 +120,36 @@ end
     end
 end
 
+@testset "PSparseMatrix SplitMatrix: GMRES + Jacobi preconditioner" begin
+    n = 8
+    with_mpi() do distribute
+        rp = mpi_row_partition(distribute, n)
+        A, b, u = build_splitmat_diag(rp)
+        sol = solve(
+            LinearProblem(A, b; u0 = u),
+            PETScAlgorithm(:gmres; pc_type = :jacobi);
+            abstol = 1.0e-12
+        )
+        @test sol.retcode == SciMLBase.ReturnCode.Success
+        assert_owned_approx(sol.u, 1.0)
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
+end
+
+@testset "PSparseMatrix SplitMatrix: explicit prec_matrix" begin
+    n = 8
+    with_mpi() do distribute
+        rp = mpi_row_partition(distribute, n)
+        A, b, u = build_splitmat_diag(rp)
+        P, _, _ = build_splitmat_diag(rp)
+        alg = PETScAlgorithm(:gmres; pc_type = :jacobi, prec_matrix = P)
+        sol = solve(LinearProblem(A, b; u0 = u), alg; abstol = 1.0e-12)
+        @test sol.retcode == SciMLBase.ReturnCode.Success
+        assert_owned_approx(sol.u, 1.0)
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
+end
+
 @testset "PSparseMatrix SplitMatrix: tridiagonal GMRES + Jacobi" begin
     # Diagonally dominant tridiagonal: A[i,i]=4, A[i,i±1]=-1
     n = 12
@@ -224,6 +254,36 @@ end
     end
 end
 
+@testset "PSparseMatrix CSR{0}: GMRES + Jacobi preconditioner" begin
+    n = 8
+    with_mpi() do distribute
+        rp = mpi_row_partition(distribute, n)
+        A, b, u = build_csr_diag(rp)
+        sol = solve(
+            LinearProblem(A, b; u0 = u),
+            PETScAlgorithm(:gmres; pc_type = :jacobi);
+            abstol = 1.0e-12
+        )
+        @test sol.retcode == SciMLBase.ReturnCode.Success
+        assert_owned_approx(sol.u, 1.0)
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
+end
+
+@testset "PSparseMatrix CSR{0}: explicit prec_matrix" begin
+    n = 8
+    with_mpi() do distribute
+        rp = mpi_row_partition(distribute, n)
+        A, b, u = build_csr_diag(rp)
+        P, _, _ = build_csr_diag(rp)
+        alg = PETScAlgorithm(:gmres; pc_type = :jacobi, prec_matrix = P)
+        sol = solve(LinearProblem(A, b; u0 = u), alg; abstol = 1.0e-12)
+        @test sol.retcode == SciMLBase.ReturnCode.Success
+        assert_owned_approx(sol.u, 1.0)
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
+end
+
 @testset "PSparseMatrix CSR{0}: reinit! Case 3 — KSP reused, values updated" begin
     # For CSR{0} local mats the fast pattern-check path is taken, so a
     # same-pattern reinit! should reuse the existing KSP object.
@@ -318,6 +378,36 @@ end
     end
 end
 
+@testset "PSparseMatrix DebugArray SplitMatrix: GMRES + Jacobi preconditioner" begin
+    n = 8
+    with_debug() do distribute
+        rp = debug_row_partition(distribute, n)
+        A, b, u = build_splitmat_diag(rp)
+        sol = solve(
+            LinearProblem(A, b; u0 = u),
+            PETScAlgorithm(:gmres; pc_type = :jacobi);
+            abstol = 1.0e-12
+        )
+        @test sol.retcode == SciMLBase.ReturnCode.Success
+        assert_owned_approx(sol.u, 1.0)
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
+end
+
+@testset "PSparseMatrix DebugArray SplitMatrix: explicit prec_matrix" begin
+    n = 8
+    with_debug() do distribute
+        rp = debug_row_partition(distribute, n)
+        A, b, u = build_splitmat_diag(rp)
+        P, _, _ = build_splitmat_diag(rp)
+        alg = PETScAlgorithm(:gmres; pc_type = :jacobi, prec_matrix = P)
+        sol = solve(LinearProblem(A, b; u0 = u), alg; abstol = 1.0e-12)
+        @test sol.retcode == SciMLBase.ReturnCode.Success
+        assert_owned_approx(sol.u, 1.0)
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
+end
+
 @testset "PSparseMatrix DebugArray SplitMatrix: reinit! (Case 2 — pattern change)" begin
     n = 8
     with_debug() do distribute
@@ -383,6 +473,36 @@ end
         rp = debug_row_partition(distribute, n)
         A, b, u = build_csr_diag(rp)
         sol = solve(LinearProblem(A, b; u0 = u), PETScAlgorithm(:gmres); abstol = 1.0e-12)
+        @test sol.retcode == SciMLBase.ReturnCode.Success
+        assert_owned_approx(sol.u, 1.0)
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
+end
+
+@testset "PSparseMatrix DebugArray CSR{0}: GMRES + Jacobi preconditioner" begin
+    n = 8
+    with_debug() do distribute
+        rp = debug_row_partition(distribute, n)
+        A, b, u = build_csr_diag(rp)
+        sol = solve(
+            LinearProblem(A, b; u0 = u),
+            PETScAlgorithm(:gmres; pc_type = :jacobi);
+            abstol = 1.0e-12
+        )
+        @test sol.retcode == SciMLBase.ReturnCode.Success
+        assert_owned_approx(sol.u, 1.0)
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
+end
+
+@testset "PSparseMatrix DebugArray CSR{0}: explicit prec_matrix" begin
+    n = 8
+    with_debug() do distribute
+        rp = debug_row_partition(distribute, n)
+        A, b, u = build_csr_diag(rp)
+        P, _, _ = build_csr_diag(rp)
+        alg = PETScAlgorithm(:gmres; pc_type = :jacobi, prec_matrix = P)
+        sol = solve(LinearProblem(A, b; u0 = u), alg; abstol = 1.0e-12)
         @test sol.retcode == SciMLBase.ReturnCode.Success
         assert_owned_approx(sol.u, 1.0)
         PETScExt.cleanup_petsc_cache!(sol)

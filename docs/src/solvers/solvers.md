@@ -391,9 +391,20 @@ GinkgoJL_GMRES
     Passing a multi-rank communicator will raise an error.  MPI-parallel support is planned
     for a future release.
 
-`PETScAlgorithm` wraps PETSc's KSP (Krylov subspace) solvers and exposes the full PETSc
-preconditioner interface using [PETSc.jl](https://github.com/JuliaParallel/PETSc.jl).  It works with **dense matrices**, **`SparseMatrixCSC`**, and
-**`SparseMatrixCSR`** (from [SparseMatricesCSR.jl](https://github.com/gridap/SparseMatricesCSR.jl)).
+[PETSc](https://petsc.org) (Portable, Extensible Toolkit for Scientific Computation) is a
+library for the parallel numerical solution of scientific applications.  Its KSP
+component provides a comprehensive suite of Krylov iterative solvers paired with a large
+selection of preconditioners.
+
+`PETScAlgorithm` wraps PETSc's KSP solvers via [PETSc.jl](https://github.com/JuliaParallel/PETSc.jl)
+and exposes the full preconditioner interface.  It works with **dense matrices**,
+**`SparseMatrixCSC`**, and **`SparseMatrixCSR`** (from
+[SparseMatricesCSR.jl](https://github.com/gridap/SparseMatricesCSR.jl)).
+
+**When to choose PETSc over the pure-Julia Krylov solvers:**
+- You want to test a wide variety of Krylov methods and preconditioners without needing to add multiple Julia packages.
+- You want direct access to PETSc's Options Database to fine-tune solver behavior at runtime
+  without recompiling.
 
 #### Solver type
 

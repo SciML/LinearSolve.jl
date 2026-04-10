@@ -385,12 +385,6 @@ GinkgoJL_GMRES
     MPI.Init()
     ```
 
-!!! warning "Serial only"
-
-    The current implementation supports only **single-process** solves (`MPI.COMM_SELF`).
-    Passing a multi-rank communicator will raise an error.  MPI-parallel support is planned
-    for a future release.
-
 [PETSc](https://petsc.org) (Portable, Extensible Toolkit for Scientific Computation) is a
 library for the parallel numerical solution of scientific applications.  Its KSP
 component provides a comprehensive suite of Krylov iterative solvers paired with a large
@@ -405,6 +399,7 @@ and exposes the full preconditioner interface.  It works with **dense matrices**
 - You want to test a wide variety of Krylov methods and preconditioners without needing to add multiple Julia packages.
 - You want direct access to PETSc's Options Database to fine-tune solver behavior at runtime
   without recompiling.
+- You want to solve large sparse systems in parallel using MPI, with PETSc handling the communication and load balancing.
 
 #### Solver type
 
@@ -562,6 +557,104 @@ PETScExt.cleanup_petsc_cache!(cache) # after init/solve! cycle
 ```
 
 A GC finalizer is registered as a safety net, but explicit cleanup is strongly preferred.
+
+#### MPI-parallel solves
+
+`PETScAlgorithm` supports **distributed-memory parallel** solves when the system matrix
+is a `PSparseMatrix` and the RHS/solution are `PVector` from
+[PartitionedArrays.jl](https://github.com/gridap/PartitionedArrays.jl).  Each MPI rank
+contributes its owned rows; PETSc assembles and solves the global system in parallel.
+
+Requires loading all four trigger packages:
+
+```julia
+using LinearSolve, PETSc, MPI
+using PartitionedArrays, SparseArrays, SparseMatricesCSR
+MPI.Init()
+```
+
+!!! note
+
+    Run scripts with `mpiexecjl -n <P> julia --project script.jl`.
+    For single-process testing without MPI, use `with_debug()` instead of `with_mpi()`;
+    it runs the same code sequentially using `DebugArray` as the backend.
+
+##### Basic parallel solve
+
+```julia
+using LinearSolve, PETSc, MPI
+using PartitionedArrays, PartitionedArrays: PSparseMatrix, PVector,
+    uniform_partition, partition, tuple_of_arrays
+using SparseArrays, SparseMatricesCSR
+MPI.Init()
+
+# Build a simple diagonal system distributed across all ranks.
+# A[i,i] = i,  b[i] = i  →  exact solution u[i] = 1 everywhere.
+n = 100
+with_mpi() do distribute
+    parts = distribute(LinearIndices((MPI.Comm_size(MPI.COMM_WORLD),)))
+    row_partition = uniform_partition(parts, n)
+
+    I_v, J_v, V_v = map(row_partition) do rng
+        collect(Int, rng), collect(Int, rng), Float64.(rng)
+    end |> tuple_of_arrays
+    A = psparse(I_v, J_v, V_v, row_partition, row_partition) |> fetch
+
+    b = PVector(map(rng -> Float64.(collect(rng)), row_partition), row_partition)
+    u = PVector(map(rng -> zeros(length(rng)), row_partition), row_partition)
+
+    sol = solve(LinearProblem(A, b; u0 = u), PETScAlgorithm(:gmres); abstol = 1e-12)
+    # sol.u is a PVector whose owned DOFs contain the solution on each rank.
+    # Ghost values are stale after the solve; call consistent!(sol.u) if needed.
+end
+```
+
+##### Repeated parallel solves (same sparsity pattern, values change)
+
+For `SparseMatrixCSR{0}` local matrices, if the sparsity pattern
+is unchanged between `reinit!` calls the KSP is reused and only the matrix values
+are updated no reallocation of PETSc objects.
+
+```julia
+with_mpi() do distribute
+    parts = distribute(LinearIndices((MPI.Comm_size(MPI.COMM_WORLD),)))
+    row_partition = uniform_partition(parts, n)
+
+    function build_csr_diag(row_partition, scale)
+        csr_part = map(row_partition) do rng
+            m = length(rng)
+            sp = sparse(1:m, 1:m, scale .* Float64.(collect(rng)), m, m)
+            convert(SparseMatrixCSR{0, Float64, Int64}, sp)
+        end
+        A = PSparseMatrix(csr_part, row_partition, row_partition, true)
+        b = PVector(map(rng -> scale .* Float64.(collect(rng)), row_partition), row_partition)
+        u = PVector(map(rng -> zeros(length(rng)), row_partition), row_partition)
+        A, b, u
+    end
+
+    A1, b1, u1 = build_csr_diag(row_partition, 1.0)
+    cache = SciMLBase.init(LinearProblem(A1, b1; u0 = u1), PETScAlgorithm(:gmres))
+    solve!(cache)
+
+    for scale in [2.0, 3.0, 4.0]
+        A_new, b_new, _ = build_csr_diag(row_partition, scale)
+        SciMLBase.reinit!(cache; A = A_new, b = b_new)
+        solve!(cache)   # KSP reused; only values updated
+    end
+
+    PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
+    PETScExt.cleanup_petsc_cache!(cache)
+end
+```
+
+!!! note "Ghost synchronisation"
+
+    After the solve, only the **owned** degrees of freedom in `sol.u` are updated.
+    Ghost values remain stale.  If subsequent operations (e.g. the next matrix–vector
+    product) need ghost values, call:
+    ```julia
+    PartitionedArrays.consistent!(sol.u)
+    ```
 
 ```@docs
 PETScAlgorithm

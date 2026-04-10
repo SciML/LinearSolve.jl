@@ -64,7 +64,7 @@ end
 # 3. Store the canonical CSR object — not just the arrays — as the GC anchor
 #    so that PETSc's borrowed pointers remain valid for the lifetime of PA.
 
-function PETScExt.to_petsc_mat(petsclib, A::SparseMatrixCSR{Bi}) where {Bi}
+function PETScExt.to_petsc_mat(petsclib, A::SparseMatrixCSR{Bi}, pcache = nothing) where {Bi}
     PetscInt = PETSc.inttype(petsclib)
     PetscScalar = PETSc.scalartype(petsclib)
 

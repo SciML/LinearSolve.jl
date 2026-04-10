@@ -1,6 +1,7 @@
 SciMLLogging.@verbosity_specifier LinearVerbosity begin
     toggles = (
         :default_lu_fallback,
+        :residual_safety,
         :no_right_preconditioning,
         :using_IterativeSolvers,
         :IterativeSolvers_iterations,
@@ -21,6 +22,7 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
     presets = (
         None = (
             default_lu_fallback = Silent(),
+            residual_safety = Silent(),
             no_right_preconditioning = Silent(),
             using_IterativeSolvers = Silent(),
             IterativeSolvers_iterations = Silent(),
@@ -39,6 +41,7 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
         ),
         Minimal = (
             default_lu_fallback = Silent(),
+            residual_safety = Silent(),
             no_right_preconditioning = Silent(),
             using_IterativeSolvers = Silent(),
             IterativeSolvers_iterations = Silent(),
@@ -57,6 +60,7 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
         ),
         Standard = (
             default_lu_fallback = Silent(),
+            residual_safety = Silent(),
             no_right_preconditioning = Silent(),
             using_IterativeSolvers = Silent(),
             IterativeSolvers_iterations = Silent(),
@@ -75,6 +79,7 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
         ),
         Detailed = (
             default_lu_fallback = WarnLevel(),
+            residual_safety = WarnLevel(),
             no_right_preconditioning = InfoLevel(),
             using_IterativeSolvers = InfoLevel(),
             IterativeSolvers_iterations = Silent(),
@@ -93,6 +98,7 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
         ),
         All = (
             default_lu_fallback = WarnLevel(),
+            residual_safety = WarnLevel(),
             no_right_preconditioning = InfoLevel(),
             using_IterativeSolvers = InfoLevel(),
             IterativeSolvers_iterations = InfoLevel(),
@@ -112,7 +118,7 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
     )
 
     groups = (
-        error_control = (:default_lu_fallback, :blas_errors, :blas_invalid_args),
+        error_control = (:default_lu_fallback, :residual_safety, :blas_errors, :blas_invalid_args),
         performance = (:no_right_preconditioning,),
         numerical = (
             :using_IterativeSolvers, :IterativeSolvers_iterations,
@@ -133,6 +139,7 @@ diagnostic messages, warnings, and errors during linear system solution.
 
 ## Error Control Group
 - `default_lu_fallback`: Messages when falling back to LU factorization from other methods
+- `residual_safety`: Messages from the residual safety check (`‖A*x - b‖` vs tolerance)
 - `blas_errors`: Critical BLAS errors that stop computation
 - `blas_invalid_args`: BLAS errors due to invalid arguments
 
@@ -196,7 +203,7 @@ verbose = LinearVerbosity(
 """ LinearVerbosity
 
 # Group classifications (for backwards compatibility)
-const error_control_options = (:default_lu_fallback, :blas_errors, :blas_invalid_args)
+const error_control_options = (:default_lu_fallback, :residual_safety, :blas_errors, :blas_invalid_args)
 const performance_options = (:no_right_preconditioning,)
 const numerical_options = (
     :using_IterativeSolvers, :IterativeSolvers_iterations,

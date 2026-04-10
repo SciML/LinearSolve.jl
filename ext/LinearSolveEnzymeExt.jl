@@ -37,6 +37,16 @@ function _safe_add!(dst::AbstractArray, src::AbstractArray)
     return dst
 end
 
+function _safe_add!(dst::LinearAlgebra.Symmetric, src::LinearAlgebra.Symmetric)
+    parent(dst) .+= parent(src)
+    return dst
+end
+
+function _safe_add!(dst::LinearAlgebra.Symmetric, src::AbstractArray)
+    parent(dst) .+= src
+    return dst
+end
+
 """
     _safe_zero!(A)
 
@@ -50,6 +60,11 @@ end
 
 function _safe_zero!(A::AbstractArray)
     fill!(A, zero(eltype(A)))
+    return A
+end
+
+function _safe_zero!(A::LinearAlgebra.Symmetric)
+    fill!(parent(A), zero(eltype(A)))
     return A
 end
 
@@ -141,6 +156,42 @@ end
 
 function _sparse_outer_sub!(dA::AbstractArray, z::AbstractVector, y::AbstractVector)
     dA .-= z * transpose(y)
+    return dA
+end
+
+function _sparse_outer_sub!(
+        dA::LinearAlgebra.Symmetric, z::AbstractVector, y::AbstractVector
+    )
+    # `Symmetric` disallows writing off-diagonal entries via `setindex!` on the wrapper.
+    # Accumulate directly into the parent storage while preserving symmetry by updating
+    # only the stored triangle with the reduced gradient for unique symmetric entries.
+    A_parent = parent(dA)
+    n = size(A_parent, 1)
+
+    @assert size(A_parent, 1) == size(A_parent, 2)
+    @assert length(z) == n
+    @assert length(y) == n
+
+    if dA.uplo == :U
+        @inbounds for j in 1:n
+            zj = z[j]
+            yj = y[j]
+            for i in 1:(j - 1)
+                A_parent[i, j] -= z[i] * yj + zj * y[i]
+            end
+            A_parent[j, j] -= zj * yj
+        end
+    else
+        @inbounds for j in 1:n
+            zj = z[j]
+            yj = y[j]
+            A_parent[j, j] -= zj * yj
+            for i in (j + 1):n
+                A_parent[i, j] -= z[i] * yj + zj * y[i]
+            end
+        end
+    end
+
     return dA
 end
 

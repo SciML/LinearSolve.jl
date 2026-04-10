@@ -365,7 +365,7 @@ function is_algorithm_available(alg::DefaultAlgorithmChoice.T)
 end
 
 """
-    DefaultLinearSolver(;safetyfallback=true, residualsafety=safetyfallback)
+    DefaultLinearSolver(;safetyfallback=true, residualsafety=false)
 
 The default linear solver. This is the algorithm chosen when `solve(prob)`
 is called. It's a polyalgorithm that detects the optimal method for a given
@@ -374,11 +374,15 @@ is called. It's a polyalgorithm that detects the optimal method for a given
 ## Keyword Arguments
 
   - `safetyfallback`: determines whether to fallback to a column-pivoted QR factorization
-    when an LU factorization fails. Defaults to `true`.
+    when an LU factorization fails (zero pivot) or produces non-finite values (NaN/Inf
+    from near-singular matrices). Defaults to `true`.
   - `residualsafety`: when `true`, the inner LU algorithm computes the post-solve residual
     `‖A*x - b‖` and returns `ReturnCode.APosterioriSafetyFailure` if it exceeds
     `abstol + reltol * ‖b‖`. The default solver then falls back to column-pivoted QR.
-    Defaults to the value of `safetyfallback` (i.e. `true` by default).
+    Defaults to `false`. Note: for ill-conditioned matrices, LU with partial pivoting
+    always achieves optimal backward error (≈ eps), so the large forward residual reflects
+    the problem conditioning, not algorithm failure. Enabling this check can trigger
+    unnecessary fallbacks; callers should set appropriate `abstol`/`reltol` values.
 
 ## Residual Safety
 
@@ -393,7 +397,7 @@ struct DefaultLinearSolver <: SciMLLinearSolveAlgorithm
     alg::DefaultAlgorithmChoice.T
     safetyfallback::Bool
     residualsafety::Bool
-    DefaultLinearSolver(alg; safetyfallback = true, residualsafety = safetyfallback) = new(alg, safetyfallback, residualsafety)
+    DefaultLinearSolver(alg; safetyfallback = true, residualsafety = false) = new(alg, safetyfallback, residualsafety)
 end
 
 const BLASELTYPES = Union{Float32, Float64, ComplexF32, ComplexF64}
@@ -462,7 +466,11 @@ for alg in (
     )
     @eval needs_square_A(::$(alg)) = false
 end
-for kralg in (Krylov.lsmr!, Krylov.craigmr!)
+for kralg in (
+        Krylov.lsmr!, Krylov.craigmr!, Krylov.lsqr!, Krylov.cgls!,
+        Krylov.crls!, Krylov.cgne!, Krylov.craig!, Krylov.lslq!,
+        Krylov.crmr!, Krylov.lnlq!,
+    )
     @eval needs_square_A(::KrylovJL{$(typeof(kralg))}) = false
 end
 for alg in (
@@ -521,6 +529,8 @@ export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
     IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
     IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES, IterativeSolversJL_IDRS,
     KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES, KrylovJL_MINARES, AlgebraicMultigridJL
+
+export ElementalJL
 
 export GinkgoJL, GinkgoJL_CG, GinkgoJL_GMRES
 

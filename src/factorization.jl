@@ -134,6 +134,9 @@ function _check_residual_safety(cache::LinearCache, alg, A_original, y)
     b_norm = norm(b)
     tol = cache.abstol + cache.reltol * b_norm
     if res_norm > tol
+        @SciMLMessage(cache.verbose, :residual_safety) do
+            return "Residual safety check failed: ‖A*x - b‖ = $(res_norm), tol = $(tol) (abstol = $(cache.abstol), reltol = $(cache.reltol), ‖b‖ = $(b_norm), ratio = $(res_norm / tol))"
+        end
         return SciMLBase.build_linear_solution(
             alg, y, nothing, cache; retcode = ReturnCode.APosterioriSafetyFailure
         )

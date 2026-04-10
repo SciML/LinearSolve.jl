@@ -9,13 +9,15 @@ using SciMLBase: LinearSolution, build_linear_solution, ReturnCode, SciMLBase
 
 # ── MPI communicator ──────────────────────────────────────────────────────────
 
-# Only MPI.COMM_SELF (serial) is supported. MPI-parallel solves are planned
-# for a future release.
-function resolve_comm(alg::PETScAlgorithm)
+# Default (serial) communicator resolution.  Return MPI.COMM_SELF or error if
+# a non-serial comm is requested for a standard Julia matrix.
+# Overloaded by LinearSolvePETScMPIExt to support PSparseMatrix / PVector.
+function get_comm(alg::PETScAlgorithm, A)
     comm = alg.comm === nothing ? MPI.COMM_SELF : alg.comm
     comm == MPI.COMM_SELF || error(
         "PETScAlgorithm currently only supports MPI.COMM_SELF (serial solves). " *
-            "Pass `comm = nothing` or `comm = MPI.COMM_SELF` to use serial mode."
+            "Pass `comm = nothing` or `comm = MPI.COMM_SELF` to use serial mode, " *
+            "or use a PSparseMatrix / PVector for MPI-parallel solves."
     )
     return comm
 end
@@ -64,6 +66,9 @@ Fields
                      KSP build and reused on every Case 3 update with zero allocations.
 - `sparse_scratch` — Scratch buffer of length `2*(m+1)` used by `_csc_to_csr_perm!`
                      to avoid allocation during permutation construction.
+- `mpi_data`       — Opaque slot for MPI-specific per-matrix data (populated by
+                     `LinearSolvePETScMPIExt` when A is a `PSparseMatrix`).  `nothing`
+                     for all serial matrix types.
 - `initialized`    — `true` once `PETSc.initialize` has been called for this cache.
 """
 mutable struct PETScCache{T}
@@ -81,6 +86,7 @@ mutable struct PETScCache{T}
     prev_size::Union{NTuple{2, Int}, Nothing}
     sparse_perm::Union{Vector{Int}, Nothing}
     sparse_scratch::Union{Vector{Int}, Nothing}
+    mpi_data::Any
     initialized::Bool
 end
 
@@ -89,7 +95,7 @@ end
 function _nullify_all!(pcache::PETScCache)
     pcache.ksp = pcache.petsc_A = pcache.petsc_P = pcache.nullspace_obj = nothing
     pcache.petsc_x = pcache.petsc_b = nothing
-    pcache.sparse_perm = pcache.sparse_scratch = nothing
+    pcache.sparse_perm = pcache.sparse_scratch = pcache.mpi_data = nothing
     pcache.vec_n = 0
     pcache.prev_colptr = pcache.prev_rowval = pcache.prev_size = nothing
     return pcache.initialized = false
@@ -151,7 +157,8 @@ function LinearSolve.init_cacheval(
     T = eltype(A)
     pcache = PETScCache{T}(
         nothing, nothing, nothing, nothing, nothing, nothing,
-        nothing, nothing, 0, nothing, nothing, nothing, nothing, nothing, false
+        nothing, nothing, 0, nothing, nothing, nothing, nothing, nothing,
+        nothing, false
     )
     finalizer(cleanup_petsc_cache!, pcache)
     return pcache
@@ -163,7 +170,7 @@ end
 # Overloaded by LinearSolvePETScCSRExt to also return true for SparseMatrixCSR.
 is_sparse_petsc(A) = A isa SparseMatrixCSC
 
-# Convert a Julia matrix to a PETSc sequential matrix.
+# Convert a Julia matrix to a PETSc matrix.
 #
 # Sparse (SparseMatrixCSC) → MatSeqAIJWithArrays :
 #   Internally converts to CSR format.
@@ -172,7 +179,12 @@ is_sparse_petsc(A) = A isa SparseMatrixCSC
 #   This protects the Julia array even when a factorising preconditioner is
 #   used without a separate `prec_matrix`.
 # SparseMatrixCSR → handled by LinearSolvePETScCSRExt via to_petsc_mat overload.
-function to_petsc_mat(petsclib, A)
+# PSparseMatrix  → handled by LinearSolvePETScMPIExt  via to_petsc_mat overload.
+#
+# The optional `pcache` argument is used by MPI-aware overloads to stash
+# GC anchors and per-matrix metadata into the cache during matrix construction.
+# Serial matrix types ignore it.
+function to_petsc_mat(petsclib, A, pcache = nothing)
     if A isa SparseMatrixCSC
         return PETSc.MatSeqAIJWithArrays(petsclib, MPI.COMM_SELF, A)
     else
@@ -327,7 +339,9 @@ function create_seq_vec(petsclib, src::AbstractVector)
 end
 
 # Recreate petsc_x and petsc_b only when the problem size changes.
-function ensure_vecs!(pcache, petsclib, b)
+# `comm` is MPI.COMM_SELF for serial solves; MPI extensions pass the real comm.
+# Overloaded by LinearSolvePETScMPIExt for PVector.
+function ensure_vecs!(pcache, petsclib, comm, b)
     n = length(b)
     if pcache.vec_n != n || pcache.petsc_x === nothing || pcache.petsc_b === nothing
         pcache.petsc_x !== nothing && PETSc.destroy(pcache.petsc_x)
@@ -337,6 +351,29 @@ function ensure_vecs!(pcache, petsclib, b)
         pcache.vec_n = n
     end
     return pcache.petsc_x, pcache.petsc_b
+end
+
+# ── KSP solve dispatch ────────────────────────────────────────────────────────
+#
+# run_ksp! abstracts the VecPlaceArray / KSPSolve / VecResetArray pattern.
+# For serial AbstractVector: zero-copy via VecPlaceArray.
+# Overloaded by LinearSolvePETScMPIExt for PVector (uses VecGetArray copy path).
+function run_ksp!(pcache, petsclib, alg, b::AbstractVector, u::AbstractVector)
+    petsc_x = pcache.petsc_x
+    petsc_b = pcache.petsc_b
+    LibPETSc.VecPlaceArray(petsclib, petsc_b, b)
+    LibPETSc.VecPlaceArray(petsclib, petsc_x, u)
+    return try
+        if alg.transposed
+            LibPETSc.KSPSolveTranspose(petsclib, pcache.ksp, petsc_b, petsc_x)
+        else
+            LibPETSc.KSPSolve(petsclib, pcache.ksp, petsc_b, petsc_x)
+        end
+        # Solution is written directly into cache.u — no read-back needed.
+    finally
+        LibPETSc.VecResetArray(petsclib, petsc_x)
+        LibPETSc.VecResetArray(petsclib, petsc_b)
+    end
 end
 
 # ── Null space ────────────────────────────────────────────────────────────────
@@ -386,7 +423,8 @@ end
 # petsc_b after every rebuild — required when the problem size changes.
 function build_ksp!(pcache, petsclib, cache, alg)
     pcache.vec_n = 0
-    pcache.petsc_A = to_petsc_mat(petsclib, cache.A)
+    # Pass pcache so MPI-aware overloads can stash GC anchors / metadata.
+    pcache.petsc_A = to_petsc_mat(petsclib, cache.A, pcache)
 
     if is_sparse_petsc(cache.A)
         store_sparse_pattern!(pcache, cache.A)
@@ -397,8 +435,10 @@ function build_ksp!(pcache, petsclib, cache, alg)
     end
 
     # petsc_P aliases petsc_A when no separate preconditioner matrix is given.
+    # prec_matrix is passed with pcache=nothing so MPI overloads do not clobber
+    # the system-matrix mpi_data stored above.
     pcache.petsc_P = alg.prec_matrix === nothing ?
-        pcache.petsc_A : to_petsc_mat(petsclib, alg.prec_matrix)
+        pcache.petsc_A : to_petsc_mat(petsclib, alg.prec_matrix, nothing)
 
     pcache.ksp = PETSc.KSP(
         pcache.petsc_A, pcache.petsc_P;
@@ -447,7 +487,7 @@ structural fingerprint:
 function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm; kwargs...)
 
     pcache = cache.cacheval
-    comm = resolve_comm(alg)
+    comm = get_comm(alg, cache.A)
 
     petsclib = pcache.petsclib === nothing ? get_petsclib(eltype(cache.A)) : pcache.petsclib
     PETSc.initialized(petsclib) || PETSc.initialize(petsclib)
@@ -495,21 +535,12 @@ function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm; kwargs...)
     end
     cache.isfresh = false
 
-    # ── Vectors + Solve (VecPlaceArray — zero copy) ───────────────────────────
-    petsc_x, petsc_b = ensure_vecs!(pcache, petsclib, cache.b)
-    LibPETSc.VecPlaceArray(petsclib, petsc_b, cache.b)
-    LibPETSc.VecPlaceArray(petsclib, petsc_x, cache.u)
-    try
-        if alg.transposed
-            LibPETSc.KSPSolveTranspose(petsclib, pcache.ksp, petsc_b, petsc_x)
-        else
-            LibPETSc.KSPSolve(petsclib, pcache.ksp, petsc_b, petsc_x)
-        end
-        # Solution is written directly into cache.u — no read-back needed.
-    finally
-        LibPETSc.VecResetArray(petsclib, petsc_x)
-        LibPETSc.VecResetArray(petsclib, petsc_b)
-    end
+    # ── Vectors + Solve ───────────────────────────────────────────────────────
+    # ensure_vecs! creates (or reuses) petsc_x and petsc_b, dispatching on the
+    # vector type so that MPI extensions can create distributed Vecs.
+    # run_ksp! performs I/O + KSPSolve, also dispatching on vector type.
+    ensure_vecs!(pcache, petsclib, comm, cache.b)
+    run_ksp!(pcache, petsclib, alg, cache.b, cache.u)
 
     # ── Convergence metadata ──────────────────────────────────────────────────
     iters = Int(LibPETSc.KSPGetIterationNumber(petsclib, pcache.ksp))

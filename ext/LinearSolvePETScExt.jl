@@ -281,7 +281,7 @@ function store_sparse_pattern!(pcache, A::SparseMatrixCSC)
     end
     _csc_to_csr_perm!(pcache.sparse_perm, pcache.sparse_scratch, A)
     pcache.prev_colptr = A.colptr
-    pcache.prev_rowval = A.rowval
+    return pcache.prev_rowval = A.rowval
 end
 
 function check_pattern_changed(pcache, A::SparseMatrixCSC)
@@ -293,49 +293,47 @@ function update_sparse_values!(petsclib, PA, pcache, A::SparseMatrixCSC; assembl
     return update_mat_values!(petsclib, PA, A, pcache.sparse_perm; assemble = assemble)
 end
 
-# ── Vector I/O ────────────────────────────────────────────────────────────────
+# ── Vector I/O (VecPlaceArray pattern) ───────────────────────────────────────
 #
-# VecGetArray / VecGetArrayRead return Julia Arrays wrapping PETSc's internal
-# memory — no extra allocation.  The matching Restore call is mandatory and
-# must always be reached (hence the try/finally pattern).
+# Use VecPlaceArray / VecResetArray to temporarily redirect PETSc's internal
+# Vec buffer to point at Julia arrays — zero copy in both directions.
 #
-# Note: VecAssemblyBegin/End is NOT needed after direct pointer writes.
-# Assembly is only required after VecSetValues, which uses an off-process
-# communication stash.  Direct pointer access bypasses the stash entirely.
+#   VecPlaceArray(petsc_b, cache.b)   # redirect pointer — no copy
+#   VecPlaceArray(petsc_x, cache.u)   # redirect pointer — initial guess in-place
+#   KSPSolve(...)                     # writes solution directly into cache.u
+#   VecResetArray(petsc_x/petsc_b)    # restore PETSc's own buffer
+#
+# This avoids 3 × O(n) memcpy per solve (write b, write x, read x back).
+# VecPlaceArray requires eltype == PetscScalar, which is guaranteed because
+# petsclib is chosen by eltype(cache.A) and u/b share that type.
+# VecResetArray is always called in a finally block.
 
-function write_vec!(pv, src::AbstractVector, petsclib)
+# Allocate a PETSc sequential Vec of length n.
+# Contents are uninitialised; VecPlaceArray redirects its buffer before each use.
+function create_seq_vec(petsclib, n::Int)
+    return LibPETSc.VecCreateSeq(petsclib, MPI.COMM_SELF, petsclib.PetscInt(n))
+end
+
+# Allocate and fill a Vec from a Julia vector (used for nullspace basis vectors).
+function create_seq_vec(petsclib, src::AbstractVector)
+    pv = create_seq_vec(petsclib, length(src))
     ptr = LibPETSc.VecGetArray(petsclib, pv)
-    return try
-        copyto!(ptr, src) # Use vectorized copy
+    try
+        copyto!(ptr, src)
     finally
         LibPETSc.VecRestoreArray(petsclib, pv, ptr)
     end
-end
-
-function read_vec!(dst::AbstractVector, pv, petsclib)
-    ptr = LibPETSc.VecGetArrayRead(petsclib, pv)
-    return try
-        copyto!(dst, ptr)
-    finally
-        LibPETSc.VecRestoreArrayRead(petsclib, pv, ptr)
-    end
-end
-
-# Allocate a PETSc sequential Vec of length n and fill it from src.
-function create_seq_vec(petsclib, src::AbstractVector)
-    pv = LibPETSc.VecCreateSeq(petsclib, MPI.COMM_SELF, petsclib.PetscInt(length(src)))
-    write_vec!(pv, src, petsclib)
     return pv
 end
 
 # Recreate petsc_x and petsc_b only when the problem size changes.
-function ensure_vecs!(pcache, petsclib, u, b)
+function ensure_vecs!(pcache, petsclib, b)
     n = length(b)
     if pcache.vec_n != n || pcache.petsc_x === nothing || pcache.petsc_b === nothing
         pcache.petsc_x !== nothing && PETSc.destroy(pcache.petsc_x)
         pcache.petsc_b !== nothing && PETSc.destroy(pcache.petsc_b)
-        pcache.petsc_x = create_seq_vec(petsclib, u)
-        pcache.petsc_b = create_seq_vec(petsclib, b)
+        pcache.petsc_x = create_seq_vec(petsclib, n)
+        pcache.petsc_b = create_seq_vec(petsclib, n)
         pcache.vec_n = n
     end
     return pcache.petsc_x, pcache.petsc_b
@@ -497,19 +495,21 @@ function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm; kwargs...)
     end
     cache.isfresh = false
 
-    # ── Vectors ───────────────────────────────────────────────────────────────
-    petsc_x, petsc_b = ensure_vecs!(pcache, petsclib, cache.u, cache.b)
-    write_vec!(petsc_x, cache.u, petsclib)
-    write_vec!(petsc_b, cache.b, petsclib)
-
-    # ── Solve ─────────────────────────────────────────────────────────────────
-    if alg.transposed
-        LibPETSc.KSPSolveTranspose(petsclib, pcache.ksp, petsc_b, petsc_x)
-    else
-        LibPETSc.KSPSolve(petsclib, pcache.ksp, petsc_b, petsc_x)
+    # ── Vectors + Solve (VecPlaceArray — zero copy) ───────────────────────────
+    petsc_x, petsc_b = ensure_vecs!(pcache, petsclib, cache.b)
+    LibPETSc.VecPlaceArray(petsclib, petsc_b, cache.b)
+    LibPETSc.VecPlaceArray(petsclib, petsc_x, cache.u)
+    try
+        if alg.transposed
+            LibPETSc.KSPSolveTranspose(petsclib, pcache.ksp, petsc_b, petsc_x)
+        else
+            LibPETSc.KSPSolve(petsclib, pcache.ksp, petsc_b, petsc_x)
+        end
+        # Solution is written directly into cache.u — no read-back needed.
+    finally
+        LibPETSc.VecResetArray(petsclib, petsc_x)
+        LibPETSc.VecResetArray(petsclib, petsc_b)
     end
-
-    read_vec!(cache.u, petsc_x, petsclib)
 
     # ── Convergence metadata ──────────────────────────────────────────────────
     iters = Int(LibPETSc.KSPGetIterationNumber(petsclib, pcache.ksp))

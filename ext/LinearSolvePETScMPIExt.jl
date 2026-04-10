@@ -8,8 +8,8 @@ module LinearSolvePETScMPIExt
 # distributed PETSc KSP solve:
 #
 #   • to_petsc_mat    → MatCreateMPIAIJWithArrays  (owned rows per rank)
-#   • ensure_vecs!    → VecCreateMPI               (owned DOF local sizes)
-#   • run_ksp!        → VecGetArray I/O + KSPSolve
+#   • ensure_vecs!    → no-op (Vecs are created fresh in run_ksp!)
+#   • run_ksp!        → VecCreateGhostWithArray (zero-copy) + KSPSolve
 #   • store/check_sparse_pattern!, update_sparse_values! for PSparseMatrix
 #
 # Two backends are supported:
@@ -42,7 +42,7 @@ const PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
 # DebugArray (single-process simulation) stores all parts in `.items`; with
 # a single part we just take the first element.
 
-_local_part(a::MPIArray)   = a.item
+_local_part(a::MPIArray) = a.item
 _local_part(a::DebugArray) = a.items[1]
 
 # ── Comm resolution ───────────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ function _build_mpi_csr_arrays(
 
     # Row pointer slice for owned rows only.
     rowptr = Vector{PetscInt}(getrowptr(csr)[1:(m_own + 1)])
-    n_nz   = Int(rowptr[end])
+    n_nz = Int(rowptr[end])
 
     # Global (0-based) column index translation.
     # local_to_global(col_idx)[j_local_1based] gives the 1-based global column.
@@ -122,14 +122,14 @@ function PETScExt.to_petsc_mat(petsclib, A::PSparseMatrix, pcache)
     part = partition(A)
     comm = part isa MPIArray ? part.comm : MPI.COMM_SELF
 
-    PetscInt    = PETSc.inttype(petsclib)
+    PetscInt = PETSc.inttype(petsclib)
     PetscScalar = PETSc.scalartype(petsclib)
 
     M, N = size(A)
 
     local_mat = _local_part(partition(A))
-    row_idx   = _local_part(partition(axes(A, 1)))
-    col_idx   = _local_part(partition(axes(A, 2)))
+    row_idx = _local_part(partition(axes(A, 1)))
+    col_idx = _local_part(partition(axes(A, 2)))
 
     rowptr, colind, nzval, m_own, n_nz =
         _build_mpi_csr_arrays(local_mat, row_idx, col_idx, PetscInt, PetscScalar)
@@ -153,15 +153,15 @@ function PETScExt.to_petsc_mat(petsclib, A::PSparseMatrix, pcache)
         local_colval = Vector{Int}(getcolval(csr_det)[1:n_nz])
 
         pcache.mpi_data = (
-            rowptr      = rowptr,       # GC anchor (may be borrowed by PETSc)
-            colind      = colind,       # GC anchor
-            nzval       = nzval,        # buffer reused for Case 3 updates
-            m_own       = m_own,
-            n_nz        = n_nz,
+            rowptr = rowptr,       # GC anchor (may be borrowed by PETSc)
+            colind = colind,       # GC anchor
+            nzval = nzval,        # buffer reused for Case 3 updates
+            m_own = m_own,
+            n_nz = n_nz,
             global_size = (M, N),
             local_rowptr = local_rowptr, # pre-global-translation, for detection
             local_colval = local_colval,
-            comm        = comm,
+            comm = comm,
         )
     end
 
@@ -197,8 +197,8 @@ function PETScExt.check_pattern_changed(pcache, A::PSparseMatrix)
     size(A) != data.global_size && return true
 
     local_mat = _local_part(partition(A))
-    row_idx   = _local_part(partition(axes(A, 1)))
-    m_own     = own_length(row_idx)
+    row_idx = _local_part(partition(axes(A, 1)))
+    m_own = own_length(row_idx)
     m_own != data.m_own && return true
 
     # Detailed structure check for CSR{0} local matrices.
@@ -244,8 +244,8 @@ function PETScExt.update_sparse_values!(
     if PA !== pcache.petsc_A
         error(
             "Case 3 value updates for a PSparseMatrix preconditioner matrix " *
-            "are not yet supported. Use `alg.prec_matrix = nothing` and let " *
-            "PETSc handle preconditioning internally."
+                "are not yet supported. Use `alg.prec_matrix = nothing` and let " *
+                "PETSc handle preconditioning internally."
         )
     end
 
@@ -253,10 +253,10 @@ function PETScExt.update_sparse_values!(
     data === nothing && error("mpi_data not initialised — this is an internal bug.")
 
     PetscScalar = PETSc.scalartype(petsclib)
-    PetscInt    = PETSc.inttype(petsclib)
+    PetscInt = PETSc.inttype(petsclib)
 
     local_mat = _local_part(partition(A))
-    n_nz      = data.n_nz
+    n_nz = data.n_nz
     nzval_buf = data.nzval
 
     if local_mat isa SparseMatrixCSR{0}
@@ -276,90 +276,85 @@ end
 
 # ── Distributed vector creation ───────────────────────────────────────────────
 #
-# Create a pair of VECMPI vectors whose local (owned) size matches the PVector
-# partition on this rank.  They are reused across solves (same pattern).
-# `vec_n` stores the local owned size rather than the global size so that
-# a change in the per-rank distribution is also detected.
+# With VecCreateGhostWithArray, Vecs are created fresh in run_ksp! and
+# alias the PVector's local storage directly (zero-copy).  This function
+# only tracks the owned-size for partition-change detection and cleans up
+# any stale Vecs left from a previous call path.
 
 function PETScExt.ensure_vecs!(pcache, petsclib, comm, b::PVector)
     row_idx = _local_part(partition(axes(b, 1)))
-    n_own   = own_length(row_idx)
-    N       = length(b)                # global
-
-    if pcache.vec_n != n_own || pcache.petsc_x === nothing || pcache.petsc_b === nothing
+    n_own = own_length(row_idx)
+    if pcache.vec_n != n_own
         pcache.petsc_x !== nothing && PETSc.destroy(pcache.petsc_x)
         pcache.petsc_b !== nothing && PETSc.destroy(pcache.petsc_b)
-        PetscInt       = PETSc.inttype(petsclib)
-        pcache.petsc_x = LibPETSc.VecCreateMPI(
-            petsclib, comm, PetscInt(n_own), PetscInt(N))
-        pcache.petsc_b = LibPETSc.VecCreateMPI(
-            petsclib, comm, PetscInt(n_own), PetscInt(N))
-        pcache.vec_n   = n_own
-    end
-    return pcache.petsc_x, pcache.petsc_b
-end
-
-# ── Vector I/O helpers ────────────────────────────────────────────────────────
-#
-# Copy the owned DOFs of a PVector into / out of a VECMPI PETSc vector via
-# VecGetArray / VecRestoreArray.  For standard OwnAndGhostIndices layout,
-# own_to_local returns 1:n_own so the inner loop is equivalent to a copyto!
-# and the compiler can vectorise it.
-#
-# Note: only owned DOFs are transferred.  Ghost DOFs of the solution PVector
-# remain stale after the solve and must be refreshed by the caller if needed
-# (e.g. via PartitionedArrays.consistent!).
-
-function _pvec_to_petscvec!(petsclib, pv::PVector, petsc_v)
-    local_vals = _local_part(partition(pv))
-    row_idx    = _local_part(partition(axes(pv, 1)))
-    own_idxs   = own_to_local(row_idx)
-
-    buf = LibPETSc.VecGetArray(petsclib, petsc_v)
-    try
-        @inbounds for (i, j) in enumerate(own_idxs)
-            buf[i] = local_vals[j]
-        end
-    finally
-        LibPETSc.VecRestoreArray(petsclib, petsc_v, buf)
+        pcache.petsc_x = nothing
+        pcache.petsc_b = nothing
+        pcache.vec_n = n_own
     end
     return nothing
 end
 
-function _petscvec_to_pvec!(petsclib, petsc_v, pv::PVector)
-    local_vals = _local_part(partition(pv))
-    row_idx    = _local_part(partition(axes(pv, 1)))
-    own_idxs   = own_to_local(row_idx)
-
-    buf = LibPETSc.VecGetArray(petsclib, petsc_v)
-    try
-        @inbounds for (i, j) in enumerate(own_idxs)
-            local_vals[j] = buf[i]
-        end
-    finally
-        LibPETSc.VecRestoreArray(petsclib, petsc_v, buf)
-    end
-    return nothing
-end
-
-# ── KSP solve with PVector I/O ────────────────────────────────────────────────
+# ── KSP solve with zero-copy PVector I/O ─────────────────────────────────────
 #
-# Copies owned DOFs of b into petsc_b (RHS), owned DOFs of u into petsc_x
-# (initial guess), runs KSPSolve, then copies the solution from petsc_x back
-# into the owned DOFs of u.
+# Creates short-lived Vecs via VecCreateGhostWithArray that alias the
+# PVector's local storage directly — no per-solve copy for b or x.
+#
+# Layout (PartitionedArrays OwnAndGhostIndices):
+#   local array = [ owned_0 … owned_{n_own-1} | ghost_0 … ghost_{n_ghost-1} ]
+#
+# PETSc reads the RHS from local_b[1:n_own] and writes the solution back
+# into local_u[1:n_own] in place.  Ghost values remain stale; the caller
+# must call PartitionedArrays.consistent!(u) if ghost synchronisation is
+# needed.
+#
+# Mixed-precision fallback: if PetscScalar ≠ eltype(local_u), a typed
+# copy is made and the solution is written back manually after the solve.
 
 function PETScExt.run_ksp!(pcache, petsclib, alg, b::PVector, u::PVector)
-    _pvec_to_petscvec!(petsclib, b, pcache.petsc_b)
-    _pvec_to_petscvec!(petsclib, u, pcache.petsc_x)  # initial guess
+    PetscInt = PETSc.inttype(petsclib)
+    PetscScalar = PETSc.scalartype(petsclib)
+
+    data = pcache.mpi_data
+    comm = data.comm
+
+    row_idx = _local_part(partition(axes(b, 1)))
+    n_own = PetscInt(own_length(row_idx))
+    N = PetscInt(length(b))
+    n_ghost = PetscInt(ghost_length(row_idx))
+    ghosts = convert(Vector{PetscInt}, ghost_to_global(row_idx)) .- PetscInt(1)
+
+    # Obtain PetscScalar-typed arrays aliasing the PVector's local storage.
+    # When element types match, the `isa` check is a no-op (same array object).
+    local_b = _local_part(partition(b))
+    local_u = _local_part(partition(u))
+    arr_b = local_b isa Vector{PetscScalar} ? local_b : Vector{PetscScalar}(local_b)
+    arr_u = local_u isa Vector{PetscScalar} ? local_u : Vector{PetscScalar}(local_u)
+
+    petsc_b = LibPETSc.VecCreateGhostWithArray(
+        petsclib, comm, n_own, N, n_ghost, ghosts, arr_b
+    )
+    petsc_x = LibPETSc.VecCreateGhostWithArray(
+        petsclib, comm, n_own, N, n_ghost, ghosts, arr_u
+    )
 
     if alg.transposed
-        LibPETSc.KSPSolveTranspose(
-            petsclib, pcache.ksp, pcache.petsc_b, pcache.petsc_x)
+        LibPETSc.KSPSolveTranspose(petsclib, pcache.ksp, petsc_b, petsc_x)
     else
-        LibPETSc.KSPSolve(petsclib, pcache.ksp, pcache.petsc_b, pcache.petsc_x)
+        LibPETSc.KSPSolve(petsclib, pcache.ksp, petsc_b, petsc_x)
     end
 
-    _petscvec_to_pvec!(petsclib, pcache.petsc_x, u)
+    # When arr_u === local_u, PETSc wrote the solution directly into the
+    # PVector's owned slots — nothing to copy back.
+    # If a type-conversion buffer was used, copy the owned DOFs back manually.
+    if arr_u !== local_u
+        own_idxs = own_to_local(row_idx)
+        @inbounds for (i, j) in enumerate(own_idxs)
+            local_u[j] = arr_u[i]
+        end
+    end
+
+    PETSc.destroy(petsc_x)
+    PETSc.destroy(petsc_b)
     return nothing
 end
 

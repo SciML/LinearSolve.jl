@@ -363,7 +363,7 @@ function run_ksp!(pcache, petsclib, alg, b::AbstractVector, u::AbstractVector)
     petsc_b = pcache.petsc_b
     LibPETSc.VecPlaceArray(petsclib, petsc_b, b)
     LibPETSc.VecPlaceArray(petsclib, petsc_x, u)
-    try
+    return try
         if alg.transposed
             LibPETSc.KSPSolveTranspose(petsclib, pcache.ksp, petsc_b, petsc_x)
         else

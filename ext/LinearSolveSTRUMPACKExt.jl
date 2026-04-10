@@ -43,9 +43,18 @@ mutable struct STRUMPACKCache
     rowptr::Vector{Int32}
     colind::Vector{Int32}
     nzval::Vector{Float64}
+    option_storage::Vector{Vector{UInt8}}
+    option_ptrs::Vector{Ptr{UInt8}}
 
     function STRUMPACKCache()
-        cache = new(Ref{Ptr{Cvoid}}(C_NULL), Int32[], Int32[], Float64[])
+        cache = new(
+            Ref{Ptr{Cvoid}}(C_NULL),
+            Int32[],
+            Int32[],
+            Float64[],
+            Vector{Vector{UInt8}}(),
+            Ptr{UInt8}[]
+        )
         finalizer(_strumpack_destroy!, cache)
         return cache
     end
@@ -59,8 +68,27 @@ function _strumpack_destroy!(cache::STRUMPACKCache)
     return
 end
 
-function _ensure_initialized!(cache::STRUMPACKCache)
+function _set_runtime_options!(cache::STRUMPACKCache, alg::LinearSolve.STRUMPACKFactorization)
+    empty!(cache.option_storage)
+    empty!(cache.option_ptrs)
+
+    for opt in alg.options
+        bytes = Vector{UInt8}(codeunits(opt))
+        push!(bytes, 0x00)
+        push!(cache.option_storage, bytes)
+        push!(cache.option_ptrs, pointer(bytes))
+    end
+
+    return
+end
+
+function _ensure_initialized!(cache::STRUMPACKCache, alg::LinearSolve.STRUMPACKFactorization)
     cache.solver[] != C_NULL && return
+    _set_runtime_options!(cache, alg)
+
+    argc = Cint(length(cache.option_ptrs))
+    argv = isempty(cache.option_ptrs) ? Ptr{Ptr{UInt8}}(C_NULL) : Ptr{Ptr{UInt8}}(pointer(cache.option_ptrs))
+
     ccall(
         (:STRUMPACK_init_mt, _libstrumpack[]),
         Cvoid,
@@ -69,8 +97,8 @@ function _ensure_initialized!(cache::STRUMPACKCache)
         STRUMPACK_DOUBLE,
         STRUMPACK_MT,
         Cint(0),
-        Ptr{Ptr{UInt8}}(C_NULL),
-        Cint(0)
+        argv,
+        argc
     )
     return
 end
@@ -163,7 +191,7 @@ function SciMLBase.solve!(
         error("STRUMPACKFactorization currently supports `AbstractSparseMatrixCSC{<:AbstractFloat}`")
     end
 
-    _ensure_initialized!(scache)
+    _ensure_initialized!(scache, alg)
 
     if cache.isfresh
         scache.rowptr, scache.colind, scache.nzval = _csc_to_csr_0based(A)

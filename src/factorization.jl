@@ -1486,7 +1486,7 @@ struct SparspakFactorization <: AbstractSparseFactorization
 end
 
 """
-`STRUMPACKFactorization(; use_initial_guess = false)`
+`STRUMPACKFactorization(; use_initial_guess = false, options = String[], kwargs...)`
 
 A sparse direct solver based on
 [STRUMPACK](https://github.com/pghysels/STRUMPACK) via the
@@ -1496,6 +1496,20 @@ This wrapper targets the single-node (`MT`) sparse interface and currently suppo
 real sparse matrices (`AbstractSparseMatrixCSC{<:AbstractFloat}`), solving in
 `Float64` precision.
 
+Pass STRUMPACK runtime options through `options` to expose advanced functionality.
+
+Convenience keyword arguments are provided for common low-rank/compression tuning
+and are translated to STRUMPACK-style runtime options:
+- `compression` -> `--sp_compression`
+- `rel_tol` -> `--sp_rel_tol`
+- `abs_tol` -> `--sp_abs_tol`
+- `max_rank` -> `--sp_max_rank`
+- `leaf_size` -> `--sp_leaf_size`
+- `reordering` -> `--sp_reordering_method`
+- `matching` -> `--sp_enable_matching`
+
+Any unexposed or version-specific knobs can still be passed through `options`.
+
 !!! note
 
     Using this solver requires:
@@ -1504,13 +1518,48 @@ real sparse matrices (`AbstractSparseMatrixCSC{<:AbstractFloat}`), solving in
 """
 struct STRUMPACKFactorization <: AbstractSparseFactorization
     use_initial_guess::Bool
+    options::Vector{String}
 
-    function STRUMPACKFactorization(; use_initial_guess = false, throwerror = true)
+    function _push_opt_pair!(opts::Vector{String}, key::String, value)
+        push!(opts, key)
+        push!(opts, string(value))
+        return opts
+    end
+
+    function STRUMPACKFactorization(
+            ; use_initial_guess = false,
+            options = String[],
+            compression = nothing,
+            rel_tol = nothing,
+            abs_tol = nothing,
+            max_rank = nothing,
+            leaf_size = nothing,
+            reordering = nothing,
+            matching = nothing,
+            throwerror = true
+        )
         ext = Base.get_extension(@__MODULE__, :LinearSolveSTRUMPACKExt)
         return if throwerror && (ext === nothing || !ext.strumpack_isavailable())
             error("STRUMPACKFactorization requires a discoverable STRUMPACK shared library (`libstrumpack`) and `using SparseArrays`")
         else
-            new(use_initial_guess)
+            rel_tol !== nothing && rel_tol < 0 && error("`rel_tol` must be non-negative")
+            abs_tol !== nothing && abs_tol < 0 && error("`abs_tol` must be non-negative")
+            max_rank !== nothing && max_rank < 1 && error("`max_rank` must be >= 1")
+            leaf_size !== nothing && leaf_size < 1 && error("`leaf_size` must be >= 1")
+
+            runtime_options = String.(options)
+
+            compression !== nothing && _push_opt_pair!(runtime_options, "--sp_compression", compression)
+            rel_tol !== nothing && _push_opt_pair!(runtime_options, "--sp_rel_tol", rel_tol)
+            abs_tol !== nothing && _push_opt_pair!(runtime_options, "--sp_abs_tol", abs_tol)
+            max_rank !== nothing && _push_opt_pair!(runtime_options, "--sp_max_rank", Int(max_rank))
+            leaf_size !== nothing && _push_opt_pair!(runtime_options, "--sp_leaf_size", Int(leaf_size))
+            reordering !== nothing &&
+                _push_opt_pair!(runtime_options, "--sp_reordering_method", reordering)
+            matching !== nothing &&
+                _push_opt_pair!(runtime_options, "--sp_enable_matching", matching ? 1 : 0)
+
+            new(use_initial_guess, runtime_options)
         end
     end
 end

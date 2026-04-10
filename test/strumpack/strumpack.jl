@@ -8,6 +8,39 @@ using Test
     if ext === nothing || !ext.strumpack_isavailable()
         @test_throws ["STRUMPACKFactorization", "libstrumpack"] STRUMPACKFactorization()
         @test STRUMPACKFactorization(throwerror = false) isa STRUMPACKFactorization
+        @test STRUMPACKFactorization(
+            throwerror = false,
+            options = ["--sp_compression", "hss", "--sp_rel_tol", "1e-4"]
+        ) isa STRUMPACKFactorization
+
+        alg_phase2 = STRUMPACKFactorization(
+            throwerror = false,
+            compression = "hss",
+            rel_tol = 1e-4,
+            abs_tol = 1e-10,
+            max_rank = 64,
+            leaf_size = 128,
+            reordering = "metis",
+            matching = true
+        )
+        @test alg_phase2.options == [
+            "--sp_compression", "hss",
+            "--sp_rel_tol", "0.0001",
+            "--sp_abs_tol", "1.0e-10",
+            "--sp_max_rank", "64",
+            "--sp_leaf_size", "128",
+            "--sp_reordering_method", "metis",
+            "--sp_enable_matching", "1",
+        ]
+
+        @test_throws "`rel_tol` must be non-negative" STRUMPACKFactorization(
+            throwerror = false,
+            rel_tol = -1.0
+        )
+        @test_throws "`max_rank` must be >= 1" STRUMPACKFactorization(
+            throwerror = false,
+            max_rank = 0
+        )
 
         A = sparse([4.0 1.0; 2.0 3.0])
         b = [1.0, -1.0]
@@ -30,6 +63,37 @@ using Test
         sol = solve(prob, STRUMPACKFactorization())
         @test sol.retcode == ReturnCode.Success
         @test A * sol.u ≈ b atol = 1.0e-10 rtol = 1.0e-10
+
+        alg_opts = STRUMPACKFactorization(
+            options = ["--sp_compression", "hss", "--sp_rel_tol", "1e-4"]
+        )
+        @test alg_opts.options == ["--sp_compression", "hss", "--sp_rel_tol", "1e-4"]
+
+        alg_phase2 = STRUMPACKFactorization(
+            compression = "hss",
+            rel_tol = 1e-4,
+            abs_tol = 1e-10,
+            max_rank = 64,
+            leaf_size = 128,
+            reordering = "metis",
+            matching = true
+        )
+        @test alg_phase2.options == [
+            "--sp_compression", "hss",
+            "--sp_rel_tol", "0.0001",
+            "--sp_abs_tol", "1.0e-10",
+            "--sp_max_rank", "64",
+            "--sp_leaf_size", "128",
+            "--sp_reordering_method", "metis",
+            "--sp_enable_matching", "1",
+        ]
+
+        @test_throws "`rel_tol` must be non-negative" STRUMPACKFactorization(
+            rel_tol = -1.0
+        )
+        @test_throws "`max_rank` must be >= 1" STRUMPACKFactorization(
+            max_rank = 0
+        )
 
         cache = init(prob, STRUMPACKFactorization())
         sol1 = solve!(cache)

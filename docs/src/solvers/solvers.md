@@ -67,6 +67,10 @@ to the sparsity pattern and `UMFPACKFactorization` if there is more structure.
 alternative to `UMFPACKFactorization` that exploits OpenMP task parallelism
 for the numeric factorization phase, which can give speedups on multicore systems
 for larger sparse problems.
+`STRUMPACKFactorization` provides a sparse direct alternative that can be tuned
+with approximate low-rank compression options (for example HSS/HODLR modes,
+compression tolerances, and rank/leaf-size controls) when supported by the
+installed STRUMPACK build.
 Pardiso.jl's methods are also known to be very efficient sparse linear solvers.
 
 For GPU-accelerated sparse LU-factorizations, there are two high-performance options.
@@ -215,6 +219,28 @@ ParUFactorization
 
 ```@docs
 SparspakFactorization
+```
+
+### STRUMPACK
+
+!!! note
+
+    Using this solver requires `SparseArrays` and a discoverable STRUMPACK shared library (`libstrumpack`).
+
+The following convenience keywords map to STRUMPACK runtime options:
+
+- `compression` -> `--sp_compression`
+- `rel_tol` -> `--sp_rel_tol`
+- `abs_tol` -> `--sp_abs_tol`
+- `max_rank` -> `--sp_max_rank`
+- `leaf_size` -> `--sp_leaf_size`
+- `reordering` -> `--sp_reordering_method`
+- `matching` -> `--sp_enable_matching`
+
+You can also pass raw STRUMPACK flags via `options = ["--flag", "value", ...]`.
+
+```@docs
+STRUMPACKFactorization
 ```
 
 ### CliqueTrees.jl

@@ -88,6 +88,7 @@ LinearSolvePETScMPIExt = ["PETSc", "PartitionedArrays", "SparseArrays", "SparseM
 LinearSolveParUExt = ["ParU_jll", "SparseArrays"]
 LinearSolvePardisoExt = ["Pardiso", "SparseArrays"]
 LinearSolveRecursiveFactorizationExt = "RecursiveFactorization"
+LinearSolveSTRUMPACKExt = "SparseArrays"
 LinearSolveSparseArraysExt = "SparseArrays"
 LinearSolveSparspakExt = ["SparseArrays", "Sparspak"]
 

@@ -1,4 +1,5 @@
 [deps]
+python = ">=3.10,<3.14"
 
 [pip.deps]
 pyamg = ">=5.3,<6"

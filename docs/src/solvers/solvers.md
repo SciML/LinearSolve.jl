@@ -588,7 +588,7 @@ A GC finalizer is registered as a safety net, but explicit cleanup is strongly p
 
 `PETScAlgorithm` supports **distributed-memory parallel** solves when the system matrix
 is a `PSparseMatrix` and the RHS/solution are `PVector` from
-[PartitionedArrays.jl](https://github.com/gridap/PartitionedArrays.jl).  Each MPI rank
+[PartitionedArrays.jl](https://github.com/PartitionedArrays/PartitionedArrays.jl).  Each MPI rank
 contributes its owned rows; PETSc assembles and solves the global system in parallel.
 
 Requires loading all four trigger packages:

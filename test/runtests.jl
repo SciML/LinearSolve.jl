@@ -53,6 +53,10 @@ if GROUP == "DefaultsLoading"
     @time @safetestset "Defaults Loading Tests" include("defaults_loading.jl")
 end
 
+if GROUP == "All" || GROUP == "LinearSolveSTRUMPACK"
+    @time @safetestset "LinearSolveSTRUMPACK" include("strumpack/strumpack.jl")
+end
+
 if GROUP == "LinearSolveAutotune"
     Pkg.activate(joinpath(dirname(@__DIR__), "lib", GROUP))
     Pkg.test(
@@ -114,6 +118,7 @@ if Base.Sys.islinux() && GROUP == "LinearSolvePETSc" && HAS_EXTENSIONS
     Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
     Pkg.instantiate()
     @time @safetestset "LinearSolvePETSc" include("petsctests.jl")
+    @time @safetestset "LinearSolvePETScMPI" include("petsctests_mpi.jl")
 end
 
 if GROUP == "Trim" && VERSION >= v"1.12.0"

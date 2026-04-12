@@ -16,8 +16,8 @@ using Test
         alg_phase2 = STRUMPACKFactorization(
             throwerror = false,
             compression = "hss",
-            rel_tol = 1e-4,
-            abs_tol = 1e-10,
+            rel_tol = 1.0e-4,
+            abs_tol = 1.0e-10,
             max_rank = 64,
             leaf_size = 128,
             reordering = "metis",
@@ -71,8 +71,8 @@ using Test
 
         alg_phase2 = STRUMPACKFactorization(
             compression = "hss",
-            rel_tol = 1e-4,
-            abs_tol = 1e-10,
+            rel_tol = 1.0e-4,
+            abs_tol = 1.0e-10,
             max_rank = 64,
             leaf_size = 128,
             reordering = "metis",

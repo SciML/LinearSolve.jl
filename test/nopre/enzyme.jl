@@ -339,3 +339,178 @@ Enzyme.autodiff(Reverse, testls, Duplicated(A, dA2), Duplicated(b, db2), Duplica
     expected = A \ ones(3)
     @test db ≈ expected rtol = 1.0e-12 atol = 1.0e-12
 end
+
+# https://github.com/SciML/LinearSolve.jl/pull/935 — cover all of LinearAlgebra.jl
+# Each test confirms: (1) Enzyme reverse-mode doesn't throw on the wrapper type, and
+# (2) the gradient matches a ForwardDiff reference.
+
+@testset "Hermitian reverse" begin
+    n = 4
+    _A = rand(n, n)
+    _A = _A + _A'  # make symmetric
+    A_herm = Hermitian(_A)
+    b = rand(n)
+
+    function f_herm(b)
+        prob = LinearProblem(Hermitian(_A), copy(b))
+        sol = solve(prob, CholeskyFactorization())
+        return sum(sol.u)
+    end
+
+    db_en = zero(b)
+    Enzyme.autodiff(Reverse, Const(f_herm), Active, Duplicated(copy(b), db_en))
+
+    db_fd = ForwardDiff.gradient(f_herm, b)
+    @test db_en ≈ db_fd rtol = 1.0e-8
+end
+
+@testset "UpperTriangular reverse" begin
+    n = 4
+    _A = triu(rand(n, n) + n * I)  # well-conditioned upper triangular
+    A_ut = UpperTriangular(_A)
+    b = rand(n)
+
+    function f_ut(b)
+        prob = LinearProblem(UpperTriangular(_A), copy(b))
+        sol = solve(prob)
+        return sum(sol.u)
+    end
+
+    db_en = zero(b)
+    Enzyme.autodiff(Reverse, Const(f_ut), Active, Duplicated(copy(b), db_en))
+
+    db_fd = ForwardDiff.gradient(f_ut, b)
+    @test db_en ≈ db_fd rtol = 1.0e-8
+end
+
+@testset "LowerTriangular reverse" begin
+    n = 4
+    _A = tril(rand(n, n) + n * I)
+    b = rand(n)
+
+    function f_lt(b)
+        prob = LinearProblem(LowerTriangular(_A), copy(b))
+        sol = solve(prob)
+        return sum(sol.u)
+    end
+
+    db_en = zero(b)
+    Enzyme.autodiff(Reverse, Const(f_lt), Active, Duplicated(copy(b), db_en))
+
+    db_fd = ForwardDiff.gradient(f_lt, b)
+    @test db_en ≈ db_fd rtol = 1.0e-8
+end
+
+@testset "UnitUpperTriangular reverse" begin
+    n = 4
+    _A = triu(rand(n, n))
+    for i in 1:n; _A[i, i] = 1.0; end
+    b = rand(n)
+
+    function f_uut(b)
+        prob = LinearProblem(UnitUpperTriangular(_A), copy(b))
+        sol = solve(prob)
+        return sum(sol.u)
+    end
+
+    db_en = zero(b)
+    Enzyme.autodiff(Reverse, Const(f_uut), Active, Duplicated(copy(b), db_en))
+
+    db_fd = ForwardDiff.gradient(f_uut, b)
+    @test db_en ≈ db_fd rtol = 1.0e-8
+end
+
+@testset "UnitLowerTriangular reverse" begin
+    n = 4
+    _A = tril(rand(n, n))
+    for i in 1:n; _A[i, i] = 1.0; end
+    b = rand(n)
+
+    function f_ult(b)
+        prob = LinearProblem(UnitLowerTriangular(_A), copy(b))
+        sol = solve(prob)
+        return sum(sol.u)
+    end
+
+    db_en = zero(b)
+    Enzyme.autodiff(Reverse, Const(f_ult), Active, Duplicated(copy(b), db_en))
+
+    db_fd = ForwardDiff.gradient(f_ult, b)
+    @test db_en ≈ db_fd rtol = 1.0e-8
+end
+
+@testset "Diagonal reverse" begin
+    n = 4
+    d = rand(n) .+ 1.0  # avoid near-zero diagonal
+    b = rand(n)
+
+    function f_diag(b)
+        prob = LinearProblem(Diagonal(d), copy(b))
+        sol = solve(prob, DiagonalFactorization())
+        return sum(sol.u)
+    end
+
+    db_en = zero(b)
+    Enzyme.autodiff(Reverse, Const(f_diag), Active, Duplicated(copy(b), db_en))
+
+    db_fd = ForwardDiff.gradient(f_diag, b)
+    @test db_en ≈ db_fd rtol = 1.0e-8
+end
+
+@testset "Bidiagonal reverse" begin
+    n = 4
+    dv = rand(n) .+ 1.0
+    ev = rand(n - 1) .* 0.1
+    b = rand(n)
+
+    function f_bidiag(b)
+        prob = LinearProblem(Bidiagonal(dv, ev, :U), copy(b))
+        sol = solve(prob)
+        return sum(sol.u)
+    end
+
+    db_en = zero(b)
+    Enzyme.autodiff(Reverse, Const(f_bidiag), Active, Duplicated(copy(b), db_en))
+
+    db_fd = ForwardDiff.gradient(f_bidiag, b)
+    @test db_en ≈ db_fd rtol = 1.0e-8
+end
+
+@testset "Tridiagonal reverse" begin
+    n = 4
+    dl = rand(n - 1) .* 0.1
+    d  = rand(n) .+ 2.0
+    du = rand(n - 1) .* 0.1
+    b  = rand(n)
+
+    function f_tridiag(b)
+        prob = LinearProblem(Tridiagonal(dl, d, du), copy(b))
+        sol = solve(prob)
+        return sum(sol.u)
+    end
+
+    db_en = zero(b)
+    Enzyme.autodiff(Reverse, Const(f_tridiag), Active, Duplicated(copy(b), db_en))
+
+    db_fd = ForwardDiff.gradient(f_tridiag, b)
+    @test db_en ≈ db_fd rtol = 1.0e-8
+end
+
+@testset "SymTridiagonal reverse" begin
+    n = 4
+    dv = rand(n) .+ 2.0
+    ev = rand(n - 1) .* 0.1
+    b  = rand(n)
+
+    function f_symtridiag(b)
+        prob = LinearProblem(SymTridiagonal(dv, ev), copy(b))
+        sol = solve(prob, LDLtFactorization())
+        return sum(sol.u)
+    end
+
+    db_en = zero(b)
+    Enzyme.autodiff(Reverse, Const(f_symtridiag), Active, Duplicated(copy(b), db_en))
+
+    db_fd = ForwardDiff.gradient(f_symtridiag, b)
+    @test db_en ≈ db_fd rtol = 1.0e-8
+end

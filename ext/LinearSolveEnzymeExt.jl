@@ -47,6 +47,85 @@ function _safe_add!(dst::LinearAlgebra.Symmetric, src::AbstractArray)
     return dst
 end
 
+function _safe_add!(dst::LinearAlgebra.Hermitian, src::LinearAlgebra.Hermitian)
+    parent(dst) .+= parent(src)
+    return dst
+end
+
+function _safe_add!(dst::LinearAlgebra.Hermitian, src::AbstractArray)
+    parent(dst) .+= src
+    return dst
+end
+
+function _safe_add!(dst::LinearAlgebra.UpperTriangular, src::LinearAlgebra.UpperTriangular)
+    parent(dst) .+= parent(src)
+    return dst
+end
+
+function _safe_add!(dst::LinearAlgebra.UpperTriangular, src::AbstractArray)
+    parent(dst) .+= src
+    return dst
+end
+
+function _safe_add!(dst::LinearAlgebra.LowerTriangular, src::LinearAlgebra.LowerTriangular)
+    parent(dst) .+= parent(src)
+    return dst
+end
+
+function _safe_add!(dst::LinearAlgebra.LowerTriangular, src::AbstractArray)
+    parent(dst) .+= src
+    return dst
+end
+
+function _safe_add!(dst::LinearAlgebra.UnitUpperTriangular, src::LinearAlgebra.UnitUpperTriangular)
+    parent(dst) .+= parent(src)
+    return dst
+end
+
+function _safe_add!(dst::LinearAlgebra.UnitUpperTriangular, src::AbstractArray)
+    parent(dst) .+= src
+    return dst
+end
+
+function _safe_add!(dst::LinearAlgebra.UnitLowerTriangular, src::LinearAlgebra.UnitLowerTriangular)
+    parent(dst) .+= parent(src)
+    return dst
+end
+
+function _safe_add!(dst::LinearAlgebra.UnitLowerTriangular, src::AbstractArray)
+    parent(dst) .+= src
+    return dst
+end
+
+function _safe_add!(dst::LinearAlgebra.Diagonal, src::LinearAlgebra.Diagonal)
+    dst.diag .+= src.diag
+    return dst
+end
+
+function _safe_add!(dst::LinearAlgebra.Diagonal, src::AbstractArray)
+    dst.diag .+= diag(src)
+    return dst
+end
+
+function _safe_add!(dst::LinearAlgebra.Bidiagonal, src::LinearAlgebra.Bidiagonal)
+    dst.dv .+= src.dv
+    dst.ev .+= src.ev
+    return dst
+end
+
+function _safe_add!(dst::LinearAlgebra.Tridiagonal, src::LinearAlgebra.Tridiagonal)
+    dst.dl .+= src.dl
+    dst.d .+= src.d
+    dst.du .+= src.du
+    return dst
+end
+
+function _safe_add!(dst::LinearAlgebra.SymTridiagonal, src::LinearAlgebra.SymTridiagonal)
+    dst.dv .+= src.dv
+    dst.ev .+= src.ev
+    return dst
+end
+
 """
     _safe_zero!(A)
 
@@ -65,6 +144,55 @@ end
 
 function _safe_zero!(A::LinearAlgebra.Symmetric)
     fill!(parent(A), zero(eltype(A)))
+    return A
+end
+
+function _safe_zero!(A::LinearAlgebra.Hermitian)
+    fill!(parent(A), zero(eltype(A)))
+    return A
+end
+
+function _safe_zero!(A::LinearAlgebra.UpperTriangular)
+    fill!(parent(A), zero(eltype(A)))
+    return A
+end
+
+function _safe_zero!(A::LinearAlgebra.LowerTriangular)
+    fill!(parent(A), zero(eltype(A)))
+    return A
+end
+
+function _safe_zero!(A::LinearAlgebra.UnitUpperTriangular)
+    fill!(parent(A), zero(eltype(A)))
+    return A
+end
+
+function _safe_zero!(A::LinearAlgebra.UnitLowerTriangular)
+    fill!(parent(A), zero(eltype(A)))
+    return A
+end
+
+function _safe_zero!(A::LinearAlgebra.Diagonal)
+    fill!(A.diag, zero(eltype(A)))
+    return A
+end
+
+function _safe_zero!(A::LinearAlgebra.Bidiagonal)
+    fill!(A.dv, zero(eltype(A)))
+    fill!(A.ev, zero(eltype(A)))
+    return A
+end
+
+function _safe_zero!(A::LinearAlgebra.Tridiagonal)
+    fill!(A.dl, zero(eltype(A)))
+    fill!(A.d, zero(eltype(A)))
+    fill!(A.du, zero(eltype(A)))
+    return A
+end
+
+function _safe_zero!(A::LinearAlgebra.SymTridiagonal)
+    fill!(A.dv, zero(eltype(A)))
+    fill!(A.ev, zero(eltype(A)))
     return A
 end
 
@@ -195,6 +323,162 @@ function _sparse_outer_sub!(
     return dA
 end
 
+function _sparse_outer_sub!(
+        dA::LinearAlgebra.Hermitian, z::AbstractVector, y::AbstractVector
+    )
+    # `Hermitian` disallows writing off-diagonal entries via `setindex!` on the wrapper.
+    # Accumulate directly into the parent storage. For a Hermitian matrix H = H†, the
+    # stored triangle holds unique entries; the gradient contribution from (i,j) and its
+    # conjugate (j,i) must both be folded into the stored triangle with conjugation.
+    A_parent = parent(dA)
+    n = size(A_parent, 1)
+
+    if dA.uplo == :U
+        @inbounds for j in 1:n
+            zj = z[j]
+            yj_c = conj(y[j])
+            for i in 1:(j - 1)
+                A_parent[i, j] -= z[i] * yj_c + conj(zj) * y[i]
+            end
+            # Diagonal must remain real for Hermitian matrices
+            A_parent[j, j] -= real(zj * yj_c)
+        end
+    else
+        @inbounds for j in 1:n
+            zj = z[j]
+            yj_c = conj(y[j])
+            A_parent[j, j] -= real(zj * yj_c)
+            for i in (j + 1):n
+                A_parent[i, j] -= z[i] * yj_c + conj(zj) * y[i]
+            end
+        end
+    end
+
+    return dA
+end
+
+function _sparse_outer_sub!(
+        dA::LinearAlgebra.UpperTriangular, z::AbstractVector, y::AbstractVector
+    )
+    # Only the upper triangle (including diagonal) is stored. Accumulate gradients
+    # only into those entries, operating through parent to bypass setindex! guards.
+    A_parent = parent(dA)
+    n = size(A_parent, 1)
+    @inbounds for j in 1:n
+        yj = y[j]
+        for i in 1:j
+            A_parent[i, j] -= z[i] * yj
+        end
+    end
+    return dA
+end
+
+function _sparse_outer_sub!(
+        dA::LinearAlgebra.LowerTriangular, z::AbstractVector, y::AbstractVector
+    )
+    # Only the lower triangle (including diagonal) is stored.
+    A_parent = parent(dA)
+    n = size(A_parent, 1)
+    @inbounds for j in 1:n
+        yj = y[j]
+        for i in j:n
+            A_parent[i, j] -= z[i] * yj
+        end
+    end
+    return dA
+end
+
+function _sparse_outer_sub!(
+        dA::LinearAlgebra.UnitUpperTriangular, z::AbstractVector, y::AbstractVector
+    )
+    # The diagonal is fixed at 1 (not stored as a free parameter), so we only accumulate
+    # into the strict upper triangle.
+    A_parent = parent(dA)
+    n = size(A_parent, 1)
+    @inbounds for j in 1:n
+        yj = y[j]
+        for i in 1:(j - 1)
+            A_parent[i, j] -= z[i] * yj
+        end
+    end
+    return dA
+end
+
+function _sparse_outer_sub!(
+        dA::LinearAlgebra.UnitLowerTriangular, z::AbstractVector, y::AbstractVector
+    )
+    # The diagonal is fixed at 1, so only accumulate into the strict lower triangle.
+    A_parent = parent(dA)
+    n = size(A_parent, 1)
+    @inbounds for j in 1:n
+        yj = y[j]
+        for i in (j + 1):n
+            A_parent[i, j] -= z[i] * yj
+        end
+    end
+    return dA
+end
+
+function _sparse_outer_sub!(
+        dA::LinearAlgebra.Diagonal, z::AbstractVector, y::AbstractVector
+    )
+    # Only the diagonal entries are free parameters.
+    @inbounds for i in eachindex(dA.diag)
+        dA.diag[i] -= z[i] * y[i]
+    end
+    return dA
+end
+
+function _sparse_outer_sub!(
+        dA::LinearAlgebra.Bidiagonal, z::AbstractVector, y::AbstractVector
+    )
+    # Bidiagonal stores a main diagonal (dv) and one off-diagonal (ev).
+    # uplo == :U → superdiagonal (row i, col i+1); uplo == :L → subdiagonal (row i+1, col i).
+    n = length(dA.dv)
+    @inbounds for i in 1:n
+        dA.dv[i] -= z[i] * y[i]
+    end
+    if dA.uplo == :U
+        @inbounds for i in 1:(n - 1)
+            dA.ev[i] -= z[i] * y[i + 1]
+        end
+    else
+        @inbounds for i in 1:(n - 1)
+            dA.ev[i] -= z[i + 1] * y[i]
+        end
+    end
+    return dA
+end
+
+function _sparse_outer_sub!(
+        dA::LinearAlgebra.Tridiagonal, z::AbstractVector, y::AbstractVector
+    )
+    # Tridiagonal stores dl (subdiagonal), d (diagonal), du (superdiagonal).
+    n = length(dA.d)
+    @inbounds for i in 1:n
+        dA.d[i] -= z[i] * y[i]
+    end
+    @inbounds for i in 1:(n - 1)
+        dA.du[i] -= z[i] * y[i + 1]   # superdiagonal: row i, col i+1
+        dA.dl[i] -= z[i + 1] * y[i]   # subdiagonal:   row i+1, col i
+    end
+    return dA
+end
+
+function _sparse_outer_sub!(
+        dA::LinearAlgebra.SymTridiagonal, z::AbstractVector, y::AbstractVector
+    )
+    # SymTridiagonal stores dv (diagonal) and ev (superdiagonal, also represents subdiagonal
+    # by symmetry). Fold both (i, i+1) and (i+1, i) gradient contributions into ev[i].
+    n = length(dA.dv)
+    @inbounds for i in 1:n
+        dA.dv[i] -= z[i] * y[i]
+    end
+    @inbounds for i in 1:(n - 1)
+        dA.ev[i] -= z[i] * y[i + 1] + z[i + 1] * y[i]
+    end
+    return dA
+end
 function EnzymeRules.forward(
         config::EnzymeRules.FwdConfigWidth{1},
         func::Const{typeof(LinearSolve.init)}, ::Type{RT}, prob::EnzymeCore.Annotation{LP},

@@ -225,7 +225,7 @@ SparspakFactorization
 
 !!! note
 
-    Using this solver requires `SparseArrays` and a discoverable STRUMPACK shared library (`libstrumpack`).
+    Using this solver requires `using SparseArrays` and loading `STRUMPACK_jll` (for example `import STRUMPACK_jll`).
 
 The following convenience keywords map to STRUMPACK runtime options:
 

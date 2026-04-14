@@ -1,4 +1,5 @@
 using LinearSolve, LinearAlgebra, SparseArrays, SciMLBase
+using STRUMPACK_jll
 using Test
 
 @testset "STRUMPACK Factorization" begin
@@ -6,7 +7,7 @@ using Test
     @test ext !== nothing
 
     if ext === nothing || !ext.strumpack_isavailable()
-        @test_throws ["STRUMPACKFactorization", "libstrumpack"] STRUMPACKFactorization()
+        @test_throws ["STRUMPACKFactorization", "STRUMPACK_jll"] STRUMPACKFactorization()
         @test STRUMPACKFactorization(throwerror = false) isa STRUMPACKFactorization
         @test STRUMPACKFactorization(
             throwerror = false,
@@ -45,7 +46,7 @@ using Test
         A = sparse([4.0 1.0; 2.0 3.0])
         b = [1.0, -1.0]
         prob = LinearProblem(A, b)
-        @test_throws ["STRUMPACKFactorization", "libstrumpack"] solve(
+        @test_throws ["STRUMPACKFactorization", "STRUMPACK_jll"] solve(
             prob,
             STRUMPACKFactorization(throwerror = false)
         )

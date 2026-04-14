@@ -31,7 +31,7 @@ prob = LinearProblem(mat, rhs)
 
 STRUMPACKExt = Base.get_extension(LinearSolve, :LinearSolveSTRUMPACKExt)
 if STRUMPACKExt === nothing || !STRUMPACKExt.strumpack_isavailable()
-    @test_throws ["STRUMPACKFactorization", "libstrumpack"] STRUMPACKFactorization()
+    @test_throws ["STRUMPACKFactorization", "STRUMPACK_jll"] STRUMPACKFactorization()
 else
     @test STRUMPACKFactorization() isa STRUMPACKFactorization
 end

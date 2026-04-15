@@ -33,6 +33,7 @@ jobs:
         group:
           - "Core"
           - "DefaultsLoading"
+          - "LinearSolveSTRUMPACK"
           - "LinearSolveHYPRE"
           - "LinearSolvePETSc"
           - "LinearSolvePardiso"

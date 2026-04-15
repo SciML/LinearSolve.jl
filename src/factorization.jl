@@ -1514,7 +1514,7 @@ Any unexposed or version-specific knobs can still be passed through `options`.
 
     Using this solver requires:
     1. `using SparseArrays` (to enable sparse matrix support), and
-    2. a system installation of `libstrumpack` discoverable by the dynamic loader.
+    2. loading `STRUMPACK_jll` (for example `import STRUMPACK_jll`).
 """
 struct STRUMPACKFactorization <: AbstractSparseFactorization
     use_initial_guess::Bool
@@ -1540,7 +1540,7 @@ struct STRUMPACKFactorization <: AbstractSparseFactorization
         )
         ext = Base.get_extension(@__MODULE__, :LinearSolveSTRUMPACKExt)
         return if throwerror && (ext === nothing || !ext.strumpack_isavailable())
-            error("STRUMPACKFactorization requires a discoverable STRUMPACK shared library (`libstrumpack`) and `using SparseArrays`")
+            error("STRUMPACKFactorization requires `using SparseArrays` and loading `STRUMPACK_jll` (for example `import STRUMPACK_jll`)")
         else
             rel_tol !== nothing && rel_tol < 0 && error("`rel_tol` must be non-negative")
             abs_tol !== nothing && abs_tol < 0 && error("`abs_tol` must be non-negative")

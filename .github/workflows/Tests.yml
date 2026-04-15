@@ -54,17 +54,6 @@ jobs:
             version: "lts"
           - group: Trim
             version: "pre"
-          # Keep STRUMPACK coverage targeted to one stable platform/version
-          - group: LinearSolveSTRUMPACK
-            version: "lts"
-          - group: LinearSolveSTRUMPACK
-            version: "pre"
-          - group: LinearSolveSTRUMPACK
-            os: windows-latest
-          - group: LinearSolveSTRUMPACK
-            os: macos-latest
-          - group: LinearSolveSTRUMPACK
-            arch: x86
           # MKL Pardiso has numerical issues on pre-release Julia
           # See: https://github.com/SciML/LinearSolve.jl/issues/879
           - group: LinearSolvePardiso

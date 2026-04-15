@@ -23,12 +23,12 @@ struct STRUMPACKSparseSolver
     interface::Cint
 end
 
-const _libstrumpack = Ref{Union{Nothing, String}}(nothing)
+const _libstrumpack = Ref{Union{Nothing, Ptr{Cvoid}}}(nothing)
 
 function _load_libstrumpack()
     if libstrumpack isa AbstractString
         handle = Libdl.dlopen_e(libstrumpack)
-        handle != C_NULL && return String(libstrumpack)
+        handle != C_NULL && return handle
     elseif libstrumpack isa Ptr
         libpath = try
             Libdl.dlpath(libstrumpack)
@@ -37,7 +37,7 @@ function _load_libstrumpack()
         end
         if libpath !== nothing
             handle = Libdl.dlopen_e(libpath)
-            handle != C_NULL && return String(libpath)
+            handle != C_NULL && return handle
         end
     end
 
@@ -49,7 +49,7 @@ function _load_libstrumpack()
             "strumpack",
         )
         handle = Libdl.dlopen_e(name)
-        handle != C_NULL && return String(name)
+        handle != C_NULL && return handle
     end
     return nothing
 end
@@ -59,6 +59,12 @@ function __init__()
 end
 
 strumpack_isavailable() = _libstrumpack[] !== nothing
+
+function _strumpack_fptr(name::Symbol)
+    lib = _libstrumpack[]
+    lib === nothing && error("STRUMPACK library is not loaded")
+    return Libdl.dlsym(lib, name)
+end
 
 mutable struct STRUMPACKCache
     solver::Ref{STRUMPACKSparseSolver}
@@ -85,7 +91,7 @@ end
 function _strumpack_destroy!(cache::STRUMPACKCache)
     _libstrumpack[] === nothing && return
     cache.solver[].solver == C_NULL && return
-    ccall((:STRUMPACK_destroy, _libstrumpack[]), Cvoid, (Ref{STRUMPACKSparseSolver},), cache.solver)
+    ccall(_strumpack_fptr(:STRUMPACK_destroy), Cvoid, (Ref{STRUMPACKSparseSolver},), cache.solver)
     cache.solver[] = STRUMPACKSparseSolver(C_NULL, 0, 0)
     return
 end
@@ -112,7 +118,7 @@ function _ensure_initialized!(cache::STRUMPACKCache, alg::LinearSolve.STRUMPACKF
     argv = isempty(cache.option_ptrs) ? Ptr{Ptr{UInt8}}(C_NULL) : Ptr{Ptr{UInt8}}(pointer(cache.option_ptrs))
 
     ccall(
-        (:STRUMPACK_init_mt, _libstrumpack[]),
+        _strumpack_fptr(:STRUMPACK_init_mt),
         Cvoid,
         (Ref{STRUMPACKSparseSolver}, Cint, Cint, Cint, Ptr{Ptr{UInt8}}, Cint),
         cache.solver,
@@ -219,7 +225,7 @@ function SciMLBase.solve!(
         scache.rowptr, scache.colind, scache.nzval = _csc_to_csr_0based(A)
         nref = Ref{Cint}(Cint(size(A, 1)))
         ccall(
-            (:STRUMPACK_set_csr_matrix, _libstrumpack[]),
+            _strumpack_fptr(:STRUMPACK_set_csr_matrix),
             Cvoid,
             (STRUMPACKSparseSolver, Ref{Cint}, Ref{Cint}, Ref{Cint}, Ref{Cdouble}, Cint),
             scache.solver[],
@@ -230,7 +236,7 @@ function SciMLBase.solve!(
             Cint(0)
         )
 
-        info = ccall((:STRUMPACK_factor, _libstrumpack[]), Cint, (STRUMPACKSparseSolver,), scache.solver[])
+        info = ccall(_strumpack_fptr(:STRUMPACK_factor), Cint, (STRUMPACKSparseSolver,), scache.solver[])
         if info != STRUMPACK_SUCCESS
             @SciMLMessage(
                 "STRUMPACK factorization failed (code $(Int(info)))",
@@ -253,7 +259,7 @@ function SciMLBase.solve!(
     xvec = Float64.(cache.u)
 
     info = ccall(
-        (:STRUMPACK_solve, _libstrumpack[]),
+        _strumpack_fptr(:STRUMPACK_solve),
         Cint,
         (STRUMPACKSparseSolver, Ref{Cdouble}, Ref{Cdouble}, Cint),
         scache.solver[],

@@ -308,17 +308,20 @@ function LinearSolve.init_cacheval(
     return nothing
 end
 
+const PREALLOCATED_KLU = KLU.KLUFactorization(
+    SparseMatrixCSC(
+        0, 0, [1], Int[],
+        Float64[]
+    )
+)
+
 function LinearSolve.init_cacheval(
         alg::KLUFactorization, A::AbstractSparseArray{Float64, Int64}, b, u, Pl, Pr,
         maxiters::Int, abstol,
         reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
-    return KLU.KLUFactorization(
-        SparseMatrixCSC{Float64, Int64}(
-            0, 0, [Int64(1)], Int64[], Float64[]
-        )
-    )
+    return PREALLOCATED_KLU
 end
 
 # KLU supports Float64 and ComplexF64 (KLUTypes)

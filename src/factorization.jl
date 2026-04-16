@@ -1224,6 +1224,12 @@ to fail.
 
 Only supports sparse matrices.
 
+!!! note
+
+    CHOLMOD expects a structurally symmetric/Hermitian sparse matrix. Wrap the
+    input in `Symmetric(A)` or `Hermitian(A)` when the matrix is symmetric by
+    construction.
+
 ## Keyword Arguments
 
   - shift: the shift argument in CHOLMOD.

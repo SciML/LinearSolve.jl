@@ -921,6 +921,15 @@ end
 
     pr = LinearProblem(B, b)
     solver = KLUFactorization()
+
+    # Regression test for #737: KLU should work with AbstractSparseMatrixCSC wrappers
+    sol = solve(pr, solver)
+    @test norm(sol.u - u0, Inf) < 1.0e-8
+
+    # Repeat direct solve to exercise cache-init/reuse paths through solve(prob, alg)
+    sol = solve(pr, solver)
+    @test norm(sol.u - u0, Inf) < 1.0e-8
+
     cache = init(pr, solver)
     u = solve!(cache)
     @test norm(u - u0, Inf) < 1.0e-8

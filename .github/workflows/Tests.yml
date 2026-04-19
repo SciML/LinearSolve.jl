@@ -43,24 +43,11 @@ jobs:
           - "LinearSolveAutotune"
           - "LinearSolvePyAMG"
           - "Preferences"
-          - "Trim"
         os:
           - ubuntu-latest
           - macos-latest
           - windows-latest
         exclude:
-          # Don't run trim tests on Julia versions below 1.12
-          - group: Trim
-            version: "lts"
-          - group: Trim
-            version: "pre"
-          # Run trim tests only on one canonical GitHub-hosted target
-          - group: Trim
-            arch: x86
-          - group: Trim
-            os: macos-latest
-          - group: Trim
-            os: windows-latest
           # MKL Pardiso has numerical issues on pre-release Julia
           # See: https://github.com/SciML/LinearSolve.jl/issues/879
           - group: LinearSolvePardiso
@@ -75,4 +62,17 @@ jobs:
     with:
       group: "${{ matrix.group }}"
       julia-version: "${{ matrix.version }}"
+      julia-arch: "${{ matrix.arch }}"
+    secrets: "inherit"
+
+  # Keep trim on one fixed GitHub-hosted runner for deterministic compiler availability.
+  trim:
+    name: "Trim"
+    uses: "SciML/.github/.github/workflows/tests.yml@v1"
+    with:
+      group: "Trim"
+      julia-version: "1"
+      julia-arch: "x64"
+      os: "ubuntu-22.04"
+      self-hosted: false
     secrets: "inherit"

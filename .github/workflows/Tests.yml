@@ -54,6 +54,13 @@ jobs:
             version: "lts"
           - group: Trim
             version: "pre"
+          # Force Trim tests onto a single standard CI machine (ubuntu x64)
+          - group: Trim
+            os: macos-latest
+          - group: Trim
+            os: windows-latest
+          - group: Trim
+            arch: x86
           # MKL Pardiso has numerical issues on pre-release Julia
           # See: https://github.com/SciML/LinearSolve.jl/issues/879
           - group: LinearSolvePardiso
@@ -68,4 +75,5 @@ jobs:
     with:
       group: "${{ matrix.group }}"
       julia-version: "${{ matrix.version }}"
+      self-hosted: ${{ matrix.group != 'Trim' }}
     secrets: "inherit"

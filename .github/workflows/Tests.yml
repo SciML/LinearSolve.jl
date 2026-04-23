@@ -29,7 +29,6 @@ jobs:
           - "pre"
         arch:
           - x64
-          - x86
         group:
           - "Core"
           - "DefaultsLoading"
@@ -74,5 +73,16 @@ jobs:
       julia-version: "1"
       julia-arch: "x64"
       os: "ubuntu-22.04"
+      self-hosted: false
+    secrets: "inherit"
+
+  test_x86:
+    name: "32-bit (x86) Tests"
+    uses: "SciML/.github/.github/workflows/tests.yml@v1"
+    with:
+      group: "Core"
+      julia-version: "1"
+      julia-arch: "x86"
+      os: "ubuntu-latest"
       self-hosted: false
     secrets: "inherit"

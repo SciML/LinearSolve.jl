@@ -75,5 +75,4 @@ jobs:
     with:
       group: "${{ matrix.group }}"
       julia-version: "${{ matrix.version }}"
-      julia-arch: "${{ matrix.arch }}"
     secrets: "inherit"

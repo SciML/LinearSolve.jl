@@ -134,6 +134,9 @@ function _check_residual_safety(cache::LinearCache, alg, A_original, y)
     b_norm = norm(b)
     tol = cache.abstol + cache.reltol * b_norm
     if res_norm > tol
+        @SciMLMessage(cache.verbose, :residual_safety) do
+            return "Residual safety check failed: ‖A*x - b‖ = $(res_norm), tol = $(tol) (abstol = $(cache.abstol), reltol = $(cache.reltol), ‖b‖ = $(b_norm), ratio = $(res_norm / tol))"
+        end
         return SciMLBase.build_linear_solution(
             alg, y, nothing, cache; retcode = ReturnCode.APosterioriSafetyFailure
         )
@@ -1221,6 +1224,12 @@ to fail.
 
 Only supports sparse matrices.
 
+!!! note
+
+    CHOLMOD expects a structurally symmetric/Hermitian sparse matrix. Wrap the
+    input in `Symmetric(A)` or `Hermitian(A)` when the matrix is symmetric by
+    construction.
+
 ## Keyword Arguments
 
   - shift: the shift argument in CHOLMOD.
@@ -1480,6 +1489,101 @@ struct SparspakFactorization <: AbstractSparseFactorization
             new(reuse_symbolic)
         end
     end
+end
+
+"""
+`STRUMPACKFactorization(; use_initial_guess = false, options = String[], kwargs...)`
+
+A sparse direct solver based on
+[STRUMPACK](https://github.com/pghysels/STRUMPACK) via the
+`LinearSolveSTRUMPACKExt` extension.
+
+This wrapper targets the single-node (`MT`) sparse interface and currently supports
+real sparse matrices (`AbstractSparseMatrixCSC{<:AbstractFloat}`), solving in
+`Float64` precision.
+
+Pass STRUMPACK runtime options through `options` to expose advanced functionality.
+
+Convenience keyword arguments are provided for common low-rank/compression tuning
+and are translated to STRUMPACK-style runtime options:
+- `compression` -> `--sp_compression`
+- `rel_tol` -> `--sp_rel_tol`
+- `abs_tol` -> `--sp_abs_tol`
+- `max_rank` -> `--sp_max_rank`
+- `leaf_size` -> `--sp_leaf_size`
+- `reordering` -> `--sp_reordering_method`
+- `matching` -> `--sp_enable_matching`
+
+Any unexposed or version-specific knobs can still be passed through `options`.
+
+!!! note
+
+    Using this solver requires:
+    1. `using SparseArrays` (to enable sparse matrix support), and
+    2. loading `STRUMPACK_jll` (for example `import STRUMPACK_jll`).
+"""
+struct STRUMPACKFactorization <: AbstractSparseFactorization
+    use_initial_guess::Bool
+    options::Vector{String}
+
+    function _push_opt_pair!(opts::Vector{String}, key::String, value)
+        push!(opts, key)
+        push!(opts, string(value))
+        return opts
+    end
+
+    function STRUMPACKFactorization(
+            ; use_initial_guess = false,
+            options = String[],
+            compression = nothing,
+            rel_tol = nothing,
+            abs_tol = nothing,
+            max_rank = nothing,
+            leaf_size = nothing,
+            reordering = nothing,
+            matching = nothing,
+            throwerror = true
+        )
+        ext = Base.get_extension(@__MODULE__, :LinearSolveSTRUMPACKExt)
+        return if throwerror && (ext === nothing || !ext.strumpack_isavailable())
+            error("STRUMPACKFactorization requires `using SparseArrays` and loading `STRUMPACK_jll` (for example `import STRUMPACK_jll`)")
+        else
+            rel_tol !== nothing && rel_tol < 0 && error("`rel_tol` must be non-negative")
+            abs_tol !== nothing && abs_tol < 0 && error("`abs_tol` must be non-negative")
+            max_rank !== nothing && max_rank < 1 && error("`max_rank` must be >= 1")
+            leaf_size !== nothing && leaf_size < 1 && error("`leaf_size` must be >= 1")
+
+            runtime_options = String.(options)
+
+            compression !== nothing && _push_opt_pair!(runtime_options, "--sp_compression", compression)
+            rel_tol !== nothing && _push_opt_pair!(runtime_options, "--sp_rel_tol", rel_tol)
+            abs_tol !== nothing && _push_opt_pair!(runtime_options, "--sp_abs_tol", abs_tol)
+            max_rank !== nothing && _push_opt_pair!(runtime_options, "--sp_max_rank", Int(max_rank))
+            leaf_size !== nothing && _push_opt_pair!(runtime_options, "--sp_leaf_size", Int(leaf_size))
+            reordering !== nothing &&
+                _push_opt_pair!(runtime_options, "--sp_reordering_method", reordering)
+            matching !== nothing &&
+                _push_opt_pair!(runtime_options, "--sp_enable_matching", matching ? 1 : 0)
+
+            new(use_initial_guess, runtime_options)
+        end
+    end
+end
+
+function init_cacheval(
+        ::STRUMPACKFactorization,
+        ::Union{AbstractMatrix, Nothing, AbstractSciMLOperator}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
+function init_cacheval(
+        ::STRUMPACKFactorization, ::StaticArray, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return nothing
 end
 
 function init_cacheval(

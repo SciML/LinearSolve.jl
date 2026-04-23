@@ -67,6 +67,10 @@ to the sparsity pattern and `UMFPACKFactorization` if there is more structure.
 alternative to `UMFPACKFactorization` that exploits OpenMP task parallelism
 for the numeric factorization phase, which can give speedups on multicore systems
 for larger sparse problems.
+`STRUMPACKFactorization` provides a sparse direct alternative that can be tuned
+with approximate low-rank compression options (for example HSS/HODLR modes,
+compression tolerances, and rank/leaf-size controls) when supported by the
+installed STRUMPACK build.
 Pardiso.jl's methods are also known to be very efficient sparse linear solvers.
 
 For GPU-accelerated sparse LU-factorizations, there are two high-performance options.
@@ -215,6 +219,28 @@ ParUFactorization
 
 ```@docs
 SparspakFactorization
+```
+
+### STRUMPACK
+
+!!! note
+
+    Using this solver requires `using SparseArrays` and loading `STRUMPACK_jll` (for example `import STRUMPACK_jll`).
+
+The following convenience keywords map to STRUMPACK runtime options:
+
+- `compression` -> `--sp_compression`
+- `rel_tol` -> `--sp_rel_tol`
+- `abs_tol` -> `--sp_abs_tol`
+- `max_rank` -> `--sp_max_rank`
+- `leaf_size` -> `--sp_leaf_size`
+- `reordering` -> `--sp_reordering_method`
+- `matching` -> `--sp_enable_matching`
+
+You can also pass raw STRUMPACK flags via `options = ["--flag", "value", ...]`.
+
+```@docs
+STRUMPACKFactorization
 ```
 
 ### CliqueTrees.jl
@@ -373,6 +399,291 @@ HYPREAlgorithm
 GinkgoJL
 GinkgoJL_CG
 GinkgoJL_GMRES
+```
+
+### PETSc.jl
+
+!!! note
+
+    Using this solver requires loading PETSc.jl and MPI.jl, and initialising MPI:
+    ```julia
+    using PETSc, MPI, SparseMatricesCSR   # SparseMatricesCSR is optional but recommended for best performance
+    MPI.Init()
+    ```
+
+[PETSc](https://petsc.org) (Portable, Extensible Toolkit for Scientific Computation) is a
+library for the parallel numerical solution of scientific applications.  Its KSP
+component provides a comprehensive suite of Krylov iterative solvers paired with a large
+selection of preconditioners.
+
+`PETScAlgorithm` wraps PETSc's KSP solvers via [PETSc.jl](https://github.com/JuliaParallel/PETSc.jl)
+and exposes the full preconditioner interface.  It works with **dense matrices**,
+**`SparseMatrixCSC`**, and **`SparseMatrixCSR`** (from
+[SparseMatricesCSR.jl](https://github.com/gridap/SparseMatricesCSR.jl)).
+
+**When to choose PETSc over the pure-Julia Krylov solvers:**
+- You want to test a wide variety of Krylov methods and preconditioners without needing to add multiple Julia packages.
+- You want direct access to PETSc's Options Database to fine-tune solver behavior at runtime
+  without recompiling.
+- You want to solve large sparse systems in parallel using MPI, with PETSc handling the communication and load balancing.
+
+#### Solver type
+
+The first positional argument selects the KSP algorithm. Any string accepted by
+[`KSPSetType`](https://petsc.org/release/manualpages/KSP/KSPSetType/) can be passed as a `Symbol`.
+The most commonly used options are:
+
+| Symbol | Method | Notes |
+| :--- | :--- | :--- |
+| `:gmres` (default) | GMRES | General non-symmetric systems |
+| `:fgmres` | Flexible GMRES | Allows variable preconditioner |
+| `:lgmres` | LGMRES | Augmented GMRES, better for restarting |
+| `:cg` | Conjugate Gradient | SPD systems only |
+| `:fcg` | Flexible CG | CG with variable preconditioner |
+| `:minres` | MINRES | Symmetric indefinite systems |
+| `:symmlq` | SYMMLQ | Symmetric indefinite systems |
+| `:bcgs` | BiCGStab | Non-symmetric, more stable than BiCG |
+| `:fbcgs` | Flexible BiCGStab | BiCGStab with variable preconditioner |
+| `:bcgsl` | BiCGStab(ℓ) | Stabilised BiCGStab variant |
+| `:bicg` | BiConjugate Gradient | Non-symmetric |
+| `:cgs` | CGS | Non-symmetric, faster but less stable |
+| `:tfqmr` | TFQMR | Transpose-free QMR |
+| `:tcqmr` | TCQMR | Transpose-free QMR variant |
+| `:cr` | Conjugate Residuals | Symmetric systems |
+| `:gcr` | GCR | Generalized CR, flexible preconditioner |
+| `:chebyshev` | Chebyshev iteration | Requires eigenvalue bounds; good for smoothing |
+| `:richardson` | Richardson iteration | Stationary; mainly used as smoother |
+| `:lsqr` | LSQR | Least-squares problems |
+| `:cgls` | CGLS | Least-squares problems |
+| `:preonly` | Preconditioner only | Use with `:lu` for a direct solve |
+| `:none` | No solver | Identity; useful for debugging |
+
+#### Preconditioners
+
+Preconditioners are selected via the `pc_type` keyword. Any string accepted by
+[`PCSetType`](https://petsc.org/release/manualpages/PC/PCSetType/) can be passed as a `Symbol`.
+The most commonly used options are:
+
+| Symbol | Preconditioner | Notes |
+| :--- | :--- | :--- |
+| `:none` (default) | No preconditioner | Useful for well-conditioned problems |
+| `:jacobi` | Diagonal (Jacobi) scaling | Cheap; good for diagonally dominant systems |
+| `:pbjacobi` | Point Block Jacobi | Fixed-size dense blocks along the diagonal |
+| `:sor` | SOR / Gauss-Seidel | Successive over-relaxation |
+| `:eisenstat` | Eisenstat SSOR | Symmetric SOR; cheaper than a full SSOR sweep |
+| `:ilu` | Incomplete LU | General sparse systems |
+| `:icc` | Incomplete Cholesky | SPD systems; symmetric analogue of ILU |
+| `:lu` | Exact LU (direct) | Use with `:preonly` for a direct solve |
+| `:cholesky` | Exact Cholesky (direct) | SPD systems; use with `:preonly` |
+| `:bjacobi` | Block Jacobi | Applies an independent ILU/LU solve per block |
+| `:asm` | Additive Schwarz | Overlapping domain decomposition |
+| `:gasm` | Generalized Additive Schwarz | Multi-level ASM variant |
+| `:gamg` | Algebraic Multigrid (GAMG) | No hierarchy needed; good for PDEs |
+| `:hypre` | Hypre BoomerAMG | Excellent AMG for large ill-conditioned systems |
+| `:kaczmarz` | Kaczmarz | Row-projection smoother |
+
+A separate matrix for building the preconditioner can be supplied via `prec_matrix`:
+
+```julia
+PETScAlgorithm(:gmres; prec_matrix = P)
+```
+
+#### Matrix format recommendations
+
+PETSc operates internally on 0-based CSR arrays. The recommended matrix format is
+**`SparseMatrixCSR{0}`** (from SparseMatricesCSR.jl), which matches PETSc's native layout
+exactly:
+
+- **`SparseMatrixCSR{0}`** — *fastest*: zero-copy path on construction; direct `copyto!`
+  on value-only updates.
+- **`SparseMatrixCSR{1}`** — slightly slower than `{0}` on construction (index shift on
+  cold start), same fast value-update path.
+- **`SparseMatrixCSC`** — supported, but requires a CSC→CSR permutation and scatter on
+  every value update.
+- **Dense `Matrix`** — supported via `MatSeqDense`; works out of the box.
+
+```julia
+using SparseMatricesCSR, SparseArrays
+
+A_csc = spdiagm(-1 => -ones(n-1), 0 => 2ones(n), 1 => -ones(n-1))
+
+# Recommended: one-liner to build SparseMatrixCSR{0} from a CSC matrix.
+# Note: this mutates A_csc's internal storage (colptr/rowvals are shifted in-place).
+# Use a copy if you need to keep A_csc usable afterwards.
+A = SparseMatrixCSR{0}(transpose(sparse(transpose(A_csc))))
+```
+
+#### Basic usage
+
+```julia
+using LinearSolve, PETSc, MPI, SparseArrays, LinearAlgebra
+MPI.Init()
+
+n = 200
+A = sprand(n, n, 0.05); A = A + A' + 20I
+b = rand(n)
+
+# Simple one-shot solve with ILU preconditioner
+sol = solve(LinearProblem(A, b), PETScAlgorithm(:gmres; pc_type = :ilu))
+@show norm(A * sol.u - b) / norm(b)
+```
+
+#### Repeated solves (same sparsity pattern, values change)
+
+When the sparsity pattern is fixed across calls,
+the KSP is reused and only the matrix values are updated.
+
+```julia
+using LinearSolve, PETSc, MPI, SparseArrays, SparseMatricesCSR, LinearAlgebra
+import SciMLBase
+MPI.Init()
+
+n = 200
+A_csc = sprand(n, n, 0.05); A_csc = A_csc + A_csc' + 20I
+b = rand(n)
+
+# Convert to SparseMatrixCSR{0} once — getrowptr/getcolval require a CSR matrix
+A = SparseMatrixCSR{0}(transpose(sparse(transpose(A_csc))))
+
+cache = SciMLBase.init(LinearProblem(A, b), PETScAlgorithm(:gmres; pc_type = :ilu))
+solve!(cache)
+
+# Extract the fixed sparsity structure once (0-based row pointers and column indices)
+rowptr0 = copy(SparseMatricesCSR.getrowptr(A))
+colval0 = copy(SparseMatricesCSR.getcolval(A))
+
+# Iterate: only nzval changes, sparsity pattern is fixed
+for t in 1:10
+    new_vals = A.nzval .* (1 + 0.1 * t)   # e.g. time-varying coefficients
+    A_new = SparseMatrixCSR{0}(n, n, rowptr0, colval0, new_vals)
+    SciMLBase.reinit!(cache; A = A_new, b = rand(n))
+    solve!(cache)
+end
+```
+
+#### Extra PETSc options
+
+Any PETSc Options Database key can be forwarded via `ksp_options`:
+
+```julia
+PETScAlgorithm(:gmres;
+    pc_type     = :ilu,
+    ksp_options = (ksp_monitor = "", ksp_rtol = 1e-12, pc_factor_levels = 2))
+```
+
+#### Memory management
+
+PETSc objects live in C-managed memory outside Julia's GC.  Call
+`cleanup_petsc_cache!` explicitly when finished to release resources promptly:
+
+```julia
+PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
+PETScExt.cleanup_petsc_cache!(sol)   # after solve(...)
+PETScExt.cleanup_petsc_cache!(cache) # after init/solve! cycle
+```
+
+A GC finalizer is registered as a safety net, but explicit cleanup is strongly preferred.
+
+#### MPI-parallel solves
+
+`PETScAlgorithm` supports **distributed-memory parallel** solves when the system matrix
+is a `PSparseMatrix` and the RHS/solution are `PVector` from
+[PartitionedArrays.jl](https://github.com/PartitionedArrays/PartitionedArrays.jl).  Each MPI rank
+contributes its owned rows; PETSc assembles and solves the global system in parallel.
+
+Requires loading all four trigger packages:
+
+```julia
+using LinearSolve, PETSc, MPI
+using PartitionedArrays, SparseArrays, SparseMatricesCSR
+MPI.Init()
+```
+
+!!! note
+
+    Run scripts with `mpiexecjl -n <P> julia --project script.jl`.
+    For single-process testing without MPI, use `with_debug()` instead of `with_mpi()`;
+    it runs the same code sequentially using `DebugArray` as the backend.
+
+##### Basic parallel solve
+
+```julia
+using LinearSolve, PETSc, MPI
+using PartitionedArrays, PartitionedArrays: PSparseMatrix, PVector,
+    uniform_partition, partition, tuple_of_arrays
+using SparseArrays, SparseMatricesCSR
+MPI.Init()
+
+# Build a simple diagonal system distributed across all ranks.
+# A[i,i] = i,  b[i] = i  →  exact solution u[i] = 1 everywhere.
+n = 100
+with_mpi() do distribute
+    parts = distribute(LinearIndices((MPI.Comm_size(MPI.COMM_WORLD),)))
+    row_partition = uniform_partition(parts, n)
+
+    I_v, J_v, V_v = map(row_partition) do rng
+        collect(Int, rng), collect(Int, rng), Float64.(rng)
+    end |> tuple_of_arrays
+    A = psparse(I_v, J_v, V_v, row_partition, row_partition) |> fetch
+
+    b = PVector(map(rng -> Float64.(collect(rng)), row_partition), row_partition)
+    u = PVector(map(rng -> zeros(length(rng)), row_partition), row_partition)
+
+    sol = solve(LinearProblem(A, b; u0 = u), PETScAlgorithm(:gmres); abstol = 1e-12)
+    # sol.u is a PVector whose owned DOFs contain the solution on each rank.
+    # Ghost values are stale after the solve; call consistent!(sol.u) if needed.
+end
+```
+
+##### Repeated parallel solves (same sparsity pattern, values change)
+
+For `SparseMatrixCSR{0}` local matrices, if the sparsity pattern
+is unchanged between `reinit!` calls the KSP is reused and only the matrix values
+are updated no reallocation of PETSc objects.
+
+```julia
+with_mpi() do distribute
+    parts = distribute(LinearIndices((MPI.Comm_size(MPI.COMM_WORLD),)))
+    row_partition = uniform_partition(parts, n)
+
+    function build_csr_diag(row_partition, scale)
+        csr_part = map(row_partition) do rng
+            m = length(rng)
+            sp = sparse(1:m, 1:m, scale .* Float64.(collect(rng)), m, m)
+            convert(SparseMatrixCSR{0, Float64, Int64}, sp)
+        end
+        A = PSparseMatrix(csr_part, row_partition, row_partition, true)
+        b = PVector(map(rng -> scale .* Float64.(collect(rng)), row_partition), row_partition)
+        u = PVector(map(rng -> zeros(length(rng)), row_partition), row_partition)
+        A, b, u
+    end
+
+    A1, b1, u1 = build_csr_diag(row_partition, 1.0)
+    cache = SciMLBase.init(LinearProblem(A1, b1; u0 = u1), PETScAlgorithm(:gmres))
+    solve!(cache)
+
+    for scale in [2.0, 3.0, 4.0]
+        A_new, b_new, _ = build_csr_diag(row_partition, scale)
+        SciMLBase.reinit!(cache; A = A_new, b = b_new)
+        solve!(cache)   # KSP reused; only values updated
+    end
+
+    PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
+    PETScExt.cleanup_petsc_cache!(cache)
+end
+```
+
+!!! note "Ghost synchronisation"
+
+    After the solve, only the **owned** degrees of freedom in `sol.u` are updated.
+    Ghost values remain stale.  If subsequent operations (e.g. the next matrix–vector
+    product) need ghost values, call:
+    ```julia
+    PartitionedArrays.consistent!(sol.u)
+    ```
+
+```@docs
+PETScAlgorithm
 ```
 
 ### LinearSolvePyAMG.jl

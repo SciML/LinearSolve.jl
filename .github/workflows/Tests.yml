@@ -33,10 +33,12 @@ jobs:
         group:
           - "Core"
           - "DefaultsLoading"
+          - "LinearSolveSTRUMPACK"
           - "LinearSolveHYPRE"
           - "LinearSolvePETSc"
           - "LinearSolvePardiso"
           - "LinearSolveGinkgo"
+          - "LinearSolveElemental"
           - "NoPre"
           - "LinearSolveAutotune"
           - "LinearSolvePyAMG"
@@ -52,6 +54,13 @@ jobs:
             version: "lts"
           - group: Trim
             version: "pre"
+          # Force Trim tests onto a single standard CI machine (ubuntu x64)
+          - group: Trim
+            os: macos-latest
+          - group: Trim
+            os: windows-latest
+          - group: Trim
+            arch: x86
           # MKL Pardiso has numerical issues on pre-release Julia
           # See: https://github.com/SciML/LinearSolve.jl/issues/879
           - group: LinearSolvePardiso
@@ -59,8 +68,12 @@ jobs:
           # Ginkgo.jl is not available on Windows
           - group: LinearSolveGinkgo
             os: windows-latest
+          # Elemental_jll has no Windows binary
+          - group: LinearSolveElemental
+            os: windows-latest
     uses: "SciML/.github/.github/workflows/tests.yml@v1"
     with:
       group: "${{ matrix.group }}"
       julia-version: "${{ matrix.version }}"
+      self-hosted: ${{ matrix.group != 'Trim' }}
     secrets: "inherit"

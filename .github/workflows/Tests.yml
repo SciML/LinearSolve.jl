@@ -75,4 +75,5 @@ jobs:
     with:
       group: "${{ matrix.group }}"
       julia-version: "${{ matrix.version }}"
+      self-hosted: ${{ matrix.group != 'Trim' }}
     secrets: "inherit"

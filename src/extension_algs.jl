@@ -1243,6 +1243,78 @@ struct ParUFactorization <: AbstractSparseFactorization
 end
 
 """
+`HSLMA57Factorization(; kwargs...)`
+
+A sparse symmetric direct solver powered by
+[HSL.jl](https://github.com/JuliaSmoothOptimizers/HSL.jl)'s MA57 backend.
+
+Keyword arguments are forwarded to `HSL.Ma57(...)`.
+
+!!! note
+
+    Using this solver requires loading `HSL.jl` and `SparseArrays`:
+    ```julia
+    using HSL, SparseArrays
+    ```
+
+    `HSL.jl` requires a manual installation of `HSL_jll.jl` due proprietary
+    licensing. See `HSL.jl` installation instructions:
+    https://github.com/JuliaSmoothOptimizers/HSL.jl
+"""
+struct HSLMA57Factorization{K} <: AbstractSparseFactorization
+    kwargs::K
+
+    function HSLMA57Factorization(; kwargs...)
+        ext = Base.get_extension(@__MODULE__, :LinearSolveHSLExt)
+        if ext === nothing
+            error("HSLMA57Factorization requires `using HSL, SparseArrays`. Note: `HSL.jl` requires manual installation of `HSL_jll.jl`.")
+        end
+        return new{typeof(kwargs)}(kwargs)
+    end
+end
+
+"""
+`HSLMA97Factorization(; matrix_type = :real_indef, kwargs...)`
+
+A sparse symmetric/Hermitian direct solver powered by
+[HSL.jl](https://github.com/JuliaSmoothOptimizers/HSL.jl)'s MA97 backend.
+
+## Keyword Arguments
+
+  - `matrix_type`: Passed to `HSL.ma97_factorize!`. Supported values include
+    `:real_spd`, `:real_indef`, `:herm_pd`, `:herm_indef`, `:cmpl_indef`.
+  - `kwargs...`: Forwarded to `HSL.Ma97(...)`.
+
+!!! note
+
+    Using this solver requires loading `HSL.jl` and `SparseArrays`:
+    ```julia
+    using HSL, SparseArrays
+    ```
+
+    `HSL.jl` requires a manual installation of `HSL_jll.jl` due proprietary
+    licensing. See `HSL.jl` installation instructions:
+    https://github.com/JuliaSmoothOptimizers/HSL.jl
+"""
+struct HSLMA97Factorization{K} <: AbstractSparseFactorization
+    matrix_type::Symbol
+    kwargs::K
+
+    function HSLMA97Factorization(; matrix_type::Symbol = :real_indef, kwargs...)
+        ext = Base.get_extension(@__MODULE__, :LinearSolveHSLExt)
+        if ext === nothing
+            error("HSLMA97Factorization requires `using HSL, SparseArrays`. Note: `HSL.jl` requires manual installation of `HSL_jll.jl`.")
+        end
+
+        matrix_type ∈ (:real_spd, :real_indef, :herm_pd, :herm_indef, :cmpl_indef) || error(
+            "Unsupported matrix_type: $(matrix_type). Expected one of :real_spd, :real_indef, :herm_pd, :herm_indef, :cmpl_indef."
+        )
+
+        return new{typeof(kwargs)}(matrix_type, kwargs)
+    end
+end
+
+"""
     ElementalJL(; method = :LU)
 
 A wrapper for [Elemental.jl](https://github.com/JuliaParallel/Elemental.jl),

@@ -95,6 +95,13 @@ if GROUP == "LinearSolvePardiso"
     @time @safetestset "Pardiso" include("pardiso/pardiso.jl")
 end
 
+if GROUP == "LinearSolveHSL"
+    Pkg.activate("hsl")
+    Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
+    Pkg.instantiate()
+    @time @safetestset "HSL" include("hsl/hsl.jl")
+end
+
 if !Base.Sys.iswindows() && GROUP == "LinearSolveGinkgo"
     Pkg.activate("ginkgo")
     Pkg.develop(PackageSpec(path = dirname(@__DIR__)))

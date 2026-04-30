@@ -200,7 +200,7 @@ end
     end
 end
 
-# Try to load BLIS extension
+# Try to load BLIS extension.
 try
     using blis_jll, LAPACK_jll
 catch LoadError

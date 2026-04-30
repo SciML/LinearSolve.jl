@@ -287,9 +287,9 @@ function SciMLBase.solve!(
         info_value = res[3]
 
         if info_value != 0
-            if !isa(verbose.blas_info, SciMLLogging.Silent) || !isa(verbose.blas_errors, SciMLLogging.Silent) ||
-                    !isa(verbose.blas_invalid_args, SciMLLogging.Silent)
-                op_info = get_blas_operation_info(:dgetrf, A, cache.b, condition = !isa(verbose.condition_number, SciMLLogging.Silent))
+            if verbose.blas_info != SciMLLogging.Silent || verbose.blas_errors != SciMLLogging.Silent ||
+                    verbose.blas_invalid_args != SciMLLogging.Silent
+                op_info = get_blas_operation_info(:dgetrf, A, cache.b, condition = verbose.condition_number != SciMLLogging.Silent)
                 @SciMLMessage(cache.verbose, :condition_number) do
                     if op_info[:condition_number] === nothing
                         return "Matrix condition number calculation failed."
@@ -306,7 +306,7 @@ function SciMLBase.solve!(
             @SciMLMessage(cache.verbose, :blas_success) do
                 op_info = get_blas_operation_info(
                     :dgetrf, A, cache.b,
-                    condition = !isa(verbose.condition_number, SciMLLogging.Silent)
+                    condition = verbose.condition_number != SciMLLogging.Silent
                 )
                 @SciMLMessage(cache.verbose, :condition_number) do
                     if op_info[:condition_number] === nothing

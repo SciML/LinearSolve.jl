@@ -8,8 +8,8 @@ using Test
     @testset "Default constructor" begin
         v1 = LinearVerbosity()
         @test v1 isa LinearVerbosity
-        @test v1.default_lu_fallback isa SciMLLogging.Silent
-        @test v1.KrylovKit_verbosity == SciMLLogging.CustomLevel(1)
+        @test v1.default_lu_fallback == SciMLLogging.Silent
+        @test v1.KrylovKit_verbosity == SciMLLogging.MessageLevel(1)
     end
     @testset "LinearVerbosity constructors" begin
         v3_none = LinearVerbosity(SciMLLogging.None())
@@ -18,50 +18,50 @@ using Test
         v3_standard = LinearVerbosity(SciMLLogging.Standard())
         v3_detailed = LinearVerbosity(SciMLLogging.Detailed())
 
-        @test v3_all.default_lu_fallback isa SciMLLogging.WarnLevel
-        @test v3_minimal.default_lu_fallback isa SciMLLogging.Silent
-        @test v3_minimal.KrylovKit_verbosity isa SciMLLogging.Silent
-        @test v3_detailed.KrylovKit_verbosity == SciMLLogging.CustomLevel(2)
+        @test v3_all.default_lu_fallback == SciMLLogging.WarnLevel
+        @test v3_minimal.default_lu_fallback == SciMLLogging.Silent
+        @test v3_minimal.KrylovKit_verbosity == SciMLLogging.Silent
+        @test v3_detailed.KrylovKit_verbosity == SciMLLogging.MessageLevel(2)
     end
 
     @testset "Group-level keyword constructors" begin
-        v4_error = LinearVerbosity(error_control = SciMLLogging.ErrorLevel())
-        @test v4_error.default_lu_fallback isa SciMLLogging.ErrorLevel
+        v4_error = LinearVerbosity(error_control = SciMLLogging.ErrorLevel)
+        @test v4_error.default_lu_fallback == SciMLLogging.ErrorLevel
 
-        v4_numerical = LinearVerbosity(numerical = Silent())
-        @test v4_numerical.KrylovKit_verbosity isa SciMLLogging.Silent
-        @test v4_numerical.using_IterativeSolvers isa SciMLLogging.Silent
-        @test v4_numerical.pardiso_verbosity isa SciMLLogging.Silent
+        v4_numerical = LinearVerbosity(numerical = Silent)
+        @test v4_numerical.KrylovKit_verbosity == SciMLLogging.Silent
+        @test v4_numerical.using_IterativeSolvers == SciMLLogging.Silent
+        @test v4_numerical.pardiso_verbosity == SciMLLogging.Silent
 
-        v4_performance = LinearVerbosity(performance = InfoLevel())
-        @test v4_performance.no_right_preconditioning isa SciMLLogging.InfoLevel
+        v4_performance = LinearVerbosity(performance = InfoLevel)
+        @test v4_performance.no_right_preconditioning == SciMLLogging.InfoLevel
     end
 
     @testset "Mixed group and individual settings" begin
         v5_mixed = LinearVerbosity(
-            numerical = Silent(),
-            KrylovKit_verbosity = WarnLevel(),
-            performance = InfoLevel()
+            numerical = Silent,
+            KrylovKit_verbosity = WarnLevel,
+            performance = InfoLevel
         )
         # Individual override should take precedence
-        @test v5_mixed.KrylovKit_verbosity isa SciMLLogging.WarnLevel
+        @test v5_mixed.KrylovKit_verbosity == SciMLLogging.WarnLevel
         # Other numerical options should use group setting
-        @test v5_mixed.using_IterativeSolvers isa SciMLLogging.Silent
+        @test v5_mixed.using_IterativeSolvers == SciMLLogging.Silent
         # Performance group setting should apply
-        @test v5_mixed.no_right_preconditioning isa SciMLLogging.InfoLevel
+        @test v5_mixed.no_right_preconditioning == SciMLLogging.InfoLevel
     end
 
     @testset "Individual keyword arguments" begin
         v6_individual = LinearVerbosity(
-            default_lu_fallback = SciMLLogging.ErrorLevel(),
-            KrylovKit_verbosity = SciMLLogging.InfoLevel(),
-            pardiso_verbosity = SciMLLogging.Silent()
+            default_lu_fallback = SciMLLogging.ErrorLevel,
+            KrylovKit_verbosity = SciMLLogging.InfoLevel,
+            pardiso_verbosity = SciMLLogging.Silent
         )
-        @test v6_individual.default_lu_fallback isa SciMLLogging.ErrorLevel
-        @test v6_individual.KrylovKit_verbosity isa SciMLLogging.InfoLevel
-        @test v6_individual.pardiso_verbosity isa SciMLLogging.Silent
+        @test v6_individual.default_lu_fallback == SciMLLogging.ErrorLevel
+        @test v6_individual.KrylovKit_verbosity == SciMLLogging.InfoLevel
+        @test v6_individual.pardiso_verbosity == SciMLLogging.Silent
         # Unspecified options should use defaults
-        @test v6_individual.no_right_preconditioning isa SciMLLogging.Silent
+        @test v6_individual.no_right_preconditioning == SciMLLogging.Silent
     end
 
     @testset "Group classification functions" begin
@@ -74,12 +74,12 @@ using Test
     end
 
     @testset "Group options function" begin
-        v8 = LinearVerbosity(numerical = WarnLevel())
+        v8 = LinearVerbosity(numerical = WarnLevel)
         numerical_opts = group_options(v8, :numerical)
         @test numerical_opts isa NamedTuple
         @test :KrylovKit_verbosity in keys(numerical_opts)
         @test :using_IterativeSolvers in keys(numerical_opts)
-        @test numerical_opts.KrylovKit_verbosity isa SciMLLogging.WarnLevel
+        @test numerical_opts.KrylovKit_verbosity == SciMLLogging.WarnLevel
 
         error_opts = group_options(v8, :error_control)
         @test :default_lu_fallback in keys(error_opts)
@@ -107,7 +107,7 @@ end
         r"LU factorization failed, falling back to QR factorization\. `A` is potentially rank-deficient\.",
     ) solve(
         prob,
-        verbose = LinearVerbosity(default_lu_fallback = WarnLevel())
+        verbose = LinearVerbosity(default_lu_fallback = WarnLevel)
     )
 
     @test_logs (
@@ -115,10 +115,10 @@ end
         r"LU factorization failed, falling back to QR factorization\. `A` is potentially rank-deficient\.",
     ) solve(
         prob,
-        verbose = LinearVerbosity(default_lu_fallback = InfoLevel())
+        verbose = LinearVerbosity(default_lu_fallback = InfoLevel)
     )
 
-    verb = LinearVerbosity(default_lu_fallback = WarnLevel())
+    verb = LinearVerbosity(default_lu_fallback = WarnLevel)
 
     @test_logs (
         :warn,
@@ -172,10 +172,10 @@ end
         @test info.memory_usage_MB >= 0  # Memory can be 0 for very small matrices
 
         # Test with condition number computation enabled via verbosity
-        verbose_with_cond = LinearVerbosity(condition_number = InfoLevel())
+        verbose_with_cond = LinearVerbosity(condition_number = InfoLevel)
         info_with_cond = LinearSolve.get_blas_operation_info(
             :dgetrf, A, b,
-            condition = !isa(verbose_with_cond.condition_number, SciMLLogging.Silent)
+            condition = verbose_with_cond.condition_number != SciMLLogging.Silent
         )
         @test !isinf(info_with_cond.condition_number)  # Should be computed (not -Inf)
     end

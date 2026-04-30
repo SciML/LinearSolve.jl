@@ -148,7 +148,7 @@ mutable struct KLUFactorization{Tv <: KLUTypes, Ti <: KLUITypes, Tklu <: Union{k
         Ti = eltype(colptr)
         common = _common(Ti)
         commonref = Ref(common)
-        obj = new{eltype(nzval), Ti, typeof(common)}(common, commonref, C_NULL, C_NULL, n, colptr, rowval, nzval)
+        obj = new{eltype(nzval), Ti, typeof(common), typeof(commonref)}(common, commonref, C_NULL, C_NULL, n, colptr, rowval, nzval)
         function f(klu)
             _free_symbolic(klu)
             return _free_numeric(klu)

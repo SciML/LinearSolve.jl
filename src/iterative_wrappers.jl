@@ -348,6 +348,8 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
             verbose, :no_right_preconditioning
         )
         Krylov.krylov_solve!(args...; M, kwargs...)
+    elseif cache.cacheval isa Krylov.LsmrWorkspace
+        Krylov.krylov_solve!(args...; M, N, kwargs...)
     else
         Krylov.krylov_solve!(args...; kwargs...)
     end

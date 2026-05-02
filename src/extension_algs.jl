@@ -13,10 +13,11 @@ solvers via [PETSc.jl](https://github.com/JuliaParallel/PETSc.jl).
     MPI.Init()
     ```
 
-!!! warning "Serial only"
-    Currently supports only serial solves (`MPI.COMM_SELF`). Passing a
-    multi-rank communicator will raise an error. MPI-parallel support is
-    planned for a future release.
+!!! warning "Serial and MPI-parallel"
+    Standard Julia matrices use serial solves via `MPI.COMM_SELF` unless a
+    non-`nothing` communicator is supplied. Distributed `PSparseMatrix` and
+    `PVector` inputs are handled by the MPI extension when `PETSc` and
+    `PartitionedArrays` are loaded.
 
 ---
 

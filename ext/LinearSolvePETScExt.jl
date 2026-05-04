@@ -3,6 +3,7 @@ module LinearSolvePETScExt
 using PETSc
 import PETSc: MPI, LibPETSc
 using SparseArrays: SparseMatrixCSC, nzrange, sparse
+using SparseMatricesCSR: SparseMatrixCSR, getrowptr, getcolval
 using LinearSolve: PETScAlgorithm, LinearCache, LinearSolve,
     OperatorAssumptions, LinearVerbosity
 using SciMLBase: LinearSolution, build_linear_solution, ReturnCode, SciMLBase
@@ -167,8 +168,83 @@ end
 # ── Matrix conversion ─────────────────────────────────────────────────────────
 
 # Trait function: is A a sparse format that PETSc can handle as an AIJ matrix?
-# Overloaded by LinearSolvePETScCSRExt to also return true for SparseMatrixCSR.
 is_sparse_petsc(A) = A isa SparseMatrixCSC
+is_sparse_petsc(::SparseMatrixCSR) = true
+
+# SparseMatrixCSR is already in PETSc's native CSR order, so the conversion can
+# reuse the row/column arrays directly after canonicalizing the index base.
+function _to_petsc_canonical(
+        A::SparseMatrixCSR{Bi, Tv, Ti},
+        ::Type{PetscInt}, ::Type{PetscScalar}
+    ) where {Bi, Tv, Ti, PetscInt, PetscScalar}
+    m, n = size(A)
+    src_rp = getrowptr(A)
+    src_cv = getcolval(A)
+    src_nz = A.nzval
+
+    if Bi == 0
+        if Ti == PetscInt
+            Tv == PetscScalar && return A
+            rp = src_rp
+            cv = src_cv
+        else
+            rp = PetscInt.(src_rp)
+            cv = PetscInt.(src_cv)
+        end
+    else
+        rp = PetscInt[v - Bi for v in src_rp]
+        cv = PetscInt[v - Bi for v in src_cv]
+    end
+
+    nz = Tv == PetscScalar ? copy(src_nz) : PetscScalar.(src_nz)
+    return SparseMatrixCSR{0}(m, n, rp, cv, nz)
+end
+
+function to_petsc_mat(petsclib, A::SparseMatrixCSR{Bi}, pcache = nothing) where {Bi}
+    PetscInt = PETSc.inttype(petsclib)
+    PetscScalar = PETSc.scalartype(petsclib)
+
+    canonical = _to_petsc_canonical(A, PetscInt, PetscScalar)
+    m, n = size(canonical)
+
+    mat = LibPETSc.MatCreateSeqAIJWithArrays(
+        petsclib, MPI.COMM_SELF,
+        PetscInt(m), PetscInt(n),
+        getrowptr(canonical), getcolval(canonical), canonical.nzval
+    )
+
+    PETSc._MATSEQAIJ_WITHARRAYS_STORAGE[mat.ptr] = canonical
+    return mat
+end
+
+function store_sparse_pattern!(pcache, A::SparseMatrixCSR)
+    pcache.sparse_perm = nothing
+    pcache.sparse_scratch = nothing
+    pcache.prev_colptr = getrowptr(A)
+    return pcache.prev_rowval = getcolval(A)
+end
+
+function check_pattern_changed(pcache, A::SparseMatrixCSR)
+    pcache.prev_colptr === nothing && return true
+    old_rp, old_cv = pcache.prev_colptr, pcache.prev_rowval
+    new_rp, new_cv = getrowptr(A), getcolval(A)
+    old_rp === new_rp && old_cv === new_cv && return false
+    (length(old_rp) != length(new_rp) || length(old_cv) != length(new_cv)) && return true
+    return old_rp != new_rp || old_cv != new_cv
+end
+
+function update_sparse_values!(
+        petsclib, PA, pcache, A::SparseMatrixCSR; assemble::Bool = true
+    )
+    vals = LibPETSc.MatSeqAIJGetArray(petsclib, PA)
+    try
+        pointer(vals) != pointer(A.nzval) && copyto!(vals, A.nzval)
+    finally
+        LibPETSc.MatSeqAIJRestoreArray(petsclib, PA, vals)
+    end
+    assemble && PETSc.assemble!(PA)
+    return nothing
+end
 
 # Convert a Julia matrix to a PETSc matrix.
 #
@@ -178,7 +254,6 @@ is_sparse_petsc(A) = A isa SparseMatrixCSC
 #   PETSc allocates its own buffer and copies the values in on construction.
 #   This protects the Julia array even when a factorising preconditioner is
 #   used without a separate `prec_matrix`.
-# SparseMatrixCSR → handled by LinearSolvePETScCSRExt via to_petsc_mat overload.
 # PSparseMatrix  → handled by LinearSolvePETScMPIExt  via to_petsc_mat overload.
 #
 # The optional `pcache` argument is used by MPI-aware overloads to stash

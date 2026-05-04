@@ -13,10 +13,11 @@ solvers via [PETSc.jl](https://github.com/JuliaParallel/PETSc.jl).
     MPI.Init()
     ```
 
-!!! warning "Serial only"
-    Currently supports only serial solves (`MPI.COMM_SELF`). Passing a
-    multi-rank communicator will raise an error. MPI-parallel support is
-    planned for a future release.
+!!! warning "Serial and MPI-parallel"
+    Standard Julia matrices use serial solves via `MPI.COMM_SELF` unless a
+    non-`nothing` communicator is supplied. Distributed `PSparseMatrix` and
+    `PVector` inputs are handled by the MPI extension when `PETSc` and
+    `PartitionedArrays` are loaded.
 
 ---
 
@@ -118,7 +119,7 @@ struct PETScAlgorithm <: SciMLLinearSolveAlgorithm
             ksp_options::NamedTuple = NamedTuple(),
         )
         Base.get_extension(@__MODULE__, :LinearSolvePETScExt) === nothing && error(
-            "PETScAlgorithm requires PETSc and MPI to be loaded: `using PETSc, MPI`"
+            "PETScAlgorithm requires PETSc, MPI, and SparseMatricesCSR to be loaded: `using PETSc, MPI, SparseMatricesCSR`"
         )
         nullspace ∈ (:none, :constant, :custom) || error(
             "nullspace must be :none, :constant, or :custom (got :$nullspace)"

@@ -119,7 +119,7 @@ struct PETScAlgorithm <: SciMLLinearSolveAlgorithm
             ksp_options::NamedTuple = NamedTuple(),
         )
         Base.get_extension(@__MODULE__, :LinearSolvePETScExt) === nothing && error(
-            "PETScAlgorithm requires PETSc and MPI to be loaded: `using PETSc, MPI`"
+            "PETScAlgorithm requires PETSc, MPI, and SparseMatricesCSR to be loaded: `using PETSc, MPI, SparseMatricesCSR`"
         )
         nullspace ∈ (:none, :constant, :custom) || error(
             "nullspace must be :none, :constant, or :custom (got :$nullspace)"

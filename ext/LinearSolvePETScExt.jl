@@ -271,7 +271,7 @@ function to_petsc_mat(petsclib, A, pcache = nothing)
     if pcache !== nothing && pcache.comm != MPI.COMM_SELF
         error(
             "PETSc multi-rank support for standard Julia matrices is currently limited " *
-            "to SparseMatrixCSC assembly. Distributed RHS/solution handling is a later step."
+                "to SparseMatrixCSC assembly. Distributed RHS/solution handling is a later step."
         )
     end
 
@@ -555,7 +555,7 @@ end
 function run_ksp!(pcache, petsclib, alg, b::AbstractVector, u::AbstractVector)
     pcache.comm != MPI.COMM_SELF && error(
         "PETSc multi-rank SparseMatrixCSC support currently stops at matrix assembly. " *
-        "Distributed RHS/solution handling for standard Julia vectors is planned for later work."
+            "Distributed RHS/solution handling for standard Julia vectors is planned for later work."
     )
 
     petsc_x = pcache.petsc_x

@@ -30,10 +30,12 @@ function _sparse_csc_matrix(A::AbstractSparseMatrixCSC)
     return A
 end
 
-function _sparse_csc_matrix(A::Union{
-        Symmetric{T, <:AbstractSparseMatrixCSC{T}},
-        Hermitian{T, <:AbstractSparseMatrixCSC{T}},
-    }) where {T}
+function _sparse_csc_matrix(
+        A::Union{
+            Symmetric{T, <:AbstractSparseMatrixCSC{T}},
+            Hermitian{T, <:AbstractSparseMatrixCSC{T}},
+        }
+    ) where {T}
     return parent(A)
 end
 
@@ -76,9 +78,11 @@ function LinearSolve.init_cacheval(
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
     A_sparse = _sparse_csc_matrix(A)
-    if !(A_sparse isa AbstractSparseMatrixCSC{
-            <:Union{Float32, Float64, ComplexF32, ComplexF64},
-        })
+    if !(
+            A_sparse isa AbstractSparseMatrixCSC{
+                <:Union{Float32, Float64, ComplexF32, ComplexF64},
+            }
+        )
         return nothing
     end
     A_int = _as_int_csc(A_sparse)

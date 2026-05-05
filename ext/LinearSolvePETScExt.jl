@@ -540,8 +540,12 @@ function ensure_vecs!(pcache, petsclib, comm, b)
     if pcache.vec_n != n || pcache.petsc_x === nothing || pcache.petsc_b === nothing
         pcache.petsc_x !== nothing && PETSc.destroy(pcache.petsc_x)
         pcache.petsc_b !== nothing && PETSc.destroy(pcache.petsc_b)
-        pcache.petsc_x = create_seq_vec(petsclib, n)
-        pcache.petsc_b = create_seq_vec(petsclib, n)
+        if comm == MPI.COMM_SELF
+            pcache.petsc_x = create_seq_vec(petsclib, n)
+            pcache.petsc_b = create_seq_vec(petsclib, n)
+        else
+            pcache.petsc_x, pcache.petsc_b = LibPETSc.MatCreateVecs(petsclib, pcache.petsc_A)
+        end
         pcache.vec_n = n
     end
     return pcache.petsc_x, pcache.petsc_b
@@ -551,12 +555,12 @@ end
 #
 # run_ksp! abstracts the VecPlaceArray / KSPSolve / VecResetArray pattern.
 # For serial AbstractVector: zero-copy via VecPlaceArray.
+# For replicated Julia vectors on a multi-rank communicator: copy the owned
+# rows into a distributed PETSc Vec, solve, then gather the full solution back
+# onto every rank with VecScatterCreateToAll.
 # Overloaded by LinearSolvePETScMPIExt for PVector (uses VecGetArray copy path).
 function run_ksp!(pcache, petsclib, alg, b::AbstractVector, u::AbstractVector)
-    pcache.comm != MPI.COMM_SELF && error(
-        "PETSc multi-rank SparseMatrixCSC support currently stops at matrix assembly. " *
-            "Distributed RHS/solution handling for standard Julia vectors is planned for later work."
-    )
+    pcache.comm != MPI.COMM_SELF && return run_ksp_mpi!(pcache, petsclib, alg, b, u)
 
     petsc_x = pcache.petsc_x
     petsc_b = pcache.petsc_b
@@ -574,6 +578,56 @@ function run_ksp!(pcache, petsclib, alg, b::AbstractVector, u::AbstractVector)
         LibPETSc.VecResetArray(petsclib, petsc_x)
         LibPETSc.VecResetArray(petsclib, petsc_b)
     end
+end
+
+function run_ksp_mpi!(pcache, petsclib, alg, b::AbstractVector, u::AbstractVector)
+    petsc_x = pcache.petsc_x
+    petsc_b = pcache.petsc_b
+    local_range = (pcache.rstart + 1):pcache.rend
+
+    local_b = LibPETSc.VecGetArray(petsclib, petsc_b)
+    try
+        copyto!(local_b, view(b, local_range))
+    finally
+        LibPETSc.VecRestoreArray(petsclib, petsc_b, local_b)
+    end
+
+    local_x = LibPETSc.VecGetArray(petsclib, petsc_x)
+    try
+        copyto!(local_x, view(u, local_range))
+    finally
+        LibPETSc.VecRestoreArray(petsclib, petsc_x, local_x)
+    end
+
+    if alg.transposed
+        LibPETSc.KSPSolveTranspose(petsclib, pcache.ksp, petsc_b, petsc_x)
+    else
+        LibPETSc.KSPSolve(petsclib, pcache.ksp, petsc_b, petsc_x)
+    end
+
+    scatter, gathered_x = LibPETSc.VecScatterCreateToAll(petsclib, petsc_x)
+    try
+        LibPETSc.VecScatterBegin(
+            petsclib, scatter, petsc_x, gathered_x,
+            LibPETSc.INSERT_VALUES, LibPETSc.SCATTER_FORWARD
+        )
+        LibPETSc.VecScatterEnd(
+            petsclib, scatter, petsc_x, gathered_x,
+            LibPETSc.INSERT_VALUES, LibPETSc.SCATTER_FORWARD
+        )
+
+        gathered = LibPETSc.VecGetArray(petsclib, gathered_x)
+        try
+            copyto!(u, gathered)
+        finally
+            LibPETSc.VecRestoreArray(petsclib, gathered_x, gathered)
+        end
+    finally
+        LibPETSc.VecScatterDestroy(petsclib, scatter)
+        PETSc.destroy(gathered_x)
+    end
+
+    return nothing
 end
 
 # ── Null space ────────────────────────────────────────────────────────────────

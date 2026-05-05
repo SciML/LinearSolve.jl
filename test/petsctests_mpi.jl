@@ -44,6 +44,7 @@ end
     n = 12
     A = spdiagm(-1 => -ones(n - 1), 0 => 4.0 .* ones(n), 1 => -ones(n - 1))
     b = ones(n)
+    x_ref = A \ b
 
     function init_replicated_cache(; prec_matrix = nothing)
         alg = PETScAlgorithm(:gmres; comm = MPI.COMM_WORLD, pc_type = :jacobi, prec_matrix)
@@ -92,24 +93,43 @@ end
         PETScExt.cleanup_petsc_cache!(cache)
     end
 
-    @testset "solve path stays guarded until week 3-4" begin
+    @testset "basic 2-rank GMRES solve replicates full solution" begin
+        sol = solve(
+            LinearProblem(A, b),
+            PETScAlgorithm(:gmres; comm = MPI.COMM_WORLD);
+            abstol = 1.0e-10,
+            reltol = 1.0e-10
+        )
+        pcache = sol.cache.cacheval
+
+        @test sol.retcode == SciMLBase.ReturnCode.Success
+        @test norm(A * sol.u - b) / norm(b) < 1.0e-10
+        @test sol.u ≈ x_ref atol = 1.0e-10
+        @test pcache.rstart >= 0
+        @test pcache.rend >= pcache.rstart
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
+
+    @testset "cache reuse with new rhs preserves full-solution contract" begin
         cache = SciMLBase.init(
             LinearProblem(A, b),
             PETScAlgorithm(:gmres; comm = MPI.COMM_WORLD);
             abstol = 1.0e-10,
             reltol = 1.0e-10
         )
-        err = try
-            solve!(cache)
-            nothing
-        catch e
-            e
-        finally
-            PETScExt.cleanup_petsc_cache!(cache)
-        end
+        sol1 = solve!(cache)
+        @test sol1.retcode == SciMLBase.ReturnCode.Success
+        @test sol1.u ≈ x_ref atol = 1.0e-10
 
-        @test err isa ErrorException
-        @test occursin("matrix assembly", sprint(showerror, err))
+        b2 = collect(1.0:n)
+        x_ref2 = A \ b2
+        cache.b = b2
+        sol2 = solve!(cache)
+
+        @test sol2.retcode == SciMLBase.ReturnCode.Success
+        @test norm(A * sol2.u - b2) / norm(b2) < 1.0e-10
+        @test sol2.u ≈ x_ref2 atol = 1.0e-10
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 

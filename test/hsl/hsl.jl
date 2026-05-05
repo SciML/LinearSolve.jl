@@ -25,10 +25,12 @@ else
         A = A + A' + 40.0I
         b = rand(Float64, n)
         prob = LinearProblem(A, b)
+        prob_sym = LinearProblem(Symmetric(A), b)
 
         sol = solve(prob, HSLMA57Factorization())
         @test sol.retcode == ReturnCode.Success
         @test A * sol.u ≈ b rtol = 1.0e-9 atol = 1.0e-11
+        @test solve(prob_sym, HSLMA57Factorization()).u ≈ sol.u
 
         cache = init(prob, HSLMA57Factorization())
         sol1 = solve!(cache)
@@ -46,10 +48,12 @@ else
         A = A + A' + 30.0I
         b = rand(Float64, n)
         prob = LinearProblem(A, b)
+        prob_sym = LinearProblem(Symmetric(A), b)
 
         sol = solve(prob, HSLMA97Factorization(matrix_type = :real_spd))
         @test sol.retcode == ReturnCode.Success
         @test A * sol.u ≈ b rtol = 1.0e-9 atol = 1.0e-11
+        @test solve(prob_sym, HSLMA97Factorization(matrix_type = :real_spd)).u ≈ sol.u
 
         cache = init(prob, HSLMA97Factorization(matrix_type = :real_spd))
         sol1 = solve!(cache)
@@ -59,5 +63,12 @@ else
         @test sol1.retcode == ReturnCode.Success
         @test sol2.retcode == ReturnCode.Success
         @test A * sol2.u ≈ b2 rtol = 1.0e-9 atol = 1.0e-11
+
+        Ac = ComplexF64.(A)
+        bc = rand(ComplexF64, n)
+        prob_herm = LinearProblem(Hermitian(Ac), bc)
+        solc = solve(prob_herm, HSLMA97Factorization(matrix_type = :herm_pd))
+        @test solc.retcode == ReturnCode.Success
+        @test Hermitian(Ac) * solc.u ≈ bc rtol = 1.0e-9 atol = 1.0e-11
     end
 end

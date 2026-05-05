@@ -40,6 +40,79 @@ const PAExt = Base.get_extension(LinearSolve, :LinearSolvePETScMPIExt)
     @test PAExt !== nothing
 end
 
+@testset "SparseMatrixCSC: multi-rank assembly plumbing" begin
+    n = 12
+    A = spdiagm(-1 => -ones(n - 1), 0 => 4.0 .* ones(n), 1 => -ones(n - 1))
+    b = ones(n)
+
+    function init_replicated_cache(; prec_matrix = nothing)
+        alg = PETScAlgorithm(:gmres; comm = MPI.COMM_WORLD, pc_type = :jacobi, prec_matrix)
+        cache = SciMLBase.init(
+            LinearProblem(A, b), alg;
+            abstol = 1.0e-10, reltol = 1.0e-10
+        )
+        pcache = cache.cacheval
+        petsclib = PETScExt.get_petsclib(eltype(A))
+        PETSc.initialized(petsclib) || PETSc.initialize(petsclib)
+        pcache.petsclib = petsclib
+        pcache.initialized = true
+        return cache, alg, petsclib, pcache
+    end
+
+    @testset "cache sentinels and ownership range" begin
+        cache, alg, petsclib, pcache = init_replicated_cache()
+        @test pcache.rstart == -1
+        @test pcache.rend == -1
+        @test pcache.comm === nothing
+
+        PETScExt.build_ksp!(pcache, petsclib, cache, alg)
+
+        @test pcache.comm == MPI.COMM_WORLD
+        @test pcache.petsc_A !== nothing
+        @test pcache.ksp !== nothing
+        @test pcache.rstart >= 0
+        @test pcache.rend >= pcache.rstart
+
+        owned_rows = pcache.rend - pcache.rstart
+        @test MPI.Allreduce(owned_rows, +, MPI.COMM_WORLD) == n
+        PETScExt.cleanup_petsc_cache!(cache)
+    end
+
+    @testset "separate preconditioner follows MPI assembly path" begin
+        P = copy(A)
+        P[1, 1] += 1
+        cache, alg, petsclib, pcache = init_replicated_cache(; prec_matrix = P)
+
+        PETScExt.build_ksp!(pcache, petsclib, cache, alg)
+
+        @test pcache.petsc_P !== nothing
+        @test pcache.petsc_P !== pcache.petsc_A
+        @test pcache.rstart >= 0
+        @test pcache.rend >= pcache.rstart
+        PETScExt.cleanup_petsc_cache!(cache)
+    end
+
+    @testset "solve path stays guarded until week 3-4" begin
+        cache = SciMLBase.init(
+            LinearProblem(A, b),
+            PETScAlgorithm(:gmres; comm = MPI.COMM_WORLD);
+            abstol = 1.0e-10,
+            reltol = 1.0e-10
+        )
+        err = try
+            solve!(cache)
+            nothing
+        catch e
+            e
+        finally
+            PETScExt.cleanup_petsc_cache!(cache)
+        end
+
+        @test err isa ErrorException
+        @test occursin("matrix assembly", sprint(showerror, err))
+    end
+end
+
 # ── Helper: uniform_partition over MPI.COMM_WORLD ────────────────────────────
 
 function mpi_row_partition(distribute, n)

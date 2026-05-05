@@ -10,16 +10,11 @@ using SciMLBase: LinearSolution, build_linear_solution, ReturnCode, SciMLBase
 
 # ── MPI communicator ──────────────────────────────────────────────────────────
 
-# Default (serial) communicator resolution.  Return MPI.COMM_SELF or error if
-# a non-serial comm is requested for a standard Julia matrix.
+# MPI communicator resolution.
+# Standard Julia matrices default to COMM_SELF when no communicator is provided.
 # Overloaded by LinearSolvePETScMPIExt to support PSparseMatrix / PVector.
 function get_comm(alg::PETScAlgorithm, A)
     comm = alg.comm === nothing ? MPI.COMM_SELF : alg.comm
-    comm == MPI.COMM_SELF || error(
-        "PETScAlgorithm currently only supports MPI.COMM_SELF (serial solves). " *
-            "Pass `comm = nothing` or `comm = MPI.COMM_SELF` to use serial mode, " *
-            "or use a PSparseMatrix / PVector for MPI-parallel solves."
-    )
     return comm
 end
 
@@ -51,7 +46,7 @@ Fields
 ──────
 - `ksp`            — KSP (Krylov subspace) solver object.
 - `petsclib`       — PETSc library handle; selects the scalar-type-specific C library.
-- `comm`           — MPI communicator (always `COMM_SELF` in this implementation).
+- `comm`           — MPI communicator used to build PETSc objects.
 - `petsc_A`        — System matrix in PETSc format.
 - `petsc_P`        — Preconditioner matrix.  Aliases `petsc_A` when no separate
                      `prec_matrix` is provided (same pointer, not a copy).
@@ -70,6 +65,9 @@ Fields
 - `mpi_data`       — Opaque slot for MPI-specific per-matrix data (populated by
                      `LinearSolvePETScMPIExt` when A is a `PSparseMatrix`).  `nothing`
                      for all serial matrix types.
+- `rstart`         — First row owned by this rank (0-indexed); queried from PETSc after
+                     matrix creation. Used for multi-rank `SparseMatrixCSC` assembly.
+- `rend`           — Last row owned by this rank (exclusive, 0-indexed); queried from PETSc.
 - `initialized`    — `true` once `PETSc.initialize` has been called for this cache.
 """
 mutable struct PETScCache{T}
@@ -88,6 +86,8 @@ mutable struct PETScCache{T}
     sparse_perm::Union{Vector{Int}, Nothing}
     sparse_scratch::Union{Vector{Int}, Nothing}
     mpi_data::Any
+    rstart::Int  # First owned row (0-indexed)
+    rend::Int    # Last owned row (exclusive, 0-indexed)
     initialized::Bool
 end
 
@@ -99,6 +99,7 @@ function _nullify_all!(pcache::PETScCache)
     pcache.sparse_perm = pcache.sparse_scratch = pcache.mpi_data = nothing
     pcache.vec_n = 0
     pcache.prev_colptr = pcache.prev_rowval = pcache.prev_size = nothing
+    pcache.rstart = pcache.rend = -1
     return pcache.initialized = false
 end
 
@@ -159,7 +160,7 @@ function LinearSolve.init_cacheval(
     pcache = PETScCache{T}(
         nothing, nothing, nothing, nothing, nothing, nothing,
         nothing, nothing, 0, nothing, nothing, nothing, nothing, nothing,
-        nothing, false
+        nothing, -1, -1, false
     )
     finalizer(cleanup_petsc_cache!, pcache)
     return pcache
@@ -248,8 +249,10 @@ end
 
 # Convert a Julia matrix to a PETSc matrix.
 #
-# Sparse (SparseMatrixCSC) → MatSeqAIJWithArrays :
+# Sparse (SparseMatrixCSC) → MatSeqAIJWithArrays (serial, COMM_SELF):
 #   Internally converts to CSR format.
+# Sparse (SparseMatrixCSC) → MatCreateMPIAIJ (multi-rank):
+#   Each rank queries its owned rows and assembles only those rows.
 # Dense (AbstractMatrix) → MatSeqDense:
 #   PETSc allocates its own buffer and copies the values in on construction.
 #   This protects the Julia array even when a factorising preconditioner is
@@ -258,13 +261,129 @@ end
 #
 # The optional `pcache` argument is used by MPI-aware overloads to stash
 # GC anchors and per-matrix metadata into the cache during matrix construction.
-# Serial matrix types ignore it.
 function to_petsc_mat(petsclib, A, pcache = nothing)
     if A isa SparseMatrixCSC
+        pcache !== nothing && pcache.comm != MPI.COMM_SELF &&
+            return _to_petsc_mat_mpi_csc(petsclib, A, pcache)
         return PETSc.MatSeqAIJWithArrays(petsclib, MPI.COMM_SELF, A)
-    else
-        return PETSc.MatSeqDense(petsclib, A)
     end
+
+    if pcache !== nothing && pcache.comm != MPI.COMM_SELF
+        error(
+            "PETSc multi-rank support for standard Julia matrices is currently limited " *
+                "to SparseMatrixCSC assembly. Distributed RHS/solution handling is a later step."
+        )
+    end
+
+    return PETSc.MatSeqDense(petsclib, A)
+end
+
+# Convert SparseMatrixCSC to an MPI AIJ matrix, with each rank owning a contiguous
+# block of rows. This implements the original proposal's multi-rank SparseMatrixCSC path.
+function _to_petsc_mat_mpi_csc(petsclib, A::SparseMatrixCSC, pcache)
+    PetscInt = PETSc.inttype(petsclib)
+    comm = pcache.comm
+
+    m, n = size(A)
+
+    # Create an empty MPI AIJ matrix to establish ownership ranges
+    mat = LibPETSc.MatCreateAIJ(
+        petsclib, comm,
+        PetscInt(-1), PetscInt(-1),
+        PetscInt(m), PetscInt(n),
+        0,
+        C_NULL,
+        0,
+        C_NULL
+    )
+    LibPETSc.MatSetOption(
+        petsclib, mat,
+        LibPETSc.MAT_NEW_NONZERO_ALLOCATION_ERR,
+        LibPETSc.PETSC_FALSE
+    )
+
+    # Query this rank's row ownership
+    rstart, rend = LibPETSc.MatGetOwnershipRange(petsclib, mat)
+    pcache.rstart = rstart
+    pcache.rend = rend
+
+    _assemble_local_rows_csr!(petsclib, mat, A, rstart, rend)
+    PETSc.assemble!(mat)
+    return mat
+end
+
+# Extract rows [rstart, rend) from CSC matrix A and assemble into PETSc matrix mat
+# A is a SparseMatrixCSC with 1-indexed Julia rows [1, m].
+# rstart, rend are 0-indexed PETSc row indices defining which rows this rank owns.
+# rstart <= rowindex < rend (0-indexed).
+function _assemble_local_rows_csr!(petsclib, mat, A::SparseMatrixCSC, rstart, rend)
+    PetscInt = PETSc.inttype(petsclib)
+    PetscScalar = PETSc.scalartype(petsclib)
+
+    local_m = rend - rstart
+    local_nnz = 0
+    for col in 1:size(A, 2)
+        for idx in nzrange(A, col)
+            row_petsc = A.rowval[idx] - 1
+            if rstart <= row_petsc < rend
+                local_nnz += 1
+            end
+        end
+    end
+
+    local_rowptr = zeros(PetscInt, local_m + 1)
+    local_colind = Vector{PetscInt}(undef, local_nnz)
+    local_vals = Vector{PetscScalar}(undef, local_nnz)
+
+    for col in 1:size(A, 2)
+        for idx in nzrange(A, col)
+            row_petsc = A.rowval[idx] - 1
+            if rstart <= row_petsc < rend
+                local_row_idx = row_petsc - rstart + 1
+                local_rowptr[local_row_idx] += 1
+            end
+        end
+    end
+
+    cumsum = 0
+    for i in 1:(local_m + 1)
+        tmp = local_rowptr[i]
+        local_rowptr[i] = cumsum
+        cumsum += tmp
+    end
+
+    local_rowptr_count = copy(local_rowptr)
+    for col in 1:size(A, 2)
+        for idx in nzrange(A, col)
+            row_petsc = A.rowval[idx] - 1
+            if rstart <= row_petsc < rend
+                local_row_idx = row_petsc - rstart + 1
+                pos = local_rowptr_count[local_row_idx] + 1
+                local_colind[pos] = PetscInt(col - 1)
+                local_vals[pos] = PetscScalar == eltype(A.nzval) ?
+                    A.nzval[idx] : PetscScalar(A.nzval[idx])
+                local_rowptr_count[local_row_idx] += 1
+            end
+        end
+    end
+
+    for local_i in 1:local_m
+        row_nnz = local_rowptr[local_i + 1] - local_rowptr[local_i]
+        if row_nnz > 0
+            row_petsc = rstart + local_i - 1
+            row_range = (local_rowptr[local_i] + 1):local_rowptr[local_i + 1]
+            cols = local_colind[row_range]
+            vals = local_vals[row_range]
+            LibPETSc.MatSetValues(
+                petsclib, mat,
+                PetscInt(1), [row_petsc],
+                PetscInt(row_nnz), cols,
+                vals, LibPETSc.INSERT_VALUES
+            )
+        end
+    end
+
+    return nothing
 end
 
 # ── CSC → CSR permutation ─────────────────────────────────────────────────────
@@ -434,10 +553,16 @@ end
 # For serial AbstractVector: zero-copy via VecPlaceArray.
 # Overloaded by LinearSolvePETScMPIExt for PVector (uses VecGetArray copy path).
 function run_ksp!(pcache, petsclib, alg, b::AbstractVector, u::AbstractVector)
+    pcache.comm != MPI.COMM_SELF && error(
+        "PETSc multi-rank SparseMatrixCSC support currently stops at matrix assembly. " *
+            "Distributed RHS/solution handling for standard Julia vectors is planned for later work."
+    )
+
     petsc_x = pcache.petsc_x
     petsc_b = pcache.petsc_b
     LibPETSc.VecPlaceArray(petsclib, petsc_b, b)
     LibPETSc.VecPlaceArray(petsclib, petsc_x, u)
+
     return try
         if alg.transposed
             LibPETSc.KSPSolveTranspose(petsclib, pcache.ksp, petsc_b, petsc_x)
@@ -498,8 +623,12 @@ end
 # petsc_b after every rebuild — required when the problem size changes.
 function build_ksp!(pcache, petsclib, cache, alg)
     pcache.vec_n = 0
-    # Pass pcache so MPI-aware overloads can stash GC anchors / metadata.
-    pcache.petsc_A = to_petsc_mat(petsclib, cache.A, pcache)
+    pcache.comm = get_comm(alg, cache.A)
+    if cache.A isa SparseMatrixCSC && pcache.comm == MPI.COMM_SELF
+        pcache.petsc_A = to_petsc_mat(petsclib, cache.A, nothing)
+    else
+        pcache.petsc_A = to_petsc_mat(petsclib, cache.A, pcache)
+    end
 
     if is_sparse_petsc(cache.A)
         store_sparse_pattern!(pcache, cache.A)
@@ -509,11 +638,13 @@ function build_ksp!(pcache, petsclib, cache, alg)
         pcache.prev_size = size(cache.A)
     end
 
-    # petsc_P aliases petsc_A when no separate preconditioner matrix is given.
-    # prec_matrix is passed with pcache=nothing so MPI overloads do not clobber
-    # the system-matrix mpi_data stored above.
-    pcache.petsc_P = alg.prec_matrix === nothing ?
-        pcache.petsc_A : to_petsc_mat(petsclib, alg.prec_matrix, nothing)
+    pcache.petsc_P = if alg.prec_matrix === nothing
+        pcache.petsc_A
+    elseif alg.prec_matrix isa SparseMatrixCSC && pcache.comm != MPI.COMM_SELF
+        to_petsc_mat(petsclib, alg.prec_matrix, pcache)
+    else
+        to_petsc_mat(petsclib, alg.prec_matrix, nothing)
+    end
 
     pcache.ksp = PETSc.KSP(
         pcache.petsc_A, pcache.petsc_P;

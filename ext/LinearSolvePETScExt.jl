@@ -807,13 +807,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm; kwargs...)
     # vector type so that MPI extensions can create distributed Vecs.
     # run_ksp! performs I/O + KSPSolve, also dispatching on vector type.
     ensure_vecs!(pcache, petsclib, comm, cache.b)
-    try
-        run_ksp!(pcache, petsclib, alg, cache.b, cache.u)
-    catch
-        return build_linear_solution(
-            alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
-        )
-    end
+    run_ksp!(pcache, petsclib, alg, cache.b, cache.u)
 
     # ── Convergence metadata ──────────────────────────────────────────────────
     iters = Int(LibPETSc.KSPGetIterationNumber(petsclib, pcache.ksp))
@@ -823,6 +817,14 @@ function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm; kwargs...)
     # reason < 0 → diverged or other failure.
     retcode = reason > 0 ? ReturnCode.Success :
         reason == 0 ? ReturnCode.Default : ReturnCode.Failure
+    if retcode === ReturnCode.Success && any(!isfinite, cache.u)
+        retcode = ReturnCode.Failure
+    end
+    if retcode === ReturnCode.Success &&
+            (pcache.comm == MPI.COMM_SELF || cache.A isa SparseMatrixCSC)
+        failed = LinearSolve._check_residual_safety(cache, alg, cache.A, cache.u)
+        failed !== nothing && return failed
+    end
 
     return build_linear_solution(alg, cache.u, resid, cache; retcode, iters)
 end

@@ -131,6 +131,21 @@ end
         @test sol2.u ≈ x_ref2 atol = 1.0e-10
         PETScExt.cleanup_petsc_cache!(cache)
     end
+
+    @testset "maxiters failure sets retcode" begin
+        sol = solve(
+            LinearProblem(A, b),
+            PETScAlgorithm(:gmres; comm = MPI.COMM_WORLD);
+            abstol = 1.0e-16,
+            reltol = 1.0e-16,
+            maxiters = 1
+        )
+
+        @test sol.retcode == SciMLBase.ReturnCode.Failure
+        @test sol.iters == 1
+        @test norm(A * sol.u - b) / norm(b) > sol.cache.reltol
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
 end
 
 # ── Helper: uniform_partition over MPI.COMM_WORLD ────────────────────────────

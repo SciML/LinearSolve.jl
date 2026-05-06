@@ -580,31 +580,27 @@ function run_ksp!(pcache, petsclib, alg, b::AbstractVector, u::AbstractVector)
     end
 end
 
-function run_ksp_mpi!(pcache, petsclib, alg, b::AbstractVector, u::AbstractVector)
-    petsc_x = pcache.petsc_x
-    petsc_b = pcache.petsc_b
-    local_range = (pcache.rstart + 1):pcache.rend
-
-    local_b = LibPETSc.VecGetArray(petsclib, petsc_b)
+function copyto_local_petsc_vec!(petsclib, petsc_vec, values::AbstractVector)
+    local_values = LibPETSc.VecGetArray(petsclib, petsc_vec)
     try
-        copyto!(local_b, view(b, local_range))
+        copyto!(local_values, values)
     finally
-        LibPETSc.VecRestoreArray(petsclib, petsc_b, local_b)
+        LibPETSc.VecRestoreArray(petsclib, petsc_vec, local_values)
     end
+    return nothing
+end
 
-    local_x = LibPETSc.VecGetArray(petsclib, petsc_x)
+function copyfrom_local_petsc_vec!(dest::AbstractVector, petsclib, petsc_vec)
+    local_values = LibPETSc.VecGetArray(petsclib, petsc_vec)
     try
-        copyto!(local_x, view(u, local_range))
+        copyto!(dest, local_values)
     finally
-        LibPETSc.VecRestoreArray(petsclib, petsc_x, local_x)
+        LibPETSc.VecRestoreArray(petsclib, petsc_vec, local_values)
     end
+    return nothing
+end
 
-    if alg.transposed
-        LibPETSc.KSPSolveTranspose(petsclib, pcache.ksp, petsc_b, petsc_x)
-    else
-        LibPETSc.KSPSolve(petsclib, pcache.ksp, petsc_b, petsc_x)
-    end
-
+function gather_petsc_vec_to_all!(u::AbstractVector, petsclib, petsc_x)
     scatter, gathered_x = LibPETSc.VecScatterCreateToAll(petsclib, petsc_x)
     try
         LibPETSc.VecScatterBegin(
@@ -615,18 +611,29 @@ function run_ksp_mpi!(pcache, petsclib, alg, b::AbstractVector, u::AbstractVecto
             petsclib, scatter, petsc_x, gathered_x,
             LibPETSc.INSERT_VALUES, LibPETSc.SCATTER_FORWARD
         )
-
-        gathered = LibPETSc.VecGetArray(petsclib, gathered_x)
-        try
-            copyto!(u, gathered)
-        finally
-            LibPETSc.VecRestoreArray(petsclib, gathered_x, gathered)
-        end
+        copyfrom_local_petsc_vec!(u, petsclib, gathered_x)
     finally
         LibPETSc.VecScatterDestroy(petsclib, scatter)
         PETSc.destroy(gathered_x)
     end
+    return nothing
+end
 
+function run_ksp_mpi!(pcache, petsclib, alg, b::AbstractVector, u::AbstractVector)
+    petsc_x = pcache.petsc_x
+    petsc_b = pcache.petsc_b
+    local_range = (pcache.rstart + 1):pcache.rend
+
+    copyto_local_petsc_vec!(petsclib, petsc_b, view(b, local_range))
+    copyto_local_petsc_vec!(petsclib, petsc_x, view(u, local_range))
+
+    if alg.transposed
+        LibPETSc.KSPSolveTranspose(petsclib, pcache.ksp, petsc_b, petsc_x)
+    else
+        LibPETSc.KSPSolve(petsclib, pcache.ksp, petsc_b, petsc_x)
+    end
+
+    gather_petsc_vec_to_all!(u, petsclib, petsc_x)
     return nothing
 end
 
@@ -800,7 +807,13 @@ function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm; kwargs...)
     # vector type so that MPI extensions can create distributed Vecs.
     # run_ksp! performs I/O + KSPSolve, also dispatching on vector type.
     ensure_vecs!(pcache, petsclib, comm, cache.b)
-    run_ksp!(pcache, petsclib, alg, cache.b, cache.u)
+    try
+        run_ksp!(pcache, petsclib, alg, cache.b, cache.u)
+    catch
+        return build_linear_solution(
+            alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+        )
+    end
 
     # ── Convergence metadata ──────────────────────────────────────────────────
     iters = Int(LibPETSc.KSPGetIterationNumber(petsclib, pcache.ksp))

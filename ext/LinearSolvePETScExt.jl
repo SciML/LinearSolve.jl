@@ -619,6 +619,15 @@ function gather_petsc_vec_to_all!(u::AbstractVector, petsclib, petsc_x)
     return nothing
 end
 
+function postsolve_solution_check(cache, alg, pcache, A::AbstractMatrix, u::AbstractVector)
+    if pcache.comm == MPI.COMM_SELF || A isa SparseMatrixCSC
+        return LinearSolve._check_residual_safety(cache, alg, A, u)
+    end
+    return nothing
+end
+
+postsolve_solution_check(cache, alg, pcache, A, u) = nothing
+
 function run_ksp_mpi!(pcache, petsclib, alg, b::AbstractVector, u::AbstractVector)
     petsc_x = pcache.petsc_x
     petsc_b = pcache.petsc_b
@@ -820,9 +829,8 @@ function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm; kwargs...)
     if retcode === ReturnCode.Success && any(!isfinite, cache.u)
         retcode = ReturnCode.Failure
     end
-    if retcode === ReturnCode.Success &&
-            (pcache.comm == MPI.COMM_SELF || cache.A isa SparseMatrixCSC)
-        failed = LinearSolve._check_residual_safety(cache, alg, cache.A, cache.u)
+    if retcode === ReturnCode.Success
+        failed = postsolve_solution_check(cache, alg, pcache, cache.A, cache.u)
         failed !== nothing && return failed
     end
 

@@ -284,6 +284,67 @@ end
     end
 end
 
+@testset "PSparseMatrix SplitMatrix: maxiters failure sets retcode" begin
+    n = 12
+    with_mpi() do distribute
+        rp = mpi_row_partition(distribute, n)
+
+        I_v, J_v, V_v = map(rp) do rng
+            Is, Js, Vs = Int[], Int[], Float64[]
+            for i in rng
+                push!(Is, i); push!(Js, i); push!(Vs, 4.0)
+                i > 1 && (push!(Is, i); push!(Js, i - 1); push!(Vs, -1.0))
+                i < n && (push!(Is, i); push!(Js, i + 1); push!(Vs, -1.0))
+            end
+            Is, Js, Vs
+        end |> tuple_of_arrays
+        A = psparse(I_v, J_v, V_v, rp, rp) |> fetch
+        b = PVector(map(rng -> ones(length(rng)), rp), rp)
+        u = PVector(map(rng -> zeros(length(rng)), rp), rp)
+
+        sol = solve(
+            LinearProblem(A, b; u0 = u),
+            PETScAlgorithm(:gmres);
+            abstol = 1.0e-16,
+            reltol = 1.0e-16,
+            maxiters = 1
+        )
+        @test sol.retcode == SciMLBase.ReturnCode.Failure
+        @test sol.iters == 1
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
+end
+
+@testset "PSparseMatrix SplitMatrix: residual safety failure" begin
+    n = 12
+    with_mpi() do distribute
+        rp = mpi_row_partition(distribute, n)
+
+        I_v, J_v, V_v = map(rp) do rng
+            Is, Js, Vs = Int[], Int[], Float64[]
+            for i in rng
+                push!(Is, i); push!(Js, i); push!(Vs, 4.0)
+                i > 1 && (push!(Is, i); push!(Js, i - 1); push!(Vs, -1.0))
+                i < n && (push!(Is, i); push!(Js, i + 1); push!(Vs, -1.0))
+            end
+            Is, Js, Vs
+        end |> tuple_of_arrays
+        A = psparse(I_v, J_v, V_v, rp, rp) |> fetch
+        b = PVector(map(rng -> ones(length(rng)), rp), rp)
+        u = PVector(map(rng -> zeros(length(rng)), rp), rp)
+
+        sol = solve(
+            LinearProblem(A, b; u0 = u),
+            PETScAlgorithm(:gmres; ksp_options = (ksp_rtol = 0.9,));
+            abstol = 0.0,
+            reltol = 1.0e-12,
+            maxiters = 100
+        )
+        @test sol.retcode == SciMLBase.ReturnCode.APosterioriSafetyFailure
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
+end
+
 @testset "PSparseMatrix SplitMatrix: reinit! (Case 2 — pattern change)" begin
     # Case 2: sparsity pattern changes between solves → KSP must be rebuilt.
     n = 8

@@ -24,14 +24,17 @@ module LinearSolvePETScMPIExt
 using PartitionedArrays: PartitionedArrays, PSparseMatrix, PVector,
     MPIArray, DebugArray, partition,
     own_length, ghost_length,
-    own_to_local, local_to_global, own_to_global, ghost_to_global
+    own_to_local, local_to_global, own_to_global, ghost_to_global,
+    consistent, own_values
 
 using SparseMatricesCSR: SparseMatrixCSR, getrowptr, getcolval
+using LinearAlgebra
 
 using PETSc
 import PETSc: MPI, LibPETSc
 
 using LinearSolve: PETScAlgorithm, LinearSolve
+using SciMLBase: ReturnCode, SciMLBase
 
 const PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
 
@@ -336,25 +339,56 @@ function PETScExt.run_ksp!(pcache, petsclib, alg, b::PVector, u::PVector)
     petsc_x = LibPETSc.VecCreateGhostWithArray(
         petsclib, comm, n_own, N, n_ghost, ghosts, arr_u
     )
-
-    if alg.transposed
-        LibPETSc.KSPSolveTranspose(petsclib, pcache.ksp, petsc_b, petsc_x)
-    else
-        LibPETSc.KSPSolve(petsclib, pcache.ksp, petsc_b, petsc_x)
-    end
-
-    # When arr_u === local_u, PETSc wrote the solution directly into the
-    # PVector's owned slots — nothing to copy back.
-    # If a type-conversion buffer was used, copy the owned DOFs back manually.
-    if arr_u !== local_u
-        own_idxs = own_to_local(row_idx)
-        @inbounds for (i, j) in enumerate(own_idxs)
-            local_u[j] = arr_u[i]
+    try
+        if alg.transposed
+            LibPETSc.KSPSolveTranspose(petsclib, pcache.ksp, petsc_b, petsc_x)
+        else
+            LibPETSc.KSPSolve(petsclib, pcache.ksp, petsc_b, petsc_x)
         end
+
+        # When arr_u === local_u, PETSc wrote the solution directly into the
+        # PVector's owned slots — nothing to copy back.
+        # If a type-conversion buffer was used, copy the owned DOFs back manually.
+        if arr_u !== local_u
+            own_idxs = own_to_local(row_idx)
+            @inbounds for (i, j) in enumerate(own_idxs)
+                local_u[j] = arr_u[i]
+            end
+        end
+    finally
+        PETSc.destroy(petsc_x)
+        PETSc.destroy(petsc_b)
+    end
+    return nothing
+end
+
+function PETScExt.postsolve_solution_check(cache, alg, pcache, A::PSparseMatrix, u::PVector)
+    u_consistent = consistent(u, partition(axes(A, 2))) |> fetch
+    Au = similar(u_consistent, axes(A, 1))
+    LinearAlgebra.mul!(Au, A, u_consistent)
+
+    local_Au = _local_part(own_values(Au))
+    local_b = _local_part(own_values(cache.b))
+    local_resid_sq = zero(typeof(abs2(zero(eltype(local_Au)))))
+    local_b_sq = zero(typeof(abs2(zero(eltype(local_b)))))
+    @inbounds for i in eachindex(local_Au, local_b)
+        local_resid_sq += abs2(local_Au[i] - local_b[i])
+        local_b_sq += abs2(local_b[i])
     end
 
-    PETSc.destroy(petsc_x)
-    PETSc.destroy(petsc_b)
+    data = pcache.mpi_data
+    comm = data === nothing ? MPI.COMM_SELF : data.comm
+    resid_sq = MPI.Allreduce(local_resid_sq, +, comm)
+    b_sq = MPI.Allreduce(local_b_sq, +, comm)
+    res_norm = sqrt(resid_sq)
+    b_norm = sqrt(b_sq)
+    tol = cache.abstol + cache.reltol * b_norm
+
+    if res_norm > tol
+        return SciMLBase.build_linear_solution(
+            alg, u, nothing, cache; retcode = ReturnCode.APosterioriSafetyFailure
+        )
+    end
     return nothing
 end
 

@@ -468,9 +468,11 @@ function setA!(dc::DualLinearCache, A)
     prop = nodual_value!(getproperty(dc.linear_cache, :A), A) # Update in-place
     setproperty!(dc.linear_cache, :A, prop) # Does additional invalidation logic etc.
 
-    # Update partials
+    # Update partials (skip when there is no partials slot, e.g. when the
+    # cache was built with a non-Dual A and is now being reused.)
     setfield!(dc, :dual_A, A)
-    partial_vals!(getfield(dc, :partials_A), A) # Update in-place
+    pA = getfield(dc, :partials_A)
+    pA === nothing || partial_vals!(pA, A)
 
     # Invalidate cache (if setting A or b)
     return setfield!(dc, :rhs_cache_valid, false)
@@ -480,9 +482,11 @@ function setb!(dc::DualLinearCache, b)
     prop = nodual_value!(getproperty(dc.linear_cache, :b), b) # Update in-place
     setproperty!(dc.linear_cache, :b, prop) # Does additional invalidation logic etc.
 
-    # Update partials
+    # Update partials (skip when there is no partials slot, e.g. when the
+    # cache was built with a non-Dual b and is now being reused.)
     setfield!(dc, :dual_b, b)
-    partial_vals!(getfield(dc, :partials_b), b) # Update in-place
+    pb = getfield(dc, :partials_b)
+    pb === nothing || partial_vals!(pb, b)
 
     # Invalidate cache (if setting A or b)
     return setfield!(dc, :rhs_cache_valid, false)
@@ -492,9 +496,12 @@ function setu!(dc::DualLinearCache, u)
     prop = nodual_value!(getproperty(dc.linear_cache, :u), u) # Update in-place
     setproperty!(dc.linear_cache, :u, prop) # Does additional invalidation logic etc.
 
-    # Update partials
+    # Update partials (skip when there is no partials slot, e.g. when the
+    # cache was built with a non-Dual u and is now being reused.)
     setfield!(dc, :dual_u, u)
-    return partial_vals!(getfield(dc, :partials_u), u) # Update in-place
+    pu = getfield(dc, :partials_u)
+    pu === nothing && return nothing
+    return partial_vals!(pu, u)
 end
 
 function SciMLBase.reinit!(

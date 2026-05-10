@@ -76,4 +76,11 @@ jobs:
       group: "${{ matrix.group }}"
       julia-version: "${{ matrix.version }}"
       self-hosted: ${{ matrix.group != 'Trim' }}
+      # Coverage processing requires the General registry, which is not
+      # reliably available on the self-hosted runners (the
+      # `julia-processcoverage` action creates a temp env and tries to
+      # `Pkg.add("CoverageTools")`, which fails when the registry is missing).
+      # Restrict coverage to the github-hosted Trim job, which is also the
+      # only run where the codecov upload step is reachable in practice.
+      coverage: ${{ matrix.group == 'Trim' }}
     secrets: "inherit"

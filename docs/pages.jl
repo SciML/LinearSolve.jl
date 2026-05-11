@@ -5,6 +5,7 @@ pages = [
     "tutorials/linear.md",
     "Tutorials" => Any[
         "tutorials/caching_interface.md",
+        "tutorials/petsc_mpi.md",
         "tutorials/accelerating_choices.md",
         "tutorials/gpu.md",
         "tutorials/autotune.md",

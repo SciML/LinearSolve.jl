@@ -7,9 +7,9 @@ A `LinearSolve.jl` algorithm that wraps PETSc's KSP (Krylov Subspace) linear
 solvers via [PETSc.jl](https://github.com/JuliaParallel/PETSc.jl).
 
 !!! compat
-    Requires `PETSc.jl` and `MPI.jl` to be loaded:
+    Requires `PETSc.jl`, `MPI.jl`, and `SparseMatricesCSR.jl` to be loaded:
     ```julia
-    using PETSc, MPI
+    using PETSc, MPI, SparseMatricesCSR
     MPI.Init()
     ```
 
@@ -18,6 +18,13 @@ solvers via [PETSc.jl](https://github.com/JuliaParallel/PETSc.jl).
     non-`nothing` communicator is supplied. Distributed `PSparseMatrix` and
     `PVector` inputs are handled by the MPI extension when `PETSc` and
     `PartitionedArrays` are loaded.
+
+!!! note "Replicated SparseMatrixCSC with MPI"
+    Plain Julia sparse matrices such as `SparseMatrixCSC` can also be solved on a
+    multi-rank communicator by passing `comm = MPI.COMM_WORLD` (or another MPI
+    communicator). Each rank assembles only its owned row interval into PETSc, PETSc
+    solves the distributed system, and the final `sol.u` is gathered back as the full
+    Julia vector on every rank.
 
 ---
 
@@ -79,7 +86,7 @@ strongly preferred for deterministic, timely resource release.
 ## Example
 
 ```julia
-using LinearSolve, PETSc, MPI, SparseArrays, LinearAlgebra
+using LinearSolve, PETSc, MPI, SparseArrays, SparseMatricesCSR, LinearAlgebra
 
 MPI.Init()
 PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
@@ -93,6 +100,30 @@ sol = solve(
     PETScAlgorithm(:gmres; pc_type = :ilu, ksp_options = (ksp_monitor = "",))
 )
 println("Residual: ", norm(A * sol.u - b) / norm(b))
+PETScExt.cleanup_petsc_cache!(sol)
+```
+
+## Distributed SparseMatrixCSC Example
+
+```julia
+using LinearSolve, PETSc, MPI, SparseArrays, SparseMatricesCSR, LinearAlgebra
+
+MPI.Init()
+PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
+
+n = 12
+A = spdiagm(-1 => -ones(n - 1), 0 => 4.0 .* ones(n), 1 => -ones(n - 1))
+b = ones(n)
+
+sol = solve(
+    LinearProblem(A, b),
+    PETScAlgorithm(:gmres; comm = MPI.COMM_WORLD);
+    abstol = 1.0e-10,
+    reltol = 1.0e-10
+)
+
+# sol.u is the full replicated solution on every rank.
+println(norm(A * sol.u - b) / norm(b))
 PETScExt.cleanup_petsc_cache!(sol)
 ```
 """

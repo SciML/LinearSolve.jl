@@ -540,8 +540,12 @@ function ensure_vecs!(pcache, petsclib, comm, b)
     if pcache.vec_n != n || pcache.petsc_x === nothing || pcache.petsc_b === nothing
         pcache.petsc_x !== nothing && PETSc.destroy(pcache.petsc_x)
         pcache.petsc_b !== nothing && PETSc.destroy(pcache.petsc_b)
-        pcache.petsc_x = create_seq_vec(petsclib, n)
-        pcache.petsc_b = create_seq_vec(petsclib, n)
+        if comm == MPI.COMM_SELF
+            pcache.petsc_x = create_seq_vec(petsclib, n)
+            pcache.petsc_b = create_seq_vec(petsclib, n)
+        else
+            pcache.petsc_x, pcache.petsc_b = LibPETSc.MatCreateVecs(petsclib, pcache.petsc_A)
+        end
         pcache.vec_n = n
     end
     return pcache.petsc_x, pcache.petsc_b
@@ -551,12 +555,12 @@ end
 #
 # run_ksp! abstracts the VecPlaceArray / KSPSolve / VecResetArray pattern.
 # For serial AbstractVector: zero-copy via VecPlaceArray.
+# For replicated Julia vectors on a multi-rank communicator: copy the owned
+# rows into a distributed PETSc Vec, solve, then gather the full solution back
+# onto every rank with VecScatterCreateToAll.
 # Overloaded by LinearSolvePETScMPIExt for PVector (uses VecGetArray copy path).
 function run_ksp!(pcache, petsclib, alg, b::AbstractVector, u::AbstractVector)
-    pcache.comm != MPI.COMM_SELF && error(
-        "PETSc multi-rank SparseMatrixCSC support currently stops at matrix assembly. " *
-            "Distributed RHS/solution handling for standard Julia vectors is planned for later work."
-    )
+    pcache.comm != MPI.COMM_SELF && return run_ksp_mpi!(pcache, petsclib, alg, b, u)
 
     petsc_x = pcache.petsc_x
     petsc_b = pcache.petsc_b
@@ -574,6 +578,72 @@ function run_ksp!(pcache, petsclib, alg, b::AbstractVector, u::AbstractVector)
         LibPETSc.VecResetArray(petsclib, petsc_x)
         LibPETSc.VecResetArray(petsclib, petsc_b)
     end
+end
+
+function copyto_local_petsc_vec!(petsclib, petsc_vec, values::AbstractVector)
+    local_values = LibPETSc.VecGetArray(petsclib, petsc_vec)
+    try
+        copyto!(local_values, values)
+    finally
+        LibPETSc.VecRestoreArray(petsclib, petsc_vec, local_values)
+    end
+    return nothing
+end
+
+function copyfrom_local_petsc_vec!(dest::AbstractVector, petsclib, petsc_vec)
+    local_values = LibPETSc.VecGetArray(petsclib, petsc_vec)
+    try
+        copyto!(dest, local_values)
+    finally
+        LibPETSc.VecRestoreArray(petsclib, petsc_vec, local_values)
+    end
+    return nothing
+end
+
+function gather_petsc_vec_to_all!(u::AbstractVector, petsclib, petsc_x)
+    scatter, gathered_x = LibPETSc.VecScatterCreateToAll(petsclib, petsc_x)
+    try
+        LibPETSc.VecScatterBegin(
+            petsclib, scatter, petsc_x, gathered_x,
+            LibPETSc.INSERT_VALUES, LibPETSc.SCATTER_FORWARD
+        )
+        LibPETSc.VecScatterEnd(
+            petsclib, scatter, petsc_x, gathered_x,
+            LibPETSc.INSERT_VALUES, LibPETSc.SCATTER_FORWARD
+        )
+        copyfrom_local_petsc_vec!(u, petsclib, gathered_x)
+    finally
+        LibPETSc.VecScatterDestroy(petsclib, scatter)
+        PETSc.destroy(gathered_x)
+    end
+    return nothing
+end
+
+function postsolve_solution_check(cache, alg, pcache, A::AbstractMatrix, u::AbstractVector)
+    if pcache.comm == MPI.COMM_SELF || A isa SparseMatrixCSC
+        return LinearSolve._check_residual_safety(cache, alg, A, u)
+    end
+    return nothing
+end
+
+postsolve_solution_check(cache, alg, pcache, A, u) = nothing
+
+function run_ksp_mpi!(pcache, petsclib, alg, b::AbstractVector, u::AbstractVector)
+    petsc_x = pcache.petsc_x
+    petsc_b = pcache.petsc_b
+    local_range = (pcache.rstart + 1):pcache.rend
+
+    copyto_local_petsc_vec!(petsclib, petsc_b, view(b, local_range))
+    copyto_local_petsc_vec!(petsclib, petsc_x, view(u, local_range))
+
+    if alg.transposed
+        LibPETSc.KSPSolveTranspose(petsclib, pcache.ksp, petsc_b, petsc_x)
+    else
+        LibPETSc.KSPSolve(petsclib, pcache.ksp, petsc_b, petsc_x)
+    end
+
+    gather_petsc_vec_to_all!(u, petsclib, petsc_x)
+    return nothing
 end
 
 # ── Null space ────────────────────────────────────────────────────────────────
@@ -756,6 +826,13 @@ function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm; kwargs...)
     # reason < 0 → diverged or other failure.
     retcode = reason > 0 ? ReturnCode.Success :
         reason == 0 ? ReturnCode.Default : ReturnCode.Failure
+    if retcode === ReturnCode.Success && any(!isfinite, cache.u)
+        retcode = ReturnCode.Failure
+    end
+    if retcode === ReturnCode.Success
+        failed = postsolve_solution_check(cache, alg, pcache, cache.A, cache.u)
+        failed !== nothing && return failed
+    end
 
     return build_linear_solution(alg, cache.u, resid, cache; retcode, iters)
 end

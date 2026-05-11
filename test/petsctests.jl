@@ -222,6 +222,26 @@ end
     end
 end
 
+@testset "Serial: Retcode Handling" begin
+    n = 100
+    A = sprand(n, n, 0.05) + 10I
+    A = A'A
+    b = rand(n)
+
+    sol = solve(
+        LinearProblem(A, b),
+        PETScAlgorithm(:cg);
+        abstol = 1.0e-16,
+        reltol = 1.0e-16,
+        maxiters = 1
+    )
+
+    @test sol.retcode == SciMLBase.ReturnCode.Failure
+    @test sol.iters == 1
+    @test norm(A * sol.u - b) / norm(b) > sol.cache.reltol
+    PETScExt.cleanup_petsc_cache!(sol)
+end
+
 @testset "Serial: Cleanup" begin
     n = 50
     A = sprand(n, n, 0.1) + 10I; A = A'A; b = rand(n)

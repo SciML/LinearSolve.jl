@@ -44,6 +44,7 @@ end
     n = 12
     A = spdiagm(-1 => -ones(n - 1), 0 => 4.0 .* ones(n), 1 => -ones(n - 1))
     b = ones(n)
+    x_ref = A \ b
 
     function init_replicated_cache(; prec_matrix = nothing)
         alg = PETScAlgorithm(:gmres; comm = MPI.COMM_WORLD, pc_type = :jacobi, prec_matrix)
@@ -92,24 +93,58 @@ end
         PETScExt.cleanup_petsc_cache!(cache)
     end
 
-    @testset "solve path stays guarded until week 3-4" begin
+    @testset "basic 2-rank GMRES solve replicates full solution" begin
+        sol = solve(
+            LinearProblem(A, b),
+            PETScAlgorithm(:gmres; comm = MPI.COMM_WORLD);
+            abstol = 1.0e-10,
+            reltol = 1.0e-10
+        )
+        pcache = sol.cache.cacheval
+
+        @test sol.retcode == SciMLBase.ReturnCode.Success
+        @test norm(A * sol.u - b) / norm(b) < 1.0e-10
+        @test sol.u ≈ x_ref atol = 1.0e-10
+        @test pcache.rstart >= 0
+        @test pcache.rend >= pcache.rstart
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
+
+    @testset "cache reuse with new rhs preserves full-solution contract" begin
         cache = SciMLBase.init(
             LinearProblem(A, b),
             PETScAlgorithm(:gmres; comm = MPI.COMM_WORLD);
             abstol = 1.0e-10,
             reltol = 1.0e-10
         )
-        err = try
-            solve!(cache)
-            nothing
-        catch e
-            e
-        finally
-            PETScExt.cleanup_petsc_cache!(cache)
-        end
+        sol1 = solve!(cache)
+        @test sol1.retcode == SciMLBase.ReturnCode.Success
+        @test sol1.u ≈ x_ref atol = 1.0e-10
 
-        @test err isa ErrorException
-        @test occursin("matrix assembly", sprint(showerror, err))
+        b2 = collect(1.0:n)
+        x_ref2 = A \ b2
+        cache.b = b2
+        sol2 = solve!(cache)
+
+        @test sol2.retcode == SciMLBase.ReturnCode.Success
+        @test norm(A * sol2.u - b2) / norm(b2) < 1.0e-10
+        @test sol2.u ≈ x_ref2 atol = 1.0e-10
+        PETScExt.cleanup_petsc_cache!(cache)
+    end
+
+    @testset "maxiters failure sets retcode" begin
+        sol = solve(
+            LinearProblem(A, b),
+            PETScAlgorithm(:gmres; comm = MPI.COMM_WORLD);
+            abstol = 1.0e-16,
+            reltol = 1.0e-16,
+            maxiters = 1
+        )
+
+        @test sol.retcode == SciMLBase.ReturnCode.Failure
+        @test sol.iters == 1
+        @test norm(A * sol.u - b) / norm(b) > sol.cache.reltol
+        PETScExt.cleanup_petsc_cache!(sol)
     end
 end
 
@@ -245,6 +280,67 @@ end
         alg = PETScAlgorithm(:gmres; pc_type = :jacobi)
         sol = solve(LinearProblem(A, b; u0 = u), alg; abstol = 1.0e-10, reltol = 1.0e-10)
         @test sol.retcode == SciMLBase.ReturnCode.Success
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
+end
+
+@testset "PSparseMatrix SplitMatrix: maxiters failure sets retcode" begin
+    n = 12
+    with_mpi() do distribute
+        rp = mpi_row_partition(distribute, n)
+
+        I_v, J_v, V_v = map(rp) do rng
+            Is, Js, Vs = Int[], Int[], Float64[]
+            for i in rng
+                push!(Is, i); push!(Js, i); push!(Vs, 4.0)
+                i > 1 && (push!(Is, i); push!(Js, i - 1); push!(Vs, -1.0))
+                i < n && (push!(Is, i); push!(Js, i + 1); push!(Vs, -1.0))
+            end
+            Is, Js, Vs
+        end |> tuple_of_arrays
+        A = psparse(I_v, J_v, V_v, rp, rp) |> fetch
+        b = PVector(map(rng -> ones(length(rng)), rp), rp)
+        u = PVector(map(rng -> zeros(length(rng)), rp), rp)
+
+        sol = solve(
+            LinearProblem(A, b; u0 = u),
+            PETScAlgorithm(:gmres);
+            abstol = 1.0e-16,
+            reltol = 1.0e-16,
+            maxiters = 1
+        )
+        @test sol.retcode == SciMLBase.ReturnCode.Failure
+        @test sol.iters == 1
+        PETScExt.cleanup_petsc_cache!(sol)
+    end
+end
+
+@testset "PSparseMatrix SplitMatrix: residual safety failure" begin
+    n = 12
+    with_mpi() do distribute
+        rp = mpi_row_partition(distribute, n)
+
+        I_v, J_v, V_v = map(rp) do rng
+            Is, Js, Vs = Int[], Int[], Float64[]
+            for i in rng
+                push!(Is, i); push!(Js, i); push!(Vs, 4.0)
+                i > 1 && (push!(Is, i); push!(Js, i - 1); push!(Vs, -1.0))
+                i < n && (push!(Is, i); push!(Js, i + 1); push!(Vs, -1.0))
+            end
+            Is, Js, Vs
+        end |> tuple_of_arrays
+        A = psparse(I_v, J_v, V_v, rp, rp) |> fetch
+        b = PVector(map(rng -> ones(length(rng)), rp), rp)
+        u = PVector(map(rng -> zeros(length(rng)), rp), rp)
+
+        sol = solve(
+            LinearProblem(A, b; u0 = u),
+            PETScAlgorithm(:gmres; ksp_options = (ksp_rtol = 0.9,));
+            abstol = 0.0,
+            reltol = 1.0e-12,
+            maxiters = 100
+        )
+        @test sol.retcode == SciMLBase.ReturnCode.APosterioriSafetyFailure
         PETScExt.cleanup_petsc_cache!(sol)
     end
 end

@@ -339,6 +339,8 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
         Krylov.krylov_solve!(args...; M, kwargs...)
     elseif cache.cacheval isa Krylov.GmresWorkspace
         Krylov.krylov_solve!(args...; M, N, restart = alg.gmres_restart > 0, kwargs...)
+    elseif cache.cacheval isa Krylov.FgmresWorkspace
+        Krylov.krylov_solve!(args...; M, N, kwargs...)
     elseif cache.cacheval isa Krylov.BicgstabWorkspace
         Krylov.krylov_solve!(args...; M, N, kwargs...)
     elseif cache.cacheval isa Krylov.MinresWorkspace

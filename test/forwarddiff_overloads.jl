@@ -432,3 +432,34 @@ end
     @test ForwardDiff.jacobian(f972_setA, [1.0, 2.0]) ≈
         [1.5 0.0; 0.0 1.5]
 end
+
+# Regression test for SciML/LinearSolve.jl#974
+# When a DualLinearCache is constructed with a Dual A and Float64 b, the
+# `dual_u` field is statically typed Vector{<:Dual}. NonlinearSolveBase's
+# `set_lincache_u!` (which does `cache.u = primal_u_vector`) then routes
+# through `setproperty!(dc, :u, ::Vector{Float64})` → `setu!` →
+# `setfield!(dc, :dual_u, ::Vector{Float64})`, which TypeError'd on the
+# typed field. Hit in practice by NonlinearSolve.NewtonRaphson under
+# ForwardDiff.hessian (outer Dual tag specializes dual_u against an
+# outer-Dual type while the inner solve's iterate is Float64).
+@testset "DualLinearCache setu! with non-Dual u (#974)" begin
+    p = [ForwardDiff.Dual(1.0, 1.0, 0.0), ForwardDiff.Dual(2.0, 0.0, 1.0)]
+    A = sparse(Diagonal(p))                # sparse Dual A
+    b = [1.0, 2.0]                         # Float64 b (no partials)
+    prob = LinearProblem(A, b)
+    cache = init(prob)
+    solve!(cache)
+    @test getfield(cache, :dual_u) isa AbstractVector{<:ForwardDiff.Dual}
+
+    # On master this errors with `TypeError: in setfield!, expected
+    # Vector{ForwardDiff.Dual{...}}, got a value of type Vector{Float64}`.
+    @test_nowarn (cache.u = [0.5, 1.5])
+    @test cache.linear_cache.u == [0.5, 1.5]
+
+    # A subsequent solve must still produce the correct dual solution. Compare
+    # against an uncached reference using the post-mutation primal u as the
+    # initial state.
+    sol = solve!(cache)
+    ref = A \ b
+    @test sol.u ≈ ref rtol = 1.0e-9
+end

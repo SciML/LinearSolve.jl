@@ -498,10 +498,12 @@ function setu!(dc::DualLinearCache, u)
     prop = nodual_value!(getproperty(dc.linear_cache, :u), u) # Update in-place
     setproperty!(dc.linear_cache, :u, prop) # Does additional invalidation logic etc.
 
-    # Update partials only when u actually carries Duals; otherwise there is
-    # nothing to extract and the partials slot may be unallocated.
-    setfield!(dc, :dual_u, u)
+    # Skip dual_u when u carries no Duals: dual_u is statically typed
+    # Vector{<:Dual} from construction, so setfield! with a Vector{Float64}
+    # would TypeError. dual_u is rewritten in place by linearsolve_dual_solution!
+    # on the next solve!, so the assignment is unnecessary in that case.
     get_dual_type(u) === nothing && return nothing
+    setfield!(dc, :dual_u, u)
     return partial_vals!(getfield(dc, :partials_u), u)
 end
 

@@ -405,9 +405,10 @@ GinkgoJL_GMRES
 
 !!! note
 
-    Using this solver requires loading PETSc.jl and MPI.jl, and initialising MPI:
+    Using this solver requires loading PETSc.jl, MPI.jl, and SparseMatricesCSR.jl,
+    and initialising MPI:
     ```julia
-    using PETSc, MPI, SparseMatricesCSR   # SparseMatricesCSR is optional but recommended for best performance
+    using PETSc, MPI, SparseMatricesCSR
     MPI.Init()
     ```
 
@@ -586,12 +587,26 @@ A GC finalizer is registered as a safety net, but explicit cleanup is strongly p
 
 #### MPI-parallel solves
 
-`PETScAlgorithm` supports **distributed-memory parallel** solves when the system matrix
-is a `PSparseMatrix` and the RHS/solution are `PVector` from
-[PartitionedArrays.jl](https://github.com/PartitionedArrays/PartitionedArrays.jl).  Each MPI rank
-contributes its owned rows; PETSc assembles and solves the global system in parallel.
+`PETScAlgorithm` supports two MPI-parallel workflows:
 
-Requires loading all four trigger packages:
+- **Replicated Julia matrices/vectors**: pass a plain `SparseMatrixCSC` (or dense Julia
+  matrix) together with `comm = MPI.COMM_WORLD` or another multi-rank communicator.
+  Each rank assembles only its owned row interval into PETSc, PETSc solves the
+  distributed system, and the full solution is gathered back into the ordinary Julia
+  vector `sol.u` on every rank.
+- **PartitionedArrays inputs**: use `PSparseMatrix` and `PVector` from
+  [PartitionedArrays.jl](https://github.com/PartitionedArrays/PartitionedArrays.jl). Each MPI rank
+  contributes its owned rows; PETSc assembles and solves the global system in parallel,
+  and the owned portion of the `PVector` solution is updated on each rank.
+
+For the replicated Julia-matrix/vector workflow, load:
+
+```julia
+using LinearSolve, PETSc, MPI, SparseMatricesCSR
+MPI.Init()
+```
+
+For the PartitionedArrays workflow, load all four trigger packages:
 
 ```julia
 using LinearSolve, PETSc, MPI
@@ -605,7 +620,57 @@ MPI.Init()
     For single-process testing without MPI, use `with_debug()` instead of `with_mpi()`;
     it runs the same code sequentially using `DebugArray` as the backend.
 
-##### Basic parallel solve
+##### Replicated SparseMatrixCSC solve
+
+```julia
+using LinearSolve, PETSc, MPI, SparseArrays, SparseMatricesCSR, LinearAlgebra
+MPI.Init()
+
+n = 12
+A = spdiagm(-1 => -ones(n - 1), 0 => 4.0 .* ones(n), 1 => -ones(n - 1))
+b = ones(n)
+
+sol = solve(
+    LinearProblem(A, b),
+    PETScAlgorithm(:gmres; comm = MPI.COMM_WORLD);
+    abstol = 1e-10,
+    reltol = 1e-10
+)
+
+# sol.u is the full replicated solution on every rank.
+@show norm(A * sol.u - b) / norm(b)
+```
+
+##### Repeated replicated solves
+
+```julia
+using LinearSolve, PETSc, MPI, SparseArrays, SparseMatricesCSR, LinearAlgebra
+import SciMLBase
+
+MPI.Init()
+
+n = 12
+A = spdiagm(-1 => -ones(n - 1), 0 => 4.0 .* ones(n), 1 => -ones(n - 1))
+b = ones(n)
+
+cache = SciMLBase.init(
+    LinearProblem(A, b),
+    PETScAlgorithm(:gmres; comm = MPI.COMM_WORLD);
+    abstol = 1e-10,
+    reltol = 1e-10
+)
+solve!(cache)
+
+for rhs_scale in (2.0, 3.0, 4.0)
+    SciMLBase.reinit!(cache; b = rhs_scale .* b)
+    solve!(cache)
+end
+
+PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
+PETScExt.cleanup_petsc_cache!(cache)
+```
+
+##### Basic parallel solve with PartitionedArrays
 
 ```julia
 using LinearSolve, PETSc, MPI
@@ -681,6 +746,16 @@ end
     ```julia
     PartitionedArrays.consistent!(sol.u)
     ```
+
+#### MPI test coverage
+
+The PETSc MPI suite is verified for both `mpiexecjl -n 2` and `mpiexecjl -n 4`.
+Coverage includes:
+
+- replicated `SparseMatrixCSC` ownership and MPI assembly
+- replicated `SparseMatrixCSC` distributed solves and repeated `solve!` reuse
+- `PSparseMatrix` / `PVector` solves on MPI and DebugArray backends
+- explicit PETSc retcode and a posteriori safety-check coverage on the MPI paths
 
 ```@docs
 PETScAlgorithm

@@ -1,6 +1,7 @@
 using LinearSolve
 using ForwardDiff
 using Test
+using LinearAlgebra
 using SparseArrays
 using ComponentArrays
 using Sparspak
@@ -380,4 +381,54 @@ backslash_large = A_large_dual \ b_large_dual
     another_p = (nothing, [5.0, 6.0], 2.0)
     @test_nowarn (cache_p.p = another_p)
     @test cache_p.p == another_p
+end
+
+# Regression test for SciML/LinearSolve.jl#972
+# When DualLinearCache is built from a Dual A and a Float64 b (so partials_b
+# is `nothing`), reusing the cache by mutating b to another Float64 vector
+# previously hit `MethodError: no method matching map!(::partial_vals,
+# ::Nothing, ::Vector{Float64})` from `setb!`. The same applied symmetrically
+# to setA!/setu! when their partials slots were unallocated.
+@testset "DualLinearCache reuse with nothing partials (#972)" begin
+    function f972(p)
+        A = sparse(Diagonal(p))           # A is Dual under ForwardDiff
+        b1 = [1.0, 2.0]                   # Float64, no partials
+        prob = LinearProblem(A, b1)
+        cache = init(prob)
+        u1 = copy(solve!(cache).u)        # first solve seeded the cache
+        cache.b = [3.0, 4.0]              # mutating b to another Float64 vector used to MethodError
+        u2 = copy(solve!(cache).u)
+        return u1 .+ u2
+    end
+
+    # Primal call must still work and produce a sensible result.
+    @test f972([1.0, 2.0]) ≈ [4.0, 3.0]
+
+    # The original failure mode: pushing Duals through the same cache path.
+    J = ForwardDiff.jacobian(f972, [1.0, 2.0])
+    @test size(J) == (2, 2)
+    @test all(isfinite, J)
+
+    # Sanity-check the partials by comparing against a non-cached implementation.
+    function f972_nocache(p)
+        A = sparse(Diagonal(p))
+        u1 = A \ [1.0, 2.0]
+        u2 = A \ [3.0, 4.0]
+        return u1 .+ u2
+    end
+    @test J ≈ ForwardDiff.jacobian(f972_nocache, [1.0, 2.0])
+
+    # Symmetric coverage: Float64 A + Dual b cache reuse via setA!.
+    function f972_setA(p)
+        A1 = Matrix{Float64}(I, 2, 2)
+        b = p                              # b is Dual
+        prob = LinearProblem(A1, b)
+        cache = init(prob)
+        u1 = copy(solve!(cache).u)
+        cache.A = [2.0 0.0; 0.0 2.0]       # mutate A to another Float64 matrix
+        u2 = copy(solve!(cache).u)
+        return u1 .+ u2
+    end
+    @test ForwardDiff.jacobian(f972_setA, [1.0, 2.0]) ≈
+        [1.5 0.0; 0.0 1.5]
 end

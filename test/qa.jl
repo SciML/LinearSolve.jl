@@ -34,7 +34,7 @@ end
     # These SciMLLogging imports are used by the @verbosity_specifier macro-generated code
     # but ExplicitImports can't detect usage through macro expansions
     sciml_logging_macro_imports = (
-        :AbstractVerbositySpecifier, :AbstractMessageLevel, :AbstractVerbosityPreset,
+        :AbstractVerbositySpecifier, :AbstractVerbosityPreset,
         :None, :Minimal, :Standard, :Detailed, :All,
     )
     # @set! is used by extensions via LinearSolve.@set! but ExplicitImports can't detect this

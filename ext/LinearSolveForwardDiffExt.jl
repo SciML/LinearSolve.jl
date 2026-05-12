@@ -508,9 +508,7 @@ function setu!(dc::DualLinearCache{DT}, u) where {DT}
         # `linearsolve_dual_solution!`.
         dual_u_field = getfield(dc, :dual_u)
         if dual_u_field isa AbstractArray
-            @inbounds for i in eachindex(dual_u_field, u)
-                dual_u_field[i] = DT(u[i])
-            end
+            dual_u_field .= DT.(u)
         else
             setfield!(dc, :dual_u, DT(u))
         end

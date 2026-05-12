@@ -493,15 +493,31 @@ function setb!(dc::DualLinearCache, b)
     # Invalidate cache (if setting A or b)
     return setfield!(dc, :rhs_cache_valid, false)
 end
-function setu!(dc::DualLinearCache, u)
+function setu!(dc::DualLinearCache{DT}, u) where {DT}
     # Put the Dual-stripped versions in the LinearCache
     prop = nodual_value!(getproperty(dc.linear_cache, :u), u) # Update in-place
     setproperty!(dc.linear_cache, :u, prop) # Does additional invalidation logic etc.
 
-    # Update partials only when u actually carries Duals; otherwise there is
-    # nothing to extract and the partials slot may be unallocated.
+    if get_dual_type(u) === nothing
+        # `u` is primal-only (e.g. the Vector{Float64} iterate handed in by
+        # `NonlinearSolveBase.set_lincache_u!` during Newton iterations under
+        # an outer Hessian tag), while `dual_u` is statically typed
+        # Vector{<:Dual}. Promote element-wise to `DT` with zero partials so
+        # the field invariant is preserved without dropping derivatives — the
+        # next solve! will rewrite the partials from the Dual A / b via
+        # `linearsolve_dual_solution!`.
+        dual_u_field = getfield(dc, :dual_u)
+        if dual_u_field isa AbstractArray
+            dual_u_field .= DT.(u)
+        else
+            setfield!(dc, :dual_u, DT(u))
+        end
+        pu = getfield(dc, :partials_u)
+        pu === nothing || fill!(pu, zero(eltype(pu)))
+        return nothing
+    end
+
     setfield!(dc, :dual_u, u)
-    get_dual_type(u) === nothing && return nothing
     return partial_vals!(getfield(dc, :partials_u), u)
 end
 

@@ -432,3 +432,49 @@ end
     @test ForwardDiff.jacobian(f972_setA, [1.0, 2.0]) ≈
         [1.5 0.0; 0.0 1.5]
 end
+
+# Regression test for SciML/LinearSolve.jl#974
+# When a DualLinearCache is constructed with a Dual A and Float64 b, the
+# `dual_u` field is statically typed Vector{<:Dual}. NonlinearSolveBase's
+# `set_lincache_u!` (which does `cache.u = primal_u_vector`) then routes
+# through `setproperty!(dc, :u, ::Vector{Float64})` → `setu!` →
+# `setfield!(dc, :dual_u, ::Vector{Float64})`, which TypeError'd on the
+# typed field. Hit in practice by NonlinearSolve.NewtonRaphson under
+# ForwardDiff.hessian (outer Dual tag specializes dual_u against an
+# outer-Dual type while the inner solve's iterate is Float64). The fix
+# promotes the primal-only `u` to the cache's Dual type with zero partials
+# so the field invariant is preserved.
+@testset "DualLinearCache setu! with non-Dual u (#974)" begin
+    p = [ForwardDiff.Dual(1.0, 1.0, 0.0), ForwardDiff.Dual(2.0, 0.0, 1.0)]
+    A = sparse(Diagonal(p))                # sparse Dual A
+    b = [1.0, 2.0]                         # Float64 b (no partials)
+    prob = LinearProblem(A, b)
+    cache = init(prob)
+    solve!(cache)
+    DT = eltype(getfield(cache, :dual_u))
+    @test DT <: ForwardDiff.Dual
+
+    # On master this errors with `TypeError: in setfield!, expected
+    # Vector{ForwardDiff.Dual{...}}, got a value of type Vector{Float64}`.
+    new_u = [0.5, 1.5]
+    @test_nowarn (cache.u = new_u)
+    @test cache.linear_cache.u == new_u
+
+    # The dual_u field invariant must be preserved: still Vector{DT}, with
+    # primal values matching `new_u` and zero partials. Derivatives must not
+    # be dropped — the next solve! will rewrite the partials from `A`.
+    promoted = getfield(cache, :dual_u)
+    @test eltype(promoted) === DT
+    @test ForwardDiff.value.(promoted) == new_u
+    @test all(iszero, ForwardDiff.partials.(promoted))
+
+    # A subsequent solve must still produce the correct dual solution —
+    # values AND partials. `≈` on Dual only compares values, so check the
+    # extracted partials matrix against `Diagonal(p) \ b` separately.
+    sol = solve!(cache)
+    ref = Diagonal(p) \ b
+    @test eltype(sol.u) === DT
+    @test ForwardDiff.value.(sol.u) ≈ ForwardDiff.value.(ref) rtol = 1.0e-9
+    extract_partials(v) = [collect(ForwardDiff.partials(x)) for x in v]
+    @test all(((a, b),) -> a ≈ b, zip(extract_partials(sol.u), extract_partials(ref)))
+end

@@ -10,6 +10,8 @@ using SciMLLogging: SciMLLogging, verbosity_to_int, @SciMLMessage
 using SciMLBase: LinearProblem, LinearAliasSpecifier, SciMLBase
 using Setfield: @set!
 
+const MPI = HYPRE.MPI
+
 mutable struct HYPRECache
     solver::Union{HYPRE.HYPRESolver, Nothing}
     A::Union{HYPREMatrix, Nothing}
@@ -28,6 +30,45 @@ function LinearSolve.init_cacheval(
     return HYPRECache(nothing, nothing, nothing, nothing, true, true, true)
 end
 
+function local_row_partition(nrows::Integer, comm::MPI.Comm)
+    nranks = MPI.Comm_size(comm)
+    rank = MPI.Comm_rank(comm)
+    q, r = divrem(nrows, nranks)
+    nlocal = q + (rank < r ? 1 : 0)
+    ilower = rank * q + min(rank, r) + 1
+    iupper = ilower + nlocal - 1
+    return ilower, iupper
+end
+
+is_distributed_comm(comm) = !(comm === nothing) && comm != MPI.COMM_NULL && MPI.Comm_size(comm) > 1
+
+auto_hypre_matrix(::HYPREAlgorithm, A::HYPREMatrix) = A
+auto_hypre_vector(::HYPREAlgorithm, b::HYPREVector) = b
+
+function auto_hypre_matrix(alg::HYPREAlgorithm, A)
+    if !is_distributed_comm(alg.comm)
+        return A isa HYPREMatrix ? A : HYPREMatrix(A)
+    end
+    if !(A isa AbstractMatrix)
+        throw(ArgumentError("distributed HYPRE auto-construction requires an AbstractMatrix input"))
+    end
+    ilower, iupper = local_row_partition(size(A, 1), alg.comm)
+    Alocal = A[ilower:iupper, :]
+    return HYPREMatrix(alg.comm, Alocal, ilower, iupper)
+end
+
+function auto_hypre_vector(alg::HYPREAlgorithm, b)
+    if !is_distributed_comm(alg.comm)
+        return b isa HYPREVector ? b : HYPREVector(b)
+    end
+    if !(b isa AbstractVector)
+        throw(ArgumentError("distributed HYPRE auto-construction requires an AbstractVector input"))
+    end
+    ilower, iupper = local_row_partition(length(b), alg.comm)
+    blocal = b[ilower:iupper]
+    return HYPREVector(alg.comm, blocal, ilower, iupper)
+end
+
 # Overload set_(A|b|u) in order to keep track of "isfresh" for all of them
 const LinearCacheHYPRE = LinearCache{<:Any, <:Any, <:Any, <:Any, <:Any, HYPRECache}
 
@@ -35,15 +76,15 @@ function Base.setproperty!(cache::LinearCacheHYPRE, name::Symbol, x)
     if name === :A
         cache.cacheval.isfresh_A = true
         setfield!(cache, :isfresh, true)
-        return setfield!(cache, name, x isa HYPREMatrix ? x : HYPREMatrix(x))
+        return setfield!(cache, name, auto_hypre_matrix(cache.alg, x))
     elseif name == :b
         cache.cacheval.isfresh_b = true
         setfield!(cache, :isfresh, true)
-        return setfield!(cache, name, x isa HYPREVector ? x : HYPREVector(x))
+        return setfield!(cache, name, auto_hypre_vector(cache.alg, x))
     elseif name == :u
         cache.cacheval.isfresh_u = true
         setfield!(cache, :isfresh, true)
-        return setfield!(cache, name, x isa HYPREVector ? x : HYPREVector(x))
+        return setfield!(cache, name, auto_hypre_vector(cache.alg, x))
     end
     return setfield!(cache, name, x)
 end
@@ -137,9 +178,9 @@ function SciMLBase.init(
         init_cache_verb = verb_spec
     end
 
-    A = A isa HYPREMatrix ? A : HYPREMatrix(A)
-    b = b isa HYPREVector ? b : HYPREVector(b)
-    u0 = u0 isa HYPREVector ? u0 : (u0 === nothing ? nothing : HYPREVector(u0))
+    A = auto_hypre_matrix(alg, A)
+    b = auto_hypre_vector(alg, b)
+    u0 = u0 === nothing ? nothing : auto_hypre_vector(alg, u0)
 
     # Create solution vector/initial guess
     if u0 === nothing

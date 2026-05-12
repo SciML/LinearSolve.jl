@@ -169,7 +169,7 @@ struct PETScAlgorithm <: SciMLLinearSolveAlgorithm
 end
 
 """
-`HYPREAlgorithm(solver; Pl = nothing)`
+`HYPREAlgorithm(solver; comm = nothing, Pl = nothing)`
 
 [HYPRE.jl](https://github.com/fredrikekre/HYPRE.jl) is an interface to
 [`hypre`](https://computing.llnl.gov/projects/hypre-scalable-linear-solvers-multigrid-methods)
@@ -201,6 +201,8 @@ The single positional argument `solver` has the following choices:
 
 ## Keyword Arguments
 
+  - `comm`: optional MPI communicator used to auto-construct distributed
+    `HYPREMatrix` / `HYPREVector` inputs from plain Julia sparse matrices and vectors.
   - `Pl`: A choice of left preconditioner.
 
 ## Example
@@ -215,15 +217,26 @@ alg = HYPREAlgorithm(HYPRE.PCG)
 prec = HYPRE.BoomerAMG
 sol = solve(prob, alg; Pl = prec)
 ```
+
+For automatic distributed construction from a plain Julia sparse matrix on an MPI
+communicator, pass the communicator through `comm`:
+
+```julia
+using MPI
+
+alg = HYPREAlgorithm(HYPRE.PCG; comm = MPI.COMM_WORLD)
+sol = solve(prob, alg)
+```
 """
 struct HYPREAlgorithm <: SciMLLinearSolveAlgorithm
     solver::Any
-    function HYPREAlgorithm(solver)
+    comm::Any
+    function HYPREAlgorithm(solver; comm = nothing)
         ext = Base.get_extension(@__MODULE__, :LinearSolveHYPREExt)
         if ext === nothing
             error("HYPREAlgorithm requires that HYPRE is loaded, i.e. `using HYPRE`")
         else
-            return new{}(solver)
+            return new{}(solver, comm)
         end
     end
 end

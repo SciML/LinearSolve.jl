@@ -1566,9 +1566,9 @@ version = "3.9.1"
 
 [[deps.SciMLLogging]]
 deps = ["Logging", "LoggingExtras", "Preferences"]
-git-tree-sha1 = "0161be062570af4042cf6f69e3d5d0b0555b6927"
+git-tree-sha1 = "35bdd8e578af78030d98b262461e8eedc045d943"
 uuid = "a6db7da4-7206-11f0-1eab-35f2a5dbe1d1"
-version = "1.9.1"
+version = "1.10.0"
 weakdeps = ["Tracy"]
 
     [deps.SciMLLogging.extensions]

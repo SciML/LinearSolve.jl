@@ -94,3 +94,51 @@ b = rand(m)
 prob = LinearProblem(A, b)
 res = A \ b
 @test solve(prob).u ≈ res
+
+# Least-squares Krylov solvers with preconditioning: identity-equivalent counting
+# preconditioner verifies Pl/Pr are actually forwarded to Krylov (not silently dropped).
+mutable struct CountingDiagPrec
+    d::Vector{Float64}
+    calls::Int
+end
+CountingDiagPrec(d::AbstractVector) = CountingDiagPrec(collect(Float64, d), 0)
+Base.size(P::CountingDiagPrec) = (length(P.d), length(P.d))
+Base.size(P::CountingDiagPrec, ::Integer) = length(P.d)
+Base.eltype(::CountingDiagPrec) = Float64
+function LinearAlgebra.ldiv!(y::AbstractVector, P::CountingDiagPrec, x::AbstractVector)
+    P.calls += 1
+    @. y = x / P.d
+    return y
+end
+function LinearAlgebra.ldiv!(P::CountingDiagPrec, x::AbstractVector)
+    P.calls += 1
+    @. x = x / P.d
+    return x
+end
+
+
+@testset "LS family preconditioning" begin
+    m, n = 30, 10
+    A = randn(m, n)
+    b = randn(m)
+    res = A \ b
+
+    ls_algs = [
+        (KrylovJL_LSMR(), "LSMR", :both),
+        (KrylovJL(KrylovAlg = Krylov.lsqr!), "LSQR", :both),
+        (KrylovJL(KrylovAlg = Krylov.lslq!), "LSLQ", :both),
+        (KrylovJL(KrylovAlg = Krylov.cgls!), "CGLS", :left_only),
+        (KrylovJL(KrylovAlg = Krylov.crls!), "CRLS", :left_only),
+    ]
+
+    for (alg, name, support) in ls_algs
+        @testset "$name" begin
+            Pl = CountingDiagPrec(ones(m))
+            Pr = CountingDiagPrec(ones(n))
+            sol = solve(LinearProblem(A, b), alg; Pl = Pl, Pr = Pr)
+            @test sol.u ≈ res
+            @test Pl.calls > 0
+            support === :both && @test Pr.calls > 0
+        end
+    end
+end

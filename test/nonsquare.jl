@@ -116,10 +116,7 @@ function LinearAlgebra.ldiv!(P::CountingDiagPrec, x::AbstractVector)
     return x
 end
 
-# Per-algorithm expectations:
-# - LSMR, LSQR, LSLQ: Krylov supports M and N; LinearSolve forwards both.
-# - CGLS, CRLS: Krylov supports only M; LinearSolve forwards M and warns on non-identity N.
-#   No assertion on Pr.calls since these solvers do not accept a right preconditioner.
+
 @testset "LS family preconditioning" begin
     m, n = 30, 10
     A = randn(m, n)

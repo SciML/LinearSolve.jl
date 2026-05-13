@@ -351,11 +351,11 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
         )
         Krylov.krylov_solve!(args...; M, kwargs...)
     elseif cache.cacheval isa Krylov.LsmrWorkspace ||
-           cache.cacheval isa Krylov.LsqrWorkspace ||
-           cache.cacheval isa Krylov.LslqWorkspace
+            cache.cacheval isa Krylov.LsqrWorkspace ||
+            cache.cacheval isa Krylov.LslqWorkspace
         Krylov.krylov_solve!(args...; M, N, kwargs...)
     elseif cache.cacheval isa Krylov.CglsWorkspace ||
-           cache.cacheval isa Krylov.CrlsWorkspace
+            cache.cacheval isa Krylov.CrlsWorkspace
         N !== I &&
             @SciMLMessage(
             "$(alg.KrylovAlg) doesn't support right preconditioning.",

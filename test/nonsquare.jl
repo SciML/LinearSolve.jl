@@ -124,7 +124,7 @@ end
     res = A \ b
 
     ls_algs = [
-        (KrylovJL_LSMR(),                    "LSMR", :both),
+        (KrylovJL_LSMR(), "LSMR", :both),
         (KrylovJL(KrylovAlg = Krylov.lsqr!), "LSQR", :both),
         (KrylovJL(KrylovAlg = Krylov.lslq!), "LSLQ", :both),
         (KrylovJL(KrylovAlg = Krylov.cgls!), "CGLS", :left_only),

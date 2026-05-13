@@ -13,8 +13,8 @@ prob = LS.LinearProblem(A, b)
 sol = LS.solve(prob, LS.KrylovJL_GMRES(precs))
 
 sol.u</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
- -36.72773515885941
-  14.919755813843361</code></pre><p>If you want to use a “real” preconditioner under the norm <code>weights</code>, then one can use <code>ComposePreconditioner</code> to apply the preconditioner after the application of the weights like as follows:</p><pre><code class="language-julia hljs">import LinearSolve as LS
+ 0.6929088374766436
+ 0.5707444288051111</code></pre><p>If you want to use a “real” preconditioner under the norm <code>weights</code>, then one can use <code>ComposePreconditioner</code> to apply the preconditioner after the application of the weights like as follows:</p><pre><code class="language-julia hljs">import LinearSolve as LS
 import LinearAlgebra as LA
 
 n = 4
@@ -30,7 +30,7 @@ Pr = LA.Diagonal(weights)
 prob = LS.LinearProblem(A, b)
 sol = LS.solve(prob, LS.KrylovJL_GMRES(precs = Returns((Pl, Pr))))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">retcode: Success
 u: 4-element Vector{Float64}:
- -0.7079271533459166
-  1.9967666798900168
-  0.05279966213744319
- -0.34996860799142376</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../Preconditioners/">« Preconditioners</a><a class="docs-footer-nextpage" href="../../solvers/solvers/">Linear System Solvers »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Tuesday 12 May 2026 15:37">Tuesday 12 May 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+ -1.5913092829708055
+  1.8411074148546727
+ -3.1824415927383383
+  3.02875696043459</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../Preconditioners/">« Preconditioners</a><a class="docs-footer-nextpage" href="../../solvers/solvers/">Linear System Solvers »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Wednesday 13 May 2026 20:31">Wednesday 13 May 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

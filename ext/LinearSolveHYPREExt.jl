@@ -1,7 +1,7 @@
 module LinearSolveHYPREExt
 
 using LinearAlgebra
-using HYPRE.LibHYPRE: HYPRE_Complex
+using HYPRE.LibHYPRE: HYPRE_Complex, HYPREError, HYPRE_ERROR_CONV
 using HYPRE: HYPRE, HYPREMatrix, HYPRESolver, HYPREVector
 using LinearSolve: HYPREAlgorithm, LinearCache, LinearProblem, LinearSolve,
     OperatorAssumptions, default_tol, init_cacheval, __issquare,
@@ -217,6 +217,23 @@ create_solver(::Type{S}, comm) where {S <: COMM_SOLVERS} = S(comm)
 const NO_COMM_SOLVERS = Union{HYPRE.BoomerAMG, HYPRE.Hybrid, HYPRE.ILU}
 create_solver(::Type{S}, comm) where {S <: NO_COMM_SOLVERS} = S()
 
+function hypre_retcode(
+        cache::LinearCache, resid, iters::Integer; convergence_error::Bool = false
+    )
+    if !isfinite(resid)
+        return SciMLBase.ReturnCode.Failure
+    end
+
+    tol = max(abs(float(cache.abstol)), abs(float(cache.reltol)))
+    if !convergence_error && resid <= tol
+        return SciMLBase.ReturnCode.Success
+    elseif iters >= cache.maxiters
+        return SciMLBase.ReturnCode.MaxIters
+    else
+        return SciMLBase.ReturnCode.ConvergenceFailure
+    end
+end
+
 function create_solver(alg::HYPREAlgorithm, cache::LinearCache)
     # If the solver is already instantiated, return it directly
     if alg.solver isa HYPRE.HYPRESolver
@@ -308,7 +325,16 @@ function SciMLBase.solve!(cache::LinearCache, alg::HYPREAlgorithm, args...; kwar
     cache.isfresh = false
 
     # Solve!
-    HYPRE.solve!(hcache.solver, hcache.u, hcache.A, hcache.b)
+    convergence_error = false
+    try
+        HYPRE.solve!(hcache.solver, hcache.u, hcache.A, hcache.b)
+    catch err
+        if err isa HYPREError && (err.ierr & HYPRE_ERROR_CONV) != 0
+            convergence_error = true
+        else
+            rethrow()
+        end
+    end
 
     # Copy back if the output is not HYPREVector
     if cache.u !== hcache.u
@@ -323,7 +349,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::HYPREAlgorithm, args...; kwar
     N = 1 # length((size(u)...,))
     resid = HYPRE.GetFinalRelativeResidualNorm(hcache.solver)
     iters = Int(HYPRE.GetNumIterations(hcache.solver))
-    retc = SciMLBase.ReturnCode.Default # TODO: Fetch from solver
+    retc = hypre_retcode(cache, resid, iters; convergence_error)
     stats = nothing
 
     ret = SciMLBase.LinearSolution{

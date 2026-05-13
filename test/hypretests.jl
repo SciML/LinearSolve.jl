@@ -34,6 +34,13 @@ function to_array(b::HYPREVector)
 end
 to_array(x) = x
 
+function failure_prob()
+    n = 100
+    A = spdiagm(-1 => -ones(n - 1), 0 => 2.0 .* ones(n), 1 => -ones(n - 1))
+    b = ones(n)
+    return LinearProblem(A, b)
+end
+
 function generate_probs(alg)
     rng = MersenneTwister(1234)
     n = 100
@@ -128,6 +135,17 @@ function test_interface(alg; kw...)
     return
 end
 
+function test_retcode_failure()
+    prob = failure_prob()
+    sol = solve(
+        prob, HYPREAlgorithm(HYPRE.PCG);
+        abstol = 1.0e-12, reltol = 1.0e-12, maxiters = 1
+    )
+    @test sol.retcode == SciMLBase.ReturnCode.MaxIters
+    @test sol.iters == 1
+    return @test sol.resid > sol.cache.reltol
+end
+
 const comm = MPI.COMM_WORLD
 
 # HYPRE.BiCGSTAB
@@ -165,8 +183,11 @@ test_interface(HYPREAlgorithm(HYPRE.PCG))
 test_interface(HYPREAlgorithm(HYPRE.PCG), Pl = HYPRE.BoomerAMG)
 test_interface(HYPREAlgorithm(HYPRE.PCG(comm)))
 test_interface(HYPREAlgorithm(HYPRE.PCG(comm)), Pl = HYPRE.BoomerAMG())
+test_retcode_failure()
 
 # Test MPI execution
 mpitestfile = joinpath(@__DIR__, "hypretests_mpi.jl")
-r = run(ignorestatus(`$(mpiexec()) -n 2 $(Base.julia_cmd()) $(mpitestfile)`))
+mpicmd = `$(mpiexec()) -n 2 $(Base.julia_cmd()) $(mpitestfile)`
+mpicmd = addenv(mpicmd, "JULIA_LOAD_PATH" => join(LOAD_PATH, ':'))
+r = run(ignorestatus(mpicmd))
 @test r.exitcode == 0

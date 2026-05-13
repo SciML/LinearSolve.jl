@@ -123,3 +123,14 @@ sol = solve!(cache)
 @test sol.iters > 0
 copy!(local_sol, sol.u)
 @test local_sol ≈ fill(3.0, local_size)
+
+# Automatic distributed construction failure retcode
+A_fail = spdiagm(-1 => -ones(19), 0 => 2.0 .* ones(20), 1 => -ones(19))
+b_fail = ones(20)
+sol = solve(
+    LinearProblem(A_fail, b_fail), HYPREAlgorithm(HYPRE.PCG; comm = comm);
+    abstol = 1.0e-12, reltol = 1.0e-12, maxiters = 1
+)
+@test sol.retcode == SciMLBase.ReturnCode.MaxIters
+@test sol.iters == 1
+@test sol.resid > sol.cache.reltol

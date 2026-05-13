@@ -187,7 +187,5 @@ test_retcode_failure()
 
 # Test MPI execution
 mpitestfile = joinpath(@__DIR__, "hypretests_mpi.jl")
-mpicmd = `$(mpiexec()) -n 2 $(Base.julia_cmd()) $(mpitestfile)`
-mpicmd = addenv(mpicmd, "JULIA_LOAD_PATH" => join(LOAD_PATH, ':'))
-r = run(ignorestatus(mpicmd))
+r = run(ignorestatus(`$(mpiexec()) -n 2 $(Base.julia_cmd()) $(mpitestfile)`))
 @test r.exitcode == 0

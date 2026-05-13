@@ -95,8 +95,8 @@ prob = LinearProblem(A, b)
 res = A \ b
 @test solve(prob).u ≈ res
 
-# LSMR with preconditioning: identity-equivalent counting preconditioner
-# verifies Pl/Pr are actually forwarded to Krylov.lsmr! (and not silently dropped).
+# Least-squares Krylov solvers with preconditioning: identity-equivalent counting
+# preconditioner verifies Pl/Pr are actually forwarded to Krylov (not silently dropped).
 mutable struct CountingDiagPrec
     d::Vector{Float64}
     calls::Int
@@ -116,16 +116,37 @@ function LinearAlgebra.ldiv!(P::CountingDiagPrec, x::AbstractVector)
     return x
 end
 
-@testset "LSMR preconditioning" begin
+# Per-algorithm expectations:
+# - LSMR: Krylov supports M and N; LinearSolve forwards both (fixed in this PR).
+# - LSQR, LSLQ: Krylov supports M and N; LinearSolve currently drops both -> @test_broken.
+# - CGLS, CRLS: Krylov supports only M; LinearSolve currently drops it -> @test_broken on Pl.
+#   No assertion on Pr.calls since these solvers do not accept a right preconditioner.
+@testset "LS family preconditioning" begin
     m, n = 30, 10
     A = randn(m, n)
     b = randn(m)
     res = A \ b
 
-    Pl = CountingDiagPrec(ones(m))
-    Pr = CountingDiagPrec(ones(n))
-    sol = solve(LinearProblem(A, b), KrylovJL_LSMR(); Pl = Pl, Pr = Pr)
-    @test sol.u ≈ res
-    @test Pl.calls > 0
-    @test Pr.calls > 0
+    ls_algs = [
+        (KrylovJL_LSMR(),                    "LSMR", :working, :working),
+        (KrylovJL(KrylovAlg = Krylov.lsqr!), "LSQR", :broken,  :broken),
+        (KrylovJL(KrylovAlg = Krylov.lslq!), "LSLQ", :broken,  :broken),
+        (KrylovJL(KrylovAlg = Krylov.cgls!), "CGLS", :broken,  :unsupported),
+        (KrylovJL(KrylovAlg = Krylov.crls!), "CRLS", :broken,  :unsupported),
+    ]
+
+    for (alg, name, pl_status, pr_status) in ls_algs
+        @testset "$name" begin
+            Pl = CountingDiagPrec(ones(m))
+            Pr = CountingDiagPrec(ones(n))
+            sol = solve(LinearProblem(A, b), alg; Pl = Pl, Pr = Pr)
+            @test sol.u ≈ res
+            pl_status === :working ? (@test Pl.calls > 0) : (@test_broken Pl.calls > 0)
+            if pr_status === :working
+                @test Pr.calls > 0
+            elseif pr_status === :broken
+                @test_broken Pr.calls > 0
+            end
+        end
+    end
 end

@@ -117,9 +117,8 @@ function LinearAlgebra.ldiv!(P::CountingDiagPrec, x::AbstractVector)
 end
 
 # Per-algorithm expectations:
-# - LSMR: Krylov supports M and N; LinearSolve forwards both (fixed in this PR).
-# - LSQR, LSLQ: Krylov supports M and N; LinearSolve currently drops both -> @test_broken.
-# - CGLS, CRLS: Krylov supports only M; LinearSolve currently drops it -> @test_broken on Pl.
+# - LSMR, LSQR, LSLQ: Krylov supports M and N; LinearSolve forwards both.
+# - CGLS, CRLS: Krylov supports only M; LinearSolve forwards M and warns on non-identity N.
 #   No assertion on Pr.calls since these solvers do not accept a right preconditioner.
 @testset "LS family preconditioning" begin
     m, n = 30, 10
@@ -128,25 +127,21 @@ end
     res = A \ b
 
     ls_algs = [
-        (KrylovJL_LSMR(),                    "LSMR", :working, :working),
-        (KrylovJL(KrylovAlg = Krylov.lsqr!), "LSQR", :broken,  :broken),
-        (KrylovJL(KrylovAlg = Krylov.lslq!), "LSLQ", :broken,  :broken),
-        (KrylovJL(KrylovAlg = Krylov.cgls!), "CGLS", :broken,  :unsupported),
-        (KrylovJL(KrylovAlg = Krylov.crls!), "CRLS", :broken,  :unsupported),
+        (KrylovJL_LSMR(),                    "LSMR", :both),
+        (KrylovJL(KrylovAlg = Krylov.lsqr!), "LSQR", :both),
+        (KrylovJL(KrylovAlg = Krylov.lslq!), "LSLQ", :both),
+        (KrylovJL(KrylovAlg = Krylov.cgls!), "CGLS", :left_only),
+        (KrylovJL(KrylovAlg = Krylov.crls!), "CRLS", :left_only),
     ]
 
-    for (alg, name, pl_status, pr_status) in ls_algs
+    for (alg, name, support) in ls_algs
         @testset "$name" begin
             Pl = CountingDiagPrec(ones(m))
             Pr = CountingDiagPrec(ones(n))
             sol = solve(LinearProblem(A, b), alg; Pl = Pl, Pr = Pr)
             @test sol.u ≈ res
-            pl_status === :working ? (@test Pl.calls > 0) : (@test_broken Pl.calls > 0)
-            if pr_status === :working
-                @test Pr.calls > 0
-            elseif pr_status === :broken
-                @test_broken Pr.calls > 0
-            end
+            @test Pl.calls > 0
+            support === :both && @test Pr.calls > 0
         end
     end
 end

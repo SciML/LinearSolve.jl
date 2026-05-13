@@ -392,9 +392,10 @@ KrylovKitJL
     HYPRE.Init()
     ```
 
-[HYPRE](https://computing.llnl.gov/projects/hypre-scalable-linear-solvers-multigrid-methods)
-targets large sparse linear systems and is especially useful when the solve itself should run
-across multiple MPI ranks.
+[HYPRE.jl](https://github.com/fredrikekre/HYPRE.jl) is the Julia interface to
+[hypre](https://computing.llnl.gov/projects/hypre-scalable-linear-solvers-multigrid-methods).
+It targets large sparse linear systems and is especially useful when the solve itself should
+run across multiple MPI ranks.
 
 `HYPREAlgorithm` supports two workflows:
 

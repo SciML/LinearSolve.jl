@@ -94,3 +94,38 @@ b = rand(m)
 prob = LinearProblem(A, b)
 res = A \ b
 @test solve(prob).u ≈ res
+
+# LSMR with preconditioning: identity-equivalent counting preconditioner
+# verifies Pl/Pr are actually forwarded to Krylov.lsmr! (and not silently dropped).
+mutable struct CountingDiagPrec
+    d::Vector{Float64}
+    calls::Int
+end
+CountingDiagPrec(d::AbstractVector) = CountingDiagPrec(collect(Float64, d), 0)
+Base.size(P::CountingDiagPrec) = (length(P.d), length(P.d))
+Base.size(P::CountingDiagPrec, ::Integer) = length(P.d)
+Base.eltype(::CountingDiagPrec) = Float64
+function LinearAlgebra.ldiv!(y::AbstractVector, P::CountingDiagPrec, x::AbstractVector)
+    P.calls += 1
+    @. y = x / P.d
+    return y
+end
+function LinearAlgebra.ldiv!(P::CountingDiagPrec, x::AbstractVector)
+    P.calls += 1
+    @. x = x / P.d
+    return x
+end
+
+@testset "LSMR preconditioning" begin
+    m, n = 30, 10
+    A = randn(m, n)
+    b = randn(m)
+    res = A \ b
+
+    Pl = CountingDiagPrec(ones(m))
+    Pr = CountingDiagPrec(ones(n))
+    sol = solve(LinearProblem(A, b), KrylovJL_LSMR(); Pl = Pl, Pr = Pr)
+    @test sol.u ≈ res
+    @test Pl.calls > 0
+    @test Pr.calls > 0
+end

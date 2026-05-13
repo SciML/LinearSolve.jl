@@ -35,7 +35,9 @@ end
 to_array(x) = x
 
 function failure_prob()
-    n = 100
+    n = 200
+    # This SPD 1D Laplacian does not converge in a single PCG iteration, so with
+    # maxiters = 1 we should get a non-success retcode rather than an exception.
     A = spdiagm(-1 => -ones(n - 1), 0 => 2.0 .* ones(n), 1 => -ones(n - 1))
     b = ones(n)
     return LinearProblem(A, b)

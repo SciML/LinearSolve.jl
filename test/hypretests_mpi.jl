@@ -125,8 +125,13 @@ copy!(local_sol, sol.u)
 @test local_sol ≈ fill(3.0, local_size)
 
 # Automatic distributed construction failure retcode
-A_fail = spdiagm(-1 => -ones(19), 0 => 2.0 .* ones(20), 1 => -ones(19))
-b_fail = ones(20)
+n_fail = 200
+# This SPD 1D Laplacian does not converge in a single PCG iteration, so with
+# maxiters = 1 we should get a non-success retcode rather than an exception.
+A_fail = spdiagm(
+    -1 => -ones(n_fail - 1), 0 => 2.0 .* ones(n_fail), 1 => -ones(n_fail - 1)
+)
+b_fail = ones(n_fail)
 sol = solve(
     LinearProblem(A_fail, b_fail), HYPREAlgorithm(HYPRE.PCG; comm = comm);
     abstol = 1.0e-12, reltol = 1.0e-12, maxiters = 1

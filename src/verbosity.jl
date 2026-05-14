@@ -64,7 +64,7 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
             no_right_preconditioning = Silent(),
             using_IterativeSolvers = Silent(),
             IterativeSolvers_iterations = Silent(),
-            KrylovKit_verbosity = CustomLevel(1),
+            KrylovKit_verbosity = MessageLevel(1),
             KrylovJL_verbosity = Silent(),
             HYPRE_verbosity = InfoLevel(),
             pardiso_verbosity = Silent(),
@@ -83,10 +83,10 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
             no_right_preconditioning = InfoLevel(),
             using_IterativeSolvers = InfoLevel(),
             IterativeSolvers_iterations = Silent(),
-            KrylovKit_verbosity = CustomLevel(2),
-            KrylovJL_verbosity = CustomLevel(1),
+            KrylovKit_verbosity = MessageLevel(2),
+            KrylovJL_verbosity = MessageLevel(1),
             HYPRE_verbosity = InfoLevel(),
-            pardiso_verbosity = CustomLevel(1),
+            pardiso_verbosity = MessageLevel(1),
             blas_errors = WarnLevel(),
             blas_invalid_args = WarnLevel(),
             blas_info = InfoLevel(),
@@ -102,10 +102,10 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
             no_right_preconditioning = InfoLevel(),
             using_IterativeSolvers = InfoLevel(),
             IterativeSolvers_iterations = InfoLevel(),
-            KrylovKit_verbosity = CustomLevel(3),
-            KrylovJL_verbosity = CustomLevel(1),
+            KrylovKit_verbosity = MessageLevel(3),
+            KrylovJL_verbosity = MessageLevel(1),
             HYPRE_verbosity = InfoLevel(),
-            pardiso_verbosity = CustomLevel(1),
+            pardiso_verbosity = MessageLevel(1),
             blas_errors = WarnLevel(),
             blas_invalid_args = WarnLevel(),
             blas_info = InfoLevel(),
@@ -190,7 +190,7 @@ verbose = LinearVerbosity(
 # Set individual fields
 verbose = LinearVerbosity(
     default_lu_fallback = SciMLLogging.InfoLevel(),
-    KrylovJL_verbosity = SciMLLogging.CustomLevel(1),
+    KrylovJL_verbosity = SciMLLogging.MessageLevel(1),
     blas_errors = SciMLLogging.ErrorLevel()
 )
 

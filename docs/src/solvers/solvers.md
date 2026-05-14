@@ -409,55 +409,6 @@ For the MPI workflow, `sol.u` is a distributed `HYPREVector` holding the owned l
 each rank. Unlike the PETSc `SparseMatrixCSC` MPI path, the full Julia solution is not
 replicated back onto every rank automatically.
 
-#### Basic usage
-
-```julia
-using LinearSolve, HYPRE, SparseArrays
-
-HYPRE.Init()
-
-n = 8
-A = spdiagm(0 => collect(2.0:9.0))
-b = collect(2.0:9.0)
-
-prob = LinearProblem(A, b)
-sol = solve(prob, HYPREAlgorithm(HYPRE.PCG))
-```
-
-#### MPI auto-construction from plain Julia arrays
-
-```julia
-using LinearSolve, HYPRE, MPI, SparseArrays
-
-MPI.Init()
-HYPRE.Init()
-
-comm = MPI.COMM_WORLD
-n = 20
-A = spdiagm(0 => collect(1.0:n))
-b = 2.0 .* collect(1.0:n)
-
-prob = LinearProblem(A, b)
-sol = solve(prob, HYPREAlgorithm(HYPRE.PCG; comm = comm))
-
-# sol.u is a distributed HYPREVector over the owned local rows on each rank.
-local_x = Vector{Float64}(undef, sol.u.iupper - sol.u.ilower + 1)
-copy!(local_x, sol.u)
-```
-
-If the matrix structure is unchanged and only the right-hand side changes, reuse the cached
-distributed HYPRE objects:
-
-```julia
-using SciMLBase
-
-cache = SciMLBase.init(prob, HYPREAlgorithm(HYPRE.PCG; comm = comm))
-sol = solve!(cache)
-
-b2 = 3.0 .* collect(1.0:n)
-cache.b = b2
-sol = solve!(cache)
-```
 
 ```@docs
 HYPREAlgorithm

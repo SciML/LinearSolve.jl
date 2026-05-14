@@ -44,6 +44,7 @@ jobs:
           - "LinearSolvePyAMG"
           - "Preferences"
           - "Trim"
+          - "JET"
         os:
           - ubuntu-latest
           - macos-latest

@@ -211,6 +211,9 @@ For example, to use `HYPRE.PCG` as the solver, with `HYPRE.BoomerAMG` as the pre
 the algorithm should be defined as follows:
 
 ```julia
+using HYPRE
+
+HYPRE.Init()
 A, b = setup_system(...)
 prob = LinearProblem(A, b)
 alg = HYPREAlgorithm(HYPRE.PCG)
@@ -222,8 +225,10 @@ For automatic distributed construction from a plain Julia sparse matrix on an MP
 communicator, pass the communicator through `comm`:
 
 ```julia
-using MPI
+using HYPRE, MPI
 
+MPI.Init()
+HYPRE.Init()
 alg = HYPREAlgorithm(HYPRE.PCG; comm = MPI.COMM_WORLD)
 sol = solve(prob, alg)
 ```

@@ -384,6 +384,32 @@ KrylovKitJL
     Using HYPRE solvers requires Julia version 1.9 or higher, and that the package HYPRE.jl
     is installed.
 
+!!! note
+
+    Initialize HYPRE before solving:
+    ```julia
+    using HYPRE
+    HYPRE.Init()
+    ```
+
+[HYPRE.jl](https://github.com/fredrikekre/HYPRE.jl) is the Julia interface to
+[hypre](https://computing.llnl.gov/projects/hypre-scalable-linear-solvers-multigrid-methods).
+It targets large sparse linear systems and is especially useful when the solve itself should
+run across multiple MPI ranks.
+
+`HYPREAlgorithm` supports two workflows:
+
+- Serial auto-conversion: pass ordinary Julia sparse matrices and vectors and let
+  LinearSolve construct `HYPREMatrix` / `HYPREVector` values automatically.
+- MPI auto-construction: pass a communicator with `comm = MPI.COMM_WORLD` (or another MPI
+  communicator), and LinearSolve will split a plain Julia matrix/vector into contiguous local
+  row blocks before constructing distributed HYPRE objects.
+
+For the MPI workflow, `sol.u` is a distributed `HYPREVector` holding the owned local rows on
+each rank. Unlike the PETSc `SparseMatrixCSC` MPI path, the full Julia solution is not
+replicated back onto every rank automatically.
+
+
 ```@docs
 HYPREAlgorithm
 ```

@@ -77,7 +77,7 @@ _solve_default(A, b) = solve!(init(LinearProblem(A, b)))
         # inside LinearSolve and Krylov that JET reports. The concrete-rettype
         # tests above are the load-bearing check for this group; the @test_opt
         # is here to ratchet down the remaining dispatch issues over time.
-        JET.@test_opt target_modules=(LinearSolve,) broken=true _solve_default(
+        JET.@test_opt target_modules = (LinearSolve,) broken = true _solve_default(
             rand(4, 4), rand(4)
         )
     end

@@ -72,6 +72,11 @@ jobs:
           # Elemental_jll has no Windows binary
           - group: LinearSolveElemental
             os: windows-latest
+          # JET 0.9–0.11 (pinned to match Sundials.jl) doesn't support
+          # Julia pre-release (1.13.0-rc1) yet; same exclusion strategy as
+          # the existing NoPre group.
+          - group: JET
+            version: "pre"
     uses: "SciML/.github/.github/workflows/tests.yml@v1"
     with:
       group: "${{ matrix.group }}"

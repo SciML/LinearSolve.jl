@@ -68,10 +68,10 @@ version = "0.1.44"
     Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [[deps.Adapt]]
-deps = ["LinearAlgebra", "Requires"]
-git-tree-sha1 = "0761717147821d696c9470a7a86364b2fbd22fd8"
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "28e1637322d4019ed2577cbec9268fab9b7da117"
 uuid = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
-version = "4.5.2"
+version = "4.6.0"
 weakdeps = ["SparseArrays", "StaticArrays"]
 
     [deps.Adapt.extensions]
@@ -953,7 +953,7 @@ version = "1.12.0"
 deps = ["ArrayInterface", "ConcreteStructs", "DocStringExtensions", "EnumX", "GPUArraysCore", "InteractiveUtils", "Krylov", "Libdl", "LinearAlgebra", "MKL_jll", "Markdown", "OpenBLAS_jll", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLLogging", "SciMLOperators", "Setfield", "StaticArraysCore"]
 path = "/home/runner/work/LinearSolve.jl/LinearSolve.jl"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
-version = "3.78.0"
+version = "3.79.0"
 
     [deps.LinearSolve.extensions]
     LinearSolveAMDGPUExt = "AMDGPU"
@@ -1566,9 +1566,9 @@ version = "3.11.0"
 
 [[deps.SciMLLogging]]
 deps = ["Logging", "LoggingExtras", "Preferences"]
-git-tree-sha1 = "4e1e21f14a284f892eb62923a356c70a2a0c68e1"
+git-tree-sha1 = "3f98a53703f925cbd5aac5da4924f82ca34d09ab"
 uuid = "a6db7da4-7206-11f0-1eab-35f2a5dbe1d1"
-version = "1.10.1"
+version = "2.0.0"
 weakdeps = ["Tracy"]
 
     [deps.SciMLLogging.extensions]

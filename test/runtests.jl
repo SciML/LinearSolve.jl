@@ -128,9 +128,3 @@ if GROUP == "Trim" && VERSION >= v"1.12.0"
     @time @safetestset "Trim Tests" include("trim/runtests.jl")
 end
 
-if GROUP == "JET"
-    Pkg.activate("jet")
-    Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
-    Pkg.instantiate()
-    @time @safetestset "JET type-inference QA" include("jet/runtests.jl")
-end

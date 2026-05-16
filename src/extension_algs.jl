@@ -246,6 +246,51 @@ struct HYPREAlgorithm <: SciMLLinearSolveAlgorithm
     end
 end
 
+"""
+`PartitionedSolversAlgorithm(solver = nothing; kwargs...)`
+
+[PartitionedSolvers](https://github.com/PartitionedArrays/PartitionedArrays.jl/tree/master/PartitionedSolvers)
+provides distributed linear solver building blocks for
+[PartitionedArrays.jl](https://github.com/PartitionedArrays/PartitionedArrays.jl).
+
+This algorithm is intended for `PSparseMatrix` / `PVector` inputs. The week 10--11
+integration only provides the loading and validation skeleton: it checks the input types,
+builds a LinearSolve cache, and reserves the extension point where the actual
+PartitionedSolvers-backed solve path will be connected in the following stage.
+
+## Positional Arguments
+
+  - `solver`: optional PartitionedSolvers solver object or constructor placeholder. It is
+    stored for the later solve-path implementation.
+
+## Keyword Arguments
+
+  - `kwargs...`: reserved for later forwarding into the full PartitionedSolvers solve path.
+
+## Example
+
+```julia
+using LinearSolve, PartitionedArrays, PartitionedSolvers
+
+alg = PartitionedSolversAlgorithm()
+cache = SciMLBase.init(prob, alg)
+```
+"""
+struct PartitionedSolversAlgorithm <: SciMLLinearSolveAlgorithm
+    solver::Any
+    kwargs::NamedTuple
+    function PartitionedSolversAlgorithm(solver = nothing; kwargs...)
+        ext = Base.get_extension(@__MODULE__, :LinearSolvePartitionedSolversExt)
+        if ext === nothing
+            error(
+                "PartitionedSolversAlgorithm requires PartitionedArrays and PartitionedSolvers to be loaded: `using PartitionedArrays, PartitionedSolvers`"
+            )
+        else
+            return new(solver, NamedTuple(kwargs))
+        end
+    end
+end
+
 # Debug: About to define CudaOffloadLUFactorization
 """
 `CudaOffloadLUFactorization()`

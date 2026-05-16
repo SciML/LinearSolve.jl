@@ -538,6 +538,7 @@ export SimpleGMRES
 
 export HYPREAlgorithm
 export PETScAlgorithm
+export PartitionedSolversAlgorithm
 export CudaOffloadFactorization
 export CudaOffloadLUFactorization
 export CudaOffloadQRFactorization

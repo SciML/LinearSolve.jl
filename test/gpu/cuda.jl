@@ -1,10 +1,10 @@
-using LinearSolve, CUDA, LinearAlgebra, SparseArrays, StableRNGs
-using CUDA.CUSPARSE
+using LinearSolve, LinearAlgebra, SparseArrays, StableRNGs
+using CUDACore, cuSPARSE, cuSOLVER # or using CUDA, cuSPARSE
 using Test
 
 @testset "Test default solver choice for CuSparse" begin
     b = Float64[1, 2, 3, 4]
-    b_gpu = CUDA.adapt(CuArray, b)
+    b_gpu = CUDACore.adapt(CuArray, b)
 
     A = Float64[
         1 1 0 0
@@ -12,8 +12,8 @@ using Test
         0 0 3 1
         0 0 0 4
     ]
-    A_gpu_csr = CUDA.CUSPARSE.CuSparseMatrixCSR(sparse(A))
-    A_gpu_csc = CUDA.CUSPARSE.CuSparseMatrixCSC(sparse(A))
+    A_gpu_csr = cuSPARSE.CuSparseMatrixCSR(sparse(A))
+    A_gpu_csc = cuSPARSE.CuSparseMatrixCSC(sparse(A))
     prob_csr = LinearProblem(A_gpu_csr, b_gpu)
     prob_csc = LinearProblem(A_gpu_csc, b_gpu)
 
@@ -23,8 +23,8 @@ using Test
         0 0 3 0
         0 2 0 0
     ]
-    A_gpu_sym_csr = CUDA.CUSPARSE.CuSparseMatrixCSR(sparse(A_sym))
-    A_gpu_sym_csc = CUDA.CUSPARSE.CuSparseMatrixCSC(sparse(A_sym))
+    A_gpu_sym_csr = cuSPARSE.CuSparseMatrixCSR(sparse(A_sym))
+    A_gpu_sym_csc = cuSPARSE.CuSparseMatrixCSC(sparse(A_sym))
     prob_sym_csr = LinearProblem(A_gpu_sym_csr, b_gpu)
     prob_sym_csc = LinearProblem(A_gpu_sym_csc, b_gpu)
 
@@ -64,7 +64,7 @@ using Test
     end
 end
 
-CUDA.allowscalar(false)
+CUDACore.allowscalar(false)
 
 n = 8
 A = Matrix(I, n, n)
@@ -90,19 +90,19 @@ function test_interface(alg, prob1, prob2)
     x2 = prob2.u0
 
     y = solve(prob1, alg; cache_kwargs...)
-    @test CUDA.@allowscalar(Array(A1 * y) ≈ Array(b1))
+    @test CUDACore.@allowscalar(Array(A1 * y) ≈ Array(b1))
 
     cache = SciMLBase.init(prob1, alg; cache_kwargs...) # initialize cache
     solve!(cache)
-    @test CUDA.@allowscalar(Array(A1 * cache.u) ≈ Array(b1))
+    @test CUDACore.@allowscalar(Array(A1 * cache.u) ≈ Array(b1))
 
     cache.A = copy(A2)
     solve!(cache)
-    @test CUDA.@allowscalar(Array(A2 * cache.u) ≈ Array(b1))
+    @test CUDACore.@allowscalar(Array(A2 * cache.u) ≈ Array(b1))
 
     cache.b = copy(b2)
     solve!(cache)
-    @test CUDA.@allowscalar(Array(A2 * cache.u) ≈ Array(b2))
+    @test CUDACore.@allowscalar(Array(A2 * cache.u) ≈ Array(b2))
 
     return
 end

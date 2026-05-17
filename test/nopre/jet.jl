@@ -227,7 +227,7 @@ end
         DiagonalFactorization(),
         SVDFactorization(),
         CholeskyFactorization(),
-        NormalCholeskyFactorization()
+        NormalCholeskyFactorization(),
     )
     for alg in algs_concrete
         @testset "$(nameof(typeof(alg)))" begin
@@ -243,7 +243,7 @@ end
     # group is guarding against.
     algs_broken = (
         BunchKaufmanFactorization(),
-        LDLtFactorization()
+        LDLtFactorization(),
     )
     for alg in algs_broken
         @testset "$(nameof(typeof(alg))) (broken)" begin

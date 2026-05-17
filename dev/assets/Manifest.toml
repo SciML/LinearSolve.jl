@@ -216,9 +216,9 @@ version = "0.2.2+0"
 
 [[deps.CUDA_Driver_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "TOML"]
-git-tree-sha1 = "69bb8fdf66c687e35149ac9b2bd1d582fd58a792"
+git-tree-sha1 = "23c51e2c9bb36be09c3f10f92d0b9cc294e1bc5e"
 uuid = "4ee394cb-3365-5eb0-8335-949819d2adfc"
-version = "13.2.1+2"
+version = "13.2.1+3"
 
 [[deps.CUDA_Runtime_Discovery]]
 deps = ["Libdl"]
@@ -325,9 +325,9 @@ weakdeps = ["InverseFunctions"]
     CompositionsBaseInverseFunctionsExt = "InverseFunctions"
 
 [[deps.ConcreteStructs]]
-git-tree-sha1 = "f749037478283d372048690eb3b5f92a79432b34"
+git-tree-sha1 = "ed1da4eac5ba9b3f6d061c90f3ca6ba190dd6595"
 uuid = "2569d6c7-a4a2-43d3-a901-331e8e4be471"
-version = "0.2.3"
+version = "0.2.4"
 
 [[deps.ConcurrentUtilities]]
 deps = ["Serialization", "Sockets"]
@@ -538,9 +538,9 @@ version = "3.4.1+1"
 
 [[deps.GPUArrays]]
 deps = ["Adapt", "GPUArraysCore", "KernelAbstractions", "LLVM", "LinearAlgebra", "Printf", "Random", "Reexport", "ScopedValues", "Serialization", "SparseArrays", "Statistics"]
-git-tree-sha1 = "34fd745547978beb471f029f447290ef4dbc7bbd"
+git-tree-sha1 = "cf230532c7871ce9bfa5812dd699cb68da888364"
 uuid = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7"
-version = "11.5.3"
+version = "11.5.4"
 
     [deps.GPUArrays.extensions]
     JLD2Ext = "JLD2"
@@ -610,9 +610,9 @@ version = "5.12.0"
 
 [[deps.Git_LFS_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "bb8471f313ed941f299aa53d32a94ab3bee08844"
+git-tree-sha1 = "8c66e385d631bb934ff05e76d4a566c640c8df69"
 uuid = "020c3dae-16b3-5ae5-87b3-4cb189e250b2"
-version = "3.7.0+0"
+version = "3.7.1+0"
 
 [[deps.Git_jll]]
 deps = ["Artifacts", "Expat_jll", "JLLWrappers", "LibCURL_jll", "Libdl", "Libiconv_jll", "OpenSSL_jll", "PCRE2_jll", "Zlib_jll"]
@@ -734,9 +734,9 @@ version = "1.8.0"
 
 [[deps.JSON]]
 deps = ["Dates", "Logging", "Parsers", "PrecompileTools", "StructUtils", "UUIDs", "Unicode"]
-git-tree-sha1 = "fe23330af47b8ab4e135b2ff65f7398c3a2bfc65"
+git-tree-sha1 = "f76f7560267b840e492180f9899b472f30b88450"
 uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
-version = "1.5.2"
+version = "1.6.0"
 
     [deps.JSON.extensions]
     JSONArrowExt = ["ArrowTypes"]
@@ -813,15 +813,15 @@ weakdeps = ["BFloat16s"]
 
 [[deps.LLVMDowngrader_jll]]
 deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl", "TOML", "Zlib_jll"]
-git-tree-sha1 = "6c4eee9991684790dcd49c52508836c02ac36133"
+git-tree-sha1 = "61b917828b9d9bf6da81876dc3798f774b419707"
 uuid = "f52de702-fb25-5922-94ba-81dd59b07444"
-version = "0.6.0+1"
+version = "0.6.0+2"
 
 [[deps.LLVMExtra_jll]]
 deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl", "TOML"]
-git-tree-sha1 = "a7f7333df8ee998f8f8f65f08b49f04baf8db623"
+git-tree-sha1 = "70c96f133c78c3cdc06234157144fab3744c6b38"
 uuid = "dad2f222-ce93-54a1-a47d-0025e8a3acab"
-version = "0.0.43+0"
+version = "0.0.43+1"
 
 [[deps.LLVMLoopInfo]]
 git-tree-sha1 = "2e5c102cfc41f48ae4740c7eca7743cc7e7b75ea"
@@ -951,7 +951,7 @@ version = "1.12.0"
 
 [[deps.LinearSolve]]
 deps = ["ArrayInterface", "ConcreteStructs", "DocStringExtensions", "EnumX", "GPUArraysCore", "InteractiveUtils", "Krylov", "Libdl", "LinearAlgebra", "MKL_jll", "Markdown", "OpenBLAS_jll", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLLogging", "SciMLOperators", "Setfield", "StaticArraysCore"]
-path = "/home/runner/work/LinearSolve.jl/LinearSolve.jl"
+path = "/home/chrisrackauckas/github-runners/deepsea4-26/_work/LinearSolve.jl/LinearSolve.jl"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 version = "3.79.0"
 
@@ -961,7 +961,7 @@ version = "3.79.0"
     LinearSolveBLISExt = ["blis_jll", "LAPACK_jll"]
     LinearSolveBandedMatricesExt = "BandedMatrices"
     LinearSolveBlockDiagonalsExt = "BlockDiagonals"
-    LinearSolveCUDAExt = "CUDA"
+    LinearSolveCUDAExt = ["cuSOLVER"]
     LinearSolveCUDSSExt = "CUDSS"
     LinearSolveCUSOLVERRFExt = ["CUSOLVERRF", "SparseArrays"]
     LinearSolveChainRulesCoreExt = "ChainRulesCore"
@@ -992,7 +992,6 @@ version = "3.79.0"
     AlgebraicMultigrid = "2169fc97-5a83-5252-b627-83903c6c433c"
     BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
     BlockDiagonals = "0a1fb500-61f7-11e9-3c65-f5ef3456f9f0"
-    CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
     CUDSS = "45b445bb-4962-46a0-9369-b4df9d0f772e"
     CUSOLVERRF = "a8cc9031-bad2-4722-94f5-40deabb4245c"
     ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
@@ -1020,6 +1019,7 @@ version = "3.79.0"
     SparseMatricesCSR = "a0a7dd2c-ebf4-11e9-1f05-cf50bc540ca1"
     Sparspak = "e56a9233-b9d6-4f03-8d0f-1825330902ac"
     blis_jll = "6136c539-28a5-5bf0-87cc-b183200dce32"
+    cuSOLVER = "887afef0-6a32-4de5-add4-7827692ba8fc"
 
 [[deps.LinearSolveAutotune]]
 deps = ["Base64", "BenchmarkTools", "CPUSummary", "CUDA", "DataFrames", "Dates", "FastLapackInterface", "GitHub", "LAPACK_jll", "LinearAlgebra", "LinearSolve", "MKL_jll", "Metal", "OpenBLAS_jll", "Pkg", "Plots", "Preferences", "PrettyTables", "Printf", "ProgressMeter", "Random", "RecursiveFactorization", "Statistics", "Test", "blis_jll", "gh_cli_jll"]
@@ -1523,9 +1523,9 @@ version = "0.1.0"
 
 [[deps.SciMLBase]]
 deps = ["ADTypes", "Accessors", "Adapt", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "PreallocationTools", "PrecompileTools", "Preferences", "Printf", "Random", "RecipesBase", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SciMLLogging", "SciMLOperators", "SciMLPublic", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface"]
-git-tree-sha1 = "123912a46cba69536f21d0f6847e927d0883eca4"
+git-tree-sha1 = "91c452da69d9e349159b71cf5995973b9d6a0367"
 uuid = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
-version = "3.11.0"
+version = "3.13.0"
 
     [deps.SciMLBase.extensions]
     SciMLBaseChainRulesCoreExt = "ChainRulesCore"
@@ -1741,9 +1741,9 @@ version = "0.4.4"
 
 [[deps.StructUtils]]
 deps = ["Dates", "UUIDs"]
-git-tree-sha1 = "dd974aefe288ef2898733aecf40858dc86742d74"
+git-tree-sha1 = "82bee338d650aa515f31866c460cb7e3bcef90b8"
 uuid = "ec057cc2-7a8d-4b58-b3b3-92acb9f63b42"
-version = "2.8.1"
+version = "2.8.2"
 
     [deps.StructUtils.extensions]
     StructUtilsMeasurementsExt = ["Measurements"]

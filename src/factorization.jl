@@ -456,15 +456,22 @@ end
 function do_factorization(alg::QRFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
     if ArrayInterface.can_setindex(typeof(A))
-        if alg.inplace && !issparsematrixcsc(A) && !(A isa GPUArraysCore.AnyGPUArray) &&
-                !is_cusparse(A)
+        # Sparse CSC (SPQR) does not accept a pivoting strategy, and CUDA's
+        # `qr` does not accept extra args either. Use the no-arg `qr(A)`
+        # form in those cases. For other CPU matrices, always pass
+        # `alg.pivot` so the return type is determined by the static
+        # `QRFactorization{P}` parameter (otherwise this branch returns
+        # `Union{QRCompactWY, QRPivoted}` depending on `alg.inplace`).
+        if A isa GPUArraysCore.AnyGPUArray || is_cusparse(A) || issparsematrixcsc(A)
+            fact = qr(A)
+        elseif alg.inplace
             if A isa Symmetric
                 fact = qr(A, alg.pivot)
             else
                 fact = qr!(A, alg.pivot)
             end
         else
-            fact = qr(A) # CUDA.jl does not allow other args!
+            fact = qr(A, alg.pivot)
         end
     else
         fact = qr(A, alg.pivot)

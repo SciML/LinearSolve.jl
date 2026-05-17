@@ -20,7 +20,7 @@ function is_cuda_available()
             if haskey(ENV, "CUDA_VISIBLE_DEVICES") ||
                     (Sys.islinux() && isfile("/proc/driver/nvidia/version")) ||
                     (Sys.iswindows() && success(`where nvidia-smi`))
-                @warn "CUDA hardware may be available but CUDA.jl extension is not loaded. Consider adding `using CUDA` to enable GPU algorithms."
+                @warn "CUDA hardware may be available but CUDA.jl extension is not loaded. Consider adding `using cuSOLVER` or `using CUDA` to enable GPU algorithms."
             end
         catch
             # Silently continue if detection fails
@@ -28,10 +28,10 @@ function is_cuda_available()
         return false
     end
 
-    # Check if we have CUDA.jl loaded
+    # Check if we have cuSOLVER.jl loaded
     try
-        CUDA = Base.get_extension(LinearSolve, :LinearSolveCUDAExt).CUDA
-        return CUDA.functional()
+        cuSOLVER = Base.get_extension(LinearSolve, :LinearSolveCUDAExt).cuSOLVER
+        return cuSOLVER.functional()
     catch
         return false
     end
@@ -86,16 +86,16 @@ function get_cuda_gpu_info()
     end
 
     try
-        # Get CUDA module from the extension
-        CUDA = ext.CUDA
+        # Get CUDACore module from the extension
+        CUDACore = ext.CUDACore
 
-        # Check if CUDA is functional
-        if !CUDA.functional()
+        # Check if CUDACore is functional
+        if !CUDACore.functional()
             return gpu_info
         end
 
         # Get device information
-        devices = collect(CUDA.devices())
+        devices = collect(CUDACore.devices())
         num_devices = length(devices)
 
         if num_devices > 0
@@ -103,21 +103,21 @@ function get_cuda_gpu_info()
 
             # Get information from the first GPU
             first_device = devices[1]
-            gpu_info["gpu_type"] = CUDA.name(first_device)
+            gpu_info["gpu_type"] = CUDACore.name(first_device)
 
             # Convert memory from bytes to GB
-            total_mem_bytes = CUDA.totalmem(first_device)
+            total_mem_bytes = CUDACore.totalmem(first_device)
             gpu_info["gpu_memory_gb"] = round(total_mem_bytes / (1024^3), digits = 2)
 
             # Get compute capability
-            capability = CUDA.capability(first_device)
+            capability = CUDACore.capability(first_device)
             gpu_info["gpu_capability"] = "$(capability.major).$(capability.minor)"
 
             # If multiple GPUs, list all types
             if num_devices > 1
                 gpu_types = String[]
                 for dev in devices
-                    push!(gpu_types, CUDA.name(dev))
+                    push!(gpu_types, CUDACore.name(dev))
                 end
                 gpu_info["gpu_types"] = unique(gpu_types)
             end
@@ -302,7 +302,7 @@ function get_package_versions()
         "LinearSolve",
         "LinearSolveAutotune",
         "RecursiveFactorization",
-        "CUDA",
+        "cuSOLVER",
         "Metal",
         "MKL_jll",
         "BLISBLAS",
@@ -626,9 +626,9 @@ function get_detailed_system_info()
     system_data["cuda_loaded"] = false
     system_data["metal_loaded"] = false
     try
-        # Check if CUDA algorithms are actually available
+        # Check if cuSOLVER (CUDA algorithms) are actually available
         if system_data["cuda_available"]
-            system_data["cuda_loaded"] = isdefined(Main, :CUDA) || haskey(Base.loaded_modules, Base.PkgId(Base.UUID("052768ef-5323-5732-b1bb-66c8b64840ba"), "CUDA"))
+            system_data["cuda_loaded"] = isdefined(Main, :cuSOLVER) || haskey(Base.loaded_modules, Base.PkgId(Base.UUID("887afef0-6a32-4de5-add4-7827692ba8fc"), "cuSOLVER"))
         end
         if system_data["metal_available"]
             system_data["metal_loaded"] = isdefined(Main, :Metal) || haskey(Base.loaded_modules, Base.PkgId(Base.UUID("dde4c033-4e86-420c-a63e-0dd931031962"), "Metal"))

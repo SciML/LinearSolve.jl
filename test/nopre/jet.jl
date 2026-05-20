@@ -197,3 +197,61 @@ end
         JET.@test_opt init(dual_prob)
     end
 end
+
+# Concrete-return-type QA for `solve!(cache)`. Guards against the regression
+# where `solve!(cache)` through `DefaultLinearSolver` returned
+# `LinearSolution{_A, _B, _C, _D, DefaultLinearSolver, _E, _F} where {...}`
+# (a UnionAll over 6 free type parameters) instead of a concrete LinearSolution.
+_solve_alg(A, b, alg) = solve!(init(LinearProblem(A, b), alg))
+_solve_default(A, b) = solve!(init(LinearProblem(A, b)))
+
+@testset "solve!(cache) returns concrete LinearSolution — default solver" begin
+    # Headline case: `solve!(cache)` after `init(LinearProblem(A, b))` must not
+    # return a UnionAll-typed LinearSolution. Was broken by the
+    # `_default_lu_solve_with_fallback`/`_do_qr_fallback` helpers reading
+    # `sol.u`/`sol.resid`/`sol.cache`/`sol.stats` from an inner `sol` whose
+    # rettype got capped to `Any` during precompile.
+    rt = Core.Compiler.return_type(
+        _solve_default, Tuple{Matrix{Float64}, Vector{Float64}}
+    )
+    @test isconcretetype(rt)
+    @test rt <: LinearSolve.SciMLBase.LinearSolution{Float64, 1, Vector{Float64}}
+end
+
+@testset "solve!(cache) is concrete for each algorithm" begin
+    algs_concrete = (
+        LUFactorization(),
+        GenericLUFactorization(),
+        QRFactorization(LinearAlgebra.ColumnNorm()),
+        QRFactorization(LinearAlgebra.NoPivot()),
+        DiagonalFactorization(),
+        SVDFactorization(),
+        CholeskyFactorization(),
+        NormalCholeskyFactorization(),
+    )
+    for alg in algs_concrete
+        @testset "$(nameof(typeof(alg)))" begin
+            rt = Core.Compiler.return_type(
+                _solve_alg,
+                Tuple{Matrix{Float64}, Vector{Float64}, typeof(alg)}
+            )
+            @test isconcretetype(rt)
+        end
+    end
+
+    # Known unrelated inference issues — tracked separately, not what this
+    # group is guarding against.
+    algs_broken = (
+        BunchKaufmanFactorization(),
+        LDLtFactorization(),
+    )
+    for alg in algs_broken
+        @testset "$(nameof(typeof(alg))) (broken)" begin
+            rt = Core.Compiler.return_type(
+                _solve_alg,
+                Tuple{Matrix{Float64}, Vector{Float64}, typeof(alg)}
+            )
+            @test_broken isconcretetype(rt)
+        end
+    end
+end

@@ -558,3 +558,5 @@ end
 function update_tolerances_internal!(cache, alg::AbstractKrylovSubspaceMethod, abstol, reltol)
     return @warn "Tolerance update for Krylov subspace method '$typeof(alg)' not implemented." maxlog = 1
 end
+
+Base.:*(A::AbstractMatrix, sol::SciMLBase.LinearSolution) = A * sol.u

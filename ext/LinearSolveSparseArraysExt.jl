@@ -620,7 +620,15 @@ end
             assump::OperatorAssumptions{Bool}
         ) where {Ti}
         if assump.issq
-            if length(b) <= 10_000 && length(nonzeros(A)) / length(A) < 2.0e-4
+            # Heuristic: KLU is essentially always better than UMFPACK for
+            # small enough sparse problems, and for medium-sized problems that
+            # are also sufficiently sparse. The previous heuristic only used the
+            # density check, which missed dense-but-tiny problems where KLU is
+            # the right call algorithmically. The `length(b) <= 1_000` branch is
+            # the "small enough should use KLU" fast path; the second branch is
+            # the original "medium and sparse" rule.
+            if length(b) <= 1_000 ||
+                    (length(b) <= 10_000 && length(nonzeros(A)) / length(A) < 2.0e-4)
                 LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KLUFactorization)
             else
                 LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.UMFPACKFactorization)
@@ -654,6 +662,14 @@ end
 
 function LinearSolve.init_cacheval(
         alg::QRFactorization, A::SparseMatrixCSC{Float64, <:Integer}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions
+    )
+    return ArrayInterface.qr_instance(convert(AbstractMatrix, A), alg.pivot)
+end
+
+function LinearSolve.init_cacheval(
+        alg::QRFactorization, A::SparseMatrixCSC{ComplexF64, <:Integer}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )

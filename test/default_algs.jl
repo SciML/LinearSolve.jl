@@ -166,7 +166,7 @@ A = SparseMatrixCSC{Float64, Int32}(
 b = ones(2)
 A2 = hcat(A, A)
 prob = LinearProblem(A, b)
-@test_broken SciMLBase.successful_retcode(solve(prob))
+@test SciMLBase.successful_retcode(solve(prob))
 
 prob2 = LinearProblem(A2, b)
 @test SciMLBase.successful_retcode(solve(prob2))
@@ -397,3 +397,100 @@ sol_qr_stage2_ref = solve(LinearProblem(copy(A_nearsing), copy(b2)), QRFactoriza
 # After setting a new A, fell_back_to_qr should be reset
 cache_qr_reuse.A = copy(A_nearsing)  # triggers setproperty! for :A
 @test !cache_qr_reuse.cacheval.fell_back_to_qr
+
+# === Sparse KLU fast-path heuristic ===
+# Tunes the sparse default-alg dispatch so that "small enough" sparse problems
+# always pick KLU regardless of density. The previous heuristic only used
+# density × size, which routed e.g. a 199×199 sparse matrix at 2.5% density to
+# UMFPACK even though KLU is algorithmically the right tool for that size.
+let
+    # Small sparse, high density → fast path (length(b) ≤ 1_000) picks KLU
+    A_small_dense = sprand(100, 100, 0.5) + I
+    @test LinearSolve.defaultalg(A_small_dense, rand(100), LinearSolve.OperatorAssumptions(true)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.KLUFactorization
+
+    # Right at the fast-path boundary, length(b) = 1_000, still picks KLU
+    A_boundary = sprand(1_000, 1_000, 0.5) + I
+    @test LinearSolve.defaultalg(A_boundary, rand(1_000), LinearSolve.OperatorAssumptions(true)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.KLUFactorization
+
+    # Just past the fast-path boundary on a dense matrix → UMFPACK
+    A_past = sprand(1_001, 1_001, 0.5) + I
+    @test LinearSolve.defaultalg(A_past, rand(1_001), LinearSolve.OperatorAssumptions(true)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.UMFPACKFactorization
+
+    # Medium-size, very sparse (density < 2e-4) → density branch picks KLU
+    n = 9_000
+    A_diag = spdiagm(0 => ones(n))
+    @test nnz(A_diag) / length(A_diag) < 2.0e-4
+    @test LinearSolve.defaultalg(A_diag, rand(n), LinearSolve.OperatorAssumptions(true)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.KLUFactorization
+
+    # Medium-size, dense sparse → UMFPACK
+    A_med_dense = sprand(5_000, 5_000, 0.5) + I
+    @test LinearSolve.defaultalg(A_med_dense, rand(5_000), LinearSolve.OperatorAssumptions(true)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.UMFPACKFactorization
+end
+
+# === Sparse LU → SPQR fallback ===
+# Mirrors the dense LU → QR fallback: if the sparse LU (KLU, UMFPACK,
+# Sparspak) reports failure or produces non-finite values, the default
+# solver retries with sparse column-pivoted QR (SPQR).
+let
+    # 1) Structurally singular small sparse matrix: direct KLU returns
+    # Infeasible; default solver falls back and returns Success.
+    A_singular = spzeros(3, 3)
+    b_singular = ones(3)
+    @test solve(LinearProblem(A_singular, b_singular), KLUFactorization()).retcode ===
+        ReturnCode.Infeasible
+    sol = solve(LinearProblem(A_singular, b_singular))
+    @test sol.retcode === ReturnCode.Success
+    @test all(iszero, sol.u)  # least-squares solution of A = 0
+
+    # 2) Rank-deficient (zero row) — least-squares solution exists.
+    A_rd = sparse([1.0 2.0; 0.0 0.0])
+    b_rd = [3.0, 0.0]
+    sol_rd = solve(LinearProblem(A_rd, b_rd))
+    @test sol_rd.retcode === ReturnCode.Success
+
+    # 3) ComplexF64 singular sparse → fallback also fires.
+    A_c = sparse(ComplexF64[0 0; 0 0])
+    b_c = ComplexF64[1.0, 1.0]
+    @test solve(LinearProblem(A_c, b_c)).retcode === ReturnCode.Success
+
+    # 4) safetyfallback = false ⇒ no fallback; LU's Infeasible propagates.
+    alg_nofallback = LinearSolve.DefaultLinearSolver(
+        LinearSolve.DefaultAlgorithmChoice.KLUFactorization; safetyfallback = false
+    )
+    @test solve(LinearProblem(spzeros(3, 3), ones(3)), alg_nofallback).retcode ===
+        ReturnCode.Infeasible
+
+    # 5) Reuse path: after fallback, changing only b should reuse the cached QR.
+    cache_sp = init(LinearProblem(spzeros(4, 4), ones(4)))
+    sol1 = solve!(cache_sp)
+    @test sol1.retcode === ReturnCode.Success
+    @test cache_sp.cacheval.fell_back_to_qr
+    cache_sp.b = -ones(4)
+    sol2 = solve!(cache_sp)
+    @test sol2.retcode === ReturnCode.Success
+    # Setting a new A clears the QR-fallback flag
+    cache_sp.A = spzeros(4, 4)
+    @test !cache_sp.cacheval.fell_back_to_qr
+
+    # 6) UMFPACK path (length(b) > fast-path boundary, dense enough).
+    # Zero row makes A rank-deficient; b[1] ≠ 0 ⇒ least-squares residual is ≥ 1.
+    n_u = 1_200
+    A_u = sprand(n_u, n_u, 0.001) + 1.0 * I
+    A_u = SparseMatrixCSC(A_u)
+    A_u[1, :] .= 0
+    A_u = sparse(A_u)
+    @test LinearSolve.defaultalg(A_u, ones(n_u), LinearSolve.OperatorAssumptions(true)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.UMFPACKFactorization
+    sol_u = solve(LinearProblem(A_u, ones(n_u)))
+    @test sol_u.retcode === ReturnCode.Success
+    # Sanity: a non-singular matrix should NOT fall back.
+    A_nons = spdiagm(0 => ones(50), 1 => fill(-0.5, 49), -1 => fill(-0.5, 49))
+    sol_nons = solve(LinearProblem(A_nons, rand(50)))
+    @test sol_nons.retcode === ReturnCode.Success
+    @test !init(LinearProblem(A_nons, rand(50))).cacheval.fell_back_to_qr
+end

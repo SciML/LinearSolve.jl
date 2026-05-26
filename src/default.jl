@@ -587,6 +587,18 @@ const _SPARSE_ONLY_ALGORITHMS = Symbol.(
     )
 )
 
+# Sparse LU algorithms (i.e., not CHOLMOD) that should fall back to SPQR
+# (column-pivoted sparse QR) when factorization fails or produces non-finite
+# values. Mirrors the dense LU → QR fallback handled by
+# `_default_lu_solve_with_fallback`.
+const _SPARSE_LU_FALLBACK_ALGORITHMS = Symbol.(
+    (
+        DefaultAlgorithmChoice.KLUFactorization,
+        DefaultAlgorithmChoice.UMFPACKFactorization,
+        DefaultAlgorithmChoice.SparspakFactorization,
+    )
+)
+
 _qr_fallback_pivot(A::GPUArraysCore.AnyGPUArray) = NoPivot()
 function _qr_fallback_pivot(A)
     if _is_gpu_sparse(A)
@@ -676,6 +688,103 @@ function _reuse_qr_fallback(cache::LinearCache, alg)
     return SciMLBase.build_linear_solution(
         alg, cache.u, nothing, cache;
         retcode = qr_sol.retcode, iters = qr_sol.iters, stats = nothing
+    )
+end
+
+"""
+    _do_sparse_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol)
+
+Perform SPQR (sparse QR via SuiteSparse) fallback after a sparse LU
+(`KLUFactorization`, `UMFPACKFactorization`, `SparspakFactorization`) solve failed
+or produced non-finite output.
+
+Sparse LU does not modify `cache.A` in place — UMFPACK and KLU wrap a
+`SparseMatrixCSC` over the existing `colptr`/`rowval`/`nzval` arrays and store
+the factorization on the factorization object — so there is no `A_backup`
+restoration step like in the dense path's `_do_qr_fallback`.
+
+Unlike the dense path, we do not recurse through `solve!(cache, QRFactorization(...))`
+to compute the QR. The default solver's `cacheval` routing in `Base.setproperty!`
+dispatches the stored factorization to the slot named after `cache.alg.alg`
+(e.g. `:KLUFactorization`), which would type-mismatch when we want to land a
+`QRSparse` factorization there. Instead, we compute the QR directly with
+`qr(cache.A)` and stash it in the `:QRFactorizationPivoted` slot ourselves with
+`setfield!`. The slot's type parameter is concretely `QRSparse` for the
+`SparseMatrixCSC{<:Union{Float64, ComplexF64}, <:Integer}` cases that the sparse
+LU defaults select, so the assignment is type-stable.
+"""
+function _do_sparse_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol)
+    if reason === :residual_check
+        @SciMLMessage(
+            "Sparse LU solve residual check failed, falling back to SPQR (sparse QR). `A` is potentially ill-conditioned.",
+            cache.verbose, :default_lu_fallback
+        )
+    else
+        @SciMLMessage(
+            "Sparse LU factorization failed, falling back to SPQR (sparse QR). `A` is potentially rank-deficient or numerically singular.",
+            cache.verbose, :default_lu_fallback
+        )
+    end
+    qr_fact = qr(convert(AbstractMatrix, cache.A))
+    y = _ldiv!(cache.u, qr_fact, cache.b)
+    setfield!(cache.cacheval, :QRFactorizationPivoted, qr_fact)
+    cache.cacheval.fell_back_to_qr = true
+    cache.isfresh = false
+    return SciMLBase.build_linear_solution(
+        alg, y, nothing, cache; retcode = ReturnCode.Success, iters = 0, stats = nothing
+    )
+end
+
+"""
+    _reuse_sparse_qr_fallback(cache::LinearCache, alg)
+
+Reuse a cached sparse QR factorization stored by `_do_sparse_qr_fallback` in the
+`:QRFactorizationPivoted` slot. Called when `fell_back_to_qr` is `true` and the
+matrix has not changed since the fallback — we reuse the QR instead of retrying
+the (failed) LU.
+"""
+function _reuse_sparse_qr_fallback(cache::LinearCache, alg)
+    qr_fact = getfield(cache.cacheval, :QRFactorizationPivoted)
+    y = _ldiv!(cache.u, qr_fact, cache.b)
+    return SciMLBase.build_linear_solution(
+        alg, y, nothing, cache; retcode = ReturnCode.Success, iters = 0, stats = nothing
+    )
+end
+
+"""
+    _default_sparse_lu_solve_with_fallback(cache::LinearCache, alg::DefaultLinearSolver, sol)
+
+Post-process a sparse-LU solve result: if the inner solver reported failure
+(`ReturnCode.Failure` from Sparspak, `ReturnCode.Infeasible` from KLU/UMFPACK)
+or produced non-finite values, fall back to SPQR. Otherwise return the original
+solution.
+
+This is the sparse-LU analogue of `_default_lu_solve_with_fallback`. The sparse
+LU algorithms in LinearSolve return `ReturnCode.Infeasible` on `UMFPACK_OK`/
+`KLU_OK` mismatch, whereas the dense LU path returns `ReturnCode.Failure`; we
+accept both here so the wiring works uniformly.
+"""
+function _default_sparse_lu_solve_with_fallback(
+        cache::LinearCache, alg::DefaultLinearSolver, sol
+    )
+    if alg.safetyfallback
+        if sol.retcode === ReturnCode.Failure || sol.retcode === ReturnCode.Infeasible
+            return _do_sparse_qr_fallback(cache, alg, sol, :lu_failure)
+        end
+        if sol.retcode === ReturnCode.Success && any(!isfinite, sol.u)
+            @SciMLMessage(
+                "Sparse LU solve produced non-finite values (NaN/Inf), falling back to SPQR. Matrix is likely near-singular.",
+                cache.verbose, :default_lu_fallback
+            )
+            return _do_sparse_qr_fallback(cache, alg, sol, :lu_failure)
+        end
+        if sol.retcode === ReturnCode.APosterioriSafetyFailure
+            return _do_sparse_qr_fallback(cache, alg, sol, :residual_check)
+        end
+    end
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache;
+        retcode = sol.retcode, iters = sol.iters, stats = nothing
     )
 end
 
@@ -813,19 +922,35 @@ end
             end
         else
             if alg in LinearSolve._SPARSE_ONLY_ALGORITHMS
-                newex = quote
-                    if !(cache.A isa Array)
-                        sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)))
-                        SciMLBase.build_linear_solution(
-                            alg, cache.u, nothing, cache;
-                            retcode = sol.retcode,
-                            iters = sol.iters, stats = nothing
-                        )
-                    else
-                        error(
-                            "Sparse algorithm " * $(string(alg)) *
-                                " called on non-sparse matrix. This shouldn't happen."
-                        )
+                if alg in LinearSolve._SPARSE_LU_FALLBACK_ALGORITHMS
+                    # Sparse LU (KLU/UMFPACK/Sparspak): on failure, fall back to
+                    # SPQR. Mirrors the dense LU → QR fallback path.
+                    newex = quote
+                        if !(cache.A isa Array)
+                            sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)))
+                            _default_sparse_lu_solve_with_fallback(cache, alg, sol)
+                        else
+                            error(
+                                "Sparse algorithm " * $(string(alg)) *
+                                    " called on non-sparse matrix. This shouldn't happen."
+                            )
+                        end
+                    end
+                else
+                    newex = quote
+                        if !(cache.A isa Array)
+                            sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)))
+                            SciMLBase.build_linear_solution(
+                                alg, cache.u, nothing, cache;
+                                retcode = sol.retcode,
+                                iters = sol.iters, stats = nothing
+                            )
+                        else
+                            error(
+                                "Sparse algorithm " * $(string(alg)) *
+                                    " called on non-sparse matrix. This shouldn't happen."
+                            )
+                        end
                     end
                 end
             else
@@ -853,7 +978,11 @@ end
     return quote
         if cache.cacheval isa DefaultLinearSolverInit &&
                 cache.cacheval.fell_back_to_qr && !cache.isfresh
-            _reuse_qr_fallback(cache, alg)
+            if cache.A isa Array
+                _reuse_qr_fallback(cache, alg)
+            else
+                _reuse_sparse_qr_fallback(cache, alg)
+            end
         else
             $alg_dispatch
         end

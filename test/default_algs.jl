@@ -497,3 +497,26 @@ let
     @test sol_nons.retcode === ReturnCode.Success
     @test !init(LinearProblem(A_nons, rand(50))).cacheval.fell_back_to_qr
 end
+
+# Regression test for https://github.com/SciML/LinearSolve.jl/issues/991:
+# `KLUFactorization(; reuse_symbolic = false)` on a singular matrix used to
+# throw `LinearAlgebra.SingularException` because the `reuse_symbolic = false`
+# branch in `solve!(::LinearCache, ::KLUFactorization)` called `KLU.klu(A)`
+# without `check = false`. It now returns `ReturnCode.Infeasible` like the
+# `reuse_symbolic = true` branch.
+let
+    Is = [1, 2, 4, 1, 5, 7, 9]
+    Js = [4, 4, 4, 7, 8, 9, 10]
+    Vs = [
+        0.35209876935890616, 0.11497167473826142, 0.24468931805408345,
+        0.056730539026381366, 0.9152256278300128, 0.46648361943562067,
+        0.6891333467010995,
+    ]
+    A_991 = sparse(Is, Js, Vs, 10, 10)
+    pr_991 = LinearProblem(A_991, rand(10))
+    @test solve(pr_991, KLUFactorization()).retcode === ReturnCode.Infeasible
+    @test solve(pr_991, KLUFactorization(; reuse_symbolic = false)).retcode ===
+        ReturnCode.Infeasible
+    # Default solver path: should fall back to SPQR and succeed.
+    @test solve(pr_991).retcode === ReturnCode.Success
+end

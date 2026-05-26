@@ -445,12 +445,17 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
             end
         else
             # New fact each time since the sparsity pattern can change
-            # and thus it needs to reallocate
+            # and thus it needs to reallocate. `check = false` matches the
+            # `reuse_symbolic = true` branch and keeps singular matrices from
+            # throwing `LinearAlgebra.SingularException`; the status check
+            # below maps that to `ReturnCode.Infeasible` instead. Fixes
+            # https://github.com/SciML/LinearSolve.jl/issues/991.
             fact = KLU.klu(
                 SparseMatrixCSC(
                     size(A)..., getcolptr(A), rowvals(A),
                     nonzeros(A)
-                )
+                ),
+                check = false
             )
         end
         cache.cacheval = fact

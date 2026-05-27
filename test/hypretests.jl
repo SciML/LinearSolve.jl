@@ -66,10 +66,9 @@ function generate_probs(alg; Pl = LinearAlgebra.I)
         A[1, 1] = 2
         A[end, end] = 2
     elseif is_parasails_precond(Pl)
-        # ParaSails setup is fragile on the sparser SPD family below. Use a denser,
-        # more strongly regularized SPD matrix similar to HYPRE.jl's own ParaSails test.
-        A = sprand(rng, n, n, 0.05)
-        A = A'A + 5 * LinearAlgebra.I
+        # ParaSails setup is fragile on the random sparse SPD family below on some
+        # platforms. Use a deterministic strictly diagonally dominant SPD tridiagonal.
+        A = spdiagm(-1 => -ones(n - 1), 0 => 4.0 .* ones(n), 1 => -ones(n - 1))
     else
         A = sprand(rng, n, n, 0.01) + 3 * LinearAlgebra.I
         A = A'A

@@ -185,10 +185,10 @@ test_interface(HYPREAlgorithm(HYPRE.ILU()))
 test_interface(HYPREAlgorithm(HYPRE.ILU()), Pl = HYPRE.BoomerAMG)
 # HYPRE.ParaSails
 # Use instantiated ParaSails preconditioners with explicit settings and a deterministic
-# test matrix. Avoid forcing the SPD-specific ParaSails mode since that path depends on
-# LAPACK symbols being available through HYPRE on every CI image.
-test_interface(HYPREAlgorithm(HYPRE.PCG), Pl = HYPRE.ParaSails(; Params = (0.1, 1), Filter = 0.05))
-test_interface(HYPREAlgorithm(HYPRE.PCG()), Pl = HYPRE.ParaSails(; Params = (0.1, 1), Filter = 0.05))
+# test matrix. Use the nonsymmetric ParaSails mode since the SPD-specific path depends
+# on LAPACK symbols being available through HYPRE on every CI image.
+test_interface(HYPREAlgorithm(HYPRE.PCG), Pl = HYPRE.ParaSails(; Params = (0.1, 1), Filter = 0.05, Sym = 0))
+test_interface(HYPREAlgorithm(HYPRE.PCG()), Pl = HYPRE.ParaSails(; Params = (0.1, 1), Filter = 0.05, Sym = 0))
 # HYPRE.PCG
 test_interface(HYPREAlgorithm(HYPRE.PCG))
 test_interface(HYPREAlgorithm(HYPRE.PCG), Pl = HYPRE.BoomerAMG)

@@ -65,6 +65,11 @@ jobs:
           # See: https://github.com/SciML/LinearSolve.jl/issues/879
           - group: LinearSolvePardiso
             version: "pre"
+          # Skip HYPRE and PETSc on pre-release Julia
+          - group: LinearSolveHYPRE
+            version: "pre"
+          - group: LinearSolvePETSc
+            version: "pre"
           # Ginkgo.jl is not available on Windows
           - group: LinearSolveGinkgo
             os: windows-latest

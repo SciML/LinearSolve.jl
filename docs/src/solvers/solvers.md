@@ -424,8 +424,7 @@ HYPREAlgorithm
     using LinearSolve, PartitionedArrays, PartitionedSolvers
     ```
 
-This integration is currently in the week 10--11 scaffold stage. The
-`PartitionedSolversAlgorithm` extension validates `PSparseMatrix` / `PVector` inputs and
+The `PartitionedSolversAlgorithm` extension validates `PSparseMatrix` / `PVector` inputs and
 initializes the LinearSolve cache structure, but the full solve-path delegation into
 `PartitionedSolvers.solve` is not integrated yet.
 

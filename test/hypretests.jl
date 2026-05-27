@@ -43,7 +43,9 @@ function failure_prob()
     return LinearProblem(A, b)
 end
 
-function generate_probs(alg)
+is_parasails_precond(Pl) = Pl isa HYPRE.ParaSails || (Pl isa DataType && Pl <: HYPRE.ParaSails)
+
+function generate_probs(alg; Pl = LinearAlgebra.I)
     rng = MersenneTwister(1234)
     n = 100
     if alg.solver isa HYPRE.BoomerAMG || alg.solver === HYPRE.BoomerAMG
@@ -63,6 +65,11 @@ function generate_probs(alg)
         A[end, :] .= 0
         A[1, 1] = 2
         A[end, end] = 2
+    elseif is_parasails_precond(Pl)
+        # ParaSails setup is fragile on the sparser SPD family below. Use a denser,
+        # more strongly regularized SPD matrix similar to HYPRE.jl's own ParaSails test.
+        A = sprand(rng, n, n, 0.05)
+        A = A'A + 5 * LinearAlgebra.I
     else
         A = sprand(rng, n, n, 0.01) + 3 * LinearAlgebra.I
         A = A'A
@@ -83,7 +90,7 @@ function generate_probs(alg)
 end
 
 function test_interface(alg; kw...)
-    prob1, prob2, prob3, prob4 = generate_probs(alg)
+    prob1, prob2, prob3, prob4 = generate_probs(alg; Pl = get(kw, :Pl, LinearAlgebra.I))
 
     atol = 1.0e-6
     rtol = 1.0e-6
@@ -95,7 +102,7 @@ function test_interface(alg; kw...)
         A, b = to_array(prob.A), to_array(prob.b)
 
         # Solve prob directly (without cache)
-        y = solve(prob, alg; cache_kwargs..., Pl = HYPRE.BoomerAMG)
+        y = solve(prob, alg; cache_kwargs...)
         @test A * to_array(y.u) ≈ b atol = atol rtol = rtol
         @test y.iters > 0
         @test y.resid < rtol

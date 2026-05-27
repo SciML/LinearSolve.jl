@@ -45,6 +45,28 @@ end
 
 is_parasails_precond(Pl) = Pl isa HYPRE.ParaSails || (Pl isa DataType && Pl <: HYPRE.ParaSails)
 
+function parasails_is_usable()
+    n = 20
+    A = spdiagm(-1 => -ones(n - 1), 0 => 4.0 .* ones(n), 1 => -ones(n - 1))
+    b = ones(n)
+    x = zeros(n)
+    A_h = HYPREMatrix(A)
+    b_h = HYPREVector(b)
+    x_h = HYPREVector(x)
+    parasails = HYPRE.ParaSails(; Params = (0.1, 1), Filter = 0.05, Sym = 0)
+    pcg = HYPRE.PCG(; Tol = 1.0e-6, MaxIter = 20, Precond = parasails)
+
+    try
+        redirect_stderr(devnull) do
+            HYPRE.solve!(pcg, x_h, A_h, b_h)
+        end
+        return true
+    catch err
+        err isa HYPRE.LibHYPRE.HYPREError || rethrow()
+        return false
+    end
+end
+
 function generate_probs(alg; Pl = LinearAlgebra.I)
     rng = MersenneTwister(1234)
     n = 100
@@ -184,11 +206,22 @@ test_interface(HYPREAlgorithm(HYPRE.ILU), Pl = HYPRE.BoomerAMG)
 test_interface(HYPREAlgorithm(HYPRE.ILU()))
 test_interface(HYPREAlgorithm(HYPRE.ILU()), Pl = HYPRE.BoomerAMG)
 # HYPRE.ParaSails
-# Use instantiated ParaSails preconditioners with explicit settings and a deterministic
-# test matrix. Use the nonsymmetric ParaSails mode since the SPD-specific path depends
-# on LAPACK symbols being available through HYPRE on every CI image.
-test_interface(HYPREAlgorithm(HYPRE.PCG), Pl = HYPRE.ParaSails(; Params = (0.1, 1), Filter = 0.05, Sym = 0))
-test_interface(HYPREAlgorithm(HYPRE.PCG()), Pl = HYPRE.ParaSails(; Params = (0.1, 1), Filter = 0.05, Sym = 0))
+# ParaSails setup may call LP64 LAPACK symbols from HYPRE. Some CI images only have an
+# ILP64 BLAS/LAPACK backend forwarded through libblastrampoline, so first check whether
+# HYPRE itself can set up PCG+ParaSails in this process.
+if parasails_is_usable()
+    test_interface(
+        HYPREAlgorithm(HYPRE.PCG),
+        Pl = HYPRE.ParaSails(; Params = (0.1, 1), Filter = 0.05, Sym = 0)
+    )
+    test_interface(
+        HYPREAlgorithm(HYPRE.PCG()),
+        Pl = HYPRE.ParaSails(; Params = (0.1, 1), Filter = 0.05, Sym = 0)
+    )
+else
+    @test_skip "HYPRE ParaSails requires an LP64 LAPACK backend in this HYPRE build"
+    @test_skip "HYPRE ParaSails requires an LP64 LAPACK backend in this HYPRE build"
+end
 # HYPRE.PCG
 test_interface(HYPREAlgorithm(HYPRE.PCG))
 test_interface(HYPREAlgorithm(HYPRE.PCG), Pl = HYPRE.BoomerAMG)

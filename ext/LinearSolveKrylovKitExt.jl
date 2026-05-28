@@ -27,8 +27,8 @@ LinearSolve.default_alias_b(::KrylovKitJL, ::Any, ::Any) = true
 function SciMLBase.solve!(cache::LinearCache, alg::KrylovKitJL; kwargs...)
     # KrylovKit doesn't use Pl/Pr, so warn if the user set one
     if !(cache.Pl isa LinearAlgebra.UniformScaling) ||
-       !(cache.Pr isa LinearAlgebra.UniformScaling)
-        @warn "KrylovKit does not support preconditioners. Pl/Pr will be ignored. Use KrylovJL_GMRES() if you need preconditioning." maxlog=1
+            !(cache.Pr isa LinearAlgebra.UniformScaling)
+        @warn "KrylovKit does not support preconditioners. Pl/Pr will be ignored. Use KrylovJL_GMRES() if you need preconditioning." maxlog = 1
     end
     atol = float(cache.abstol)
     rtol = float(cache.reltol)

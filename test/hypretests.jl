@@ -45,6 +45,28 @@ end
 
 is_parasails_precond(Pl) = Pl isa HYPRE.ParaSails || (Pl isa DataType && Pl <: HYPRE.ParaSails)
 
+function parasails_is_usable()
+    n = 20
+    A = spdiagm(-1 => -ones(n - 1), 0 => 4.0 .* ones(n), 1 => -ones(n - 1))
+    b = ones(n)
+    x = zeros(n)
+    A_h = HYPREMatrix(A)
+    b_h = HYPREVector(b)
+    x_h = HYPREVector(x)
+    parasails = HYPRE.ParaSails(; Params = (0.1, 1), Filter = 0.05, Sym = 0)
+    pcg = HYPRE.PCG(; Tol = 1.0e-6, MaxIter = 20, Precond = parasails)
+
+    try
+        redirect_stderr(devnull) do
+            HYPRE.solve!(pcg, x_h, A_h, b_h)
+        end
+        return true
+    catch err
+        err isa HYPRE.LibHYPRE.HYPREError || rethrow()
+        return false
+    end
+end
+
 function generate_probs(alg; Pl = LinearAlgebra.I)
     rng = MersenneTwister(1234)
     n = 100
@@ -66,10 +88,9 @@ function generate_probs(alg; Pl = LinearAlgebra.I)
         A[1, 1] = 2
         A[end, end] = 2
     elseif is_parasails_precond(Pl)
-        # ParaSails setup is fragile on the sparser SPD family below. Use a denser,
-        # more strongly regularized SPD matrix similar to HYPRE.jl's own ParaSails test.
-        A = sprand(rng, n, n, 0.05)
-        A = A'A + 5 * LinearAlgebra.I
+        # ParaSails setup is fragile on the random sparse SPD family below on some
+        # platforms. Use a deterministic strictly diagonally dominant SPD tridiagonal.
+        A = spdiagm(-1 => -ones(n - 1), 0 => 4.0 .* ones(n), 1 => -ones(n - 1))
     else
         A = sprand(rng, n, n, 0.01) + 3 * LinearAlgebra.I
         A = A'A
@@ -185,8 +206,22 @@ test_interface(HYPREAlgorithm(HYPRE.ILU), Pl = HYPRE.BoomerAMG)
 test_interface(HYPREAlgorithm(HYPRE.ILU()))
 test_interface(HYPREAlgorithm(HYPRE.ILU()), Pl = HYPRE.BoomerAMG)
 # HYPRE.ParaSails
-test_interface(HYPREAlgorithm(HYPRE.PCG), Pl = HYPRE.ParaSails)
-test_interface(HYPREAlgorithm(HYPRE.PCG()), Pl = HYPRE.ParaSails())
+# ParaSails setup may call LP64 LAPACK symbols from HYPRE. Some CI images only have an
+# ILP64 BLAS/LAPACK backend forwarded through libblastrampoline, so first check whether
+# HYPRE itself can set up PCG+ParaSails in this process.
+if parasails_is_usable()
+    test_interface(
+        HYPREAlgorithm(HYPRE.PCG),
+        Pl = HYPRE.ParaSails(; Params = (0.1, 1), Filter = 0.05, Sym = 0)
+    )
+    test_interface(
+        HYPREAlgorithm(HYPRE.PCG()),
+        Pl = HYPRE.ParaSails(; Params = (0.1, 1), Filter = 0.05, Sym = 0)
+    )
+else
+    @test_skip "HYPRE ParaSails requires an LP64 LAPACK backend in this HYPRE build"
+    @test_skip "HYPRE ParaSails requires an LP64 LAPACK backend in this HYPRE build"
+end
 # HYPRE.PCG
 test_interface(HYPREAlgorithm(HYPRE.PCG))
 test_interface(HYPREAlgorithm(HYPRE.PCG), Pl = HYPRE.BoomerAMG)

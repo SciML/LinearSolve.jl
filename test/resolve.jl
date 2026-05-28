@@ -6,6 +6,7 @@ using LinearSolve: AbstractDenseFactorization, AbstractSparseFactorization,
 
 const STRUMPACKExt = Base.get_extension(LinearSolve, :LinearSolveSTRUMPACKExt)
 const HAS_STRUMPACK = STRUMPACKExt !== nothing && STRUMPACKExt.strumpack_isavailable()
+const HAS_MUMPS = Base.get_extension(LinearSolve, :LinearSolveMUMPSExt) !== nothing
 
 # Function to check if an algorithm is mixed precision
 function is_mixed_precision_alg(alg)
@@ -59,6 +60,9 @@ for alg in vcat(
             (
             !(alg == ElementalJL) ||
                 Base.get_extension(LinearSolve, :LinearSolveElementalExt) !== nothing
+        ) &&
+            (
+            !(alg == MUMPSFactorization) || HAS_MUMPS
         )
         A = [1.0 2.0; 3.0 4.0]
         alg in [

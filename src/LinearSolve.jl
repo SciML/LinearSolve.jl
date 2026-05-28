@@ -520,7 +520,7 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
     SparspakFactorization, DiagonalFactorization, CholeskyFactorization,
     BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization,
     CUSOLVERRFFactorization, CliqueTreesFactorization, ParUFactorization,
-    STRUMPACKFactorization
+    STRUMPACKFactorization, MUMPSFactorization
 
 export LinearSolveFunction, DirectLdiv!, show_algorithm_choices
 
@@ -547,6 +547,7 @@ export AMDGPUOffloadLUFactorization, AMDGPUOffloadQRFactorization
 export MKLPardisoFactorize, MKLPardisoIterate
 export PanuaPardisoFactorize, PanuaPardisoIterate
 export PardisoJL
+export MUMPSFactorization
 export MKLLUFactorization
 export OpenBLASLUFactorization
 export OpenBLAS32MixedLUFactorization

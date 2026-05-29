@@ -20,6 +20,9 @@ const PARU_INVALID = Int32(-2)
 const PARU_SINGULAR = Int32(-3)
 const PARU_TOO_LARGE = Int32(-4)
 
+# ParU_Control_enum key for the max OpenMP thread count (see ParU.h)
+const PARU_CONTROL_MAX_THREADS = Cint(1001)
+
 #-------------------------------------------------------------------------------
 # ParUCache — holds the symbolic and numeric factorization objects plus the
 # ParU control struct.  A finalizer ensures the ParU/CHOLMOD memory is freed.
@@ -38,7 +41,7 @@ mutable struct ParUCache
     # passed to ParU_C_Solve_Axb after a failed factorization.
     last_factorize_info::Int32
 
-    function ParUCache()
+    function ParUCache(max_threads::Union{Int, Nothing} = nothing)
         @static if !Base.USE_GPL_LIBS
             error(
                 "ParUFactorization requires GPL libraries (CHOLMOD/UMFPACK). " *
@@ -54,7 +57,23 @@ mutable struct ParUCache
         if info != PARU_SUCCESS
             error("ParU_C_InitControl failed with code $info")
         end
-        cache = new(C_NULL, C_NULL, ctrl_ref[], Int64[], Int64[], 0, PARU_INVALID)
+        ctrl = ctrl_ref[]
+        # By default ParU uses *all* OpenMP threads, which is counter-productive
+        # for small/medium problems on many-core machines (thread-pool overhead
+        # dominates). Honor a user-supplied cap via PARU_CONTROL_MAX_THREADS.
+        if max_threads !== nothing
+            info = ccall(
+                (:ParU_C_Set_Control_INT64, libparu), Int32,
+                (Cint, Int64, Ptr{Cvoid}),
+                PARU_CONTROL_MAX_THREADS, Int64(max_threads), ctrl
+            )
+            if info != PARU_SUCCESS
+                ctrl_free = Ref(ctrl)
+                ccall((:ParU_C_FreeControl, libparu), Int32, (Ref{Ptr{Cvoid}},), ctrl_free)
+                error("ParU_C_Set_Control_INT64(MAX_THREADS) failed with code $info")
+            end
+        end
+        cache = new(C_NULL, C_NULL, ctrl, Int64[], Int64[], 0, PARU_INVALID)
         finalizer(_paru_free_cache!, cache)
         return cache
     end
@@ -146,7 +165,7 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
-    return ParUCache()
+    return ParUCache(alg.max_threads)
 end
 
 # Generic fallback for type mismatches

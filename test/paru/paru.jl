@@ -44,4 +44,14 @@ end
         cache.A = A2
         @test A2 * solve!(cache) ≈ b1
     end
+
+    @testset "max_threads control" begin
+        # max_threads caps ParU's OpenMP threads (PARU_CONTROL_MAX_THREADS) and
+        # must not affect the result.
+        @test ParUFactorization(max_threads = 1).max_threads == 1
+        @test ParUFactorization().max_threads === nothing
+        @test_throws ArgumentError ParUFactorization(max_threads = 0)
+        test_interface(ParUFactorization(max_threads = 1), prob1, prob2)
+        test_interface(ParUFactorization(max_threads = 2), prob1, prob2)
+    end
 end

@@ -1287,7 +1287,7 @@ end
 needs_concrete_A(::AlgebraicMultigridJL) = true
 
 """
-`ParUFactorization(;reuse_symbolic=true)`
+`ParUFactorization(;reuse_symbolic=true, max_threads=nothing)`
 
 A parallel sparse LU factorization from SuiteSparse's
 [ParU](https://github.com/DrTimothyAldenDavis/SuiteSparse) library.
@@ -1305,6 +1305,15 @@ Only supports `Float64` element type.
 
   - `reuse_symbolic`: Cache and reuse the symbolic factorization across solves
     when the sparsity pattern of `A` does not change. Defaults to `true`.
+  - `max_threads`: Cap the number of OpenMP threads ParU uses for the numeric
+    factorization, set via ParU's `PARU_CONTROL_MAX_THREADS`. `nothing` (the
+    default) leaves ParU's own default, which is to use *all* available OpenMP
+    threads. On machines with many cores this default is counter-productive for
+    small and medium problems: spinning up the OpenMP task pool costs far more
+    than the factorization itself (e.g. on a 128-core host a 200×200 system
+    takes ~16 ms with all threads versus ~1 ms capped to a few). ParU only pays
+    off its parallel overhead on large systems, so set a modest `max_threads`
+    (or cap `OMP_NUM_THREADS`) unless the problem is large.
 
 !!! note
 
@@ -1328,12 +1337,18 @@ sol = solve(prob, ParUFactorization())
 """
 struct ParUFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool
-    function ParUFactorization(; reuse_symbolic::Bool = true)
+    max_threads::Union{Int, Nothing}
+    function ParUFactorization(;
+            reuse_symbolic::Bool = true, max_threads::Union{Int, Nothing} = nothing
+        )
         ext = Base.get_extension(@__MODULE__, :LinearSolveParUExt)
         if ext === nothing
             error("ParUFactorization requires that ParU_jll and SparseArrays are loaded, i.e. `import ParU_jll; using SparseArrays`")
         end
-        return new(reuse_symbolic)
+        if max_threads !== nothing && max_threads < 1
+            throw(ArgumentError("ParUFactorization max_threads must be ≥ 1 (or `nothing` to use ParU's default)"))
+        end
+        return new(reuse_symbolic, max_threads)
     end
 end
 

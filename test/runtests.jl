@@ -95,6 +95,13 @@ if GROUP == "LinearSolvePardiso"
     @time @safetestset "Pardiso" include("pardiso/pardiso.jl")
 end
 
+if Base.Sys.islinux() && GROUP == "LinearSolveMUMPS"
+    Pkg.activate("mumps")
+    Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
+    Pkg.instantiate()
+    @time @safetestset "MUMPS" include("mumps/mumps.jl")
+end
+
 if !Base.Sys.iswindows() && GROUP == "LinearSolveGinkgo"
     Pkg.activate("ginkgo")
     Pkg.develop(PackageSpec(path = dirname(@__DIR__)))

@@ -67,6 +67,9 @@ to the sparsity pattern and `UMFPACKFactorization` if there is more structure.
 alternative to `UMFPACKFactorization` that exploits OpenMP task parallelism
 for the numeric factorization phase, which can give speedups on multicore systems
 for larger sparse problems.
+`MUMPSFactorization` provides a sparse direct alternative through `MUMPS.jl`
+for users who want MUMPS's distributed-memory-capable direct solver interface
+through the standard LinearSolve caching API.
 `STRUMPACKFactorization` provides a sparse direct alternative that can be tuned
 with approximate low-rank compression options (for example HSS/HODLR modes,
 compression tolerances, and rank/leaf-size controls) when supported by the
@@ -209,6 +212,26 @@ UMFPACKFactorization
 
 ```@docs
 ParUFactorization
+```
+
+### MUMPS.jl
+
+!!! note
+
+    Using this solver requires loading `MUMPS.jl`, `SparseArrays`, and `MPI`,
+    and calling `MPI.Init()` before constructing the solver.
+
+!!! warning
+
+    Call `cleanup_mumps_cache!` explicitly through the extension before
+    `MPI.Finalize()`:
+    ```julia
+    MUMPSExt = Base.get_extension(LinearSolve, :LinearSolveMUMPSExt)
+    MUMPSExt.cleanup_mumps_cache!(sol)
+    ```
+
+```@docs
+MUMPSFactorization
 ```
 
 ### Sparspak.jl

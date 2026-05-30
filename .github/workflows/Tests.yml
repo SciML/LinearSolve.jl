@@ -35,6 +35,7 @@ jobs:
           - "DefaultsLoading"
           - "LinearSolveSTRUMPACK"
           - "LinearSolveHYPRE"
+          - "LinearSolveMUMPS"
           - "LinearSolvePETSc"
           - "LinearSolvePardiso"
           - "LinearSolveGinkgo"
@@ -68,6 +69,14 @@ jobs:
           # Skip HYPRE and PETSc on pre-release Julia
           - group: LinearSolveHYPRE
             version: "pre"
+          # MUMPS tests are only wired for Linux
+          - group: LinearSolveMUMPS
+            os: macos-latest
+          - group: LinearSolveMUMPS
+            os: windows-latest
+          # Restrict MUMPS to standard Linux x64 runners
+          - group: LinearSolveMUMPS
+            arch: x86
           - group: LinearSolvePETSc
             version: "pre"
           # Ginkgo.jl is not available on Windows

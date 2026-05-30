@@ -1338,6 +1338,124 @@ struct ParUFactorization <: AbstractSparseFactorization
 end
 
 """
+`MUMPSFactorization(; sym = :unsymmetric, transposed = false, verbose = false, ooc = false, itref = 0, user_perm = false, icntl = nothing, cntl = nothing, par = 1)`
+
+A sparse direct solver wrapper around [MUMPS.jl](https://github.com/JuliaSmoothOptimizers/MUMPS.jl),
+backed by the `MUMPS_jll` artifact.
+
+This wrapper is intended for repeated solves with the same sparse matrix, using a cached
+MUMPS factorization inside the `LinearSolve` cache. When `cache.A` is replaced, the old
+MUMPS object is finalized and a new factorization is built.
+
+## Keyword Arguments
+
+  - `sym`: Matrix structure passed to MUMPS. Choices are `:unsymmetric` (default),
+    `:definite`, and `:symmetric`.
+  - `transposed`: Solve `A' * x = b` instead of `A * x = b`.
+  - `verbose`: Enable MUMPS output.
+  - `ooc`: Enable out-of-core factorization.
+  - `itref`: Maximum number of iterative refinement steps.
+  - `user_perm`: Tell MUMPS to use a user-supplied permutation.
+  - `icntl`: Optional custom MUMPS `ICNTL` vector. When provided, it overrides the
+    wrapper-generated control vector.
+  - `cntl`: Optional custom MUMPS `CNTL` vector.
+  - `par`: MUMPS host participation flag. Defaults to `1`.
+
+!!! note
+
+    Using this solver requires loading `MUMPS.jl` and `SparseArrays`, and initializing MPI:
+    ```julia
+    using MPI, MUMPS, SparseArrays
+    MPI.Init()
+    ```
+
+## Supported Element Types
+
+`Float32`, `Float64`, `ComplexF32`, and `ComplexF64`.
+
+Inputs with other element types are rejected with an error instead of being
+silently converted to a lower-precision type.
+
+## Memory Management
+
+MUMPS holds MPI-backed resources outside Julia's GC. Call
+`cleanup_mumps_cache!` explicitly when you are finished with a solve and before
+`MPI.Finalize()`:
+
+```julia
+using LinearSolve, SparseArrays, MPI, MUMPS
+
+MPI.Init()
+MUMPSExt = Base.get_extension(LinearSolve, :LinearSolveMUMPSExt)
+
+A = sparse([4.0 1.0; 2.0 3.0])
+b = [1.0, 2.0]
+sol = solve(LinearProblem(A, b), MUMPSFactorization())
+
+MUMPSExt.cleanup_mumps_cache!(sol)
+MPI.Finalize()
+```
+
+The extension also registers a GC finalizer as a safety net, but explicit
+cleanup is strongly preferred for deterministic teardown.
+
+## Example
+
+```julia
+using LinearSolve, SparseArrays, MPI, MUMPS
+
+MPI.Init()
+MUMPSExt = Base.get_extension(LinearSolve, :LinearSolveMUMPSExt)
+A = sparse([4.0 1.0; 2.0 3.0])
+b = [1.0, 2.0]
+sol = solve(LinearProblem(A, b), MUMPSFactorization())
+MUMPSExt.cleanup_mumps_cache!(sol)
+```
+"""
+struct MUMPSFactorization <: AbstractSparseFactorization
+    sym::Int
+    transposed::Bool
+    verbose::Bool
+    ooc::Bool
+    itref::Int
+    user_perm::Bool
+    icntl::Any
+    cntl::Any
+    par::Int
+
+    function MUMPSFactorization(;
+            sym::Union{Symbol, Integer} = :unsymmetric,
+            transposed::Bool = false,
+            verbose::Bool = false,
+            ooc::Bool = false,
+            itref::Int = 0,
+            user_perm::Bool = false,
+            icntl = nothing,
+            cntl = nothing,
+            par::Int = 1,
+        )
+        ext = Base.get_extension(@__MODULE__, :LinearSolveMUMPSExt)
+        if ext === nothing
+            error("MUMPSFactorization requires that MUMPS and SparseArrays are loaded, i.e. `using MPI, MUMPS, SparseArrays`")
+        end
+        sym_val = if sym isa Symbol
+            if sym === :unsymmetric
+                0
+            elseif sym === :definite
+                1
+            elseif sym === :symmetric
+                2
+            else
+                error("Unknown MUMPS symmetry flag: $sym")
+            end
+        else
+            Int(sym)
+        end
+        return new(sym_val, transposed, verbose, ooc, itref, user_perm, icntl, cntl, par)
+    end
+end
+
+"""
     ElementalJL(; method = :LU)
 
 A wrapper for [Elemental.jl](https://github.com/JuliaParallel/Elemental.jl),

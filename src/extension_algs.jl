@@ -253,27 +253,33 @@ end
 provides distributed linear solver building blocks for
 [PartitionedArrays.jl](https://github.com/PartitionedArrays/PartitionedArrays.jl).
 
-This algorithm is intended for `PSparseMatrix` / `PVector` inputs. The week 10--11
-integration only provides the loading and validation skeleton: it checks the input types,
-builds a LinearSolve cache, and reserves the extension point where the actual
-PartitionedSolvers-backed solve path will be connected in the following stage.
+This algorithm is intended for `PSparseMatrix` / `PVector` inputs. The integration
+delegates actual solves to the local `PartitionedSolvers` solver constructors and caches
+the resulting solver object for repeated solves. The default dispatch for `PSparseMatrix`
+inputs chooses the CG-backed PartitionedSolvers path, but the integration is
+solver-agnostic: any PartitionedSolvers solver constructor (for example
+`PartitionedSolvers.cg`, `PartitionedSolvers.jacobi`, or `PartitionedSolvers.amg`) can be
+passed, and only the convergence keywords that the chosen solver actually accepts are
+forwarded automatically.
 
 ## Positional Arguments
 
-  - `solver`: optional PartitionedSolvers solver object or constructor placeholder. It is
-    stored for the later solve-path implementation.
+  - `solver`: optional PartitionedSolvers solver object or constructor such as
+    `PartitionedSolvers.cg`. If omitted, the integration uses the local
+    `PartitionedSolvers` default solver.
 
 ## Keyword Arguments
 
-  - `kwargs...`: reserved for later forwarding into the full PartitionedSolvers solve path.
+  - `kwargs...`: forwarded when constructing an explicit underlying PartitionedSolvers
+    solver. They take precedence over the auto-derived convergence keywords.
 
 ## Example
 
 ```julia
 using LinearSolve, PartitionedArrays, PartitionedSolvers
 
-alg = PartitionedSolversAlgorithm()
-cache = SciMLBase.init(prob, alg)
+alg = PartitionedSolversAlgorithm(PartitionedSolvers.cg)
+sol = solve(prob, alg)
 ```
 """
 struct PartitionedSolversAlgorithm <: SciMLLinearSolveAlgorithm

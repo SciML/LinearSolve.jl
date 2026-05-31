@@ -447,9 +447,29 @@ HYPREAlgorithm
     using LinearSolve, PartitionedArrays, PartitionedSolvers
     ```
 
-The `PartitionedSolversAlgorithm` extension validates `PSparseMatrix` / `PVector` inputs and
-initializes the LinearSolve cache structure, but the full solve-path delegation into
-`PartitionedSolvers.solve` is not integrated yet.
+The `PartitionedSolversAlgorithm` extension is intended for
+`PSparseMatrix` / `PVector` inputs from `PartitionedArrays.jl`. It delegates solves to the
+local `PartitionedSolvers` solver constructors, supports repeated `solve!` reuse through the
+cached solver object, and provides a typed `defaultalg` dispatch for square `PSparseMatrix`
+problems.
+
+The integration is solver-agnostic: it forwards only the convergence keywords that the chosen
+solver constructor accepts, so different PartitionedSolvers solvers can be used directly. The
+CG-backed Krylov path is the default,
+
+```julia
+using LinearSolve, PartitionedArrays, PartitionedSolvers
+
+alg = PartitionedSolversAlgorithm(PartitionedSolvers.cg)
+sol = solve(prob, alg; abstol = 1.0e-10, reltol = 1.0e-10)
+```
+
+but other distributed solvers such as the stationary Jacobi iteration work the same way:
+
+```julia
+alg = PartitionedSolversAlgorithm(PartitionedSolvers.jacobi)
+sol = solve(prob, alg; maxiters = 50)
+```
 
 ```@docs
 PartitionedSolversAlgorithm

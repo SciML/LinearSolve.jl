@@ -120,6 +120,14 @@ if Base.Sys.islinux() && (GROUP == "All" || GROUP == "LinearSolveHYPRE") && HAS_
     @time @safetestset "LinearSolveHYPRE" include("hypretests.jl")
 end
 
+if Base.Sys.islinux() && (GROUP == "All" || GROUP == "LinearSolvePartitionedSolvers") &&
+        HAS_EXTENSIONS
+    @time @safetestset "LinearSolvePartitionedSolvers" include("partitionedsolverstests.jl")
+    @time @safetestset "LinearSolvePartitionedSolversMPI" include(
+        "partitionedsolverstests_mpi.jl"
+    )
+end
+
 if Base.Sys.islinux() && GROUP == "LinearSolvePETSc" && HAS_EXTENSIONS
     Pkg.activate("petsc")
     Pkg.develop(PackageSpec(path = dirname(@__DIR__)))

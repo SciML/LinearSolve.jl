@@ -66,7 +66,12 @@ end
         # In particular, the `_64` APIs do not exist
         # https://www.intel.com/content/www/us/en/developer/articles/release-notes/onemkl-release-notes-2022.html
         using MKL_jll: MKL_jll
-        const usemkl = MKL_jll.is_available() && pkgversion(MKL_jll) >= v"2022.2"
+        # Check the version before `is_available`: MKL_jll builds older than the
+        # one carrying the JLLWrappers `is_available` API don't define it, and
+        # those are exactly the < 2022.2 builds rejected here anyway. Calling
+        # `is_available` first would throw an UndefVarError on such old builds
+        # (e.g. under `]up`-downgrade resolution).
+        const usemkl = pkgversion(MKL_jll) >= v"2022.2" && MKL_jll.is_available()
     else
         const usemkl = false
     end
@@ -84,7 +89,7 @@ end
 # OpenBLAS_jll is a standard library, but allow users to disable it via preferences
 if Preferences.@load_preference("LoadOpenBLAS_JLL", true)
     using OpenBLAS_jll: OpenBLAS_jll, libopenblas
-    const useopenblas = OpenBLAS_jll.is_available()
+    const useopenblas = isdefined(OpenBLAS_jll, :is_available) && OpenBLAS_jll.is_available()
 else
     const useopenblas = false
     global libopenblas

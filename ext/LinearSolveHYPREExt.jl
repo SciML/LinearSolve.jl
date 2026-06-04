@@ -186,11 +186,17 @@ function SciMLBase.init(
         init_cache_verb = verb_spec
     end
 
-    # Auto-construction of HYPREMatrix/HYPREVector touches MPI inside HYPRE.jl.
-    ensure_hypre_initialized(A, b, u0)
-    A = auto_hypre_matrix(alg, A)
-    b = auto_hypre_vector(alg, b)
-    u0 = u0 === nothing ? nothing : auto_hypre_vector(alg, u0)
+    # Ensure HYPRE (and MPI) are initialized before creating any HYPRE objects.
+    # This is needed when the user passes plain Julia arrays rather than HYPREArrays,
+    # because the conversion below would otherwise attempt to call HYPRE before Init().
+    if !(A isa HYPREMatrix || b isa HYPREVector ||
+            (u0 !== nothing && u0 isa HYPREVector) || alg.solver isa HYPRESolver)
+        HYPRE.Init()
+    end
+
+    A = A isa HYPREMatrix ? A : HYPREMatrix(A)
+    b = b isa HYPREVector ? b : HYPREVector(b)
+    u0 = u0 isa HYPREVector ? u0 : (u0 === nothing ? nothing : HYPREVector(u0))
 
     # Create solution vector/initial guess
     if u0 === nothing

@@ -1,6 +1,7 @@
 SciMLLogging.@verbosity_specifier LinearVerbosity begin
     toggles = (
         :default_lu_fallback,
+        :residual_safety,
         :no_right_preconditioning,
         :using_IterativeSolvers,
         :IterativeSolvers_iterations,
@@ -21,6 +22,7 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
     presets = (
         None = (
             default_lu_fallback = Silent(),
+            residual_safety = Silent(),
             no_right_preconditioning = Silent(),
             using_IterativeSolvers = Silent(),
             IterativeSolvers_iterations = Silent(),
@@ -39,6 +41,7 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
         ),
         Minimal = (
             default_lu_fallback = Silent(),
+            residual_safety = Silent(),
             no_right_preconditioning = Silent(),
             using_IterativeSolvers = Silent(),
             IterativeSolvers_iterations = Silent(),
@@ -57,10 +60,11 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
         ),
         Standard = (
             default_lu_fallback = Silent(),
+            residual_safety = Silent(),
             no_right_preconditioning = Silent(),
             using_IterativeSolvers = Silent(),
             IterativeSolvers_iterations = Silent(),
-            KrylovKit_verbosity = CustomLevel(1),
+            KrylovKit_verbosity = MessageLevel(1),
             KrylovJL_verbosity = Silent(),
             HYPRE_verbosity = InfoLevel(),
             pardiso_verbosity = Silent(),
@@ -75,13 +79,14 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
         ),
         Detailed = (
             default_lu_fallback = WarnLevel(),
+            residual_safety = WarnLevel(),
             no_right_preconditioning = InfoLevel(),
             using_IterativeSolvers = InfoLevel(),
             IterativeSolvers_iterations = Silent(),
-            KrylovKit_verbosity = CustomLevel(2),
-            KrylovJL_verbosity = CustomLevel(1),
+            KrylovKit_verbosity = MessageLevel(2),
+            KrylovJL_verbosity = MessageLevel(1),
             HYPRE_verbosity = InfoLevel(),
-            pardiso_verbosity = CustomLevel(1),
+            pardiso_verbosity = MessageLevel(1),
             blas_errors = WarnLevel(),
             blas_invalid_args = WarnLevel(),
             blas_info = InfoLevel(),
@@ -93,13 +98,14 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
         ),
         All = (
             default_lu_fallback = WarnLevel(),
+            residual_safety = WarnLevel(),
             no_right_preconditioning = InfoLevel(),
             using_IterativeSolvers = InfoLevel(),
             IterativeSolvers_iterations = InfoLevel(),
-            KrylovKit_verbosity = CustomLevel(3),
-            KrylovJL_verbosity = CustomLevel(1),
+            KrylovKit_verbosity = MessageLevel(3),
+            KrylovJL_verbosity = MessageLevel(1),
             HYPRE_verbosity = InfoLevel(),
-            pardiso_verbosity = CustomLevel(1),
+            pardiso_verbosity = MessageLevel(1),
             blas_errors = WarnLevel(),
             blas_invalid_args = WarnLevel(),
             blas_info = InfoLevel(),
@@ -112,7 +118,7 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
     )
 
     groups = (
-        error_control = (:default_lu_fallback, :blas_errors, :blas_invalid_args),
+        error_control = (:default_lu_fallback, :residual_safety, :blas_errors, :blas_invalid_args),
         performance = (:no_right_preconditioning,),
         numerical = (
             :using_IterativeSolvers, :IterativeSolvers_iterations,
@@ -133,6 +139,7 @@ diagnostic messages, warnings, and errors during linear system solution.
 
 ## Error Control Group
 - `default_lu_fallback`: Messages when falling back to LU factorization from other methods
+- `residual_safety`: Messages from the residual safety check (`‖A*x - b‖` vs tolerance)
 - `blas_errors`: Critical BLAS errors that stop computation
 - `blas_invalid_args`: BLAS errors due to invalid arguments
 
@@ -183,7 +190,7 @@ verbose = LinearVerbosity(
 # Set individual fields
 verbose = LinearVerbosity(
     default_lu_fallback = SciMLLogging.InfoLevel(),
-    KrylovJL_verbosity = SciMLLogging.CustomLevel(1),
+    KrylovJL_verbosity = SciMLLogging.MessageLevel(1),
     blas_errors = SciMLLogging.ErrorLevel()
 )
 
@@ -196,7 +203,7 @@ verbose = LinearVerbosity(
 """ LinearVerbosity
 
 # Group classifications (for backwards compatibility)
-const error_control_options = (:default_lu_fallback, :blas_errors, :blas_invalid_args)
+const error_control_options = (:default_lu_fallback, :residual_safety, :blas_errors, :blas_invalid_args)
 const performance_options = (:no_right_preconditioning,)
 const numerical_options = (
     :using_IterativeSolvers, :IterativeSolvers_iterations,

@@ -324,6 +324,20 @@ function LinearSolve.init_cacheval(
     return PREALLOCATED_KLU
 end
 
+# KLU supports Float64 and ComplexF64 (KLUTypes)
+function LinearSolve.init_cacheval(
+        alg::KLUFactorization, A::AbstractSparseArray{T, Int64}, b, u, Pl, Pr,
+        maxiters::Int, abstol,
+        reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    ) where {T <: KLU.KLUTypes}
+    return KLU.KLUFactorization(
+        SparseMatrixCSC{T, Int64}(
+            0, 0, [Int64(1)], Int64[], T[]
+        )
+    )
+end
+
 function LinearSolve.init_cacheval(
         alg::KLUFactorization, A::AbstractSparseArray{Float64, Int32}, b, u, Pl, Pr,
         maxiters::Int, abstol,
@@ -333,6 +347,19 @@ function LinearSolve.init_cacheval(
     return KLU.KLUFactorization(
         SparseMatrixCSC{Float64, Int32}(
             0, 0, [Int32(1)], Int32[], Float64[]
+        )
+    )
+end
+
+function LinearSolve.init_cacheval(
+        alg::KLUFactorization, A::AbstractSparseArray{T, Int32}, b, u, Pl, Pr,
+        maxiters::Int, abstol,
+        reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    ) where {T <: KLU.KLUTypes}
+    return KLU.KLUFactorization(
+        SparseMatrixCSC{T, Int32}(
+            0, 0, [Int32(1)], Int32[], T[]
         )
     )
 end
@@ -418,12 +445,17 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
             end
         else
             # New fact each time since the sparsity pattern can change
-            # and thus it needs to reallocate
+            # and thus it needs to reallocate. `check = false` matches the
+            # `reuse_symbolic = true` branch and keeps singular matrices from
+            # throwing `LinearAlgebra.SingularException`; the status check
+            # below maps that to `ReturnCode.Infeasible` instead. Fixes
+            # https://github.com/SciML/LinearSolve.jl/issues/991.
             fact = KLU.klu(
                 SparseMatrixCSC(
                     size(A)..., getcolptr(A), rowvals(A),
                     nonzeros(A)
-                )
+                ),
+                check = false
             )
         end
         cache.cacheval = fact
@@ -564,11 +596,14 @@ end
     end
 end # @static if Base.USE_GPL_LIBS
 
-function LinearSolve.pattern_changed(fact::Nothing, A::SparseArrays.SparseMatrixCSC)
+function LinearSolve.pattern_changed(
+        fact::Nothing,
+        A::SparseArrays.AbstractSparseMatrixCSC{<:Any, <:Integer}
+    )
     return true
 end
 
-function LinearSolve.pattern_changed(fact, A::SparseArrays.SparseMatrixCSC)
+function LinearSolve.pattern_changed(fact, A::SparseArrays.AbstractSparseMatrixCSC{<:Any, <:Integer})
     colptr0 = fact.colptr # has 0-based indices
     colptr1 = SparseArrays.getcolptr(A) # has 1-based indices
     length(colptr0) == length(colptr1) || return true
@@ -576,7 +611,7 @@ function LinearSolve.pattern_changed(fact, A::SparseArrays.SparseMatrixCSC)
         colptr0[i] + 1 == colptr1[i] || return true
     end
     rowval0 = fact.rowval
-    rowval1 = SparseArrays.getrowval(A)
+    rowval1 = SparseArrays.rowvals(A)
     length(rowval0) == length(rowval1) || return true
     @inbounds for i in eachindex(rowval0)
         rowval0[i] + 1 == rowval1[i] || return true
@@ -590,7 +625,15 @@ end
             assump::OperatorAssumptions{Bool}
         ) where {Ti}
         if assump.issq
-            if length(b) <= 10_000 && length(nonzeros(A)) / length(A) < 2.0e-4
+            # Heuristic: KLU is essentially always better than UMFPACK for
+            # small enough sparse problems, and for medium-sized problems that
+            # are also sufficiently sparse. The previous heuristic only used the
+            # density check, which missed dense-but-tiny problems where KLU is
+            # the right call algorithmically. The `length(b) <= 1_000` branch is
+            # the "small enough should use KLU" fast path; the second branch is
+            # the original "medium and sparse" rule.
+            if length(b) <= 1_000 ||
+                    (length(b) <= 10_000 && length(nonzeros(A)) / length(A) < 2.0e-4)
                 LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KLUFactorization)
             else
                 LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.UMFPACKFactorization)
@@ -624,6 +667,14 @@ end
 
 function LinearSolve.init_cacheval(
         alg::QRFactorization, A::SparseMatrixCSC{Float64, <:Integer}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions
+    )
+    return ArrayInterface.qr_instance(convert(AbstractMatrix, A), alg.pivot)
+end
+
+function LinearSolve.init_cacheval(
+        alg::QRFactorization, A::SparseMatrixCSC{ComplexF64, <:Integer}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )

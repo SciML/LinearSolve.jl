@@ -7,16 +7,24 @@ A `LinearSolve.jl` algorithm that wraps PETSc's KSP (Krylov Subspace) linear
 solvers via [PETSc.jl](https://github.com/JuliaParallel/PETSc.jl).
 
 !!! compat
-    Requires `PETSc.jl` and `MPI.jl` to be loaded:
+    Requires `PETSc.jl`, `MPI.jl`, and `SparseMatricesCSR.jl` to be loaded:
     ```julia
-    using PETSc, MPI
+    using PETSc, MPI, SparseMatricesCSR
     MPI.Init()
     ```
 
-!!! warning "Serial only"
-    Currently supports only serial solves (`MPI.COMM_SELF`). Passing a
-    multi-rank communicator will raise an error. MPI-parallel support is
-    planned for a future release.
+!!! warning "Serial and MPI-parallel"
+    Standard Julia matrices use serial solves via `MPI.COMM_SELF` unless a
+    non-`nothing` communicator is supplied. Distributed `PSparseMatrix` and
+    `PVector` inputs are handled by the MPI extension when `PETSc` and
+    `PartitionedArrays` are loaded.
+
+!!! note "Replicated SparseMatrixCSC with MPI"
+    Plain Julia sparse matrices such as `SparseMatrixCSC` can also be solved on a
+    multi-rank communicator by passing `comm = MPI.COMM_WORLD` (or another MPI
+    communicator). Each rank assembles only its owned row interval into PETSc, PETSc
+    solves the distributed system, and the final `sol.u` is gathered back as the full
+    Julia vector on every rank.
 
 ---
 
@@ -78,7 +86,7 @@ strongly preferred for deterministic, timely resource release.
 ## Example
 
 ```julia
-using LinearSolve, PETSc, MPI, SparseArrays, LinearAlgebra
+using LinearSolve, PETSc, MPI, SparseArrays, SparseMatricesCSR, LinearAlgebra
 
 MPI.Init()
 PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
@@ -92,6 +100,30 @@ sol = solve(
     PETScAlgorithm(:gmres; pc_type = :ilu, ksp_options = (ksp_monitor = "",))
 )
 println("Residual: ", norm(A * sol.u - b) / norm(b))
+PETScExt.cleanup_petsc_cache!(sol)
+```
+
+## Distributed SparseMatrixCSC Example
+
+```julia
+using LinearSolve, PETSc, MPI, SparseArrays, SparseMatricesCSR, LinearAlgebra
+
+MPI.Init()
+PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
+
+n = 12
+A = spdiagm(-1 => -ones(n - 1), 0 => 4.0 .* ones(n), 1 => -ones(n - 1))
+b = ones(n)
+
+sol = solve(
+    LinearProblem(A, b),
+    PETScAlgorithm(:gmres; comm = MPI.COMM_WORLD);
+    abstol = 1.0e-10,
+    reltol = 1.0e-10
+)
+
+# sol.u is the full replicated solution on every rank.
+println(norm(A * sol.u - b) / norm(b))
 PETScExt.cleanup_petsc_cache!(sol)
 ```
 """
@@ -118,7 +150,7 @@ struct PETScAlgorithm <: SciMLLinearSolveAlgorithm
             ksp_options::NamedTuple = NamedTuple(),
         )
         Base.get_extension(@__MODULE__, :LinearSolvePETScExt) === nothing && error(
-            "PETScAlgorithm requires PETSc and MPI to be loaded: `using PETSc, MPI`"
+            "PETScAlgorithm requires PETSc, MPI, and SparseMatricesCSR to be loaded: `using PETSc, MPI, SparseMatricesCSR`"
         )
         nullspace ∈ (:none, :constant, :custom) || error(
             "nullspace must be :none, :constant, or :custom (got :$nullspace)"
@@ -137,7 +169,7 @@ struct PETScAlgorithm <: SciMLLinearSolveAlgorithm
 end
 
 """
-`HYPREAlgorithm(solver; Pl = nothing)`
+`HYPREAlgorithm(solver; comm = nothing, Pl = nothing)`
 
 [HYPRE.jl](https://github.com/fredrikekre/HYPRE.jl) is an interface to
 [`hypre`](https://computing.llnl.gov/projects/hypre-scalable-linear-solvers-multigrid-methods)
@@ -169,6 +201,8 @@ The single positional argument `solver` has the following choices:
 
 ## Keyword Arguments
 
+  - `comm`: optional MPI communicator used to auto-construct distributed
+    `HYPREMatrix` / `HYPREVector` inputs from plain Julia sparse matrices and vectors.
   - `Pl`: A choice of left preconditioner.
 
 ## Example
@@ -177,21 +211,88 @@ For example, to use `HYPRE.PCG` as the solver, with `HYPRE.BoomerAMG` as the pre
 the algorithm should be defined as follows:
 
 ```julia
+using HYPRE
+
+HYPRE.Init()
 A, b = setup_system(...)
 prob = LinearProblem(A, b)
 alg = HYPREAlgorithm(HYPRE.PCG)
 prec = HYPRE.BoomerAMG
 sol = solve(prob, alg; Pl = prec)
 ```
+
+For automatic distributed construction from a plain Julia sparse matrix on an MPI
+communicator, pass the communicator through `comm`:
+
+```julia
+using HYPRE, MPI
+
+MPI.Init()
+HYPRE.Init()
+alg = HYPREAlgorithm(HYPRE.PCG; comm = MPI.COMM_WORLD)
+sol = solve(prob, alg)
+```
 """
 struct HYPREAlgorithm <: SciMLLinearSolveAlgorithm
     solver::Any
-    function HYPREAlgorithm(solver)
+    comm::Any
+    function HYPREAlgorithm(solver; comm = nothing)
         ext = Base.get_extension(@__MODULE__, :LinearSolveHYPREExt)
         if ext === nothing
             error("HYPREAlgorithm requires that HYPRE is loaded, i.e. `using HYPRE`")
         else
-            return new{}(solver)
+            return new{}(solver, comm)
+        end
+    end
+end
+
+"""
+`PartitionedSolversAlgorithm(solver = nothing; kwargs...)`
+
+[PartitionedSolvers](https://github.com/PartitionedArrays/PartitionedArrays.jl/tree/master/PartitionedSolvers)
+provides distributed linear solver building blocks for
+[PartitionedArrays.jl](https://github.com/PartitionedArrays/PartitionedArrays.jl).
+
+This algorithm is intended for `PSparseMatrix` / `PVector` inputs. The integration
+delegates actual solves to the local `PartitionedSolvers` solver constructors and caches
+the resulting solver object for repeated solves. The default dispatch for `PSparseMatrix`
+inputs chooses the CG-backed PartitionedSolvers path, but the integration is
+solver-agnostic: any PartitionedSolvers solver constructor (for example
+`PartitionedSolvers.cg`, `PartitionedSolvers.jacobi`, or `PartitionedSolvers.amg`) can be
+passed, and only the convergence keywords that the chosen solver actually accepts are
+forwarded automatically.
+
+## Positional Arguments
+
+  - `solver`: optional PartitionedSolvers solver object or constructor such as
+    `PartitionedSolvers.cg`. If omitted, the integration uses the local
+    `PartitionedSolvers` default solver.
+
+## Keyword Arguments
+
+  - `kwargs...`: forwarded when constructing an explicit underlying PartitionedSolvers
+    solver. They take precedence over the auto-derived convergence keywords.
+
+## Example
+
+```julia
+using LinearSolve, PartitionedArrays, PartitionedSolvers
+
+alg = PartitionedSolversAlgorithm(PartitionedSolvers.cg)
+sol = solve(prob, alg)
+```
+"""
+struct PartitionedSolversAlgorithm <: SciMLLinearSolveAlgorithm
+    solver::Any
+    kwargs::NamedTuple
+    function PartitionedSolversAlgorithm(solver = nothing; kwargs...)
+        ext = Base.get_extension(@__MODULE__, :LinearSolvePartitionedSolversExt)
+        if ext === nothing
+            error(
+                "PartitionedSolversAlgorithm requires PartitionedArrays and PartitionedSolvers to be loaded: `using PartitionedArrays, PartitionedSolvers`"
+            )
+        else
+            return new(solver, NamedTuple(kwargs))
         end
     end
 end
@@ -765,7 +866,7 @@ function IterativeSolversJL_GMRES end
 
 """
 ```julia
-IterativeSolversJL_IDRS(args...; Pl = nothing, kwargs...)
+IterativeSolversJL_IDRS(args...; Pl = nothing, idrs_s = 4, kwargs...)
 ```
 
 A wrapper over the IterativeSolvers.jl IDR(S).
@@ -1240,4 +1341,191 @@ struct ParUFactorization <: AbstractSparseFactorization
         end
         return new(reuse_symbolic)
     end
+end
+
+"""
+`MUMPSFactorization(; sym = :unsymmetric, transposed = false, verbose = false, ooc = false, itref = 0, user_perm = false, icntl = nothing, cntl = nothing, par = 1)`
+
+A sparse direct solver wrapper around [MUMPS.jl](https://github.com/JuliaSmoothOptimizers/MUMPS.jl),
+backed by the `MUMPS_jll` artifact.
+
+This wrapper is intended for repeated solves with the same sparse matrix, using a cached
+MUMPS factorization inside the `LinearSolve` cache. When `cache.A` is replaced, the old
+MUMPS object is finalized and a new factorization is built.
+
+## Keyword Arguments
+
+  - `sym`: Matrix structure passed to MUMPS. Choices are `:unsymmetric` (default),
+    `:definite`, and `:symmetric`.
+  - `transposed`: Solve `A' * x = b` instead of `A * x = b`.
+  - `verbose`: Enable MUMPS output.
+  - `ooc`: Enable out-of-core factorization.
+  - `itref`: Maximum number of iterative refinement steps.
+  - `user_perm`: Tell MUMPS to use a user-supplied permutation.
+  - `icntl`: Optional custom MUMPS `ICNTL` vector. When provided, it overrides the
+    wrapper-generated control vector.
+  - `cntl`: Optional custom MUMPS `CNTL` vector.
+  - `par`: MUMPS host participation flag. Defaults to `1`.
+
+!!! note
+
+    Using this solver requires loading `MUMPS.jl` and `SparseArrays`, and initializing MPI:
+    ```julia
+    using MPI, MUMPS, SparseArrays
+    MPI.Init()
+    ```
+
+## Supported Element Types
+
+`Float32`, `Float64`, `ComplexF32`, and `ComplexF64`.
+
+Inputs with other element types are rejected with an error instead of being
+silently converted to a lower-precision type.
+
+## Memory Management
+
+MUMPS holds MPI-backed resources outside Julia's GC. Call
+`cleanup_mumps_cache!` explicitly when you are finished with a solve and before
+`MPI.Finalize()`:
+
+```julia
+using LinearSolve, SparseArrays, MPI, MUMPS
+
+MPI.Init()
+MUMPSExt = Base.get_extension(LinearSolve, :LinearSolveMUMPSExt)
+
+A = sparse([4.0 1.0; 2.0 3.0])
+b = [1.0, 2.0]
+sol = solve(LinearProblem(A, b), MUMPSFactorization())
+
+MUMPSExt.cleanup_mumps_cache!(sol)
+MPI.Finalize()
+```
+
+The extension also registers a GC finalizer as a safety net, but explicit
+cleanup is strongly preferred for deterministic teardown.
+
+## Example
+
+```julia
+using LinearSolve, SparseArrays, MPI, MUMPS
+
+MPI.Init()
+MUMPSExt = Base.get_extension(LinearSolve, :LinearSolveMUMPSExt)
+A = sparse([4.0 1.0; 2.0 3.0])
+b = [1.0, 2.0]
+sol = solve(LinearProblem(A, b), MUMPSFactorization())
+MUMPSExt.cleanup_mumps_cache!(sol)
+```
+"""
+struct MUMPSFactorization <: AbstractSparseFactorization
+    sym::Int
+    transposed::Bool
+    verbose::Bool
+    ooc::Bool
+    itref::Int
+    user_perm::Bool
+    icntl::Any
+    cntl::Any
+    par::Int
+
+    function MUMPSFactorization(;
+            sym::Union{Symbol, Integer} = :unsymmetric,
+            transposed::Bool = false,
+            verbose::Bool = false,
+            ooc::Bool = false,
+            itref::Int = 0,
+            user_perm::Bool = false,
+            icntl = nothing,
+            cntl = nothing,
+            par::Int = 1,
+        )
+        ext = Base.get_extension(@__MODULE__, :LinearSolveMUMPSExt)
+        if ext === nothing
+            error("MUMPSFactorization requires that MUMPS and SparseArrays are loaded, i.e. `using MPI, MUMPS, SparseArrays`")
+        end
+        sym_val = if sym isa Symbol
+            if sym === :unsymmetric
+                0
+            elseif sym === :definite
+                1
+            elseif sym === :symmetric
+                2
+            else
+                error("Unknown MUMPS symmetry flag: $sym")
+            end
+        else
+            Int(sym)
+        end
+        return new(sym_val, transposed, verbose, ooc, itref, user_perm, icntl, cntl, par)
+    end
+end
+
+"""
+    ElementalJL(; method = :LU)
+
+A wrapper for [Elemental.jl](https://github.com/JuliaParallel/Elemental.jl),
+providing distributed-memory dense linear algebra solvers built on the
+[Elemental](https://github.com/elemental/Elemental) C++ library by Jack Poulson.
+(LLNL maintains an active GPU-focused fork of Elemental called
+[Hydrogen](https://github.com/LLNL/Elemental).)
+
+## Keyword Arguments
+
+  - `method`: The factorization method to use. Options:
+    - `:LU` (default) — LU factorization with partial pivoting. Suitable for
+      general square systems.
+    - `:QR` — QR factorization. Suitable for square or overdetermined systems.
+    - `:LQ` — LQ factorization. Suitable for square or underdetermined systems.
+    - `:Cholesky` — Cholesky factorization. Requires the matrix to be Hermitian
+      positive definite.
+
+## Supported Element Types
+
+`Float32`, `Float64`, `ComplexF32`, `ComplexF64`. Matrices with other element
+types are promoted to `Float64` (real) or `ComplexF64` (complex) before being
+passed to Elemental.
+
+## Notes
+
+  - Serial `Elemental.Matrix` values are accepted directly as the problem
+    matrix `A`; they are copied before factorization so the original is
+    never mutated.
+  - When `A` is a standard Julia `AbstractMatrix`, it is copied into an
+    `Elemental.Matrix` for the factorization.
+  - The factorization is cached across repeated solves with the same matrix
+    (i.e. when `isfresh = false`).
+
+!!! note
+
+    Using this solver requires adding the package Elemental.jl:
+    ```julia
+    using Elemental
+    ```
+    Elemental.jl automatically initialises MPI when loaded; no explicit
+    `MPI.Init()` call is needed for serial usage.
+
+## Example
+
+```julia
+using LinearSolve, Elemental
+
+A = rand(100, 100); A = A + A' + 100I  # well-conditioned
+b = rand(100)
+prob = LinearProblem(A, b)
+
+# LU (default)
+sol = solve(prob, ElementalJL())
+# LQ
+sol = solve(prob, ElementalJL(method = :LQ))
+# Cholesky (symmetric positive definite)
+sol = solve(prob, ElementalJL(method = :Cholesky))
+```
+"""
+struct ElementalJL <: AbstractDenseFactorization
+    method::Symbol
+end
+
+function ElementalJL(; method::Symbol = :LU)
+    return ElementalJL(method)
 end

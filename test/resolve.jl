@@ -4,6 +4,10 @@ using LinearSolve: AbstractDenseFactorization, AbstractSparseFactorization,
     AMDGPUOffloadLUFactorization, AMDGPUOffloadQRFactorization,
     SparspakFactorization
 
+const STRUMPACKExt = Base.get_extension(LinearSolve, :LinearSolveSTRUMPACKExt)
+const HAS_STRUMPACK = STRUMPACKExt !== nothing && STRUMPACKExt.strumpack_isavailable()
+const HAS_MUMPS = Base.get_extension(LinearSolve, :LinearSolveMUMPSExt) !== nothing
+
 # Function to check if an algorithm is mixed precision
 function is_mixed_precision_alg(alg)
     alg_name = string(alg)
@@ -48,14 +52,22 @@ for alg in vcat(
             (!(alg == AppleAccelerate32MixedLUFactorization) || Sys.isapple()) &&
             (!(alg == OpenBLAS32MixedLUFactorization) || LinearSolve.useopenblas) &&
             (!(alg == SparspakFactorization) || false) &&
+            (!(alg == STRUMPACKFactorization) || HAS_STRUMPACK) &&
             (
             !(alg == ParUFactorization) ||
                 Base.get_extension(LinearSolve, :LinearSolveParUExt) !== nothing
+        ) &&
+            (
+            !(alg == ElementalJL) ||
+                Base.get_extension(LinearSolve, :LinearSolveElementalExt) !== nothing
+        ) &&
+            (
+            !(alg == MUMPSFactorization) || HAS_MUMPS
         )
         A = [1.0 2.0; 3.0 4.0]
         alg in [
             KLUFactorization, UMFPACKFactorization, SparspakFactorization,
-            ParUFactorization,
+            ParUFactorization, STRUMPACKFactorization,
         ] &&
             (A = sparse(A))
         A = A' * A
@@ -84,7 +96,7 @@ for alg in vcat(
         A = [1.0 2.0; 3.0 4.0]
         alg in [
             KLUFactorization, UMFPACKFactorization, SparspakFactorization,
-            ParUFactorization,
+            ParUFactorization, STRUMPACKFactorization,
         ] &&
             (A = sparse(A))
         A = A' * A
@@ -110,11 +122,21 @@ linsolve = init(
     prob, DiagonalFactorization(),
     alias = LinearAliasSpecifier(alias_A = false, alias_b = false)
 )
-@test solve!(linsolve).u ≈ [1.0, 0.5]
-@test solve!(linsolve).u ≈ [1.0, 0.5]
+sol = solve!(linsolve)
+@test sol.u ≈ [1.0, 0.5]
+@test sol.retcode == ReturnCode.Success
+sol = solve!(linsolve)
+@test sol.u ≈ [1.0, 0.5]
+@test sol.retcode == ReturnCode.Success
 A = Diagonal([1.0, 4.0])
 linsolve.A = A
 @test solve!(linsolve).u ≈ [1.0, 0.5]
+
+# Test retcode for default algorithm with Diagonal
+prob_diag = LinearProblem(Diagonal(ones(2)), ones(2))
+sol_diag = solve(prob_diag)
+@test sol_diag.u ≈ ones(2)
+@test sol_diag.retcode == ReturnCode.Success
 
 A = Symmetric(
     [

@@ -1,7 +1,7 @@
 name = "LinearSolvePyAMG"
 uuid = "7a56c47d-7ab1-4e99-b0e3-2952e463d64a"
 authors = ["SciML"]
-version = "1.0.0"
+version = "1.1.0"
 
 [sources]
 LinearSolve = {path = "../.."}
@@ -19,4 +19,4 @@ julia = "1.10"
 CondaPkg = "0.2"
 LinearSolve = "3"
 PythonCall = "0.9"
-SciMLBase = "2"
+SciMLBase = "2, 3"

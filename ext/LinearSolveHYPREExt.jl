@@ -1,7 +1,7 @@
 module LinearSolveHYPREExt
 
 using LinearAlgebra
-using HYPRE.LibHYPRE: HYPRE_Complex
+using HYPRE.LibHYPRE: HYPRE_Complex, HYPREError, HYPRE_ERROR_CONV
 using HYPRE: HYPRE, HYPREMatrix, HYPRESolver, HYPREVector
 using LinearSolve: HYPREAlgorithm, LinearCache, LinearProblem, LinearSolve,
     OperatorAssumptions, default_tol, init_cacheval, __issquare,
@@ -9,6 +9,8 @@ using LinearSolve: HYPREAlgorithm, LinearCache, LinearProblem, LinearSolve,
 using SciMLLogging: SciMLLogging, verbosity_to_int, @SciMLMessage
 using SciMLBase: LinearProblem, LinearAliasSpecifier, SciMLBase
 using Setfield: @set!
+
+const MPI = HYPRE.MPI
 
 mutable struct HYPRECache
     solver::Union{HYPRE.HYPRESolver, Nothing}
@@ -28,6 +30,45 @@ function LinearSolve.init_cacheval(
     return HYPRECache(nothing, nothing, nothing, nothing, true, true, true)
 end
 
+function local_row_partition(nrows::Integer, comm::MPI.Comm)
+    nranks = MPI.Comm_size(comm)
+    rank = MPI.Comm_rank(comm)
+    q, r = divrem(nrows, nranks)
+    nlocal = q + (rank < r ? 1 : 0)
+    ilower = rank * q + min(rank, r) + 1
+    iupper = ilower + nlocal - 1
+    return ilower, iupper
+end
+
+is_distributed_comm(comm) = !(comm === nothing) && comm != MPI.COMM_NULL && MPI.Comm_size(comm) > 1
+
+auto_hypre_matrix(::HYPREAlgorithm, A::HYPREMatrix) = A
+auto_hypre_vector(::HYPREAlgorithm, b::HYPREVector) = b
+
+function auto_hypre_matrix(alg::HYPREAlgorithm, A)
+    if !is_distributed_comm(alg.comm)
+        return A isa HYPREMatrix ? A : HYPREMatrix(A)
+    end
+    if !(A isa AbstractMatrix)
+        throw(ArgumentError("distributed HYPRE auto-construction requires an AbstractMatrix input"))
+    end
+    ilower, iupper = local_row_partition(size(A, 1), alg.comm)
+    Alocal = A[ilower:iupper, :]
+    return HYPREMatrix(alg.comm, Alocal, ilower, iupper)
+end
+
+function auto_hypre_vector(alg::HYPREAlgorithm, b)
+    if !is_distributed_comm(alg.comm)
+        return b isa HYPREVector ? b : HYPREVector(b)
+    end
+    if !(b isa AbstractVector)
+        throw(ArgumentError("distributed HYPRE auto-construction requires an AbstractVector input"))
+    end
+    ilower, iupper = local_row_partition(length(b), alg.comm)
+    blocal = b[ilower:iupper]
+    return HYPREVector(alg.comm, blocal, ilower, iupper)
+end
+
 # Overload set_(A|b|u) in order to keep track of "isfresh" for all of them
 const LinearCacheHYPRE = LinearCache{<:Any, <:Any, <:Any, <:Any, <:Any, HYPRECache}
 
@@ -35,15 +76,15 @@ function Base.setproperty!(cache::LinearCacheHYPRE, name::Symbol, x)
     if name === :A
         cache.cacheval.isfresh_A = true
         setfield!(cache, :isfresh, true)
-        return setfield!(cache, name, x isa HYPREMatrix ? x : HYPREMatrix(x))
+        return setfield!(cache, name, auto_hypre_matrix(cache.alg, x))
     elseif name == :b
         cache.cacheval.isfresh_b = true
         setfield!(cache, :isfresh, true)
-        return setfield!(cache, name, x isa HYPREVector ? x : HYPREVector(x))
+        return setfield!(cache, name, auto_hypre_vector(cache.alg, x))
     elseif name == :u
         cache.cacheval.isfresh_u = true
         setfield!(cache, :isfresh, true)
-        return setfield!(cache, name, x isa HYPREVector ? x : HYPREVector(x))
+        return setfield!(cache, name, auto_hypre_vector(cache.alg, x))
     end
     return setfield!(cache, name, x)
 end
@@ -184,6 +225,23 @@ create_solver(::Type{S}, comm) where {S <: COMM_SOLVERS} = S(comm)
 const NO_COMM_SOLVERS = Union{HYPRE.BoomerAMG, HYPRE.Hybrid, HYPRE.ILU}
 create_solver(::Type{S}, comm) where {S <: NO_COMM_SOLVERS} = S()
 
+function hypre_retcode(
+        cache::LinearCache, resid, iters::Integer; convergence_error::Bool = false
+    )
+    if !isfinite(resid)
+        return SciMLBase.ReturnCode.Failure
+    end
+
+    tol = max(abs(float(cache.abstol)), abs(float(cache.reltol)))
+    if !convergence_error && resid <= tol
+        return SciMLBase.ReturnCode.Success
+    elseif iters >= cache.maxiters
+        return SciMLBase.ReturnCode.MaxIters
+    else
+        return SciMLBase.ReturnCode.ConvergenceFailure
+    end
+end
+
 function create_solver(alg::HYPREAlgorithm, cache::LinearCache)
     # If the solver is already instantiated, return it directly
     if alg.solver isa HYPRE.HYPRESolver
@@ -275,7 +333,16 @@ function SciMLBase.solve!(cache::LinearCache, alg::HYPREAlgorithm, args...; kwar
     cache.isfresh = false
 
     # Solve!
-    HYPRE.solve!(hcache.solver, hcache.u, hcache.A, hcache.b)
+    convergence_error = false
+    try
+        HYPRE.solve!(hcache.solver, hcache.u, hcache.A, hcache.b)
+    catch err
+        if err isa HYPREError && (err.ierr & HYPRE_ERROR_CONV) != 0
+            convergence_error = true
+        else
+            rethrow()
+        end
+    end
 
     # Copy back if the output is not HYPREVector
     if cache.u !== hcache.u
@@ -290,7 +357,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::HYPREAlgorithm, args...; kwar
     N = 1 # length((size(u)...,))
     resid = HYPRE.GetFinalRelativeResidualNorm(hcache.solver)
     iters = Int(HYPRE.GetNumIterations(hcache.solver))
-    retc = SciMLBase.ReturnCode.Default # TODO: Fetch from solver
+    retc = hypre_retcode(cache, resid, iters; convergence_error)
     stats = nothing
 
     ret = SciMLBase.LinearSolution{

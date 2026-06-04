@@ -35,7 +35,7 @@ using CPUSummary
 using RecursiveFactorization
 using blis_jll
 using LAPACK_jll
-using CUDA
+using cuSOLVER
 using Metal
 using FastLapackInterface
 

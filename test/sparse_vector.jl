@@ -47,9 +47,48 @@ prob = LinearProblem(H, hess_mat' * grad_vec)
 linsolve = init(prob, CholeskyFactorization())
 @test solve!(linsolve).u ≈ H \ Array(hess_mat' * grad_vec)
 
-# https://github.com/SciML/LinearSolve.jl/issues/614
-A = sprand(ComplexF64, 10, 10, 0.5)
-b = rand(ComplexF64, 10)
+# Complex sparse matrix support for all solvers
+# https://github.com/SciML/OrdinaryDiffEq.jl/issues/2892
+# Note: SuiteSparse sparse solvers (UMFPACK, KLU, CHOLMOD, SPQR) only support
+# Float64 and ComplexF64. ComplexF32 sparse is not supported by any of them.
+@testset "Complex sparse solvers" begin
+    n = 10
+    T = ComplexF64
+    A = sprand(T, n, n, 0.5) + I
+    b = rand(T, n)
+    expected = A \ b
 
-cache = init(LinearProblem(A, b, UMFPACKFactorization()))
-sol = solve!(cache)
+    @testset "UMFPACKFactorization" begin
+        prob = LinearProblem(A, b)
+        sol = solve(prob, UMFPACKFactorization())
+        @test sol.u ≈ expected
+
+        cache = init(prob, UMFPACKFactorization())
+        sol1 = solve!(cache)
+        @test sol1.u ≈ expected
+        A2 = sprand(T, n, n, 0.5) + I
+        cache.A = A2
+        sol2 = solve!(cache)
+        @test A2 * sol2.u ≈ b
+    end
+
+    @testset "KLUFactorization" begin
+        prob = LinearProblem(A, b)
+        sol = solve(prob, KLUFactorization())
+        @test sol.u ≈ expected
+
+        cache = init(prob, KLUFactorization())
+        sol1 = solve!(cache)
+        @test sol1.u ≈ expected
+        A2 = sprand(T, n, n, 0.5) + I
+        cache.A = A2
+        sol2 = solve!(cache)
+        @test A2 * sol2.u ≈ b
+    end
+
+    @testset "LUFactorization" begin
+        prob = LinearProblem(A, b)
+        sol = solve(prob, LUFactorization())
+        @test sol.u ≈ expected
+    end
+end

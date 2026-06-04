@@ -134,9 +134,10 @@ See the [`klu`](@ref) docs for more information.
 
 You typically should not construct this directly, instead use [`klu`](@ref).
 """
-mutable struct KLUFactorization{Tv <: KLUTypes, Ti <: KLUITypes, Tklu <: Union{klu_l_common, klu_common}} <:
+mutable struct KLUFactorization{Tv <: KLUTypes, Ti <: KLUITypes, Tklu <: Union{klu_l_common, klu_common}, Tcommonref <: Ref} <:
     AbstractKLUFactorization{Tv, Ti}
     common::Tklu
+    commonref::Tcommonref
     _symbolic::Ptr{Cvoid}
     _numeric::Ptr{Cvoid}
     n::Int
@@ -146,7 +147,8 @@ mutable struct KLUFactorization{Tv <: KLUTypes, Ti <: KLUITypes, Tklu <: Union{k
     function KLUFactorization(n, colptr, rowval, nzval)
         Ti = eltype(colptr)
         common = _common(Ti)
-        obj = new{eltype(nzval), Ti, typeof(common)}(common, C_NULL, C_NULL, n, colptr, rowval, nzval)
+        commonref = Ref(common)
+        obj = new{eltype(nzval), Ti, typeof(common), typeof(commonref)}(common, commonref, C_NULL, C_NULL, n, colptr, rowval, nzval)
         function f(klu)
             _free_symbolic(klu)
             return _free_numeric(klu)
@@ -158,9 +160,9 @@ end
 function _free_symbolic(K::AbstractKLUFactorization{Tv, Ti}) where {Ti <: KLUITypes, Tv}
     K._symbolic == C_NULL && return C_NULL
     if Ti == Int64
-        klu_l_free_symbolic(Ref(Ptr{klu_l_symbolic}(K._symbolic)), Ref(K.common))
+        klu_l_free_symbolic(Ref(Ptr{klu_l_symbolic}(K._symbolic)), K.commonref)
     elseif Ti == Int32
-        klu_free_symbolic(Ref(Ptr{klu_symbolic}(K._symbolic)), Ref(K.common))
+        klu_free_symbolic(Ref(Ptr{klu_symbolic}(K._symbolic)), K.commonref)
     end
     return K._symbolic = C_NULL
 end
@@ -172,7 +174,7 @@ for Ti in KLUIndexTypes, Tv in KLUValueTypes
     @eval begin
         function _free_numeric(K::AbstractKLUFactorization{$Tv, $Ti})
             K._numeric == C_NULL && return C_NULL
-            $klufree(Ref(Ptr{$ptr}(K._numeric)), Ref(K.common))
+            $klufree(Ref(Ptr{$ptr}(K._numeric)), K.commonref)
             return K._numeric = C_NULL
         end
     end
@@ -229,14 +231,14 @@ for Tv in KLUValueTypes, Ti in KLUIndexTypes
         call = :(
             $extract(
                 klu._numeric, klu._symbolic, Lp, Li, Lx, Lz, Up, Ui,
-                Ux, Uz, Fp, Fi, Fx, Fz, P, Q, Rs, R, Ref(klu.common)
+                Ux, Uz, Fp, Fi, Fx, Fz, P, Q, Rs, R, klu.commonref
             )
         )
     else
         call = :(
             $extract(
                 klu._numeric, klu._symbolic, Lp, Li, Lx, Up, Ui,
-                Ux, Fp, Fi, Fx, P, Q, Rs, R, Ref(klu.common)
+                Ux, Fp, Fi, Fx, P, Q, Rs, R, klu.commonref
             )
         )
     end
@@ -247,7 +249,7 @@ for Tv in KLUValueTypes, Ti in KLUIndexTypes
                 P = C_NULL, Q = C_NULL, R = C_NULL, Lx = C_NULL, Lz = C_NULL, Ux = C_NULL, Uz = C_NULL,
                 Fx = C_NULL, Fz = C_NULL, Rs = C_NULL
             )
-            $sort(klu._symbolic, klu._numeric, Ref(klu.common))
+            $sort(klu._symbolic, klu._numeric, klu.commonref)
             ok = $call
             if ok == 1
                 return nothing
@@ -420,9 +422,9 @@ function klu_analyze!(K::KLUFactorization{Tv, Ti}; check = true) where {Tv, Ti <
         return K
     end
     if Ti == Int64
-        sym = klu_l_analyze(K.n, K.colptr, K.rowval, Ref(K.common))
+        sym = klu_l_analyze(K.n, K.colptr, K.rowval, K.commonref)
     else
-        sym = klu_analyze(K.n, K.colptr, K.rowval, Ref(K.common))
+        sym = klu_analyze(K.n, K.colptr, K.rowval, K.commonref)
     end
     if sym == C_NULL && check
         kluerror(K.common)
@@ -441,9 +443,9 @@ function klu_analyze!(
         return K
     end
     if Ti == Int64
-        sym = klu_l_analyze_given(K.n, K.colptr, K.rowval, P, Q, Ref(K.common))
+        sym = klu_l_analyze_given(K.n, K.colptr, K.rowval, P, Q, K.commonref)
     else
-        sym = klu_analyze_given(K.n, K.colptr, K.rowval, P, Q, Ref(K.common))
+        sym = klu_analyze_given(K.n, K.colptr, K.rowval, P, Q, K.commonref)
     end
     if sym == C_NULL && check
         kluerror(K.common)
@@ -463,7 +465,7 @@ for Tv in KLUValueTypes, Ti in KLUIndexTypes
             K._symbolic == C_NULL && K.common.status >= KLU_OK && klu_analyze!(K)
             if K._symbolic != C_NULL && K.common.status >= KLU_OK
                 K.common.halt_if_singular = !allowsingular && check
-                num = $factor(K.colptr, K.rowval, K.nzval, K._symbolic, Ref(K.common))
+                num = $factor(K.colptr, K.rowval, K.nzval, K._symbolic, K.commonref)
                 K.common.halt_if_singular = true
             else
                 num = C_NULL
@@ -497,7 +499,7 @@ for Tv in KLUValueTypes, Ti in KLUIndexTypes
         function rgrowth(K::KLUFactorization{$Tv, $Ti})
             K._numeric == C_NULL && klu_factor!(K)
             ok = $rgrowth(
-                K.colptr, K.rowval, K.nzval, K._symbolic, K._numeric, Ref(K.common)
+                K.colptr, K.rowval, K.nzval, K._symbolic, K._numeric, K.commonref
             )
             if ok == 0
                 kluerror(K.common)
@@ -513,7 +515,7 @@ for Tv in KLUValueTypes, Ti in KLUIndexTypes
         """
         function rcond(K::AbstractKLUFactorization{$Tv, $Ti})
             K._numeric == C_NULL && klu_factor!(K)
-            ok = $rcond(K._symbolic, K._numeric, Ref(K.common))
+            ok = $rcond(K._symbolic, K._numeric, K.commonref)
             if ok == 0
                 kluerror(K.common)
             else
@@ -528,7 +530,7 @@ for Tv in KLUValueTypes, Ti in KLUIndexTypes
         """
         function condest(K::KLUFactorization{$Tv, $Ti})
             K._numeric == C_NULL && klu_factor!(K)
-            ok = $condest(K.colptr, K.nzval, K._symbolic, K._numeric, Ref(K.common))
+            ok = $condest(K.colptr, K.nzval, K._symbolic, K._numeric, K.commonref)
             if ok == 0
                 kluerror(K.common)
             else
@@ -678,7 +680,7 @@ for Tv in KLUValueTypes, Ti in KLUIndexTypes
             K.nzval = nzval
             K.common.halt_if_singular = !allowsingular && check
             ok = $refactor(
-                K.colptr, K.rowval, K.nzval, K._symbolic, K._numeric, Ref(K.common)
+                K.colptr, K.rowval, K.nzval, K._symbolic, K._numeric, K.commonref
             )
             K.common.halt_if_singular = true
             if (ok == 1 || !check || (allowsingular && K.common.status >= KLU_OK))
@@ -760,7 +762,7 @@ for Tv in KLUValueTypes, Ti in KLUIndexTypes
             klu._numeric == C_NULL && klu_factor!(klu)
             size(B, 1) == size(klu, 1) || throw(DimensionMismatch())
             isok = $solve(
-                klu._symbolic, klu._numeric, size(B, 1), size(B, 2), B, Ref(klu.common)
+                klu._symbolic, klu._numeric, size(B, 1), size(B, 2), B, klu.commonref
             )
             isok == 0 && check && kluerror(klu.common)
             return B
@@ -774,13 +776,13 @@ for Tv in KLUValueTypes, Ti in KLUIndexTypes
     if Tv === :ComplexF64
         call = :(
             $tsolve(
-                klu._symbolic, klu._numeric, size(B, 1), size(B, 2), B, conj, Ref(klu.common)
+                klu._symbolic, klu._numeric, size(B, 1), size(B, 2), B, conj, klu.commonref
             )
         )
     else
         call = :(
             $tsolve(
-                klu._symbolic, klu._numeric, size(B, 1), size(B, 2), B, Ref(klu.common)
+                klu._symbolic, klu._numeric, size(B, 1), size(B, 2), B, klu.commonref
             )
         )
     end

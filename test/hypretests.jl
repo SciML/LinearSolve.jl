@@ -34,7 +34,40 @@ function to_array(b::HYPREVector)
 end
 to_array(x) = x
 
-function generate_probs(alg)
+function failure_prob()
+    n = 200
+    # This SPD 1D Laplacian does not converge in a single PCG iteration, so with
+    # maxiters = 1 we should get a non-success retcode rather than an exception.
+    A = spdiagm(-1 => -ones(n - 1), 0 => 2.0 .* ones(n), 1 => -ones(n - 1))
+    b = ones(n)
+    return LinearProblem(A, b)
+end
+
+is_parasails_precond(Pl) = Pl isa HYPRE.ParaSails || (Pl isa DataType && Pl <: HYPRE.ParaSails)
+
+function parasails_is_usable()
+    n = 20
+    A = spdiagm(-1 => -ones(n - 1), 0 => 4.0 .* ones(n), 1 => -ones(n - 1))
+    b = ones(n)
+    x = zeros(n)
+    A_h = HYPREMatrix(A)
+    b_h = HYPREVector(b)
+    x_h = HYPREVector(x)
+    parasails = HYPRE.ParaSails(; Params = (0.1, 1), Filter = 0.05, Sym = 0)
+    pcg = HYPRE.PCG(; Tol = 1.0e-6, MaxIter = 20, Precond = parasails)
+
+    try
+        redirect_stderr(devnull) do
+            HYPRE.solve!(pcg, x_h, A_h, b_h)
+        end
+        return true
+    catch err
+        err isa HYPRE.LibHYPRE.HYPREError || rethrow()
+        return false
+    end
+end
+
+function generate_probs(alg; Pl = LinearAlgebra.I)
     rng = MersenneTwister(1234)
     n = 100
     if alg.solver isa HYPRE.BoomerAMG || alg.solver === HYPRE.BoomerAMG
@@ -54,6 +87,10 @@ function generate_probs(alg)
         A[end, :] .= 0
         A[1, 1] = 2
         A[end, end] = 2
+    elseif is_parasails_precond(Pl)
+        # ParaSails setup is fragile on the random sparse SPD family below on some
+        # platforms. Use a deterministic strictly diagonally dominant SPD tridiagonal.
+        A = spdiagm(-1 => -ones(n - 1), 0 => 4.0 .* ones(n), 1 => -ones(n - 1))
     else
         A = sprand(rng, n, n, 0.01) + 3 * LinearAlgebra.I
         A = A'A
@@ -74,7 +111,7 @@ function generate_probs(alg)
 end
 
 function test_interface(alg; kw...)
-    prob1, prob2, prob3, prob4 = generate_probs(alg)
+    prob1, prob2, prob3, prob4 = generate_probs(alg; Pl = get(kw, :Pl, LinearAlgebra.I))
 
     atol = 1.0e-6
     rtol = 1.0e-6
@@ -86,7 +123,7 @@ function test_interface(alg; kw...)
         A, b = to_array(prob.A), to_array(prob.b)
 
         # Solve prob directly (without cache)
-        y = solve(prob, alg; cache_kwargs..., Pl = HYPRE.BoomerAMG)
+        y = solve(prob, alg; cache_kwargs...)
         @test A * to_array(y.u) ≈ b atol = atol rtol = rtol
         @test y.iters > 0
         @test y.resid < rtol
@@ -128,6 +165,17 @@ function test_interface(alg; kw...)
     return
 end
 
+function test_retcode_failure()
+    prob = failure_prob()
+    sol = solve(
+        prob, HYPREAlgorithm(HYPRE.PCG);
+        abstol = 1.0e-12, reltol = 1.0e-12, maxiters = 1
+    )
+    @test sol.retcode == SciMLBase.ReturnCode.MaxIters
+    @test sol.iters == 1
+    return @test sol.resid > sol.cache.reltol
+end
+
 const comm = MPI.COMM_WORLD
 
 # HYPRE.BiCGSTAB
@@ -158,13 +206,28 @@ test_interface(HYPREAlgorithm(HYPRE.ILU), Pl = HYPRE.BoomerAMG)
 test_interface(HYPREAlgorithm(HYPRE.ILU()))
 test_interface(HYPREAlgorithm(HYPRE.ILU()), Pl = HYPRE.BoomerAMG)
 # HYPRE.ParaSails
-test_interface(HYPREAlgorithm(HYPRE.PCG), Pl = HYPRE.ParaSails)
-test_interface(HYPREAlgorithm(HYPRE.PCG()), Pl = HYPRE.ParaSails())
+# ParaSails setup may call LP64 LAPACK symbols from HYPRE. Some CI images only have an
+# ILP64 BLAS/LAPACK backend forwarded through libblastrampoline, so first check whether
+# HYPRE itself can set up PCG+ParaSails in this process.
+if parasails_is_usable()
+    test_interface(
+        HYPREAlgorithm(HYPRE.PCG),
+        Pl = HYPRE.ParaSails(; Params = (0.1, 1), Filter = 0.05, Sym = 0)
+    )
+    test_interface(
+        HYPREAlgorithm(HYPRE.PCG()),
+        Pl = HYPRE.ParaSails(; Params = (0.1, 1), Filter = 0.05, Sym = 0)
+    )
+else
+    @test_skip "HYPRE ParaSails requires an LP64 LAPACK backend in this HYPRE build"
+    @test_skip "HYPRE ParaSails requires an LP64 LAPACK backend in this HYPRE build"
+end
 # HYPRE.PCG
 test_interface(HYPREAlgorithm(HYPRE.PCG))
 test_interface(HYPREAlgorithm(HYPRE.PCG), Pl = HYPRE.BoomerAMG)
 test_interface(HYPREAlgorithm(HYPRE.PCG(comm)))
 test_interface(HYPREAlgorithm(HYPRE.PCG(comm)), Pl = HYPRE.BoomerAMG())
+test_retcode_failure()
 
 # Test MPI execution
 mpitestfile = joinpath(@__DIR__, "hypretests_mpi.jl")

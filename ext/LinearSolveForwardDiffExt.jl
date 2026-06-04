@@ -325,7 +325,8 @@ function __dual_init(
     ∂_A = partial_vals(A)
     ∂_b = partial_vals(b)
 
-    primal_prob = LinearProblem{SciMLBase.isinplace(prob)}(new_A, new_b; u0 = new_u0)
+    new_p = nodual_value(p)
+    primal_prob = LinearProblem{SciMLBase.isinplace(prob)}(new_A, new_b, new_p; u0 = new_u0)
 
     if get_dual_type(prob.A) !== nothing
         dual_type = get_dual_type(prob.A)
@@ -467,9 +468,12 @@ function setA!(dc::DualLinearCache, A)
     prop = nodual_value!(getproperty(dc.linear_cache, :A), A) # Update in-place
     setproperty!(dc.linear_cache, :A, prop) # Does additional invalidation logic etc.
 
-    # Update partials
+    # Update partials only when A actually carries Duals; otherwise there is
+    # nothing to extract and the partials slot may be unallocated.
     setfield!(dc, :dual_A, A)
-    partial_vals!(getfield(dc, :partials_A), A) # Update in-place
+    if get_dual_type(A) !== nothing
+        partial_vals!(getfield(dc, :partials_A), A)
+    end
 
     # Invalidate cache (if setting A or b)
     return setfield!(dc, :rhs_cache_valid, false)
@@ -479,21 +483,42 @@ function setb!(dc::DualLinearCache, b)
     prop = nodual_value!(getproperty(dc.linear_cache, :b), b) # Update in-place
     setproperty!(dc.linear_cache, :b, prop) # Does additional invalidation logic etc.
 
-    # Update partials
+    # Update partials only when b actually carries Duals; otherwise there is
+    # nothing to extract and the partials slot may be unallocated.
     setfield!(dc, :dual_b, b)
-    partial_vals!(getfield(dc, :partials_b), b) # Update in-place
+    if get_dual_type(b) !== nothing
+        partial_vals!(getfield(dc, :partials_b), b)
+    end
 
     # Invalidate cache (if setting A or b)
     return setfield!(dc, :rhs_cache_valid, false)
 end
-function setu!(dc::DualLinearCache, u)
+function setu!(dc::DualLinearCache{DT}, u) where {DT}
     # Put the Dual-stripped versions in the LinearCache
     prop = nodual_value!(getproperty(dc.linear_cache, :u), u) # Update in-place
     setproperty!(dc.linear_cache, :u, prop) # Does additional invalidation logic etc.
 
-    # Update partials
+    if get_dual_type(u) === nothing
+        # `u` is primal-only (e.g. the Vector{Float64} iterate handed in by
+        # `NonlinearSolveBase.set_lincache_u!` during Newton iterations under
+        # an outer Hessian tag), while `dual_u` is statically typed
+        # Vector{<:Dual}. Promote element-wise to `DT` with zero partials so
+        # the field invariant is preserved without dropping derivatives — the
+        # next solve! will rewrite the partials from the Dual A / b via
+        # `linearsolve_dual_solution!`.
+        dual_u_field = getfield(dc, :dual_u)
+        if dual_u_field isa AbstractArray
+            dual_u_field .= DT.(u)
+        else
+            setfield!(dc, :dual_u, DT(u))
+        end
+        pu = getfield(dc, :partials_u)
+        pu === nothing || fill!(pu, zero(eltype(pu)))
+        return nothing
+    end
+
     setfield!(dc, :dual_u, u)
-    return partial_vals!(getfield(dc, :partials_u), u) # Update in-place
+    return partial_vals!(getfield(dc, :partials_u), u)
 end
 
 function SciMLBase.reinit!(
@@ -517,7 +542,7 @@ function SciMLBase.reinit!(
     end
 
     if !isnothing(p)
-        cache.linear_cache.p = p
+        cache.linear_cache.p = nodual_value(p)
     end
 
     isfresh = !isnothing(A)
@@ -538,6 +563,8 @@ function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)
         setb!(dc, val)
     elseif sym === :u
         setu!(dc, val)
+    elseif sym === :p
+        setproperty!(dc.linear_cache, :p, nodual_value(val))
     elseif hasfield(DualLinearCache, sym)
         setfield!(dc, sym, val)
     elseif hasfield(LinearSolve.LinearCache, sym)
@@ -578,6 +605,7 @@ partial_vals!(out, x) = map!(partial_vals, out, x) # Update in-place
 nodual_value(x) = x
 nodual_value(x::Dual{T, V, P}) where {T, V <: AbstractFloat, P} = ForwardDiff.value(x)
 nodual_value(x::Dual{T, V, P}) where {T, V <: Dual, P} = x.value  # Keep the inner dual intact
+nodual_value(x::Tuple) = map(nodual_value, x)
 function nodual_value(x::AbstractArray{<:Dual})
     return nodual_value!(similar(x, typeof(nodual_value(first(x)))), x)
 end

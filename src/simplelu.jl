@@ -214,7 +214,10 @@ function SciMLBase.solve!(cache::LinearCache, alg::SimpleLUFactorization; kwargs
     cache.cacheval.b .= cache.b
     cache.cacheval.x .= cache.u
     y = simplelu_solve!(cache.cacheval)
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(
+        alg, y, nothing, cache;
+        retcode = ReturnCode.Success
+    )
 end
 
 function init_cacheval(

@@ -12,10 +12,11 @@ using Test
         return
     end
 
-    # Test with a small sparse matrix
+    using StableRNGs
+    rng = StableRNG(42)
     n = 100
-    A = sprand(n, n, 0.1) + I
-    b = rand(n)
+    A = sprand(rng, n, n, 0.1) + 5I
+    b = rand(rng, n)
 
     # Test with CPU sparse matrix (should auto-convert to GPU)
     @testset "CPU Sparse Matrix" begin
@@ -46,8 +47,8 @@ using Test
     # Test matrix update with same sparsity pattern
     @testset "Matrix Update" begin
         # Create a new matrix with same pattern but different values
-        A2 = A + 0.1 * sprand(n, n, 0.01)
-        b2 = rand(n)
+        A2 = A + 0.1 * sprand(rng, n, n, 0.01)
+        b2 = rand(rng, n)
 
         prob2 = LinearProblem(A2, b2)
         sol2 = solve(prob2, CUSOLVERRFFactorization(reuse_symbolic = true))

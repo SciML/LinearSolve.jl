@@ -1,6 +1,9 @@
 module LinearSolveCUDAExt
 
-using CUDA
+using cuSOLVER
+CUDACore = cuSOLVER.CUDACore
+cuSPARSE = cuSOLVER.cuSPARSE
+
 using LinearSolve: LinearSolve, is_cusparse, defaultalg, cudss_loaded, DefaultLinearSolver,
     DefaultAlgorithmChoice, ALREADY_WARNED_CUDSS, LinearCache,
     needs_concrete_A,
@@ -11,20 +14,20 @@ using LinearSolve: LinearSolve, is_cusparse, defaultalg, cudss_loaded, DefaultLi
 using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase, LinearSolve.ArrayInterface
 using SciMLBase: AbstractSciMLOperator
 
-LinearSolve.usecuda(x::Nothing) = CUDA.functional()
+LinearSolve.usecuda(x::Nothing) = CUDACore.functional()
 
 function LinearSolve.is_cusparse(
         A::Union{
-            CUDA.CUSPARSE.CuSparseMatrixCSR, CUDA.CUSPARSE.CuSparseMatrixCSC,
+            cuSPARSE.CuSparseMatrixCSR, cuSPARSE.CuSparseMatrixCSC,
         }
     )
     return true
 end
-LinearSolve.is_cusparse_csr(::CUDA.CUSPARSE.CuSparseMatrixCSR) = true
-LinearSolve.is_cusparse_csc(::CUDA.CUSPARSE.CuSparseMatrixCSC) = true
+LinearSolve.is_cusparse_csr(::cuSPARSE.CuSparseMatrixCSR) = true
+LinearSolve.is_cusparse_csc(::cuSPARSE.CuSparseMatrixCSC) = true
 
 function LinearSolve.defaultalg(
-        A::CUDA.CUSPARSE.CuSparseMatrixCSR{Tv, Ti}, b,
+        A::cuSPARSE.CuSparseMatrixCSR{Tv, Ti}, b,
         assump::OperatorAssumptions{Bool}
     ) where {Tv, Ti}
     return if LinearSolve.cudss_loaded(A)
@@ -39,7 +42,7 @@ function LinearSolve.defaultalg(
 end
 
 function LinearSolve.defaultalg(
-        A::CUDA.CUSPARSE.CuSparseMatrixCSC, b,
+        A::cuSPARSE.CuSparseMatrixCSC, b,
         assump::OperatorAssumptions{Bool}
     )
     if LinearSolve.cudss_loaded(A)
@@ -50,7 +53,7 @@ function LinearSolve.defaultalg(
     return LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES)
 end
 
-function LinearSolve.error_no_cudss_lu(A::CUDA.CUSPARSE.CuSparseMatrixCSR)
+function LinearSolve.error_no_cudss_lu(A::cuSPARSE.CuSparseMatrixCSR)
     if !LinearSolve.cudss_loaded(A)
         error("CUDSS.jl is required for LU Factorizations on CuSparseMatrixCSR. Please load this library.")
     end
@@ -63,12 +66,12 @@ function SciMLBase.solve!(
     )
     if cache.isfresh
         cacheval = LinearSolve.@get_cacheval(cache, :CudaOffloadLUFactorization)
-        fact = lu(CUDA.CuArray(cache.A))
+        fact = lu(CUDACore.CuArray(cache.A))
         cache.cacheval = fact
         cache.isfresh = false
     end
     fact = LinearSolve.@get_cacheval(cache, :CudaOffloadLUFactorization)
-    y = Array(ldiv!(CUDA.CuArray(cache.u), fact, CUDA.CuArray(cache.b)))
+    y = Array(ldiv!(CUDACore.CuArray(cache.u), fact, CUDACore.CuArray(cache.b)))
     cache.u .= y
     return SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
@@ -79,16 +82,16 @@ function LinearSolve.init_cacheval(
         assumptions::OperatorAssumptions
     )
     # Check if CUDA is functional before creating CUDA arrays
-    if !CUDA.functional()
+    if !CUDACore.functional()
         return nothing
     end
 
     T = eltype(A)
     noUnitT = typeof(zero(T))
     luT = LinearAlgebra.lutype(noUnitT)
-    ipiv = CuVector{Int32}(undef, 0)
+    ipiv = CUDACore.CuVector{Int32}(undef, 0)
     info = zero(LinearAlgebra.BlasInt)
-    return LU{luT}(CuMatrix{Float64}(undef, 0, 0), ipiv, info)
+    return LU{luT}(CUDACore.CuMatrix{Float64}(undef, 0, 0), ipiv, info)
 end
 
 function SciMLBase.solve!(
@@ -96,11 +99,11 @@ function SciMLBase.solve!(
         kwargs...
     )
     if cache.isfresh
-        fact = qr(CUDA.CuArray(cache.A))
+        fact = qr(CUDACore.CuArray(cache.A))
         cache.cacheval = fact
         cache.isfresh = false
     end
-    y = Array(ldiv!(CUDA.CuArray(cache.u), cache.cacheval, CUDA.CuArray(cache.b)))
+    y = Array(ldiv!(CUDACore.CuArray(cache.u), cache.cacheval, CUDACore.CuArray(cache.b)))
     cache.u .= y
     return SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
@@ -111,11 +114,11 @@ function LinearSolve.init_cacheval(
         assumptions::OperatorAssumptions
     )
     # Check if CUDA is functional before creating CUDA arrays
-    if !CUDA.functional()
+    if !CUDACore.functional()
         return nothing
     end
 
-    return qr(CUDA.CuArray(A))
+    return qr(CUDACore.CuArray(A))
 end
 
 # Keep the deprecated CudaOffloadFactorization working by forwarding to QR
@@ -124,11 +127,11 @@ function SciMLBase.solve!(
         kwargs...
     )
     if cache.isfresh
-        fact = qr(CUDA.CuArray(cache.A))
+        fact = qr(CUDACore.CuArray(cache.A))
         cache.cacheval = fact
         cache.isfresh = false
     end
-    y = Array(ldiv!(CUDA.CuArray(cache.u), cache.cacheval, CUDA.CuArray(cache.b)))
+    y = Array(ldiv!(CUDACore.CuArray(cache.u), cache.cacheval, CUDACore.CuArray(cache.b)))
     cache.u .= y
     return SciMLBase.build_linear_solution(alg, y, nothing, cache)
 end
@@ -138,25 +141,35 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    return qr(CUDA.CuArray(A))
+    return qr(CUDACore.CuArray(A))
+end
+
+for AlgType in (SparspakFactorization, LinearSolve.QRFactorization)
+    @eval function LinearSolve.init_cacheval(
+            ::$AlgType, A::cuSPARSE.CuSparseMatrixCSR, b, u,
+            Pl, Pr, maxiters::Int, abstol, reltol,
+            verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+        )
+        return nothing
+    end
+    @eval function LinearSolve.init_cacheval(
+            ::$AlgType, A::cuSPARSE.CuSparseMatrixCSC, b, u,
+            Pl, Pr, maxiters::Int, abstol, reltol,
+            verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+        )
+        return nothing
+    end
 end
 
 function LinearSolve.init_cacheval(
-        ::SparspakFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
+        ::KLUFactorization, A::cuSPARSE.CuSparseMatrixCSR, b, u,
         Pl, Pr, maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
     return nothing
 end
 
 function LinearSolve.init_cacheval(
-        ::KLUFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
-        Pl, Pr, maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
-    )
-    return nothing
-end
-
-function LinearSolve.init_cacheval(
-        ::UMFPACKFactorization, A::CUDA.CUSPARSE.CuSparseMatrixCSR, b, u,
+        ::UMFPACKFactorization, A::cuSPARSE.CuSparseMatrixCSR, b, u,
         Pl, Pr, maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
     return nothing
@@ -167,10 +180,15 @@ function SciMLBase.solve!(
         cache::LinearSolve.LinearCache, alg::CUDAOffload32MixedLUFactorization;
         kwargs...
     )
+    T32 = eltype(cache.A) <: Complex ? ComplexF32 : Float32
     if cache.isfresh
         fact, A_gpu_f32, b_gpu_f32, u_gpu_f32 = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
-        # Compute 32-bit type on demand and convert
-        T32 = eltype(cache.A) <: Complex ? ComplexF32 : Float32
+        if isempty(A_gpu_f32)
+            m, n = size(cache.A)
+            A_gpu_f32 = CuMatrix{T32}(undef, m, n)
+            b_gpu_f32 = CuVector{T32}(undef, size(cache.b, 1))
+            u_gpu_f32 = CuVector{T32}(undef, size(cache.u, 1))
+        end
         A_f32 = T32.(cache.A)
         copyto!(A_gpu_f32, A_f32)
         fact = lu(A_gpu_f32)
@@ -179,8 +197,6 @@ function SciMLBase.solve!(
     end
     fact, A_gpu_f32, b_gpu_f32, u_gpu_f32 = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
 
-    # Compute types on demand for conversions
-    T32 = eltype(cache.A) <: Complex ? ComplexF32 : Float32
     Torig = eltype(cache.u)
 
     # Convert b to Float32, solve, then convert back to original precision
@@ -198,17 +214,19 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    # Pre-allocate with Float32 arrays
-    m, n = size(A)
+    if !CUDA.functional()
+        return nothing
+    end
+
     T32 = eltype(A) <: Complex ? ComplexF32 : Float32
     noUnitT = typeof(zero(T32))
     luT = LinearAlgebra.lutype(noUnitT)
-    ipiv = CuVector{Int32}(undef, min(m, n))
+    ipiv = CuVector{Int32}(undef, 0)
     info = zero(LinearAlgebra.BlasInt)
-    fact = LU{luT}(CuMatrix{T32}(undef, m, n), ipiv, info)
-    A_gpu_f32 = CuMatrix{T32}(undef, m, n)
-    b_gpu_f32 = CuVector{T32}(undef, size(b, 1))
-    u_gpu_f32 = CuVector{T32}(undef, size(u, 1))
+    fact = LU{luT}(CuMatrix{T32}(undef, 0, 0), ipiv, info)
+    A_gpu_f32 = CuMatrix{T32}(undef, 0, 0)
+    b_gpu_f32 = CuVector{T32}(undef, 0)
+    u_gpu_f32 = CuVector{T32}(undef, 0)
     return (fact, A_gpu_f32, b_gpu_f32, u_gpu_f32)
 end
 

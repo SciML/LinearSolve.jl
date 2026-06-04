@@ -80,3 +80,62 @@ sol = solve!(cache)
 @test sol.iters > 0
 copy!(local_sol, sol.u)
 @test local_sol ≈ 4 * (ilower:iupper)
+
+# Automatic distributed construction from plain Julia arrays
+function get_julia_system(scale)
+    diagvals = collect(1.0:20.0)
+    A = spdiagm(0 => diagvals)
+    b = scale .* diagvals
+    return A, b
+end
+
+A_julia, b_julia = get_julia_system(1.0)
+alg = HYPREAlgorithm(HYPRE.PCG; comm = comm)
+prob = LinearProblem(A_julia, b_julia)
+sol = solve(prob, alg)
+@test sol.resid < TOL
+@test sol.iters > 0
+@test sol.u isa HYPREVector
+@test sol.u.comm == comm
+@test sol.u.ilower == ilower
+@test sol.u.iupper == iupper
+copy!(local_sol, sol.u)
+@test local_sol ≈ ones(local_size)
+
+A_julia, b_julia = get_julia_system(2.0)
+cache = init(LinearProblem(A_julia, b_julia), HYPREAlgorithm(HYPRE.PCG; comm = comm))
+@test cache.A isa HYPREMatrix
+@test cache.b isa HYPREVector
+@test cache.u isa HYPREVector
+@test cache.A.comm == cache.b.comm == cache.u.comm == comm
+@test cache.A.ilower == cache.b.ilower == cache.u.ilower == ilower
+@test cache.A.iupper == cache.b.iupper == cache.u.iupper == iupper
+sol = solve!(cache)
+@test sol.resid < TOL
+@test sol.iters > 0
+copy!(local_sol, sol.u)
+@test local_sol ≈ fill(2.0, local_size)
+
+_, b_julia = get_julia_system(3.0)
+cache.b = b_julia
+sol = solve!(cache)
+@test sol.resid < TOL
+@test sol.iters > 0
+copy!(local_sol, sol.u)
+@test local_sol ≈ fill(3.0, local_size)
+
+# Automatic distributed construction failure retcode
+n_fail = 200
+# This SPD 1D Laplacian does not converge in a single PCG iteration, so with
+# maxiters = 1 we should get a non-success retcode rather than an exception.
+A_fail = spdiagm(
+    -1 => -ones(n_fail - 1), 0 => 2.0 .* ones(n_fail), 1 => -ones(n_fail - 1)
+)
+b_fail = ones(n_fail)
+sol = solve(
+    LinearProblem(A_fail, b_fail), HYPREAlgorithm(HYPRE.PCG; comm = comm);
+    abstol = 1.0e-12, reltol = 1.0e-12, maxiters = 1
+)
+@test sol.retcode == SciMLBase.ReturnCode.MaxIters
+@test sol.iters == 1
+@test sol.resid > sol.cache.reltol

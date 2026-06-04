@@ -458,15 +458,15 @@ end
         kwargs = (; gmres_restart = 5)
         precs = (A, p = nothing) -> (BlockJacobiPreconditioner(A, 2), I)
         algorithms = (
-            ("Default", KrylovJL(kwargs...)),
-            ("CG", KrylovJL_CG(kwargs...)),
-            ("GMRES", KrylovJL_GMRES(kwargs...)),
-            ("FGMRES", KrylovJL_FGMRES(kwargs...)),
+            ("Default", KrylovJL(; kwargs...)),
+            ("CG", KrylovJL_CG(; kwargs...)),
+            ("GMRES", KrylovJL_GMRES(; kwargs...)),
+            ("FGMRES", KrylovJL_FGMRES(; kwargs...)),
             ("GMRES_prec", KrylovJL_GMRES(; precs, ldiv = false, kwargs...)),
             ("FGMRES_prec", KrylovJL_FGMRES(; precs, ldiv = false, kwargs...)),
-            # ("BICGSTAB",KrylovJL_BICGSTAB(kwargs...)),
-            ("MINRES", KrylovJL_MINRES(kwargs...)),
-            ("MINARES", KrylovJL_MINARES(kwargs...)),
+            # ("BICGSTAB",KrylovJL_BICGSTAB(; kwargs...)),
+            ("MINRES", KrylovJL_MINRES(; kwargs...)),
+            ("MINARES", KrylovJL_MINARES(; kwargs...)),
         )
         for (name, algorithm) in algorithms
             @testset "$name" begin
@@ -505,10 +505,13 @@ end
         @testset "IterativeSolversJL" begin
             kwargs = (; gmres_restart = 5)
             for alg in (
-                    ("Default", IterativeSolversJL(kwargs...)),
-                    ("CG", IterativeSolversJL_CG(kwargs...)),
-                    ("GMRES", IterativeSolversJL_GMRES(kwargs...)),
-                    ("IDRS", IterativeSolversJL_IDRS(kwargs...)),                #           ("BICGSTAB",IterativeSolversJL_BICGSTAB(kwargs...)),                #            ("MINRES",IterativeSolversJL_MINRES(kwargs...)),
+                    ("Default", IterativeSolversJL(; kwargs...)),
+                    ("CG", IterativeSolversJL_CG(; kwargs...)),
+                    ("GMRES", IterativeSolversJL_GMRES(; kwargs...)),
+                    ("IDRS", IterativeSolversJL_IDRS(; kwargs...)),
+                    ("IDRS(2)", IterativeSolversJL_IDRS(; idrs_s = 2, kwargs...)),
+                    # ("BICGSTAB",IterativeSolversJL_BICGSTAB(; kwargs...)),
+                    # ("MINRES",IterativeSolversJL_MINRES(; kwargs...)),
                 )
                 @testset "$(alg[1])" begin
                     test_interface(alg[2], prob1, prob2)
@@ -523,9 +526,9 @@ end
         @testset "KrylovKit" begin
             kwargs = (; gmres_restart = 5)
             for alg in (
-                    ("Default", KrylovKitJL(kwargs...)),
-                    ("CG", KrylovKitJL_CG(kwargs...)),
-                    ("GMRES", KrylovKitJL_GMRES(kwargs...)),
+                    ("Default", KrylovKitJL(; kwargs...)),
+                    ("CG", KrylovKitJL_CG(; kwargs...)),
+                    ("GMRES", KrylovKitJL_GMRES(; kwargs...)),
                 )
                 @testset "$(alg[1])" begin
                     test_interface(alg[2], prob1, prob2)
@@ -554,6 +557,27 @@ end
             prob2 = LinearProblem(Symmetric(A), b)
             sol2 = solve(prob2)
             @test abs(norm(A * sol2.u .- b) - norm(A * sol.u .- b)) < 1.0e-12
+
+            # Regression test for https://github.com/SciML/LinearSolve.jl/issues/936
+            # CHOLMODFactorization must handle Float32 sparse matrices without
+            # tripping the cacheval's type assertion (the cache used to be
+            # initialized with a Factor{Float64} regardless of the input eltype).
+            for T in (Float32, Float64)
+                A32 = T.(sprand(50, 50, 0.1))
+                A32 = A32 * A32' + 10I
+                A32 = T.(A32)
+                b32 = rand(T, 50)
+
+                prob32 = LinearProblem(A32, b32)
+                sol32 = solve(prob32, CHOLMODFactorization())
+                @test eltype(sol32.u) === T
+                @test norm(A32 * sol32.u - b32) < sqrt(eps(T)) * 100
+
+                prob32s = LinearProblem(Symmetric(A32), b32)
+                sol32s = solve(prob32s, CHOLMODFactorization())
+                @test eltype(sol32s.u) === T
+                @test norm(A32 * sol32s.u - b32) < sqrt(eps(T)) * 100
+            end
         end
     end
 
@@ -897,6 +921,15 @@ end
 
     pr = LinearProblem(B, b)
     solver = KLUFactorization()
+
+    # Regression test for #737: KLU should work with AbstractSparseMatrixCSC wrappers
+    sol = solve(pr, solver)
+    @test norm(sol.u - u0, Inf) < 1.0e-8
+
+    # Repeat direct solve to exercise cache-init/reuse paths through solve(prob, alg)
+    sol = solve(pr, solver)
+    @test norm(sol.u - u0, Inf) < 1.0e-8
+
     cache = init(pr, solver)
     u = solve!(cache)
     @test norm(u - u0, Inf) < 1.0e-8

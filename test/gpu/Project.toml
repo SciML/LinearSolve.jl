@@ -1,8 +1,9 @@
 [deps]
 BlockDiagonals = "0a1fb500-61f7-11e9-3c65-f5ef3456f9f0"
-CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+CUDACore = "bd0ed864-bdfe-4181-a5ed-ce625a5fdea2"
+cuSPARSE = "b26da814-b3bc-49ef-b0ee-c816305aa060"
 CUDSS = "45b445bb-4962-46a0-9369-b4df9d0f772e"
-CUSOLVERRF = "a8cc9031-bad2-4722-94f5-40deabb4245c"
+cuSOLVER = "887afef0-6a32-4de5-add4-7827692ba8fc"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"

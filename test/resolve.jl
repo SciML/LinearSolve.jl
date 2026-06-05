@@ -68,6 +68,7 @@ for alg in vcat(
         alg in [
             KLUFactorization, PureKLUFactorization, UMFPACKFactorization,
             SparspakFactorization, ParUFactorization, STRUMPACKFactorization,
+            SparseColumnPivotedQRFactorization,
         ] &&
             (A = sparse(A))
         A = A' * A
@@ -97,6 +98,7 @@ for alg in vcat(
         alg in [
             KLUFactorization, PureKLUFactorization, UMFPACKFactorization,
             SparspakFactorization, ParUFactorization, STRUMPACKFactorization,
+            SparseColumnPivotedQRFactorization,
         ] &&
             (A = sparse(A))
         A = A' * A

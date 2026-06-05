@@ -328,6 +328,7 @@ EnumX.@enumx DefaultAlgorithmChoice begin
     BLISLUFactorization
     CudaOffloadLUFactorization
     MetalLUFactorization
+    SparseColumnPivotedQRFactorization
 end
 
 # Autotune preference constants - loaded once at package import time
@@ -355,6 +356,8 @@ function is_algorithm_available(alg::DefaultAlgorithmChoice.T)
         return usecuda(nothing)  # Available if CUDA extension is loaded
     elseif alg === DefaultAlgorithmChoice.MetalLUFactorization
         return usemetal(nothing)  # Available if Metal extension is loaded
+    elseif alg === DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization
+        return true  # SparseColumnPivotedQR is a hard dependency, always available
     else
         # For extension-dependent algorithms not explicitly handled above,
         # we cannot easily check availability without trying to use them.
@@ -516,7 +519,8 @@ is_cusparse_csc(A) = false
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
     GenericLUFactorization, SimpleLUFactorization, RFLUFactorization, ButterflyFactorization,
     NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
-    UMFPACKFactorization, KLUFactorization, PureKLUFactorization, FastLUFactorization,
+    UMFPACKFactorization, KLUFactorization, PureKLUFactorization,
+    SparseColumnPivotedQRFactorization, FastLUFactorization,
     FastQRFactorization,
     SparspakFactorization, DiagonalFactorization, CholeskyFactorization,
     BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization,

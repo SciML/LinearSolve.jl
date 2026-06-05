@@ -143,6 +143,10 @@ else
         end
     end
 
+    if GROUP == "LinearSolvePureUMFPACK"
+        @time @safetestset "PureUMFPACK" include("pureumfpack.jl")
+    end
+
     # ParU_jll requires Julia >= 1.12 (SuiteSparse_jll in older stdlib is incompatible)
     if GROUP == "LinearSolveParU" && VERSION >= v"1.12.0-"
         activate_group_env("paru")

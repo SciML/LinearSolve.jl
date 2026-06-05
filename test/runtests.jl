@@ -102,6 +102,7 @@ else
         @time @safetestset "Butterfly Factorization" include("core/butterfly.jl")
         @time @safetestset "Mixed Precision" include("core/test_mixed_precision.jl")
         @time @safetestset "Resize" include("core/resize.jl")
+        @time @safetestset "SpecializingFactorizations" include("core/specializing_factorizations.jl")
     end
 
     # STRUMPACK runs in the base env: STRUMPACK_jll is a base test dep (the Core

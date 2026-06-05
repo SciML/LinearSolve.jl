@@ -525,7 +525,8 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
     SparspakFactorization, DiagonalFactorization, CholeskyFactorization,
     BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization,
     CUSOLVERRFFactorization, CliqueTreesFactorization, ParUFactorization,
-    STRUMPACKFactorization, MUMPSFactorization
+    STRUMPACKFactorization, MUMPSFactorization,
+    SpecializedLUFactorization, SpecializedQRFactorization
 
 export LinearSolveFunction, DirectLdiv!, show_algorithm_choices
 

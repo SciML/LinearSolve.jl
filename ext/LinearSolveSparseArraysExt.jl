@@ -468,9 +468,24 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
     F = LinearSolve.@get_cacheval(cache, :KLUFactorization)
     return if F.common.status == KLU.KLU_OK
         y = ldiv!(cache.u, F, cache.b)
-        SciMLBase.build_linear_solution(
-            alg, y, nothing, cache; retcode = ReturnCode.Success
-        )
+        if all(isfinite, y)
+            SciMLBase.build_linear_solution(
+                alg, y, nothing, cache; retcode = ReturnCode.Success
+            )
+        else
+            # KLU can report `KLU_OK` on a numerically singular matrix (a
+            # tiny-but-nonzero pivot, common when explicit stored zeros mask a
+            # rank deficiency) yet produce non-finite output. Surface that as a
+            # failure instead of a silent NaN `Success`, matching the default
+            # solver's finiteness check.
+            @SciMLMessage(
+                "Solver produced non-finite values; matrix is likely singular",
+                cache.verbose, :solver_failure
+            )
+            SciMLBase.build_linear_solution(
+                alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible
+            )
+        end
     else
         @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
         SciMLBase.build_linear_solution(
@@ -611,9 +626,24 @@ function SciMLBase.solve!(
     F = LinearSolve.@get_cacheval(cache, :KLUFactorization)
     return if F.common.status == PureKLU.KLU_OK
         y = ldiv!(cache.u, F, cache.b)
-        SciMLBase.build_linear_solution(
-            alg, y, nothing, cache; retcode = ReturnCode.Success
-        )
+        if all(isfinite, y)
+            SciMLBase.build_linear_solution(
+                alg, y, nothing, cache; retcode = ReturnCode.Success
+            )
+        else
+            # PureKLU (like SuiteSparse KLU) can report `KLU_OK` on a numerically
+            # singular matrix (a tiny-but-nonzero pivot, common when explicit
+            # stored zeros mask a rank deficiency) yet produce non-finite output.
+            # Surface that as a failure instead of a silent NaN `Success`,
+            # matching the default solver's finiteness check.
+            @SciMLMessage(
+                "Solver produced non-finite values; matrix is likely singular",
+                cache.verbose, :solver_failure
+            )
+            SciMLBase.build_linear_solution(
+                alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible
+            )
+        end
     else
         @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
         SciMLBase.build_linear_solution(

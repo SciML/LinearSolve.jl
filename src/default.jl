@@ -1,7 +1,7 @@
 needs_concrete_A(alg::DefaultLinearSolver) = true
 mutable struct DefaultLinearSolverInit{
         T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12,
-        T13, T14, T15, T16, T17, T18, T19, T20, T21, T22, T23, T24,
+        T13, T14, T15, T16, T17, T18, T19, T20, T21, T22, T23, T24, T25,
         TA, Tb,
     }
     LUFactorization::T1
@@ -28,6 +28,7 @@ mutable struct DefaultLinearSolverInit{
     BLISLUFactorization::T22
     CudaOffloadLUFactorization::T23
     MetalLUFactorization::T24
+    SparseColumnPivotedQRFactorization::T25
     A_backup::TA  # backup of cache.A for restoring after in-place LU and QR fallback
     residual_buf::Tb  # pre-allocated buffer for post-solve residual check (same size/type as b)
     a_backup_synced::Bool  # true if A_backup content matches cache.A (before LU modifies it)
@@ -473,6 +474,8 @@ function algchoice_to_alg(alg::Symbol)
         CudaOffloadLUFactorization(throwerror = false)
     elseif alg === :MetalLUFactorization
         MetalLUFactorization(throwerror = false)
+    elseif alg === :SparseColumnPivotedQRFactorization
+        SparseColumnPivotedQRFactorization()
     else
         error("Algorithm choice symbol $alg not allowed in the default")
     end
@@ -587,6 +590,7 @@ const _SPARSE_ONLY_ALGORITHMS = Symbol.(
         DefaultAlgorithmChoice.UMFPACKFactorization,
         DefaultAlgorithmChoice.SparspakFactorization,
         DefaultAlgorithmChoice.CHOLMODFactorization,
+        DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization,
     )
 )
 
@@ -697,9 +701,9 @@ end
 """
     _do_sparse_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol)
 
-Perform SPQR (sparse QR via SuiteSparse) fallback after a sparse LU
-(`KLUFactorization`, `UMFPACKFactorization`, `SparspakFactorization`) solve failed
-or produced non-finite output.
+Perform column-pivoted sparse QR (`SparseColumnPivotedQRFactorization`) fallback
+after a sparse LU (`KLUFactorization`, `UMFPACKFactorization`,
+`SparspakFactorization`) solve failed or produced non-finite output.
 
 Sparse LU does not modify `cache.A` in place — UMFPACK and KLU wrap a
 `SparseMatrixCSC` over the existing `colptr`/`rowval`/`nzval` arrays and store
@@ -707,30 +711,29 @@ the factorization on the factorization object — so there is no `A_backup`
 restoration step like in the dense path's `_do_qr_fallback`.
 
 Unlike the dense path, we do not recurse through `solve!(cache, QRFactorization(...))`
-to compute the QR. The default solver's `cacheval` routing in `Base.setproperty!`
-dispatches the stored factorization to the slot named after `cache.alg.alg`
-(e.g. `:KLUFactorization`), which would type-mismatch when we want to land a
-`QRSparse` factorization there. Instead, we compute the QR directly with
-`qr(cache.A)` and stash it in the `:QRFactorizationPivoted` slot ourselves with
-`setfield!`. The slot's type parameter is concretely `QRSparse` for the
+to compute the QR. We compute the rank-revealing column-pivoted sparse QR
+directly via `sparse_colpivqr_factorize(cache.A)` (implemented in the SparseArrays
+extension over SparseColumnPivotedQR.jl) and stash it in the dedicated
+`:SparseColumnPivotedQRFactorization` slot ourselves with `setfield!`. That slot
+is pre-initialized to a `CSRQRFactorization` of the matching element type for the
 `SparseMatrixCSC{<:Union{Float64, ComplexF64}, <:Integer}` cases that the sparse
 LU defaults select, so the assignment is type-stable.
 """
 function _do_sparse_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol)
     if reason === :residual_check
         @SciMLMessage(
-            "Sparse LU solve residual check failed, falling back to SPQR (sparse QR). `A` is potentially ill-conditioned.",
+            "Sparse LU solve residual check failed, falling back to column-pivoted sparse QR. `A` is potentially ill-conditioned.",
             cache.verbose, :default_lu_fallback
         )
     else
         @SciMLMessage(
-            "Sparse LU factorization failed, falling back to SPQR (sparse QR). `A` is potentially rank-deficient or numerically singular.",
+            "Sparse LU factorization failed, falling back to column-pivoted sparse QR. `A` is potentially rank-deficient or numerically singular.",
             cache.verbose, :default_lu_fallback
         )
     end
-    qr_fact = qr(convert(AbstractMatrix, cache.A))
+    qr_fact = sparse_colpivqr_factorize(cache.A)
     y = _ldiv!(cache.u, qr_fact, cache.b)
-    setfield!(cache.cacheval, :QRFactorizationPivoted, qr_fact)
+    setfield!(cache.cacheval, :SparseColumnPivotedQRFactorization, qr_fact)
     cache.cacheval.fell_back_to_qr = true
     cache.isfresh = false
     return SciMLBase.build_linear_solution(
@@ -747,7 +750,7 @@ matrix has not changed since the fallback — we reuse the QR instead of retryin
 the (failed) LU.
 """
 function _reuse_sparse_qr_fallback(cache::LinearCache, alg)
-    qr_fact = getfield(cache.cacheval, :QRFactorizationPivoted)
+    qr_fact = getfield(cache.cacheval, :SparseColumnPivotedQRFactorization)
     y = _ldiv!(cache.u, qr_fact, cache.b)
     return SciMLBase.build_linear_solution(
         alg, y, nothing, cache; retcode = ReturnCode.Success, iters = 0, stats = nothing
@@ -1046,6 +1049,9 @@ end
                 (
                     DefaultAlgorithmChoice.KrylovJL_GMRES, DefaultAlgorithmChoice.KrylovJL_LSMR,
                     DefaultAlgorithmChoice.KrylovJL_CRAIGMR,
+                    # SparseColumnPivotedQR has no adjoint-factorization solve, so
+                    # take the adjoint by solving the transpose system directly.
+                    DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization,
                 )
             )
             quote

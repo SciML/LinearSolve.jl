@@ -150,6 +150,11 @@ _ldiv!(x, A, b::SVector) = (x .= A \ b)
 _ldiv!(::SVector, A, b::SVector) = (A \ b)
 _ldiv!(::SVector, A, b) = (A \ b)
 
+# Build a column-pivoted sparse QR factorization of `A` (the default sparse-LU
+# singular fallback). The method is provided by the SparseArrays extension over
+# SparseColumnPivotedQR.jl; this generic declaration lets `src/default.jl` call it.
+function sparse_colpivqr_factorize end
+
 # RF Bad fallback: will fail if `A` is just a stand-in
 # This should instead just create the factorization type.
 function init_cacheval(
@@ -1258,6 +1263,43 @@ end
 
 function init_cacheval(
         alg::PureKLUFactorization,
+        A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
+"""
+`SparseColumnPivotedQRFactorization(; reuse_symbolic = true, ordering = :default)`
+
+A pure-Julia, rank-revealing column-pivoted sparse QR factorization, provided by
+[SparseColumnPivotedQR.jl](https://github.com/SciML/SparseColumnPivotedQR.jl). It
+targets the same "small-to-medium sparse" niche as KLU does for LU (low
+symbolic-phase overhead, no SuiteSparse dependency) while preserving the
+rank-revealing guarantees of LAPACK's column-pivoted QR, so it handles
+rectangular (least-squares) and rank-deficient systems.
+
+`SparseColumnPivotedQRFactorization` is a hard dependency of LinearSolve and is
+the default sparse QR: it is the QR choice for non-square sparse systems in the
+default polyalgorithm and the fallback when the default sparse LU
+([`PureKLUFactorization`](@ref)/UMFPACK) hits a (near-)singular matrix.
+
+## Keyword Arguments
+
+  - `reuse_symbolic`: reuse the cached symbolic factorization across solves when
+    the sparsity pattern is unchanged. Defaults to `true`.
+  - `ordering`: column ordering passed to `SparseColumnPivotedQR.csr_qr`
+    (`:default`, `:amd`, `:natural`). `:default` uses AMD when the AMD extension
+    of SparseColumnPivotedQR is loaded, else natural ordering. Defaults to `:default`.
+"""
+Base.@kwdef struct SparseColumnPivotedQRFactorization <: AbstractSparseFactorization
+    reuse_symbolic::Bool = true
+    ordering::Symbol = :default
+end
+
+function init_cacheval(
+        alg::SparseColumnPivotedQRFactorization,
         A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions

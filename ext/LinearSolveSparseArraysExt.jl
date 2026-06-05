@@ -6,7 +6,8 @@ using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
     KLUFactorization, PureKLUFactorization, LUFactorization,
     NormalCholeskyFactorization,
     OperatorAssumptions, LinearVerbosity,
-    QRFactorization, RFLUFactorization, UMFPACKFactorization, solve
+    QRFactorization, RFLUFactorization, UMFPACKFactorization,
+    SparseColumnPivotedQRFactorization, solve
 using SciMLOperators: AbstractSciMLOperator, has_concretization
 using ArrayInterface: ArrayInterface
 using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!
@@ -30,6 +31,10 @@ include("../src/KLU/klu.jl")
 # PureKLU (pure-Julia, no SuiteSparse) is a hard dependency and the default
 # sparse LU; the SuiteSparse `KLUFactorization` above is unchanged.
 import PureKLU
+# SparseColumnPivotedQR (pure-Julia, rank-revealing column-pivoted sparse QR) is a
+# hard dependency: the default sparse QR and the singular-LU fallback.
+import SparseColumnPivotedQR
+const SCPQR = SparseColumnPivotedQR
 
 LinearSolve.issparsematrixcsc(A::AbstractSparseMatrixCSC) = true
 LinearSolve.issparsematrix(A::AbstractSparseArray) = true
@@ -652,6 +657,99 @@ function SciMLBase.solve!(
     end
 end
 
+# --- SparseColumnPivotedQR: pure-Julia rank-revealing column-pivoted sparse QR ---
+# The default sparse QR (non-square sparse systems) and the singular-LU fallback.
+
+# Convert any CSC sparse matrix to the `SparseMatrixCSR` the solver consumes.
+_scpqr_csr(A) = SCPQR.SparseMatrixCSR(SparseMatrixCSC(A))
+
+# Element-typed preallocated factorizations. `CSRQRFactorization{T, real(T)}` is
+# not parameterized on the index type, so one prealloc per element type suffices
+# to fix the default cacheval slot's type (used by the singular-LU fallback).
+const PREALLOCATED_SCPQR_F64 = SCPQR.csr_qr(_scpqr_csr(sparse(reshape([1.0], 1, 1))))
+const PREALLOCATED_SCPQR_C64 = SCPQR.csr_qr(_scpqr_csr(sparse(reshape([ComplexF64(1)], 1, 1))))
+
+function LinearSolve.init_cacheval(
+        alg::SparseColumnPivotedQRFactorization, A::AbstractArray, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
+function LinearSolve.init_cacheval(
+        alg::SparseColumnPivotedQRFactorization, A::LinearSolve.GPUArraysCore.AnyGPUArray,
+        b, u, Pl, Pr, maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
+function LinearSolve.init_cacheval(
+        alg::SparseColumnPivotedQRFactorization, A::AbstractSparseArray{Float64, <:Integer},
+        b, u, Pl, Pr, maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return PREALLOCATED_SCPQR_F64
+end
+
+function LinearSolve.init_cacheval(
+        alg::SparseColumnPivotedQRFactorization, A::AbstractSparseArray{ComplexF64, <:Integer},
+        b, u, Pl, Pr, maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return PREALLOCATED_SCPQR_C64
+end
+
+function LinearSolve.init_cacheval(
+        alg::SparseColumnPivotedQRFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    if has_concretization(A)
+        return LinearSolve.init_cacheval(
+            alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
+            maxiters, abstol, reltol, verbose, assumptions
+        )
+    else
+        nothing
+    end
+end
+
+function SciMLBase.solve!(
+        cache::LinearSolve.LinearCache, alg::SparseColumnPivotedQRFactorization; kwargs...
+    )
+    A = cache.A
+    A = convert(AbstractMatrix, A)
+    if cache.isfresh
+        cacheval = LinearSolve.@get_cacheval(cache, :SparseColumnPivotedQRFactorization)
+        Acsr = _scpqr_csr(A)
+        # Reuse the cached symbolic + numeric workspace via `csr_refactor!` when the
+        # cached factorization has the same shape (it re-analyzes internally if the
+        # pattern changed); otherwise build fresh. A size mismatch also rules out the
+        # tiny preallocated factorization, forcing the first real factorization.
+        fact = if alg.reuse_symbolic && cacheval isa SCPQR.CSRQRFactorization &&
+                size(cacheval) == size(A)
+            SCPQR.csr_refactor!(cacheval, Acsr)
+        else
+            SCPQR.csr_qr(Acsr; ordering = alg.ordering)
+        end
+        cache.cacheval = fact
+        cache.isfresh = false
+    end
+    F = LinearSolve.@get_cacheval(cache, :SparseColumnPivotedQRFactorization)
+    y = ldiv!(cache.u, F, cache.b)
+    return SciMLBase.build_linear_solution(
+        alg, y, nothing, cache; retcode = ReturnCode.Success
+    )
+end
+
+# Build a column-pivoted sparse QR factorization for the default sparse-LU
+# singular fallback (`_do_sparse_qr_fallback` in src/default.jl).
+function LinearSolve.sparse_colpivqr_factorize(A)
+    return SCPQR.csr_qr(_scpqr_csr(convert(AbstractMatrix, A)))
+end
+
 function LinearSolve.init_cacheval(
         alg::CHOLMODFactorization,
         A::AbstractArray, b, u,
@@ -817,7 +915,7 @@ end
                 LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.UMFPACKFactorization)
             end
         else
-            LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.QRFactorization)
+            LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization)
         end
     end
 else
@@ -828,7 +926,7 @@ else
         if assump.issq
             LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KLUFactorization)
         elseif !assump.issq
-            LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.QRFactorization)
+            LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization)
         end
     end
 end # @static if Base.USE_GPL_LIBS
@@ -873,6 +971,7 @@ LinearSolve.PrecompileTools.@compile_workload begin
     prob = LinearProblem(A, b)
     sol = solve(prob, PureKLUFactorization())
     sol = solve(prob, KLUFactorization())
+    sol = solve(prob, SparseColumnPivotedQRFactorization())
     if Base.USE_GPL_LIBS
         sol = solve(prob, UMFPACKFactorization())
     end

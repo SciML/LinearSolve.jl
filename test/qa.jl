@@ -44,5 +44,10 @@ end
         allow_unanalyzable = unanalyzable_mods,
         ignore = (sciml_logging_macro_imports..., extension_imports...)
     ) === nothing
-    @test check_all_qualified_accesses_via_owners(LinearSolve) === nothing
+    # `SparseMatrixCSR` (owner `SparseMatricesCSR`) is reached through the
+    # `SparseColumnPivotedQR` hard dep in `LinearSolveSparseArraysExt`, because
+    # `SparseMatricesCSR` is only a weakdep here (it can't be imported directly).
+    @test check_all_qualified_accesses_via_owners(
+        LinearSolve; ignore = (:SparseMatrixCSR,)
+    ) === nothing
 end

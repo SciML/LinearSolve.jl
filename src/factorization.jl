@@ -1220,6 +1220,51 @@ function init_cacheval(
     return nothing
 end
 
+"""
+`PureKLUFactorization(; reuse_symbolic = true, check_pattern = true, use_fma = true, fully_preallocated = nothing)`
+
+A pure-Julia port of SuiteSparse's KLU sparse LU solver, provided by
+[PureKLU.jl](https://github.com/SciML/PureKLU.jl). It has no SuiteSparse binary
+dependency and supports generic element types in addition to `Float64`/`ComplexF64`.
+Loading PureKLU (`using PureKLU`) makes this the default sparse LU for "less
+structured" sparse matrices, replacing the SuiteSparse-backed [`KLUFactorization`](@ref)
+in the default polyalgorithm.
+
+!!! note
+
+    `PureKLUFactorization` is only available once the `PureKLU` package is loaded
+    (`using PureKLU`). It mirrors [`KLUFactorization`](@ref): by default the symbolic
+    factorization is cached. If the sparsity pattern of `A` may change between solves,
+    set `reuse_symbolic = false`. To skip the pattern check entirely (which errors if the
+    pattern unexpectedly changes), set `check_pattern = false`.
+
+## Keyword Arguments
+
+  - `reuse_symbolic`: reuse the cached symbolic factorization across solves. Defaults to `true`.
+  - `check_pattern`: check whether the sparsity pattern changed before reusing the
+    symbolic factorization. Defaults to `true`.
+  - `use_fma`: use fused multiply-add in the numeric kernel (faster, up to one ULP
+    different from SuiteSparse KLU). Set to `false` for bit-for-bit agreement with
+    SuiteSparse `KLUFactorization`. Defaults to `true`.
+  - `fully_preallocated`: PureKLU's `fully_preallocated` option. `nothing` (default) lets
+    PureKLU choose automatically based on the maximum block size.
+"""
+Base.@kwdef struct PureKLUFactorization <: AbstractSparseFactorization
+    reuse_symbolic::Bool = true
+    check_pattern::Bool = true
+    use_fma::Bool = true
+    fully_preallocated::Union{Bool, Nothing} = nothing
+end
+
+function init_cacheval(
+        alg::PureKLUFactorization,
+        A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
 ## CHOLMODFactorization
 
 """

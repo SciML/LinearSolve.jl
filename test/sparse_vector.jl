@@ -86,6 +86,20 @@ linsolve = init(prob, CholeskyFactorization())
         @test A2 * sol2.u ≈ b
     end
 
+    @testset "PureKLUFactorization" begin
+        prob = LinearProblem(A, b)
+        sol = solve(prob, PureKLUFactorization())
+        @test sol.u ≈ expected
+
+        cache = init(prob, PureKLUFactorization())
+        sol1 = solve!(cache)
+        @test sol1.u ≈ expected
+        A2 = sprand(T, n, n, 0.5) + I
+        cache.A = A2
+        sol2 = solve!(cache)
+        @test A2 * sol2.u ≈ b
+    end
+
     @testset "LUFactorization" begin
         prob = LinearProblem(A, b)
         sol = solve(prob, LUFactorization())

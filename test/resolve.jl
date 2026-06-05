@@ -66,8 +66,8 @@ for alg in vcat(
         )
         A = [1.0 2.0; 3.0 4.0]
         alg in [
-            KLUFactorization, UMFPACKFactorization, SparspakFactorization,
-            ParUFactorization, STRUMPACKFactorization,
+            KLUFactorization, PureKLUFactorization, UMFPACKFactorization,
+            SparspakFactorization, ParUFactorization, STRUMPACKFactorization,
         ] &&
             (A = sparse(A))
         A = A' * A
@@ -95,8 +95,8 @@ for alg in vcat(
 
         A = [1.0 2.0; 3.0 4.0]
         alg in [
-            KLUFactorization, UMFPACKFactorization, SparspakFactorization,
-            ParUFactorization, STRUMPACKFactorization,
+            KLUFactorization, PureKLUFactorization, UMFPACKFactorization,
+            SparspakFactorization, ParUFactorization, STRUMPACKFactorization,
         ] &&
             (A = sparse(A))
         A = A' * A

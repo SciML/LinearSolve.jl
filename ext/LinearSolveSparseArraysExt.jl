@@ -660,14 +660,15 @@ end
 # --- SparseColumnPivotedQR: pure-Julia rank-revealing column-pivoted sparse QR ---
 # The default sparse QR (non-square sparse systems) and the singular-LU fallback.
 
-# Convert any CSC sparse matrix to the `SparseMatrixCSR` the solver consumes.
-_scpqr_csr(A) = SCPQR.SparseMatrixCSR(SparseMatrixCSC(A))
+# SparseColumnPivotedQR is now CSC-native, so the matrix is passed straight
+# through as a `SparseMatrixCSC` with no transpose/CSR round-trip.
+_scpqr_csc(A) = SparseMatrixCSC(A)
 
 # Element-typed preallocated factorizations. `CSRQRFactorization{T, real(T)}` is
 # not parameterized on the index type, so one prealloc per element type suffices
 # to fix the default cacheval slot's type (used by the singular-LU fallback).
-const PREALLOCATED_SCPQR_F64 = SCPQR.csr_qr(_scpqr_csr(sparse(reshape([1.0], 1, 1))))
-const PREALLOCATED_SCPQR_C64 = SCPQR.csr_qr(_scpqr_csr(sparse(reshape([ComplexF64(1)], 1, 1))))
+const PREALLOCATED_SCPQR_F64 = SCPQR.csr_qr(_scpqr_csc(sparse(reshape([1.0], 1, 1))))
+const PREALLOCATED_SCPQR_C64 = SCPQR.csr_qr(_scpqr_csc(sparse(reshape([ComplexF64(1)], 1, 1))))
 
 function LinearSolve.init_cacheval(
         alg::SparseColumnPivotedQRFactorization, A::AbstractArray, b, u, Pl, Pr,
@@ -723,16 +724,16 @@ function SciMLBase.solve!(
     A = convert(AbstractMatrix, A)
     if cache.isfresh
         cacheval = LinearSolve.@get_cacheval(cache, :SparseColumnPivotedQRFactorization)
-        Acsr = _scpqr_csr(A)
+        Acsc = _scpqr_csc(A)
         # Reuse the cached symbolic + numeric workspace via `csr_refactor!` when the
         # cached factorization has the same shape (it re-analyzes internally if the
         # pattern changed); otherwise build fresh. A size mismatch also rules out the
         # tiny preallocated factorization, forcing the first real factorization.
         fact = if alg.reuse_symbolic && cacheval isa SCPQR.CSRQRFactorization &&
                 size(cacheval) == size(A)
-            SCPQR.csr_refactor!(cacheval, Acsr)
+            SCPQR.csr_refactor!(cacheval, Acsc)
         else
-            SCPQR.csr_qr(Acsr; ordering = alg.ordering)
+            SCPQR.csr_qr(Acsc; ordering = alg.ordering)
         end
         cache.cacheval = fact
         cache.isfresh = false
@@ -747,7 +748,7 @@ end
 # Build a column-pivoted sparse QR factorization for the default sparse-LU
 # singular fallback (`_do_sparse_qr_fallback` in src/default.jl).
 function LinearSolve.sparse_colpivqr_factorize(A)
-    return SCPQR.csr_qr(_scpqr_csr(convert(AbstractMatrix, A)))
+    return SCPQR.csr_qr(_scpqr_csc(convert(AbstractMatrix, A)))
 end
 
 function LinearSolve.init_cacheval(

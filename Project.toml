@@ -1,6 +1,6 @@
 name = "LinearSolve"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
-version = "3.83.0"
+version = "3.84.0"
 authors = ["SciML"]
 
 [deps]
@@ -150,7 +150,7 @@ PartitionedSolvers = "0.3"
 Pkg = "1.10"
 PrecompileTools = "1.2"
 Preferences = "1.4"
-PureKLU = "0.1"
+PureKLU = "1"
 Random = "1.10"
 RecursiveArrayTools = "3.37, 4"
 RecursiveFactorization = "0.2.26"

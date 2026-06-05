@@ -894,28 +894,38 @@ function LinearSolve.pattern_changed(fact, A::SparseArrays.AbstractSparseMatrixC
     return false
 end
 
+# Heuristic shared by the sparse default's LU and QR branches. `true` (small, or
+# medium and very sparse / "less structure") favors the pure-Julia KLU-style
+# solvers: PureKLU for LU and SparseColumnPivotedQR for QR. `false` ("more
+# structure") favors the SuiteSparse solvers: UMFPACK for LU and SPQR for QR.
+# The `length(b) <= 1_000` branch is the "small enough" fast path; the second is
+# the "medium and sufficiently sparse" rule.
+function LinearSolve.use_klulike_sparse_structure(A::AbstractSparseMatrixCSC, b)
+    return length(b) <= 1_000 ||
+        (length(b) <= 10_000 && length(nonzeros(A)) / length(A) < 2.0e-4)
+end
+
 @static if Base.USE_GPL_LIBS
     function LinearSolve.defaultalg(
             A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
             assump::OperatorAssumptions{Bool}
         ) where {Ti}
+        klulike = LinearSolve.use_klulike_sparse_structure(A, b)
         if assump.issq
-            # Heuristic: KLU is essentially always better than UMFPACK for
-            # small enough sparse problems, and for medium-sized problems that
-            # are also sufficiently sparse. The previous heuristic only used the
-            # density check, which missed dense-but-tiny problems where KLU is
-            # the right call algorithmically. The `length(b) <= 1_000` branch is
-            # the "small enough should use KLU" fast path; the second branch is
-            # the original "medium and sparse" rule. The KLU slot uses PureKLU
-            # (pure-Julia, no SuiteSparse), not the SuiteSparse-backed KLUFactorization.
-            if length(b) <= 1_000 ||
-                    (length(b) <= 10_000 && length(nonzeros(A)) / length(A) < 2.0e-4)
+            # Less structure → PureKLU (pure-Julia); more structure → UMFPACK.
+            if klulike
                 LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KLUFactorization)
             else
                 LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.UMFPACKFactorization)
             end
         else
-            LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization)
+            # Same split for sparse QR: less structure → SparseColumnPivotedQR
+            # (pure-Julia); more structure → SuiteSparse SPQR (`QRFactorization`).
+            if klulike
+                LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization)
+            else
+                LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.QRFactorization)
+            end
         end
     end
 else
@@ -923,9 +933,10 @@ else
             A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
             assump::OperatorAssumptions{Bool}
         ) where {Ti}
+        # No SuiteSparse (UMFPACK/SPQR) available: always use the pure-Julia solvers.
         if assump.issq
             LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KLUFactorization)
-        elseif !assump.issq
+        else
             LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization)
         end
     end

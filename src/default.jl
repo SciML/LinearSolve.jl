@@ -731,9 +731,20 @@ function _do_sparse_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol)
             cache.verbose, :default_lu_fallback
         )
     end
-    qr_fact = sparse_colpivqr_factorize(cache.A)
-    y = _ldiv!(cache.u, qr_fact, cache.b)
-    setfield!(cache.cacheval, :SparseColumnPivotedQRFactorization, qr_fact)
+    # Mirror the KLU/UMFPACK structure split on the QR fallback: less-structured
+    # (KLU-style) matrices fall back to the pure-Julia column-pivoted sparse QR;
+    # more-structured matrices (which would have used UMFPACK) fall back to
+    # SuiteSparse SPQR. Without GPL libraries SPQR is unavailable, so always use
+    # the pure-Julia solver there.
+    if Base.USE_GPL_LIBS && !use_klulike_sparse_structure(cache.A, cache.b)
+        qr_fact = qr(convert(AbstractMatrix, cache.A))
+        y = _ldiv!(cache.u, qr_fact, cache.b)
+        setfield!(cache.cacheval, :QRFactorizationPivoted, qr_fact)
+    else
+        qr_fact = sparse_colpivqr_factorize(cache.A)
+        y = _ldiv!(cache.u, qr_fact, cache.b)
+        setfield!(cache.cacheval, :SparseColumnPivotedQRFactorization, qr_fact)
+    end
     cache.cacheval.fell_back_to_qr = true
     cache.isfresh = false
     return SciMLBase.build_linear_solution(
@@ -744,13 +755,19 @@ end
 """
     _reuse_sparse_qr_fallback(cache::LinearCache, alg)
 
-Reuse a cached sparse QR factorization stored by `_do_sparse_qr_fallback` in the
-`:QRFactorizationPivoted` slot. Called when `fell_back_to_qr` is `true` and the
-matrix has not changed since the fallback — we reuse the QR instead of retrying
-the (failed) LU.
+Reuse the cached sparse QR factorization stored by `_do_sparse_qr_fallback`.
+Called when `fell_back_to_qr` is `true` and the matrix has not changed since the
+fallback — we reuse the QR instead of retrying the (failed) LU. The structure
+heuristic is re-derived (unchanged `A`) to read the slot the fallback wrote:
+`:SparseColumnPivotedQRFactorization` (pure-Julia) or, for more-structured GPL
+cases, `:QRFactorizationPivoted` (SPQR).
 """
 function _reuse_sparse_qr_fallback(cache::LinearCache, alg)
-    qr_fact = getfield(cache.cacheval, :SparseColumnPivotedQRFactorization)
+    qr_fact = if Base.USE_GPL_LIBS && !use_klulike_sparse_structure(cache.A, cache.b)
+        getfield(cache.cacheval, :QRFactorizationPivoted)
+    else
+        getfield(cache.cacheval, :SparseColumnPivotedQRFactorization)
+    end
     y = _ldiv!(cache.u, qr_fact, cache.b)
     return SciMLBase.build_linear_solution(
         alg, y, nothing, cache; retcode = ReturnCode.Success, iters = 0, stats = nothing

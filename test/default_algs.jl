@@ -47,10 +47,18 @@ prob = LinearProblem(A, ones(2))
 # solution (Success) rather than Infeasible on a singular system.
 @test SciMLBase.successful_retcode(solve(prob, SparseColumnPivotedQRFactorization()).retcode)
 
-# Non-square sparse systems default to the column-pivoted sparse QR.
+# Non-square sparse QR mirrors the KLU/UMFPACK structure split: less-structured
+# (small) systems use the pure-Julia column-pivoted QR; more-structured
+# (large + dense) systems use SuiteSparse SPQR via `QRFactorization`.
 @test LinearSolve.defaultalg(
     sprand(20, 10, 0.3), zeros(20), LinearSolve.OperatorAssumptions(false)
 ).alg === LinearSolve.DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization
+if Base.USE_GPL_LIBS
+    @test LinearSolve.defaultalg(
+        sprand(2000, 1500, 0.5) + sparse(1:1500, 1:1500, 1.0, 2000, 1500),
+        zeros(2000), LinearSolve.OperatorAssumptions(false)
+    ).alg === LinearSolve.DefaultAlgorithmChoice.QRFactorization
+end
 let Anq = sprand(40, 25, 0.2) + sparse(1:25, 1:25, 1.0, 40, 25), bnq = rand(40)
     solnq = solve(LinearProblem(Anq, bnq))
     @test SciMLBase.successful_retcode(solnq.retcode)

@@ -155,6 +155,14 @@ _ldiv!(::SVector, A, b) = (A \ b)
 # SparseColumnPivotedQR.jl; this generic declaration lets `src/default.jl` call it.
 function sparse_colpivqr_factorize end
 
+# Heuristic shared by the sparse default's LU and QR choices: `true` selects the
+# pure-Julia "KLU-style" solver for less-structured problems (small, or medium and
+# very sparse) — `PureKLUFactorization` for LU and `SparseColumnPivotedQRFactorization`
+# for QR — while `false` selects the SuiteSparse solver for more structure (UMFPACK
+# for LU, SPQR for QR). The SparseArrays extension provides the real method for
+# sparse matrices; the generic fallback prefers the pure-Julia option.
+use_klulike_sparse_structure(A, b) = true
+
 # RF Bad fallback: will fail if `A` is just a stand-in
 # This should instead just create the factorization type.
 function init_cacheval(

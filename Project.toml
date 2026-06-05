@@ -4,6 +4,7 @@ version = "3.84.0"
 authors = ["SciML"]
 
 [deps]
+AMD = "14f7f29c-3bd6-536c-9a0b-7339e30b5a3e"
 ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
 ConcreteStructs = "2569d6c7-a4a2-43d3-a901-331e8e4be471"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
@@ -99,6 +100,7 @@ LinearSolveSparseArraysExt = "SparseArrays"
 LinearSolveSparspakExt = ["SparseArrays", "Sparspak"]
 
 [compat]
+AMD = "0.5"
 AMDGPU = "1.2, 2"
 AlgebraicMultigrid = "1"
 AllocCheck = "0.2"

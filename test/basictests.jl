@@ -186,6 +186,31 @@ end
         @test X * solve!(cache) ≈ b1
     end
 
+    @testset "PureKLU Factorization" begin
+        A1 = sparse(A / 1)
+        b1 = rand(n)
+        x1 = zero(b)
+        A2 = sparse(A / 2)
+        b2 = rand(n)
+        x2 = zero(b)
+
+        prob1 = LinearProblem(A1, b1; u0 = x1)
+        prob2 = LinearProblem(A2, b2; u0 = x2)
+        test_interface(PureKLUFactorization(), prob1, prob2)
+        test_interface(PureKLUFactorization(reuse_symbolic = false), prob1, prob2)
+        test_interface(PureKLUFactorization(use_fma = false), prob1, prob2)
+        test_interface(PureKLUFactorization(fully_preallocated = true), prob1, prob2)
+
+        # Test that refactoring with a changed pattern is checked and handled.
+        cache = SciMLBase.init(prob1, PureKLUFactorization(); cache_kwargs...) # initialize cache
+        y = solve!(cache)
+        cache.A = A2
+        @test A2 * solve!(cache) ≈ b1
+        X = sprand(n, n, 0.8)
+        cache.A = X
+        @test X * solve!(cache) ≈ b1
+    end
+
     @testset "Sparspak Factorization (Float64)" begin
         A1 = sparse(A / 1)
         b1 = rand(n)

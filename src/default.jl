@@ -439,7 +439,10 @@ function algchoice_to_alg(alg::Symbol)
     elseif alg === :SparspakFactorization
         SparspakFactorization(throwerror = false)
     elseif alg === :KLUFactorization
-        KLUFactorization()
+        # The default polyalgorithm's "KLU" slot resolves to the pure-Julia
+        # PureKLU. The SuiteSparse `KLUFactorization` is unchanged and remains
+        # available when requested explicitly.
+        PureKLUFactorization()
     elseif alg === :UMFPACKFactorization
         UMFPACKFactorization()
     elseif alg === :KrylovJL_GMRES

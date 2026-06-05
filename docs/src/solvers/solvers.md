@@ -61,8 +61,10 @@ when reduced precision is acceptable for the factorization step.
 
 ### Sparse Matrices
 
-For sparse LU-factorizations, `KLUFactorization` if there is less structure
-to the sparsity pattern and `UMFPACKFactorization` if there is more structure.
+For sparse LU-factorizations, `PureKLUFactorization` (a pure-Julia KLU with no
+SuiteSparse dependency, the default) if there is less structure to the sparsity
+pattern and `UMFPACKFactorization` if there is more structure. The SuiteSparse-backed
+`KLUFactorization` remains available as an explicit alternative.
 `ParUFactorization` (from SuiteSparse's ParU library) provides a parallel
 alternative to `UMFPACKFactorization` that exploits OpenMP task parallelism
 for the numeric factorization phase, which can give speedups on multicore systems
@@ -197,8 +199,16 @@ FastQRFactorization
 
 ```@docs
 KLUFactorization
+PureKLUFactorization
 UMFPACKFactorization
 ```
+
+!!! note
+    
+    `PureKLUFactorization` is a pure-Julia KLU (from PureKLU.jl, no SuiteSparse
+    dependency) and is the default sparse LU for "less structured" sparsity
+    patterns, replacing the SuiteSparse-backed `KLUFactorization` in the default
+    polyalgorithm.
 
 ### ParU (SuiteSparse)
 

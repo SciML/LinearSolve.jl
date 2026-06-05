@@ -23,4 +23,5 @@ end
 
 test_nonzero_init()
 test_nonzero_init(KLUFactorization())
+test_nonzero_init(PureKLUFactorization())
 test_nonzero_init(UMFPACKFactorization())

@@ -3,7 +3,8 @@ module LinearSolveSparseArraysExt
 using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
     CHOLMODFactorization, GenericFactorization,
     GenericLUFactorization,
-    KLUFactorization, LUFactorization, NormalCholeskyFactorization,
+    KLUFactorization, PureKLUFactorization, LUFactorization,
+    NormalCholeskyFactorization,
     OperatorAssumptions, LinearVerbosity,
     QRFactorization, RFLUFactorization, UMFPACKFactorization, solve
 using SciMLOperators: AbstractSciMLOperator, has_concretization
@@ -26,6 +27,9 @@ import StaticArraysCore: SVector
 # But there's no reason to require it because SparseArrays will already
 # load SuiteSparse and thus all of the underlying KLU code
 include("../src/KLU/klu.jl")
+# PureKLU (pure-Julia, no SuiteSparse) is a hard dependency and the default
+# sparse LU; the SuiteSparse `KLUFactorization` above is unchanged.
+import PureKLU
 
 LinearSolve.issparsematrixcsc(A::AbstractSparseMatrixCSC) = true
 LinearSolve.issparsematrix(A::AbstractSparseArray) = true
@@ -475,6 +479,149 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
     end
 end
 
+# --- PureKLU: pure-Julia KLU, the default sparse LU (no SuiteSparse dependency) ---
+
+function LinearSolve.init_cacheval(
+        alg::PureKLUFactorization, A::AbstractArray, b, u, Pl,
+        Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
+function LinearSolve.init_cacheval(
+        alg::PureKLUFactorization, A::LinearSolve.GPUArraysCore.AnyGPUArray, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
+const PREALLOCATED_PUREKLU = PureKLU.KLUFactorization(
+    SparseMatrixCSC(
+        0, 0, [1], Int[],
+        Float64[]
+    )
+)
+
+function LinearSolve.init_cacheval(
+        alg::PureKLUFactorization, A::AbstractSparseArray{Float64, Int64}, b, u, Pl, Pr,
+        maxiters::Int, abstol,
+        reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return PREALLOCATED_PUREKLU
+end
+
+function LinearSolve.init_cacheval(
+        alg::PureKLUFactorization, A::AbstractSparseArray{T, Int64}, b, u, Pl, Pr,
+        maxiters::Int, abstol,
+        reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    ) where {T <: Union{Float64, ComplexF64}}
+    return PureKLU.KLUFactorization(
+        SparseMatrixCSC{T, Int64}(
+            0, 0, [Int64(1)], Int64[], T[]
+        )
+    )
+end
+
+function LinearSolve.init_cacheval(
+        alg::PureKLUFactorization, A::AbstractSparseArray{Float64, Int32}, b, u, Pl, Pr,
+        maxiters::Int, abstol,
+        reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return PureKLU.KLUFactorization(
+        SparseMatrixCSC{Float64, Int32}(
+            0, 0, [Int32(1)], Int32[], Float64[]
+        )
+    )
+end
+
+function LinearSolve.init_cacheval(
+        alg::PureKLUFactorization, A::AbstractSparseArray{T, Int32}, b, u, Pl, Pr,
+        maxiters::Int, abstol,
+        reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    ) where {T <: Union{Float64, ComplexF64}}
+    return PureKLU.KLUFactorization(
+        SparseMatrixCSC{T, Int32}(
+            0, 0, [Int32(1)], Int32[], T[]
+        )
+    )
+end
+
+function LinearSolve.init_cacheval(
+        alg::PureKLUFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    if has_concretization(A)
+        return LinearSolve.init_cacheval(
+            alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
+            maxiters, abstol, reltol, verbose, assumptions
+        )
+    else
+        nothing
+    end
+end
+
+function SciMLBase.solve!(
+        cache::LinearSolve.LinearCache, alg::PureKLUFactorization; kwargs...
+    )
+    A = cache.A
+    A = convert(AbstractMatrix, A)
+    if cache.isfresh
+        # PureKLU occupies the default polyalgorithm's `:KLUFactorization` slot
+        # (the default's KLU choice resolves to PureKLU), so it reads that field.
+        cacheval = LinearSolve.@get_cacheval(cache, :KLUFactorization)
+        if alg.reuse_symbolic
+            if length(cacheval.nzval) != length(nonzeros(A)) ||
+                    alg.check_pattern && pattern_changed(cacheval, A)
+                fact = PureKLU.klu(
+                    SparseMatrixCSC(
+                        size(A)..., getcolptr(A), rowvals(A),
+                        nonzeros(A)
+                    ),
+                    check = false, use_fma = alg.use_fma,
+                    fully_preallocated = alg.fully_preallocated
+                )
+            else
+                fact = PureKLU.klu!(cacheval, nonzeros(A), check = false)
+            end
+        else
+            # New fact each time since the sparsity pattern can change and thus
+            # it needs to reallocate. `check = false` keeps singular matrices from
+            # throwing; the status check below maps that to `ReturnCode.Infeasible`.
+            fact = PureKLU.klu(
+                SparseMatrixCSC(
+                    size(A)..., getcolptr(A), rowvals(A),
+                    nonzeros(A)
+                ),
+                check = false, use_fma = alg.use_fma,
+                fully_preallocated = alg.fully_preallocated
+            )
+        end
+        cache.cacheval = fact
+        cache.isfresh = false
+    end
+    F = LinearSolve.@get_cacheval(cache, :KLUFactorization)
+    return if F.common.status == PureKLU.KLU_OK
+        y = ldiv!(cache.u, F, cache.b)
+        SciMLBase.build_linear_solution(
+            alg, y, nothing, cache; retcode = ReturnCode.Success
+        )
+    else
+        @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
+        SciMLBase.build_linear_solution(
+            alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible
+        )
+    end
+end
+
 function LinearSolve.init_cacheval(
         alg::CHOLMODFactorization,
         A::AbstractArray, b, u,
@@ -631,7 +778,8 @@ end
             # density check, which missed dense-but-tiny problems where KLU is
             # the right call algorithmically. The `length(b) <= 1_000` branch is
             # the "small enough should use KLU" fast path; the second branch is
-            # the original "medium and sparse" rule.
+            # the original "medium and sparse" rule. The KLU slot uses PureKLU
+            # (pure-Julia, no SuiteSparse), not the SuiteSparse-backed KLUFactorization.
             if length(b) <= 1_000 ||
                     (length(b) <= 10_000 && length(nonzeros(A)) / length(A) < 2.0e-4)
                 LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KLUFactorization)
@@ -693,6 +841,7 @@ LinearSolve.PrecompileTools.@compile_workload begin
     A = sprand(4, 4, 0.3) + I
     b = rand(4)
     prob = LinearProblem(A, b)
+    sol = solve(prob, PureKLUFactorization())
     sol = solve(prob, KLUFactorization())
     if Base.USE_GPL_LIBS
         sol = solve(prob, UMFPACKFactorization())

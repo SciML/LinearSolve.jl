@@ -116,6 +116,7 @@ end
     # Test major sparse factorization algorithms
     sparse_algs = [
         KLUFactorization(),
+        PureKLUFactorization(),
         UMFPACKFactorization(),
         CHOLMODFactorization(),
     ]

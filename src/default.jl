@@ -1057,6 +1057,7 @@ end
                     DefaultAlgorithmChoice.CholeskyFactorization,
                     DefaultAlgorithmChoice.NormalCholeskyFactorization,
                     DefaultAlgorithmChoice.QRFactorizationPivoted,
+                    DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization,
                 )
             )
             quote
@@ -1066,9 +1067,6 @@ end
                 (
                     DefaultAlgorithmChoice.KrylovJL_GMRES, DefaultAlgorithmChoice.KrylovJL_LSMR,
                     DefaultAlgorithmChoice.KrylovJL_CRAIGMR,
-                    # SparseColumnPivotedQR has no adjoint-factorization solve, so
-                    # take the adjoint by solving the transpose system directly.
-                    DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization,
                 )
             )
             quote

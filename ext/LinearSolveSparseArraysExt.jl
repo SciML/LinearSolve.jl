@@ -662,14 +662,12 @@ end
 
 # --- SparseColumnPivotedQR: pure-Julia rank-revealing column-pivoted sparse QR ---
 # The default sparse QR (non-square sparse systems) and the singular-LU fallback.
-# SparseColumnPivotedQR is CSC-native, so `SparseMatrixCSC` matrices go straight
-# to `csr_qr`.
 
-# Element-typed preallocated factorizations. `CSRQRFactorization{T, real(T)}` is
-# not parameterized on the index type, so one prealloc per element type suffices
-# to fix the default cacheval slot's type (used by the singular-LU fallback).
-const PREALLOCATED_SCPQR_F64 = SCPQR.csr_qr(sparse(reshape([1.0], 1, 1)))
-const PREALLOCATED_SCPQR_C64 = SCPQR.csr_qr(sparse(reshape([ComplexF64(1)], 1, 1)))
+# One preallocated factorization per supported element type. They give the
+# default solver's cacheval slot a concrete element type so the singular-LU
+# fallback can store its factorization into it type-stably.
+const PREALLOCATED_SCPQR_F64 = SCPQR.scpqr(sparse(reshape([1.0], 1, 1)))
+const PREALLOCATED_SCPQR_C64 = SCPQR.scpqr(sparse(reshape([ComplexF64(1)], 1, 1)))
 
 function LinearSolve.init_cacheval(
         alg::SparseColumnPivotedQRFactorization, A::AbstractArray, b, u, Pl, Pr,
@@ -726,15 +724,15 @@ function SciMLBase.solve!(
     if cache.isfresh
         cacheval = LinearSolve.@get_cacheval(cache, :SparseColumnPivotedQRFactorization)
         Acsc = convert(SparseMatrixCSC, A)
-        # Reuse the cached symbolic + numeric workspace via `csr_refactor!` when the
-        # cached factorization has the same shape (it re-analyzes internally if the
-        # pattern changed); otherwise build fresh. A size mismatch also rules out the
-        # tiny preallocated factorization, forcing the first real factorization.
-        fact = if alg.reuse_symbolic && cacheval isa SCPQR.CSRQRFactorization &&
+        # Reuse the cached factorization's symbolic analysis + workspace when the
+        # shape matches (it re-analyzes internally if the sparsity pattern changed);
+        # otherwise factor fresh. The preallocated factorization has a different
+        # shape, so the first real solve always factors fresh.
+        fact = if alg.reuse_symbolic && cacheval isa SCPQR.SparseColumnPivotedQRFactorization &&
                 size(cacheval) == size(A)
-            SCPQR.csr_refactor!(cacheval, Acsc)
+            SCPQR.scpqr_refactor!(cacheval, Acsc)
         else
-            SCPQR.csr_qr(Acsc; ordering = alg.ordering)
+            SCPQR.scpqr(Acsc; ordering = alg.ordering)
         end
         cache.cacheval = fact
         cache.isfresh = false
@@ -749,7 +747,7 @@ end
 # Build a column-pivoted sparse QR factorization for the default sparse-LU
 # singular fallback (`_do_sparse_qr_fallback` in src/default.jl).
 function LinearSolve.sparse_colpivqr_factorize(A)
-    return SCPQR.csr_qr(convert(SparseMatrixCSC, convert(AbstractMatrix, A)))
+    return SCPQR.scpqr(convert(SparseMatrixCSC, convert(AbstractMatrix, A)))
 end
 
 function LinearSolve.init_cacheval(

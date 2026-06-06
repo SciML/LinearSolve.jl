@@ -715,7 +715,7 @@ to compute the QR. We compute the rank-revealing column-pivoted sparse QR
 directly via `sparse_colpivqr_factorize(cache.A)` (implemented in the SparseArrays
 extension over SparseColumnPivotedQR.jl) and stash it in the dedicated
 `:SparseColumnPivotedQRFactorization` slot ourselves with `setfield!`. That slot
-is pre-initialized to a `CSRQRFactorization` of the matching element type for the
+is pre-initialized to a `SparseColumnPivotedQRFactorization` of the matching element type for the
 `SparseMatrixCSC{<:Union{Float64, ComplexF64}, <:Integer}` cases that the sparse
 LU defaults select, so the assignment is type-stable.
 """

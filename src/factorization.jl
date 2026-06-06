@@ -1297,7 +1297,7 @@ default polyalgorithm and the fallback when the default sparse LU
 
   - `reuse_symbolic`: reuse the cached symbolic factorization across solves when
     the sparsity pattern is unchanged. Defaults to `true`.
-  - `ordering`: column ordering passed to `SparseColumnPivotedQR.csr_qr`
+  - `ordering`: column ordering passed to `SparseColumnPivotedQR.scpqr`
     (`:default`, `:amd`, `:natural`). LinearSolve loads AMD alongside the sparse
     extension, so `:default` resolves to AMD ordering (1.5-2x faster factorization
     than `:natural`). Defaults to `:default`.

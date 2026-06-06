@@ -65,6 +65,16 @@ For sparse LU-factorizations, `PureKLUFactorization` (a pure-Julia KLU with no
 SuiteSparse dependency, the default) if there is less structure to the sparsity
 pattern and `UMFPACKFactorization` if there is more structure. The SuiteSparse-backed
 `KLUFactorization` remains available as an explicit alternative.
+For sparse QR-factorizations (used for non-square, rank-deficient, or least-squares
+systems, and as the fallback when the sparse LU hits a (near-)singular matrix), the
+same less-structure/more-structure split as the LU case applies:
+`SparseColumnPivotedQRFactorization` (a pure-Julia, rank-revealing column-pivoted
+sparse QR with no SuiteSparse dependency, the default) if there is less structure to
+the sparsity pattern, and SPQR — the SuiteSparse-backed sparse QR, used by
+`QRFactorization()` on a sparse matrix — if there is more structure. This mirrors the
+`PureKLUFactorization`/`UMFPACKFactorization` choice for LU:
+`SparseColumnPivotedQRFactorization` is the KLU-style default and SPQR
+(`QRFactorization`) is the more-structured alternative.
 `ParUFactorization` (from SuiteSparse's ParU library) provides a parallel
 alternative to `UMFPACKFactorization` that exploits OpenMP task parallelism
 for the numeric factorization phase, which can give speedups on multicore systems
@@ -201,6 +211,7 @@ FastQRFactorization
 KLUFactorization
 PureKLUFactorization
 UMFPACKFactorization
+SparseColumnPivotedQRFactorization
 ```
 
 !!! note
@@ -209,6 +220,16 @@ UMFPACKFactorization
     dependency) and is the default sparse LU for "less structured" sparsity
     patterns, replacing the SuiteSparse-backed `KLUFactorization` in the default
     polyalgorithm.
+
+!!! note
+    
+    `SparseColumnPivotedQRFactorization` is a pure-Julia, rank-revealing
+    column-pivoted sparse QR (from SparseColumnPivotedQR.jl, no SuiteSparse
+    dependency). It is the default sparse QR: the polyalgorithm selects it for
+    non-square sparse systems and falls back to it from the sparse LU
+    (`PureKLUFactorization`/`UMFPACKFactorization`) when the matrix is
+    (near-)singular — the sparse, KLU-style analog of using a column-pivoted QR
+    for rank-deficient dense systems.
 
 ### ParU (SuiteSparse)
 

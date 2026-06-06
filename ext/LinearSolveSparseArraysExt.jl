@@ -6,7 +6,8 @@ using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
     KLUFactorization, PureKLUFactorization, LUFactorization,
     NormalCholeskyFactorization,
     OperatorAssumptions, LinearVerbosity,
-    QRFactorization, RFLUFactorization, UMFPACKFactorization, solve
+    QRFactorization, RFLUFactorization, UMFPACKFactorization,
+    SparseColumnPivotedQRFactorization, solve
 using SciMLOperators: AbstractSciMLOperator, has_concretization
 using ArrayInterface: ArrayInterface
 using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!
@@ -30,6 +31,13 @@ include("../src/KLU/klu.jl")
 # PureKLU (pure-Julia, no SuiteSparse) is a hard dependency and the default
 # sparse LU; the SuiteSparse `KLUFactorization` above is unchanged.
 import PureKLU
+# SparseColumnPivotedQR (pure-Julia, rank-revealing column-pivoted sparse QR) is a
+# hard dependency: the default sparse QR and the singular-LU fallback.
+import SparseColumnPivotedQR
+const SCPQR = SparseColumnPivotedQR
+# Loading AMD activates SparseColumnPivotedQR's AMD extension, so its `:default`
+# ordering resolves to AMD (1.5-2x faster factorization than natural ordering).
+import AMD
 
 LinearSolve.issparsematrixcsc(A::AbstractSparseMatrixCSC) = true
 LinearSolve.issparsematrix(A::AbstractSparseArray) = true
@@ -652,6 +660,96 @@ function SciMLBase.solve!(
     end
 end
 
+# --- SparseColumnPivotedQR: pure-Julia rank-revealing column-pivoted sparse QR ---
+# The default sparse QR (non-square sparse systems) and the singular-LU fallback.
+
+# One preallocated factorization per supported element type. They give the
+# default solver's cacheval slot a concrete element type so the singular-LU
+# fallback can store its factorization into it type-stably.
+const PREALLOCATED_SCPQR_F64 = SCPQR.scpqr(sparse(reshape([1.0], 1, 1)))
+const PREALLOCATED_SCPQR_C64 = SCPQR.scpqr(sparse(reshape([ComplexF64(1)], 1, 1)))
+
+function LinearSolve.init_cacheval(
+        alg::SparseColumnPivotedQRFactorization, A::AbstractArray, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
+function LinearSolve.init_cacheval(
+        alg::SparseColumnPivotedQRFactorization, A::LinearSolve.GPUArraysCore.AnyGPUArray,
+        b, u, Pl, Pr, maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
+function LinearSolve.init_cacheval(
+        alg::SparseColumnPivotedQRFactorization, A::AbstractSparseArray{Float64, <:Integer},
+        b, u, Pl, Pr, maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return PREALLOCATED_SCPQR_F64
+end
+
+function LinearSolve.init_cacheval(
+        alg::SparseColumnPivotedQRFactorization, A::AbstractSparseArray{ComplexF64, <:Integer},
+        b, u, Pl, Pr, maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return PREALLOCATED_SCPQR_C64
+end
+
+function LinearSolve.init_cacheval(
+        alg::SparseColumnPivotedQRFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    if has_concretization(A)
+        return LinearSolve.init_cacheval(
+            alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
+            maxiters, abstol, reltol, verbose, assumptions
+        )
+    else
+        nothing
+    end
+end
+
+function SciMLBase.solve!(
+        cache::LinearSolve.LinearCache, alg::SparseColumnPivotedQRFactorization; kwargs...
+    )
+    A = cache.A
+    A = convert(AbstractMatrix, A)
+    if cache.isfresh
+        cacheval = LinearSolve.@get_cacheval(cache, :SparseColumnPivotedQRFactorization)
+        Acsc = convert(SparseMatrixCSC, A)
+        # Reuse the cached factorization's symbolic analysis + workspace when the
+        # shape matches (it re-analyzes internally if the sparsity pattern changed);
+        # otherwise factor fresh. The preallocated factorization has a different
+        # shape, so the first real solve always factors fresh.
+        fact = if alg.reuse_symbolic && cacheval isa SCPQR.SparseColumnPivotedQRFactorization &&
+                size(cacheval) == size(A)
+            SCPQR.scpqr_refactor!(cacheval, Acsc)
+        else
+            SCPQR.scpqr(Acsc; ordering = alg.ordering)
+        end
+        cache.cacheval = fact
+        cache.isfresh = false
+    end
+    F = LinearSolve.@get_cacheval(cache, :SparseColumnPivotedQRFactorization)
+    y = ldiv!(cache.u, F, cache.b)
+    return SciMLBase.build_linear_solution(
+        alg, y, nothing, cache; retcode = ReturnCode.Success
+    )
+end
+
+# Build a column-pivoted sparse QR factorization for the default sparse-LU
+# singular fallback (`_do_sparse_qr_fallback` in src/default.jl).
+function LinearSolve.sparse_colpivqr_factorize(A)
+    return SCPQR.scpqr(convert(SparseMatrixCSC, convert(AbstractMatrix, A)))
+end
+
 function LinearSolve.init_cacheval(
         alg::CHOLMODFactorization,
         A::AbstractArray, b, u,
@@ -796,28 +894,38 @@ function LinearSolve.pattern_changed(fact, A::SparseArrays.AbstractSparseMatrixC
     return false
 end
 
+# Heuristic shared by the sparse default's LU and QR branches. `true` (small, or
+# medium and very sparse / "less structure") favors the pure-Julia KLU-style
+# solvers: PureKLU for LU and SparseColumnPivotedQR for QR. `false` ("more
+# structure") favors the SuiteSparse solvers: UMFPACK for LU and SPQR for QR.
+# The `length(b) <= 1_000` branch is the "small enough" fast path; the second is
+# the "medium and sufficiently sparse" rule.
+function LinearSolve.use_klulike_sparse_structure(A::AbstractSparseMatrixCSC, b)
+    return length(b) <= 1_000 ||
+        (length(b) <= 10_000 && length(nonzeros(A)) / length(A) < 2.0e-4)
+end
+
 @static if Base.USE_GPL_LIBS
     function LinearSolve.defaultalg(
             A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
             assump::OperatorAssumptions{Bool}
         ) where {Ti}
+        klulike = LinearSolve.use_klulike_sparse_structure(A, b)
         if assump.issq
-            # Heuristic: KLU is essentially always better than UMFPACK for
-            # small enough sparse problems, and for medium-sized problems that
-            # are also sufficiently sparse. The previous heuristic only used the
-            # density check, which missed dense-but-tiny problems where KLU is
-            # the right call algorithmically. The `length(b) <= 1_000` branch is
-            # the "small enough should use KLU" fast path; the second branch is
-            # the original "medium and sparse" rule. The KLU slot uses PureKLU
-            # (pure-Julia, no SuiteSparse), not the SuiteSparse-backed KLUFactorization.
-            if length(b) <= 1_000 ||
-                    (length(b) <= 10_000 && length(nonzeros(A)) / length(A) < 2.0e-4)
+            # Less structure → PureKLU (pure-Julia); more structure → UMFPACK.
+            if klulike
                 LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KLUFactorization)
             else
                 LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.UMFPACKFactorization)
             end
         else
-            LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.QRFactorization)
+            # Same split for sparse QR: less structure → SparseColumnPivotedQR
+            # (pure-Julia); more structure → SuiteSparse SPQR (`QRFactorization`).
+            if klulike
+                LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization)
+            else
+                LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.QRFactorization)
+            end
         end
     end
 else
@@ -825,10 +933,11 @@ else
             A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
             assump::OperatorAssumptions{Bool}
         ) where {Ti}
+        # No SuiteSparse (UMFPACK/SPQR) available: always use the pure-Julia solvers.
         if assump.issq
             LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KLUFactorization)
-        elseif !assump.issq
-            LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.QRFactorization)
+        else
+            LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization)
         end
     end
 end # @static if Base.USE_GPL_LIBS
@@ -873,6 +982,7 @@ LinearSolve.PrecompileTools.@compile_workload begin
     prob = LinearProblem(A, b)
     sol = solve(prob, PureKLUFactorization())
     sol = solve(prob, KLUFactorization())
+    sol = solve(prob, SparseColumnPivotedQRFactorization())
     if Base.USE_GPL_LIBS
         sol = solve(prob, UMFPACKFactorization())
     end

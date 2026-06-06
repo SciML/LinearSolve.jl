@@ -150,6 +150,19 @@ _ldiv!(x, A, b::SVector) = (x .= A \ b)
 _ldiv!(::SVector, A, b::SVector) = (A \ b)
 _ldiv!(::SVector, A, b) = (A \ b)
 
+# Build a column-pivoted sparse QR factorization of `A` (the default sparse-LU
+# singular fallback). The method is provided by the SparseArrays extension over
+# SparseColumnPivotedQR.jl; this generic declaration lets `src/default.jl` call it.
+function sparse_colpivqr_factorize end
+
+# Heuristic shared by the sparse default's LU and QR choices: `true` selects the
+# pure-Julia "KLU-style" solver for less-structured problems (small, or medium and
+# very sparse) — `PureKLUFactorization` for LU and `SparseColumnPivotedQRFactorization`
+# for QR — while `false` selects the SuiteSparse solver for more structure (UMFPACK
+# for LU, SPQR for QR). The SparseArrays extension provides the real method for
+# sparse matrices; the generic fallback prefers the pure-Julia option.
+use_klulike_sparse_structure(A, b) = true
+
 # RF Bad fallback: will fail if `A` is just a stand-in
 # This should instead just create the factorization type.
 function init_cacheval(
@@ -1258,6 +1271,44 @@ end
 
 function init_cacheval(
         alg::PureKLUFactorization,
+        A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
+"""
+`SparseColumnPivotedQRFactorization(; reuse_symbolic = true, ordering = :default)`
+
+A pure-Julia, rank-revealing column-pivoted sparse QR factorization, provided by
+[SparseColumnPivotedQR.jl](https://github.com/SciML/SparseColumnPivotedQR.jl). It
+targets the same "small-to-medium sparse" niche as KLU does for LU (low
+symbolic-phase overhead, no SuiteSparse dependency) while preserving the
+rank-revealing guarantees of LAPACK's column-pivoted QR, so it handles
+rectangular (least-squares) and rank-deficient systems.
+
+`SparseColumnPivotedQRFactorization` is a hard dependency of LinearSolve and is
+the default sparse QR: it is the QR choice for non-square sparse systems in the
+default polyalgorithm and the fallback when the default sparse LU
+([`PureKLUFactorization`](@ref)/UMFPACK) hits a (near-)singular matrix.
+
+## Keyword Arguments
+
+  - `reuse_symbolic`: reuse the cached symbolic factorization across solves when
+    the sparsity pattern is unchanged. Defaults to `true`.
+  - `ordering`: column ordering passed to `SparseColumnPivotedQR.scpqr`
+    (`:default`, `:amd`, `:natural`). LinearSolve loads AMD alongside the sparse
+    extension, so `:default` resolves to AMD ordering (1.5-2x faster factorization
+    than `:natural`). Defaults to `:default`.
+"""
+Base.@kwdef struct SparseColumnPivotedQRFactorization <: AbstractSparseFactorization
+    reuse_symbolic::Bool = true
+    ordering::Symbol = :default
+end
+
+function init_cacheval(
+        alg::SparseColumnPivotedQRFactorization,
         A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions

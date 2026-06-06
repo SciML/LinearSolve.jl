@@ -44,6 +44,17 @@ prob = LinearProblem(A, ones(2))
 @test solve(prob, KLUFactorization()).retcode == ReturnCode.Infeasible
 @test solve(prob, PureKLUFactorization()).retcode == ReturnCode.Infeasible
 
+# Singular matrix with an *explicit stored zero* pivot: KLU/PureKLU report
+# `KLU_OK` but produce a non-finite solution. The finiteness guard must surface
+# that as `Infeasible` rather than a silent `Success` with NaNs.
+let A_ez = sparse([1, 2], [1, 2], [1.0, 0.0], 2, 2), b_ez = ones(2)
+    klu_sol = solve(LinearProblem(A_ez, b_ez), KLUFactorization())
+    @test klu_sol.retcode == ReturnCode.Infeasible
+    @test !any(isnan, klu_sol.u)  # not a silent NaN Success
+    @test solve(LinearProblem(A_ez, b_ez), PureKLUFactorization()).retcode ==
+        ReturnCode.Infeasible
+end
+
 @test LinearSolve.defaultalg(sprand(10^4, 10^4, 1.0e-5) + I, zeros(1000)).alg ===
     LinearSolve.DefaultAlgorithmChoice.KLUFactorization
 prob = LinearProblem(sprand(1000, 1000, 0.5), zeros(1000))

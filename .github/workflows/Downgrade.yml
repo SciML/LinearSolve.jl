@@ -18,5 +18,4 @@ jobs:
       julia-version: "1.10"
       group: "Core"
       skip: "Pkg,TOML"
-      allow-reresolve: false
     secrets: "inherit"

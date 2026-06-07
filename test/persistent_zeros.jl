@@ -121,6 +121,49 @@ reduction(cache) = cache.cacheval.sparse_reduction
         end
     end
 
+    @testset "inconsistent zeros: auto switches to per-solve dropzeros" begin
+        # Fixed stored pattern = diagonal + 5 super-diagonal bands, but each step
+        # only ONE band is nonzero (rotating). The union of ever-nonzero positions
+        # grows to the full pattern, so the cached-union reduction bloats; auto must
+        # switch to dropping each matrix's own zeros per solve.
+        m = 16
+        bands = 1:5
+        I = Int[]
+        J = Int[]
+        for j in 1:m
+            push!(I, j); push!(J, j)
+            for d in bands
+                j + d <= m && (push!(I, j + d); push!(J, j))
+            end
+        end
+        Pin = sparse(I, J, ones(length(I)), m, m)
+        function inc_step(P, m, step)
+            cp = SparseArrays.getcolptr(P)
+            rv = rowvals(P)
+            nz = zeros(length(rv))
+            active_band = (step % 5) + 1
+            @inbounds for j in 1:m
+                for p in cp[j]:(cp[j + 1] - 1)
+                    i = rv[p]
+                    nz[p] = i == j ? 10.0 : (i - j == active_band ? -1.0 : 0.0)
+                end
+            end
+            return SparseMatrixCSC(m, m, copy(cp), copy(rv), nz)
+        end
+        steps = [inc_step(Pin, m, s) for s in 0:11]
+        bin = collect(1.0:m)
+        cache = init(LinearProblem(copy(steps[1]), copy(bin)))   # auto
+        for A in steps
+            cache.A = copy(A)
+            cache.b = copy(bin)
+            sol = solve!(cache)
+            @test sol.u ≈ Matrix(A) \ bin rtol = 1.0e-8
+        end
+        red = reduction(cache)
+        @test red.active
+        @test !red.cache_union          # bloated union => switched to per-solve dropzeros
+    end
+
     @testset "constant-pattern contract is enforced" begin
         cache = init(
             LinearProblem(copy(mats[1]), copy(b));

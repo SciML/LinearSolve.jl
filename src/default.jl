@@ -973,21 +973,21 @@ end
                                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)))
                                 _default_sparse_lu_solve_with_fallback(cache, alg, sol)
                             else
+                                # Swap in the reduced operand for the whole sub-solve
+                                # (LU attempt + QR fallback both read `cache.A`), then
+                                # restore. The sparse solvers report status by return
+                                # code rather than throwing, so no `try`/`finally` is
+                                # needed. Separate variable for the raw sub-solve so
+                                # `_result` only ever holds the (uniform
+                                # `DefaultLinearSolver`-tagged) post-fallback solution,
+                                # keeping the return type concrete.
                                 _origA = getfield(cache, :A)
                                 setfield!(cache, :A, _Aop)
-                                # Separate variable for the raw sub-solve so `_result`
-                                # only ever holds the (uniform `DefaultLinearSolver`-
-                                # tagged) post-fallback solution — keeps the return
-                                # type concrete, matching the no-reduction path.
-                                local _result
-                                try
-                                    _rawsol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)))
-                                    _result = _default_sparse_lu_solve_with_fallback(
-                                        cache, alg, _rawsol
-                                    )
-                                finally
-                                    setfield!(cache, :A, _origA)
-                                end
+                                _rawsol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)))
+                                _result = _default_sparse_lu_solve_with_fallback(
+                                    cache, alg, _rawsol
+                                )
+                                setfield!(cache, :A, _origA)
                                 _result
                             end
                         else

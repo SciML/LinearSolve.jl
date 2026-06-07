@@ -13,7 +13,7 @@ using ArrayInterface: ArrayInterface
 using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!
 using SparseArrays: SparseArrays, AbstractSparseArray, AbstractSparseMatrixCSC,
     SparseMatrixCSC,
-    nonzeros, rowvals, getcolptr, sparse, sprand
+    nonzeros, rowvals, getcolptr, sparse, sprand, dropzeros
 using SciMLLogging: @SciMLMessage
 
 @static if Base.USE_GPL_LIBS
@@ -988,16 +988,29 @@ LinearSolve.PrecompileTools.@compile_workload begin
     end
 end
 
-# --- Persistent-nonstructural-zero reduction (shared helper for sparse solvers) ---
+# --- Nonstructural-zero reduction (shared helper for sparse solvers) ---
 #
-# Drops stored entries that have been numerically zero in every solve so far: the
-# kept set is the running union of ever-nonzero positions, which only grows, so
-# `reduced` is always a valid superset of the current matrix's nonzeros and the
-# inner symbolic factorization stays reusable. `active` is a runtime field (not a
-# type), so `init_sparse_reduction` returns a concrete type regardless of whether
-# the reduction fires — keeping the caller type-stable.
+# Two strategies, chosen per `OperatorAssumptions(...; persistent_nonstructural_zeros)`:
+#
+#   * union caching (`cache_union = true`): drop only entries numerically zero in
+#     every solve so far — the kept set is the running union of ever-nonzero
+#     positions, which only grows, so `reduced` is a valid superset of the current
+#     nonzeros and the inner symbolic factorization stays reusable. Best when the
+#     zeros are persistent (stable positions).
+#
+#   * per-solve dropzeros (`cache_union = false`): drop *this* matrix's zeros each
+#     solve and hand the inner solver a fresh pattern. No cross-solve symbolic
+#     caching is assumed (the inner solver re-analyzes when the pattern changes).
+#     Best when the zeros are inconsistent (wobble too much for a stable union).
+#
+# In `auto` mode the reduction starts in union caching and switches to per-solve
+# dropzeros if the union bloats past `UNION_BLOAT_FRACTION` (the zeros turned out
+# not to be persistent). `active` / `cache_union` are runtime fields (not types),
+# so `init_sparse_reduction` returns a concrete type either way — type-stable.
 mutable struct SparseReduction{Tv, Ti}
     active::Bool
+    cache_union::Bool             # true: union caching; false: per-solve dropzeros
+    auto::Bool                    # may switch union -> per-solve on bloat
     colptr::Vector{Ti}            # full stored pattern (reference, for validation)
     rowval::Vector{Ti}
     mask::Vector{Bool}            # over full nnz positions: kept (ever-nonzero)?
@@ -1041,21 +1054,29 @@ function LinearSolve.init_sparse_reduction(
         !isempty(nz) &&
             count(iszero, nz) / length(nz) >= LinearSolve.PERSISTENT_ZERO_FRACTION_THRESHOLD
     end
+    auto = pnz === nothing
     n = size(A, 1)
     colptr = copy(getcolptr(A))
     rowval = copy(rowvals(A))
     if active
         mask = Bool[!iszero(v) for v in nz]
         keep, reduced = _persistent_reduced(colptr, rowval, n, mask, nz)
-        return SparseReduction{Tv, Ti}(true, colptr, rowval, mask, keep, reduced, 1, 0)
+        return SparseReduction{Tv, Ti}(
+            true, true, auto, colptr, rowval, mask, keep, reduced, 1, 0
+        )
     else
         empty = SparseMatrixCSC{Tv, Ti}(0, 0, Ti[1], Ti[], Tv[])
-        return SparseReduction{Tv, Ti}(false, colptr, rowval, Bool[], Int[], empty, 0, 0)
+        return SparseReduction{Tv, Ti}(
+            false, true, auto, colptr, rowval, Bool[], Int[], empty, 0, 0
+        )
     end
 end
 
 function LinearSolve.reduce_operand!(red::SparseReduction, A)
     red.active || return A
+    # per-solve dropzeros: drop this matrix's own zeros and let the inner solver
+    # re-analyze when the pattern changes (no cross-solve union assumed).
+    red.cache_union || (red.reduced = dropzeros(A); red.nrefactor += 1; return red.reduced)
     nz = nonzeros(A)
     length(nz) == length(red.mask) ||
         throw(ArgumentError("persistent_nonstructural_zeros reduction requires a constant \
@@ -1070,6 +1091,12 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
     if grew
         red.keep, red.reduced = _persistent_reduced(red.colptr, red.rowval, size(A, 1), red.mask, nz)
         red.nanalyze += 1
+        # auto mode: if the union has bloated, the zeros are not persistent — stop
+        # caching the union and drop per solve instead (this matrix's zeros only).
+        if red.auto && length(red.keep) > LinearSolve.UNION_BLOAT_FRACTION * length(red.mask)
+            red.cache_union = false
+            red.reduced = dropzeros(A)
+        end
     else
         rnz = nonzeros(red.reduced)
         keep = red.keep

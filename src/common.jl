@@ -55,6 +55,22 @@ end
 
 Sets the operator `A` assumptions used as part of the default algorithm.
 
+`issquare` asserts whether `A` is square (and thus whether a direct
+factorization vs. a least-squares solver is appropriate). `nothing` (default)
+defers the decision, letting `init`/`defaultalg` infer it from `A`.
+
+`condition` describes the conditioning of `A` and selects how aggressively the
+default algorithm trades speed for stability (see [`OperatorCondition`](@ref)):
+
+  - `OperatorCondition.IllConditioned` (default): assume `A` may be ill
+    conditioned; pick a stability-preserving algorithm (e.g. pivoted
+    factorizations).
+  - `OperatorCondition.WellConditioned`: assume contained conditioning and pick
+    the fastest algorithm, skipping safety work.
+  - `OperatorCondition.VeryIllConditioned` /
+    `OperatorCondition.SuperIllConditioned`: progressively more conservative,
+    favoring the most numerically robust paths.
+
 `persistent_nonstructural_zeros` asserts whether `A` stores entries that are
 *numerically zero* (non-structural zeros) at positions that stay zero across a
 sequence of solves — common for ODE/DAE Jacobians and `W = I - γJ` operators
@@ -67,8 +83,13 @@ positions, so it never under-covers the current matrix).
 
   - `nothing` (default): auto-detect from the starting matrix — enable the
     reduction when a sufficient fraction of the stored entries are numerically
-    zero (see `LinearSolve.PERSISTENT_ZERO_FRACTION_THRESHOLD`).
-  - `true`: assume such zeros are present and always reduce.
+    zero (see `LinearSolve.PERSISTENT_ZERO_FRACTION_THRESHOLD`). If the zeros turn
+    out *not* to be persistent (the union of ever-nonzero positions bloats past
+    `LinearSolve.UNION_BLOAT_FRACTION`), it stops caching the union and instead
+    drops each matrix's own zeros per solve, letting the inner factorization
+    re-analyze on pattern changes.
+  - `true`: assume the zeros are present and persistent; always reduce via the
+    cached union (never falls back to per-solve dropzeros).
   - `false`: assume none; never reduce (bit-for-bit identical to the plain
     factorization, with no detection overhead).
 
@@ -100,6 +121,15 @@ end
 # enable the sparse persistent-zero reduction. Below this the matrix is treated
 # as already tight and factorized unchanged (no detection overhead, bit-identical).
 const PERSISTENT_ZERO_FRACTION_THRESHOLD = 0.1
+
+# In auto mode, if the running union of ever-nonzero positions grows to cover more
+# than this fraction of the stored pattern, the nonstructural zeros are not
+# actually persistent (they wobble too much for a stable reduced pattern). The
+# reduction then stops maintaining the union and instead drops each matrix's own
+# zeros per solve (no cross-solve symbolic caching) — better than carrying the
+# bloated near-full union. An explicit `persistent_nonstructural_zeros = true`
+# pins union caching and never switches.
+const UNION_BLOAT_FRACTION = 0.9
 
 # Shared persistent-nonstructural-zero reduction helpers. The reduction drops
 # stored entries that have been numerically zero in every solve so far (the

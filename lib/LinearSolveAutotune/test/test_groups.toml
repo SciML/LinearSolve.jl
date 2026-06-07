@@ -1,0 +1,4 @@
+# LinearSolveAutotune's runtests recognizes only the Core group; it has no
+# QA group, so the default (Core + QA on 1) is overridden to declare Core only.
+[Core]
+versions = ["lts", "1.11", "1", "pre"]

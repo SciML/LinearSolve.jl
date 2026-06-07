@@ -41,8 +41,6 @@ jobs:
           - "LinearSolveGinkgo"
           - "LinearSolveElemental"
           - "NoPre"
-          - "LinearSolveAutotune"
-          - "LinearSolvePyAMG"
           - "Preferences"
           - "Trim"
         os:

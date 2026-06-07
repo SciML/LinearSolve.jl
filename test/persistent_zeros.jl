@@ -164,6 +164,33 @@ reduction(cache) = cache.cacheval.sparse_reduction
         @test !red.cache_union          # bloated union => switched to per-solve dropzeros
     end
 
+    @testset "standalone sparse solvers apply the reduction" begin
+        algs = Any[PureKLUFactorization(), KLUFactorization()]
+        Base.USE_GPL_LIBS && push!(algs, UMFPACKFactorization())
+        @testset "$(nameof(typeof(alg)))" for alg in algs
+            cache = init(
+                LinearProblem(copy(mats[1]), copy(b)), alg;
+                assumptions = OperatorAssumptions(true; persistent_nonstructural_zeros = true)
+            )
+            @test cache.sparse_reduction !== nothing
+            for (i, A) in enumerate(mats)
+                cache.A = copy(A)
+                cache.b = copy(b)
+                @test solve!(cache).u ≈ refs[i] rtol = 1.0e-8
+            end
+            red = cache.sparse_reduction
+            @test red.active
+            @test length(red.keep) < length(red.mask)   # reduction really happened
+        end
+        # force off => standalone reduction inactive, plain solve
+        coff = init(
+            LinearProblem(copy(mats[1]), copy(b)), PureKLUFactorization();
+            assumptions = OperatorAssumptions(true; persistent_nonstructural_zeros = false)
+        )
+        solve!(coff)
+        @test !coff.sparse_reduction.active
+    end
+
     @testset "constant-pattern contract is enforced" begin
         cache = init(
             LinearProblem(copy(mats[1]), copy(b));

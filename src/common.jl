@@ -122,14 +122,16 @@ end
 # as already tight and factorized unchanged (no detection overhead, bit-identical).
 const PERSISTENT_ZERO_FRACTION_THRESHOLD = 0.1
 
-# In auto mode, if the running union of ever-nonzero positions grows to cover more
-# than this fraction of the stored pattern, the nonstructural zeros are not
-# actually persistent (they wobble too much for a stable reduced pattern). The
-# reduction then stops maintaining the union and instead drops each matrix's own
-# zeros per solve (no cross-solve symbolic caching) — better than carrying the
-# bloated near-full union. An explicit `persistent_nonstructural_zeros = true`
-# pins union caching and never switches.
-const UNION_BLOAT_FRACTION = 0.9
+# In auto mode, if more than this fraction of the entries that were numerically
+# zero on the *starting* matrix have since become nonzero, the nonstructural zeros
+# are deemed non-persistent (they wobble too much for a stable reduced pattern).
+# The reduction then stops maintaining the union and instead drops each matrix's
+# own zeros per solve (no cross-solve symbolic caching) — better than carrying a
+# union that has lost most of what it could drop. An explicit
+# `persistent_nonstructural_zeros = true` pins union caching and never switches.
+# (This is "fraction of the starting zeros that turned nonzero", independent of
+# how dense the matrix is — not a fraction of the whole stored pattern.)
+const NONPERSISTENT_ZERO_FRACTION = 0.5
 
 # Shared persistent-nonstructural-zero reduction helpers. The reduction drops
 # stored entries that have been numerically zero in every solve so far (the
@@ -184,7 +186,7 @@ The cache automatically tracks when matrix `A` or parameters `p` change by setti
 appropriate freshness flags. When `solve!` is called, stale cache entries are automatically
 recomputed as needed.
 """
-mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, Tlv <: LinearVerbosity, issq, S}
+mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, Tlv <: LinearVerbosity, issq, S, Tred}
     A::TA
     b::Tb
     u::Tu
@@ -201,6 +203,10 @@ mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, Tlv <: Linear
     verbose::Tlv
     assumptions::OperatorAssumptions{issq}
     sensealg::S
+    # Persistent-nonstructural-zero reduction state for standalone sparse
+    # factorizations (`nothing` otherwise; the default solver carries its own in
+    # `DefaultLinearSolverInit`). Set once at `init`; persists across `reinit!`.
+    sparse_reduction::Tred
 end
 
 function Base.setproperty!(cache::LinearCache, name::Symbol, x)
@@ -505,13 +511,18 @@ function __init(
     precsisfresh = false
     Tc = typeof(cacheval)
 
+    # Standalone sparse factorizations may drop persistent nonstructural zeros (the
+    # default carries its own reduction in DefaultLinearSolverInit, so skip it here).
+    sparse_reduction = alg isa AbstractSparseFactorization ?
+        init_sparse_reduction(A, assumptions) : nothing
+
     cache = LinearCache{
         typeof(A), typeof(b), typeof(u0_), typeof(p), typeof(alg), Tc,
         typeof(Pl), typeof(Pr), typeof(reltol), typeof(verbose_spec), typeof(assumptions.issq),
-        typeof(sensealg),
+        typeof(sensealg), typeof(sparse_reduction),
     }(
         A, b, u0_, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
-        maxiters, verbose_spec, assumptions, sensealg
+        maxiters, verbose_spec, assumptions, sensealg, sparse_reduction
     )
     return cache
 end

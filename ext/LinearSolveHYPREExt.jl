@@ -198,10 +198,10 @@ function SciMLBase.init(
     cache = LinearCache{
         typeof(A), typeof(b), typeof(u0), typeof(p), typeof(alg), Tc,
         typeof(Pl), typeof(Pr), typeof(reltol), typeof(verb_spec),
-        typeof(__issquare(assumptions)), typeof(sensealg),
+        typeof(__issquare(assumptions)), typeof(sensealg), Nothing,
     }(
         A, b, u0, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
-        maxiters, verb_spec, assumptions, sensealg
+        maxiters, verb_spec, assumptions, sensealg, nothing
     )
     return cache
 end

@@ -7,7 +7,7 @@ using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
     NormalCholeskyFactorization,
     OperatorAssumptions, LinearVerbosity,
     QRFactorization, RFLUFactorization, UMFPACKFactorization,
-    SparseColumnPivotedQRFactorization, solve
+    SparseColumnPivotedQRFactorization, PersistentDropFactorization, solve
 using SciMLOperators: AbstractSciMLOperator, has_concretization
 using ArrayInterface: ArrayInterface
 using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!
@@ -986,6 +986,122 @@ LinearSolve.PrecompileTools.@compile_workload begin
     if Base.USE_GPL_LIBS
         sol = solve(prob, UMFPACKFactorization())
     end
+end
+
+# --- PersistentDropFactorization: drop only persistently-zero stored entries ---
+# State carried in the cacheval. The reduced matrix is the operand fed to an inner
+# LinearCache (any sparse algorithm, or the default polyalgorithm). Because the
+# inner cache solves the reduced matrix, the inner default's singular LU → QR
+# fallback factorizes the reduced matrix too -- the reduction flows to QR for free.
+mutable struct PersistentDropCache{Tinner, Tv, Ti}
+    colptr::Vector{Ti}              # fixed FULL stored pattern (reference)
+    rowval::Vector{Ti}
+    n::Int
+    mask::Vector{Bool}              # over full nnz positions: kept (ever-nonzero)?
+    keep::Vector{Int}              # kept positions into the full nzval (sorted, CSC order)
+    reduced::SparseMatrixCSC{Tv, Ti} # operand; nzval overwritten in place each step
+    inner::Tinner                   # inner LinearCache solving the reduced matrix
+    nanalyze::Int                   # number of (re)analyses (pattern widenings + initial)
+    nrefactor::Int                  # number of numeric-only refactors
+end
+
+# Build the reduced (colptr, rowval, nzval) and the keep list from the full
+# pattern + mask, gathering current values. Allocates a fresh reduced matrix.
+function _persistent_reduced(
+        colptr::Vector{Ti}, rowval, n, mask, nzval::AbstractVector{Tv}
+    ) where {Ti, Tv}
+    keep = Int[]
+    rcolptr = Vector{Ti}(undef, n + 1)
+    rrowval = Ti[]
+    rnzval = Tv[]
+    @inbounds for j in 1:n
+        rcolptr[j] = length(rrowval) + 1
+        for p in colptr[j]:(colptr[j + 1] - 1)
+            if mask[p]
+                push!(keep, p)
+                push!(rrowval, rowval[p])
+                push!(rnzval, nzval[p])
+            end
+        end
+    end
+    rcolptr[n + 1] = length(rrowval) + 1
+    return keep, SparseMatrixCSC(n, n, rcolptr, rrowval, rnzval)
+end
+
+function LinearSolve.init_cacheval(
+        alg::PersistentDropFactorization,
+        A::AbstractSparseMatrixCSC, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    n = size(A, 1)
+    colptr = copy(getcolptr(A))
+    rowval = copy(rowvals(A))
+    nz = nonzeros(A)
+    mask = alg.drop_initial_zeros ? Bool[!iszero(v) for v in nz] : trues(length(nz))
+    keep, reduced = _persistent_reduced(colptr, rowval, n, mask, nz)
+    inner_alg = alg.alg === nothing ? LinearSolve.defaultalg(reduced, b, assumptions) : alg.alg
+    inner = SciMLBase.init(
+        LinearProblem(reduced, b), inner_alg;
+        assumptions = assumptions,
+        alias = LinearSolve.LinearAliasSpecifier(alias_A = true, alias_b = true),
+        maxiters = maxiters, abstol = abstol, reltol = reltol, verbose = verbose
+    )
+    return PersistentDropCache(colptr, rowval, n, mask, keep, reduced, inner, 1, 0)
+end
+
+# Non-sparse input: PersistentDrop has nothing to do, so it is an error to use it
+# off the sparse path (it is a sparse-only meta-algorithm).
+function LinearSolve.init_cacheval(
+        alg::PersistentDropFactorization, A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    throw(ArgumentError("PersistentDropFactorization requires a sparse (CSC) matrix"))
+end
+
+function SciMLBase.solve!(
+        cache::LinearSolve.LinearCache, alg::PersistentDropFactorization; kwargs...
+    )
+    st = cache.cacheval::PersistentDropCache
+    A = cache.A
+    nz = nonzeros(A)
+    length(nz) == length(st.mask) ||
+        throw(ArgumentError("PersistentDropFactorization: the stored sparsity pattern \
+                             must be constant across solves (stored nnz changed)"))
+    # Widen the union mask if any persistently-dead entry has just activated.
+    grew = false
+    @inbounds for i in eachindex(nz)
+        if !st.mask[i] && !iszero(nz[i])
+            st.mask[i] = true
+            grew = true
+        end
+    end
+    if grew
+        # Pattern grew: rebuild the reduced operand (new pattern). Handing the inner
+        # cache a new-pattern matrix makes it re-analyze (and clears any QR fallback).
+        st.keep, st.reduced = _persistent_reduced(st.colptr, st.rowval, st.n, st.mask, nz)
+        st.inner.A = st.reduced
+        st.nanalyze += 1
+    else
+        # Stable pattern: gather current values into the existing reduced operand and
+        # hand it back so the inner cache reuses its symbolic analysis (numeric refactor).
+        rnz = nonzeros(st.reduced)
+        keep = st.keep
+        @inbounds @simd for j in eachindex(keep)
+            rnz[j] = nz[keep[j]]
+        end
+        st.inner.A = st.reduced
+        st.nrefactor += 1
+    end
+    st.inner.b = cache.b
+    sol = SciMLBase.solve!(st.inner)
+    copyto!(cache.u, sol.u)
+    cache.isfresh = false
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache;
+        retcode = sol.retcode, iters = sol.iters, stats = sol.stats
+    )
 end
 
 end

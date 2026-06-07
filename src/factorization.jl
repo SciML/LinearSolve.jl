@@ -1316,6 +1316,75 @@ function init_cacheval(
     return nothing
 end
 
+"""
+`PersistentDropFactorization(alg = nothing; drop_initial_zeros = true)`
+
+A meta-algorithm for sequences of sparse solves where the matrix keeps a *fixed
+stored sparsity pattern* but many of its stored entries are numerically zero, and
+the positions of those zeros wobble between solves (common for ODE/DAE Jacobians
+and `W = I - γJ` operators built from a conservative symbolic sparsity pattern).
+
+Such stored zeros are not free: they join the fill-reducing ordering and the
+symbolic factorization as if they were real nonzeros, inflating the factor (often
+~2x for KLU-style orderings) and so making every numeric refactor and triangular
+solve more expensive. The obvious fix -- `dropzeros` before each solve -- is a
+trap: the dropped pattern changes whenever a zero wobbles, forcing a fresh
+symbolic analysis nearly every step, which costs far more than it saves.
+
+`PersistentDropFactorization` instead drops only the entries that have been zero
+in *every* solve so far -- the complement of the running union of "ever-nonzero"
+positions. That union only ever grows, so the reduced pattern is always a valid
+superset of the current true nonzeros: the inner factorization's symbolic
+analysis stays valid and is reused. The pattern widens (and re-analyzes) only the
+handful of times a previously-dead entry first activates, then never again.
+Steady state is one numeric refactor + one solve per step on the small pattern --
+the full fill-reduction win without the re-analysis thrash.
+
+The reduction is performed *above* the inner solver: the reduced matrix becomes
+the operand handed to `alg`. Consequently it composes with the default
+polyalgorithm, including its singular LU → column-pivoted-QR fallback -- the QR
+fallback factorizes the same reduced matrix, so the fill reduction carries
+through to the fallback automatically.
+
+## Arguments
+
+  - `alg`: the inner sparse algorithm applied to the reduced matrix. `nothing`
+    (default) uses LinearSolve's default sparse polyalgorithm (with its singular
+    LU → QR safety fallback). May also be an explicit sparse algorithm such as
+    `KLUFactorization()`, `PureKLUFactorization()`, `UMFPACKFactorization()`, or
+    `SparspakFactorization()`.
+
+## Keyword Arguments
+
+  - `drop_initial_zeros`: if `true` (default), the initial kept set is the
+    nonzeros of the first matrix (its stored zeros start dropped). If `false`,
+    the kept set starts as the full stored pattern and only ever the union with
+    later activations -- i.e. nothing is dropped until a position is observed to
+    be persistently zero. `true` is the right choice when the first matrix is
+    representative; `false` is conservative.
+
+!!! note
+
+    The input must keep a *constant stored sparsity pattern* across solves (only
+    the values, including which are zero, may change). A genuinely different
+    stored pattern raises rather than silently mis-solving. Dropping stored zeros
+    changes pivoting, so results differ from the un-dropped solve at the level of
+    floating-point roundoff.
+"""
+struct PersistentDropFactorization{A} <: AbstractSparseFactorization
+    alg::A
+    drop_initial_zeros::Bool
+end
+
+function PersistentDropFactorization(alg = nothing; drop_initial_zeros::Bool = true)
+    return PersistentDropFactorization{typeof(alg)}(alg, drop_initial_zeros)
+end
+
+# `init_cacheval` for PersistentDropFactorization lives in the SparseArrays
+# extension (it needs to build the reduced operand and an inner cache); the
+# generic `init_cacheval(::SciMLLinearSolveAlgorithm, args...) = nothing` covers
+# the non-extension load.
+
 ## CHOLMODFactorization
 
 """

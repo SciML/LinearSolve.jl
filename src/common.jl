@@ -49,9 +49,57 @@ EnumX.@enumx OperatorCondition begin
 end
 
 """
+    EnumX.@enumx NonstructuralZeros
+
+How a sparse operator's *nonstructural zeros* — stored entries that are
+numerically zero — are expected to behave across a sequence of solves. Such
+stored zeros (common in ODE/DAE Jacobians and `W = I - γJ` built from a
+conservative symbolic sparsity pattern) join the fill-reducing ordering and
+symbolic factorization as if real, inflating the factor, so dropping them speeds
+up every refactor and solve. Passed via [`OperatorAssumptions`](@ref); has no
+effect on dense operators.
+"""
+EnumX.@enumx NonstructuralZeros begin
+    """
+    `NonstructuralZeros.Auto`
+
+    Default. Detect from the starting matrix: enable the reduction when a
+    sufficient fraction of the stored entries are numerically zero (see
+    `LinearSolve.PERSISTENT_ZERO_FRACTION_THRESHOLD`), starting in cached-union
+    mode and switching to per-solve `dropzeros` if the zeros prove non-persistent
+    (more than `LinearSolve.NONPERSISTENT_ZERO_FRACTION` of the starting zeros
+    activate).
+    """
+    Auto
+    """
+    `NonstructuralZeros.None`
+
+    Assume the operator has no nonstructural zeros worth dropping. Never reduce —
+    bit-for-bit identical to the plain factorization, with no detection overhead.
+    """
+    None
+    """
+    `NonstructuralZeros.Persistent`
+
+    Assume nonstructural zeros are present at *persistent* positions (the same
+    entries stay zero across solves). Drop them via the cached union of
+    ever-nonzero positions, reusing the symbolic factorization across solves.
+    """
+    Persistent
+    """
+    `NonstructuralZeros.Present`
+
+    Assume nonstructural zeros are present but at positions that may vary between
+    solves. Drop each matrix's own zeros per solve (no cross-solve symbolic
+    caching; the inner solver re-analyzes when the pattern changes).
+    """
+    Present
+end
+
+"""
     OperatorAssumptions(issquare = nothing;
                         condition::OperatorCondition.T = IllConditioned,
-                        persistent_nonstructural_zeros::Union{Nothing, Bool} = nothing)
+                        nonstructural_zeros::NonstructuralZeros.T = Auto)
 
 Sets the operator `A` assumptions used as part of the default algorithm.
 
@@ -71,55 +119,43 @@ default algorithm trades speed for stability (see [`OperatorCondition`](@ref)):
     `OperatorCondition.SuperIllConditioned`: progressively more conservative,
     favoring the most numerically robust paths.
 
-`persistent_nonstructural_zeros` asserts whether `A` stores entries that are
-*numerically zero* (non-structural zeros) at positions that stay zero across a
-sequence of solves — common for ODE/DAE Jacobians and `W = I - γJ` operators
-built from a conservative symbolic sparsity pattern. Such stored zeros inflate
-the fill-reducing ordering and symbolic factorization, so dropping the
-persistently-zero ones speeds up every refactor and solve. For sparse `A` this
-enables an internal reduction that factorizes the smaller pattern while keeping
-the result valid (the kept pattern is the growing union of ever-nonzero
-positions, so it never under-covers the current matrix).
+`nonstructural_zeros` declares how `A`'s *nonstructural zeros* (stored entries
+that are numerically zero) behave across a sequence of solves, and hence whether
+and how a sparse factorization should drop them (see [`NonstructuralZeros`](@ref)):
 
-  - `nothing` (default): auto-detect from the starting matrix — enable the
-    reduction when a sufficient fraction of the stored entries are numerically
-    zero (see `LinearSolve.PERSISTENT_ZERO_FRACTION_THRESHOLD`). If the zeros turn
-    out *not* to be persistent (the union of ever-nonzero positions bloats past
-    `LinearSolve.UNION_BLOAT_FRACTION`), it stops caching the union and instead
-    drops each matrix's own zeros per solve, letting the inner factorization
-    re-analyze on pattern changes.
-  - `true`: assume the zeros are present and persistent; always reduce via the
-    cached union (never falls back to per-solve dropzeros).
-  - `false`: assume none; never reduce (bit-for-bit identical to the plain
-    factorization, with no detection overhead).
+  - `NonstructuralZeros.Auto` (default): detect from the starting matrix and
+    adapt (cached union, falling back to per-solve dropzeros if non-persistent).
+  - `NonstructuralZeros.None`: none worth dropping; never reduce (bit-identical).
+  - `NonstructuralZeros.Persistent`: present at stable positions; cached-union
+    reduction.
+  - `NonstructuralZeros.Present`: present but positions may vary; per-solve
+    dropzeros.
 
 Has no effect on dense `A`.
 """
 struct OperatorAssumptions{T}
     issq::T
     condition::OperatorCondition.T
-    persistent_nonstructural_zeros::Union{Nothing, Bool}
+    nonstructural_zeros::NonstructuralZeros.T
 end
 
 function OperatorAssumptions(
         issquare = nothing;
         condition::OperatorCondition.T = OperatorCondition.IllConditioned,
-        persistent_nonstructural_zeros::Union{Nothing, Bool} = nothing
+        nonstructural_zeros::NonstructuralZeros.T = NonstructuralZeros.Auto
     )
     return OperatorAssumptions{typeof(issquare)}(
-        issquare, condition, persistent_nonstructural_zeros
+        issquare, condition, nonstructural_zeros
     )
 end
 __issquare(assump::OperatorAssumptions) = assump.issq
 __conditioning(assump::OperatorAssumptions) = assump.condition
-function __persistent_nonstructural_zeros(assump::OperatorAssumptions)
-    return assump.persistent_nonstructural_zeros
-end
+__nonstructural_zeros(assump::OperatorAssumptions) = assump.nonstructural_zeros
 
 # Fraction of stored entries that must be numerically zero on the *starting*
-# matrix for auto-detection (`persistent_nonstructural_zeros === nothing`) to
-# enable the sparse persistent-zero reduction. Below this the matrix is treated
-# as already tight and factorized unchanged (no detection overhead, bit-identical).
+# matrix for auto-detection (`nonstructural_zeros == NonstructuralZeros.Auto`) to
+# enable the sparse reduction. Below this the matrix is treated as already tight
+# and factorized unchanged (no detection overhead, bit-identical).
 const PERSISTENT_ZERO_FRACTION_THRESHOLD = 0.1
 
 # In auto mode, if more than this fraction of the entries that were numerically
@@ -127,10 +163,11 @@ const PERSISTENT_ZERO_FRACTION_THRESHOLD = 0.1
 # are deemed non-persistent (they wobble too much for a stable reduced pattern).
 # The reduction then stops maintaining the union and instead drops each matrix's
 # own zeros per solve (no cross-solve symbolic caching) — better than carrying a
-# union that has lost most of what it could drop. An explicit
-# `persistent_nonstructural_zeros = true` pins union caching and never switches.
-# (This is "fraction of the starting zeros that turned nonzero", independent of
-# how dense the matrix is — not a fraction of the whole stored pattern.)
+# union that has lost most of what it could drop. `NonstructuralZeros.Persistent`
+# pins union caching and never switches; `NonstructuralZeros.Present` starts in
+# per-solve mode. (This is "fraction of the starting zeros that turned nonzero",
+# independent of how dense the matrix is — not a fraction of the whole stored
+# pattern.)
 const NONPERSISTENT_ZERO_FRACTION = 0.5
 
 # Shared persistent-nonstructural-zero reduction helpers. The reduction drops

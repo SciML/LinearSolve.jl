@@ -996,7 +996,7 @@ end
 
 # --- Nonstructural-zero reduction (shared helper for sparse solvers) ---
 #
-# Two strategies, chosen per `OperatorAssumptions(...; persistent_nonstructural_zeros)`:
+# Two strategies, chosen per `OperatorAssumptions(...; nonstructural_zeros)`:
 #
 #   * union caching (`cache_union = true`): drop only entries numerically zero in
 #     every solve so far — the kept set is the running union of ever-nonzero
@@ -1010,7 +1010,7 @@ end
 #     Best when the zeros are inconsistent (wobble too much for a stable union).
 #
 # In `auto` mode the reduction starts in union caching and switches to per-solve
-# dropzeros if the union bloats past `UNION_BLOAT_FRACTION` (the zeros turned out
+# dropzeros if the union bloats past `NONPERSISTENT_ZERO_FRACTION` (the zeros turned out
 # not to be persistent). `active` / `cache_union` are runtime fields (not types),
 # so `init_sparse_reduction` returns a concrete type either way — type-stable.
 mutable struct SparseReduction{Tv, Ti}
@@ -1051,17 +1051,19 @@ end
 function LinearSolve.init_sparse_reduction(
         A::AbstractSparseMatrixCSC{Tv, Ti}, assumptions
     ) where {Tv, Ti}
-    pnz = LinearSolve.__persistent_nonstructural_zeros(assumptions)
+    nsz = LinearSolve.__nonstructural_zeros(assumptions)
+    NZ = LinearSolve.NonstructuralZeros
     nz = nonzeros(A)
-    active = if pnz === true
+    active = if nsz == NZ.Persistent || nsz == NZ.Present
         true
-    elseif pnz === false
+    elseif nsz == NZ.None
         false
-    else
+    else  # Auto
         !isempty(nz) &&
             count(iszero, nz) / length(nz) >= LinearSolve.PERSISTENT_ZERO_FRACTION_THRESHOLD
     end
-    auto = pnz === nothing
+    auto = nsz == NZ.Auto
+    cache_union = nsz != NZ.Present     # Present => per-solve dropzeros from the start
     m, k = size(A)
     colptr = copy(getcolptr(A))
     rowval = copy(rowvals(A))
@@ -1070,12 +1072,12 @@ function LinearSolve.init_sparse_reduction(
         nstart_zeros = count(iszero, nz)
         keep, reduced = _persistent_reduced(colptr, rowval, m, k, mask, nz)
         return SparseReduction{Tv, Ti}(
-            true, true, auto, nstart_zeros, colptr, rowval, mask, keep, reduced, 1, 0
+            true, cache_union, auto, nstart_zeros, colptr, rowval, mask, keep, reduced, 1, 0
         )
     else
         empty = SparseMatrixCSC{Tv, Ti}(0, 0, Ti[1], Ti[], Tv[])
         return SparseReduction{Tv, Ti}(
-            false, true, auto, 0, colptr, rowval, Bool[], Int[], empty, 0, 0
+            false, cache_union, auto, 0, colptr, rowval, Bool[], Int[], empty, 0, 0
         )
     end
 end
@@ -1087,7 +1089,7 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
     red.cache_union || (red.reduced = dropzeros(A); red.nrefactor += 1; return red.reduced)
     nz = nonzeros(A)
     length(nz) == length(red.mask) ||
-        throw(ArgumentError("persistent_nonstructural_zeros reduction requires a constant \
+        throw(ArgumentError("nonstructural_zeros reduction requires a constant \
                              stored sparsity pattern across solves (stored nnz changed)"))
     grew = false
     @inbounds for i in eachindex(nz)

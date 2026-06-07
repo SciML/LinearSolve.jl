@@ -13,7 +13,7 @@ if GROUP == "All" || GROUP == "Core"
     @time @safetestset "Zero Initialization Tests" include("zeroinittests.jl")
     @time @safetestset "Non-Square Tests" include("nonsquare.jl")
     @time @safetestset "SparseVector b Tests" include("sparse_vector.jl")
-    @time @safetestset "Persistent Nonstructural Zeros" include("persistent_zeros.jl")
+    @time @safetestset "Nonstructural Zeros" include("nonstructural_zeros.jl")
     @time @safetestset "Default Alg Tests" include("default_algs.jl")
     @time @safetestset "Adjoint Sensitivity" include("adjoint.jl")
     @time @safetestset "ForwardDiff Overloads" include("forwarddiff_overloads.jl")

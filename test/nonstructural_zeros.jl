@@ -3,7 +3,7 @@ using LinearSolve, SparseArrays, LinearAlgebra, Test
 # A family of sparse matrices sharing a FIXED stored sparsity pattern, where many
 # stored entries are zero in every step (persistently dead) and a few "wobble"
 # (zero in some steps, nonzero in others) -- the regime the
-# `persistent_nonstructural_zeros` operator assumption targets.
+# `nonstructural_zeros` operator assumption targets.
 function pz_pattern(n)
     I = Int[]
     J = Int[]
@@ -40,7 +40,7 @@ end
 
 reduction(cache) = cache.cacheval.sparse_reduction
 
-@testset "persistent_nonstructural_zeros (sparse reduction)" begin
+@testset "nonstructural_zeros (sparse reduction)" begin
     n = 12
     P = pz_pattern(n)
     nsteps = 8
@@ -54,7 +54,7 @@ reduction(cache) = cache.cacheval.sparse_reduction
     @testset "force on: correctness + caching" begin
         cache = init(
             LinearProblem(copy(mats[1]), copy(b));
-            assumptions = OperatorAssumptions(true; persistent_nonstructural_zeros = true)
+            assumptions = OperatorAssumptions(true; nonstructural_zeros = NonstructuralZeros.Persistent)
         )
         for (i, A) in enumerate(mats)
             cache.A = copy(A)
@@ -80,7 +80,7 @@ reduction(cache) = cache.cacheval.sparse_reduction
     @testset "force off: inactive, matches plain solve" begin
         cache = init(
             LinearProblem(copy(mats[1]), copy(b));
-            assumptions = OperatorAssumptions(true; persistent_nonstructural_zeros = false)
+            assumptions = OperatorAssumptions(true; nonstructural_zeros = NonstructuralZeros.None)
         )
         for (i, A) in enumerate(mats)
             cache.A = copy(A)
@@ -106,7 +106,7 @@ reduction(cache) = cache.cacheval.sparse_reduction
         sing = [pz_step(P, n, s; singular = true) for s in 1:3]
         cache = init(
             LinearProblem(copy(sing[1]), copy(b));
-            assumptions = OperatorAssumptions(true; persistent_nonstructural_zeros = true)
+            assumptions = OperatorAssumptions(true; nonstructural_zeros = NonstructuralZeros.Persistent)
         )
         for A in sing
             cache.A = copy(A)
@@ -119,6 +119,21 @@ reduction(cache) = cache.cacheval.sparse_reduction
             # is the operand the swap hands to the LU attempt AND the QR fallback
             @test length(reduction(cache).keep) < length(reduction(cache).mask)
         end
+    end
+
+    @testset "Present forces per-solve dropzeros from the start" begin
+        cache = init(
+            LinearProblem(copy(mats[1]), copy(b));
+            assumptions = OperatorAssumptions(true; nonstructural_zeros = NonstructuralZeros.Present)
+        )
+        for (i, A) in enumerate(mats)
+            cache.A = copy(A)
+            cache.b = copy(b)
+            @test solve!(cache).u ≈ refs[i] rtol = 1.0e-8
+        end
+        red = reduction(cache)
+        @test red.active
+        @test !red.cache_union          # per-solve from the first solve, no union caching
     end
 
     @testset "inconsistent zeros: auto switches to per-solve dropzeros" begin
@@ -170,7 +185,7 @@ reduction(cache) = cache.cacheval.sparse_reduction
         @testset "$(nameof(typeof(alg)))" for alg in algs
             cache = init(
                 LinearProblem(copy(mats[1]), copy(b)), alg;
-                assumptions = OperatorAssumptions(true; persistent_nonstructural_zeros = true)
+                assumptions = OperatorAssumptions(true; nonstructural_zeros = NonstructuralZeros.Persistent)
             )
             @test cache.sparse_reduction !== nothing
             for (i, A) in enumerate(mats)
@@ -185,7 +200,7 @@ reduction(cache) = cache.cacheval.sparse_reduction
         # force off => standalone reduction inactive, plain solve
         coff = init(
             LinearProblem(copy(mats[1]), copy(b)), PureKLUFactorization();
-            assumptions = OperatorAssumptions(true; persistent_nonstructural_zeros = false)
+            assumptions = OperatorAssumptions(true; nonstructural_zeros = NonstructuralZeros.None)
         )
         solve!(coff)
         @test !coff.sparse_reduction.active
@@ -213,7 +228,7 @@ reduction(cache) = cache.cacheval.sparse_reduction
         bls = ones(m)
         cache = init(
             LinearProblem(copy(lsmats[1]), copy(bls));
-            assumptions = OperatorAssumptions(false; persistent_nonstructural_zeros = true)
+            assumptions = OperatorAssumptions(false; nonstructural_zeros = NonstructuralZeros.Persistent)
         )
         for A in lsmats
             cache.A = copy(A)
@@ -229,7 +244,7 @@ reduction(cache) = cache.cacheval.sparse_reduction
     @testset "constant-pattern contract is enforced" begin
         cache = init(
             LinearProblem(copy(mats[1]), copy(b));
-            assumptions = OperatorAssumptions(true; persistent_nonstructural_zeros = true)
+            assumptions = OperatorAssumptions(true; nonstructural_zeros = NonstructuralZeros.Persistent)
         )
         solve!(cache)
         cache.A = sparse(2.0I, n, n)   # different stored pattern

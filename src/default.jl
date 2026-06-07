@@ -153,7 +153,7 @@ function defaultalg(A, b, assump::OperatorAssumptions{Nothing})
         A, b,
         OperatorAssumptions(
             issq; condition = assump.condition,
-            persistent_nonstructural_zeros = assump.persistent_nonstructural_zeros
+            nonstructural_zeros = assump.nonstructural_zeros
         )
     )
 end

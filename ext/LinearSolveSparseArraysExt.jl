@@ -725,6 +725,7 @@ function SciMLBase.solve!(
         cache::LinearSolve.LinearCache, alg::SparseColumnPivotedQRFactorization; kwargs...
     )
     A = cache.A
+    A = LinearSolve.reduce_operand!(cache.sparse_reduction, A)
     A = convert(AbstractMatrix, A)
     if cache.isfresh
         cacheval = LinearSolve.@get_cacheval(cache, :SparseColumnPivotedQRFactorization)
@@ -1027,13 +1028,13 @@ mutable struct SparseReduction{Tv, Ti}
 end
 
 function _persistent_reduced(
-        colptr::Vector{Ti}, rowval, n, mask, nzval::AbstractVector{Tv}
+        colptr::Vector{Ti}, rowval, m::Integer, k::Integer, mask, nzval::AbstractVector{Tv}
     ) where {Ti, Tv}
     keep = Int[]
-    rcolptr = Vector{Ti}(undef, n + 1)
+    rcolptr = Vector{Ti}(undef, k + 1)
     rrowval = Ti[]
     rnzval = Tv[]
-    @inbounds for j in 1:n
+    @inbounds for j in 1:k
         rcolptr[j] = length(rrowval) + 1
         for p in colptr[j]:(colptr[j + 1] - 1)
             if mask[p]
@@ -1043,8 +1044,8 @@ function _persistent_reduced(
             end
         end
     end
-    rcolptr[n + 1] = length(rrowval) + 1
-    return keep, SparseMatrixCSC(n, n, rcolptr, rrowval, rnzval)
+    rcolptr[k + 1] = length(rrowval) + 1
+    return keep, SparseMatrixCSC(m, k, rcolptr, rrowval, rnzval)
 end
 
 function LinearSolve.init_sparse_reduction(
@@ -1061,13 +1062,13 @@ function LinearSolve.init_sparse_reduction(
             count(iszero, nz) / length(nz) >= LinearSolve.PERSISTENT_ZERO_FRACTION_THRESHOLD
     end
     auto = pnz === nothing
-    n = size(A, 1)
+    m, k = size(A)
     colptr = copy(getcolptr(A))
     rowval = copy(rowvals(A))
     if active
         mask = Bool[!iszero(v) for v in nz]
         nstart_zeros = count(iszero, nz)
-        keep, reduced = _persistent_reduced(colptr, rowval, n, mask, nz)
+        keep, reduced = _persistent_reduced(colptr, rowval, m, k, mask, nz)
         return SparseReduction{Tv, Ti}(
             true, true, auto, nstart_zeros, colptr, rowval, mask, keep, reduced, 1, 0
         )
@@ -1096,7 +1097,9 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
         end
     end
     if grew
-        red.keep, red.reduced = _persistent_reduced(red.colptr, red.rowval, size(A, 1), red.mask, nz)
+        red.keep, red.reduced = _persistent_reduced(
+            red.colptr, red.rowval, size(A, 1), size(A, 2), red.mask, nz
+        )
         red.nanalyze += 1
         # auto mode: if more than NONPERSISTENT_ZERO_FRACTION of the starting zeros
         # have activated, the zeros are not persistent — stop caching the union and

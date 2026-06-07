@@ -191,6 +191,41 @@ reduction(cache) = cache.cacheval.sparse_reduction
         @test !coff.sparse_reduction.active
     end
 
+    @testset "non-square least-squares (default sparse QR) drops zeros" begin
+        m, k = 14, 9
+        rows = Int[]
+        cols = Int[]
+        for j in 1:k, i in (j, j + 1, j + 5)
+            i <= m && (push!(rows, i); push!(cols, j))
+        end
+        Pr = sparse(rows, cols, ones(length(rows)), m, k)
+        function ls_step(P, s)
+            cp = SparseArrays.getcolptr(P)
+            rv = rowvals(P)
+            nz = zeros(length(rv))
+            for j in 1:size(P, 2), p in cp[j]:(cp[j + 1] - 1)
+                i = rv[p]
+                nz[p] = i == j ? 3.0 : (i == j + 1 ? 1.0 : (j == 2 && isodd(s) ? 0.5 : 0.0))
+            end
+            return SparseMatrixCSC(size(P, 1), size(P, 2), copy(cp), copy(rv), nz)
+        end
+        lsmats = [ls_step(Pr, s) for s in 1:6]
+        bls = ones(m)
+        cache = init(
+            LinearProblem(copy(lsmats[1]), copy(bls));
+            assumptions = OperatorAssumptions(false; persistent_nonstructural_zeros = true)
+        )
+        for A in lsmats
+            cache.A = copy(A)
+            cache.b = copy(bls)
+            @test solve!(cache).u ≈ Matrix(A) \ bls rtol = 1.0e-8   # vs dense least squares
+        end
+        red = cache.cacheval.sparse_reduction
+        @test red.active
+        @test size(red.reduced) == (m, k)                # reduced keeps the rectangular shape
+        @test length(red.keep) < length(red.mask)        # zeros really dropped
+    end
+
     @testset "constant-pattern contract is enforced" begin
         cache = init(
             LinearProblem(copy(mats[1]), copy(b));

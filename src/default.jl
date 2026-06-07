@@ -997,6 +997,41 @@ end
                             )
                         end
                     end
+                elseif alg == Symbol(DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization)
+                    # Sparse column-pivoted QR (non-square / least-squares). Like the
+                    # sparse-LU branch, drop persistent nonstructural zeros when active
+                    # by swapping in the reduced operand for the solve, then restore.
+                    # (CHOLMOD is handled in the `else` below WITHOUT reduction: dropping
+                    # zeros asymmetrically would break the Cholesky structure.)
+                    newex = quote
+                        if !(cache.A isa Array)
+                            _red = cache.cacheval.sparse_reduction
+                            _Aop = reduce_operand!(_red, cache.A)
+                            if _Aop === cache.A
+                                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)))
+                                SciMLBase.build_linear_solution(
+                                    alg, cache.u, nothing, cache;
+                                    retcode = sol.retcode, iters = sol.iters, stats = nothing
+                                )
+                            else
+                                _origA = getfield(cache, :A)
+                                setfield!(cache, :A, _Aop)
+                                _rawsol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)))
+                                _result = SciMLBase.build_linear_solution(
+                                    alg, cache.u, nothing, cache;
+                                    retcode = _rawsol.retcode, iters = _rawsol.iters,
+                                    stats = nothing
+                                )
+                                setfield!(cache, :A, _origA)
+                                _result
+                            end
+                        else
+                            error(
+                                "Sparse algorithm " * $(string(alg)) *
+                                    " called on non-sparse matrix. This shouldn't happen."
+                            )
+                        end
+                    end
                 else
                     newex = quote
                         if !(cache.A isa Array)

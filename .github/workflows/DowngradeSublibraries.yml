@@ -23,4 +23,3 @@ jobs:
     with:
       julia-version: "lts"
       skip: "Pkg,TOML,Statistics,LinearAlgebra,SparseArrays,InteractiveUtils,Random,Test,Base64,Dates,Printf,LinearSolve"
-      allow-reresolve: true

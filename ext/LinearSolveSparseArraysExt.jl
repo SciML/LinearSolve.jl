@@ -988,4 +988,97 @@ LinearSolve.PrecompileTools.@compile_workload begin
     end
 end
 
+# --- Persistent-nonstructural-zero reduction (shared helper for sparse solvers) ---
+#
+# Drops stored entries that have been numerically zero in every solve so far: the
+# kept set is the running union of ever-nonzero positions, which only grows, so
+# `reduced` is always a valid superset of the current matrix's nonzeros and the
+# inner symbolic factorization stays reusable. `active` is a runtime field (not a
+# type), so `init_sparse_reduction` returns a concrete type regardless of whether
+# the reduction fires — keeping the caller type-stable.
+mutable struct SparseReduction{Tv, Ti}
+    active::Bool
+    colptr::Vector{Ti}            # full stored pattern (reference, for validation)
+    rowval::Vector{Ti}
+    mask::Vector{Bool}            # over full nnz positions: kept (ever-nonzero)?
+    keep::Vector{Int}             # kept positions into the full nzval (CSC order)
+    reduced::SparseMatrixCSC{Tv, Ti}
+    nanalyze::Int
+    nrefactor::Int
+end
+
+function _persistent_reduced(
+        colptr::Vector{Ti}, rowval, n, mask, nzval::AbstractVector{Tv}
+    ) where {Ti, Tv}
+    keep = Int[]
+    rcolptr = Vector{Ti}(undef, n + 1)
+    rrowval = Ti[]
+    rnzval = Tv[]
+    @inbounds for j in 1:n
+        rcolptr[j] = length(rrowval) + 1
+        for p in colptr[j]:(colptr[j + 1] - 1)
+            if mask[p]
+                push!(keep, p)
+                push!(rrowval, rowval[p])
+                push!(rnzval, nzval[p])
+            end
+        end
+    end
+    rcolptr[n + 1] = length(rrowval) + 1
+    return keep, SparseMatrixCSC(n, n, rcolptr, rrowval, rnzval)
+end
+
+function LinearSolve.init_sparse_reduction(
+        A::AbstractSparseMatrixCSC{Tv, Ti}, assumptions
+    ) where {Tv, Ti}
+    pnz = LinearSolve.__persistent_nonstructural_zeros(assumptions)
+    nz = nonzeros(A)
+    active = if pnz === true
+        true
+    elseif pnz === false
+        false
+    else
+        !isempty(nz) &&
+            count(iszero, nz) / length(nz) >= LinearSolve.PERSISTENT_ZERO_FRACTION_THRESHOLD
+    end
+    n = size(A, 1)
+    colptr = copy(getcolptr(A))
+    rowval = copy(rowvals(A))
+    if active
+        mask = Bool[!iszero(v) for v in nz]
+        keep, reduced = _persistent_reduced(colptr, rowval, n, mask, nz)
+        return SparseReduction{Tv, Ti}(true, colptr, rowval, mask, keep, reduced, 1, 0)
+    else
+        empty = SparseMatrixCSC{Tv, Ti}(0, 0, Ti[1], Ti[], Tv[])
+        return SparseReduction{Tv, Ti}(false, colptr, rowval, Bool[], Int[], empty, 0, 0)
+    end
+end
+
+function LinearSolve.reduce_operand!(red::SparseReduction, A)
+    red.active || return A
+    nz = nonzeros(A)
+    length(nz) == length(red.mask) ||
+        throw(ArgumentError("persistent_nonstructural_zeros reduction requires a constant \
+                             stored sparsity pattern across solves (stored nnz changed)"))
+    grew = false
+    @inbounds for i in eachindex(nz)
+        if !red.mask[i] && !iszero(nz[i])
+            red.mask[i] = true
+            grew = true
+        end
+    end
+    if grew
+        red.keep, red.reduced = _persistent_reduced(red.colptr, red.rowval, size(A, 1), red.mask, nz)
+        red.nanalyze += 1
+    else
+        rnz = nonzeros(red.reduced)
+        keep = red.keep
+        @inbounds @simd for j in eachindex(keep)
+            rnz[j] = nz[keep[j]]
+        end
+        red.nrefactor += 1
+    end
+    return red.reduced
+end
+
 end

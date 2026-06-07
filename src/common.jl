@@ -49,23 +49,70 @@ EnumX.@enumx OperatorCondition begin
 end
 
 """
-    OperatorAssumptions(issquare = nothing; condition::OperatorCondition.T = IllConditioned)
+    OperatorAssumptions(issquare = nothing;
+                        condition::OperatorCondition.T = IllConditioned,
+                        persistent_nonstructural_zeros::Union{Nothing, Bool} = nothing)
 
-Sets the operator `A` assumptions used as part of the default algorithm
+Sets the operator `A` assumptions used as part of the default algorithm.
+
+`persistent_nonstructural_zeros` asserts whether `A` stores entries that are
+*numerically zero* (non-structural zeros) at positions that stay zero across a
+sequence of solves — common for ODE/DAE Jacobians and `W = I - γJ` operators
+built from a conservative symbolic sparsity pattern. Such stored zeros inflate
+the fill-reducing ordering and symbolic factorization, so dropping the
+persistently-zero ones speeds up every refactor and solve. For sparse `A` this
+enables an internal reduction that factorizes the smaller pattern while keeping
+the result valid (the kept pattern is the growing union of ever-nonzero
+positions, so it never under-covers the current matrix).
+
+  - `nothing` (default): auto-detect from the starting matrix — enable the
+    reduction when a sufficient fraction of the stored entries are numerically
+    zero (see `LinearSolve.PERSISTENT_ZERO_FRACTION_THRESHOLD`).
+  - `true`: assume such zeros are present and always reduce.
+  - `false`: assume none; never reduce (bit-for-bit identical to the plain
+    factorization, with no detection overhead).
+
+Has no effect on dense `A`.
 """
 struct OperatorAssumptions{T}
     issq::T
     condition::OperatorCondition.T
+    persistent_nonstructural_zeros::Union{Nothing, Bool}
 end
 
 function OperatorAssumptions(
         issquare = nothing;
-        condition::OperatorCondition.T = OperatorCondition.IllConditioned
+        condition::OperatorCondition.T = OperatorCondition.IllConditioned,
+        persistent_nonstructural_zeros::Union{Nothing, Bool} = nothing
     )
-    return OperatorAssumptions{typeof(issquare)}(issquare, condition)
+    return OperatorAssumptions{typeof(issquare)}(
+        issquare, condition, persistent_nonstructural_zeros
+    )
 end
 __issquare(assump::OperatorAssumptions) = assump.issq
 __conditioning(assump::OperatorAssumptions) = assump.condition
+function __persistent_nonstructural_zeros(assump::OperatorAssumptions)
+    return assump.persistent_nonstructural_zeros
+end
+
+# Fraction of stored entries that must be numerically zero on the *starting*
+# matrix for auto-detection (`persistent_nonstructural_zeros === nothing`) to
+# enable the sparse persistent-zero reduction. Below this the matrix is treated
+# as already tight and factorized unchanged (no detection overhead, bit-identical).
+const PERSISTENT_ZERO_FRACTION_THRESHOLD = 0.1
+
+# Shared persistent-nonstructural-zero reduction helpers. The reduction drops
+# stored entries that have been numerically zero in every solve so far (the
+# complement of the running union of ever-nonzero positions), handing the inner
+# factorization a smaller, valid superset pattern. Sparse-matrix methods live in
+# the SparseArrays extension; these generic fallbacks make the non-sparse /
+# reduction-off paths no-ops so callers can stay branch-light and type-stable.
+#
+# `init_sparse_reduction(A, assumptions)` returns either `nothing` (no reduction
+# for this A) or a concrete reduction-state object; `reduce_operand!(red, A)`
+# returns the matrix to factor (the reduced operand when active, else `A`).
+init_sparse_reduction(A, assumptions) = nothing
+reduce_operand!(::Nothing, A) = A
 
 """
     LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, S}

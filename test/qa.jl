@@ -22,7 +22,10 @@ end
     catch
         nothing
     end
-    unanalyzable_mods = (LinearSolve.OperatorCondition, LinearSolve.DefaultAlgorithmChoice)
+    unanalyzable_mods = (
+        LinearSolve.OperatorCondition, LinearSolve.DefaultAlgorithmChoice,
+        LinearSolve.NonstructuralZeros,
+    )
     if klu_mod !== nothing
         unanalyzable_mods = (unanalyzable_mods..., klu_mod)
     end

@@ -563,7 +563,7 @@ export RF32MixedLUFactorization
 export MetalLUFactorization
 export MetalOffload32MixedLUFactorization
 
-export OperatorAssumptions, OperatorCondition
+export OperatorAssumptions, OperatorCondition, NonstructuralZeros
 
 export LinearSolveAdjoint
 

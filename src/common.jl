@@ -49,23 +49,139 @@ EnumX.@enumx OperatorCondition begin
 end
 
 """
-    OperatorAssumptions(issquare = nothing; condition::OperatorCondition.T = IllConditioned)
+    EnumX.@enumx NonstructuralZeros
 
-Sets the operator `A` assumptions used as part of the default algorithm
+How a sparse operator's *nonstructural zeros* — stored entries that are
+numerically zero — are expected to behave across a sequence of solves. Such
+stored zeros (common in ODE/DAE Jacobians and `W = I - γJ` built from a
+conservative symbolic sparsity pattern) join the fill-reducing ordering and
+symbolic factorization as if real, inflating the factor, so dropping them speeds
+up every refactor and solve. Passed via [`OperatorAssumptions`](@ref); has no
+effect on dense operators.
+"""
+EnumX.@enumx NonstructuralZeros begin
+    """
+    `NonstructuralZeros.Auto`
+
+    Default. Detect from the starting matrix: enable the reduction when a
+    sufficient fraction of the stored entries are numerically zero (see
+    `LinearSolve.PERSISTENT_ZERO_FRACTION_THRESHOLD`), starting in cached-union
+    mode and switching to per-solve `dropzeros` if the zeros prove non-persistent
+    (more than `LinearSolve.NONPERSISTENT_ZERO_FRACTION` of the starting zeros
+    activate).
+    """
+    Auto
+    """
+    `NonstructuralZeros.None`
+
+    Assume the operator has no nonstructural zeros worth dropping. Never reduce —
+    bit-for-bit identical to the plain factorization, with no detection overhead.
+    """
+    None
+    """
+    `NonstructuralZeros.Persistent`
+
+    Assume nonstructural zeros are present at *persistent* positions (the same
+    entries stay zero across solves). Drop them via the cached union of
+    ever-nonzero positions, reusing the symbolic factorization across solves.
+    """
+    Persistent
+    """
+    `NonstructuralZeros.Present`
+
+    Assume nonstructural zeros are present but at positions that may vary between
+    solves. Drop each matrix's own zeros per solve (no cross-solve symbolic
+    caching; the inner solver re-analyzes when the pattern changes).
+    """
+    Present
+end
+
+"""
+    OperatorAssumptions(issquare = nothing;
+                        condition::OperatorCondition.T = IllConditioned,
+                        nonstructural_zeros::NonstructuralZeros.T = Auto)
+
+Sets the operator `A` assumptions used as part of the default algorithm.
+
+`issquare` asserts whether `A` is square (and thus whether a direct
+factorization vs. a least-squares solver is appropriate). `nothing` (default)
+defers the decision, letting `init`/`defaultalg` infer it from `A`.
+
+`condition` describes the conditioning of `A` and selects how aggressively the
+default algorithm trades speed for stability (see [`OperatorCondition`](@ref)):
+
+  - `OperatorCondition.IllConditioned` (default): assume `A` may be ill
+    conditioned; pick a stability-preserving algorithm (e.g. pivoted
+    factorizations).
+  - `OperatorCondition.WellConditioned`: assume contained conditioning and pick
+    the fastest algorithm, skipping safety work.
+  - `OperatorCondition.VeryIllConditioned` /
+    `OperatorCondition.SuperIllConditioned`: progressively more conservative,
+    favoring the most numerically robust paths.
+
+`nonstructural_zeros` declares how `A`'s *nonstructural zeros* (stored entries
+that are numerically zero) behave across a sequence of solves, and hence whether
+and how a sparse factorization should drop them (see [`NonstructuralZeros`](@ref)):
+
+  - `NonstructuralZeros.Auto` (default): detect from the starting matrix and
+    adapt (cached union, falling back to per-solve dropzeros if non-persistent).
+  - `NonstructuralZeros.None`: none worth dropping; never reduce (bit-identical).
+  - `NonstructuralZeros.Persistent`: present at stable positions; cached-union
+    reduction.
+  - `NonstructuralZeros.Present`: present but positions may vary; per-solve
+    dropzeros.
+
+Has no effect on dense `A`.
 """
 struct OperatorAssumptions{T}
     issq::T
     condition::OperatorCondition.T
+    nonstructural_zeros::NonstructuralZeros.T
 end
 
 function OperatorAssumptions(
         issquare = nothing;
-        condition::OperatorCondition.T = OperatorCondition.IllConditioned
+        condition::OperatorCondition.T = OperatorCondition.IllConditioned,
+        nonstructural_zeros::NonstructuralZeros.T = NonstructuralZeros.Auto
     )
-    return OperatorAssumptions{typeof(issquare)}(issquare, condition)
+    return OperatorAssumptions{typeof(issquare)}(
+        issquare, condition, nonstructural_zeros
+    )
 end
 __issquare(assump::OperatorAssumptions) = assump.issq
 __conditioning(assump::OperatorAssumptions) = assump.condition
+__nonstructural_zeros(assump::OperatorAssumptions) = assump.nonstructural_zeros
+
+# Fraction of stored entries that must be numerically zero on the *starting*
+# matrix for auto-detection (`nonstructural_zeros == NonstructuralZeros.Auto`) to
+# enable the sparse reduction. Below this the matrix is treated as already tight
+# and factorized unchanged (no detection overhead, bit-identical).
+const PERSISTENT_ZERO_FRACTION_THRESHOLD = 0.1
+
+# In auto mode, if more than this fraction of the entries that were numerically
+# zero on the *starting* matrix have since become nonzero, the nonstructural zeros
+# are deemed non-persistent (they wobble too much for a stable reduced pattern).
+# The reduction then stops maintaining the union and instead drops each matrix's
+# own zeros per solve (no cross-solve symbolic caching) — better than carrying a
+# union that has lost most of what it could drop. `NonstructuralZeros.Persistent`
+# pins union caching and never switches; `NonstructuralZeros.Present` starts in
+# per-solve mode. (This is "fraction of the starting zeros that turned nonzero",
+# independent of how dense the matrix is — not a fraction of the whole stored
+# pattern.)
+const NONPERSISTENT_ZERO_FRACTION = 0.5
+
+# Shared persistent-nonstructural-zero reduction helpers. The reduction drops
+# stored entries that have been numerically zero in every solve so far (the
+# complement of the running union of ever-nonzero positions), handing the inner
+# factorization a smaller, valid superset pattern. Sparse-matrix methods live in
+# the SparseArrays extension; these generic fallbacks make the non-sparse /
+# reduction-off paths no-ops so callers can stay branch-light and type-stable.
+#
+# `init_sparse_reduction(A, assumptions)` returns either `nothing` (no reduction
+# for this A) or a concrete reduction-state object; `reduce_operand!(red, A)`
+# returns the matrix to factor (the reduced operand when active, else `A`).
+init_sparse_reduction(A, assumptions) = nothing
+reduce_operand!(::Nothing, A) = A
 
 """
     LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, S}
@@ -107,7 +223,7 @@ The cache automatically tracks when matrix `A` or parameters `p` change by setti
 appropriate freshness flags. When `solve!` is called, stale cache entries are automatically
 recomputed as needed.
 """
-mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, Tlv <: LinearVerbosity, issq, S}
+mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, Tlv <: LinearVerbosity, issq, S, Tred}
     A::TA
     b::Tb
     u::Tu
@@ -124,6 +240,10 @@ mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, Tlv <: Linear
     verbose::Tlv
     assumptions::OperatorAssumptions{issq}
     sensealg::S
+    # Persistent-nonstructural-zero reduction state for standalone sparse
+    # factorizations (`nothing` otherwise; the default solver carries its own in
+    # `DefaultLinearSolverInit`). Set once at `init`; persists across `reinit!`.
+    sparse_reduction::Tred
 end
 
 function Base.setproperty!(cache::LinearCache, name::Symbol, x)
@@ -428,13 +548,18 @@ function __init(
     precsisfresh = false
     Tc = typeof(cacheval)
 
+    # Standalone sparse factorizations may drop persistent nonstructural zeros (the
+    # default carries its own reduction in DefaultLinearSolverInit, so skip it here).
+    sparse_reduction = alg isa AbstractSparseFactorization ?
+        init_sparse_reduction(A, assumptions) : nothing
+
     cache = LinearCache{
         typeof(A), typeof(b), typeof(u0_), typeof(p), typeof(alg), Tc,
         typeof(Pl), typeof(Pr), typeof(reltol), typeof(verbose_spec), typeof(assumptions.issq),
-        typeof(sensealg),
+        typeof(sensealg), typeof(sparse_reduction),
     }(
         A, b, u0_, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
-        maxiters, verbose_spec, assumptions, sensealg
+        maxiters, verbose_spec, assumptions, sensealg, sparse_reduction
     )
     return cache
 end

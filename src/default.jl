@@ -2,7 +2,7 @@ needs_concrete_A(alg::DefaultLinearSolver) = true
 mutable struct DefaultLinearSolverInit{
         T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12,
         T13, T14, T15, T16, T17, T18, T19, T20, T21, T22, T23, T24, T25,
-        TA, Tb,
+        TA, Tb, TR,
     }
     LUFactorization::T1
     QRFactorization::T2
@@ -34,6 +34,10 @@ mutable struct DefaultLinearSolverInit{
     a_backup_synced::Bool  # true if A_backup content matches cache.A (before LU modifies it)
     a_backup_allocated::Bool  # true once A_backup has been replaced with a private buffer
     fell_back_to_qr::Bool  # true after QR fallback; reuse QR until matrix is refreshed
+    # Persistent-nonstructural-zero reduction state, shared across the sparse
+    # sub-algorithm slots (KLU/UMFPACK + the QR fallback all factor the one reduced
+    # matrix). `nothing` when inactive / non-sparse. See `init_sparse_reduction`.
+    sparse_reduction::TR
 end
 
 function resize_cacheval!(cache, cacheval::DefaultLinearSolverInit, i)
@@ -145,7 +149,13 @@ end
 
 function defaultalg(A, b, assump::OperatorAssumptions{Nothing})
     issq = issquare(A)
-    return defaultalg(A, b, OperatorAssumptions(issq, assump.condition))
+    return defaultalg(
+        A, b,
+        OperatorAssumptions(
+            issq; condition = assump.condition,
+            nonstructural_zeros = assump.nonstructural_zeros
+        )
+    )
 end
 
 function defaultalg(A::SMatrix{S1, S2}, b, assump::OperatorAssumptions{Bool}) where {S1, S2}
@@ -573,7 +583,8 @@ end
     end
     return Expr(
         :call, :DefaultLinearSolverInit, caches...,
-        :A_original, :(similar(b)), true, false, false
+        :A_original, :(similar(b)), true, false, false,
+        :(init_sparse_reduction(A, assump))
     )
 end
 
@@ -948,10 +959,72 @@ end
                 if alg in LinearSolve._SPARSE_LU_FALLBACK_ALGORITHMS
                     # Sparse LU (KLU/UMFPACK/Sparspak): on failure, fall back to
                     # SPQR. Mirrors the dense LU → QR fallback path.
+                    #
+                    # When the persistent-nonstructural-zero reduction is active, the
+                    # reduced matrix is the operand for the WHOLE sub-solve: we swap
+                    # `cache.A` to it (raw `setfield!`, so no `isfresh`/`A_backup`
+                    # side effects) around both the LU attempt and the QR fallback,
+                    # so the fallback factorizes the same reduced matrix, then restore.
                     newex = quote
                         if !(cache.A isa Array)
-                            sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)))
-                            _default_sparse_lu_solve_with_fallback(cache, alg, sol)
+                            _red = cache.cacheval.sparse_reduction
+                            _Aop = reduce_operand!(_red, cache.A)
+                            if _Aop === cache.A
+                                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)))
+                                _default_sparse_lu_solve_with_fallback(cache, alg, sol)
+                            else
+                                # Swap in the reduced operand for the whole sub-solve
+                                # (LU attempt + QR fallback both read `cache.A`), then
+                                # restore. The sparse solvers report status by return
+                                # code rather than throwing, so no `try`/`finally` is
+                                # needed. Separate variable for the raw sub-solve so
+                                # `_result` only ever holds the (uniform
+                                # `DefaultLinearSolver`-tagged) post-fallback solution,
+                                # keeping the return type concrete.
+                                _origA = getfield(cache, :A)
+                                setfield!(cache, :A, _Aop)
+                                _rawsol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)))
+                                _result = _default_sparse_lu_solve_with_fallback(
+                                    cache, alg, _rawsol
+                                )
+                                setfield!(cache, :A, _origA)
+                                _result
+                            end
+                        else
+                            error(
+                                "Sparse algorithm " * $(string(alg)) *
+                                    " called on non-sparse matrix. This shouldn't happen."
+                            )
+                        end
+                    end
+                elseif alg == Symbol(DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization)
+                    # Sparse column-pivoted QR (non-square / least-squares). Like the
+                    # sparse-LU branch, drop persistent nonstructural zeros when active
+                    # by swapping in the reduced operand for the solve, then restore.
+                    # (CHOLMOD is handled in the `else` below WITHOUT reduction: dropping
+                    # zeros asymmetrically would break the Cholesky structure.)
+                    newex = quote
+                        if !(cache.A isa Array)
+                            _red = cache.cacheval.sparse_reduction
+                            _Aop = reduce_operand!(_red, cache.A)
+                            if _Aop === cache.A
+                                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)))
+                                SciMLBase.build_linear_solution(
+                                    alg, cache.u, nothing, cache;
+                                    retcode = sol.retcode, iters = sol.iters, stats = nothing
+                                )
+                            else
+                                _origA = getfield(cache, :A)
+                                setfield!(cache, :A, _Aop)
+                                _rawsol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)))
+                                _result = SciMLBase.build_linear_solution(
+                                    alg, cache.u, nothing, cache;
+                                    retcode = _rawsol.retcode, iters = _rawsol.iters,
+                                    stats = nothing
+                                )
+                                setfield!(cache, :A, _origA)
+                                _result
+                            end
                         else
                             error(
                                 "Sparse algorithm " * $(string(alg)) *

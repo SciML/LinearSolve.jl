@@ -13,7 +13,7 @@ using ArrayInterface: ArrayInterface
 using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!
 using SparseArrays: SparseArrays, AbstractSparseArray, AbstractSparseMatrixCSC,
     SparseMatrixCSC,
-    nonzeros, rowvals, getcolptr, sparse, sprand
+    nonzeros, rowvals, getcolptr, sparse, sprand, dropzeros
 using SciMLLogging: @SciMLMessage
 
 @static if Base.USE_GPL_LIBS
@@ -248,6 +248,7 @@ end
             cache::LinearSolve.LinearCache, alg::UMFPACKFactorization; kwargs...
         )
         A = cache.A
+        A = LinearSolve.reduce_operand!(cache.sparse_reduction, A)
         A = convert(AbstractMatrix, A)
         if cache.isfresh
             cacheval = LinearSolve.@get_cacheval(cache, :UMFPACKFactorization)
@@ -440,6 +441,9 @@ end
 
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization; kwargs...)
     A = cache.A
+    # Drop persistent nonstructural zeros when the assumption requests it; a no-op
+    # (returns `A`) for the default solver and when no reduction is active.
+    A = LinearSolve.reduce_operand!(cache.sparse_reduction, A)
     A = convert(AbstractMatrix, A)
     if cache.isfresh
         cacheval = LinearSolve.@get_cacheval(cache, :KLUFactorization)
@@ -596,6 +600,7 @@ function SciMLBase.solve!(
         cache::LinearSolve.LinearCache, alg::PureKLUFactorization; kwargs...
     )
     A = cache.A
+    A = LinearSolve.reduce_operand!(cache.sparse_reduction, A)
     A = convert(AbstractMatrix, A)
     if cache.isfresh
         # PureKLU occupies the default polyalgorithm's `:KLUFactorization` slot
@@ -720,6 +725,7 @@ function SciMLBase.solve!(
         cache::LinearSolve.LinearCache, alg::SparseColumnPivotedQRFactorization; kwargs...
     )
     A = cache.A
+    A = LinearSolve.reduce_operand!(cache.sparse_reduction, A)
     A = convert(AbstractMatrix, A)
     if cache.isfresh
         cacheval = LinearSolve.@get_cacheval(cache, :SparseColumnPivotedQRFactorization)
@@ -986,6 +992,136 @@ LinearSolve.PrecompileTools.@compile_workload begin
     if Base.USE_GPL_LIBS
         sol = solve(prob, UMFPACKFactorization())
     end
+end
+
+# --- Nonstructural-zero reduction (shared helper for sparse solvers) ---
+#
+# Two strategies, chosen per `OperatorAssumptions(...; nonstructural_zeros)`:
+#
+#   * union caching (`cache_union = true`): drop only entries numerically zero in
+#     every solve so far — the kept set is the running union of ever-nonzero
+#     positions, which only grows, so `reduced` is a valid superset of the current
+#     nonzeros and the inner symbolic factorization stays reusable. Best when the
+#     zeros are persistent (stable positions).
+#
+#   * per-solve dropzeros (`cache_union = false`): drop *this* matrix's zeros each
+#     solve and hand the inner solver a fresh pattern. No cross-solve symbolic
+#     caching is assumed (the inner solver re-analyzes when the pattern changes).
+#     Best when the zeros are inconsistent (wobble too much for a stable union).
+#
+# In `auto` mode the reduction starts in union caching and switches to per-solve
+# dropzeros if the union bloats past `NONPERSISTENT_ZERO_FRACTION` (the zeros turned out
+# not to be persistent). `active` / `cache_union` are runtime fields (not types),
+# so `init_sparse_reduction` returns a concrete type either way — type-stable.
+mutable struct SparseReduction{Tv, Ti}
+    active::Bool
+    cache_union::Bool             # true: union caching; false: per-solve dropzeros
+    auto::Bool                    # may switch union -> per-solve on bloat
+    nstart_zeros::Int             # # stored entries zero on the starting matrix
+    colptr::Vector{Ti}            # full stored pattern (reference, for validation)
+    rowval::Vector{Ti}
+    mask::Vector{Bool}            # over full nnz positions: kept (ever-nonzero)?
+    keep::Vector{Int}             # kept positions into the full nzval (CSC order)
+    reduced::SparseMatrixCSC{Tv, Ti}
+    nanalyze::Int
+    nrefactor::Int
+end
+
+function _persistent_reduced(
+        colptr::Vector{Ti}, rowval, m::Integer, k::Integer, mask, nzval::AbstractVector{Tv}
+    ) where {Ti, Tv}
+    keep = Int[]
+    rcolptr = Vector{Ti}(undef, k + 1)
+    rrowval = Ti[]
+    rnzval = Tv[]
+    @inbounds for j in 1:k
+        rcolptr[j] = length(rrowval) + 1
+        for p in colptr[j]:(colptr[j + 1] - 1)
+            if mask[p]
+                push!(keep, p)
+                push!(rrowval, rowval[p])
+                push!(rnzval, nzval[p])
+            end
+        end
+    end
+    rcolptr[k + 1] = length(rrowval) + 1
+    return keep, SparseMatrixCSC(m, k, rcolptr, rrowval, rnzval)
+end
+
+function LinearSolve.init_sparse_reduction(
+        A::AbstractSparseMatrixCSC{Tv, Ti}, assumptions
+    ) where {Tv, Ti}
+    nsz = LinearSolve.__nonstructural_zeros(assumptions)
+    NZ = LinearSolve.NonstructuralZeros
+    nz = nonzeros(A)
+    active = if nsz == NZ.Persistent || nsz == NZ.Present
+        true
+    elseif nsz == NZ.None
+        false
+    else  # Auto
+        !isempty(nz) &&
+            count(iszero, nz) / length(nz) >= LinearSolve.PERSISTENT_ZERO_FRACTION_THRESHOLD
+    end
+    auto = nsz == NZ.Auto
+    cache_union = nsz != NZ.Present     # Present => per-solve dropzeros from the start
+    m, k = size(A)
+    colptr = copy(getcolptr(A))
+    rowval = copy(rowvals(A))
+    if active
+        mask = Bool[!iszero(v) for v in nz]
+        nstart_zeros = count(iszero, nz)
+        keep, reduced = _persistent_reduced(colptr, rowval, m, k, mask, nz)
+        return SparseReduction{Tv, Ti}(
+            true, cache_union, auto, nstart_zeros, colptr, rowval, mask, keep, reduced, 1, 0
+        )
+    else
+        empty = SparseMatrixCSC{Tv, Ti}(0, 0, Ti[1], Ti[], Tv[])
+        return SparseReduction{Tv, Ti}(
+            false, cache_union, auto, 0, colptr, rowval, Bool[], Int[], empty, 0, 0
+        )
+    end
+end
+
+function LinearSolve.reduce_operand!(red::SparseReduction, A)
+    red.active || return A
+    # per-solve dropzeros: drop this matrix's own zeros and let the inner solver
+    # re-analyze when the pattern changes (no cross-solve union assumed).
+    red.cache_union || (red.reduced = dropzeros(A); red.nrefactor += 1; return red.reduced)
+    nz = nonzeros(A)
+    length(nz) == length(red.mask) ||
+        throw(ArgumentError("nonstructural_zeros reduction requires a constant \
+                             stored sparsity pattern across solves (stored nnz changed)"))
+    grew = false
+    @inbounds for i in eachindex(nz)
+        if !red.mask[i] && !iszero(nz[i])
+            red.mask[i] = true
+            grew = true
+        end
+    end
+    if grew
+        red.keep, red.reduced = _persistent_reduced(
+            red.colptr, red.rowval, size(A, 1), size(A, 2), red.mask, nz
+        )
+        red.nanalyze += 1
+        # auto mode: if more than NONPERSISTENT_ZERO_FRACTION of the starting zeros
+        # have activated, the zeros are not persistent — stop caching the union and
+        # drop per solve instead (this matrix's own zeros only). `activated` is
+        # `keep` minus the initial keep count (`length(mask) - nstart_zeros`).
+        activated = length(red.keep) - (length(red.mask) - red.nstart_zeros)
+        if red.auto && red.nstart_zeros > 0 &&
+                activated > LinearSolve.NONPERSISTENT_ZERO_FRACTION * red.nstart_zeros
+            red.cache_union = false
+            red.reduced = dropzeros(A)
+        end
+    else
+        rnz = nonzeros(red.reduced)
+        keep = red.keep
+        @inbounds @simd for j in eachindex(keep)
+            rnz[j] = nz[keep[j]]
+        end
+        red.nrefactor += 1
+    end
+    return red.reduced
 end
 
 end

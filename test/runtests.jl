@@ -6,13 +6,14 @@ const GROUP = get(ENV, "GROUP", "All")
 
 const HAS_EXTENSIONS = true
 
-# Activate the isolated QA sub-environment (test/qa). The QA tools (Aqua,
-# ExplicitImports) live only here, not in the package's main test target.
-# Pkg.develop the root LinearSolve so the QA checks run against the PR branch
-# code (the [sources] entry covers this on Julia >= 1.11, but Pkg.develop keeps
-# it working on the 1.10 floor where [sources] is ignored).
-function activate_qa_env()
-    Pkg.activate(joinpath(@__DIR__, "qa"))
+# Activate a dep-adding root test group's sub-environment (test/<group>). Each
+# such group carries its extra dependencies in test/<group>/Project.toml and is
+# excluded from the `All` run (which executes only the base-environment groups).
+# Pkg.develop the root LinearSolve so the group runs against the PR branch code
+# (the [sources] entry covers this on Julia >= 1.11; Pkg.develop keeps it working
+# on the 1.10 floor where [sources] is ignored).
+function activate_group_env(group)
+    Pkg.activate(joinpath(@__DIR__, group))
     Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
     return Pkg.instantiate()
 end
@@ -82,39 +83,55 @@ if isdir(joinpath(lib_dir, base_group))
         Pkg.test(base_group, julia_args = ["--check-bounds=auto", "--compiled-modules=yes", "--depwarn=yes"], force_latest_compatible_version = false, allow_reresolve = true)
     end
 else
+    # Base-environment groups run in the package's main test env and are part of
+    # `All`. Each test file lives in test/<group>/.
     if GROUP == "All" || GROUP == "Core"
-        @time @safetestset "Basic Tests" include("basictests.jl")
-        @time @safetestset "Return codes" include("retcodes.jl")
-        @time @safetestset "Re-solve" include("resolve.jl")
-        @time @safetestset "Zero Initialization Tests" include("zeroinittests.jl")
-        @time @safetestset "Non-Square Tests" include("nonsquare.jl")
-        @time @safetestset "SparseVector b Tests" include("sparse_vector.jl")
-        @time @safetestset "Nonstructural Zeros" include("nonstructural_zeros.jl")
-        @time @safetestset "Default Alg Tests" include("default_algs.jl")
-        @time @safetestset "Adjoint Sensitivity" include("adjoint.jl")
-        @time @safetestset "ForwardDiff Overloads" include("forwarddiff_overloads.jl")
-        @time @safetestset "Traits" include("traits.jl")
-        @time @safetestset "Verbosity" include("verbosity.jl")
-        @time @safetestset "BandedMatrices" include("banded.jl")
-        @time @safetestset "Butterfly Factorization" include("butterfly.jl")
-        @time @safetestset "Mixed Precision" include("test_mixed_precision.jl")
-        @time @safetestset "Resize" include("resize.jl")
-        # ParU_jll requires Julia >= 1.12 (SuiteSparse_jll in older stdlib is incompatible)
-        if VERSION >= v"1.12.0-"
-            Pkg.activate("paru")
-            Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
-            Pkg.instantiate()
-            @time @safetestset "ParU" include("paru/paru.jl")
-            Pkg.activate(".")
-        end
+        @time @safetestset "Basic Tests" include("core/basictests.jl")
+        @time @safetestset "Return codes" include("core/retcodes.jl")
+        @time @safetestset "Re-solve" include("core/resolve.jl")
+        @time @safetestset "Zero Initialization Tests" include("core/zeroinittests.jl")
+        @time @safetestset "Non-Square Tests" include("core/nonsquare.jl")
+        @time @safetestset "SparseVector b Tests" include("core/sparse_vector.jl")
+        @time @safetestset "Nonstructural Zeros" include("core/nonstructural_zeros.jl")
+        @time @safetestset "Default Alg Tests" include("core/default_algs.jl")
+        @time @safetestset "Adjoint Sensitivity" include("core/adjoint.jl")
+        @time @safetestset "ForwardDiff Overloads" include("core/forwarddiff_overloads.jl")
+        @time @safetestset "Traits" include("core/traits.jl")
+        @time @safetestset "Verbosity" include("core/verbosity.jl")
+        @time @safetestset "BandedMatrices" include("core/banded.jl")
+        @time @safetestset "Butterfly Factorization" include("core/butterfly.jl")
+        @time @safetestset "Mixed Precision" include("core/test_mixed_precision.jl")
+        @time @safetestset "Resize" include("core/resize.jl")
     end
+
+    # STRUMPACK runs in the base env: STRUMPACK_jll is a base test dep (the Core
+    # suite also probes the STRUMPACK extension), so this group adds no deps.
+    if GROUP == "All" || GROUP == "LinearSolveSTRUMPACK"
+        @time @safetestset "LinearSolveSTRUMPACK" include("strumpack/strumpack.jl")
+    end
+
+    if GROUP == "DefaultsLoading"
+        @time @safetestset "Defaults Loading Tests" include("defaultsloading/defaults_loading.jl")
+    end
+
+    if GROUP == "Preferences"
+        @time @safetestset "Dual Preference System Integration" include("preferences/preferences.jl")
+    end
+
+    # Quality Assurance (Aqua, ExplicitImports) — dep-adding group whose tooling
+    # deps stay out of the main test target (test/qa).
+    if GROUP == "QA" && isempty(VERSION.prerelease)
+        activate_group_env("qa")
+        @time @safetestset "Quality Assurance" include("qa/qa.jl")
+    end
+
+    # Dep-adding groups below: each activates test/<group>/Project.toml and is
+    # excluded from the `All` run.
 
     # Don't run Enzyme tests on prerelease or Julia >= 1.12 (Enzyme compatibility issues)
     # See: https://github.com/SciML/LinearSolve.jl/issues/817
     if GROUP == "NoPre" && isempty(VERSION.prerelease)
-        Pkg.activate("nopre")
-        Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
-        Pkg.instantiate()
+        activate_group_env("nopre")
         @time @safetestset "Mooncake Derivative Rules" include("nopre/mooncake.jl")
         @time @safetestset "JET Tests" include("nopre/jet.jl")
         @time @safetestset "Static Arrays" include("nopre/static_arrays.jl")
@@ -125,85 +142,62 @@ else
         end
     end
 
-    # Quality Assurance (Aqua, ExplicitImports) runs in its own isolated
-    # sub-environment (test/qa) so its tooling deps stay out of the main test
-    # target.
-    if (GROUP == "QA" || GROUP == "All") && isempty(VERSION.prerelease)
-        activate_qa_env()
-        @time @safetestset "Quality Assurance" include("qa/qa.jl")
+    # ParU_jll requires Julia >= 1.12 (SuiteSparse_jll in older stdlib is incompatible)
+    if GROUP == "LinearSolveParU" && VERSION >= v"1.12.0-"
+        activate_group_env("paru")
+        @time @safetestset "ParU" include("paru/paru.jl")
     end
 
-    if GROUP == "DefaultsLoading"
-        @time @safetestset "Defaults Loading Tests" include("defaults_loading.jl")
-    end
-
-    if GROUP == "All" || GROUP == "LinearSolveSTRUMPACK"
-        @time @safetestset "LinearSolveSTRUMPACK" include("strumpack/strumpack.jl")
-    end
-
-    if GROUP == "Preferences"
-        @time @safetestset "Dual Preference System Integration" include("preferences.jl")
-    end
-
-    if GROUP == "LinearSolveCUDA"
-        Pkg.activate("gpu")
-        Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
-        Pkg.instantiate()
+    # GPU is a dep-adding group on a self-hosted CUDA runner (folds the former
+    # bespoke GPU.yml workflow). LinearSolveCUDA kept as an alias.
+    if GROUP == "GPU" || GROUP == "LinearSolveCUDA"
+        activate_group_env("gpu")
         @time @safetestset "CUDA" include("gpu/cuda.jl")
     end
 
     if GROUP == "LinearSolvePardiso"
-        Pkg.activate("pardiso")
-        Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
-        Pkg.instantiate()
+        activate_group_env("pardiso")
         @time @safetestset "Pardiso" include("pardiso/pardiso.jl")
     end
 
     if Base.Sys.islinux() && GROUP == "LinearSolveMUMPS"
-        Pkg.activate("mumps")
-        Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
-        Pkg.instantiate()
+        activate_group_env("mumps")
         @time @safetestset "MUMPS" include("mumps/mumps.jl")
     end
 
     if !Base.Sys.iswindows() && GROUP == "LinearSolveGinkgo"
-        Pkg.activate("ginkgo")
-        Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
-        Pkg.instantiate()
+        activate_group_env("ginkgo")
         @time @safetestset "Ginkgo" include("ginkgo/ginkgo.jl")
     end
 
     if !Base.Sys.iswindows() && GROUP == "LinearSolveElemental"
-        Pkg.activate("elemental")
-        Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
-        Pkg.instantiate()
+        activate_group_env("elemental")
         @time @safetestset "Elemental" include("elemental/elemental.jl")
     end
 
-    if Base.Sys.islinux() && (GROUP == "All" || GROUP == "LinearSolveHYPRE") && HAS_EXTENSIONS
-        @time @safetestset "LinearSolveHYPRE" include("hypretests.jl")
+    if Base.Sys.islinux() && GROUP == "LinearSolveHYPRE" && HAS_EXTENSIONS
+        activate_group_env("hypre")
+        @time @safetestset "LinearSolveHYPRE" include("hypre/hypretests.jl")
     end
 
-    if Base.Sys.islinux() && (GROUP == "All" || GROUP == "LinearSolvePartitionedSolvers") &&
-            HAS_EXTENSIONS
-        @time @safetestset "LinearSolvePartitionedSolvers" include("partitionedsolverstests.jl")
+    if Base.Sys.islinux() && GROUP == "LinearSolvePartitionedSolvers" && HAS_EXTENSIONS
+        activate_group_env("partitionedsolvers")
+        @time @safetestset "LinearSolvePartitionedSolvers" include(
+            "partitionedsolvers/partitionedsolverstests.jl"
+        )
         @time @safetestset "LinearSolvePartitionedSolversMPI" include(
-            "partitionedsolverstests_mpi.jl"
+            "partitionedsolvers/partitionedsolverstests_mpi.jl"
         )
     end
 
     if Base.Sys.islinux() && GROUP == "LinearSolvePETSc" && HAS_EXTENSIONS
-        Pkg.activate("petsc")
-        Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
-        Pkg.instantiate()
-        @time @safetestset "LinearSolvePETSc" include("petsctests.jl")
-        @time @safetestset "LinearSolvePETScMPI" include("petsctests_mpi.jl")
+        activate_group_env("petsc")
+        @time @safetestset "LinearSolvePETSc" include("petsc/petsctests.jl")
+        @time @safetestset "LinearSolvePETScMPI" include("petsc/petsctests_mpi.jl")
     end
 
     if GROUP == "Trim" && VERSION >= v"1.12.0"
-        Pkg.activate("trim")
-        Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
-        Pkg.instantiate()
+        activate_group_env("trim")
         @time @safetestset "Trim Tests" include("trim/runtests.jl")
     end
 end

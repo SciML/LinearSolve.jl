@@ -1,8 +1,8 @@
 [deps]
 AllocCheck = "9b6a8646-10ed-4001-bbdc-1d2f46dfbb1a"
+Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
 FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
-Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
 InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -13,3 +13,23 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StableRNGs = "860ef19b-820b-49d6-a774-d7a799459cd3"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[sources]
+LinearSolve = {path = "../.."}
+
+[compat]
+AllocCheck = "0.2"
+Enzyme = "0.13"
+FiniteDiff = "2.26"
+ForwardDiff = "0.10.38, 1"
+InteractiveUtils = "1.10"
+JET = "0.9, 0.11"
+LinearAlgebra = "1.10"
+LinearSolve = "3"
+Mooncake = "0.5.15"
+RecursiveFactorization = "0.2.26"
+SparseArrays = "1.10"
+StableRNGs = "1.0"
+StaticArrays = "1.9"
+Test = "1.10"
+julia = "1.10"

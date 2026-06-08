@@ -1,0 +1,55 @@
+# Test group declarations for the LinearSolve root package.
+# Base-environment groups (Core, LinearSolveSTRUMPACK, DefaultsLoading,
+# Preferences) run in the package's main test env; `All` runs every
+# base-env group. Dep-adding groups carry their extra dependencies in
+# test/<group>/Project.toml and are excluded from `All`.
+
+[Core]
+versions = ["lts", "1", "pre"]
+
+[LinearSolveSTRUMPACK]
+versions = ["lts", "1", "pre"]
+
+[DefaultsLoading]
+versions = ["lts", "1", "pre"]
+
+[Preferences]
+versions = ["lts", "1", "pre"]
+
+[QA]
+versions = ["lts", "1"]
+
+[NoPre]
+versions = ["lts", "1"]
+
+[LinearSolveHYPRE]
+versions = ["lts", "1"]
+
+[LinearSolvePartitionedSolvers]
+versions = ["lts", "1"]
+
+[LinearSolvePETSc]
+versions = ["lts", "1"]
+
+[LinearSolveMUMPS]
+versions = ["lts", "1"]
+
+[LinearSolvePardiso]
+versions = ["lts", "1"]
+
+[LinearSolveGinkgo]
+versions = ["lts", "1"]
+
+[LinearSolveElemental]
+versions = ["lts", "1"]
+
+[LinearSolveParU]
+versions = ["1", "pre"]
+
+[Trim]
+versions = ["1"]
+
+[GPU]
+versions = ["1"]
+runner = ["self-hosted", "Linux", "X64", "gpu"]
+timeout = 180

@@ -3,7 +3,7 @@ using LinearAlgebra
 using Random
 
 # Load LinearSolve with the working directory
-push!(LOAD_PATH, joinpath(@__DIR__, ".."))
+push!(LOAD_PATH, joinpath(@__DIR__, "..", ".."))
 using LinearSolve
 
 Random.seed!(123)

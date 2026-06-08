@@ -1,5 +1,6 @@
 using LinearSolve, Aqua
 using ExplicitImports
+using Test
 
 @testset "Aqua" begin
     Aqua.find_persistent_tasks_deps(LinearSolve)

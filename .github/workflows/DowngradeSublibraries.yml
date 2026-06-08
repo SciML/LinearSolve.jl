@@ -22,4 +22,6 @@ jobs:
     secrets: "inherit"
     with:
       julia-version: "lts"
-      skip: "Pkg,TOML,Statistics,LinearAlgebra,SparseArrays,InteractiveUtils,Random,Test,Base64,Dates,Printf,LinearSolve"
+      group-env-name: "LINEARSOLVE_TEST_GROUP"
+      group-env-value: "Core"
+      # Every lib/* sublibrary is downgrade-tested (projects auto-discovered, no exclusions).

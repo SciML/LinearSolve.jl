@@ -4,7 +4,7 @@
 [![Global Docs](https://img.shields.io/badge/docs-SciML-blue.svg)](https://docs.sciml.ai/LinearSolve/stable/)
 
 [![codecov](https://codecov.io/gh/SciML/LinearSolve.jl/branch/main/graph/badge.svg)](https://app.codecov.io/gh/SciML/LinearSolve.jl)
-[![Build Status](https://github.com/SciML/LinearSolvers.jl/workflows/CI/badge.svg)](https://github.com/SciML/LinearSolvers.jl/actions?query=workflow%3ACI)
+[![Build Status](https://github.com/SciML/LinearSolve.jl/workflows/CI/badge.svg)](https://github.com/SciML/LinearSolve.jl/actions?query=workflow%3ACI)
 [![Build status](https://badge.buildkite.com/74699764ce224514c9632e2750e08f77c6d174c5ba7cd38297.svg?branch=main)](https://buildkite.com/julialang/linearsolve-dot-jl)
 
 [![ColPrac: Contributor's Guide on Collaborative Practices for Community Packages](https://img.shields.io/badge/ColPrac-Contributor%27s%20Guide-blueviolet)](https://github.com/SciML/ColPrac)

@@ -24,8 +24,8 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - "1"
           - "lts"
+          - "1"
           - "pre"
         arch:
           - x64
@@ -34,28 +34,45 @@ jobs:
           - "Core"
           - "DefaultsLoading"
           - "LinearSolveSTRUMPACK"
+          - "Preferences"
+          - "QA"
+          - "NoPre"
           - "LinearSolveHYPRE"
-          - "LinearSolveMUMPS"
+          - "LinearSolvePartitionedSolvers"
           - "LinearSolvePETSc"
+          - "LinearSolveMUMPS"
           - "LinearSolvePardiso"
           - "LinearSolveGinkgo"
           - "LinearSolveElemental"
-          - "NoPre"
-          - "LinearSolveAutotune"
-          - "LinearSolvePyAMG"
-          - "Preferences"
+          - "LinearSolveParU"
           - "Trim"
         os:
           - ubuntu-latest
           - macos-latest
           - windows-latest
         exclude:
-          # Don't run trim tests on Julia versions below 1.12
+          # QA runs only on lts + 1 (matches test/test_groups.toml).
+          - group: QA
+            version: "pre"
+          # NoPre is, by definition, not run on prerelease Julia.
+          - group: NoPre
+            version: "pre"
+          # ParU_jll requires Julia >= 1.12; run only on 1 + pre.
+          - group: LinearSolveParU
+            version: "lts"
+          # Force ParU tests onto a single standard CI machine (ubuntu x64).
+          - group: LinearSolveParU
+            os: macos-latest
+          - group: LinearSolveParU
+            os: windows-latest
+          - group: LinearSolveParU
+            arch: x86
+          # Don't run trim tests on Julia versions below 1.12.
           - group: Trim
             version: "lts"
           - group: Trim
             version: "pre"
-          # Force Trim tests onto a single standard CI machine (ubuntu x64)
+          # Force Trim tests onto a single standard CI machine (ubuntu x64).
           - group: Trim
             os: macos-latest
           - group: Trim
@@ -69,6 +86,15 @@ jobs:
           # Skip HYPRE and PETSc on pre-release Julia
           - group: LinearSolveHYPRE
             version: "pre"
+          - group: LinearSolvePETSc
+            version: "pre"
+          # MUMPS, Ginkgo, and Elemental declare [lts, 1] in test/test_groups.toml
+          - group: LinearSolveMUMPS
+            version: "pre"
+          - group: LinearSolveGinkgo
+            version: "pre"
+          - group: LinearSolveElemental
+            version: "pre"
           # MUMPS tests are only wired for Linux
           - group: LinearSolveMUMPS
             os: macos-latest
@@ -77,8 +103,17 @@ jobs:
           # Restrict MUMPS to standard Linux x64 runners
           - group: LinearSolveMUMPS
             arch: x86
-          - group: LinearSolvePETSc
+          # PartitionedSolvers and PETSc MPI suites are Linux-only
+          - group: LinearSolvePartitionedSolvers
+            os: macos-latest
+          - group: LinearSolvePartitionedSolvers
+            os: windows-latest
+          - group: LinearSolvePartitionedSolvers
             version: "pre"
+          - group: LinearSolvePETSc
+            os: macos-latest
+          - group: LinearSolvePETSc
+            os: windows-latest
           # Ginkgo.jl is not available on Windows
           - group: LinearSolveGinkgo
             os: windows-latest
@@ -91,3 +126,25 @@ jobs:
       julia-version: "${{ matrix.version }}"
       self-hosted: ${{ matrix.group != 'Trim' }}
     secrets: "inherit"
+
+  # GPU group: dep-adding CUDA group (test/gpu/Project.toml) on a self-hosted
+  # GPU runner. Folds the former bespoke GPU.yml workflow into a test group.
+  gpu:
+    name: "GPU"
+    runs-on: [self-hosted, gpu-v100]
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v6
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: "1"
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
+        env:
+          GROUP: "GPU"
+      - uses: julia-actions/julia-processcoverage@v1
+      - uses: codecov/codecov-action@v7
+        with:
+          files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false

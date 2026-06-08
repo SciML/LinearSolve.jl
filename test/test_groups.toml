@@ -1,54 +1,100 @@
-# Test group declarations for the LinearSolve root package.
+# Test group declarations for the LinearSolve root package, consumed by the
+# reusable grouped-tests.yml@v1 caller via
+# scripts/compute_affected_sublibraries.jl --root-matrix. Each group runs on
+# every Julia version it lists; `runner`/`timeout`/`num_threads` set any
+# non-default per-group execution settings.
+#
+# This reproduces the matrix the old hand-maintained Tests.yml ran. That
+# workflow declared `os` (ubuntu/macos/windows) and `arch` (x64/x86) matrix
+# axes but never forwarded either to the reusable tests.yml -- it passed only
+# `self-hosted: ${{ matrix.group != 'Trim' }}`, so every non-Trim cell actually
+# executed on a bare `self-hosted` runner (with JULIA_NUM_THREADS auto -> 2)
+# regardless of the os/arch axis value, and only Trim ran on GitHub-hosted
+# ubuntu-latest. The os/arch axes were therefore dead dimensions; the true
+# distinct executions are exactly (group, version), which this file encodes.
+#
 # Base-environment groups (Core, LinearSolveSTRUMPACK, DefaultsLoading,
-# Preferences) run in the package's main test env; `All` runs every
-# base-env group. Dep-adding groups carry their extra dependencies in
+# Preferences) run in the package's main test env; `All` runs every base-env
+# group. Dep-adding groups carry their extra dependencies in
 # test/<group>/Project.toml and are excluded from `All`.
 
 [Core]
 versions = ["lts", "1", "pre"]
+runner = "self-hosted"
+num_threads = 2
 
 [LinearSolveSTRUMPACK]
 versions = ["lts", "1", "pre"]
+runner = "self-hosted"
+num_threads = 2
 
 [DefaultsLoading]
 versions = ["lts", "1", "pre"]
+runner = "self-hosted"
+num_threads = 2
 
 [Preferences]
 versions = ["lts", "1", "pre"]
+runner = "self-hosted"
+num_threads = 2
 
 [QA]
 versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
 
 [NoPre]
 versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
 
 [LinearSolveHYPRE]
 versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
 
 [LinearSolvePartitionedSolvers]
 versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
 
 [LinearSolvePETSc]
 versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
 
 [LinearSolveMUMPS]
 versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
 
 [LinearSolvePardiso]
 versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
 
 [LinearSolveGinkgo]
 versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
 
 [LinearSolveElemental]
 versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
 
 [LinearSolveParU]
 versions = ["1", "pre"]
+runner = "self-hosted"
+num_threads = 2
 
+# Trim ran on GitHub-hosted ubuntu-latest (self-hosted was false for this
+# group); keep it on the default ubuntu-latest runner.
 [Trim]
 versions = ["1"]
 
+# GPU folds the former bespoke GPU.yml: a dep-adding CUDA group on a
+# self-hosted GPU runner.
 [GPU]
 versions = ["1"]
 runner = ["self-hosted", "gpu-v100"]

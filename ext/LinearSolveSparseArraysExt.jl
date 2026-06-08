@@ -1084,13 +1084,18 @@ end
 
 function LinearSolve.reduce_operand!(red::SparseReduction, A)
     red.active || return A
+    nz = nonzeros(A)
+    # A change in the stored nnz breaks union caching: an explicit `Persistent`
+    # assumption promised a constant pattern (error), while `Auto` drops the union
+    # and falls back to per-solve dropzeros, handled like the non-union case below.
+    if red.cache_union && length(nz) != length(red.mask)
+        red.auto || throw(ArgumentError("nonstructural_zeros reduction requires a constant \
+                             stored sparsity pattern across solves (stored nnz changed)"))
+        red.cache_union = false
+    end
     # per-solve dropzeros: drop this matrix's own zeros and let the inner solver
     # re-analyze when the pattern changes (no cross-solve union assumed).
     red.cache_union || (red.reduced = dropzeros(A); red.nrefactor += 1; return red.reduced)
-    nz = nonzeros(A)
-    length(nz) == length(red.mask) ||
-        throw(ArgumentError("nonstructural_zeros reduction requires a constant \
-                             stored sparsity pattern across solves (stored nnz changed)"))
     grew = false
     @inbounds for i in eachindex(nz)
         if !red.mask[i] && !iszero(nz[i])

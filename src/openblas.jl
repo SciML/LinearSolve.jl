@@ -41,7 +41,8 @@ OpenBLASLUFactorization(; residualsafety::Bool = false) = OpenBLASLUFactorizatio
 @static if !@isdefined(OpenBLAS_jll)
     __openblas_isavailable() = false
 else
-    __openblas_isavailable() = OpenBLAS_jll.is_available()
+    __openblas_isavailable() = isdefined(OpenBLAS_jll, :is_available) &&
+        OpenBLAS_jll.is_available()
 end
 
 function openblas_getrf!(

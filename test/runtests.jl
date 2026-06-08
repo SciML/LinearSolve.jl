@@ -6,6 +6,17 @@ const GROUP = get(ENV, "GROUP", "All")
 
 const HAS_EXTENSIONS = true
 
+# Activate the isolated QA sub-environment (test/qa). The QA tools (Aqua,
+# ExplicitImports) live only here, not in the package's main test target.
+# Pkg.develop the root LinearSolve so the QA checks run against the PR branch
+# code (the [sources] entry covers this on Julia >= 1.11, but Pkg.develop keeps
+# it working on the 1.10 floor where [sources] is ignored).
+function activate_qa_env()
+    Pkg.activate(joinpath(@__DIR__, "qa"))
+    Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
+    return Pkg.instantiate()
+end
+
 # Detect sublibrary test groups.
 # GROUP can be a bare sublibrary name (Core test group) or
 # "{sublibrary}_{TEST_GROUP}" for any custom group (e.g., QA, etc.).
@@ -104,7 +115,6 @@ else
         Pkg.activate("nopre")
         Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
         Pkg.instantiate()
-        @time @safetestset "Quality Assurance" include("qa.jl")
         @time @safetestset "Mooncake Derivative Rules" include("nopre/mooncake.jl")
         @time @safetestset "JET Tests" include("nopre/jet.jl")
         @time @safetestset "Static Arrays" include("nopre/static_arrays.jl")
@@ -113,6 +123,14 @@ else
         if VERSION < v"1.12.0-"
             @time @safetestset "Enzyme Derivative Rules" include("nopre/enzyme.jl")
         end
+    end
+
+    # Quality Assurance (Aqua, ExplicitImports) runs in its own isolated
+    # sub-environment (test/qa) so its tooling deps stay out of the main test
+    # target.
+    if (GROUP == "QA" || GROUP == "All") && isempty(VERSION.prerelease)
+        activate_qa_env()
+        @time @safetestset "Quality Assurance" include("qa/qa.jl")
     end
 
     if GROUP == "DefaultsLoading"

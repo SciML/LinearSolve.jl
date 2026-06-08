@@ -32,6 +32,7 @@ jobs:
           - x86
         group:
           - "Core"
+          - "QA"
           - "DefaultsLoading"
           - "LinearSolveSTRUMPACK"
           - "LinearSolveHYPRE"

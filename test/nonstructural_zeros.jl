@@ -250,4 +250,36 @@ reduction(cache) = cache.cacheval.sparse_reduction
         cache.A = sparse(2.0I, n, n)   # different stored pattern
         @test_throws ArgumentError solve!(cache)
     end
+
+    @testset "auto falls back to per-solve on a structural pattern change" begin
+        base = copy(mats[1])
+        # rebuild base's full stored triple (explicit zeros included) so we can add
+        # one entry without going through findnz, which would drop the stored zeros.
+        cp = SparseArrays.getcolptr(base)
+        rv = rowvals(base)
+        nzv = nonzeros(base)
+        Ir = collect(rv)
+        Jr = reduce(vcat, [fill(j, cp[j + 1] - cp[j]) for j in 1:n])
+        Vr = collect(nzv)
+        A_new = sparse(vcat(Ir, n), vcat(Jr, 1), vcat(Vr, 0.7), n, n)   # one added stored entry
+        @test nnz(A_new) == nnz(base) + 1
+
+        cache = init(LinearProblem(copy(base), copy(b)))   # auto
+        solve!(cache)
+        @test reduction(cache).active && reduction(cache).cache_union
+        # a stored-nnz change under auto drops the cached union and switches to
+        # per-solve dropzeros rather than throwing; the result stays correct.
+        cache.A = copy(A_new)
+        sol = solve!(cache)
+        @test sol.retcode == ReturnCode.Success
+        @test sol.u ≈ Matrix(A_new) \ b rtol = 1.0e-8
+        @test !reduction(cache).cache_union                 # no longer union caching
+        # it stays in per-solve mode and keeps solving correctly across the new pattern
+        A_new2 = sparse(vcat(Ir, n), vcat(Jr, 1), vcat(Vr, 1.3), n, n)
+        cache.A = copy(A_new2)
+        sol2 = solve!(cache)
+        @test sol2.retcode == ReturnCode.Success
+        @test sol2.u ≈ Matrix(A_new2) \ b rtol = 1.0e-8
+        @test !reduction(cache).cache_union
+    end
 end

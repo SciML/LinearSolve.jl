@@ -88,6 +88,13 @@ jobs:
             version: "pre"
           - group: LinearSolvePETSc
             version: "pre"
+          # MUMPS, Ginkgo, and Elemental declare [lts, 1] in test/test_groups.toml
+          - group: LinearSolveMUMPS
+            version: "pre"
+          - group: LinearSolveGinkgo
+            version: "pre"
+          - group: LinearSolveElemental
+            version: "pre"
           # MUMPS tests are only wired for Linux
           - group: LinearSolveMUMPS
             os: macos-latest

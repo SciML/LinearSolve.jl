@@ -1,10 +1,17 @@
 # LinearSolvePyAMG.jl
 
-A [LinearSolve.jl](https://github.com/SciML/LinearSolve.jl) sub-library that
+[![Join the chat at https://julialang.zulipchat.com #sciml-bridged](https://img.shields.io/static/v1?label=Zulip&message=chat&color=9558b2&labelColor=389826)](https://julialang.zulipchat.com/#narrow/stream/279055-sciml-bridged)
+[![Global Docs](https://img.shields.io/badge/docs-SciML-blue.svg)](https://docs.sciml.ai/LinearSolve/stable/)
+
+[![ColPrac: Contributor's Guide on Collaborative Practices for Community Packages](https://img.shields.io/badge/ColPrac-Contributor%27s%20Guide-blueviolet)](https://github.com/SciML/ColPrac)
+[![SciML Code Style](https://img.shields.io/static/v1?label=code%20style&message=SciML&color=9558b2&labelColor=389826)](https://github.com/SciML/SciMLStyle)
+
+LinearSolvePyAMG.jl is a component of the [LinearSolve.jl](https://github.com/SciML/LinearSolve.jl) monorepo. It
 wraps the Python [PyAMG](https://pyamg.readthedocs.io) Algebraic Multigrid (AMG)
 library via [PythonCall.jl](https://github.com/JuliaPy/PythonCall.jl).
 PyAMG is installed automatically into Julia's managed Python environment via
 [CondaPkg.jl](https://github.com/JuliaPy/CondaPkg.jl).
+While completely independent and usable on its own, users wanting the full linear solver suite should use [LinearSolve.jl](https://github.com/SciML/LinearSolve.jl).
 
 ## Installation
 

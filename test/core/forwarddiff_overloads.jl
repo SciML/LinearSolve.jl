@@ -5,6 +5,7 @@ using LinearAlgebra
 using SparseArrays
 using ComponentArrays
 using Sparspak
+using RecursiveFactorization
 
 function h(p)
     return (
@@ -16,6 +17,19 @@ function h(p)
         b = [p[1] + 1, p[2] * 2, p[1]^2],
     )
 end
+
+# Opt-Out Dense Methods
+
+A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+prob = LinearProblem(A, b)
+generic_x_p = solve(prob, GenericLUFactorization())
+rflu_x_p = solve(prob, RFLUFactorization())
+backslash_x_p = A \ b
+
+@test ≈(generic_x_p, backslash_x_p, rtol = 1.0e-9)
+@test ≈(rflu_x_p, backslash_x_p, rtol = 1.0e-9)
+
+# Overload Dense
 
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 
@@ -195,12 +209,36 @@ backslash_x_p = new_A \ new_b
 
 @test linu == cache.u
 
+# Test Pure Julia Sparse Linear Algebra
+
+A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+
+prob = LinearProblem(sparse(A), sparse(b))
+overload_x_p = solve(prob, PureKLUFactorization())
+backslash_x_p = A \ b
+
+@test ≈(overload_x_p, backslash_x_p, rtol = 1.0e-9)
+
+A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+
+prob = LinearProblem(sparse(A), sparse(b))
+overload_x_p = solve(prob, SparseColumnPivotedQRFactorization())
+backslash_x_p = A \ b
+
+@test ≈(overload_x_p, backslash_x_p, rtol = 1.0e-9)
+
 # Test Float Only solvers
 
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 
 prob = LinearProblem(sparse(A), sparse(b))
 overload_x_p = solve(prob, KLUFactorization())
+backslash_x_p = A \ b
+
+@test ≈(overload_x_p, backslash_x_p, rtol = 1.0e-9)
+
+prob = LinearProblem(sparse(A), sparse(b))
+overload_x_p = solve(prob, PureKLUFactorization())
 backslash_x_p = A \ b
 
 @test ≈(overload_x_p, backslash_x_p, rtol = 1.0e-9)

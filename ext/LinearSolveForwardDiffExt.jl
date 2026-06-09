@@ -394,7 +394,9 @@ end
 function _use_direct_dual_solve(alg)
     return alg isa GenericLUFactorization ||
         alg isa LinearSolve.SpecializedLUFactorization ||
-        alg isa LinearSolve.SpecializedQRFactorization
+        alg isa LinearSolve.SpecializedQRFactorization ||
+        alg isa LinearSolve.PureKLUFactorization ||
+        alg isa LinearSolve.RFLUFactorization
 end
 
 function _use_direct_dual_solve(alg::DefaultLinearSolver)

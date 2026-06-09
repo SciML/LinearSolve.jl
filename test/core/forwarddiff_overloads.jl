@@ -6,6 +6,7 @@ using SparseArrays
 using ComponentArrays
 using Sparspak
 using SpecializingFactorizations
+using RecursiveFactorization
 
 function h(p)
     return (
@@ -18,10 +19,11 @@ function h(p)
     )
 end
 
-# Opt-out dense methods: SpecializedLU/QR solve the Dual problem directly
-# (no primal/partials splitting). The partials can differ from `\` by an ulp,
-# and isapprox over Dual vectors NaNs when the primal diff is exactly zero
-# (sqrt has infinite slope at 0), so compare values and partials separately.
+# Opt-out dense methods: SpecializedLU/QR, GenericLU and RFLU solve the Dual
+# problem directly (no primal/partials splitting). The partials can differ from
+# `\` by an ulp, and isapprox over Dual vectors NaNs when the primal diff is
+# exactly zero (sqrt has infinite slope at 0), so compare values and partials
+# separately.
 function dual_isapprox(x, y; rtol)
     isapprox(ForwardDiff.value.(x), ForwardDiff.value.(y); rtol) || return false
     return isapprox(
@@ -38,6 +40,12 @@ backslash_x_p = A \ b
 )
 @test dual_isapprox(
     solve(prob, SpecializedQRFactorization()).u, backslash_x_p, rtol = 1.0e-9
+)
+@test dual_isapprox(
+    solve(prob, GenericLUFactorization()).u, backslash_x_p, rtol = 1.0e-9
+)
+@test dual_isapprox(
+    solve(prob, RFLUFactorization()).u, backslash_x_p, rtol = 1.0e-9
 )
 
 # Rectangular least-squares with Duals through the direct dual path
@@ -227,12 +235,36 @@ backslash_x_p = new_A \ new_b
 
 @test linu == cache.u
 
+# Test Pure Julia Sparse Linear Algebra
+
+A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+
+prob = LinearProblem(sparse(A), sparse(b))
+overload_x_p = solve(prob, PureKLUFactorization())
+backslash_x_p = A \ b
+
+@test ≈(overload_x_p, backslash_x_p, rtol = 1.0e-9)
+
+A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+
+prob = LinearProblem(sparse(A), sparse(b))
+overload_x_p = solve(prob, SparseColumnPivotedQRFactorization())
+backslash_x_p = A \ b
+
+@test ≈(overload_x_p, backslash_x_p, rtol = 1.0e-9)
+
 # Test Float Only solvers
 
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 
 prob = LinearProblem(sparse(A), sparse(b))
 overload_x_p = solve(prob, KLUFactorization())
+backslash_x_p = A \ b
+
+@test ≈(overload_x_p, backslash_x_p, rtol = 1.0e-9)
+
+prob = LinearProblem(sparse(A), sparse(b))
+overload_x_p = solve(prob, PureKLUFactorization())
 backslash_x_p = A \ b
 
 @test ≈(overload_x_p, backslash_x_p, rtol = 1.0e-9)

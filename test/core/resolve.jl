@@ -1,4 +1,5 @@
 using LinearSolve, LinearAlgebra, SparseArrays, InteractiveUtils, Test
+using SpecializingFactorizations
 using LinearSolve: AbstractDenseFactorization, AbstractSparseFactorization,
     BLISLUFactorization, CliqueTreesFactorization,
     AMDGPUOffloadLUFactorization, AMDGPUOffloadQRFactorization,

@@ -659,7 +659,7 @@ end
 function build_nullspace(petsclib, alg::PETScAlgorithm)
     alg.nullspace === :none     && return nothing
     alg.nullspace === :constant && return LibPETSc.MatNullSpaceCreate(
-        petsclib, MPI.COMM_SELF, LibPETSc.PetscBool(true), 0, LibPETSc.PetscVec[]
+        petsclib, MPI.COMM_SELF, LibPETSc.PetscBool(true), 0, LibPETSc.CVec[]
     )
     # :custom
     PScalar = petsclib.PetscScalar
@@ -667,9 +667,11 @@ function build_nullspace(petsclib, alg::PETScAlgorithm)
         create_seq_vec(petsclib, eltype(v) == PScalar ? v : PScalar.(v))
             for v in alg.nullspace_vecs
     ]
+    # PETSc.jl >= 0.4.10 takes the raw Vec handles (Vector{CVec}); passing the
+    # PetscVec wrappers would hand PETSc pointers to the Julia wrapper objects.
     ns = LibPETSc.MatNullSpaceCreate(
         petsclib, MPI.COMM_SELF, LibPETSc.PetscBool(false),
-        length(petsc_vecs), petsc_vecs
+        length(petsc_vecs), LibPETSc.CVec[v.ptr for v in petsc_vecs]
     )
     foreach(PETSc.destroy, petsc_vecs)
     return ns

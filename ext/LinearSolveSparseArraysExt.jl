@@ -542,12 +542,14 @@ function LinearSolve.init_cacheval(
     return PREALLOCATED_PUREKLU
 end
 
+# PureKLU's kernels are pure Julia and generic over `Union{Real, Complex}`
+# (e.g. ForwardDiff duals via the direct dual solve path), not just BLAS types.
 function LinearSolve.init_cacheval(
         alg::PureKLUFactorization, A::AbstractSparseArray{T, Int64}, b, u, Pl, Pr,
         maxiters::Int, abstol,
         reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
-    ) where {T <: Union{Float64, ComplexF64}}
+    ) where {T <: Union{Real, Complex}}
     return PureKLU.KLUFactorization(
         SparseMatrixCSC{T, Int64}(
             0, 0, [Int64(1)], Int64[], T[]
@@ -573,7 +575,7 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol,
         reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
-    ) where {T <: Union{Float64, ComplexF64}}
+    ) where {T <: Union{Real, Complex}}
     return PureKLU.KLUFactorization(
         SparseMatrixCSC{T, Int32}(
             0, 0, [Int32(1)], Int32[], T[]

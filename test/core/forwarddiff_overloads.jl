@@ -29,6 +29,18 @@ backslash_x_p = A \ b
 @test ≈(generic_x_p, backslash_x_p, rtol = 1.0e-9)
 @test ≈(rflu_x_p, backslash_x_p, rtol = 1.0e-9)
 
+# Opt-out path with duals only in A (plain b) and only in b (plain A)
+
+plain_b = ForwardDiff.value.(b)
+prob = LinearProblem(A, plain_b)
+@test ≈(solve(prob, GenericLUFactorization()), A \ plain_b, rtol = 1.0e-9)
+@test ≈(solve(prob, RFLUFactorization()), A \ plain_b, rtol = 1.0e-9)
+
+plain_A = ForwardDiff.value.(A)
+prob = LinearProblem(plain_A, b)
+@test ≈(solve(prob, GenericLUFactorization()), plain_A \ b, rtol = 1.0e-9)
+@test ≈(solve(prob, RFLUFactorization()), plain_A \ b, rtol = 1.0e-9)
+
 # Overload Dense
 
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
@@ -218,6 +230,16 @@ overload_x_p = solve(prob, PureKLUFactorization())
 backslash_x_p = A \ b
 
 @test ≈(overload_x_p, backslash_x_p, rtol = 1.0e-9)
+
+# Duals only in A, and only in b
+
+plain_b = ForwardDiff.value.(b)
+prob = LinearProblem(sparse(A), plain_b)
+@test ≈(solve(prob, PureKLUFactorization()), A \ plain_b, rtol = 1.0e-9)
+
+plain_A = ForwardDiff.value.(A)
+prob = LinearProblem(sparse(plain_A), b)
+@test ≈(solve(prob, PureKLUFactorization()), plain_A \ b, rtol = 1.0e-9)
 
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 

@@ -392,7 +392,9 @@ end
 # Check if the algorithm should use the direct dual solve path
 # (algorithms that can work directly with Dual numbers without the primal/partials separation)
 function _use_direct_dual_solve(alg)
-    return alg isa GenericLUFactorization
+    return alg isa GenericLUFactorization ||
+        alg isa LinearSolve.SpecializedLUFactorization ||
+        alg isa LinearSolve.SpecializedQRFactorization
 end
 
 function _use_direct_dual_solve(alg::DefaultLinearSolver)

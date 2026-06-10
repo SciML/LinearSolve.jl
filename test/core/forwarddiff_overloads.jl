@@ -5,6 +5,7 @@ using LinearAlgebra
 using SparseArrays
 using ComponentArrays
 using Sparspak
+using SpecializingFactorizations
 
 function h(p)
     return (
@@ -16,6 +17,37 @@ function h(p)
         b = [p[1] + 1, p[2] * 2, p[1]^2],
     )
 end
+
+# Opt-out dense methods: SpecializedLU/QR solve the Dual problem directly
+# (no primal/partials splitting). The partials can differ from `\` by an ulp,
+# and isapprox over Dual vectors NaNs when the primal diff is exactly zero
+# (sqrt has infinite slope at 0), so compare values and partials separately.
+function dual_isapprox(x, y; rtol)
+    isapprox(ForwardDiff.value.(x), ForwardDiff.value.(y); rtol) || return false
+    return isapprox(
+        reduce(hcat, collect.(ForwardDiff.partials.(x))),
+        reduce(hcat, collect.(ForwardDiff.partials.(y))); rtol
+    )
+end
+
+A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+prob = LinearProblem(A, b)
+backslash_x_p = A \ b
+@test dual_isapprox(
+    solve(prob, SpecializedLUFactorization()).u, backslash_x_p, rtol = 1.0e-9
+)
+@test dual_isapprox(
+    solve(prob, SpecializedQRFactorization()).u, backslash_x_p, rtol = 1.0e-9
+)
+
+# Rectangular least-squares with Duals through the direct dual path
+p_ls = [ForwardDiff.Dual(2.0, 1.0, 0.0), ForwardDiff.Dual(3.0, 0.0, 1.0)]
+A_ls = [p_ls[1] 1.0; 1.0 p_ls[2]; p_ls[1] p_ls[2]]
+b_ls = [p_ls[1] + 1, p_ls[2] * 2, p_ls[1] * p_ls[2]]
+qr_ls_x_p = solve(LinearProblem(A_ls, b_ls), SpecializedQRFactorization())
+@test dual_isapprox(qr_ls_x_p.u, qr(A_ls) \ b_ls, rtol = 1.0e-9)
+
+# Overload Dense
 
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 

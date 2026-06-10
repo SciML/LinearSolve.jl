@@ -1529,3 +1529,66 @@ end
 function ElementalJL(; method::Symbol = :LU)
     return ElementalJL(method)
 end
+
+"""
+    SpecializedLUFactorization()
+
+A type-stable, structure-detecting dense LU-style solver from
+SpecializingFactorizations.jl. It cheaply scans the (dense) matrix `A` to detect
+whether it actually has special structure (diagonal, bidiagonal, tridiagonal,
+banded, triangular, symmetric positive definite, symmetric/Hermitian indefinite)
+and dispatches to the matching specialized factorization instead of always using
+a general `O(n^3)` LU. Detection is tracked by a runtime enum stored in a single
+concrete workspace type, so the whole detect -> factor -> solve pipeline is
+type-stable and allocation-free on the warm path.
+
+This is for **square** systems only; use [`SpecializedQRFactorization`](@ref) for
+rectangular / rank-deficient least-squares problems.
+
+!!! note
+
+    Using this solver requires that SpecializingFactorizations.jl is loaded:
+    `using SpecializingFactorizations`.
+
+## Example
+
+```julia
+using SpecializingFactorizations
+A = Matrix(Tridiagonal(rand(99), rand(100) .+ 4, rand(99)))
+b = rand(100)
+prob = LinearProblem(A, b)
+sol = solve(prob, SpecializedLUFactorization())
+```
+"""
+struct SpecializedLUFactorization <: AbstractDenseFactorization end
+
+"""
+    SpecializedQRFactorization()
+
+A type-stable, rank-revealing dense QR least-squares solver from
+SpecializingFactorizations.jl. It uses a column-pivoted, rank-revealing QR
+(LAPACK `geqp3`) to reveal the numerical rank of a possibly **rectangular** or
+**rank-deficient** matrix and returns the least-squares solution for any shape,
+**including singular and rank-deficient** matrices, without ever throwing. For a
+rank-deficient system it returns the minimum-norm least-squares solution
+(matching `pinv(A) * b`). For square `BlasFloat` inputs it reuses the same
+structure-detection scan as [`SpecializedLUFactorization`](@ref) to take cheaper
+structured paths when doing so provably reproduces the dense rank-revealing
+result.
+
+!!! note
+
+    Using this solver requires that SpecializingFactorizations.jl is loaded:
+    `using SpecializingFactorizations`.
+
+## Example
+
+```julia
+using SpecializingFactorizations
+A = randn(100, 40)  # overdetermined least-squares
+b = randn(100)
+prob = LinearProblem(A, b)
+sol = solve(prob, SpecializedQRFactorization())
+```
+"""
+struct SpecializedQRFactorization <: AbstractDenseFactorization end

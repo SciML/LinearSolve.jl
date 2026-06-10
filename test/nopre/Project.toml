@@ -19,10 +19,7 @@ LinearSolve = {path = "../.."}
 
 [compat]
 AllocCheck = "0.2"
-# Enzyme 0.13.155 (PR EnzymeAD/Enzyme.jl#3154) errors with
-# `MethodError: no method matching LLVM.ConstantInt(::LLVM.VectorType, ::Int64)`
-# in abs_typeof (src/absint.jl:857) on Julia 1.10. Lift the cap once fixed upstream.
-Enzyme = "0.13.0 - 0.13.154"
+Enzyme = "0.13"
 FiniteDiff = "2.26"
 ForwardDiff = "0.10.38, 1"
 InteractiveUtils = "1.10"

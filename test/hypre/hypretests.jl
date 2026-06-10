@@ -230,6 +230,9 @@ test_interface(HYPREAlgorithm(HYPRE.PCG(comm)), Pl = HYPRE.BoomerAMG())
 test_retcode_failure()
 
 # Test MPI execution
+# Pass the active project explicitly: the group env (test/hypre) is activated
+# in-process by Pkg.activate, which child processes do not inherit — without
+# --project the workers resolve packages from Pkg.test's sandbox, which has no HYPRE.
 mpitestfile = joinpath(@__DIR__, "hypretests_mpi.jl")
-r = run(ignorestatus(`$(mpiexec()) -n 2 $(Base.julia_cmd()) $(mpitestfile)`))
+r = run(ignorestatus(`$(mpiexec()) -n 2 $(Base.julia_cmd()) --project=$(Base.active_project()) $(mpitestfile)`))
 @test r.exitcode == 0

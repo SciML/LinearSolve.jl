@@ -1,0 +1,18 @@
+[deps]
+Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
+LinearSolvePyAMG = "7a56c47d-7ab1-4e99-b0e3-2952e463d64a"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[sources]
+LinearSolve = {path = "../../../.."}
+LinearSolvePyAMG = {path = "../.."}
+
+[compat]
+Aqua = "0.8"
+JET = "0.9, 0.10, 0.11"
+LinearSolve = "3"
+LinearSolvePyAMG = "1"
+Test = "1"
+julia = "1.10"

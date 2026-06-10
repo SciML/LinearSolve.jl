@@ -21,10 +21,7 @@ jobs:
     uses: "SciML/.github/.github/workflows/sublibrary-downgrade.yml@v1"
     secrets: "inherit"
     with:
-      # julia-downgrade-compat's resolver rejects channel aliases like "lts"
-      # ("Invalid compat version spec: --julia=lts"); pass the numeric
-      # major.minor instead. Bump when the LTS advances.
-      julia-version: "1.10"
+      julia-version: "lts"
       group-env-name: "LINEARSOLVE_TEST_GROUP"
       group-env-value: "Core"
       # Every lib/* sublibrary is downgrade-tested (projects auto-discovered, no exclusions).

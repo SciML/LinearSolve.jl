@@ -43,8 +43,8 @@ end
     # Float32 and Complex eltypes
     Af = Matrix{Float32}(I, n, n) + 0.1f0 * rand(rng, Float32, n, n)
     bf = rand(rng, Float32, n)
-    solf = solve(LinearProblem(Af, bf), SpecializedLUFactorization())
-    @test Af * solf.u ≈ bf atol = 1.0f-4
+    sol32 = solve(LinearProblem(Af, bf), SpecializedLUFactorization())
+    @test Af * sol32.u ≈ bf atol = 1.0f-4
 
     Ac = Matrix{ComplexF64}(I, n, n) + 0.1 * (rand(rng, n, n) + im * rand(rng, n, n))
     bc = rand(rng, ComplexF64, n)

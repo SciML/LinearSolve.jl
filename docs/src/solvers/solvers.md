@@ -151,6 +151,17 @@ LinearSolve.DefaultLinearSolver
 RFLUFactorization
 ```
 
+### SpecializingFactorizations.jl
+
+!!! note
+    
+    Using this solver requires adding the package SpecializingFactorizations.jl, i.e. `using SpecializingFactorizations`
+
+```@docs
+SpecializedLUFactorization
+SpecializedQRFactorization
+```
+
 ### Base.LinearAlgebra
 
 These overloads tend to work for many array types, such as `CuArrays` for GPU-accelerated

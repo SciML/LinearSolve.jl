@@ -88,6 +88,9 @@ versions = ["1", "pre"]
 runner = "self-hosted"
 num_threads = 2
 
+[LinearSolvePureUMFPACK]
+versions = ["lts", "1", "pre"]
+
 # Trim ran on GitHub-hosted ubuntu-latest (self-hosted was false for this
 # group); keep it on the default ubuntu-latest runner.
 [Trim]

@@ -1,10 +1,3 @@
-using Pkg
-# PureUMFPACK.jl is not yet registered in the General registry; add it by URL so
-# the extension `LinearSolvePureUMFPACKExt` loads.
-if Base.identify_package("PureUMFPACK") === nothing
-    Pkg.add(url = "https://github.com/SciML/PureUMFPACK.jl.git")
-end
-
 using LinearSolve
 import PureUMFPACK
 using SparseArrays

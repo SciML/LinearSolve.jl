@@ -1279,6 +1279,46 @@ function init_cacheval(
 end
 
 """
+`PureUMFPACKFactorization(; reuse_symbolic = true, check_pattern = true)`
+
+A pure-Julia port of SuiteSparse's UMFPACK unsymmetric sparse LU solver, provided
+by [PureUMFPACK.jl](https://github.com/SciML/PureUMFPACK.jl). It has no SuiteSparse
+binary dependency and supports generic element types in addition to
+`Float64`/`ComplexF64`. It is the pure-Julia analogue of the SuiteSparse-backed
+[`UMFPACKFactorization`](@ref).
+
+!!! note
+
+    `PureUMFPACKFactorization` is only available once the `PureUMFPACK` package is
+    loaded (`using PureUMFPACK`). Unlike SuiteSparse UMFPACK, PureUMFPACK has no
+    in-place numeric-refactorization (`lu!`-style) API: each fresh factorization
+    recomputes the ordering, symbolic analysis, and numerics together. The
+    `reuse_symbolic` and `check_pattern` keywords are accepted for API parity with
+    [`UMFPACKFactorization`](@ref) and control caching of the factorization object
+    across solves, but no symbolic factorization is shared between numeric refactors.
+
+## Keyword Arguments
+
+  - `reuse_symbolic`: reuse the cached factorization across solves when the sparsity
+    pattern is unchanged. Defaults to `true`.
+  - `check_pattern`: check whether the sparsity pattern changed before reusing the
+    cached factorization. Defaults to `true`.
+"""
+Base.@kwdef struct PureUMFPACKFactorization <: AbstractSparseFactorization
+    reuse_symbolic::Bool = true
+    check_pattern::Bool = true
+end
+
+function init_cacheval(
+        alg::PureUMFPACKFactorization,
+        A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
+"""
 `SparseColumnPivotedQRFactorization(; reuse_symbolic = true, ordering = :default)`
 
 A pure-Julia, rank-revealing column-pivoted sparse QR factorization, provided by

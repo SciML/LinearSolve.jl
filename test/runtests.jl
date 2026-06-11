@@ -165,6 +165,11 @@ else
         @time @safetestset "Pardiso" include("pardiso/pardiso.jl")
     end
 
+    if GROUP == "LinearSolveHSL"
+        activate_group_env("hsl")
+        @time @safetestset "HSL" include("hsl/hsl.jl")
+    end
+
     if Base.Sys.islinux() && GROUP == "LinearSolveMUMPS"
         activate_group_env("mumps")
         @time @safetestset "MUMPS" include("mumps/mumps.jl")

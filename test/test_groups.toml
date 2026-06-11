@@ -73,6 +73,11 @@ versions = ["lts", "1"]
 runner = "self-hosted"
 num_threads = 2
 
+[LinearSolveHSL]
+versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
+
 [LinearSolveGinkgo]
 versions = ["lts", "1"]
 runner = "self-hosted"

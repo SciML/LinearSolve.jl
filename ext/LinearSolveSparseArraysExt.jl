@@ -13,7 +13,7 @@ using ArrayInterface: ArrayInterface
 using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!
 using SparseArrays: SparseArrays, AbstractSparseArray, AbstractSparseMatrixCSC,
     SparseMatrixCSC,
-    nonzeros, rowvals, getcolptr, sparse, sprand, dropzeros
+    nonzeros, rowvals, getcolptr, sparse, sprand, dropzeros, nnz
 using SciMLLogging: @SciMLMessage
 
 @static if Base.USE_GPL_LIBS
@@ -1025,6 +1025,14 @@ mutable struct SparseReduction{Tv, Ti}
     reduced::SparseMatrixCSC{Tv, Ti}
     nanalyze::Int
     nrefactor::Int
+    # Tracks whether the most recent per-solve dropzeros changed the structure
+    # of `reduced` (i.e. nnz changed). Set to `false` after the first per-solve
+    # dropzeros call so the first call never triggers a false "changed" signal.
+    # Used by the DefaultLinearSolver to decide whether to invalidate cached
+    # symbolic factorizations (Sparspak, KLU) whose symbolic reuse is only valid
+    # when the matrix structure is stable across calls.
+    reduced_nnz::Int
+    structure_changed::Bool
 end
 
 function _persistent_reduced(
@@ -1072,12 +1080,14 @@ function LinearSolve.init_sparse_reduction(
         nstart_zeros = count(iszero, nz)
         keep, reduced = _persistent_reduced(colptr, rowval, m, k, mask, nz)
         return SparseReduction{Tv, Ti}(
-            true, cache_union, auto, nstart_zeros, colptr, rowval, mask, keep, reduced, 1, 0
+            true, cache_union, auto, nstart_zeros, colptr, rowval, mask, keep, reduced,
+            1, 0, nnz(reduced), false
         )
     else
         empty = SparseMatrixCSC{Tv, Ti}(0, 0, Ti[1], Ti[], Tv[])
         return SparseReduction{Tv, Ti}(
-            false, cache_union, auto, 0, colptr, rowval, Bool[], Int[], empty, 0, 0
+            false, cache_union, auto, 0, colptr, rowval, Bool[], Int[], empty,
+            0, 0, 0, false
         )
     end
 end
@@ -1095,7 +1105,15 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
     end
     # per-solve dropzeros: drop this matrix's own zeros and let the inner solver
     # re-analyze when the pattern changes (no cross-solve union assumed).
-    red.cache_union || (red.reduced = dropzeros(A); red.nrefactor += 1; return red.reduced)
+    if !red.cache_union
+        new_reduced = dropzeros(A)
+        new_nnz = nnz(new_reduced)
+        red.structure_changed = new_nnz != red.reduced_nnz
+        red.reduced_nnz = new_nnz
+        red.reduced = new_reduced
+        red.nrefactor += 1
+        return red.reduced
+    end
     grew = false
     @inbounds for i in eachindex(nz)
         if !red.mask[i] && !iszero(nz[i])
@@ -1117,6 +1135,10 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
                 activated > LinearSolve.NONPERSISTENT_ZERO_FRACTION * red.nstart_zeros
             red.cache_union = false
             red.reduced = dropzeros(A)
+            # First per-solve reduction after switching from union caching.
+            # No "previous" per-solve result, so no structure change yet.
+            red.reduced_nnz = nnz(red.reduced)
+            red.structure_changed = false
         end
     else
         rnz = nonzeros(red.reduced)

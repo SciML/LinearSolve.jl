@@ -296,13 +296,16 @@ end
 
 function LinearSolve.init_cacheval(
         alg::AppleAccelerateLUFactorization,
-        A::AbstractMatrix{<:Union{Float32, ComplexF32, ComplexF64}}, b, u, Pl, Pr,
+        A::DenseMatrix{<:BLASELTYPES}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    A = rand(eltype(A), 0, 0)
-    luinst = ArrayInterface.lu_instance(A)
-    return LU(luinst.factors, similar(A, Cint, 0), luinst.info), Ref{Cint}()
+    # Build the instance from a 0×0 array of `A`'s own type so the cacheval slot
+    # matches the factorization `solve!` stores (built from `A`). This handles
+    # dense CPU arrays that aren't `Base.Array`, e.g. `FixedSizeArray`.
+    A0 = similar(A, 0, 0)
+    luinst = ArrayInterface.lu_instance(A0)
+    return LU(luinst.factors, similar(A0, Cint, 0), luinst.info), Ref{Cint}()
 end
 
 function SciMLBase.solve!(

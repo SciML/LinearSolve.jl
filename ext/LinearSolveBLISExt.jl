@@ -263,12 +263,15 @@ function LinearSolve.init_cacheval(
 end
 
 function LinearSolve.init_cacheval(
-        alg::BLISLUFactorization, A::AbstractMatrix{<:Union{Float32, ComplexF32, ComplexF64}}, b, u, Pl, Pr,
+        alg::BLISLUFactorization,
+        A::DenseMatrix{<:Union{Float32, Float64, ComplexF32, ComplexF64}}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    A = rand(eltype(A), 0, 0)
-    return ArrayInterface.lu_instance(A), Ref{BlasInt}()
+    # Build the instance from a 0×0 array of `A`'s own type so the cacheval slot
+    # matches the factorization `solve!` stores (built from `A`). This handles
+    # dense CPU arrays that aren't `Base.Array`, e.g. `FixedSizeArray`.
+    return ArrayInterface.lu_instance(similar(A, 0, 0)), Ref{BlasInt}()
 end
 
 function SciMLBase.solve!(

@@ -1,7 +1,12 @@
 [deps]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 ExplicitImports = "7d51a73a-1435-4ff3-83d9-f097790105c7"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
+RecursiveFactorization = "f2c3362d-daeb-58d1-803e-2bc74f2840b4"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [sources]
@@ -10,6 +15,11 @@ LinearSolve = {path = "../.."}
 [compat]
 Aqua = "0.8"
 ExplicitImports = "1.10"
+ForwardDiff = "0.10.38, 1"
+JET = "0.9, 0.11"
+LinearAlgebra = "1.10"
 LinearSolve = "3"
+RecursiveFactorization = "0.2.26"
+SparseArrays = "1.10"
 Test = "<0.0.1, 1"
 julia = "1.10"

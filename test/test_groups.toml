@@ -43,7 +43,9 @@ versions = ["lts", "1"]
 runner = "self-hosted"
 num_threads = 2
 
-[NoPre]
+# Enzyme/Mooncake/AllocCheck AD + allocation tests; not compatible with the
+# prerelease channel.
+[AD]
 versions = ["lts", "1"]
 runner = "self-hosted"
 num_threads = 2

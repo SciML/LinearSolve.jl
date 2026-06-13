@@ -119,27 +119,29 @@ else
         @time @safetestset "Dual Preference System Integration" include("preferences/preferences.jl")
     end
 
-    # Quality Assurance (Aqua, ExplicitImports) — dep-adding group whose tooling
-    # deps stay out of the main test target (test/qa).
+    # Quality Assurance (Aqua, ExplicitImports, JET) — dep-adding group whose
+    # tooling deps stay out of the main test target (test/qa).
     if GROUP == "QA" && isempty(VERSION.prerelease)
         activate_group_env("qa")
         @time @safetestset "Quality Assurance" include("qa/qa.jl")
+        @time @safetestset "JET Tests" include("qa/jet.jl")
     end
 
     # Dep-adding groups below: each activates test/<group>/Project.toml and is
     # excluded from the `All` run.
 
-    # Don't run Enzyme tests on prerelease or Julia >= 1.12 (Enzyme compatibility issues)
+    # AD/allocation tests (Enzyme, Mooncake, AllocCheck, StaticArrays); the AD
+    # stack is not compatible with prerelease Julia.
+    # Don't run Enzyme tests on Julia >= 1.12 (Enzyme compatibility issues)
     # See: https://github.com/SciML/LinearSolve.jl/issues/817
-    if GROUP == "NoPre" && isempty(VERSION.prerelease)
-        activate_group_env("nopre")
-        @time @safetestset "Mooncake Derivative Rules" include("nopre/mooncake.jl")
-        @time @safetestset "JET Tests" include("nopre/jet.jl")
-        @time @safetestset "Static Arrays" include("nopre/static_arrays.jl")
-        @time @safetestset "Caching Allocation Tests" include("nopre/caching_allocation_tests.jl")
+    if GROUP == "AD" && isempty(VERSION.prerelease)
+        activate_group_env("AD")
+        @time @safetestset "Mooncake Derivative Rules" include("AD/mooncake.jl")
+        @time @safetestset "Static Arrays" include("AD/static_arrays.jl")
+        @time @safetestset "Caching Allocation Tests" include("AD/caching_allocation_tests.jl")
         # Disable Enzyme tests on Julia >= 1.12 due to compatibility issues
         if VERSION < v"1.12.0-"
-            @time @safetestset "Enzyme Derivative Rules" include("nopre/enzyme.jl")
+            @time @safetestset "Enzyme Derivative Rules" include("AD/enzyme.jl")
         end
     end
 

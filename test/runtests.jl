@@ -94,6 +94,7 @@ else
         @time @safetestset "SparseVector b Tests" include("core/sparse_vector.jl")
         @time @safetestset "Nonstructural Zeros" include("core/nonstructural_zeros.jl")
         @time @safetestset "Default Alg Tests" include("core/default_algs.jl")
+        @time @safetestset "FixedSizeArrays" include("core/fixedsizearrays.jl")
         @time @safetestset "Adjoint Sensitivity" include("core/adjoint.jl")
         @time @safetestset "ForwardDiff Overloads" include("core/forwarddiff_overloads.jl")
         @time @safetestset "Traits" include("core/traits.jl")

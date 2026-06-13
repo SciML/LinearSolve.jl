@@ -86,15 +86,18 @@ function LinearSolve.defaultalg(
         A::AbstractSparseMatrixCSC{Tv, Ti}, b,
         assump::OperatorAssumptions{Bool}
     ) where {Tv, Ti}
-    ext = Base.get_extension(LinearSolve, :LinearSolveSparspakExt)
-    return if assump.issq && ext !== nothing
-        LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.SparspakFactorization)
-    elseif !assump.issq
-        error("Generic number sparse factorization for non-square is not currently handled")
-    elseif ext === nothing
-        error("SparspakFactorization required for general sparse matrix types and with general Julia number types. Do `using Sparspak` in order to enable this functionality")
+    # PureKLU is a pure-Julia, hard dependency that factors any `Number` element
+    # type, so it is the default sparse LU for generic (non-BLAS) eltypes such as
+    # BigFloat — no `using Sparspak` required. Unlike Sparspak's symbolic reuse,
+    # PureKLU re-analyzes when the sparsity pattern changes across solves (e.g. the
+    # per-solve dropzeros of the nonstructural_zeros path), which previously
+    # produced invalid factorizations and stalled BVP Newton iterations. A
+    # (near-)singular matrix falls back to the generic column-pivoted sparse QR via
+    # the default polyalgorithm's sparse-LU fallback chain.
+    return if assump.issq
+        LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KLUFactorization)
     else
-        error("Unreachable reached. Please report this error with a reproducer.")
+        error("Generic number sparse factorization for non-square is not currently handled")
     end
 end
 
@@ -581,6 +584,23 @@ function LinearSolve.init_cacheval(
     )
 end
 
+# Generic element types (e.g. BigFloat): PureKLU is pure-Julia and factors any
+# `Number` element type, so it serves as the default sparse LU for non-BLAS
+# eltypes too (replacing Sparspak in the default polyalgorithm). The empty
+# cacheval carries the correct element type so `klu!`/`klu` dispatch is concrete.
+function LinearSolve.init_cacheval(
+        alg::PureKLUFactorization, A::AbstractSparseArray{T, Ti}, b, u, Pl, Pr,
+        maxiters::Int, abstol,
+        reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    ) where {T <: Number, Ti <: Integer}
+    return PureKLU.KLUFactorization(
+        SparseMatrixCSC{T, Ti}(
+            0, 0, [one(Ti)], Ti[], T[]
+        )
+    )
+end
+
 function LinearSolve.init_cacheval(
         alg::PureKLUFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol,
@@ -704,6 +724,20 @@ function LinearSolve.init_cacheval(
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
     return PREALLOCATED_SCPQR_C64
+end
+
+# Generic element types (e.g. BigFloat): SparseColumnPivotedQR is pure-Julia and
+# factors any `Number` element type. Returning a matching-eltype placeholder
+# (rather than `nothing`) keeps the default polyalgorithm's
+# `:SparseColumnPivotedQRFactorization` slot concretely typed so the sparse-LU
+# singular fallback (`_do_sparse_qr_fallback`) can `setfield!` a real
+# factorization into it for non-BLAS eltypes.
+function LinearSolve.init_cacheval(
+        alg::SparseColumnPivotedQRFactorization, A::AbstractSparseArray{T, <:Integer},
+        b, u, Pl, Pr, maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    ) where {T <: Number}
+    return SCPQR.scpqr(sparse(reshape([one(T)], 1, 1)))
 end
 
 function LinearSolve.init_cacheval(

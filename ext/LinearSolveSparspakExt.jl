@@ -51,9 +51,24 @@ function SciMLBase.solve!(
     )
     A = cache.A
     if cache.isfresh
-        if !(cache.cacheval === PREALLOCATED_SPARSEPAK) && alg.reuse_symbolic
+        cached = LinearSolve.@get_cacheval(cache, :SparspakFactorization)
+        # When the DefaultLinearSolver applies per-solve dropzeros, the reduced
+        # matrix handed to us may have a different sparsity structure (nnz) than
+        # what the cached symbolic factorization was built for. In that case
+        # sparspaklu! (which reuses the symbolic ordering) would produce an invalid
+        # factorization, causing wrong linear-solve results and stalled nonlinear
+        # iterations. Detect this via the `structure_changed` flag on the
+        # SparseReduction state and fall back to a full sparspaklu in that case.
+        skip_symbolic_reuse = if cache.cacheval isa LinearSolve.DefaultLinearSolverInit
+            red = cache.cacheval.sparse_reduction
+            red !== nothing && !red.cache_union && red.active && red.structure_changed
+        else
+            false
+        end
+        if !skip_symbolic_reuse && !(cache.cacheval === PREALLOCATED_SPARSEPAK) &&
+                !(cached === PREALLOCATED_SPARSEPAK) && alg.reuse_symbolic
             fact = sparspaklu!(
-                LinearSolve.@get_cacheval(cache, :SparspakFactorization),
+                cached,
                 SparseMatrixCSC(
                     size(A)..., getcolptr(A), rowvals(A),
                     nonzeros(A)

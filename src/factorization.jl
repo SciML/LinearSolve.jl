@@ -179,7 +179,12 @@ function LinearSolve.init_cacheval(
         abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
     ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
-    return ArrayInterface.lu_instance(convert(AbstractMatrix, A)), ipiv
+    # `solve!` stores `(RecursiveFactorization.lu!(A, ipiv, ...), ipiv)` with this
+    # `Vector{BlasInt}` pivot; rebuild the instance with it so the cacheval slot
+    # type matches for dense CPU arrays whose container isn't `Base.Array`
+    # (e.g. `FixedSizeArray`), whose `lu_instance` pivot would otherwise differ.
+    luinst = ArrayInterface.lu_instance(convert(AbstractMatrix, A))
+    return LinearAlgebra.LU(luinst.factors, ipiv, luinst.info), ipiv
 end
 
 function LinearSolve.init_cacheval(
@@ -333,7 +338,12 @@ function init_cacheval(
         assumptions::OperatorAssumptions
     )
     ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
-    return ArrayInterface.lu_instance(convert(AbstractMatrix, A)), ipiv
+    # `solve!` stores `(generic_lufact!(A, ...), ipiv)` where the pivot is this
+    # `Vector{BlasInt}`. `lu_instance` would type the pivot after `A`'s container
+    # (e.g. a `FixedSizeVector` for a `FixedSizeArray`), so rebuild the instance
+    # with the `Vector` pivot to keep the cacheval slot type matching.
+    luinst = ArrayInterface.lu_instance(convert(AbstractMatrix, A))
+    return LinearAlgebra.LU(luinst.factors, ipiv, luinst.info), ipiv
 end
 
 function init_cacheval(

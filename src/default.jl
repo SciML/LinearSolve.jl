@@ -342,7 +342,7 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
         # Special case on Arrays: avoid BLAS for RecursiveFactorization.jl when
         # it makes sense according to the benchmarks, which is dependent on
         # whether MKL or OpenBLAS is being used
-        if (A === nothing && !(b isa GPUArraysCore.AnyGPUArray)) || A isa Matrix
+        if (A === nothing && !(b isa GPUArraysCore.AnyGPUArray)) || A isa DenseMatrix
             if (
                     A === nothing ||
                         eltype(A) <: BLASELTYPES
@@ -364,7 +364,8 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
 
                     if tuned_alg !== nothing
                         tuned_alg
-                    elseif appleaccelerate_isavailable() && b isa Array &&
+                    elseif appleaccelerate_isavailable() &&
+                            b isa DenseArray && !(b isa GPUArraysCore.AnyGPUArray) &&
                             eltype(b) <: Union{Float32, Float64, ComplexF32, ComplexF64}
                         DefaultAlgorithmChoice.AppleAccelerateLUFactorization
                     elseif (
@@ -379,7 +380,8 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
                         DefaultAlgorithmChoice.RFLUFactorization
                         #elseif A === nothing || A isa Matrix
                         #    alg = FastLUFactorization()
-                    elseif usemkl && b isa Array &&
+                    elseif usemkl &&
+                            b isa DenseArray && !(b isa GPUArraysCore.AnyGPUArray) &&
                             eltype(b) <: Union{Float32, Float64, ComplexF32, ComplexF64}
                         DefaultAlgorithmChoice.MKLLUFactorization
                     else
@@ -559,7 +561,7 @@ end
     caches = map(first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))) do alg
         if alg === :KrylovJL_GMRES || alg === :KrylovJL_CRAIGMR || alg === :KrylovJL_LSMR
             quote
-                if A isa Matrix || issparsematrixcsc(A)
+                if A isa DenseMatrix || issparsematrixcsc(A)
                     nothing
                 else
                     init_cacheval(
@@ -1074,7 +1076,7 @@ end
     return quote
         if cache.cacheval isa DefaultLinearSolverInit &&
                 cache.cacheval.fell_back_to_qr && !cache.isfresh
-            if cache.A isa Array
+            if cache.A isa DenseMatrix
                 _reuse_qr_fallback(cache, alg)
             else
                 _reuse_sparse_qr_fallback(cache, alg)

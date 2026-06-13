@@ -85,6 +85,36 @@ let A_ez = sparse([1, 2], [1, 2], [1.0, 0.0], 2, 2), b_ez = ones(2)
         ReturnCode.Infeasible
 end
 
+# Generic (non-BLAS) element types such as BigFloat use the pure-Julia PureKLU as
+# the default sparse LU — no `using Sparspak` required. This is the path BVP
+# solvers hit for BigFloat problems.
+let n = 20
+    A_bf = sprand(BigFloat, n, n, 0.3) + (n * one(BigFloat)) * I
+    b_bf = rand(BigFloat, n)
+    @test LinearSolve.defaultalg(A_bf, b_bf, LinearSolve.OperatorAssumptions(true)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.KLUFactorization
+    sol_bf = solve(LinearProblem(A_bf, b_bf))
+    @test SciMLBase.successful_retcode(sol_bf.retcode)
+    @test eltype(sol_bf.u) === BigFloat
+    @test norm(A_bf * sol_bf.u - b_bf) / norm(b_bf) < 1.0e-30
+    # Re-solve with a same-pattern numeric update (mimics Newton iterations):
+    # PureKLU must refactor rather than reuse a stale factorization.
+    cache_bf = init(LinearProblem(A_bf, b_bf))
+    solve!(cache_bf)
+    A_bf2 = copy(A_bf)
+    A_bf2.nzval .*= 3
+    cache_bf.A = A_bf2
+    sol_bf2 = solve!(cache_bf)
+    @test norm(A_bf2 * sol_bf2.u - b_bf) / norm(b_bf) < 1.0e-30
+end
+# Square sparse BigFloat singular system falls back to the generic column-pivoted
+# sparse QR and succeeds.
+let As_bf = sparse(BigFloat.([1 2 3; 2 4 6; 1 1 1])), bs_bf = BigFloat.([1, 2, 3])
+    sol = solve(LinearProblem(As_bf, bs_bf))
+    @test SciMLBase.successful_retcode(sol.retcode)
+    @test all(isfinite, sol.u)
+end
+
 @test LinearSolve.defaultalg(sprand(10^4, 10^4, 1.0e-5) + I, zeros(1000)).alg ===
     LinearSolve.DefaultAlgorithmChoice.KLUFactorization
 prob = LinearProblem(sprand(1000, 1000, 0.5), zeros(1000))

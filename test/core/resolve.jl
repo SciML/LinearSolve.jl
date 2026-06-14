@@ -1,5 +1,6 @@
 using LinearSolve, LinearAlgebra, SparseArrays, InteractiveUtils, Test
 using SpecializingFactorizations
+using PureUMFPACK: PureUMFPACK
 using LinearSolve: AbstractDenseFactorization, AbstractSparseFactorization,
     BLISLUFactorization, CliqueTreesFactorization,
     AMDGPUOffloadLUFactorization, AMDGPUOffloadQRFactorization,

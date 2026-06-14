@@ -394,7 +394,9 @@ end
 function _use_direct_dual_solve(alg)
     return alg isa GenericLUFactorization ||
         alg isa LinearSolve.SpecializedLUFactorization ||
-        alg isa LinearSolve.SpecializedQRFactorization
+        alg isa LinearSolve.SpecializedQRFactorization ||
+        alg isa LinearSolve.PureKLUFactorization ||
+        alg isa LinearSolve.RFLUFactorization
 end
 
 function _use_direct_dual_solve(alg::DefaultLinearSolver)
@@ -408,8 +410,12 @@ function SciMLBase.solve!(
         ForwardDiff.Dual,
     }
     # Check if this algorithm can work directly with Duals (e.g., GenericLUFactorization)
-    # In that case, we solve the dual problem directly without separating primal/partials
-    if _use_direct_dual_solve(getfield(cache, :linear_cache).alg)
+    # In that case, we solve the dual problem directly without separating primal/partials.
+    # Only worthwhile when A itself carries duals: with duals just in b, the split
+    # path (one primal factorization + partials back-solves) is strictly cheaper
+    # than factorizing in dual arithmetic.
+    if _use_direct_dual_solve(getfield(cache, :linear_cache).alg) &&
+            get_dual_type(getfield(cache, :dual_A)) !== nothing
         return _solve_direct_dual!(cache, alg, args...; kwargs...)
     end
 
@@ -439,6 +445,13 @@ function _solve_direct_dual!(
     # Get the dual A and b
     dual_A = getfield(cache, :dual_A)
     dual_b = getfield(cache, :dual_b)
+
+    # When the duals are only in A, b is stored as a plain array. Promote it to
+    # the dual type: `__init` takes the solution eltype from `b`, and the
+    # factorization/solve kernels need matching element types.
+    if eltype(dual_b) != DT
+        dual_b = DT.(dual_b)
+    end
 
     # Use __init to create a regular LinearCache (bypasses ForwardDiff extension)
     # then solve! on that cache directly with the dual values

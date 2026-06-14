@@ -6,6 +6,7 @@ using SparseArrays
 using ComponentArrays
 using Sparspak
 using SpecializingFactorizations
+using RecursiveFactorization
 
 function h(p)
     return (
@@ -18,10 +19,11 @@ function h(p)
     )
 end
 
-# Opt-out dense methods: SpecializedLU/QR solve the Dual problem directly
-# (no primal/partials splitting). The partials can differ from `\` by an ulp,
-# and isapprox over Dual vectors NaNs when the primal diff is exactly zero
-# (sqrt has infinite slope at 0), so compare values and partials separately.
+# Opt-out dense methods: SpecializedLU/QR, GenericLU and RFLU solve the Dual
+# problem directly (no primal/partials splitting). The partials can differ from
+# `\` by an ulp, and isapprox over Dual vectors NaNs when the primal diff is
+# exactly zero (sqrt has infinite slope at 0), so compare values and partials
+# separately.
 function dual_isapprox(x, y; rtol)
     isapprox(ForwardDiff.value.(x), ForwardDiff.value.(y); rtol) || return false
     return isapprox(
@@ -39,6 +41,12 @@ backslash_x_p = A \ b
 @test dual_isapprox(
     solve(prob, SpecializedQRFactorization()).u, backslash_x_p, rtol = 1.0e-9
 )
+@test dual_isapprox(
+    solve(prob, GenericLUFactorization()).u, backslash_x_p, rtol = 1.0e-9
+)
+@test dual_isapprox(
+    solve(prob, RFLUFactorization()).u, backslash_x_p, rtol = 1.0e-9
+)
 
 # Rectangular least-squares with Duals through the direct dual path
 p_ls = [ForwardDiff.Dual(2.0, 1.0, 0.0), ForwardDiff.Dual(3.0, 0.0, 1.0)]
@@ -46,6 +54,18 @@ A_ls = [p_ls[1] 1.0; 1.0 p_ls[2]; p_ls[1] p_ls[2]]
 b_ls = [p_ls[1] + 1, p_ls[2] * 2, p_ls[1] * p_ls[2]]
 qr_ls_x_p = solve(LinearProblem(A_ls, b_ls), SpecializedQRFactorization())
 @test dual_isapprox(qr_ls_x_p.u, qr(A_ls) \ b_ls, rtol = 1.0e-9)
+
+# Opt-out path with duals only in A (plain b) and only in b (plain A)
+
+plain_b = ForwardDiff.value.(b)
+prob = LinearProblem(A, plain_b)
+@test ≈(solve(prob, GenericLUFactorization()), A \ plain_b, rtol = 1.0e-9)
+@test ≈(solve(prob, RFLUFactorization()), A \ plain_b, rtol = 1.0e-9)
+
+plain_A = ForwardDiff.value.(A)
+prob = LinearProblem(plain_A, b)
+@test ≈(solve(prob, GenericLUFactorization()), plain_A \ b, rtol = 1.0e-9)
+@test ≈(solve(prob, RFLUFactorization()), plain_A \ b, rtol = 1.0e-9)
 
 # Overload Dense
 
@@ -226,6 +246,34 @@ x_p = solve!(cache)
 backslash_x_p = new_A \ new_b
 
 @test linu == cache.u
+
+# Test Pure Julia Sparse Linear Algebra
+
+A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+
+prob = LinearProblem(sparse(A), sparse(b))
+overload_x_p = solve(prob, PureKLUFactorization())
+backslash_x_p = A \ b
+
+@test ≈(overload_x_p, backslash_x_p, rtol = 1.0e-9)
+
+# Duals only in A, and only in b
+
+plain_b = ForwardDiff.value.(b)
+prob = LinearProblem(sparse(A), plain_b)
+@test ≈(solve(prob, PureKLUFactorization()), A \ plain_b, rtol = 1.0e-9)
+
+plain_A = ForwardDiff.value.(A)
+prob = LinearProblem(sparse(plain_A), b)
+@test ≈(solve(prob, PureKLUFactorization()), plain_A \ b, rtol = 1.0e-9)
+
+A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+
+prob = LinearProblem(sparse(A), sparse(b))
+overload_x_p = solve(prob, SparseColumnPivotedQRFactorization())
+backslash_x_p = A \ b
+
+@test ≈(overload_x_p, backslash_x_p, rtol = 1.0e-9)
 
 # Test Float Only solvers
 

@@ -27,8 +27,6 @@ mat = sparse(rows, cols, vals, n, n)
 rhs = big.(zeros(n))
 rhs[begin] = rhs[end] = -2
 prob = LinearProblem(mat, rhs)
-# Generic-eltype (BigFloat) sparse LU defaults to PureKLU (a hard dependency)
-# since #1037, so this solves without `using Sparspak` being loaded first.
 @test Base.get_extension(LinearSolve, :LinearSolveSparspakExt) === nothing
 @test LinearSolve.defaultalg(mat, rhs).alg ===
     LinearSolve.DefaultAlgorithmChoice.KLUFactorization

@@ -1,5 +1,7 @@
 using LinearSolve, LinearAlgebra, SparseArrays, InteractiveUtils, Test
 using SpecializingFactorizations
+# Load PureUMFPACK so its package extension is loaded for the tests
+using PureUMFPACK: PureUMFPACK
 using LinearSolve: AbstractDenseFactorization, AbstractSparseFactorization,
     BLISLUFactorization, CliqueTreesFactorization,
     AMDGPUOffloadLUFactorization, AMDGPUOffloadQRFactorization,

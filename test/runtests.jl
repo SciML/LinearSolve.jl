@@ -1,28 +1,12 @@
 using Pkg
 using SafeTestsets
+using SciMLTesting
 const LONGER_TESTS = false
 
-const GROUP = get(ENV, "GROUP", "All")
+const GROUP = current_group(default = "All")
 
 const HAS_EXTENSIONS = true
 
-# Activate a dep-adding root test group's sub-environment (test/<group>). Each
-# such group carries its extra dependencies in test/<group>/Project.toml and is
-# excluded from the `All` run (which executes only the base-environment groups).
-# Pkg.develop the root LinearSolve so the group runs against the PR branch code
-# (the [sources] entry covers this on Julia >= 1.11; Pkg.develop keeps it working
-# on the 1.10 floor where [sources] is ignored).
-function activate_group_env(group)
-    Pkg.activate(joinpath(@__DIR__, group))
-    Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
-    return Pkg.instantiate()
-end
-
-# Detect sublibrary test groups.
-# GROUP can be a bare sublibrary name (Core test group) or
-# "{sublibrary}_{TEST_GROUP}" for any custom group (e.g., QA, etc.).
-# Sublibraries declare their groups in test/test_groups.toml.
-#
 # Note on the dependency direction: LinearSolve is an "inverted-leaf" monorepo.
 # The root LinearSolve package does NOT depend on its lib/* sublibraries;
 # instead each sublibrary (LinearSolveAutotune, LinearSolvePyAMG) depends on the
@@ -30,18 +14,9 @@ end
 # has no [sources] section pointing at lib/* (the sublibs are not root deps).
 lib_dir = joinpath(dirname(@__DIR__), "lib")
 
-# Check if GROUP matches a sublibrary, possibly with a _SUFFIX for the test group.
-# Scan underscores right-to-left to find the longest matching sublibrary prefix.
-function _detect_sublibrary_group(group, lib_dir)
-    isdir(joinpath(lib_dir, group)) && return (group, "Core")
-    for i in length(group):-1:1
-        if group[i] == '_' && isdir(joinpath(lib_dir, group[1:(i - 1)]))
-            return (group[1:(i - 1)], group[(i + 1):end])
-        end
-    end
-    return (group, "Core")
-end
-const base_group, test_group = _detect_sublibrary_group(GROUP, lib_dir)
+# GROUP can be a bare sublibrary name (Core test group) or
+# "{sublibrary}_{TEST_GROUP}" for any custom group (e.g., QA, etc.).
+const base_group, test_group = detect_sublibrary_group(GROUP, lib_dir)
 
 if isdir(joinpath(lib_dir, base_group))
     Pkg.activate(joinpath(lib_dir, base_group))
@@ -83,132 +58,167 @@ if isdir(joinpath(lib_dir, base_group))
         Pkg.test(base_group, julia_args = ["--check-bounds=auto", "--compiled-modules=yes", "--depwarn=yes"], force_latest_compatible_version = false, allow_reresolve = true)
     end
 else
-    # Base-environment groups run in the package's main test env and are part of
-    # `All`. Each test file lives in test/<group>/.
-    if GROUP == "All" || GROUP == "Core"
-        @time @safetestset "Basic Tests" include("core/basictests.jl")
-        @time @safetestset "Return codes" include("core/retcodes.jl")
-        @time @safetestset "Re-solve" include("core/resolve.jl")
-        @time @safetestset "Zero Initialization Tests" include("core/zeroinittests.jl")
-        @time @safetestset "Non-Square Tests" include("core/nonsquare.jl")
-        @time @safetestset "SparseVector b Tests" include("core/sparse_vector.jl")
-        @time @safetestset "Nonstructural Zeros" include("core/nonstructural_zeros.jl")
-        @time @safetestset "Default Alg Tests" include("core/default_algs.jl")
-        @time @safetestset "FixedSizeArrays" include("core/fixedsizearrays.jl")
-        @time @safetestset "Adjoint Sensitivity" include("core/adjoint.jl")
-        @time @safetestset "ForwardDiff Overloads" include("core/forwarddiff_overloads.jl")
-        @time @safetestset "Traits" include("core/traits.jl")
-        @time @safetestset "Verbosity" include("core/verbosity.jl")
-        @time @safetestset "BandedMatrices" include("core/banded.jl")
-        @time @safetestset "Butterfly Factorization" include("core/butterfly.jl")
-        @time @safetestset "Mixed Precision" include("core/test_mixed_precision.jl")
-        @time @safetestset "Resize" include("core/resize.jl")
-        @time @safetestset "SpecializingFactorizations" include("core/specializing_factorizations.jl")
-    end
+    run_tests(;
+        default = "All",
+        core = function ()
+            @time @safetestset "Basic Tests" include("Core/basictests.jl")
+            @time @safetestset "Return codes" include("Core/retcodes.jl")
+            @time @safetestset "Re-solve" include("Core/resolve.jl")
+            @time @safetestset "Zero Initialization Tests" include("Core/zeroinittests.jl")
+            @time @safetestset "Non-Square Tests" include("Core/nonsquare.jl")
+            @time @safetestset "SparseVector b Tests" include("Core/sparse_vector.jl")
+            @time @safetestset "Nonstructural Zeros" include("Core/nonstructural_zeros.jl")
+            @time @safetestset "Default Alg Tests" include("Core/default_algs.jl")
+            @time @safetestset "FixedSizeArrays" include("Core/fixedsizearrays.jl")
+            @time @safetestset "Adjoint Sensitivity" include("Core/adjoint.jl")
+            @time @safetestset "ForwardDiff Overloads" include("Core/forwarddiff_overloads.jl")
+            @time @safetestset "Traits" include("Core/traits.jl")
+            @time @safetestset "Verbosity" include("Core/verbosity.jl")
+            @time @safetestset "BandedMatrices" include("Core/banded.jl")
+            @time @safetestset "Butterfly Factorization" include("Core/butterfly.jl")
+            @time @safetestset "Mixed Precision" include("Core/test_mixed_precision.jl")
+            @time @safetestset "Resize" include("Core/resize.jl")
+            return @time @safetestset "SpecializingFactorizations" include("Core/specializing_factorizations.jl")
+        end,
+        groups = Dict(
+            # STRUMPACK runs in the base env: STRUMPACK_jll is a base test dep (the
+            # Core suite also probes the STRUMPACK extension), so this group adds no
+            # deps.
+            "LinearSolveSTRUMPACK" => function ()
+                return @time @safetestset "LinearSolveSTRUMPACK" include("LinearSolveSTRUMPACK/strumpack.jl")
+            end,
+            "DefaultsLoading" => function ()
+                return @time @safetestset "Defaults Loading Tests" include("DefaultsLoading/defaults_loading.jl")
+            end,
+            "Preferences" => function ()
+                return @time @safetestset "Dual Preference System Integration" include("Preferences/preferences.jl")
+            end,
+            "LinearSolvePureUMFPACK" => function ()
+                return @time @safetestset "PureUMFPACK" include("LinearSolvePureUMFPACK/pureumfpack.jl")
+            end,
+            # The dep-adding groups below activate their sub-environment INSIDE the
+            # platform/version guard, so on a platform/version where the group does
+            # not run, the env is never activated or instantiated (matching the old
+            # `if Base.Sys.islinux() && GROUP == ...` dispatch, which gated the
+            # activation as well as the test body). GPU, Pardiso, and HSL have no such
+            # guard in the old dispatch, so they activate unconditionally via `env =`.
 
-    # STRUMPACK runs in the base env: STRUMPACK_jll is a base test dep (the Core
-    # suite also probes the STRUMPACK extension), so this group adds no deps.
-    if GROUP == "All" || GROUP == "LinearSolveSTRUMPACK"
-        @time @safetestset "LinearSolveSTRUMPACK" include("strumpack/strumpack.jl")
-    end
-
-    if GROUP == "DefaultsLoading"
-        @time @safetestset "Defaults Loading Tests" include("defaultsloading/defaults_loading.jl")
-    end
-
-    if GROUP == "Preferences"
-        @time @safetestset "Dual Preference System Integration" include("preferences/preferences.jl")
-    end
-
-    # Quality Assurance (Aqua, ExplicitImports) — dep-adding group whose tooling
-    # deps stay out of the main test target (test/qa).
-    if GROUP == "QA" && isempty(VERSION.prerelease)
-        activate_group_env("qa")
-        @time @safetestset "Quality Assurance" include("qa/qa.jl")
-    end
-
-    # Dep-adding groups below: each activates test/<group>/Project.toml and is
-    # excluded from the `All` run.
-
-    # Don't run Enzyme tests on prerelease or Julia >= 1.12 (Enzyme compatibility issues)
-    # See: https://github.com/SciML/LinearSolve.jl/issues/817
-    if GROUP == "NoPre" && isempty(VERSION.prerelease)
-        activate_group_env("nopre")
-        @time @safetestset "Mooncake Derivative Rules" include("nopre/mooncake.jl")
-        @time @safetestset "JET Tests" include("nopre/jet.jl")
-        @time @safetestset "Static Arrays" include("nopre/static_arrays.jl")
-        @time @safetestset "Caching Allocation Tests" include("nopre/caching_allocation_tests.jl")
-        # Disable Enzyme tests on Julia >= 1.12 due to compatibility issues
-        if VERSION < v"1.12.0-"
-            @time @safetestset "Enzyme Derivative Rules" include("nopre/enzyme.jl")
-        end
-    end
-
-    if GROUP == "LinearSolvePureUMFPACK"
-        @time @safetestset "PureUMFPACK" include("pureumfpack.jl")
-    end
-
-    # ParU_jll requires Julia >= 1.12 (SuiteSparse_jll in older stdlib is incompatible)
-    if GROUP == "LinearSolveParU" && VERSION >= v"1.12.0-"
-        activate_group_env("paru")
-        @time @safetestset "ParU" include("paru/paru.jl")
-    end
-
-    # GPU is a dep-adding group on a self-hosted CUDA runner (folds the former
-    # bespoke GPU.yml workflow). LinearSolveCUDA kept as an alias.
-    if GROUP == "GPU" || GROUP == "LinearSolveCUDA"
-        activate_group_env("gpu")
-        @time @safetestset "CUDA" include("gpu/cuda.jl")
-    end
-
-    if GROUP == "LinearSolvePardiso"
-        activate_group_env("pardiso")
-        @time @safetestset "Pardiso" include("pardiso/pardiso.jl")
-    end
-
-    if GROUP == "LinearSolveHSL"
-        activate_group_env("hsl")
-        @time @safetestset "HSL" include("hsl/hsl.jl")
-    end
-
-    if Base.Sys.islinux() && GROUP == "LinearSolveMUMPS"
-        activate_group_env("mumps")
-        @time @safetestset "MUMPS" include("mumps/mumps.jl")
-    end
-
-    if !Base.Sys.iswindows() && GROUP == "LinearSolveGinkgo"
-        activate_group_env("ginkgo")
-        @time @safetestset "Ginkgo" include("ginkgo/ginkgo.jl")
-    end
-
-    if !Base.Sys.iswindows() && GROUP == "LinearSolveElemental"
-        activate_group_env("elemental")
-        @time @safetestset "Elemental" include("elemental/elemental.jl")
-    end
-
-    if Base.Sys.islinux() && GROUP == "LinearSolveHYPRE" && HAS_EXTENSIONS
-        activate_group_env("hypre")
-        @time @safetestset "LinearSolveHYPRE" include("hypre/hypretests.jl")
-    end
-
-    if Base.Sys.islinux() && GROUP == "LinearSolvePartitionedSolvers" && HAS_EXTENSIONS
-        activate_group_env("partitionedsolvers")
-        @time @safetestset "LinearSolvePartitionedSolvers" include(
-            "partitionedsolvers/partitionedsolverstests.jl"
-        )
-        @time @safetestset "LinearSolvePartitionedSolversMPI" include(
-            "partitionedsolvers/partitionedsolverstests_mpi.jl"
-        )
-    end
-
-    if Base.Sys.islinux() && GROUP == "LinearSolvePETSc" && HAS_EXTENSIONS
-        activate_group_env("petsc")
-        @time @safetestset "LinearSolvePETSc" include("petsc/petsctests.jl")
-        @time @safetestset "LinearSolvePETScMPI" include("petsc/petsctests_mpi.jl")
-    end
-
-    if GROUP == "Trim" && VERSION >= v"1.12.0"
-        activate_group_env("trim")
-        @time @safetestset "Trim Tests" include("trim/runtests.jl")
-    end
+            # Don't run Enzyme tests on prerelease or Julia >= 1.12 (Enzyme
+            # compatibility issues). See:
+            # https://github.com/SciML/LinearSolve.jl/issues/817
+            "NoPre" => function ()
+                if isempty(VERSION.prerelease)
+                    activate_group_env(joinpath(@__DIR__, "NoPre"))
+                    @time @safetestset "Mooncake Derivative Rules" include("NoPre/mooncake.jl")
+                    @time @safetestset "JET Tests" include("NoPre/jet.jl")
+                    @time @safetestset "Static Arrays" include("NoPre/static_arrays.jl")
+                    @time @safetestset "Caching Allocation Tests" include("NoPre/caching_allocation_tests.jl")
+                    # Disable Enzyme tests on Julia >= 1.12 due to compatibility issues
+                    if VERSION < v"1.12.0-"
+                        @time @safetestset "Enzyme Derivative Rules" include("NoPre/enzyme.jl")
+                    end
+                end
+                return nothing
+            end,
+            # ParU_jll requires Julia >= 1.12 (SuiteSparse_jll in older stdlib is
+            # incompatible)
+            "LinearSolveParU" => function ()
+                if VERSION >= v"1.12.0-"
+                    activate_group_env(joinpath(@__DIR__, "LinearSolveParU"))
+                    @time @safetestset "ParU" include("LinearSolveParU/paru.jl")
+                end
+                return nothing
+            end,
+            # GPU is a dep-adding group on a self-hosted CUDA runner (folds the
+            # former bespoke GPU.yml workflow). LinearSolveCUDA kept as an alias.
+            "GPU" => (;
+                env = joinpath(@__DIR__, "GPU"), body = function ()
+                    return @time @safetestset "CUDA" include("GPU/cuda.jl")
+                end
+            ),
+            "LinearSolvePardiso" => (;
+                env = joinpath(@__DIR__, "LinearSolvePardiso"), body = function ()
+                    return @time @safetestset "Pardiso" include("LinearSolvePardiso/pardiso.jl")
+                end
+            ),
+            "LinearSolveHSL" => (;
+                env = joinpath(@__DIR__, "LinearSolveHSL"), body = function ()
+                    return @time @safetestset "HSL" include("LinearSolveHSL/hsl.jl")
+                end
+            ),
+            "LinearSolveMUMPS" => function ()
+                if Base.Sys.islinux()
+                    activate_group_env(joinpath(@__DIR__, "LinearSolveMUMPS"))
+                    @time @safetestset "MUMPS" include("LinearSolveMUMPS/mumps.jl")
+                end
+                return nothing
+            end,
+            "LinearSolveGinkgo" => function ()
+                if !Base.Sys.iswindows()
+                    activate_group_env(joinpath(@__DIR__, "LinearSolveGinkgo"))
+                    @time @safetestset "Ginkgo" include("LinearSolveGinkgo/ginkgo.jl")
+                end
+                return nothing
+            end,
+            "LinearSolveElemental" => function ()
+                if !Base.Sys.iswindows()
+                    activate_group_env(joinpath(@__DIR__, "LinearSolveElemental"))
+                    @time @safetestset "Elemental" include("LinearSolveElemental/elemental.jl")
+                end
+                return nothing
+            end,
+            "LinearSolveHYPRE" => function ()
+                if Base.Sys.islinux() && HAS_EXTENSIONS
+                    activate_group_env(joinpath(@__DIR__, "LinearSolveHYPRE"))
+                    @time @safetestset "LinearSolveHYPRE" include("LinearSolveHYPRE/hypretests.jl")
+                end
+                return nothing
+            end,
+            "LinearSolvePartitionedSolvers" => function ()
+                if Base.Sys.islinux() && HAS_EXTENSIONS
+                    activate_group_env(joinpath(@__DIR__, "LinearSolvePartitionedSolvers"))
+                    @time @safetestset "LinearSolvePartitionedSolvers" include(
+                        "LinearSolvePartitionedSolvers/partitionedsolverstests.jl"
+                    )
+                    @time @safetestset "LinearSolvePartitionedSolversMPI" include(
+                        "LinearSolvePartitionedSolvers/partitionedsolverstests_mpi.jl"
+                    )
+                end
+                return nothing
+            end,
+            "LinearSolvePETSc" => function ()
+                if Base.Sys.islinux() && HAS_EXTENSIONS
+                    activate_group_env(joinpath(@__DIR__, "LinearSolvePETSc"))
+                    @time @safetestset "LinearSolvePETSc" include("LinearSolvePETSc/petsctests.jl")
+                    @time @safetestset "LinearSolvePETScMPI" include("LinearSolvePETSc/petsctests_mpi.jl")
+                end
+                return nothing
+            end,
+            "Trim" => function ()
+                if VERSION >= v"1.12.0"
+                    activate_group_env(joinpath(@__DIR__, "Trim"))
+                    @time @safetestset "Trim Tests" include("Trim/runtests.jl")
+                end
+                return nothing
+            end,
+        ),
+        # Quality Assurance (Aqua, ExplicitImports) — dep-adding group whose tooling
+        # deps stay out of the main test target (test/qa). The prerelease guard gates
+        # the activation too, so on a prerelease the qa env is never instantiated.
+        qa = function ()
+            if isempty(VERSION.prerelease)
+                activate_group_env(joinpath(@__DIR__, "qa"))
+                @time @safetestset "Quality Assurance" include("qa/qa.jl")
+            end
+            return nothing
+        end,
+        # LinearSolveCUDA is an alias for the GPU group.
+        umbrellas = Dict("LinearSolveCUDA" => ["GPU"]),
+        # Curated All: the base-environment groups only (matching test_groups.toml's
+        # "All runs every base-env group"). Dep-adding groups are excluded from All
+        # and selectable by name.
+        all = ["Core", "LinearSolveSTRUMPACK"],
+        sublib_env = "LINEARSOLVE_TEST_GROUP",
+        lib_dir = lib_dir,
+    )
 end

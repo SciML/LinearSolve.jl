@@ -1,7 +1,11 @@
 [deps]
-Ginkgo = "4c8bd3c9-ead9-4b5e-a625-08f1338ba0ec"
+HYPRE = "b5ffcf37-a2bd-41ab-a3da-4bd9bc8ad771"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
+MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
+SciMLTesting = "09d9d899-5365-40a9-917a-5f67fddea283"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
@@ -9,9 +13,13 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 LinearSolve = {path = "../.."}
 
 [compat]
-Ginkgo = "1"
+HYPRE = "1.7"
 LinearAlgebra = "1.10"
 LinearSolve = "3"
+MPI = "0.20"
+Random = "1.10"
+SafeTestsets = "0.1, 1"
+SciMLTesting = "1"
 SparseArrays = "1.10"
 Test = "1.10"
 julia = "1.10"

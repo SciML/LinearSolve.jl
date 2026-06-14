@@ -4,6 +4,8 @@ CUDACore = "bd0ed864-bdfe-4181-a5ed-ce625a5fdea2"
 CUDSS = "45b445bb-4962-46a0-9369-b4df9d0f772e"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
+SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
+SciMLTesting = "09d9d899-5365-40a9-917a-5f67fddea283"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StableRNGs = "860ef19b-820b-49d6-a774-d7a799459cd3"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
@@ -11,13 +13,15 @@ cuSOLVER = "887afef0-6a32-4de5-add4-7827692ba8fc"
 cuSPARSE = "b26da814-b3bc-49ef-b0ee-c816305aa060"
 
 [sources]
-LinearSolve = {path = "../.."}
+LinearSolve = {path = "/home/crackauc/sandbox/tmp_20260531_035946_10202/dg/fr_LinearSolve.jl"}
 
 [compat]
 BlockDiagonals = "0.2"
 CUDSS = "0.7"
 LinearAlgebra = "1.10"
 LinearSolve = "3"
+SafeTestsets = "0.1, 1"
+SciMLTesting = "1"
 SparseArrays = "1.10"
 StableRNGs = "1.0"
 Test = "1.10"

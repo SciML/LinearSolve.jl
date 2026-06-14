@@ -167,6 +167,7 @@ SafeTestsets = "0.1"
 SciMLBase = "2.148, 3"
 SciMLLogging = "1.10.1, 2.0"
 SciMLOperators = "1.15"
+SciMLTesting = "1"
 Setfield = "1.1.1"
 SparseArrays = "1.10"
 SparseColumnPivotedQR = "2"
@@ -202,6 +203,7 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 RecursiveFactorization = "f2c3362d-daeb-58d1-803e-2bc74f2840b4"
 STRUMPACK_jll = "86fbd0b9-476f-557c-b766-62c724b42d8c"
 SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
+SciMLTesting = "09d9d899-5365-40a9-917a-5f67fddea283"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Sparspak = "e56a9233-b9d6-4f03-8d0f-1825330902ac"
 SpecializingFactorizations = "fa08b7a1-13d3-4faf-875d-5cbc1520e3f3"
@@ -210,4 +212,4 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [targets]
-test = ["AlgebraicMultigrid", "BandedMatrices", "BlockDiagonals", "CliqueTrees", "ComponentArrays", "FastAlmostBandedMatrices", "FastLapackInterface", "FiniteDiff", "FixedSizeArrays", "ForwardDiff", "InteractiveUtils", "IterativeSolvers", "KrylovKit", "KrylovPreconditioners", "MultiFloats", "Pkg", "PureUMFPACK", "Random", "RecursiveFactorization", "STRUMPACK_jll", "SafeTestsets", "SparseArrays", "Sparspak", "SpecializingFactorizations", "StaticArrays", "Test", "Zygote"]
+test = ["AlgebraicMultigrid", "BandedMatrices", "BlockDiagonals", "CliqueTrees", "ComponentArrays", "FastAlmostBandedMatrices", "FastLapackInterface", "FiniteDiff", "FixedSizeArrays", "ForwardDiff", "InteractiveUtils", "IterativeSolvers", "KrylovKit", "KrylovPreconditioners", "MultiFloats", "Pkg", "PureUMFPACK", "Random", "RecursiveFactorization", "STRUMPACK_jll", "SafeTestsets", "SciMLTesting", "SparseArrays", "Sparspak", "SpecializingFactorizations", "StaticArrays", "Test", "Zygote"]

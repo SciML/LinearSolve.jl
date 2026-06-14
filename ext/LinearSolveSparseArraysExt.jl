@@ -881,18 +881,20 @@ end
         end
     end
 
-    # ldiv!() for SPQR should be in Julia 1.13: https://github.com/JuliaSparse/SparseArrays.jl/pull/676
-    function LinearSolve._ldiv!(
-            x::Vector,
-            A::SparseArrays.SPQR.QRSparse, b::Vector
-        )
-        x .= A \ b
-    end
-    function LinearSolve._ldiv!(
-            x::AbstractVector,
-            A::SparseArrays.SPQR.QRSparse, b::AbstractVector
-        )
-        x .= A \ b
+    # ldiv!() for SPQR was added in 1.13: https://github.com/JuliaSparse/SparseArrays.jl/pull/676
+    @static if VERSION < v"1.13"
+        function LinearSolve._ldiv!(
+                x::Vector,
+                A::SparseArrays.SPQR.QRSparse, b::Vector
+            )
+            x .= A \ b
+        end
+        function LinearSolve._ldiv!(
+                x::AbstractVector,
+                A::SparseArrays.SPQR.QRSparse, b::AbstractVector
+            )
+            x .= A \ b
+        end
     end
 
     function LinearSolve._ldiv!(

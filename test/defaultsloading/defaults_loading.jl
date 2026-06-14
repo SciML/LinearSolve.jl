@@ -27,7 +27,13 @@ mat = sparse(rows, cols, vals, n, n)
 rhs = big.(zeros(n))
 rhs[begin] = rhs[end] = -2
 prob = LinearProblem(mat, rhs)
-@test_throws ["SparspakFactorization required", "using Sparspak"] sol = solve(prob).u
+# Generic-eltype (BigFloat) sparse LU defaults to PureKLU (a hard dependency)
+# since #1037, so this solves without `using Sparspak` being loaded first.
+@test Base.get_extension(LinearSolve, :LinearSolveSparspakExt) === nothing
+@test LinearSolve.defaultalg(mat, rhs).alg ===
+    LinearSolve.DefaultAlgorithmChoice.KLUFactorization
+sol = solve(prob).u
+@test sol isa Vector{BigFloat}
 
 STRUMPACKExt = Base.get_extension(LinearSolve, :LinearSolveSTRUMPACKExt)
 if STRUMPACKExt === nothing || !STRUMPACKExt.strumpack_isavailable()

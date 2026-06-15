@@ -43,7 +43,7 @@ versions = ["lts", "1"]
 runner = "self-hosted"
 num_threads = 2
 
-[NoPre]
+[AD]
 versions = ["lts", "1"]
 runner = "self-hosted"
 num_threads = 2

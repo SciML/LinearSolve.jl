@@ -63,6 +63,11 @@ versions = ["lts", "1"]
 runner = "self-hosted"
 num_threads = 2
 
+[LinearSolveSuperLUDIST]
+versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
+
 [LinearSolveMUMPS]
 versions = ["lts", "1"]
 runner = "self-hosted"

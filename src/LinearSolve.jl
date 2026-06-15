@@ -526,7 +526,7 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
     SparspakFactorization, DiagonalFactorization, CholeskyFactorization,
     BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization,
     CUSOLVERRFFactorization, CliqueTreesFactorization, ParUFactorization,
-    STRUMPACKFactorization, MUMPSFactorization,
+    STRUMPACKFactorization, MUMPSFactorization, SuperLUDISTFactorization,
     SpecializedLUFactorization, SpecializedQRFactorization,
     HSLMA57Factorization, HSLMA97Factorization
 
@@ -556,6 +556,7 @@ export MKLPardisoFactorize, MKLPardisoIterate
 export PanuaPardisoFactorize, PanuaPardisoIterate
 export PardisoJL
 export MUMPSFactorization
+export SuperLUDISTFactorization
 export MKLLUFactorization
 export OpenBLASLUFactorization
 export OpenBLAS32MixedLUFactorization

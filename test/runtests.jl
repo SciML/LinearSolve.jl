@@ -194,6 +194,13 @@ else
                 end
                 return nothing
             end,
+            "LinearSolveSuperLUDIST" => function ()
+                if Base.Sys.islinux() && HAS_EXTENSIONS
+                    activate_group_env(joinpath(@__DIR__, "LinearSolveSuperLUDIST"))
+                    @time @safetestset "LinearSolveSuperLUDIST" include("LinearSolveSuperLUDIST/superludist.jl")
+                end
+                return nothing
+            end,
             "Trim" => function ()
                 if VERSION >= v"1.12.0"
                     activate_group_env(joinpath(@__DIR__, "Trim"))

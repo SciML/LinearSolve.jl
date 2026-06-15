@@ -106,16 +106,15 @@ else
             # Don't run Enzyme tests on prerelease or Julia >= 1.12 (Enzyme
             # compatibility issues). See:
             # https://github.com/SciML/LinearSolve.jl/issues/817
-            "NoPre" => function ()
+            "AD" => function ()
                 if isempty(VERSION.prerelease)
-                    activate_group_env(joinpath(@__DIR__, "NoPre"))
-                    @time @safetestset "Mooncake Derivative Rules" include("NoPre/mooncake.jl")
-                    @time @safetestset "JET Tests" include("NoPre/jet.jl")
-                    @time @safetestset "Static Arrays" include("NoPre/static_arrays.jl")
-                    @time @safetestset "Caching Allocation Tests" include("NoPre/caching_allocation_tests.jl")
+                    activate_group_env(joinpath(@__DIR__, "AD"))
+                    @time @safetestset "Mooncake Derivative Rules" include("AD/mooncake.jl")
+                    @time @safetestset "Static Arrays" include("AD/static_arrays.jl")
+                    @time @safetestset "Caching Allocation Tests" include("AD/caching_allocation_tests.jl")
                     # Disable Enzyme tests on Julia >= 1.12 due to compatibility issues
                     if VERSION < v"1.12.0-"
-                        @time @safetestset "Enzyme Derivative Rules" include("NoPre/enzyme.jl")
+                        @time @safetestset "Enzyme Derivative Rules" include("AD/enzyme.jl")
                     end
                 end
                 return nothing
@@ -209,6 +208,7 @@ else
             if isempty(VERSION.prerelease)
                 activate_group_env(joinpath(@__DIR__, "qa"))
                 @time @safetestset "Quality Assurance" include("qa/qa.jl")
+                @time @safetestset "JET Tests" include("qa/jet.jl")
             end
             return nothing
         end,

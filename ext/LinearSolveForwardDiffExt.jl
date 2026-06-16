@@ -4,6 +4,7 @@ using LinearSolve
 using LinearSolve: SciMLLinearSolveAlgorithm, __init, LinearVerbosity, DefaultLinearSolver,
     DefaultAlgorithmChoice, defaultalg, reinit!
 using LinearAlgebra
+using SparseArrays
 using ForwardDiff
 using ForwardDiff: Dual, Partials
 using SciMLBase
@@ -668,6 +669,28 @@ function partials_to_list(partial_matrix::AbstractMatrix{T}) where {T}
         res_list[k] = res
     end
     return res_list
+end
+
+# Specializations for sparse matrices
+
+function partials_to_list(partial_matrix::SparseMatrixCSC)
+    nz = nonzeros(partial_matrix)
+    p = length(first(nz))
+    V = typeof(first(nz)[1])
+    m, n = size(partial_matrix)
+    return [SparseMatrixCSC(m, n, copy(partial_matrix.colptr), copy(partial_matrix.rowval),
+                V[nz[i][k] for i in eachindex(nz)]) for k in 1:p]
+end
+
+function update_partials_list!(partial_matrix::SparseMatrixCSC, list_cache)
+    nz = nonzeros(partial_matrix)
+    for k in eachindex(list_cache)
+        nz_k = nonzeros(list_cache[k])
+        @inbounds for i in eachindex(nz, nz_k)
+            nz_k[i] = nz[i][k]
+        end
+    end
+    return list_cache
 end
 
 end

@@ -684,10 +684,14 @@ end
 
 function update_partials_list!(partial_matrix::SparseMatrixCSC, list_cache)
     nz = nonzeros(partial_matrix)
-    for k in eachindex(list_cache)
-        nz_k = nonzeros(list_cache[k])
-        @inbounds for i in eachindex(nz, nz_k)
-            nz_k[i] = nz[i][k]
+    if length(nz) != length(nonzeros(first(list_cache))) # TODO: more precise?
+        list_cache .= partials_to_list(partial_matrix) # sparsity pattern changed
+    else
+        for k in eachindex(list_cache)
+            nz_k = nonzeros(list_cache[k])
+            @inbounds for i in eachindex(nz, nz_k)
+                nz_k[i] = nz[i][k]
+            end
         end
     end
     return list_cache

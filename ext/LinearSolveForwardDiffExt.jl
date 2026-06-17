@@ -636,10 +636,9 @@ function update_partials_list!(partial_matrix::AbstractVector{T}, list_cache) wh
     return list_cache
 end
 
-function update_partials_list!(partial_matrix, list_cache)
+function update_partials_list!(partial_matrix::AbstractMatrix{T}, list_cache) where {T}
     p = length(first(partial_matrix))
     m, n = size(partial_matrix)
-
     for k in 1:p
         for i in 1:m
             for j in 1:n
@@ -655,7 +654,7 @@ function partials_to_list(partial_matrix::AbstractVector{T}) where {T}
     return [[partial[i] for partial in partial_matrix] for i in p]
 end
 
-function partials_to_list(partial_matrix)
+function partials_to_list(partial_matrix::AbstractMatrix{T}) where {T}
     p = length(first(partial_matrix))
     m, n = size(partial_matrix)
     res_list = fill(zeros(typeof(partial_matrix[1, 1][1]), m, n), p)

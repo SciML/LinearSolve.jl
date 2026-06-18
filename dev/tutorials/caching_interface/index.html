@@ -14,22 +14,22 @@ prob = LS.LinearProblem(A, b1)
 linsolve = LS.init(prob)
 sol1 = LS.solve!(linsolve)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">retcode: Success
 u: 4-element Vector{Float64}:
-  1.586783098635673
- -4.887471637819361
- -2.6872035520743753
-  3.0536748055974123</code></pre><pre><code class="language-julia hljs">linsolve.b = b2
+  0.41120005002889926
+ -0.9293677774238921
+  0.6661137403449614
+  0.7676586584095137</code></pre><pre><code class="language-julia hljs">linsolve.b = b2
 sol2 = LS.solve!(linsolve)
 
 sol2.u</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">4-element Vector{Float64}:
- -0.6765804225159744
-  5.048050846721541
-  1.795255418488316
- -1.2421660624911364</code></pre><p>Then refactorization will occur when a new <code>A</code> is given:</p><pre><code class="language-julia hljs">A2 = rand(n, n)
+  1.0655118348078116
+ -0.09637370709607805
+ -0.5379335291194652
+  0.6970531463494799</code></pre><p>Then refactorization will occur when a new <code>A</code> is given:</p><pre><code class="language-julia hljs">A2 = rand(n, n)
 linsolve.A = A2
 sol3 = LS.solve!(linsolve)
 
 sol3.u</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">4-element Vector{Float64}:
-  0.296465237084806
-  0.8628952182447663
-  0.12738519036722226
- -0.21569550782218794</code></pre><p>The factorization occurs on the first solve, and it stores the factorization in the cache. You can retrieve this cache via <code>sol.cache</code>, which is the same object as the <code>init</code>, but updated to know not to re-solve the factorization.</p><p>The advantage of course with import LinearSolve.jl in this form is that it is efficient while being agnostic to the linear solver. One can easily swap in iterative solvers, sparse solvers, etc. and it will do all the tricks like caching the symbolic factorization if the sparsity pattern is unchanged.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../linear/">« Getting Started with Solving Linear Systems in Julia</a><a class="docs-footer-nextpage" href="../hypre_mpi/">Solving Linear Systems with HYPRE and MPI »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Thursday 18 June 2026 16:41">Thursday 18 June 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+  1.039576068162123
+ -0.8067193167930233
+ -0.30908702903871416
+  0.6269267733852036</code></pre><p>The factorization occurs on the first solve, and it stores the factorization in the cache. You can retrieve this cache via <code>sol.cache</code>, which is the same object as the <code>init</code>, but updated to know not to re-solve the factorization.</p><p>The advantage of course with import LinearSolve.jl in this form is that it is efficient while being agnostic to the linear solver. One can easily swap in iterative solvers, sparse solvers, etc. and it will do all the tricks like caching the symbolic factorization if the sparsity pattern is unchanged.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../linear/">« Getting Started with Solving Linear Systems in Julia</a><a class="docs-footer-nextpage" href="../hypre_mpi/">Solving Linear Systems with HYPRE and MPI »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Thursday 18 June 2026 19:19">Thursday 18 June 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

@@ -4,6 +4,7 @@ using LinearSolve
 using LinearSolve: SciMLLinearSolveAlgorithm, __init, LinearVerbosity, DefaultLinearSolver,
     DefaultAlgorithmChoice, defaultalg, reinit!
 using LinearAlgebra
+using SparseArrays
 using ForwardDiff
 using ForwardDiff: Dual, Partials
 using SciMLBase
@@ -636,10 +637,9 @@ function update_partials_list!(partial_matrix::AbstractVector{T}, list_cache) wh
     return list_cache
 end
 
-function update_partials_list!(partial_matrix, list_cache)
+function update_partials_list!(partial_matrix::AbstractMatrix{T}, list_cache) where {T}
     p = length(first(partial_matrix))
     m, n = size(partial_matrix)
-
     for k in 1:p
         for i in 1:m
             for j in 1:n
@@ -655,7 +655,7 @@ function partials_to_list(partial_matrix::AbstractVector{T}) where {T}
     return [[partial[i] for partial in partial_matrix] for i in p]
 end
 
-function partials_to_list(partial_matrix)
+function partials_to_list(partial_matrix::AbstractMatrix{T}) where {T}
     p = length(first(partial_matrix))
     m, n = size(partial_matrix)
     res_list = fill(zeros(typeof(partial_matrix[1, 1][1]), m, n), p)
@@ -669,6 +669,33 @@ function partials_to_list(partial_matrix)
         res_list[k] = res
     end
     return res_list
+end
+
+# Specializations for sparse matrices
+
+function partials_to_list(partial_matrix::SparseMatrixCSC)
+    nz = nonzeros(partial_matrix)
+    m, n = size(partial_matrix)
+    T = eltype(partial_matrix)
+    p = ForwardDiff.npartials(T)
+    V = ForwardDiff.valtype(T) # use type for concrete array below in empty-nz case (e.g. all-zero Jacobian at init)
+    return [SparseMatrixCSC(m, n, copy(partial_matrix.colptr), copy(partial_matrix.rowval),
+                V[nz[i][k] for i in eachindex(nz)]) for k in 1:p]
+end
+
+function update_partials_list!(partial_matrix::SparseMatrixCSC, list_cache)
+    nz = nonzeros(partial_matrix)
+    if length(nz) != length(nonzeros(first(list_cache))) # TODO: more precise?
+        list_cache .= partials_to_list(partial_matrix) # sparsity pattern changed
+    else
+        for k in eachindex(list_cache)
+            nz_k = nonzeros(list_cache[k])
+            @inbounds for i in eachindex(nz, nz_k)
+                nz_k[i] = nz[i][k]
+            end
+        end
+    end
+    return list_cache
 end
 
 end

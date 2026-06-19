@@ -1462,6 +1462,87 @@ struct MUMPSFactorization <: AbstractSparseFactorization
 end
 
 """
+`SuperLUDISTFactorization(; comm = nothing, nprow = 0, npcol = 0, options = nothing, threads = nothing)`
+
+A sparse direct solver wrapper around
+[SuperLUDIST.jl](https://github.com/JuliaSparse/SuperLUDIST.jl), backed by the
+`SuperLU_DIST_jll` artifact through that package.
+
+This wrapper targets ordinary replicated Julia sparse matrices
+(`SparseMatrixCSC`). Each participating rank builds the same Julia matrix and
+right-hand side locally, and `SuperLUDIST` performs the distributed solve on
+the requested communicator. The resulting factorization is cached inside the
+`LinearSolve` cache and reused across repeated solves with new right-hand
+sides.
+
+## Keyword Arguments
+
+  - `comm`: optional MPI communicator. `nothing` maps to `MPI.COMM_SELF`.
+  - `nprow`, `npcol`: process-grid dimensions for SuperLU_DIST. If both are
+    left as `0`, a near-square grid is chosen automatically from the
+    communicator size.
+  - `options`: either `nothing`, a `NamedTuple` of `SuperLUDIST.Options` field
+    updates, or a prebuilt `SuperLUDIST.Options` object.
+  - `threads`: optional OpenMP thread count passed through
+    `SuperLUDIST.superlu_set_num_threads`.
+
+!!! note
+
+    Using this solver requires loading `SuperLUDIST.jl` and `SparseArrays`, and
+    initializing MPI for multi-rank usage:
+    ```julia
+    using MPI, SuperLUDIST, SparseArrays
+    MPI.Init()
+    ```
+
+## Supported Element Types
+
+`Float32` and `Float64`.
+
+`ComplexF64` is intentionally rejected for now because the current upstream
+`SuperLUDIST.jl` replicated complex solve path crashes during finalization.
+
+## Example
+
+```julia
+using LinearSolve, SparseArrays, MPI, SuperLUDIST
+
+MPI.Init()
+A = sparse([4.0 1.0; 2.0 3.0])
+b = [1.0, 2.0]
+
+sol = solve(
+    LinearProblem(A, b),
+    SuperLUDISTFactorization(; comm = MPI.COMM_SELF)
+)
+```
+"""
+struct SuperLUDISTFactorization <: AbstractSparseFactorization
+    comm::Any
+    nprow::Int
+    npcol::Int
+    options::Any
+    threads::Union{Nothing, Int}
+
+    function SuperLUDISTFactorization(;
+            comm = nothing,
+            nprow::Integer = 0,
+            npcol::Integer = 0,
+            options = nothing,
+            threads::Union{Nothing, Integer} = nothing,
+        )
+        ext = Base.get_extension(@__MODULE__, :LinearSolveSuperLUDISTExt)
+        if ext === nothing
+            error("SuperLUDISTFactorization requires that SuperLUDIST and SparseArrays are loaded, i.e. `using MPI, SuperLUDIST, SparseArrays`")
+        end
+        nprow >= 0 || error("nprow must be nonnegative")
+        npcol >= 0 || error("npcol must be nonnegative")
+        threads === nothing || threads > 0 || error("threads must be positive")
+        return new(comm, Int(nprow), Int(npcol), options, threads === nothing ? nothing : Int(threads))
+    end
+end
+
+"""
 `HSLMA57Factorization(; kwargs...)`
 
 A sparse symmetric direct solver powered by

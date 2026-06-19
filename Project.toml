@@ -66,6 +66,7 @@ STRUMPACK_jll = "86fbd0b9-476f-557c-b766-62c724b42d8c"
 SparseMatricesCSR = "a0a7dd2c-ebf4-11e9-1f05-cf50bc540ca1"
 Sparspak = "e56a9233-b9d6-4f03-8d0f-1825330902ac"
 SpecializingFactorizations = "fa08b7a1-13d3-4faf-875d-5cbc1520e3f3"
+SuperLUDIST = "4cd002a6-0da4-410d-a012-232df062f478"
 blis_jll = "6136c539-28a5-5bf0-87cc-b183200dce32"
 
 [extensions]
@@ -100,6 +101,7 @@ LinearSolveParUExt = ["ParU_jll", "SparseArrays"]
 LinearSolvePureUMFPACKExt = ["PureUMFPACK", "SparseArrays"]
 LinearSolvePardisoExt = ["Pardiso", "SparseArrays"]
 LinearSolveRecursiveFactorizationExt = "RecursiveFactorization"
+LinearSolveSuperLUDISTExt = ["SparseArrays", "SuperLUDIST"]
 LinearSolveSTRUMPACKExt = ["SparseArrays", "STRUMPACK_jll"]
 LinearSolveSparseArraysExt = "SparseArrays"
 LinearSolveSparspakExt = ["SparseArrays", "Sparspak"]
@@ -176,6 +178,7 @@ Sparspak = "0.3.9"
 SpecializingFactorizations = "0.1"
 StaticArrays = "1.9"
 StaticArraysCore = "1.4.3"
+SuperLUDIST = "1"
 Test = "1.10"
 Zygote = "0.7"
 blis_jll = "0.9.0"

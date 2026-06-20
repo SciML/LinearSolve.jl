@@ -396,8 +396,8 @@ function _use_direct_dual_solve(alg)
     return alg isa GenericLUFactorization ||
         alg isa LinearSolve.SpecializedLUFactorization ||
         alg isa LinearSolve.SpecializedQRFactorization ||
-        alg isa LinearSolve.PureKLUFactorization ||
-        alg isa LinearSolve.RFLUFactorization
+        alg isa LinearSolve.PureKLUFactorization
+        #alg isa LinearSolve.RFLUFactorization # TODO: uncomment when fixed: https://github.com/SciML/LinearSolve.jl/issues/1052
 end
 
 function _use_direct_dual_solve(alg::DefaultLinearSolver)

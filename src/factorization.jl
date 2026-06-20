@@ -342,7 +342,8 @@ function init_cacheval(
         assumptions::OperatorAssumptions
     )
     ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
-    # `solve!` stores `(generic_lufact!(A, ...), ipiv)` where the pivot is this
+    # `solve!` stores `(generic_lufact!(A, ...), ipiv)`, a `LinearAlgebra.LU` whose
+    # `factors` is `convert(AbstractMatrix, A)` and whose pivot is this
     # `Vector{BlasInt}`. `lu_instance` would type the pivot after `A`'s container
     # (e.g. a `FixedSizeVector` for a `FixedSizeArray`), so rebuild the instance
     # with the `Vector` pivot to keep the cacheval slot type matching.

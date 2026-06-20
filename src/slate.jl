@@ -98,8 +98,8 @@ function _slate_lib(alg::SLATEFactorization)
     lib !== nothing && return lib
     error(
         "SLATEFactorization requires SLATE's LAPACK API library. " *
-        "Build SLATE with `slate_lapack_api`, then pass `SLATEFactorization(libpath = \"/path/to/libslate_lapack_api.so\")` " *
-        "or set ENV[\"SLATE_LAPACK_LIB\"]."
+            "Build SLATE with `slate_lapack_api`, then pass `SLATEFactorization(libpath = \"/path/to/libslate_lapack_api.so\")` " *
+            "or set ENV[\"SLATE_LAPACK_LIB\"]."
     )
 end
 
@@ -137,8 +137,10 @@ function init_cacheval(
     )
     T = _slate_eltype(A, b)
     nrhs = b isa AbstractVector ? 1 : size(b, 2)
-    return SLATECache(Matrix{T}(undef, size(A, 1), size(A, 2)),
-        Matrix{T}(undef, size(A, 1), nrhs), Vector{Cint}(undef, min(size(A)...)))
+    return SLATECache(
+        Matrix{T}(undef, size(A, 1), size(A, 2)),
+        Matrix{T}(undef, size(A, 1), nrhs), Vector{Cint}(undef, min(size(A)...))
+    )
 end
 
 function _resize_slate_cache!(scache::SLATECache{T}, A, b) where {T}

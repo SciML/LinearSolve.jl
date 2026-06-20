@@ -56,8 +56,9 @@ LinearSolve.@concrete mutable struct DualLinearCache{DT}
     primal_u_cache
     primal_b_cache
 
-    # Cache validity flag for RHS precalculation optimization
-    rhs_cache_valid
+    # Cache validity flags for when partials of A or b changes
+    A_partials_valid
+    b_partials_valid
 
     dual_A
     dual_b
@@ -94,15 +95,13 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
 
         rhs_list = cache.rhs_list
 
-        # Update cached partials lists if cache is invalid
-        if !cache.rhs_cache_valid
-            if !isnothing(∂_A)
-                update_partials_list!(∂_A, cache.partials_A_list)
-            end
-            if !isnothing(∂_b)
-                update_partials_list!(∂_b, cache.partials_b_list)
-            end
-            cache.rhs_cache_valid = true
+        if !cache.A_partials_valid && !isnothing(∂_A)
+            update_partials_list!(∂_A, cache.partials_A_list)
+            cache.A_partials_valid = true
+        end
+        if !cache.b_partials_valid && !isnothing(∂_b)
+            update_partials_list!(∂_b, cache.partials_b_list)
+            cache.b_partials_valid = true
         end
 
         A_list = cache.partials_A_list
@@ -177,11 +176,13 @@ function xp_linsolve_rhs!(
         ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}}, cache::DualLinearCache
     )
 
-    # Update cached partials lists if cache is invalid
-    if !cache.rhs_cache_valid
+    if !cache.A_partials_valid
         update_partials_list!(∂_A, cache.partials_A_list)
+        cache.A_partials_valid = true
+    end
+    if !cache.b_partials_valid
         update_partials_list!(∂_b, cache.partials_b_list)
-        cache.rhs_cache_valid = true
+        cache.b_partials_valid = true
     end
 
     A_list = cache.partials_A_list
@@ -201,10 +202,9 @@ function xp_linsolve_rhs!(
         ∂_b::Nothing, cache::DualLinearCache
     )
 
-    # Update cached partials list for A if cache is invalid
-    if !cache.rhs_cache_valid
+    if !cache.A_partials_valid
         update_partials_list!(∂_A, cache.partials_A_list)
-        cache.rhs_cache_valid = true
+        cache.A_partials_valid = true
     end
 
     A_list = cache.partials_A_list
@@ -222,10 +222,9 @@ function xp_linsolve_rhs!(
         cache::DualLinearCache
     )
 
-    # Update cached partials list for b if cache is invalid
-    if !cache.rhs_cache_valid
+    if !cache.b_partials_valid
         update_partials_list!(∂_b, cache.partials_b_list)
-        cache.rhs_cache_valid = true
+        cache.b_partials_valid = true
     end
 
     b_list = cache.partials_b_list
@@ -380,6 +379,7 @@ function __dual_init(
         similar(non_partial_cache.u),  # primal_u_cache
         similar(new_b),                # primal_b_cache
         true,  # Cache is initially valid
+        true,
         A,
         b,
         dual_u_init
@@ -491,8 +491,7 @@ function setA!(dc::DualLinearCache, A)
         partial_vals!(getfield(dc, :partials_A), A)
     end
 
-    # Invalidate cache (if setting A or b)
-    return setfield!(dc, :rhs_cache_valid, false)
+    return setfield!(dc, :A_partials_valid, false)
 end
 function setb!(dc::DualLinearCache, b)
     # Put the Dual-stripped versions in the LinearCache
@@ -506,8 +505,7 @@ function setb!(dc::DualLinearCache, b)
         partial_vals!(getfield(dc, :partials_b), b)
     end
 
-    # Invalidate cache (if setting A or b)
-    return setfield!(dc, :rhs_cache_valid, false)
+    return setfield!(dc, :b_partials_valid, false)
 end
 function setu!(dc::DualLinearCache{DT}, u) where {DT}
     # Put the Dual-stripped versions in the LinearCache

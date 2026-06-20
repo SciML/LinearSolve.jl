@@ -73,6 +73,7 @@ else
             @time @safetestset "Adjoint Sensitivity" include("Core/adjoint.jl")
             @time @safetestset "ForwardDiff Overloads" include("Core/forwarddiff_overloads.jl")
             @time @safetestset "Traits" include("Core/traits.jl")
+            @time @safetestset "SLATE" include("Core/slate.jl")
             @time @safetestset "Verbosity" include("Core/verbosity.jl")
             @time @safetestset "BandedMatrices" include("Core/banded.jl")
             @time @safetestset "Butterfly Factorization" include("Core/butterfly.jl")

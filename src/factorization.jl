@@ -184,6 +184,10 @@ function LinearSolve.init_cacheval(
     # type matches for dense CPU arrays whose container isn't `Base.Array`
     # (e.g. `FixedSizeArray`), whose `lu_instance` pivot would otherwise differ.
     luinst = ArrayInterface.lu_instance(convert(AbstractMatrix, A))
+    # `lu_instance` may return a non-`LinearAlgebra.LU` (e.g. `StaticArrays.LU`
+    # for a `SizedMatrix`, with fields `L`/`U`/`p` rather than `factors`/`info`);
+    # those already carry a `Vector` pivot, so use them as-is.
+    luinst isa LinearAlgebra.LU || return luinst, ipiv
     return LinearAlgebra.LU(luinst.factors, ipiv, luinst.info), ipiv
 end
 
@@ -343,6 +347,10 @@ function init_cacheval(
     # (e.g. a `FixedSizeVector` for a `FixedSizeArray`), so rebuild the instance
     # with the `Vector` pivot to keep the cacheval slot type matching.
     luinst = ArrayInterface.lu_instance(convert(AbstractMatrix, A))
+    # `lu_instance` may return a non-`LinearAlgebra.LU` (e.g. `StaticArrays.LU`
+    # for a `SizedMatrix`, with fields `L`/`U`/`p` rather than `factors`/`info`);
+    # those already carry a `Vector` pivot, so use them as-is.
+    luinst isa LinearAlgebra.LU || return luinst, ipiv
     return LinearAlgebra.LU(luinst.factors, ipiv, luinst.info), ipiv
 end
 

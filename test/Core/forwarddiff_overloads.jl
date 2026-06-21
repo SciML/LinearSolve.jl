@@ -67,6 +67,19 @@ prob = LinearProblem(plain_A, b)
 @test ≈(solve(prob, GenericLUFactorization()), plain_A \ b, rtol = 1.0e-9)
 @test ≈(solve(prob, RFLUFactorization()), plain_A \ b, rtol = 1.0e-9)
 
+# Regression test for #1052: RFLUFactorization must stay on the split
+# primal/partials path and NOT take the direct dual solve. Its fast Float64
+# factorization is BLAS/SIMD-grade; routing the Dual problem through it falls
+# back to generic scalar dual arithmetic (~40x slower). Guard the routing
+# decision directly so RFLU is never re-added to the direct path.
+@testset "RFLU stays off the direct dual path (#1052)" begin
+    ext = Base.get_extension(LinearSolve, :LinearSolveForwardDiffExt)
+    @test !ext._use_direct_dual_solve(RFLUFactorization())
+    # Sanity: the genuinely-cheap-in-dual algorithms are still on the direct path.
+    @test ext._use_direct_dual_solve(GenericLUFactorization())
+    @test ext._use_direct_dual_solve(SpecializedLUFactorization())
+end
+
 # Overload Dense
 
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])

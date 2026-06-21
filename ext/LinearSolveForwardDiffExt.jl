@@ -393,11 +393,15 @@ end
 # Check if the algorithm should use the direct dual solve path
 # (algorithms that can work directly with Dual numbers without the primal/partials separation)
 function _use_direct_dual_solve(alg)
+    # NOTE: RFLUFactorization is intentionally *not* on the direct path. Even when
+    # A carries duals, its fast Float64 factorization is BLAS/SIMD-grade, and routing
+    # the Dual problem through it falls back to generic scalar dual arithmetic, losing
+    # that speedup entirely (~40x slower, see issue #1052). The split path keeps the
+    # fast primal factorization and reuses it across the partial back-solves.
     return alg isa GenericLUFactorization ||
         alg isa LinearSolve.SpecializedLUFactorization ||
         alg isa LinearSolve.SpecializedQRFactorization ||
-        alg isa LinearSolve.PureKLUFactorization ||
-        alg isa LinearSolve.RFLUFactorization
+        alg isa LinearSolve.PureKLUFactorization
 end
 
 function _use_direct_dual_solve(alg::DefaultLinearSolver)

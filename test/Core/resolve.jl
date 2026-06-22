@@ -40,6 +40,7 @@ for alg in vcat(
                 BLISLUFactorization,
                 AMDGPUOffloadLUFactorization,
                 AMDGPUOffloadQRFactorization,
+                SuperLUDISTFactorization,
             ]
         ) &&
             (

@@ -45,6 +45,14 @@ is_distributed_comm(comm) = !(comm === nothing) && comm != MPI.COMM_NULL && MPI.
 auto_hypre_matrix(::HYPREAlgorithm, A::HYPREMatrix) = A
 auto_hypre_vector(::HYPREAlgorithm, b::HYPREVector) = b
 
+function ensure_hypre_initialized(A, b, u0)
+    if A isa HYPREMatrix && b isa HYPREVector && (u0 === nothing || u0 isa HYPREVector)
+        return nothing
+    end
+    HYPRE.Init()
+    return nothing
+end
+
 function auto_hypre_matrix(alg::HYPREAlgorithm, A)
     if !is_distributed_comm(alg.comm)
         return A isa HYPREMatrix ? A : HYPREMatrix(A)
@@ -178,6 +186,8 @@ function SciMLBase.init(
         init_cache_verb = verb_spec
     end
 
+    # Auto-construction of HYPREMatrix/HYPREVector touches MPI inside HYPRE.jl.
+    ensure_hypre_initialized(A, b, u0)
     A = auto_hypre_matrix(alg, A)
     b = auto_hypre_vector(alg, b)
     u0 = u0 === nothing ? nothing : auto_hypre_vector(alg, u0)

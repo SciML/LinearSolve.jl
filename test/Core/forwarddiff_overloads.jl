@@ -571,3 +571,38 @@ end
     extract_partials(v) = [collect(ForwardDiff.partials(x)) for x in v]
     @test all(((a, b),) -> a ≈ b, zip(extract_partials(sol.u), extract_partials(ref)))
 end
+
+# The DualLinearCache tracks partials-list validity for A and b independently,
+# so mutating only one side does not force the other's partials to be recomputed
+# (relevant e.g. in an ODE where A is fixed while b changes, and vice versa).
+@testset "DualLinearCache separate A/b partials validity" begin
+    A, b = h([ForwardDiff.Dual(10.0, 1.0, 0.0), ForwardDiff.Dual(10.0, 0.0, 1.0)])
+    cache = init(LinearProblem(A, b), LUFactorization())
+
+    # Both lists start valid (populated lazily on first solve).
+    @test getfield(cache, :A_partials_valid)
+    @test getfield(cache, :b_partials_valid)
+
+    # Mutating only b invalidates b's list and leaves A's untouched.
+    _, new_b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+    cache.b = new_b
+    @test getfield(cache, :A_partials_valid)
+    @test !getfield(cache, :b_partials_valid)
+
+    # Solving revalidates both, and the result still matches the reference.
+    x_p = solve!(cache)
+    @test getfield(cache, :A_partials_valid)
+    @test getfield(cache, :b_partials_valid)
+    @test ≈(x_p, A \ new_b, rtol = 1.0e-9)
+
+    # Symmetrically, mutating only A invalidates A's list and leaves b's untouched.
+    new_A, _ = h([ForwardDiff.Dual(2.0, 1.0, 0.0), ForwardDiff.Dual(2.0, 0.0, 1.0)])
+    cache.A = new_A
+    @test !getfield(cache, :A_partials_valid)
+    @test getfield(cache, :b_partials_valid)
+
+    x_p = solve!(cache)
+    @test getfield(cache, :A_partials_valid)
+    @test getfield(cache, :b_partials_valid)
+    @test ≈(x_p, new_A \ new_b, rtol = 1.0e-9)
+end

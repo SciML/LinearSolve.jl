@@ -70,6 +70,7 @@ else
             @time @safetestset "Nonstructural Zeros" include("Core/nonstructural_zeros.jl")
             @time @safetestset "Default Alg Tests" include("Core/default_algs.jl")
             @time @safetestset "FixedSizeArrays" include("Core/fixedsizearrays.jl")
+            @time @safetestset "SizedMatrix" include("Core/sized_matrix.jl")
             @time @safetestset "Adjoint Sensitivity" include("Core/adjoint.jl")
             @time @safetestset "ForwardDiff Overloads" include("Core/forwarddiff_overloads.jl")
             @time @safetestset "Traits" include("Core/traits.jl")

@@ -606,3 +606,43 @@ end
     @test getfield(cache, :b_partials_valid)
     @test ≈(x_p, new_A \ new_b, rtol = 1.0e-9)
 end
+
+@testset "Sparse matrices" begin
+    # Case 1: same number of nonzeros, same sparsity pattern, updated values
+    A1 = sparse([1, 2], [1, 2], [ForwardDiff.Dual(1.0, 10.0, 11.0), ForwardDiff.Dual(2.0, 20.0, 21.0)], 2, 2)
+    b = [1.0, 1.0]
+    prob = LinearProblem(A1, b)
+    cache = init(prob, KLUFactorization())
+    solve!(cache)
+    cache.A = A1
+    @test ≈(solve!(cache), Matrix(A1) \ b, rtol = 1.0e-9)
+
+    # Case 2: same number of nonzeros, but different positions
+    A2 = sparse([2, 1], [1, 2], [ForwardDiff.Dual(3.0, 30.0, 31.0), ForwardDiff.Dual(4.0, 40.0, 41.0)], 2, 2)
+    cache.A = A2
+    @test ≈(solve!(cache), Matrix(A2) \ b, rtol = 1.0e-9)
+
+    # Case 3: number of nonzeros increases
+    A3 = sparse([1, 2, 1], [1, 2, 2], [ForwardDiff.Dual(3.0, 30.0, 31.0), ForwardDiff.Dual(4.0, 40.0, 41.0), ForwardDiff.Dual(5.0, 50.0, 51.0)], 2, 2)
+    cache.A = A3
+    @test ≈(solve!(cache), Matrix(A3) \ b, rtol = 1.0e-9)
+
+    # Case 4: dual b (both A and b carry partials)
+    b_dual = [ForwardDiff.Dual(3.0, 1.0, 0.0), ForwardDiff.Dual(4.0, 0.0, 1.0)]
+    prob = LinearProblem(A1, b_dual)
+    cache = init(prob, KLUFactorization())
+    @test ≈(solve!(cache), Matrix(A1) \ b_dual, rtol = 1.0e-9)
+    b_dual2 = [ForwardDiff.Dual(5.0, 2.0, 0.0), ForwardDiff.Dual(6.0, 0.0, 2.0)]
+    cache.b = b_dual2
+    @test ≈(solve!(cache), Matrix(A1) \ b_dual2, rtol = 1.0e-9)
+
+    # Case 5: in-place mutation of A's nonzeros via setindex! (ODE solver pattern)
+    A = sparse([1, 2], [1, 2], [ForwardDiff.Dual(1.0, 10.0, 11.0), ForwardDiff.Dual(2.0, 20.0, 21.0)], 2, 2)
+    prob = LinearProblem(A, b)
+    cache = init(prob, KLUFactorization())
+    solve!(cache)
+    A[1, 1] = ForwardDiff.Dual(5.0, 50.0, 51.0)
+    A[2, 2] = ForwardDiff.Dual(6.0, 60.0, 61.0)
+    cache.A = A
+    @test ≈(solve!(cache), Matrix(A) \ b, rtol = 1.0e-9)
+end

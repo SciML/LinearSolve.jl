@@ -73,17 +73,19 @@ time steps of an implicit ODE/PDE integrator) is that `A` keeps the **same
 sparsity pattern** across solves while only its stored values change. In that
 case, the symbolic factorization can be reused and only the numeric
 factorization needs to be redone. This is controlled by the `reuse_symbolic`
-keyword (default `true`) on the sparse factorization algorithms:
+keyword on the sparse factorization algorithms, which **defaults to `true`** —
+so you get this behavior automatically and do not need to set it:
 
 ```julia
-solver = LS.UMFPACKFactorization(; reuse_symbolic = true)
+solver = LS.UMFPACKFactorization()   # reuse_symbolic = true by default
 ```
 
-With `reuse_symbolic = true`, when a new `A` with an unchanged pattern is given,
-LinearSolve.jl reuses the cached symbolic factorization and performs only the
-numeric refactorization. By default it also runs a `check_pattern` pass to
-confirm the pattern really is unchanged; if your pattern is guaranteed constant,
-you can set `check_pattern = false` to skip that check for a little extra speed.
+When a new `A` with an unchanged pattern is given, LinearSolve.jl reuses the
+cached symbolic factorization and performs only the numeric refactorization. By
+default it also runs a `check_pattern` pass to confirm the pattern really is
+unchanged; if your pattern is guaranteed constant, you can set
+`check_pattern = false` to skip that check for a little extra speed. Set
+`reuse_symbolic = false` only if the sparsity pattern may change between solves.
 
 ### Updating the values of `A`
 

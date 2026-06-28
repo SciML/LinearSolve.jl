@@ -2,7 +2,7 @@ module LinearSolveForwardDiffExt
 
 using LinearSolve
 using LinearSolve: SciMLLinearSolveAlgorithm, __init, LinearVerbosity, DefaultLinearSolver,
-    DefaultAlgorithmChoice, defaultalg, reinit!
+    DefaultAlgorithmChoice, defaultalg, reinit!, default_alias_A
 using LinearAlgebra
 using SparseArrays
 using ForwardDiff
@@ -480,9 +480,9 @@ function _solve_direct_dual!(
     # Update A (and trigger re-factorisation) when the outer primal cache signals
     # that A has changed via its isfresh flag, which is set by setA!.
     if linear_cache.isfresh
-        dual_cache.A = dual_A
+        dual_cache.A = default_alias_A(alg, dual_A, dual_b) ? dual_A : copy(dual_A)
     end
-    dual_cache.b = dual_b
+    dual_cache.b .= dual_b
 
     # solve! on the regular LinearCache directly with the dual values (bypasses ForwardDiff extension)
     dual_sol = SciMLBase.solve!(dual_cache)

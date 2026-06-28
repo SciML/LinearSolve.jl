@@ -280,6 +280,16 @@ plain_A = ForwardDiff.value.(A)
 prob = LinearProblem(sparse(plain_A), b)
 @test ≈(solve(prob, PureKLUFactorization()), plain_A \ b, rtol = 1.0e-9)
 
+# Regression test for #1064: PureKLUFactorization must stay on the split
+# primal/partials path and NOT take the direct dual solve. Like RFLU (#1052),
+# its fast Float64 (KLU) factorization is far cheaper than factorizing the Dual
+# problem in generic scalar dual arithmetic; the direct path was much slower with
+# ~14x more allocation through an implicit ODE solve. Guard the routing decision.
+@testset "PureKLU stays off the direct dual path (#1064)" begin
+    ext = Base.get_extension(LinearSolve, :LinearSolveForwardDiffExt)
+    @test !ext._use_direct_dual_solve(PureKLUFactorization())
+end
+
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 
 prob = LinearProblem(sparse(A), sparse(b))

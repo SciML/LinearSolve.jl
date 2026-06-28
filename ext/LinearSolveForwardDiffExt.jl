@@ -393,15 +393,21 @@ end
 # Check if the algorithm should use the direct dual solve path
 # (algorithms that can work directly with Dual numbers without the primal/partials separation)
 function _use_direct_dual_solve(alg)
-    # NOTE: RFLUFactorization is intentionally *not* on the direct path. Even when
-    # A carries duals, its fast Float64 factorization is BLAS/SIMD-grade, and routing
-    # the Dual problem through it falls back to generic scalar dual arithmetic, losing
-    # that speedup entirely (~40x slower, see issue #1052). The split path keeps the
-    # fast primal factorization and reuses it across the partial back-solves.
+    # NOTE: RFLUFactorization and PureKLUFactorization are intentionally *not* on the
+    # direct path. The split path factorizes the *primal* A once (in fast Float64
+    # arithmetic) and reuses that factorization across the partial back-solves, instead
+    # of re-running the whole numeric factorization in (2N+1)-wide scalar dual
+    # arithmetic. For RFLU this is decisive because its Float64 factorization is
+    # BLAS/SIMD-grade (~40x slower on the direct path, see #1052). For PureKLU it wins
+    # whenever the factorization carries non-trivial fill (general sparse Jacobians,
+    # PDE stencils) and for the small-chunk AD-through-implicit-ODE workload these are
+    # actually used in — see #1064, where the direct path was ~2.4x slower with ~35x
+    # the allocation through a Rosenbrock solve, matching the trusted C-KLU split path
+    # once routed here. (For a single solve of a very-low-fill matrix with a large dual
+    # chunk the direct path can edge ahead, but that is not the regime PureKLU+AD hits.)
     return alg isa GenericLUFactorization ||
         alg isa LinearSolve.SpecializedLUFactorization ||
-        alg isa LinearSolve.SpecializedQRFactorization ||
-        alg isa LinearSolve.PureKLUFactorization
+        alg isa LinearSolve.SpecializedQRFactorization
 end
 
 function _use_direct_dual_solve(alg::DefaultLinearSolver)

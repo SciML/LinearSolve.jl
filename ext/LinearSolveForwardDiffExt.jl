@@ -422,10 +422,6 @@ function _use_direct_dual_solve(alg)
         alg isa LinearSolve.PureKLUFactorization
 end
 
-function _use_direct_dual_solve(alg::DefaultLinearSolver)
-    return alg.alg === DefaultAlgorithmChoice.GenericLUFactorization
-end
-
 function SciMLBase.solve!(
         cache::DualLinearCache{DT}, alg::SciMLLinearSolveAlgorithm, args...; kwargs...
     ) where {

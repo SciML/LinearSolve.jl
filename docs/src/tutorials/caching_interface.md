@@ -63,10 +63,12 @@ caching the symbolic factorization if the sparsity pattern is unchanged.
 ## Reusing the Symbolic Factorization with Sparse Matrices
 
 For sparse factorizations such as `UMFPACKFactorization` and `KLUFactorization`,
-the most expensive part of a solve is often the *symbolic* factorization: the
+a significantly expensive part of a solve is often the *symbolic* factorization: the
 analysis of the sparsity pattern that determines the fill-in and elimination
 ordering. The subsequent *numeric* factorization, which computes the actual `L`
-and `U` factor values, is comparatively cheap.
+and `U` factor values, is not cheap but must be recomputed for every change in the
+values of `A`. Thus storing the symbolic factorization can lead to some sizable
+gains.
 
 A very common case (for example, the Newton steps of a nonlinear solve or the
 time steps of an implicit ODE/PDE integrator) is that `A` keeps the **same

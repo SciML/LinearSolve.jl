@@ -3,6 +3,13 @@ uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 version = "3.87.0"
 authors = ["SciML"]
 
+# TEMPORARY: the duals-in-b PureKLU routing needs the primal-factor/Dual-RHS `ldiv!` added
+# in PureKLU 1.1.0 (SciML/PureKLU.jl#67). Until that is registered, pull it from the PR so CI
+# can resolve `PureKLU = "1.1"` (Julia >= 1.11; on older Julia `[sources]` is ignored). Remove
+# this block once PureKLU 1.1.0 is in the General registry.
+[sources]
+PureKLU = {url = "https://github.com/ChrisRackauckas-Claude/PureKLU.jl", rev = "dual-rhs-ldiv"}
+
 [deps]
 AMD = "14f7f29c-3bd6-536c-9a0b-7339e30b5a3e"
 ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"

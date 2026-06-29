@@ -7,6 +7,7 @@ using LinearAlgebra
 using SparseArrays
 using ForwardDiff
 using ForwardDiff: Dual, Partials
+using PureKLU: PureKLU
 using SciMLBase
 using RecursiveArrayTools
 using SciMLLogging
@@ -702,6 +703,42 @@ function update_partials_list!(partial_matrix::SparseMatrixCSC, list_cache)
         end
     end
     return list_cache
+end
+
+# Backsolve a real (primal) KLU factorization against a Dual right-hand side.
+#
+# A factorization is a linear operator, so `K \ Dual(v, p₁…p_N) = Dual(K\v, K\p₁ … K\p_N)`.
+# PureKLU stores its L/U in the factor element type, so a `KLUFactorization{<:Real}` can
+# solve the primal value and every partial column without ever promoting `A` to a Dual —
+# i.e. the factorization stays in fast `Float64` arithmetic and the duals only ride
+# through the back-substitution. This is the single-solve analogue of the split path's
+# per-partial back-solves: it lets a duals-in-`b` problem be solved natively on a primal
+# factorization (see #1064 discussion). PureKLU's matrix solve handles the `N+1` columns
+# in one `klu_solve!` call.
+#
+# Note: this is a deliberate, narrowly-typed addition over `PureKLU.AbstractKLUFactorization`
+# (a hard dependency) and `ForwardDiff.Dual`; it does not promote `A` and is only reachable
+# when a primal KLU factor meets a Dual RHS. The factor eltype is constrained to
+# `AbstractFloat` (which a `Dual` is *not*, despite `Dual <: Real`) so this never collides
+# with PureKLU's own `ldiv!(::KLUFactorization{Tv}, ::VecOrMat{Tv})` on the dual-factor path.
+function LinearAlgebra.ldiv!(
+        K::PureKLU.AbstractKLUFactorization{Tv},
+        b::AbstractVector{Dual{T, V, N}}
+    ) where {Tv <: AbstractFloat, T, V, N}
+    n = length(b)
+    rhs = Matrix{Tv}(undef, n, N + 1)
+    @inbounds for i in 1:n
+        rhs[i, 1] = ForwardDiff.value(b[i])
+        p = ForwardDiff.partials(b[i])
+        for j in 1:N
+            rhs[i, j + 1] = p[j]
+        end
+    end
+    PureKLU.solve!(K, rhs) # in-place multi-RHS solve; reuses the primal factorization
+    @inbounds for i in 1:n
+        b[i] = Dual{T, V, N}(rhs[i, 1], Partials{N, V}(ntuple(j -> V(rhs[i, j + 1]), Val(N))))
+    end
+    return b
 end
 
 end

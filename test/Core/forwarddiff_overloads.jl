@@ -78,6 +78,7 @@ prob = LinearProblem(plain_A, b)
     # Sanity: the genuinely-cheap-in-dual algorithms are still on the direct path.
     @test ext._use_direct_dual_solve(GenericLUFactorization())
     @test ext._use_direct_dual_solve(SpecializedLUFactorization())
+    @test ext._use_direct_dual_solve(PureKLUFactorization())
 end
 
 # Overload Dense
@@ -645,4 +646,38 @@ end
     A[2, 2] = ForwardDiff.Dual(6.0, 60.0, 61.0)
     cache.A = A
     @test ≈(solve!(cache), Matrix(A) \ b, rtol = 1.0e-9)
+end
+
+@testset "PureKLU direct dual path reuses inner LinearCache" begin
+    # The direct dual path (PureKLUFactorization can handle Dual arithmetic
+    # natively) pre-creates an inner LinearCache in DualLinearCache.dual_linear_cache
+    # at init time and reuses it on every solve!, only re-factorising when
+    # linear_cache.isfresh is set. Verify that the inner cache object identity
+    # is preserved across successive solves with different A and b.
+    A1 = sparse([1, 2], [1, 2], [ForwardDiff.Dual(1.0, 10.0, 0.0), ForwardDiff.Dual(2.0, 0.0, 20.0)], 2, 2)
+    b1 = [ForwardDiff.Dual(3.0, 1.0, 0.0), ForwardDiff.Dual(4.0, 0.0, 1.0)]
+    prob = LinearProblem(A1, b1)
+    cache = init(prob, PureKLUFactorization())
+
+    # The inner dual cache must be pre-created at init time (not nothing).
+    inner = getfield(cache, :dual_linear_cache)
+    @test inner !== nothing
+
+    sol1 = solve!(cache)
+    @test ≈(sol1, Matrix(A1) \ b1, rtol = 1.0e-9)
+
+    # After mutating A the inner cache object must be the same — only its
+    # contents change, no new allocation.
+    A2 = sparse([1, 2], [1, 2], [ForwardDiff.Dual(3.0, 30.0, 0.0), ForwardDiff.Dual(4.0, 0.0, 40.0)], 2, 2)
+    cache.A = A2
+    sol2 = solve!(cache)
+    @test getfield(cache, :dual_linear_cache) === inner
+    @test ≈(sol2, Matrix(A2) \ b1, rtol = 1.0e-9)
+
+    # Same after mutating only b.
+    b2 = [ForwardDiff.Dual(5.0, 2.0, 0.0), ForwardDiff.Dual(6.0, 0.0, 2.0)]
+    cache.b = b2
+    sol3 = solve!(cache)
+    @test getfield(cache, :dual_linear_cache) === inner
+    @test ≈(sol3, Matrix(A2) \ b2, rtol = 1.0e-9)
 end

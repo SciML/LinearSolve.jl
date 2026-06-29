@@ -2,7 +2,7 @@ module LinearSolveForwardDiffExt
 
 using LinearSolve
 using LinearSolve: SciMLLinearSolveAlgorithm, __init, LinearVerbosity, DefaultLinearSolver,
-    DefaultAlgorithmChoice, defaultalg, reinit!
+    DefaultAlgorithmChoice, defaultalg, reinit!, default_alias_A
 using LinearAlgebra
 using SparseArrays
 using ForwardDiff
@@ -63,6 +63,9 @@ LinearSolve.@concrete mutable struct DualLinearCache{DT}
     dual_A
     dual_b
     dual_u
+
+    # Cached LinearCache for direct Dual path (nothing for split path algorithms)
+    dual_linear_cache
 end
 
 function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kwargs...)
@@ -367,6 +370,20 @@ function __dual_init(
         ArrayInterface.restructure(non_partial_cache.u, zeros(dual_type, length(non_partial_cache.u)))
     end
 
+    # For algorithms taking the direct Dual path, use __init to create a regular LinearCache
+    # (bypasses ForwardDiff extension) then solve! on that cache directly with the dual values
+    # Promote b to Dual so that dc.b is typed correctly for later dc.b = dual_b
+    # assignments in _solve_direct_dual! (b may be plain Float64 when only A is Dual).
+    if _use_direct_dual_solve(alg)
+        dual_b_init = eltype(b) <: ForwardDiff.Dual ? b : dual_type.(b)
+        dual_linear_cache_init = __init(
+            LinearProblem(A, dual_b_init), alg;
+            alias, abstol, reltol, maxiters, verbose, Pl, Pr, assumptions, sensealg, kwargs...
+        )
+    else
+        dual_linear_cache_init = nothing
+    end
+
     return DualLinearCache{dual_type}(
         non_partial_cache,
         ∂_A,
@@ -382,7 +399,8 @@ function __dual_init(
         true,
         A,
         b,
-        dual_u_init
+        dual_u_init,
+        dual_linear_cache_init
     )
 end
 
@@ -402,10 +420,6 @@ function _use_direct_dual_solve(alg)
         alg isa LinearSolve.SpecializedLUFactorization ||
         alg isa LinearSolve.SpecializedQRFactorization ||
         alg isa LinearSolve.PureKLUFactorization
-end
-
-function _use_direct_dual_solve(alg::DefaultLinearSolver)
-    return alg.alg === DefaultAlgorithmChoice.GenericLUFactorization
 end
 
 function SciMLBase.solve!(
@@ -444,6 +458,8 @@ end
 
 # Direct solve path for algorithms that can work with Dual numbers directly
 # This avoids the primal/partials separation overhead
+# The inner dual LinearCache is created eagerly in __dual_init and reused here,
+# mirroring how the split path reuses the primal factorisation across RHS vectors.
 function _solve_direct_dual!(
         cache::DualLinearCache{DT}, alg, args...; kwargs...
     ) where {DT <: ForwardDiff.Dual}
@@ -451,18 +467,27 @@ function _solve_direct_dual!(
     dual_A = getfield(cache, :dual_A)
     dual_b = getfield(cache, :dual_b)
 
-    # When the duals are only in A, b is stored as a plain array. Promote it to
-    # the dual type: `__init` takes the solution eltype from `b`, and the
-    # factorization/solve kernels need matching element types.
+    # When only A carries duals, b is a plain array — promote it so the
+    # factorisation kernel sees a uniform element type.
     if eltype(dual_b) != DT
         dual_b = DT.(dual_b)
     end
 
-    # Use __init to create a regular LinearCache (bypasses ForwardDiff extension)
-    # then solve! on that cache directly with the dual values
-    dual_prob = LinearProblem(dual_A, dual_b)
-    dual_cache = __init(dual_prob, getfield(cache, :linear_cache).alg, args...; kwargs...)
+    # Get regular LinearCache prepared in __dual__init
+    linear_cache = getfield(cache, :linear_cache)
+    dual_cache = getfield(cache, :dual_linear_cache)
+
+    # Update A (and trigger re-factorisation) when the outer primal cache signals
+    # that A has changed via its isfresh flag, which is set by setA!.
+    if linear_cache.isfresh
+        dual_cache.A = default_alias_A(alg, dual_A, dual_b) ? dual_A : copy(dual_A)
+    end
+    dual_cache.b .= dual_b
+
+    # solve! on the regular LinearCache directly with the dual values (bypasses ForwardDiff extension)
     dual_sol = SciMLBase.solve!(dual_cache)
+
+    setfield!(linear_cache, :isfresh, false)
 
     # Update the cache
     if getfield(cache, :dual_u) isa AbstractArray
@@ -472,13 +497,12 @@ function _solve_direct_dual!(
     end
 
     # Also update the primal cache for consistency
-    primal_u = nodual_value.(dual_sol.u)
-    if getfield(cache, :linear_cache).u isa AbstractArray
-        getfield(cache, :linear_cache).u .= primal_u
+    if linear_cache.u isa AbstractArray
+        linear_cache.u .= nodual_value.(dual_sol.u)
     end
 
     return SciMLBase.build_linear_solution(
-        getfield(cache, :linear_cache).alg, getfield(cache, :dual_u), dual_sol.resid, cache;
+        linear_cache.alg, getfield(cache, :dual_u), dual_sol.resid, cache;
         dual_sol.retcode, dual_sol.iters, dual_sol.stats
     )
 end

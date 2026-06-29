@@ -307,6 +307,15 @@ prob = LinearProblem(sparse(plain_A), b)
             ) for i in 1:5, j in 1:nchunk
         )
     end
+
+    # Duals-only-in-b is routed to a plain LinearCache (native solve), not the split
+    # DualLinearCache, and that routing is type-stable.
+    Adual, bdual = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+    plain_Asp = sparse(ForwardDiff.value.(Adual))
+    bprob = LinearProblem(plain_Asp, bdual)
+    @test init(bprob, PureKLUFactorization()) isa LinearSolve.LinearCache
+    @test (@inferred init(bprob, PureKLUFactorization())) isa LinearSolve.LinearCache
+    @test ≈(solve(bprob, PureKLUFactorization()), Adual \ bdual, rtol = 1.0e-9)
 end
 
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])

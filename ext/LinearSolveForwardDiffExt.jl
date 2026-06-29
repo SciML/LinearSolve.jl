@@ -285,6 +285,17 @@ function SciMLBase.init(prob::DualAbstractLinearProblem, alg::SparspakFactorizat
     return __init(prob, alg, args...; kwargs...)
 end
 
+# Duals only in b (A is primal): route PureKLU to a plain LinearCache and solve natively.
+# The mixed-type `ldiv!` (primal KLU factor against a Dual RHS) keeps the factorization in
+# Float64 and pushes the duals through the back-substitution, so there is no reason to build
+# the split DualLinearCache here. This is type-stable: dispatch is purely on the problem
+# subtype (b-dual / A-plain) and the alg type, so `init` always returns a `LinearCache` for
+# this method. It also gets correct factorization reuse across b-only `reinit!`s for free,
+# which the split path's `reinit!` does not (it always marks the inner cache fresh).
+function SciMLBase.init(prob::DualBLinearProblem, alg::PureKLUFactorization, args...; kwargs...)
+    return __init(prob, alg, args...; kwargs...)
+end
+
 # NOTE: Removed the runtime conditional for DefaultLinearSolver that checked for
 # GenericLUFactorization. Now always use __dual_init for type stability.
 function SciMLBase.init(prob::DualAbstractLinearProblem, alg::DefaultLinearSolver, args...; kwargs...)

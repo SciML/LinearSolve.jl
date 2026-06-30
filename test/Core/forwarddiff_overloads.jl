@@ -281,6 +281,44 @@ plain_A = ForwardDiff.value.(A)
 prob = LinearProblem(sparse(plain_A), b)
 @test ≈(solve(prob, PureKLUFactorization()), plain_A \ b, rtol = 1.0e-9)
 
+# Mixed-type ldiv!: a primal (Float64) KLU factorization backsolving a Dual RHS
+# without promoting A. The factor stays Float64; duals ride through the
+# back-substitution (value + each partial column solved in one multi-RHS solve).
+@testset "PureKLU primal factor \\ Dual RHS (mixed ldiv!)" begin
+    Asp = sparse(2.0I, 5, 5) + sparse(plain_A[1, 1] * 0.0I, 5, 5)
+    for i in 1:4
+        Asp[i, i + 1] = 0.3
+        Asp[i + 1, i] = 0.2
+    end
+    for nchunk in (1, 2, 3)
+        bd = [
+            ForwardDiff.Dual{Nothing, Float64, nchunk}(
+                Float64(i), ForwardDiff.Partials(ntuple(k -> sin(i + k), nchunk))
+            ) for i in 1:5
+        ]
+        cache = LinearSolve.__init(LinearProblem(Asp, bd), PureKLUFactorization())
+        @test eltype(cache.A) == Float64                 # A not promoted
+        u = solve!(cache).u
+        uref = Matrix{eltype(bd)}(Asp) \ bd
+        @test isapprox(ForwardDiff.value.(u), ForwardDiff.value.(uref); rtol = 1.0e-10)
+        @test all(
+            isapprox(
+                ForwardDiff.partials(u[i], j), ForwardDiff.partials(uref[i], j);
+                rtol = 1.0e-8, atol = 1.0e-12
+            ) for i in 1:5, j in 1:nchunk
+        )
+    end
+
+    # Duals-only-in-b is routed to a plain LinearCache (native solve), not the split
+    # DualLinearCache, and that routing is type-stable.
+    Adual, bdual = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+    plain_Asp = sparse(ForwardDiff.value.(Adual))
+    bprob = LinearProblem(plain_Asp, bdual)
+    @test init(bprob, PureKLUFactorization()) isa LinearSolve.LinearCache
+    @test (@inferred init(bprob, PureKLUFactorization())) isa LinearSolve.LinearCache
+    @test ≈(solve(bprob, PureKLUFactorization()), Adual \ bdual, rtol = 1.0e-9)
+end
+
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 
 prob = LinearProblem(sparse(A), sparse(b))

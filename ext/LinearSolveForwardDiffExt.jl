@@ -716,8 +716,4 @@ function update_partials_list!(partial_matrix::SparseMatrixCSC, list_cache)
     return list_cache
 end
 
-# NOTE: the primal-KLU-factor / Dual-RHS `ldiv!` that the duals-in-b routing above relies on
-# lives in PureKLU itself (`PureKLUForwardDiffExt`, non-allocating via a buffer on the
-# factorization), since PureKLU owns the factorization type. See the PureKLU compat bound.
-
 end

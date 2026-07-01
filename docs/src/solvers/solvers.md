@@ -308,6 +308,17 @@ You can also pass raw STRUMPACK flags via `options = ["--flag", "value", ...]`.
 STRUMPACKFactorization
 ```
 
+### SLATE
+
+`SLATEFactorization` wraps SLATE's LAPACK compatibility API for dense LU solves.
+It requires a local SLATE build with the `slate_lapack_api` library available.
+Pass the library explicitly with `SLATEFactorization(libpath = "/path/to/libslate_lapack_api.so")`
+or set `ENV["SLATE_LAPACK_LIB"]`.
+
+```@docs
+SLATEFactorization
+```
+
 ### CliqueTrees.jl
 
 !!! note

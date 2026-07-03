@@ -110,7 +110,10 @@ LinearSolveSpecializingFactorizationsExt = "SpecializingFactorizations"
 [compat]
 AMD = "0.5"
 AMDGPU = "1.2, 2"
-AlgebraicMultigrid = "1, 2"
+# 0.5 allowed so the test target resolves against LinearSolve 4 until
+# AlgebraicMultigrid widens its own LinearSolve compat (its 1.x/2.x cap at 3);
+# the ext API is identical and the AMG testset passes on 0.5.1.
+AlgebraicMultigrid = "0.5, 1, 2"
 ArrayInterface = "7.19"
 BandedMatrices = "1.8"
 BlockDiagonals = "0.2"

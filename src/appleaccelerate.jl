@@ -382,7 +382,11 @@ function SciMLBase.solve!(
     if m > n
         Bc = copy(cache.b)
         aa_getrs!('N', A.factors, A.ipiv, Bc; info)
-        copyto!(cache.u, 1, Bc, 1, n)
+        if cache.b isa AbstractMatrix
+            copyto!(cache.u, @view(Bc[1:n, :]))
+        else
+            copyto!(cache.u, 1, Bc, 1, n)
+        end
     else
         copyto!(cache.u, cache.b)
         aa_getrs!('N', A.factors, A.ipiv, cache.u; info)
@@ -468,7 +472,11 @@ function SciMLBase.solve!(
     if m > n
         aa_getrs!('N', A_lu.factors, A_lu.ipiv, b_32; info)
         # Convert back to original precision
-        cache.u[1:n] .= Torig.(b_32[1:n])
+        if cache.b isa AbstractMatrix
+            cache.u .= Torig.(@view(b_32[1:n, :]))
+        else
+            cache.u[1:n] .= Torig.(@view(b_32[1:n]))
+        end
     else
         copyto!(u_32, b_32)
         aa_getrs!('N', A_lu.factors, A_lu.ipiv, u_32; info)

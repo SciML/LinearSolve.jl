@@ -276,6 +276,19 @@ function init_cacheval(
     return nothing
 end
 
+# Krylov workspaces only support vector right-hand sides. Batched (matrix) `b`
+# with a Krylov algorithm errors informatively at `init` time
+# (`_check_batched_rhs_support`); this method only exists so the default
+# polyalgorithm can still initialize its (unused) Krylov cacheval slots when a
+# factorization algorithm is chosen for a batched problem.
+function init_cacheval(
+        alg::LinearSolve.KrylovJL, A, b::AbstractMatrix, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        ::LinearSolve.OperatorAssumptions; zeroinit = true
+    )
+    return nothing
+end
+
 function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     if cache.precsisfresh && !isnothing(alg.precs)
         Pl, Pr = alg.precs(cache.A, cache.p)

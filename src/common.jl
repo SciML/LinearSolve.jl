@@ -405,6 +405,9 @@ same element type as `b` and sized to match the number of columns in `A`.
 
 ## Returns
 A zero-initialized vector of size `(size(A, 2),)` with element type matching `b`.
+For a matrix (batched) right-hand side `b` of size `(size(A, 1), k)`, returns a
+zero-initialized matrix of size `(size(A, 2), k)` so that each column of `u0`
+corresponds to a column of `b`.
 
 ## Specializations
 - For static matrices (`SMatrix`): Returns a static vector (`SVector`)
@@ -415,7 +418,56 @@ function __init_u0_from_Ab(A, b)
     fill!(u0, false)
     return u0
 end
+function __init_u0_from_Ab(A, b::AbstractMatrix)
+    u0 = similar(b, size(A, 2), size(b, 2))
+    fill!(u0, false)
+    return u0
+end
 __init_u0_from_Ab(::SMatrix{S1, S2}, b) where {S1, S2} = zeros(SVector{S2, eltype(b)})
+function __init_u0_from_Ab(::SMatrix{S1, S2}, b::AbstractMatrix) where {S1, S2}
+    u0 = similar(b, S2, size(b, 2))
+    fill!(u0, false)
+    return u0
+end
+function __init_u0_from_Ab(
+        ::SMatrix{S1, S2}, ::SMatrix{S1b, S2b, Tb}
+    ) where {S1, S2, S1b, S2b, Tb}
+    return zeros(SMatrix{S2, S2b, Tb})
+end
+
+"""
+    _check_batched_rhs_support(alg, b)
+
+Throw an informative `ArgumentError` at `init` time when a matrix (batched)
+right-hand side `b` is used with an algorithm that only supports vector `b`
+(Krylov subspace / iterative methods). Factorization-based algorithms support
+matrix `b` and pass through the generic no-op fallback.
+"""
+_check_batched_rhs_support(alg, b) = nothing
+function _check_batched_rhs_support(alg::AbstractKrylovSubspaceMethod, b::AbstractMatrix)
+    throw(
+        ArgumentError(
+            "Batched (matrix) right-hand sides are only supported by factorization " *
+                "algorithms; $(nameof(typeof(alg))) supports only vector `b`. Solve " *
+                "column-by-column or use a factorization algorithm (e.g. `LUFactorization()`)."
+        )
+    )
+end
+function _check_batched_rhs_support(alg::DefaultLinearSolver, b::AbstractMatrix)
+    if alg.alg === DefaultAlgorithmChoice.KrylovJL_GMRES ||
+            alg.alg === DefaultAlgorithmChoice.KrylovJL_CRAIGMR ||
+            alg.alg === DefaultAlgorithmChoice.KrylovJL_LSMR
+        throw(
+            ArgumentError(
+                "Batched (matrix) right-hand sides are only supported by factorization " *
+                    "algorithms; the default algorithm selected the Krylov method " *
+                    "$(alg.alg) for this operator, which supports only vector `b`. " *
+                    "Solve column-by-column or use a factorization algorithm."
+            )
+        )
+    end
+    return nothing
+end
 
 function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm, args...; kwargs...)
     return __init(prob, alg, args...; kwargs...)
@@ -505,6 +557,8 @@ function __init(
     else
         copy(b)
     end
+
+    _check_batched_rhs_support(alg, b)
 
     u0_ = u0 !== nothing ? u0 : __init_u0_from_Ab(A, b)
 

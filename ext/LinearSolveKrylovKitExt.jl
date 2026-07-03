@@ -61,4 +61,49 @@ end
 
 LinearSolve.update_tolerances_internal!(cache, alg::KrylovKitJL, atol, rtol) = nothing
 
+function SciMLBase.solve(
+        prob::LinearSolve.EigenvalueProblem,
+        alg::LinearSolve.KrylovKitEigen,
+        args...; kwargs...)
+    nev = LinearSolve.default_nev(prob)
+    which = prob.which
+    kw = (; prob.kwargs..., alg.kwargs..., kwargs...)
+    values, vectors, info = if prob.sigma !== nothing
+        _shift_invert_eigsolve(prob, alg, nev, kw)
+    elseif prob.B === nothing
+        KrylovKit.eigsolve(prob.A, alg.args..., nev, which; kw...)
+    else
+        KrylovKit.geneigsolve((prob.A, prob.B), alg.args..., nev, which; kw...)
+    end
+    if prob.sigma !== nothing
+        values = prob.sigma .+ inv.(values)
+    end
+    vecmat = reduce(hcat, vectors)
+    values, vecmat = LinearSolve._select_eigenpairs(values, vecmat, nev, prob.which, prob.sigma)
+    retcode = info.converged >= length(values) ? ReturnCode.Success : ReturnCode.ConvergenceFailure
+    return LinearSolve.build_eigenvalue_solution(
+        prob, alg, values, vecmat; retcode, resid = info.normres, stats = info)
+end
+
+function _shift_invert_eigsolve(prob, alg, nev, kw)
+    A, B, sigma = prob.A, prob.B, prob.sigma
+    T = isnothing(B) ? promote_type(eltype(A), typeof(sigma)) :
+        promote_type(eltype(A), eltype(B), typeof(sigma))
+    if isnothing(B)
+        F = factorize(A - sigma * I)
+        op = x -> F \ x
+    elseif B isa LinearAlgebra.UniformScaling
+        F = factorize(A - sigma * B)
+        op = x -> F \ (B.λ * x)
+    else
+        F = factorize(A - sigma * B)
+        op = x -> F \ (B * x)
+    end
+    if isempty(alg.args)
+        return KrylovKit.eigsolve(op, size(A, 2), nev, :LM, T; kw...)
+    else
+        return KrylovKit.eigsolve(op, alg.args..., nev, :LM; kw...)
+    end
+end
+
 end

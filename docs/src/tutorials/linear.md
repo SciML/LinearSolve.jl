@@ -36,6 +36,26 @@ pass in an algorithm struct and all wrapped linear solvers are immediately
 available as tweaks to the general algorithm. For more information on the
 available solvers, see [the solvers page](@ref linearsystemsolvers)
 
+## Batched Right-Hand Sides
+
+A matrix right-hand side `B` solves all of its columns against the same `A` at
+once, just like `A \ B`: `solve(LinearProblem(A, B))` factorizes `A` a single
+time and returns `sol.u` as the `size(A, 2) × size(B, 2)` matrix satisfying
+`A * sol.u ≈ B`.
+
+```@example linsys1
+B = rand(4, 2)
+prob = LS.LinearProblem(A, B)
+sol = LS.solve(prob)
+sol.u ≈ A \ B
+```
+
+This works with the caching interface as well (`cache.b = B2; solve!(cache)`
+re-solves all columns against the cached factorization). Batched right-hand
+sides are only supported by factorization-based algorithms; iterative (Krylov)
+methods such as `LS.KrylovJL_GMRES()` accept only vector `b` and throw an
+informative error for matrix `B` — solve column-by-column instead in that case.
+
 ## Sparse and Structured Matrices
 
 There is no difference in the interface for LinearSolve.jl on sparse

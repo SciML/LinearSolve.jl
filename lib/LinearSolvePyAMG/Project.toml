@@ -17,7 +17,7 @@ LinearSolve = {path = "../.."}
 [compat]
 CondaPkg = "0.2"
 LinearAlgebra = "1.10"
-LinearSolve = "3"
+LinearSolve = "3, 4"
 Pkg = "1"
 PythonCall = "0.9"
 SafeTestsets = "0.1"

@@ -17,7 +17,7 @@ LinearSolve = {path = "../.."}
 
 [compat]
 LinearAlgebra = "1.10"
-LinearSolve = "3"
+LinearSolve = "3, 4"
 MPI = "0.20"
 PETSc = "0.4.10"
 PartitionedArrays = "0.5"

@@ -8,7 +8,8 @@ using SciMLBase: SciMLBase, ReturnCode
 function SciMLBase.solve(
         prob::LinearSolve.EigenvalueProblem,
         alg::LinearSolve.ArnoldiMethodJL,
-        args...; kwargs...)
+        args...; kwargs...
+    )
     prob.B === nothing ||
         error("ArnoldiMethod backend currently supports standard eigenvalue problems only.")
     nev = LinearSolve.default_nev(prob)
@@ -23,7 +24,8 @@ function SciMLBase.solve(
     values, vectors = LinearSolve._select_eigenpairs(values, vectors, nev, prob.which, prob.sigma)
     retcode = history.converged ? ReturnCode.Success : ReturnCode.ConvergenceFailure
     return LinearSolve.build_eigenvalue_solution(
-        prob, alg, values, vectors; retcode, stats = history)
+        prob, alg, values, vectors; retcode, stats = history
+    )
 end
 
 function _shift_invert_operator(A, sigma)

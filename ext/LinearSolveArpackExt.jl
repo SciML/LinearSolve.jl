@@ -7,7 +7,8 @@ using SciMLBase: SciMLBase, ReturnCode
 function SciMLBase.solve(
         prob::LinearSolve.EigenvalueProblem,
         alg::LinearSolve.ArpackJL,
-        args...; kwargs...)
+        args...; kwargs...
+    )
     nev = LinearSolve.default_nev(prob)
     base = (; nev, which = prob.which)
     if prob.sigma !== nothing
@@ -24,7 +25,8 @@ function SciMLBase.solve(
     retcode = nconv >= length(values) ? ReturnCode.Success : ReturnCode.ConvergenceFailure
     stats = (; nconv, niter, nmult)
     return LinearSolve.build_eigenvalue_solution(
-        prob, alg, values, vectors; retcode, resid, stats)
+        prob, alg, values, vectors; retcode, resid, stats
+    )
 end
 
 end

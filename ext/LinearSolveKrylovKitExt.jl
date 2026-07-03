@@ -64,7 +64,8 @@ LinearSolve.update_tolerances_internal!(cache, alg::KrylovKitJL, atol, rtol) = n
 function SciMLBase.solve(
         prob::LinearSolve.EigenvalueProblem,
         alg::LinearSolve.KrylovKitEigen,
-        args...; kwargs...)
+        args...; kwargs...
+    )
     nev = LinearSolve.default_nev(prob)
     which = prob.which
     kw = (; prob.kwargs..., alg.kwargs..., kwargs...)
@@ -82,7 +83,8 @@ function SciMLBase.solve(
     values, vecmat = LinearSolve._select_eigenpairs(values, vecmat, nev, prob.which, prob.sigma)
     retcode = info.converged >= length(values) ? ReturnCode.Success : ReturnCode.ConvergenceFailure
     return LinearSolve.build_eigenvalue_solution(
-        prob, alg, values, vecmat; retcode, resid = info.normres, stats = info)
+        prob, alg, values, vecmat; retcode, resid = info.normres, stats = info
+    )
 end
 
 function _shift_invert_eigsolve(prob, alg, nev, kw)

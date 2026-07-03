@@ -38,7 +38,8 @@ sol_arpack = solve(EigenvalueProblem(Matrix(A_backend); nev = 2), ArpackJL())
 @test sol_arpack.u ≈ [8.0, 7.0]
 
 sol_arpack_gen = solve(
-    EigenvalueProblem(Matrix(A_backend), Matrix(B_backend); nev = 2), ArpackJL())
+    EigenvalueProblem(Matrix(A_backend), Matrix(B_backend); nev = 2), ArpackJL()
+)
 @test sol_arpack_gen.u ≈ [4.0, 3.5]
 
 sol_arnoldi = solve(EigenvalueProblem(A_backend; nev = 2), LinearSolve.ArnoldiMethod())
@@ -48,19 +49,22 @@ sol_arnoldi_default = solve(EigenvalueProblem(A_backend), LinearSolve.ArnoldiMet
 @test length(sol_arnoldi_default.u) == 6
 
 sol_arnoldi_shift = solve(
-    EigenvalueProblem(A_backend; nev = 2, sigma = 3.2), LinearSolve.ArnoldiMethod())
+    EigenvalueProblem(A_backend; nev = 2, sigma = 3.2), LinearSolve.ArnoldiMethod()
+)
 @test sol_arnoldi_shift.u ≈ [3.0, 4.0]
 
 sol_krylovkit = solve(EigenvalueProblem(A_backend; nev = 2), KrylovKitEigen())
 @test sol_krylovkit.u ≈ [8.0, 7.0]
 
 sol_krylovkit_shift = solve(
-    EigenvalueProblem(Matrix(A_backend); nev = 2, sigma = 3.2), KrylovKitEigen())
+    EigenvalueProblem(Matrix(A_backend); nev = 2, sigma = 3.2), KrylovKitEigen()
+)
 @test sol_krylovkit_shift.u ≈ [3.0, 4.0]
 
 sol_krylovkit_gen_shift = solve(
     EigenvalueProblem(Matrix(A_backend), Matrix(B_backend); nev = 2, sigma = 1.6),
-    KrylovKitEigen())
+    KrylovKitEigen()
+)
 @test sol_krylovkit_gen_shift.u ≈ [1.5, 2.0]
 
 # Jacobi-Davidson is a target/interior method: it finds the eigenvalues nearest
@@ -71,7 +75,7 @@ A_jd = Matrix(Diagonal(Float64.(1:30)))
 sol_jd = solve(EigenvalueProblem(A_jd; nev = 2, sigma = 10.3), JacobiDavidsonJL())
 @test sort(real(sol_jd.u)) ≈ [10.0, 11.0]
 @test sol_jd.retcode === ReturnCode.Success
-@test norm(A_jd * sol_jd.vectors - sol_jd.vectors * Diagonal(sol_jd.u)) < 1e-6
+@test norm(A_jd * sol_jd.vectors - sol_jd.vectors * Diagonal(sol_jd.u)) < 1.0e-6
 
 sol_jd_sm = solve(EigenvalueProblem(A_jd; nev = 1, which = :SM), JacobiDavidsonJL())
 @test real(sol_jd_sm.u[1]) ≈ 1.0
@@ -79,4 +83,5 @@ sol_jd_sm = solve(EigenvalueProblem(A_jd; nev = 1, which = :SM), JacobiDavidsonJ
 # Generalized problems are not supported by the JacobiDavidson backend (upstream
 # `jdqz` is broken); it should error rather than silently misbehave.
 @test_throws ErrorException solve(
-    EigenvalueProblem(A_jd, Matrix(Diagonal(fill(2.0, 30))); nev = 1), JacobiDavidsonJL())
+    EigenvalueProblem(A_jd, Matrix(Diagonal(fill(2.0, 30))); nev = 1), JacobiDavidsonJL()
+)

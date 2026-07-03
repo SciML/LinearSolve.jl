@@ -19,8 +19,10 @@ struct EigenvalueProblem{AType, BType, NevType, WhichType, SigmaType, U0Type, PT
     kwargs::KType
 end
 
-function EigenvalueProblem(A, B = nothing, p = SciMLBase.NullParameters();
-        nev = nothing, which = :LM, sigma = nothing, u0 = nothing, kwargs...)
+function EigenvalueProblem(
+        A, B = nothing, p = SciMLBase.NullParameters();
+        nev = nothing, which = :LM, sigma = nothing, u0 = nothing, kwargs...
+    )
     return EigenvalueProblem{
         typeof(A), typeof(B), typeof(nev), typeof(which), typeof(sigma),
         typeof(u0), typeof(p), typeof(kwargs),
@@ -65,8 +67,10 @@ struct EigenvalueSolution{T, N, U, V, P, A, R, S} <: SciMLBase.AbstractNoTimeSol
     stats::S
 end
 
-function build_eigenvalue_solution(prob, alg, values, vectors;
-        retcode = ReturnCode.Success, resid = nothing, stats = nothing)
+function build_eigenvalue_solution(
+        prob, alg, values, vectors;
+        retcode = ReturnCode.Success, resid = nothing, stats = nothing
+    )
     T = eltype(eltype(values))
     N = length((size(values)...,))
     return EigenvalueSolution{
@@ -96,7 +100,8 @@ function SciMLBase.solve(prob::EigenvalueProblem, alg::DenseEigen, args...; kwar
 end
 
 function SciMLBase.solve(
-        prob::EigenvalueProblem, alg::AbstractEigenvalueAlgorithm, args...; kwargs...)
+        prob::EigenvalueProblem, alg::AbstractEigenvalueAlgorithm, args...; kwargs...
+    )
     error("The eigenvalue backend $(typeof(alg)) is not available. Load its package before solving with this algorithm.")
 end
 

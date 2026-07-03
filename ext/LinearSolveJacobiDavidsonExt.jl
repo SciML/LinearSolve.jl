@@ -8,7 +8,8 @@ using SciMLBase: SciMLBase, ReturnCode
 function SciMLBase.solve(
         prob::LinearSolve.EigenvalueProblem,
         alg::LinearSolve.JacobiDavidsonJL,
-        args...; kwargs...)
+        args...; kwargs...
+    )
     # JacobiDavidson.jl's `jdqz` (generalized solver) is broken upstream: it
     # references an undefined `verbose` variable that is absent from its
     # signature. Until that is fixed, only the standard solver `jdqr` is wired
@@ -30,10 +31,12 @@ function SciMLBase.solve(
     values, vectors = _jd_standard_pairs(prob.A, out[1])
 
     values, vectors = LinearSolve._select_eigenpairs(
-        values, vectors, nev, prob.which, prob.sigma)
+        values, vectors, nev, prob.which, prob.sigma
+    )
     retcode = length(values) >= nev ? ReturnCode.Success : ReturnCode.ConvergenceFailure
     return LinearSolve.build_eigenvalue_solution(
-        prob, alg, values, vectors; retcode, stats = out[end])
+        prob, alg, values, vectors; retcode, stats = out[end]
+    )
 end
 
 # Map the problem's spectral selector onto a JacobiDavidson `Target`. A supplied
@@ -42,13 +45,13 @@ end
 function _jd_target(prob)
     prob.sigma !== nothing && return JacobiDavidson.Near(ComplexF64(prob.sigma))
     w = prob.which
-    w === :LM ? JacobiDavidson.LargestMagnitude(0.0 + 0.0im) :
-    w === :SM ? JacobiDavidson.SmallestMagnitude(0.0 + 0.0im) :
-    w === :LR ? JacobiDavidson.LargestRealPart(0.0 + 0.0im) :
-    w === :SR ? JacobiDavidson.SmallestRealPart(0.0 + 0.0im) :
-    w === :LI ? JacobiDavidson.LargestImaginaryPart(0.0 + 0.0im) :
-    w === :SI ? JacobiDavidson.SmallestImaginaryPart(0.0 + 0.0im) :
-    throw(ArgumentError("unsupported `which = $(w)` for JacobiDavidson; expected one of :LM, :SM, :LR, :SR, :LI, :SI, or pass `sigma`"))
+    return w === :LM ? JacobiDavidson.LargestMagnitude(0.0 + 0.0im) :
+        w === :SM ? JacobiDavidson.SmallestMagnitude(0.0 + 0.0im) :
+        w === :LR ? JacobiDavidson.LargestRealPart(0.0 + 0.0im) :
+        w === :SR ? JacobiDavidson.SmallestRealPart(0.0 + 0.0im) :
+        w === :LI ? JacobiDavidson.LargestImaginaryPart(0.0 + 0.0im) :
+        w === :SI ? JacobiDavidson.SmallestImaginaryPart(0.0 + 0.0im) :
+        throw(ArgumentError("unsupported `which = $(w)` for JacobiDavidson; expected one of :LM, :SM, :LR, :SR, :LI, :SI, or pass `sigma`"))
 end
 
 # jdqr yields a partial Schur decomposition `A*Q = Q*R`. Eigenpairs are recovered

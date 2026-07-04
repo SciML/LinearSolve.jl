@@ -276,9 +276,10 @@ function init_cacheval(
     return nothing
 end
 
-# Krylov workspaces only support vector right-hand sides. Batched (matrix) `b`
-# with a Krylov algorithm errors informatively at `init` time
-# (`_check_batched_rhs_support`); this method only exists so the default
+# Batched (matrix) right-hand sides: Krylov.jl provides block methods for GMRES
+# and MINRES, so those get real block workspaces; the other methods have no
+# block variant and error informatively at `init` time
+# (`_check_batched_rhs_support`). The `nothing` fallback exists so the default
 # polyalgorithm can still initialize its (unused) Krylov cacheval slots when a
 # factorization algorithm is chosen for a batched problem.
 function init_cacheval(
@@ -286,7 +287,28 @@ function init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         ::LinearSolve.OperatorAssumptions; zeroinit = true
     )
+    if alg.KrylovAlg === Krylov.gmres!
+        return Krylov.BlockGmresWorkspace(A, b)
+    elseif alg.KrylovAlg === Krylov.minres!
+        return Krylov.BlockMinresWorkspace(A, b)
+    end
     return nothing
+end
+
+# Krylov.jl provides block methods for GMRES and MINRES, so those KrylovJL
+# variants support batched right-hand sides natively (via BlockGmresWorkspace /
+# BlockMinresWorkspace); the remaining Krylov methods have no block variant.
+function _check_batched_rhs_support(alg::KrylovJL, b::AbstractMatrix)
+    (alg.KrylovAlg === Krylov.gmres! || alg.KrylovAlg === Krylov.minres!) &&
+        return nothing
+    throw(
+        ArgumentError(
+            "$(nameof(typeof(alg))) with $(alg.KrylovAlg) supports only vector `b`: " *
+                "Krylov.jl provides block (batched) methods only for GMRES and MINRES. " *
+                "Use KrylovJL_GMRES/KrylovJL_MINRES, a factorization algorithm, or " *
+                "solve column-by-column."
+        )
+    )
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
@@ -363,6 +385,15 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
             verbose, :no_right_preconditioning
         )
         Krylov.krylov_solve!(args...; M, kwargs...)
+    elseif cache.cacheval isa Krylov.BlockGmresWorkspace
+        Krylov.krylov_solve!(args...; M, N, restart = alg.gmres_restart > 0, kwargs...)
+    elseif cache.cacheval isa Krylov.BlockMinresWorkspace
+        N !== I &&
+            @SciMLMessage(
+            "$(alg.KrylovAlg) doesn't support right preconditioning.",
+            verbose, :no_right_preconditioning
+        )
+        Krylov.krylov_solve!(args...; M, kwargs...)
     elseif cache.cacheval isa Krylov.LsmrWorkspace ||
             cache.cacheval isa Krylov.LsqrWorkspace ||
             cache.cacheval isa Krylov.LslqWorkspace
@@ -398,12 +429,15 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
         ReturnCode.Success
     end
 
-    # Copy the solution to the allocated output vector
+    # Copy the solution to the allocated output array (block workspaces store
+    # the batched solution in `X` rather than `x`)
     cacheval = @get_cacheval(cache, :KrylovJL_GMRES)
-    if cache.u !== cacheval.x && ArrayInterface.can_setindex(cache.u)
-        cache.u .= cacheval.x
+    xsol = cacheval isa Union{Krylov.BlockGmresWorkspace, Krylov.BlockMinresWorkspace} ?
+        cacheval.X : cacheval.x
+    if cache.u !== xsol && ArrayInterface.can_setindex(cache.u)
+        cache.u .= xsol
     else
-        cache.u = convert(typeof(cache.u), cacheval.x)
+        cache.u = convert(typeof(cache.u), xsol)
     end
 
     return SciMLBase.build_linear_solution(

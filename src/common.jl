@@ -448,21 +448,25 @@ function _check_batched_rhs_support(alg::AbstractKrylovSubspaceMethod, b::Abstra
     throw(
         ArgumentError(
             "Batched (matrix) right-hand sides are only supported by factorization " *
-                "algorithms; $(nameof(typeof(alg))) supports only vector `b`. Solve " *
-                "column-by-column or use a factorization algorithm (e.g. `LUFactorization()`)."
+                "algorithms and block Krylov methods; $(nameof(typeof(alg))) supports " *
+                "only vector `b`. Use KrylovJL_GMRES/KrylovJL_MINRES (block methods), " *
+                "a factorization algorithm (e.g. `LUFactorization()`), or solve " *
+                "column-by-column."
         )
     )
 end
 function _check_batched_rhs_support(alg::DefaultLinearSolver, b::AbstractMatrix)
-    if alg.alg === DefaultAlgorithmChoice.KrylovJL_GMRES ||
-            alg.alg === DefaultAlgorithmChoice.KrylovJL_CRAIGMR ||
+    # KrylovJL_GMRES is fine: it dispatches to Krylov.jl's block GMRES for
+    # matrix b. CRAIGMR/LSMR (least-squares operator defaults) have no block
+    # variants.
+    if alg.alg === DefaultAlgorithmChoice.KrylovJL_CRAIGMR ||
             alg.alg === DefaultAlgorithmChoice.KrylovJL_LSMR
         throw(
             ArgumentError(
-                "Batched (matrix) right-hand sides are only supported by factorization " *
-                    "algorithms; the default algorithm selected the Krylov method " *
-                    "$(alg.alg) for this operator, which supports only vector `b`. " *
-                    "Solve column-by-column or use a factorization algorithm."
+                "Batched (matrix) right-hand sides are not supported by the " *
+                    "least-squares Krylov method $(alg.alg) the default algorithm " *
+                    "selected for this operator. Solve column-by-column or use a " *
+                    "factorization algorithm."
             )
         )
     end

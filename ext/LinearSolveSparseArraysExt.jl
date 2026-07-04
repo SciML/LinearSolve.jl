@@ -778,10 +778,22 @@ function SciMLBase.solve!(
         cache.isfresh = false
     end
     F = LinearSolve.@get_cacheval(cache, :SparseColumnPivotedQRFactorization)
-    y = ldiv!(cache.u, F, cache.b)
+    y = LinearSolve._ldiv!(cache.u, F, cache.b)
     return SciMLBase.build_linear_solution(
         alg, y, nothing, cache; retcode = ReturnCode.Success
     )
+end
+
+# SparseColumnPivotedQR's ldiv! only accepts vector right-hand sides; batched
+# (matrix) right-hand sides solve column-by-column against the one factorization.
+function LinearSolve._ldiv!(
+        x::AbstractMatrix,
+        F::SCPQR.SparseColumnPivotedQRFactorization, b::AbstractMatrix
+    )
+    for j in axes(b, 2)
+        ldiv!(view(x, :, j), F, view(b, :, j))
+    end
+    return x
 end
 
 # Build a column-pivoted sparse QR factorization for the default sparse-LU
@@ -874,8 +886,8 @@ end
             x .= A \ b
         end
         function LinearSolve._ldiv!(
-                x::AbstractVector,
-                A::SparseArrays.CHOLMOD.Factor, b::AbstractVector
+                x::AbstractVecOrMat,
+                A::SparseArrays.CHOLMOD.Factor, b::AbstractVecOrMat
             )
             x .= A \ b
         end
@@ -895,6 +907,15 @@ end
             )
             x .= A \ b
         end
+    end
+
+    # SPQR has no in-place matrix (batched) ldiv! on any current Julia version,
+    # so route batched right-hand sides through the allocating `\`.
+    function LinearSolve._ldiv!(
+            x::AbstractMatrix,
+            A::SparseArrays.SPQR.QRSparse, b::AbstractMatrix
+        )
+        x .= A \ b
     end
 
     function LinearSolve._ldiv!(
@@ -940,11 +961,11 @@ end
 # medium and very sparse / "less structure") favors the pure-Julia KLU-style
 # solvers: PureKLU for LU and SparseColumnPivotedQR for QR. `false` ("more
 # structure") favors the SuiteSparse solvers: UMFPACK for LU and SPQR for QR.
-# The `length(b) <= 1_000` branch is the "small enough" fast path; the second is
+# The `size(b, 1) <= 1_000` branch is the "small enough" fast path; the second is
 # the "medium and sufficiently sparse" rule.
 function LinearSolve.use_klulike_sparse_structure(A::AbstractSparseMatrixCSC, b)
-    return length(b) <= 1_000 ||
-        (length(b) <= 10_000 && length(nonzeros(A)) / length(A) < 2.0e-4)
+    return size(b, 1) <= 1_000 ||
+        (size(b, 1) <= 10_000 && length(nonzeros(A)) / length(A) < 2.0e-4)
 end
 
 @static if Base.USE_GPL_LIBS

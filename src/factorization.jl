@@ -122,8 +122,10 @@ function _check_residual_safety(cache::LinearCache, alg, A_original, y)
     b = cache.b
     if cache.alg isa DefaultLinearSolver
         buf = cache.cacheval.residual_buf
-        if length(buf) != length(b)
-            resize!(buf, length(b))
+        if size(buf) != size(b)
+            # `resize!` only applies to vectors; matrix (batched) b just allocates.
+            buf = buf isa Vector && b isa AbstractVector ? resize!(buf, length(b)) :
+                similar(b)
         end
     else
         buf = similar(b)

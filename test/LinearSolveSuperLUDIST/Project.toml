@@ -9,7 +9,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 LinearSolve = {path = "../.."}
 
 [compat]
-LinearSolve = "3, 4"
+LinearSolve = "4"
 MPI = "0.20"
 SparseArrays = "1.10"
 SuperLUDIST = "1"

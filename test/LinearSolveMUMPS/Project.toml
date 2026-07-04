@@ -13,7 +13,7 @@ LinearSolve = {path = "../.."}
 
 [compat]
 LinearAlgebra = "1.10"
-LinearSolve = "3, 4"
+LinearSolve = "4"
 MPI = "0.20"
 MUMPS = "1.4"
 SafeTestsets = "0.1, 1"

@@ -14,7 +14,7 @@ LinearSolve = {path = "../.."}
 
 [compat]
 LinearAlgebra = "1.10"
-LinearSolve = "3, 4"
+LinearSolve = "4"
 ParU_jll = "1"
 Random = "1.10"
 SafeTestsets = "0.1, 1"

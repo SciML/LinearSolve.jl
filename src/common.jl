@@ -210,6 +210,10 @@ solving and caching of factorizations and intermediate results.
 - `verbose::LinearVerbosity`: Whether to print verbose output during solving.
 - `assumptions::OperatorAssumptions{issq}`: Assumptions about the operator properties.
 - `sensealg::S`: Sensitivity analysis algorithm for automatic differentiation.
+- `alias_A::Bool`: The resolved `LinearAliasSpecifier.alias_A` from `init`. When `true`,
+  the user has permitted LinearSolve to overwrite `A`; dense factorizations may then
+  refactorize in place (e.g. `lu!(cache.A)`) after `cache.A` is replaced, skipping the
+  O(n²) copy.
 
 ## Usage
 
@@ -244,6 +248,10 @@ mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, Tlv <: Linear
     # factorizations (`nothing` otherwise; the default solver carries its own in
     # `DefaultLinearSolverInit`). Set once at `init`; persists across `reinit!`.
     sparse_reduction::Tred
+    # Resolved `LinearAliasSpecifier.alias_A` from `init` (defaults applied, so
+    # never `nothing`). `true` means the user permitted overwriting `A`, which
+    # also permits in-place refactorization (e.g. `lu!(A)`) after `cache.A = X`.
+    alias_A::Bool
 end
 
 function Base.setproperty!(cache::LinearCache, name::Symbol, x)
@@ -448,21 +456,25 @@ function _check_batched_rhs_support(alg::AbstractKrylovSubspaceMethod, b::Abstra
     throw(
         ArgumentError(
             "Batched (matrix) right-hand sides are only supported by factorization " *
-                "algorithms; $(nameof(typeof(alg))) supports only vector `b`. Solve " *
-                "column-by-column or use a factorization algorithm (e.g. `LUFactorization()`)."
+                "algorithms and block Krylov methods; $(nameof(typeof(alg))) supports " *
+                "only vector `b`. Use KrylovJL_GMRES/KrylovJL_MINRES (block methods), " *
+                "a factorization algorithm (e.g. `LUFactorization()`), or solve " *
+                "column-by-column."
         )
     )
 end
 function _check_batched_rhs_support(alg::DefaultLinearSolver, b::AbstractMatrix)
-    if alg.alg === DefaultAlgorithmChoice.KrylovJL_GMRES ||
-            alg.alg === DefaultAlgorithmChoice.KrylovJL_CRAIGMR ||
+    # KrylovJL_GMRES is fine: it dispatches to Krylov.jl's block GMRES for
+    # matrix b. CRAIGMR/LSMR (least-squares operator defaults) have no block
+    # variants.
+    if alg.alg === DefaultAlgorithmChoice.KrylovJL_CRAIGMR ||
             alg.alg === DefaultAlgorithmChoice.KrylovJL_LSMR
         throw(
             ArgumentError(
-                "Batched (matrix) right-hand sides are only supported by factorization " *
-                    "algorithms; the default algorithm selected the Krylov method " *
-                    "$(alg.alg) for this operator, which supports only vector `b`. " *
-                    "Solve column-by-column or use a factorization algorithm."
+                "Batched (matrix) right-hand sides are not supported by the " *
+                    "least-squares Krylov method $(alg.alg) the default algorithm " *
+                    "selected for this operator. Solve column-by-column or use a " *
+                    "factorization algorithm."
             )
         )
     end
@@ -613,7 +625,7 @@ function __init(
         typeof(sensealg), typeof(sparse_reduction),
     }(
         A, b, u0_, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
-        maxiters, verbose_spec, assumptions, sensealg, sparse_reduction
+        maxiters, verbose_spec, assumptions, sensealg, sparse_reduction, alias_A
     )
     return cache
 end

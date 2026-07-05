@@ -282,6 +282,12 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
                 else
                     fact = lu!(cacheval, A, check = false)
                 end
+            elseif cache.alias_A && !issparsematrix(A) &&
+                    !(A isa GPUArraysCore.AnyGPUArray) &&
+                    ArrayInterface.can_setindex(typeof(A))
+                # The user permitted overwriting A (`alias_A = true` at `init`),
+                # so refactorize in place and skip the O(n²) copy `lu` makes.
+                fact = lu!(A, _normalize_pivot(alg.pivot); check = false)
             else
                 fact = lu(A, check = false)
             end

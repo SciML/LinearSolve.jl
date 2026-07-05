@@ -263,6 +263,29 @@ GenericLUFactorization(pivot = RowMaximum(); residualsafety::Bool = false) = Gen
 _get_residualsafety(alg::LUFactorization) = alg.residualsafety
 _get_residualsafety(alg::GenericLUFactorization) = alg.residualsafety
 
+# Dense-LU refactorization buffer reuse: `lu`/`lu!` allocate a fresh pivot
+# vector (and, without aliasing, a fresh factors copy) on every `cache.A = X`
+# refactorization. When the cached `LU`'s buffers match the incoming matrix,
+# factorize through `LAPACK.getrf!` with the cached `ipiv` instead. The
+# preallocated-`ipiv` `getrf!` method only exists on Julia >= 1.11; older
+# releases keep the allocating path.
+@static if VERSION >= v"1.11"
+    function _reusable_lu_cacheval(cacheval, A)
+        return cacheval isa LU &&
+            cacheval.ipiv isa Vector{BlasInt} &&
+            length(cacheval.ipiv) == min(size(A)...)
+    end
+    function _lu_reusing_ipiv!(A, ipiv::Vector{BlasInt})
+        factors, piv, info = LAPACK.getrf!(A, ipiv; check = false)
+        return LU{eltype(factors), typeof(factors), typeof(piv)}(
+            factors, piv, convert(BlasInt, info)
+        )
+    end
+else
+    _reusable_lu_cacheval(cacheval, A) = false
+    _lu_reusing_ipiv!(A, ipiv) = error("unreachable: requires Julia >= 1.11")
+end
+
 function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
@@ -287,9 +310,26 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
                     ArrayInterface.can_setindex(typeof(A))
                 # The user permitted overwriting A (`alias_A = true` at `init`),
                 # so refactorize in place and skip the O(n²) copy `lu` makes.
-                fact = lu!(A, _normalize_pivot(alg.pivot); check = false)
+                pivot = _normalize_pivot(alg.pivot)
+                if A isa StridedMatrix{<:LinearAlgebra.BlasFloat} &&
+                        pivot isa RowMaximum && _reusable_lu_cacheval(cacheval, A)
+                    fact = _lu_reusing_ipiv!(A, cacheval.ipiv)
+                else
+                    fact = lu!(A, pivot; check = false)
+                end
             else
-                fact = lu(A, check = false)
+                pivot = _normalize_pivot(alg.pivot)
+                if A isa StridedMatrix{<:LinearAlgebra.BlasFloat} &&
+                        pivot isa RowMaximum && _reusable_lu_cacheval(cacheval, A) &&
+                        cacheval.factors isa Matrix{eltype(A)} &&
+                        size(cacheval.factors) == size(A) && cacheval.factors !== A
+                    # A must stay intact, but the previous factorization's
+                    # buffers can be overwritten in place of `lu`'s fresh copy.
+                    copyto!(cacheval.factors, A)
+                    fact = _lu_reusing_ipiv!(cacheval.factors, cacheval.ipiv)
+                else
+                    fact = lu(A, check = false)
+                end
             end
         catch e
             # Some matrix types (e.g. BandedMatrix) throw LAPACKException on singular

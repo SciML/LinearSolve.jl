@@ -507,6 +507,94 @@ function init_cacheval(
     return nothing
 end
 
+## GESVFactorization
+
+"""
+`GESVFactorization()`
+
+A direct mirror of LAPACK's `gesv` driver (`LAPACK.gesv!`): on a fresh matrix the
+right-hand side is copied into `u` and the factorization and solve happen in a
+single LAPACK call, matching the classic `dgesv` workflow. The `(factors, ipiv)`
+pair is cached, so subsequent solves that only change `b` are a single
+allocation-free `LAPACK.getrs!` triangular solve. Batched (matrix) right-hand
+sides are handled natively by both calls.
+
+With `alias_A = true` the factorization overwrites `cache.A` directly; otherwise
+a workspace-owned buffer is refilled with `copyto!` on each refactorization and
+the user's matrix is left untouched.
+
+Only dense strided BLAS floating-point matrices
+(`StridedMatrix{<:Union{Float32, Float64, ComplexF32, ComplexF64}}`) are
+supported; other operator types throw an informative error at `init`.
+"""
+struct GESVFactorization <: AbstractDenseFactorization end
+
+function init_cacheval(
+        alg::GESVFactorization, A::StridedMatrix{T}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions
+    ) where {T <: LinearAlgebra.BlasFloat}
+    return (Matrix{T}(undef, 0, 0), Vector{BlasInt}(undef, 0))
+end
+
+function init_cacheval(
+        alg::GESVFactorization, A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions
+    )
+    throw(
+        ArgumentError(
+            "GESVFactorization only supports dense strided BLAS floating-point \
+            matrices (StridedMatrix{<:Union{Float32, Float64, ComplexF32, \
+            ComplexF64}}); got $(typeof(A)). Use LUFactorization or the default \
+            algorithm instead."
+        )
+    )
+end
+
+function SciMLBase.solve!(cache::LinearCache, alg::GESVFactorization; kwargs...)
+    A = convert(AbstractMatrix, cache.A)
+    F, ipiv = @get_cacheval(cache, :GESVFactorization)
+    if cache.isfresh
+        if cache.alias_A && A isa Matrix
+            # The user permitted overwriting A, so factorize it in place.
+            Atarget = A
+        else
+            if size(F) != size(A)
+                F = Matrix{eltype(A)}(undef, size(A))
+            end
+            copyto!(F, A)
+            Atarget = F
+        end
+        copyto!(cache.u, cache.b)
+        try
+            # One combined factorize-and-solve LAPACK call, exactly like dgesv;
+            # gesv! returns the factors and pivots for later getrs! reuse.
+            _, factors, ipivnew = LAPACK.gesv!(Atarget, cache.u)
+            cache.cacheval = (factors, ipivnew)
+        catch e
+            if e isa LinearAlgebra.LAPACKException ||
+                    e isa LinearAlgebra.SingularException
+                @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
+                return SciMLBase.build_linear_solution(
+                    alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                )
+            else
+                rethrow(e)
+            end
+        end
+        cache.isfresh = false
+        return SciMLBase.build_linear_solution(
+            alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+        )
+    end
+    copyto!(cache.u, cache.b)
+    LAPACK.getrs!('N', F, ipiv, cache.u)
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+    )
+end
+
 ## QRFactorization
 
 """

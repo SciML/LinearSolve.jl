@@ -175,6 +175,7 @@ customized per-package, details given below describe a subset of important array
 LUFactorization
 GenericFactorization
 GenericLUFactorization
+GESVFactorization
 QRFactorization
 SVDFactorization
 CholeskyFactorization

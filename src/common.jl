@@ -210,6 +210,10 @@ solving and caching of factorizations and intermediate results.
 - `verbose::LinearVerbosity`: Whether to print verbose output during solving.
 - `assumptions::OperatorAssumptions{issq}`: Assumptions about the operator properties.
 - `sensealg::S`: Sensitivity analysis algorithm for automatic differentiation.
+- `alias_A::Bool`: The resolved `LinearAliasSpecifier.alias_A` from `init`. When `true`,
+  the user has permitted LinearSolve to overwrite `A`; dense factorizations may then
+  refactorize in place (e.g. `lu!(cache.A)`) after `cache.A` is replaced, skipping the
+  O(n²) copy.
 
 ## Usage
 
@@ -244,6 +248,10 @@ mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, Tlv <: Linear
     # factorizations (`nothing` otherwise; the default solver carries its own in
     # `DefaultLinearSolverInit`). Set once at `init`; persists across `reinit!`.
     sparse_reduction::Tred
+    # Resolved `LinearAliasSpecifier.alias_A` from `init` (defaults applied, so
+    # never `nothing`). `true` means the user permitted overwriting `A`, which
+    # also permits in-place refactorization (e.g. `lu!(A)`) after `cache.A = X`.
+    alias_A::Bool
 end
 
 function Base.setproperty!(cache::LinearCache, name::Symbol, x)
@@ -617,7 +625,7 @@ function __init(
         typeof(sensealg), typeof(sparse_reduction),
     }(
         A, b, u0_, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
-        maxiters, verbose_spec, assumptions, sensealg, sparse_reduction
+        maxiters, verbose_spec, assumptions, sensealg, sparse_reduction, alias_A
     )
     return cache
 end

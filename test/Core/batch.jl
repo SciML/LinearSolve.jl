@@ -146,19 +146,31 @@ end
     @test sol.u isa Matrix
 end
 
-@testset "Iterative algorithms error informatively" begin
+@testset "Block Krylov methods solve batched RHS" begin
     A = rand(n, n) + n * I
     B = rand(n, k)
-    @test_throws ArgumentError solve(LinearProblem(A, B), KrylovJL_GMRES())
+    sol = solve(LinearProblem(A, B), KrylovJL_GMRES())
+    @test SciMLBase.successful_retcode(sol)
+    @test sol.u ≈ A \ B
+
+    S = A + A' + 2n * I # symmetric for MINRES
+    sol = solve(LinearProblem(S, B), KrylovJL_MINRES())
+    @test SciMLBase.successful_retcode(sol)
+    @test sol.u ≈ S \ B
+end
+
+@testset "Iterative algorithms without block variants error informatively" begin
+    A = rand(n, n) + n * I
+    B = rand(n, k)
     @test_throws ArgumentError solve(LinearProblem(A, B), SimpleGMRES())
     @test_throws ArgumentError solve(LinearProblem(A, B), KrylovJL_CG())
     @test_throws ArgumentError solve(LinearProblem(A, B), SimpleLUFactorization())
     err = try
-        solve(LinearProblem(A, B), KrylovJL_GMRES())
+        solve(LinearProblem(A, B), KrylovJL_CG())
     catch e
         e
     end
-    @test occursin("Batched", err.msg)
+    @test occursin("batched", err.msg)
     @test occursin("KrylovJL", err.msg)
 end
 
@@ -177,4 +189,45 @@ end
     solmat = solve(LinearProblem(A, B), LUFactorization())
     @test size(solmat.u) == (n, 1)
     @test vec(solmat.u) ≈ solvec.u
+end
+
+@testset "alias_A = true: LUFactorization refactorizes in place" begin
+    na = 100
+    D1 = rand(na, na) + na * I
+    D2 = rand(na, na) + na * I
+    B = rand(na, k)
+
+    function realias_solve!(cache, Abuf, D)
+        copyto!(Abuf, D)
+        cache.A = Abuf
+        return solve!(cache)
+    end
+
+    # alias_A = true: the user permitted overwriting A, so refactorization runs
+    # lu! on cache.A directly; repeated solves stay correct as long as the
+    # caller refills A between solves.
+    Abuf = copy(D1)
+    cache = init(
+        LinearProblem(Abuf, copy(B)), LUFactorization();
+        alias = LinearAliasSpecifier(alias_A = true)
+    )
+    @test cache.A === Abuf # not copied at init
+    @test solve!(cache).u ≈ D1 \ B
+    @test !(Abuf ≈ D1) # was overwritten by its LU factors
+    sol = realias_solve!(cache, Abuf, D2)
+    @test sol.u ≈ D2 \ B
+    @test cache.A === Abuf
+
+    # Reuse must not allocate a fresh n×n copy: O(n) small allocations only.
+    realias_solve!(cache, Abuf, D1) # warm up this exact path
+    alloc = @allocated realias_solve!(cache, Abuf, D2)
+    @test alloc < 20000 # n^2 * 8 = 80000 bytes would mean A was copied
+
+    # default (alias_A = false): cache.A is left untouched by refactorization.
+    cache = init(LinearProblem(copy(D1), copy(B)), LUFactorization())
+    @test solve!(cache).u ≈ D1 \ B
+    @test cache.A ≈ D1
+    cache.A = copy(D2)
+    @test solve!(cache).u ≈ D2 \ B
+    @test cache.A ≈ D2
 end

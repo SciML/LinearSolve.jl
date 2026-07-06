@@ -201,7 +201,7 @@ function SciMLBase.init(
         typeof(__issquare(assumptions)), typeof(sensealg), Nothing,
     }(
         A, b, u0, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
-        maxiters, verb_spec, assumptions, sensealg, nothing
+        maxiters, verb_spec, assumptions, sensealg, nothing, alias_A
     )
     return cache
 end

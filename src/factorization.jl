@@ -122,8 +122,10 @@ function _check_residual_safety(cache::LinearCache, alg, A_original, y)
     b = cache.b
     if cache.alg isa DefaultLinearSolver
         buf = cache.cacheval.residual_buf
-        if length(buf) != length(b)
-            resize!(buf, length(b))
+        if size(buf) != size(b)
+            # `resize!` only applies to vectors; matrix (batched) b just allocates.
+            buf = buf isa Vector && b isa AbstractVector ? resize!(buf, length(b)) :
+                similar(b)
         end
     else
         buf = similar(b)
@@ -280,6 +282,12 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
                 else
                     fact = lu!(cacheval, A, check = false)
                 end
+            elseif cache.alias_A && !issparsematrix(A) &&
+                    !(A isa GPUArraysCore.AnyGPUArray) &&
+                    ArrayInterface.can_setindex(typeof(A))
+                # The user permitted overwriting A (`alias_A = true` at `init`),
+                # so refactorize in place and skip the O(n²) copy `lu` makes.
+                fact = lu!(A, _normalize_pivot(alg.pivot); check = false)
             else
                 fact = lu(A, check = false)
             end

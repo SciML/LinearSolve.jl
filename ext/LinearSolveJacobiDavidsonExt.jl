@@ -18,7 +18,7 @@ function SciMLBase.solve(
         error("The JacobiDavidson backend currently supports standard eigenvalue problems only. Use `ArpackJL()` or `KrylovKitEigen()` for generalized problems.")
 
     n = size(prob.A, 2)
-    nev = LinearSolve.default_nev(prob)
+    nev = LinearSolve.default_num_eigenpairs(prob)
     target = _jd_target(prob)
     # Search-subspace bounds, capped at the problem size. Users may override
     # `subspace_dimensions` (and any other jdqr keyword) via the algorithm.
@@ -31,7 +31,7 @@ function SciMLBase.solve(
     values, vectors = _jd_standard_pairs(prob.A, out[1])
 
     values, vectors = LinearSolve._select_eigenpairs(
-        values, vectors, nev, prob.which, prob.sigma
+        values, vectors, nev, prob.eigentarget, prob.shift
     )
     retcode = length(values) >= nev ? ReturnCode.Success : ReturnCode.ConvergenceFailure
     return LinearSolve.build_eigenvalue_solution(
@@ -40,12 +40,12 @@ function SciMLBase.solve(
 end
 
 # Map the problem's spectral selector onto a JacobiDavidson `Target`. A supplied
-# `sigma` is the natural interior target (`Near`), which is Jacobi-Davidson's
-# strength; otherwise the `which` symbol selects an extremal target.
+# `shift` is the natural interior target (`Near`), which is Jacobi-Davidson's
+# strength; otherwise `eigentarget` selects an extremal target.
 function _jd_target(prob)
-    prob.sigma !== nothing && return JacobiDavidson.Near(ComplexF64(prob.sigma))
+    prob.shift !== nothing && return JacobiDavidson.Near(ComplexF64(prob.shift))
     T = LinearSolve.EigenvalueTarget
-    w = prob.which
+    w = prob.eigentarget
     return w == T.LargestMagnitude ? JacobiDavidson.LargestMagnitude(0.0 + 0.0im) :
         w == T.SmallestMagnitude ? JacobiDavidson.SmallestMagnitude(0.0 + 0.0im) :
         w == T.LargestRealPart ? JacobiDavidson.LargestRealPart(0.0 + 0.0im) :

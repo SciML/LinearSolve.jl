@@ -14,43 +14,27 @@ else
         EigenvalueTarget
 
     Enum selecting which part of the spectrum is returned when only a subset of the
-    eigenpairs is requested (via `nev`) in an [`EigenvalueProblem`](@ref). The `which`
-    keyword accepts either an `EigenvalueTarget` value or, for convenience, the
-    corresponding ARPACK-style `Symbol` noted for each variant below.
+    eigenpairs is requested (via `num_eigenpairs`) in an [`EigenvalueProblem`](@ref).
     """
     EnumX.@enumx EigenvalueTarget begin
-        "Eigenvalues of largest magnitude, `abs(λ)` largest (symbol `:LM`)."
+        "Eigenvalues of largest magnitude, `abs(λ)` largest."
         LargestMagnitude
-        "Eigenvalues of smallest magnitude, `abs(λ)` smallest (symbol `:SM`)."
+        "Eigenvalues of smallest magnitude, `abs(λ)` smallest."
         SmallestMagnitude
-        "Eigenvalues with the largest (most positive) real part (symbol `:LR`)."
+        "Eigenvalues with the largest (most positive) real part."
         LargestRealPart
-        "Eigenvalues with the smallest (most negative) real part (symbol `:SR`)."
+        "Eigenvalues with the smallest (most negative) real part."
         SmallestRealPart
-        "Eigenvalues with the largest (most positive) imaginary part (symbol `:LI`)."
+        "Eigenvalues with the largest (most positive) imaginary part."
         LargestImaginaryPart
-        "Eigenvalues with the smallest (most negative) imaginary part (symbol `:SI`)."
+        "Eigenvalues with the smallest (most negative) imaginary part."
         SmallestImaginaryPart
     end
 
-    # Normalize a user-supplied `which` (an `EigenvalueTarget` or an ARPACK-style
-    # `Symbol`) to an `EigenvalueTarget`, throwing on anything else.
-    _eigenvalue_target(w::EigenvalueTarget.T) = w
-    function _eigenvalue_target(w::Symbol)
-        return w === :LM ? EigenvalueTarget.LargestMagnitude :
-            w === :SM ? EigenvalueTarget.SmallestMagnitude :
-            w === :LR ? EigenvalueTarget.LargestRealPart :
-            w === :SR ? EigenvalueTarget.SmallestRealPart :
-            w === :LI ? EigenvalueTarget.LargestImaginaryPart :
-            w === :SI ? EigenvalueTarget.SmallestImaginaryPart :
-            throw(ArgumentError("unsupported eigenvalue selector `which = $(repr(w))`; expected an `EigenvalueTarget` or one of :LM, :SM, :LR, :SR, :LI, :SI"))
-    end
-    _eigenvalue_target(w) = throw(ArgumentError("`which` must be an `EigenvalueTarget` or a Symbol (:LM, :SM, :LR, :SR, :LI, :SI), got $(repr(w))"))
-
     """
         EigenvalueProblem(A[, B], p = SciMLBase.NullParameters();
-            nev = nothing, which = EigenvalueTarget.LargestMagnitude,
-            sigma = nothing, u0 = nothing)
+            num_eigenpairs = nothing, eigentarget = EigenvalueTarget.LargestMagnitude,
+            shift = nothing, u0 = nothing)
 
     Define a standard or generalized eigenvalue problem.
 
@@ -59,22 +43,22 @@ else
 
     ## Keyword arguments
 
-      - `nev`: the number of eigenpairs (eigenvalues together with their eigenvectors) to
-        compute. `nothing` (the default) requests every eigenpair for the dense solver, or
-        a solver-chosen default for the iterative backends.
-      - `which`: which part of the spectrum to return, as an [`EigenvalueTarget`](@ref).
-        An ARPACK-style `Symbol` (`:LM`, `:SM`, `:LR`, `:SR`, `:LI`, `:SI`) is also accepted
-        and converted to the corresponding `EigenvalueTarget`. Defaults to the eigenvalues of
-        largest magnitude.
-      - `sigma`: if supplied, return the eigenvalues nearest this shift (shift-and-invert).
+      - `num_eigenpairs`: the number of eigenpairs (eigenvalues together with their
+        eigenvectors) to compute. `nothing` (the default) requests every eigenpair for the
+        dense solver, or a solver-chosen default for the iterative backends.
+      - `eigentarget`: which part of the spectrum to return, as an
+        [`EigenvalueTarget`](@ref). Defaults to the eigenvalues of largest magnitude.
+      - `shift`: if supplied, return the eigenvalues nearest this shift (shift-and-invert).
       - `u0`: optional initial guess for the iterative backends.
     """
-    struct EigenvalueProblem{AType, BType, NevType, WhichType, SigmaType, U0Type, PType, KType}
+    struct EigenvalueProblem{
+            AType, BType, NevType, TargetType, ShiftType, U0Type, PType, KType,
+        }
         A::AType
         B::BType
-        nev::NevType
-        which::WhichType
-        sigma::SigmaType
+        num_eigenpairs::NevType
+        eigentarget::TargetType
+        shift::ShiftType
         u0::U0Type
         p::PType
         kwargs::KType
@@ -82,14 +66,14 @@ else
 
     function EigenvalueProblem(
             A, B = nothing, p = SciMLBase.NullParameters();
-            nev = nothing, which = EigenvalueTarget.LargestMagnitude,
-            sigma = nothing, u0 = nothing, kwargs...
+            num_eigenpairs = nothing,
+            eigentarget::EigenvalueTarget.T = EigenvalueTarget.LargestMagnitude,
+            shift = nothing, u0 = nothing, kwargs...
         )
-        target = _eigenvalue_target(which)
         return EigenvalueProblem{
-            typeof(A), typeof(B), typeof(nev), typeof(target), typeof(sigma),
-            typeof(u0), typeof(p), typeof(kwargs),
-        }(A, B, nev, target, sigma, u0, p, kwargs)
+            typeof(A), typeof(B), typeof(num_eigenpairs), typeof(eigentarget),
+            typeof(shift), typeof(u0), typeof(p), typeof(kwargs),
+        }(A, B, num_eigenpairs, eigentarget, shift, u0, p, kwargs)
     end
 
     struct EigenvalueSolution{T, N, U, V, P, A, R, S} <: SciMLBase.AbstractNoTimeSolution{T, N}
@@ -161,7 +145,9 @@ function SciMLBase.solve(prob::EigenvalueProblem, alg::DenseEigen, args...; kwar
     else
         LinearAlgebra.eigen(prob.A, prob.B; kw...)
     end
-    values, vectors = _select_eigenpairs(F.values, F.vectors, prob.nev, prob.which, prob.sigma)
+    values, vectors = _select_eigenpairs(
+        F.values, F.vectors, prob.num_eigenpairs, prob.eigentarget, prob.shift
+    )
     return build_eigenvalue_solution(prob, alg, values, vectors)
 end
 
@@ -171,43 +157,33 @@ function SciMLBase.solve(
     error("The eigenvalue backend $(typeof(alg)) is not available. Load its package before solving with this algorithm.")
 end
 
-function default_nev(prob::EigenvalueProblem)
+function default_num_eigenpairs(prob::EigenvalueProblem)
     n = size(prob.A, 2)
     # Only the iterative backends call this; requesting the full dimension `n`
     # is invalid/degenerate for them, so default to a small subset.
-    return prob.nev === nothing ? min(n, 6) : prob.nev
+    return prob.num_eigenpairs === nothing ? min(n, 6) : prob.num_eigenpairs
 end
 
-function _select_eigenpairs(values, vectors, nev, which, sigma)
+function _select_eigenpairs(values, vectors, num_eigenpairs, eigentarget, shift)
     nvals = length(values)
-    howmany = nev === nothing ? nvals : min(nev, nvals)
-    ord = _eigenvalue_order(values, which, sigma)
+    howmany = num_eigenpairs === nothing ? nvals : min(num_eigenpairs, nvals)
+    ord = _eigenvalue_order(values, eigentarget, shift)
     idxs = ord[1:howmany]
     return values[idxs], vectors[:, idxs]
 end
 
-# ARPACK-style symbol for the backends that take `which` as a `Symbol`.
-function _target_symbol(w::EigenvalueTarget.T)
-    return w == EigenvalueTarget.LargestMagnitude ? :LM :
-        w == EigenvalueTarget.SmallestMagnitude ? :SM :
-        w == EigenvalueTarget.LargestRealPart ? :LR :
-        w == EigenvalueTarget.SmallestRealPart ? :SR :
-        w == EigenvalueTarget.LargestImaginaryPart ? :LI :
-        :SI
-end
-
-function _eigenvalue_order(values, which::EigenvalueTarget.T, sigma)
-    if sigma !== nothing
-        return sortperm(abs.(values .- sigma))
-    elseif which == EigenvalueTarget.LargestMagnitude
+function _eigenvalue_order(values, eigentarget::EigenvalueTarget.T, shift)
+    if shift !== nothing
+        return sortperm(abs.(values .- shift))
+    elseif eigentarget == EigenvalueTarget.LargestMagnitude
         return sortperm(abs.(values); rev = true)
-    elseif which == EigenvalueTarget.SmallestMagnitude
+    elseif eigentarget == EigenvalueTarget.SmallestMagnitude
         return sortperm(abs.(values))
-    elseif which == EigenvalueTarget.LargestRealPart
+    elseif eigentarget == EigenvalueTarget.LargestRealPart
         return sortperm(real.(values); rev = true)
-    elseif which == EigenvalueTarget.SmallestRealPart
+    elseif eigentarget == EigenvalueTarget.SmallestRealPart
         return sortperm(real.(values))
-    elseif which == EigenvalueTarget.LargestImaginaryPart
+    elseif eigentarget == EigenvalueTarget.LargestImaginaryPart
         return sortperm(imag.(values); rev = true)
     else # EigenvalueTarget.SmallestImaginaryPart
         return sortperm(imag.(values))

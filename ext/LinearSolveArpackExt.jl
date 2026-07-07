@@ -9,10 +9,10 @@ function SciMLBase.solve(
         alg::LinearSolve.ArpackJL,
         args...; kwargs...
     )
-    nev = LinearSolve.default_nev(prob)
-    base = (; nev, which = LinearSolve._target_symbol(prob.which))
-    if prob.sigma !== nothing
-        base = (; base..., sigma = prob.sigma)
+    nev = LinearSolve.default_num_eigenpairs(prob)
+    base = (; nev, which = _arpack_which(prob.eigentarget))
+    if prob.shift !== nothing
+        base = (; base..., sigma = prob.shift)
     end
     kw = (; base..., prob.kwargs..., alg.kwargs..., kwargs...)
     # `Arpack.eigs` takes the generalized-problem matrix `B` positionally, not
@@ -27,6 +27,19 @@ function SciMLBase.solve(
     return LinearSolve.build_eigenvalue_solution(
         prob, alg, values, vectors; retcode, resid, stats
     )
+end
+
+# Arpack.eigs requires a raw ARPACK-style Symbol for `which`; this mapping is
+# purely a private adapter to that third-party API, not a general LinearSolve
+# concept.
+function _arpack_which(w::LinearSolve.EigenvalueTarget.T)
+    T = LinearSolve.EigenvalueTarget
+    return w == T.LargestMagnitude ? :LM :
+        w == T.SmallestMagnitude ? :SM :
+        w == T.LargestRealPart ? :LR :
+        w == T.SmallestRealPart ? :SR :
+        w == T.LargestImaginaryPart ? :LI :
+        :SI
 end
 
 end

@@ -2,7 +2,7 @@ module LinearSolveArnoldiMethodExt
 
 using LinearAlgebra
 using LinearSolve
-import ArnoldiMethod: partialschur, partialeigen
+import ArnoldiMethod: partialschur, partialeigen, LM, LR, SR, LI, SI
 using SciMLBase: SciMLBase, ReturnCode
 
 function SciMLBase.solve(
@@ -12,25 +12,40 @@ function SciMLBase.solve(
     )
     prob.B === nothing ||
         error("ArnoldiMethod backend currently supports standard eigenvalue problems only.")
-    nev = LinearSolve.default_nev(prob)
-    which = prob.sigma === nothing ? LinearSolve._target_symbol(prob.which) : :LM
-    A = prob.sigma === nothing ? prob.A : _shift_invert_operator(prob.A, prob.sigma)
+    nev = LinearSolve.default_num_eigenpairs(prob)
+    which = prob.shift === nothing ? _arnoldi_target(prob.eigentarget) : LM()
+    A = prob.shift === nothing ? prob.A : _shift_invert_operator(prob.A, prob.shift)
     kw = (; nev, which, prob.kwargs..., alg.kwargs..., kwargs...)
     decomp, history = partialschur(A; kw...)
     values, vectors = partialeigen(decomp)
-    if prob.sigma !== nothing
-        values = prob.sigma .+ inv.(values)
+    if prob.shift !== nothing
+        values = prob.shift .+ inv.(values)
     end
-    values, vectors = LinearSolve._select_eigenpairs(values, vectors, nev, prob.which, prob.sigma)
+    values, vectors = LinearSolve._select_eigenpairs(
+        values, vectors, nev, prob.eigentarget, prob.shift
+    )
     retcode = history.converged ? ReturnCode.Success : ReturnCode.ConvergenceFailure
     return LinearSolve.build_eigenvalue_solution(
         prob, alg, values, vectors; retcode, stats = history
     )
 end
 
-function _shift_invert_operator(A, sigma)
-    F = factorize(A - sigma * I)
-    T = promote_type(eltype(A), typeof(sigma))
+# ArnoldiMethod exposes its own `Target` types (preferred over ARPACK-style
+# symbols per its own documentation) for all but smallest-magnitude, which it
+# does not support at all.
+function _arnoldi_target(w::LinearSolve.EigenvalueTarget.T)
+    T = LinearSolve.EigenvalueTarget
+    return w == T.LargestMagnitude ? LM() :
+        w == T.LargestRealPart ? LR() :
+        w == T.SmallestRealPart ? SR() :
+        w == T.LargestImaginaryPart ? LI() :
+        w == T.SmallestImaginaryPart ? SI() :
+        throw(ArgumentError("ArnoldiMethod does not support `eigentarget = EigenvalueTarget.SmallestMagnitude`; use a different backend (e.g. `KrylovKitEigen()` or `ArpackJL()`) or supply `shift` for shift-and-invert."))
+end
+
+function _shift_invert_operator(A, shift)
+    F = factorize(A - shift * I)
+    T = promote_type(eltype(A), typeof(shift))
     return ShiftInvertMap{typeof(F), T}(F, size(A, 1))
 end
 

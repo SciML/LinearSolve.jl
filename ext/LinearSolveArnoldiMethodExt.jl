@@ -13,10 +13,10 @@ function SciMLBase.solve(
     prob.B === nothing ||
         error("ArnoldiMethod backend currently supports standard eigenvalue problems only.")
     nev = LinearSolve.default_nev(prob)
-    which = prob.sigma === nothing ? prob.which : :LM
+    which = prob.sigma === nothing ? LinearSolve._target_symbol(prob.which) : :LM
     A = prob.sigma === nothing ? prob.A : _shift_invert_operator(prob.A, prob.sigma)
     kw = (; nev, which, prob.kwargs..., alg.kwargs..., kwargs...)
-    decomp, history = partialschur(A, alg.args...; kw...)
+    decomp, history = partialschur(A; kw...)
     values, vectors = partialeigen(decomp)
     if prob.sigma !== nothing
         values = prob.sigma .+ inv.(values)

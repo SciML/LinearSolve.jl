@@ -27,7 +27,7 @@ function SciMLBase.solve(
     defaults = (; pairs = nev, target = target, subspace_dimensions = lo:hi)
     kw = (; defaults..., prob.kwargs..., alg.kwargs..., kwargs...)
 
-    out = JacobiDavidson.jdqr(prob.A, alg.args...; kw...)
+    out = JacobiDavidson.jdqr(prob.A; kw...)
     values, vectors = _jd_standard_pairs(prob.A, out[1])
 
     values, vectors = LinearSolve._select_eigenpairs(
@@ -44,14 +44,14 @@ end
 # strength; otherwise the `which` symbol selects an extremal target.
 function _jd_target(prob)
     prob.sigma !== nothing && return JacobiDavidson.Near(ComplexF64(prob.sigma))
+    T = LinearSolve.EigenvalueTarget
     w = prob.which
-    return w === :LM ? JacobiDavidson.LargestMagnitude(0.0 + 0.0im) :
-        w === :SM ? JacobiDavidson.SmallestMagnitude(0.0 + 0.0im) :
-        w === :LR ? JacobiDavidson.LargestRealPart(0.0 + 0.0im) :
-        w === :SR ? JacobiDavidson.SmallestRealPart(0.0 + 0.0im) :
-        w === :LI ? JacobiDavidson.LargestImaginaryPart(0.0 + 0.0im) :
-        w === :SI ? JacobiDavidson.SmallestImaginaryPart(0.0 + 0.0im) :
-        throw(ArgumentError("unsupported `which = $(w)` for JacobiDavidson; expected one of :LM, :SM, :LR, :SR, :LI, :SI, or pass `sigma`"))
+    return w == T.LargestMagnitude ? JacobiDavidson.LargestMagnitude(0.0 + 0.0im) :
+        w == T.SmallestMagnitude ? JacobiDavidson.SmallestMagnitude(0.0 + 0.0im) :
+        w == T.LargestRealPart ? JacobiDavidson.LargestRealPart(0.0 + 0.0im) :
+        w == T.SmallestRealPart ? JacobiDavidson.SmallestRealPart(0.0 + 0.0im) :
+        w == T.LargestImaginaryPart ? JacobiDavidson.LargestImaginaryPart(0.0 + 0.0im) :
+        JacobiDavidson.SmallestImaginaryPart(0.0 + 0.0im)
 end
 
 # jdqr yields a partial Schur decomposition `A*Q = Q*R`. Eigenpairs are recovered

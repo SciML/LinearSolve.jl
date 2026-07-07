@@ -85,3 +85,18 @@ sol_jd_sm = solve(EigenvalueProblem(A_jd; nev = 1, which = :SM), JacobiDavidsonJ
 @test_throws ErrorException solve(
     EigenvalueProblem(A_jd, Matrix(Diagonal(fill(2.0, 30))); nev = 1), JacobiDavidsonJL()
 )
+
+# `which` accepts the EigenvalueTarget enum directly, equivalent to its Symbol alias.
+prob_enum = EigenvalueProblem(A; nev = 2, which = EigenvalueTarget.SmallestMagnitude)
+@test prob_enum.which === EigenvalueTarget.SmallestMagnitude
+@test solve(prob_enum).u == [1.0, 2.0]
+@test EigenvalueProblem(A; which = :SM).which === EigenvalueTarget.SmallestMagnitude
+
+# An invalid `which` is rejected at construction.
+@test_throws ArgumentError EigenvalueProblem(A; which = :XX)
+@test_throws ArgumentError EigenvalueProblem(A; which = 5)
+
+# The iterative algorithms are keyword-only: positional arguments error, and
+# forwarded keywords reach the backend.
+@test_throws MethodError ArpackJL(5)
+@test ArpackJL(; maxiter = 500).kwargs.maxiter == 500

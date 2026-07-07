@@ -10,7 +10,7 @@ function SciMLBase.solve(
         args...; kwargs...
     )
     nev = LinearSolve.default_nev(prob)
-    base = (; nev, which = prob.which)
+    base = (; nev, which = LinearSolve._target_symbol(prob.which))
     if prob.sigma !== nothing
         base = (; base..., sigma = prob.sigma)
     end
@@ -18,9 +18,9 @@ function SciMLBase.solve(
     # `Arpack.eigs` takes the generalized-problem matrix `B` positionally, not
     # as a keyword argument.
     values, vectors, nconv, niter, nmult, resid = if prob.B === nothing
-        Arpack.eigs(prob.A, alg.args...; kw...)
+        Arpack.eigs(prob.A; kw...)
     else
-        Arpack.eigs(prob.A, prob.B, alg.args...; kw...)
+        Arpack.eigs(prob.A, prob.B; kw...)
     end
     retcode = nconv >= length(values) ? ReturnCode.Success : ReturnCode.ConvergenceFailure
     stats = (; nconv, niter, nmult)

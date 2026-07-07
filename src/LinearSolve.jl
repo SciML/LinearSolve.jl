@@ -574,8 +574,8 @@ export LinearSolveAdjoint
 
 export LinearVerbosity
 
-export EigenvalueProblem, EigenvalueSolution, AbstractEigenvalueAlgorithm,
-    DenseEigen, ArpackJL, ArnoldiMethod, ArnoldiMethodJL, KrylovKitEigen,
-    JacobiDavidsonJL
+export AbstractEigenvalueAlgorithm,
+    DenseEigen, ArpackJL, ArnoldiMethod, ArnoldiMethodJL,
+    KrylovKitEigen, JacobiDavidsonJL
 
 end

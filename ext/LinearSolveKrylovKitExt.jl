@@ -67,14 +67,14 @@ function SciMLBase.solve(
         args...; kwargs...
     )
     nev = LinearSolve.default_nev(prob)
-    which = prob.which
+    which = LinearSolve._target_symbol(prob.which)
     kw = (; prob.kwargs..., alg.kwargs..., kwargs...)
     values, vectors, info = if prob.sigma !== nothing
-        _shift_invert_eigsolve(prob, alg, nev, kw)
+        _shift_invert_eigsolve(prob, nev, kw)
     elseif prob.B === nothing
-        KrylovKit.eigsolve(prob.A, alg.args..., nev, which; kw...)
+        KrylovKit.eigsolve(prob.A, nev, which; kw...)
     else
-        KrylovKit.geneigsolve((prob.A, prob.B), alg.args..., nev, which; kw...)
+        KrylovKit.geneigsolve((prob.A, prob.B), nev, which; kw...)
     end
     if prob.sigma !== nothing
         values = prob.sigma .+ inv.(values)
@@ -87,7 +87,7 @@ function SciMLBase.solve(
     )
 end
 
-function _shift_invert_eigsolve(prob, alg, nev, kw)
+function _shift_invert_eigsolve(prob, nev, kw)
     A, B, sigma = prob.A, prob.B, prob.sigma
     T = isnothing(B) ? promote_type(eltype(A), typeof(sigma)) :
         promote_type(eltype(A), eltype(B), typeof(sigma))
@@ -101,11 +101,7 @@ function _shift_invert_eigsolve(prob, alg, nev, kw)
         F = factorize(A - sigma * B)
         op = x -> F \ (B * x)
     end
-    if isempty(alg.args)
-        return KrylovKit.eigsolve(op, size(A, 2), nev, :LM, T; kw...)
-    else
-        return KrylovKit.eigsolve(op, alg.args..., nev, :LM; kw...)
-    end
+    return KrylovKit.eigsolve(op, size(A, 2), nev, :LM, T; kw...)
 end
 
 end

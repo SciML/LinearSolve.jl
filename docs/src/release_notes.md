@@ -1,5 +1,14 @@
 # Release Notes
 
+## v4.0
+
+  - Batched (matrix) right-hand sides are now supported: `solve(LinearProblem(A, B))` with
+    `B::AbstractMatrix` computes the equivalent of `A \ B`, factorizing `A` once and
+    returning `sol.u` as a `size(A, 2) × size(B, 2)` matrix. This is a breaking change:
+    previously a matrix `b` initialized a vector-shaped `u` and generally errored downstream.
+    Batched right-hand sides are supported by the factorization-based algorithms; iterative
+    (Krylov) methods throw an informative `ArgumentError` for matrix `b`.
+
 ## Upcoming Changes
 
   - `CudaOffloadFactorization` has been split into two algorithms:

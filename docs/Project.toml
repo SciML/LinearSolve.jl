@@ -6,6 +6,10 @@ SciMLOperators = "c0aeaf25-5076-4817-a8d5-81caf7dfa961"
 
 [compat]
 Documenter = "1"
-LinearSolve = "3"
+LinearSolve = "4"
 LinearSolveAutotune = "1.1"
 SciMLOperators = "1"
+
+[sources]
+LinearSolve = {path = ".."}
+LinearSolveAutotune = {path = "../lib/LinearSolveAutotune"}

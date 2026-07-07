@@ -299,6 +299,14 @@ function SciMLBase.init(prob::DualBLinearProblem, alg::PureKLUFactorization, arg
     return __init(prob, alg, args...; kwargs...)
 end
 
+# DualBLinearProblem's A slot is `Union{Number, AbstractArray}`, which a Dual-eltype A
+# also matches, so the b-only opt-out above would otherwise capture both-Dual problems
+# (`DualLinearProblem <: DualBLinearProblem`). Restore the direct dual path for them: a
+# Dual A needs the DualLinearCache machinery, the mixed-type ldiv! only covers primal A.
+function SciMLBase.init(prob::DualLinearProblem, alg::PureKLUFactorization, args...; kwargs...)
+    return __dual_init(prob, alg, args...; kwargs...)
+end
+
 # NOTE: Removed the runtime conditional for DefaultLinearSolver that checked for
 # GenericLUFactorization. Now always use __dual_init for type stability.
 function SciMLBase.init(prob::DualAbstractLinearProblem, alg::DefaultLinearSolver, args...; kwargs...)

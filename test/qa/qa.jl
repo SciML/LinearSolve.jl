@@ -1,52 +1,72 @@
-using LinearSolve, Aqua
-using ExplicitImports
-using Test
+using SciMLTesting, LinearSolve, Test
+using SparseArrays  # materializes the KLU submodule via LinearSolveSparseArraysExt
 
-@testset "Aqua" begin
-    Aqua.find_persistent_tasks_deps(LinearSolve)
-    Aqua.test_ambiguities(LinearSolve, recursive = false, broken = true)
-    Aqua.test_deps_compat(LinearSolve, ignore = [:MKL_jll])
-    Aqua.test_piracies(
-        LinearSolve,
-        treat_as_own = [LinearProblem]
-    )
-    Aqua.test_project_extras(LinearSolve)
-    Aqua.test_stale_deps(LinearSolve, ignore = [:MKL_jll])
-    Aqua.test_unbound_args(LinearSolve)
-    Aqua.test_undefined_exports(LinearSolve)
+# Extension submodules ExplicitImports cannot analyze; allow them to be unanalyzable.
+klu_mod = try
+    Base.get_extension(LinearSolve, :LinearSolveSparseArraysExt).KLU
+catch
+    nothing
+end
+unanalyzable_mods = (
+    LinearSolve.OperatorCondition, LinearSolve.DefaultAlgorithmChoice,
+    LinearSolve.NonstructuralZeros,
+)
+if klu_mod !== nothing
+    unanalyzable_mods = (unanalyzable_mods..., klu_mod)
 end
 
-@testset "Explicit Imports" begin
-    # Get extension modules that might be unanalyzable
-    klu_mod = try
-        Base.get_extension(LinearSolve, :LinearSolveSparseArraysExt).KLU
-    catch
-        nothing
-    end
-    unanalyzable_mods = (
-        LinearSolve.OperatorCondition, LinearSolve.DefaultAlgorithmChoice,
-        LinearSolve.NonstructuralZeros,
-    )
-    if klu_mod !== nothing
-        unanalyzable_mods = (unanalyzable_mods..., klu_mod)
-    end
+# SciMLLogging names pulled in by the @verbosity_specifier macro expansion, plus
+# @set! reached by extensions via LinearSolve.@set! — both look stale to EI because
+# their only uses are through macro-generated / downstream-extension code.
+sciml_logging_macro_imports = (
+    :AbstractVerbositySpecifier, :AbstractVerbosityPreset,
+    :None, :Minimal, :Standard, :Detailed, :All,
+)
+extension_imports = (Symbol("@set!"),)
 
-    @test check_no_implicit_imports(
-        LinearSolve; skip = (Base, Core),
-        allow_unanalyzable = unanalyzable_mods
-    ) === nothing
-    # These SciMLLogging imports are used by the @verbosity_specifier macro-generated code
-    # but ExplicitImports can't detect usage through macro expansions
-    sciml_logging_macro_imports = (
-        :AbstractVerbositySpecifier, :AbstractVerbosityPreset,
-        :None, :Minimal, :Standard, :Detailed, :All,
-    )
-    # @set! is used by extensions via LinearSolve.@set! but ExplicitImports can't detect this
-    extension_imports = (Symbol("@set!"),)
-    @test check_no_stale_explicit_imports(
-        LinearSolve;
-        allow_unanalyzable = unanalyzable_mods,
-        ignore = (sciml_logging_macro_imports..., extension_imports...)
-    ) === nothing
-    @test check_all_qualified_accesses_via_owners(LinearSolve) === nothing
-end
+run_qa(
+    LinearSolve;
+    explicit_imports = true,
+    # Recursive ambiguities are tracked separately; placeholder until resolved.
+    aqua_broken = (:ambiguities,),
+    aqua_kwargs = (;
+        deps_compat = (; ignore = [:MKL_jll]),
+        stale_deps = (; ignore = [:MKL_jll]),
+        piracies = (; treat_as_own = [LinearProblem]),
+    ),
+    ei_kwargs = (;
+        no_implicit_imports = (;
+            skip = (Base, Core), allow_unanalyzable = unanalyzable_mods,
+        ),
+        no_stale_explicit_imports = (;
+            allow_unanalyzable = unanalyzable_mods,
+            ignore = (sciml_logging_macro_imports..., extension_imports...),
+        ),
+        # Names imported from a re-exporting module rather than their defining owner:
+        #   @blasfunc/chkstride1 (LinearAlgebra.BLAS, via LinearAlgebra.LAPACK),
+        #   AbstractSciMLOperator (SciMLOperators, via SciMLBase),
+        #   ArrayInterface/UMFPACK_OK (re-exported), inv (Base, via LinearAlgebra).
+        all_explicit_imports_via_owners = (;
+            ignore = (
+                Symbol("@blasfunc"), :AbstractSciMLOperator, :ArrayInterface,
+                :UMFPACK_OK, :chkstride1, :inv,
+            ),
+        ),
+        # Non-public names explicitly imported from stdlib / other packages
+        # (LinearAlgebra(.BLAS/.LAPACK), SparseArrays, SciMLBase, SciMLOperators,
+        # ArrayInterface, StaticArraysCore, Base) and needed by the solver bindings.
+        all_explicit_imports_are_public = (;
+            ignore = (
+                Symbol("@blasfunc"), :AbstractSciMLOperator, :AbstractSparseMatrixCSC,
+                :ArrayInterface, :BLASELTYPES, :BlasInt, :StaticArray, :UMFPACK_OK,
+                :chkargsok, :chkfinite, :chkstride1, :getcolptr, :inv,
+                :pattern_changed, :require_one_based_indexing,
+            ),
+        ),
+    ),
+    # ~90 qualified accesses of non-public names (LinearSolve's own internals reached
+    # via LinearSolve.x from extensions, plus stdlib/SciMLBase/LinearAlgebra internals).
+    # Making them public is a large cross-package effort tracked in
+    # https://github.com/SciML/LinearSolve.jl/issues/1058
+    ei_broken = (:all_qualified_accesses_are_public,),
+)

@@ -224,6 +224,12 @@ function init_cacheval(
         alg::SimpleLUFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
         reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
+    b isa AbstractMatrix && throw(
+        ArgumentError(
+            "SimpleLUFactorization supports only vector right-hand sides. Use " *
+                "`LUFactorization()` or `GenericLUFactorization()` for batched (matrix) `b`."
+        )
+    )
     return LUSolver(convert(AbstractMatrix, A))
 end
 

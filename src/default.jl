@@ -354,11 +354,13 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
                 )
 
                 # Small matrix override - always use GenericLUFactorization for tiny problems
-                if length(b) <= 10
+                # `size(b, 1)` (not `length(b)`) so batched (matrix) right-hand
+                # sides don't inflate the apparent problem size.
+                if size(b, 1) <= 10
                     DefaultAlgorithmChoice.GenericLUFactorization
                 else
                     # Check if autotune preferences exist for larger matrices
-                    matrix_size = length(b)
+                    matrix_size = size(b, 1)
                     eltype_A = A === nothing ? Nothing : eltype(A)
                     tuned_alg = get_tuned_algorithm(eltype_A, eltype(b), matrix_size)
 
@@ -369,8 +371,8 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
                             eltype(b) <: Union{Float32, Float64, ComplexF32, ComplexF64}
                         DefaultAlgorithmChoice.AppleAccelerateLUFactorization
                     elseif (
-                            length(b) <= 100 || (isopenblas() && length(b) <= 500) ||
-                                (usemkl && length(b) <= 200)
+                            size(b, 1) <= 100 || (isopenblas() && size(b, 1) <= 500) ||
+                                (usemkl && size(b, 1) <= 200)
                         ) &&
                             (
                             A === nothing ? eltype(b) <: Union{Float32, Float64} :

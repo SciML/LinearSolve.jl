@@ -12,6 +12,13 @@ The following are the options these algorithms take, along with their defaults.
     `A` and `b` can be written to and changed by the solver algorithm. When fields are `nothing`
     the default behavior is used, which is to default to `true` when the algorithm is known
     not to modify the matrices, and false otherwise.
+
+    `alias_A = true` also extends to caching interface refactorizations: after replacing
+    the matrix via `cache.A = A2`, dense factorizations such as `LUFactorization` will
+    factorize in place (`lu!(cache.A)`), overwriting `cache.A` with its factors instead
+    of making an O(n²) copy on every refactorization. Only opt in when you own the matrix
+    handed to the cache and refill it before each new solve, since its contents are
+    destroyed by the factorization.
   - `verbose`: Whether to print extra information. Defaults to `false`.
   - `assumptions`: Sets the assumptions of the operator in order to effect the default
     choice algorithm. See the [Operator Assumptions page for more details](@ref assumptions).

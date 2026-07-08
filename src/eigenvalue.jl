@@ -76,7 +76,7 @@ else
         }(A, B, num_eigenpairs, eigentarget, shift, u0, p, kwargs)
     end
 
-    struct EigenvalueSolution{T, N, U, V, P, A, R, S} <: SciMLBase.AbstractNoTimeSolution{T, N}
+    struct EigenvalueSolution{Tv, N, U, V, P, A, R, S} <: SciMLBase.AbstractNoTimeSolution{Tv, N}
         u::U
         vectors::V
         prob::P
@@ -90,10 +90,10 @@ else
             prob, alg, values, vectors;
             retcode = ReturnCode.Success, resid = nothing, stats = nothing
         )
-        T = eltype(eltype(values))
+        Tv = eltype(eltype(values))
         N = length((size(values)...,))
         return EigenvalueSolution{
-            T, N, typeof(values), typeof(vectors), typeof(prob), typeof(alg),
+            Tv, N, typeof(values), typeof(vectors), typeof(prob), typeof(alg),
             typeof(resid), typeof(stats),
         }(values, vectors, prob, alg, retcode, resid, stats)
     end

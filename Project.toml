@@ -121,6 +121,8 @@ AMDGPU = "1.2, 2"
 # the ext API is identical and the AMG testset passes on 0.5.1.
 AlgebraicMultigrid = "0.5, 1, 2"
 ArrayInterface = "7.19"
+ArnoldiMethod = "0.4"
+Arpack = "0.5"
 BandedMatrices = "1.8"
 BlockDiagonals = "0.2"
 cuSOLVER = "6"

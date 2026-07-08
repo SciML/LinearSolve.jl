@@ -51,7 +51,7 @@ end
     u0 = ComponentArray(a = ones(4, 2), b = ones(4, 2))
     ax = only(ComponentArrays.getaxes(u0))
     n = length(u0)
-    M = Matrix{Float64}(I, n, n) .+ 0.01 .* reshape(1:(n*n), n, n)
+    M = Matrix{Float64}(I, n, n) .+ 0.01 .* reshape(1:(n * n), n, n)
     A = ComponentArray(M, (ax, ax))
     b = copy(u0)
 

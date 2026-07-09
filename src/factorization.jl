@@ -659,6 +659,15 @@ end
 
 ## LDLtFactorization
 
+"""
+    LDLtFactorization(shift = 0.0, perm = nothing)
+
+Julia's built-in LDLᵀ factorization. Dense inputs use `ldlt!`; sparse inputs
+use `ldlt!` with the supplied `shift` and `perm` keyword values.
+
+This method is intended for Hermitian or symmetric linear systems where an LDLᵀ
+factorization is appropriate.
+"""
 struct LDLtFactorization{T} <: AbstractDenseFactorization
     shift::Float64
     perm::T

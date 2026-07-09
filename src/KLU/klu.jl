@@ -599,7 +599,7 @@ The relation between `K` and `A` is
 !!! note
 
     `klu(A::SparseMatrixCSC)` uses the KLU[^ACM907] library that is part of
-    SuiteSparse. As this library only supports sparse matrices with [`Float64`](@ref) or
+    SuiteSparse. As this library only supports sparse matrices with `Float64` or
     `ComplexF64` elements, `lu` converts `A` into a copy that is of type
     `SparseMatrixCSC{Float64}` or `SparseMatrixCSC{ComplexF64}` as appropriate.
 
@@ -660,7 +660,7 @@ See also: [`klu`](@ref)
 !!! note
 
     `klu(A::SparseMatrixCSC)` uses the KLU[^ACM907] library that is part of
-    SuiteSparse. As this library only supports sparse matrices with [`Float64`](@ref) or
+    SuiteSparse. As this library only supports sparse matrices with `Float64` or
     `ComplexF64` elements, `lu` converts `A` into a copy that is of type
     `SparseMatrixCSC{Float64}` or `SparseMatrixCSC{ComplexF64}` as appropriate.
 

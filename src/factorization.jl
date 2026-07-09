@@ -512,12 +512,12 @@ end
 """
 `GESVFactorization()`
 
-A direct mirror of LAPACK's `gesv` driver (`LAPACK.gesv!`): on a fresh matrix the
-right-hand side is copied into `u` and the factorization and solve happen in a
-single LAPACK call, matching the classic `dgesv` workflow. The `(factors, ipiv)`
-pair is cached, so subsequent solves that only change `b` are a single
-allocation-free `LAPACK.getrs!` triangular solve. Batched (matrix) right-hand
-sides are handled natively by both calls.
+A dense LU factorize-and-solve in the style of LAPACK's `gesv` driver, tuned for
+repeated solves. On a fresh matrix it factorizes with `lu!(A; check = false)`
+(so a singular factor is reported through the return code, never thrown) and
+solves into `u`; the factorization is cached, so subsequent solves that only
+change `b` are an allocation-free triangular solve. Batched (matrix) right-hand
+sides are handled natively.
 
 With `alias_A = true` the factorization overwrites `cache.A` directly; otherwise
 a workspace-owned buffer is refilled with `copyto!` on each refactorization and
@@ -534,7 +534,7 @@ function init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     ) where {T <: LinearAlgebra.BlasFloat}
-    return (Matrix{T}(undef, 0, 0), Vector{BlasInt}(undef, 0))
+    return LinearAlgebra.LU(Matrix{T}(undef, 0, 0), BlasInt[], zero(BlasInt))
 end
 
 function init_cacheval(
@@ -554,39 +554,34 @@ end
 
 function SciMLBase.solve!(cache::LinearCache, alg::GESVFactorization; kwargs...)
     A = convert(AbstractMatrix, cache.A)
-    F, ipiv = @get_cacheval(cache, :GESVFactorization)
+    luf = @get_cacheval(cache, :GESVFactorization)
     if cache.isfresh
         if cache.alias_A && A isa Matrix
             # The user permitted overwriting A, so factorize it in place.
             Atarget = A
         else
-            if size(F) != size(A)
-                F = Matrix{eltype(A)}(undef, size(A))
+            Fbuf = getfield(luf, :factors)
+            if size(Fbuf) != size(A)
+                Fbuf = similar(A)
             end
-            copyto!(F, A)
-            Atarget = F
+            copyto!(Fbuf, A)
+            Atarget = Fbuf
         end
-        # Equivalent to dgesv (factorize + solve), but split into getrf!/getrs!
-        # so a singular factor is reported through the return code rather than a
-        # thrown exception: getrf! returns `info > 0` for a singular U without
-        # raising (unlike gesv!, which calls chklapackerror).
-        factors, ipivnew, info = LAPACK.getrf!(Atarget)
-        cache.cacheval = (factors, ipivnew)
-        cache.isfresh = false
-        if !iszero(info)
+        # `check = false` returns a singular factorization instead of throwing,
+        # so a singular denominator is reported through the return code.
+        luf = lu!(Atarget; check = false)
+        cache.cacheval = luf
+        if !issuccess(luf)
             @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
             )
         end
-        copyto!(cache.u, cache.b)
-        LAPACK.getrs!('N', factors, ipivnew, cache.u)
-        return SciMLBase.build_linear_solution(
-            alg, cache.u, nothing, cache; retcode = ReturnCode.Success
-        )
+        cache.isfresh = false
     end
+    # Solve into `u`; a matrix `b` (batched RHS) is handled natively by ldiv!.
     copyto!(cache.u, cache.b)
-    LAPACK.getrs!('N', F, ipiv, cache.u)
+    ldiv!(luf, cache.u)
     return SciMLBase.build_linear_solution(
         alg, cache.u, nothing, cache; retcode = ReturnCode.Success
     )

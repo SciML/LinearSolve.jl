@@ -149,6 +149,8 @@ LinearSolve.DefaultLinearSolver
 
 ```@docs
 RFLUFactorization
+ButterflyFactorization
+RF32MixedLUFactorization
 ```
 
 ### SpecializingFactorizations.jl
@@ -171,12 +173,14 @@ customized per-package, details given below describe a subset of important array
 
 ```@docs
 LUFactorization
+GenericFactorization
 GenericLUFactorization
 QRFactorization
 SVDFactorization
 CholeskyFactorization
 BunchKaufmanFactorization
 CHOLMODFactorization
+LDLtFactorization
 NormalCholeskyFactorization
 NormalBunchKaufmanFactorization
 ```
@@ -191,6 +195,7 @@ DiagonalFactorization
 SimpleGMRES
 DirectLdiv!
 LinearSolveFunction
+LinearSolveAdjoint
 ```
 
 ### FastLapackInterface.jl
@@ -220,7 +225,10 @@ FastQRFactorization
 
 ```@docs
 KLUFactorization
+LinearSolveSparseArraysExt.KLU.klu
+LinearSolveSparseArraysExt.KLU.klu!
 PureKLUFactorization
+PureUMFPACKFactorization
 UMFPACKFactorization
 SparseColumnPivotedQRFactorization
 ```
@@ -276,6 +284,29 @@ ParUFactorization
 MUMPSFactorization
 ```
 
+### SuperLUDIST.jl
+
+!!! note
+
+    Using this solver requires loading `SuperLUDIST.jl`, `SparseArrays`, and `MPI`,
+    and calling `MPI.Init()` before constructing the solver.
+
+```@docs
+SuperLUDISTFactorization
+```
+
+### HSL.jl
+
+!!! note
+
+    Using these solvers requires loading `HSL.jl` and `SparseArrays`.
+    `HSL.jl` requires a manual installation of `HSL_jll.jl`.
+
+```@docs
+HSLMA57Factorization
+HSLMA97Factorization
+```
+
 ### Sparspak.jl
 
 !!! note
@@ -324,9 +355,11 @@ CliqueTreesFactorization
 KrylovJL_CG
 KrylovJL_MINRES
 KrylovJL_GMRES
+KrylovJL_FGMRES
 KrylovJL_BICGSTAB
 KrylovJL_LSMR
 KrylovJL_CRAIGMR
+KrylovJL_MINARES
 KrylovJL
 ```
 
@@ -341,6 +374,7 @@ MKL32MixedLUFactorization
 
 ```@docs
 OpenBLASLUFactorization
+OpenBLAS32MixedLUFactorization
 ```
 
 ### AppleAccelerate.jl
@@ -374,6 +408,8 @@ MetalOffload32MixedLUFactorization
 ```@docs
 MKLPardisoFactorize
 MKLPardisoIterate
+PanuaPardisoFactorize
+PanuaPardisoIterate
 LinearSolve.PardisoJL
 ```
 
@@ -387,6 +423,7 @@ The following are non-standard GPU factorization routines.
     Using these solvers requires adding the package CUDA.jl, i.e. `using CUDA`
 
 ```@docs
+CudaOffloadFactorization
 CudaOffloadLUFactorization
 CudaOffloadQRFactorization
 CUDAOffload32MixedLUFactorization
@@ -413,6 +450,17 @@ AMDGPUOffloadQRFactorization
 
 ```@docs
 CUSOLVERRFFactorization
+```
+
+### AlgebraicMultigrid.jl
+
+!!! note
+
+    Using this solver requires adding the package AlgebraicMultigrid.jl, i.e.
+    `using AlgebraicMultigrid`
+
+```@docs
+AlgebraicMultigridJL
 ```
 
 ### IterativeSolvers.jl
@@ -528,6 +576,17 @@ PartitionedSolversAlgorithm
 GinkgoJL
 GinkgoJL_CG
 GinkgoJL_GMRES
+```
+
+### Elemental.jl
+
+!!! note
+
+    Using this solver requires adding the package Elemental.jl, i.e.
+    `using Elemental`
+
+```@docs
+ElementalJL
 ```
 
 ### PETSc.jl
@@ -904,3 +963,9 @@ solver. `method` can be `:RugeStuben` (default) or `:SmoothedAggregation`. The o
 `accel` keyword (`"cg"`, `"gmres"`, `"bicgstab"`, …) wraps the AMG cycle in a Krylov
 solver. Convenience constructors `PyAMG_RugeStuben` and `PyAMG_SmoothedAggregation`
 are also provided.
+
+```@docs
+LinearSolvePyAMG.PyAMG
+LinearSolvePyAMG.PyAMG_RugeStuben
+LinearSolvePyAMG.PyAMG_SmoothedAggregation
+```

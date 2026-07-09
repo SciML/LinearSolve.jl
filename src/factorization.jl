@@ -566,24 +566,21 @@ function SciMLBase.solve!(cache::LinearCache, alg::GESVFactorization; kwargs...)
             copyto!(F, A)
             Atarget = F
         end
-        copyto!(cache.u, cache.b)
-        try
-            # One combined factorize-and-solve LAPACK call, exactly like dgesv;
-            # gesv! returns the factors and pivots for later getrs! reuse.
-            _, factors, ipivnew = LAPACK.gesv!(Atarget, cache.u)
-            cache.cacheval = (factors, ipivnew)
-        catch e
-            if e isa LinearAlgebra.LAPACKException ||
-                    e isa LinearAlgebra.SingularException
-                @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
-                return SciMLBase.build_linear_solution(
-                    alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
-                )
-            else
-                rethrow(e)
-            end
-        end
+        # Equivalent to dgesv (factorize + solve), but split into getrf!/getrs!
+        # so a singular factor is reported through the return code rather than a
+        # thrown exception: getrf! returns `info > 0` for a singular U without
+        # raising (unlike gesv!, which calls chklapackerror).
+        factors, ipivnew, info = LAPACK.getrf!(Atarget)
+        cache.cacheval = (factors, ipivnew)
         cache.isfresh = false
+        if !iszero(info)
+            @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
+            return SciMLBase.build_linear_solution(
+                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+            )
+        end
+        copyto!(cache.u, cache.b)
+        LAPACK.getrs!('N', factors, ipivnew, cache.u)
         return SciMLBase.build_linear_solution(
             alg, cache.u, nothing, cache; retcode = ReturnCode.Success
         )

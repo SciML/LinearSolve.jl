@@ -6,7 +6,7 @@ LinearSolvePyAMG = "7a56c47d-7ab1-4e99-b0e3-2952e463d64a"
 SciMLOperators = "c0aeaf25-5076-4817-a8d5-81caf7dfa961"
 
 [sources]
-LinearSolve = {path = "/home/runner/work/LinearSolve.jl/LinearSolve.jl"}
+LinearSolve = {path = "/home/runner/_work/LinearSolve.jl/LinearSolve.jl"}
 LinearSolveAutotune = {path = "../lib/LinearSolveAutotune"}
 LinearSolvePyAMG = {path = "../lib/LinearSolvePyAMG"}
 

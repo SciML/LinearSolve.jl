@@ -1,5 +1,14 @@
 # Release Notes
 
+## v4.2
+
+  - New `GESVFactorization` algorithm mirroring LAPACK's `gesv` driver: fresh matrices
+    factorize and solve in a single `LAPACK.gesv!` call, and repeat solves with only a new
+    `b` reuse the cached factors through an allocation-free `LAPACK.getrs!`.
+  - Dense `LUFactorization` refactorizations (`cache.A = X` then `solve!`) now reuse the
+    cached pivot vector (and, without `alias_A`, the cached factors buffer) on
+    Julia >= 1.11, making warm refactorization solves allocation-free.
+
 ## v4.0
 
   - Batched (matrix) right-hand sides are now supported: `solve(LinearProblem(A, B))` with

@@ -263,6 +263,29 @@ GenericLUFactorization(pivot = RowMaximum(); residualsafety::Bool = false) = Gen
 _get_residualsafety(alg::LUFactorization) = alg.residualsafety
 _get_residualsafety(alg::GenericLUFactorization) = alg.residualsafety
 
+# Dense-LU refactorization buffer reuse: `lu`/`lu!` allocate a fresh pivot
+# vector (and, without aliasing, a fresh factors copy) on every `cache.A = X`
+# refactorization. When the cached `LU`'s buffers match the incoming matrix,
+# factorize through `LAPACK.getrf!` with the cached `ipiv` instead. The
+# preallocated-`ipiv` `getrf!` method only exists on Julia >= 1.11; older
+# releases keep the allocating path.
+@static if VERSION >= v"1.11"
+    function _reusable_lu_cacheval(cacheval, A)
+        return cacheval isa LU &&
+            cacheval.ipiv isa Vector{BlasInt} &&
+            length(cacheval.ipiv) == min(size(A)...)
+    end
+    function _lu_reusing_ipiv!(A, ipiv::Vector{BlasInt})
+        factors, piv, info = LAPACK.getrf!(A, ipiv; check = false)
+        return LU{eltype(factors), typeof(factors), typeof(piv)}(
+            factors, piv, convert(BlasInt, info)
+        )
+    end
+else
+    _reusable_lu_cacheval(cacheval, A) = false
+    _lu_reusing_ipiv!(A, ipiv) = error("unreachable: requires Julia >= 1.11")
+end
+
 function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
     A = cache.A
     A = convert(AbstractMatrix, A)
@@ -287,9 +310,26 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
                     ArrayInterface.can_setindex(typeof(A))
                 # The user permitted overwriting A (`alias_A = true` at `init`),
                 # so refactorize in place and skip the O(n²) copy `lu` makes.
-                fact = lu!(A, _normalize_pivot(alg.pivot); check = false)
+                pivot = _normalize_pivot(alg.pivot)
+                if A isa StridedMatrix{<:LinearAlgebra.BlasFloat} &&
+                        pivot isa RowMaximum && _reusable_lu_cacheval(cacheval, A)
+                    fact = _lu_reusing_ipiv!(A, cacheval.ipiv)
+                else
+                    fact = lu!(A, pivot; check = false)
+                end
             else
-                fact = lu(A, check = false)
+                pivot = _normalize_pivot(alg.pivot)
+                if A isa StridedMatrix{<:LinearAlgebra.BlasFloat} &&
+                        pivot isa RowMaximum && _reusable_lu_cacheval(cacheval, A) &&
+                        cacheval.factors isa Matrix{eltype(A)} &&
+                        size(cacheval.factors) == size(A) && cacheval.factors !== A
+                    # A must stay intact, but the previous factorization's
+                    # buffers can be overwritten in place of `lu`'s fresh copy.
+                    copyto!(cacheval.factors, A)
+                    fact = _lu_reusing_ipiv!(cacheval.factors, cacheval.ipiv)
+                else
+                    fact = lu(A, check = false)
+                end
             end
         catch e
             # Some matrix types (e.g. BandedMatrix) throw LAPACKException on singular
@@ -465,6 +505,86 @@ function init_cacheval(
         assumptions::OperatorAssumptions
     )
     return nothing
+end
+
+## GESVFactorization
+
+"""
+`GESVFactorization()`
+
+A dense LU factorize-and-solve in the style of LAPACK's `gesv` driver, tuned for
+repeated solves. On a fresh matrix it factorizes with `lu!(A; check = false)`
+(so a singular factor is reported through the return code, never thrown) and
+solves into `u`; the factorization is cached, so subsequent solves that only
+change `b` are an allocation-free triangular solve. Batched (matrix) right-hand
+sides are handled natively.
+
+With `alias_A = true` the factorization overwrites `cache.A` directly; otherwise
+a workspace-owned buffer is refilled with `copyto!` on each refactorization and
+the user's matrix is left untouched.
+
+Only dense strided BLAS floating-point matrices
+(`StridedMatrix{<:Union{Float32, Float64, ComplexF32, ComplexF64}}`) are
+supported; other operator types throw an informative error at `init`.
+"""
+struct GESVFactorization <: AbstractDenseFactorization end
+
+function init_cacheval(
+        alg::GESVFactorization, A::StridedMatrix{T}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions
+    ) where {T <: LinearAlgebra.BlasFloat}
+    return LinearAlgebra.LU(Matrix{T}(undef, 0, 0), BlasInt[], zero(BlasInt))
+end
+
+function init_cacheval(
+        alg::GESVFactorization, A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions
+    )
+    throw(
+        ArgumentError(
+            "GESVFactorization only supports dense strided BLAS floating-point \
+            matrices (StridedMatrix{<:Union{Float32, Float64, ComplexF32, \
+            ComplexF64}}); got $(typeof(A)). Use LUFactorization or the default \
+            algorithm instead."
+        )
+    )
+end
+
+function SciMLBase.solve!(cache::LinearCache, alg::GESVFactorization; kwargs...)
+    A = convert(AbstractMatrix, cache.A)
+    luf = @get_cacheval(cache, :GESVFactorization)
+    if cache.isfresh
+        if cache.alias_A && A isa Matrix
+            # The user permitted overwriting A, so factorize it in place.
+            Atarget = A
+        else
+            Fbuf = getfield(luf, :factors)
+            if size(Fbuf) != size(A)
+                Fbuf = similar(A)
+            end
+            copyto!(Fbuf, A)
+            Atarget = Fbuf
+        end
+        # `check = false` returns a singular factorization instead of throwing,
+        # so a singular denominator is reported through the return code.
+        luf = lu!(Atarget; check = false)
+        cache.cacheval = luf
+        if !issuccess(luf)
+            @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
+            return SciMLBase.build_linear_solution(
+                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+            )
+        end
+        cache.isfresh = false
+    end
+    # Solve into `u`; a matrix `b` (batched RHS) is handled natively by ldiv!.
+    copyto!(cache.u, cache.b)
+    ldiv!(luf, cache.u)
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+    )
 end
 
 ## QRFactorization

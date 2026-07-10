@@ -1,6 +1,7 @@
-using LinearSolve, LinearAlgebra, SparseArrays, Test, Random
+using LinearSolve, LinearAlgebra, SparseArrays, Test
+using StableRNGs
 
-rng = MersenneTwister(123)
+rng = StableRNG(123)
 
 @testset "GESVFactorization" begin
     @testset "vector and matrix RHS" begin

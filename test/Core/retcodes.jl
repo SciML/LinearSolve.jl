@@ -127,7 +127,9 @@ end
         end
     end
 
-    # Nonsingular static solves stay bit-identical to `\`
+    # Nonsingular static solves match `\` (up to FMA contraction differences
+    # in StaticArrays' inlined small-size formulas, per review the check is
+    # allowed to inline rather than preserving bit-identity)
     A2n = SA[2.0 1.0; 1.0 3.0]
     A4n = SMatrix{4, 4}(
         [
@@ -145,7 +147,7 @@ end
             ),
         )
         for rhs in (b, B)
-            @test solve(LinearProblem(A, rhs)).u === A \ rhs
+            @test solve(LinearProblem(A, rhs)).u ≈ A \ rhs rtol = 4 * eps()
             @test solve(LinearProblem(A, rhs), LUFactorization()).u === lu(A) \ rhs
         end
     end

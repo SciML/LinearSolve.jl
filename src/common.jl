@@ -695,12 +695,6 @@ function SciMLBase.solve(prob::StaticLinearProblem, args...; kwargs...)
     return SciMLBase.solve(prob, nothing, args...; kwargs...)
 end
 
-# `@noinline` so the `\` kernel compiles in its own context: StaticArrays'
-# small-size formulas contain `muladd`s whose FMA contraction is
-# inlining-context dependent, and inlining them next to the finiteness check
-# below changes the result in the last bit relative to a plain `A \ b`.
-@noinline __static_plain_ldiv(A, b) = A \ b
-
 """
     __static_default_ldiv(A, b)
 
@@ -718,7 +712,10 @@ function __static_default_ldiv(A::SMatrix{N, N}, b) where {N}
     # sizes `lu(A, check = false) \ b` is the same computation as `A \ b`
     # without the throw.
     if N <= 3
-        u = __static_plain_ldiv(A, b)
+        # Fully inlined: StaticArrays' small-size formulas have
+        # inlining-context-dependent FMA contraction, so results may differ
+        # from a bare `A \ b` in the last bit.
+        u = A \ b
         # Only rescue on factorization failure: a nonsingular `A` with
         # non-finite `u` (e.g. non-finite `b`) returns `u` as-is, matching the
         # dense LU behavior.

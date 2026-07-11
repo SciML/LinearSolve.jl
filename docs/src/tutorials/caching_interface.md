@@ -52,8 +52,11 @@ sol3.u
 ```
 
 The factorization occurs on the first solve, and it stores the factorization in
-the cache. You can retrieve this cache via `sol.cache`, which is the same object
-as the `init`, but updated to know not to re-solve the factorization.
+the cache: the `linsolve` object returned by `init` is updated in-place to know
+not to re-solve the factorization. Keep the object from `init` around to reuse
+it; the solution returned by `solve!` is a lightweight value type that only
+carries the answer (`sol.u`, `sol.resid`, `sol.retcode`, ...), so its `cache`
+field is `nothing` (as of LinearSolve.jl 5.0).
 
 The advantage of course with import LinearSolve.jl in this form is that it is
 efficient while being agnostic to the linear solver. One can easily swap in

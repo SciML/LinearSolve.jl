@@ -695,11 +695,51 @@ function SciMLBase.solve(prob::StaticLinearProblem, args...; kwargs...)
     return SciMLBase.solve(prob, nothing, args...; kwargs...)
 end
 
+# `@noinline` so the `\` kernel compiles in its own context: StaticArrays'
+# small-size formulas contain `muladd`s whose FMA contraction is
+# inlining-context dependent, and inlining them next to the finiteness check
+# below changes the result in the last bit relative to a plain `A \ b`.
+@noinline __static_plain_ldiv(A, b) = A \ b
+
+"""
+    __static_default_ldiv(A, b)
+
+Solve for the static-array default algorithm. For square `A`, singular input is
+rescued with an SVD least-squares solve (min-norm pseudo-solution), mirroring
+the dense default's LU -> pivoted-QR `safetyfallback`. SVD is used instead of
+QR because `qr(::SMatrix) \\ b` least-squares is not defined in StaticArrays
+(see `defaultalg(::SMatrix)`).
+"""
+function __static_default_ldiv(A::SMatrix{N, N}, b) where {N}
+    # StaticArrays' square `\` uses direct inverse formulas for N <= 3 (never
+    # throws; singular input silently yields Inf/NaN) and `lu(A) \ b` with
+    # `check = true` (throws SingularException) for larger sizes. Keep `A \ b`
+    # for N <= 3 so nonsingular results stay bit-identical to `\`; for larger
+    # sizes `lu(A, check = false) \ b` is the same computation as `A \ b`
+    # without the throw.
+    if N <= 3
+        u = __static_plain_ldiv(A, b)
+        # Only rescue on factorization failure: a nonsingular `A` with
+        # non-finite `u` (e.g. non-finite `b`) returns `u` as-is, matching the
+        # dense LU behavior.
+        if all(isfinite, u) || LinearAlgebra.issuccess(lu(A, check = false))
+            return u
+        end
+    else
+        F = lu(A, check = false)
+        if LinearAlgebra.issuccess(F)
+            return F \ b
+        end
+    end
+    return svd(A) \ b
+end
+__static_default_ldiv(A, b) = A \ b
+
 function SciMLBase.solve(
         prob::StaticLinearProblem,
         alg::Nothing, args...; kwargs...
     )
-    u = prob.A \ prob.b
+    u = __static_default_ldiv(prob.A, prob.b)
     return SciMLBase.build_linear_solution(
         alg, u, nothing, prob; retcode = ReturnCode.Success
     )
@@ -712,7 +752,16 @@ function SciMLBase.solve(
     if alg === nothing || alg isa DirectLdiv!
         u = prob.A \ prob.b
     elseif alg isa LUFactorization
-        u = lu(prob.A) \ prob.b
+        F = lu(prob.A, check = false)
+        if !LinearAlgebra.issuccess(F)
+            # Match dense `LUFactorization` on singular input: report Failure
+            # with the (zero-)initialized `u` instead of throwing.
+            u = prob.u0 !== nothing ? prob.u0 : __init_u0_from_Ab(prob.A, prob.b)
+            return SciMLBase.build_linear_solution(
+                alg, u, nothing, prob; retcode = ReturnCode.Failure
+            )
+        end
+        u = F \ prob.b
     elseif alg isa QRFactorization
         u = qr(prob.A) \ prob.b
     elseif alg isa CholeskyFactorization

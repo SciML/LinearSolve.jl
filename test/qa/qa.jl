@@ -32,7 +32,7 @@ run_qa(
     aqua_kwargs = (;
         deps_compat = (; ignore = [:MKL_jll]),
         stale_deps = (; ignore = [:MKL_jll]),
-        piracies = (; treat_as_own = [LinearProblem]),
+        piracies = (; treat_as_own = [LinearProblem, EigenvalueProblem]),
     ),
     ei_kwargs = (;
         no_implicit_imports = (;
@@ -59,8 +59,8 @@ run_qa(
             ignore = (
                 Symbol("@blasfunc"), :AbstractSciMLOperator, :AbstractSparseMatrixCSC,
                 :ArrayInterface, :BLASELTYPES, :BlasInt, :StaticArray, :UMFPACK_OK,
-                :chkargsok, :chkfinite, :chkstride1, :getcolptr, :inv,
-                :pattern_changed, :require_one_based_indexing,
+                :build_eigenvalue_solution, :chkargsok, :chkfinite, :chkstride1,
+                :getcolptr, :inv, :pattern_changed, :require_one_based_indexing,
             ),
         ),
     ),

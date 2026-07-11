@@ -410,6 +410,7 @@ function defaultalg_symbol end
 include("verbosity.jl")
 include("blas_logging.jl")
 include("generic_lufact.jl")
+include("eigenvalue.jl")
 include("common.jl")
 include("extension_algs.jl")
 include("factorization.jl")
@@ -573,5 +574,9 @@ export OperatorAssumptions, OperatorCondition, NonstructuralZeros
 export LinearSolveAdjoint
 
 export LinearVerbosity
+
+export AbstractEigenvalueAlgorithm,
+    DenseEigen, ArpackJL, ArnoldiMethod, ArnoldiMethodJL,
+    KrylovKitEigen, JacobiDavidsonJL
 
 end

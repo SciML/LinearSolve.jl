@@ -30,7 +30,11 @@ makedocs(
     ],
     format = Documenter.HTML(
         assets = ["assets/favicon.ico"],
-        canonical = "https://docs.sciml.ai/LinearSolve/stable/"
+        canonical = "https://docs.sciml.ai/LinearSolve/stable/",
+        # solvers.md is a long auto-listed solver catalog that exceeds the
+        # default 200 KiB per-page HTML limit; it is reference material meant
+        # to be read in one page.
+        size_threshold = 500 * 1024
     ),
     pages = pages
 )

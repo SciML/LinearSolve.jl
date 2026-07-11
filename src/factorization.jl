@@ -539,7 +539,11 @@ the user's matrix is left untouched.
 
 Only dense strided BLAS floating-point matrices
 (`StridedMatrix{<:Union{Float32, Float64, ComplexF32, ComplexF64}}`) are
-supported; other operator types throw an informative error at `init`.
+supported through the caching interface; other operator types throw an
+informative error at `init`. Square StaticArrays problems have a dedicated
+direct dispatch with the same semantics (one-shot solve, singular input
+reported as `ReturnCode.Failure`, no factorization retained) — see the
+StaticArrays tutorial page.
 """
 struct GESVFactorization <: AbstractDenseFactorization end
 

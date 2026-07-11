@@ -64,6 +64,7 @@ else
             @time @safetestset "Basic Tests" include("Core/basictests.jl")
             @time @safetestset "Batched RHS" include("Core/batch.jl")
             @time @safetestset "GESV Factorization" include("Core/gesv.jl")
+            @time @safetestset "LU Refactorization Reuse" include("Core/lu_refactorization.jl")
             @time @safetestset "Return codes" include("Core/retcodes.jl")
             @time @safetestset "Re-solve" include("Core/resolve.jl")
             @time @safetestset "Zero Initialization Tests" include("Core/zeroinittests.jl")

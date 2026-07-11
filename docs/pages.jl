@@ -9,6 +9,7 @@ pages = [
         "tutorials/partitionedsolvers.md",
         "tutorials/petsc_mpi.md",
         "tutorials/accelerating_choices.md",
+        "tutorials/static_arrays.md",
         "tutorials/gpu.md",
         "tutorials/autotune.md",
         "tutorials/eigenvalue.md",

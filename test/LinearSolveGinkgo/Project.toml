@@ -13,7 +13,7 @@ LinearSolve = {path = "../.."}
 [compat]
 Ginkgo = "1"
 LinearAlgebra = "1.10"
-LinearSolve = "4"
+LinearSolve = "5"
 SafeTestsets = "0.1, 1"
 SciMLTesting = "1"
 SparseArrays = "1.10"

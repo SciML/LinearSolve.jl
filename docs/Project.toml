@@ -7,7 +7,7 @@ SciMLOperators = "c0aeaf25-5076-4817-a8d5-81caf7dfa961"
 
 [compat]
 Documenter = "1"
-LinearSolve = "4"
+LinearSolve = "5"
 LinearSolveAutotune = "1.1"
 LinearSolvePyAMG = "1"
 SciMLOperators = "1"

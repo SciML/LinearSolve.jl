@@ -514,9 +514,8 @@ end
         A = spdiagm(-1 => -ones(n - 1), 0 => fill(10.0, n), 1 => -ones(n - 1))
         b = rand(n)
         p = LinearProblem(A, b)
-        x0 = solve(p, KrylovJL_CG(precs = countingprecs, ldiv = false))
-        cache = x0.cache
-        x0 = copy(x0)
+        cache = init(p, KrylovJL_CG(precs = countingprecs, ldiv = false))
+        x0 = copy(solve!(cache))
         for i in 4:(n - 3)
             A[i, i + 3] -= 1.0e-4
             A[i - 3, i] -= 1.0e-4

@@ -26,39 +26,44 @@ const nprocs = MPI.Comm_size(MPI.COMM_WORLD)
     prob = LinearProblem(A, b)
 
     @testset "GMRES" begin
-        sol = solve(prob, PETScAlgorithm(:gmres); abstol = 1.0e-10, reltol = 1.0e-10)
+        cache = SciMLBase.init(prob, PETScAlgorithm(:gmres); abstol = 1.0e-10, reltol = 1.0e-10)
+        sol = solve!(cache)
         @test norm(A * sol.u - b) / norm(b) < 1.0e-6
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 
     @testset "CG" begin
-        sol = solve(prob, PETScAlgorithm(:cg); abstol = 1.0e-10, reltol = 1.0e-10)
+        cache = SciMLBase.init(prob, PETScAlgorithm(:cg); abstol = 1.0e-10, reltol = 1.0e-10)
+        sol = solve!(cache)
         @test norm(A * sol.u - b) / norm(b) < 1.0e-6
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 
     @testset "BiCGSTAB" begin
-        sol = solve(prob, PETScAlgorithm(:bcgs); abstol = 1.0e-10, reltol = 1.0e-10)
+        cache = SciMLBase.init(prob, PETScAlgorithm(:bcgs); abstol = 1.0e-10, reltol = 1.0e-10)
+        sol = solve!(cache)
         @test norm(A * sol.u - b) / norm(b) < 1.0e-6
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 
     @testset "GMRES + Jacobi" begin
-        sol = solve(
+        cache = SciMLBase.init(
             prob, PETScAlgorithm(:gmres; pc_type = :jacobi);
             abstol = 1.0e-10, reltol = 1.0e-10
         )
+        sol = solve!(cache)
         @test norm(A * sol.u - b) / norm(b) < 1.0e-6
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 
     @testset "GMRES + ILU" begin
-        sol = solve(
+        cache = SciMLBase.init(
             prob, PETScAlgorithm(:gmres; pc_type = :ilu);
             abstol = 1.0e-10, reltol = 1.0e-10
         )
+        sol = solve!(cache)
         @test norm(A * sol.u - b) / norm(b) < 1.0e-6
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 
@@ -66,9 +71,10 @@ end
     n = 50
     A = rand(n, n) + 10I; A = A'A
     b = rand(n)
-    sol = solve(LinearProblem(A, b), PETScAlgorithm(:gmres); abstol = 1.0e-10)
+    cache = SciMLBase.init(LinearProblem(A, b), PETScAlgorithm(:gmres); abstol = 1.0e-10)
+    sol = solve!(cache)
     @test norm(A * sol.u - b) / norm(b) < 1.0e-6
-    PETScExt.cleanup_petsc_cache!(sol)
+    PETScExt.cleanup_petsc_cache!(cache)
 end
 
 @testset "Serial: Cache Interface" begin
@@ -98,10 +104,11 @@ end
     b = rand(n); b .-= sum(b) / n
 
     alg = PETScAlgorithm(:cg; pc_type = :jacobi, nullspace = :constant)
-    sol = solve(LinearProblem(D, b), alg; abstol = 1.0e-10)
+    cache = SciMLBase.init(LinearProblem(D, b), alg; abstol = 1.0e-10)
+    sol = solve!(cache)
     @test sol.retcode == SciMLBase.ReturnCode.Success
     @test norm(D * sol.u - b) / norm(b) < 1.0e-6
-    PETScExt.cleanup_petsc_cache!(sol)
+    PETScExt.cleanup_petsc_cache!(cache)
 end
 
 @testset "Serial: Nullspace Custom" begin
@@ -118,9 +125,10 @@ end
 @testset "Serial: Transposed Solve" begin
     n = 50
     A = sprand(n, n, 0.2) + 5I; b = rand(n)
-    sol = solve(LinearProblem(A, b), PETScAlgorithm(:gmres; transposed = true))
+    cache = SciMLBase.init(LinearProblem(A, b), PETScAlgorithm(:gmres; transposed = true))
+    sol = solve!(cache)
     @test norm(A' * sol.u - b) / norm(b) < 1.0e-6
-    PETScExt.cleanup_petsc_cache!(sol)
+    PETScExt.cleanup_petsc_cache!(cache)
 end
 
 @testset "Serial: Warm Start" begin
@@ -128,12 +136,13 @@ end
     A = sprand(n, n, 0.02) + 10I; A = A'A; b = rand(n)
     prob = LinearProblem(A, b)
 
-    sol_cold = solve(
+    cache_cold = SciMLBase.init(
         prob, PETScAlgorithm(:cg; initial_guess_nonzero = false);
         reltol = 1.0e-12
     )
+    sol_cold = solve!(cache_cold)
     iters_cold = sol_cold.iters
-    PETScExt.cleanup_petsc_cache!(sol_cold)
+    PETScExt.cleanup_petsc_cache!(cache_cold)
 
     cache_warm = SciMLBase.init(
         prob, PETScAlgorithm(:cg; initial_guess_nonzero = true); reltol = 1.0e-12
@@ -150,39 +159,43 @@ end
 
     @testset "Float64 sparse" begin
         A = sprand(Float64, n, n, 0.1) + 10I; A = A'A; b = rand(Float64, n)
-        sol = solve(LinearProblem(A, b), PETScAlgorithm(:cg); abstol = 1.0e-10)
+        cache = SciMLBase.init(LinearProblem(A, b), PETScAlgorithm(:cg); abstol = 1.0e-10)
+        sol = solve!(cache)
         @test eltype(sol.u) == Float64
         @test norm(A * sol.u - b) / norm(b) < 1.0e-6
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 
     @testset "Float32 sparse" begin
         A32 = sparse(Float32.(Matrix(sprand(Float64, n, n, 0.1) + 10I)))
         A32 = A32'A32; b32 = rand(Float32, n)
-        sol32 = solve(LinearProblem(A32, b32), PETScAlgorithm(:cg); abstol = 1.0f-5)
+        cache32 = SciMLBase.init(LinearProblem(A32, b32), PETScAlgorithm(:cg); abstol = 1.0f-5)
+        sol32 = solve!(cache32)
         @test eltype(sol32.u) == Float32
         @test norm(A32 * sol32.u - b32) / norm(b32) < 1.0f-3
-        PETScExt.cleanup_petsc_cache!(sol32)
+        PETScExt.cleanup_petsc_cache!(cache32)
     end
 
     @testset "ComplexF64 sparse" begin
         B = sprand(ComplexF64, n, n, 0.1)
         Ac = B' * B + 10I
         bc = rand(ComplexF64, n)
-        sol = solve(LinearProblem(Ac, bc), PETScAlgorithm(:gmres); abstol = 1.0e-10)
+        cache = SciMLBase.init(LinearProblem(Ac, bc), PETScAlgorithm(:gmres); abstol = 1.0e-10)
+        sol = solve!(cache)
         @test eltype(sol.u) == ComplexF64
         @test norm(Ac * sol.u - bc) / norm(bc) < 1.0e-6
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 
     @testset "ComplexF32 sparse" begin
         B32 = sparse(ComplexF32.(Matrix(sprand(ComplexF64, n, n, 0.1))))
         Ac32 = B32' * B32 + 10I
         bc32 = rand(ComplexF32, n)
-        sol32 = solve(LinearProblem(Ac32, bc32), PETScAlgorithm(:gmres); abstol = 1.0f-5)
+        cache32 = SciMLBase.init(LinearProblem(Ac32, bc32), PETScAlgorithm(:gmres); abstol = 1.0f-5)
+        sol32 = solve!(cache32)
         @test eltype(sol32.u) == ComplexF32
         @test norm(Ac32 * sol32.u - bc32) / norm(bc32) < 1.0f-3
-        PETScExt.cleanup_petsc_cache!(sol32)
+        PETScExt.cleanup_petsc_cache!(cache32)
     end
 
     @testset "Unsupported type errors" begin
@@ -202,23 +215,26 @@ end
 
     @testset "High-precision tolerance" begin
         alg = PETScAlgorithm(:gmres; ksp_options = (ksp_rtol = 1.0e-14, ksp_atol = 1.0e-14))
-        sol = solve(prob, alg)
+        cache = SciMLBase.init(prob, alg)
+        sol = solve!(cache)
         @test norm(A * sol.u - b) / norm(b) < 1.0e-13
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 
     @testset "Monitoring flags (no crash)" begin
         alg = PETScAlgorithm(:cg; ksp_options = (ksp_monitor = "", ksp_view = ""))
-        sol = solve(prob, alg)
+        cache = SciMLBase.init(prob, alg)
+        sol = solve!(cache)
         @test sol.retcode == SciMLBase.ReturnCode.Success
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 
     @testset "KSP type override via options" begin
         alg = PETScAlgorithm(:gmres; ksp_options = (ksp_type = "cg",))
-        sol = solve(prob, alg)
+        cache = SciMLBase.init(prob, alg)
+        sol = solve!(cache)
         @test sol.retcode == SciMLBase.ReturnCode.Success
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 
@@ -228,18 +244,19 @@ end
     A = A'A
     b = rand(n)
 
-    sol = solve(
+    cache = SciMLBase.init(
         LinearProblem(A, b),
         PETScAlgorithm(:cg);
         abstol = 1.0e-16,
         reltol = 1.0e-16,
         maxiters = 1
     )
+    sol = solve!(cache)
 
     @test sol.retcode == SciMLBase.ReturnCode.Failure
     @test sol.iters == 1
-    @test norm(A * sol.u - b) / norm(b) > sol.cache.reltol
-    PETScExt.cleanup_petsc_cache!(sol)
+    @test norm(A * sol.u - b) / norm(b) > cache.reltol
+    PETScExt.cleanup_petsc_cache!(cache)
 end
 
 @testset "Serial: Cleanup" begin
@@ -248,11 +265,12 @@ end
     prob = LinearProblem(A, b)
     alg = PETScAlgorithm(:gmres; pc_type = :jacobi)
 
-    @testset "via solution" begin
-        sol = solve(prob, alg)
-        pcache = sol.cache.cacheval
+    @testset "via cache after solve" begin
+        cache = SciMLBase.init(prob, alg)
+        solve!(cache)
+        pcache = cache.cacheval
         @test pcache.ksp !== nothing
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
         @test pcache.ksp === nothing
     end
 
@@ -263,10 +281,11 @@ end
     end
 
     @testset "idempotent" begin
-        sol = solve(prob, alg)
-        PETScExt.cleanup_petsc_cache!(sol)
-        PETScExt.cleanup_petsc_cache!(sol)
-        @test sol.cache.cacheval.ksp === nothing
+        cache = SciMLBase.init(prob, alg)
+        solve!(cache)
+        PETScExt.cleanup_petsc_cache!(cache)
+        PETScExt.cleanup_petsc_cache!(cache)
+        @test cache.cacheval.ksp === nothing
     end
 
     @testset "empty cache (before solve)" begin
@@ -431,27 +450,29 @@ end
         b = rand(n)
         ptr_nzval = pointer(A.nzval)
         ptr_colptr = pointer(A.colptr)
-        sol = solve(
+        cache = SciMLBase.init(
             LinearProblem(A, b), PETScAlgorithm(:gmres; pc_type = :ilu);
             abstol = 1.0e-10
         )
+        sol = solve!(cache)
         @test norm(A * sol.u - b) / norm(b) < 1.0e-6
         @test pointer(A.nzval) === ptr_nzval
         @test pointer(A.colptr) === ptr_colptr
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 
     @testset "Dense operator: Julia array not copied" begin
         A = make_spd_dense(n)
         b = rand(n)
         ptr_before = pointer(A)
-        sol = solve(
+        cache = SciMLBase.init(
             LinearProblem(A, b), PETScAlgorithm(:gmres; pc_type = :jacobi);
             abstol = 1.0e-10
         )
+        sol = solve!(cache)
         @test norm(A * sol.u - b) / norm(b) < 1.0e-6
         @test pointer(A) === ptr_before
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 
     @testset "Sparse Case 3: nzval pointer stable across value-only updates" begin
@@ -515,13 +536,14 @@ end
         A = make_spd_dense(n)
         A_snapshot = copy(A)
         b = rand(n)
-        sol = solve(
+        cache = SciMLBase.init(
             LinearProblem(A, b), PETScAlgorithm(:preonly; pc_type = :lu);
             abstol = 1.0e-10
         )
+        sol = solve!(cache)
         @test norm(A_snapshot * sol.u - b) / norm(b) < 1.0e-6
         # A may have been overwritten by LU — that's expected, no assertion on A's values
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 
@@ -537,28 +559,31 @@ end
     b = rand(n)
 
     @testset "GMRES (CSR)" begin
-        sol = solve(
+        cache = SciMLBase.init(
             LinearProblem(A_csr, b), PETScAlgorithm(:gmres); abstol = 1.0e-10, reltol = 1.0e-10
         )
+        sol = solve!(cache)
         @test norm(A_csc * sol.u - b) / norm(b) < 1.0e-6
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 
     @testset "CG (CSR)" begin
-        sol = solve(
+        cache = SciMLBase.init(
             LinearProblem(A_csr, b), PETScAlgorithm(:cg); abstol = 1.0e-10, reltol = 1.0e-10
         )
+        sol = solve!(cache)
         @test norm(A_csc * sol.u - b) / norm(b) < 1.0e-6
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 
     @testset "GMRES + ILU (CSR)" begin
-        sol = solve(
+        cache = SciMLBase.init(
             LinearProblem(A_csr, b), PETScAlgorithm(:gmres; pc_type = :ilu);
             abstol = 1.0e-10, reltol = 1.0e-10
         )
+        sol = solve!(cache)
         @test norm(A_csc * sol.u - b) / norm(b) < 1.0e-6
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 
@@ -696,28 +721,31 @@ end
     b = rand(n)
 
     @testset "GMRES (CSR{0})" begin
-        sol = solve(
+        cache = SciMLBase.init(
             LinearProblem(A_csr0, b), PETScAlgorithm(:gmres); abstol = 1.0e-10, reltol = 1.0e-10
         )
+        sol = solve!(cache)
         @test norm(A_csc * sol.u - b) / norm(b) < 1.0e-6
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 
     @testset "CG (CSR{0})" begin
-        sol = solve(
+        cache = SciMLBase.init(
             LinearProblem(A_csr0, b), PETScAlgorithm(:cg); abstol = 1.0e-10, reltol = 1.0e-10
         )
+        sol = solve!(cache)
         @test norm(A_csc * sol.u - b) / norm(b) < 1.0e-6
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 
     @testset "GMRES + ILU (CSR{0})" begin
-        sol = solve(
+        cache = SciMLBase.init(
             LinearProblem(A_csr0, b), PETScAlgorithm(:gmres; pc_type = :ilu);
             abstol = 1.0e-10, reltol = 1.0e-10
         )
+        sol = solve!(cache)
         @test norm(A_csc * sol.u - b) / norm(b) < 1.0e-6
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 

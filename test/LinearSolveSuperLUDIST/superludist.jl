@@ -30,10 +30,11 @@ end
     )
 
     alg = SuperLUDISTFactorization(; comm = MPI.COMM_SELF)
-    sol = solve(LinearProblem(A, b1), alg)
+    lincache = init(LinearProblem(A, b1), alg)
+    sol = solve!(lincache)
     @test sol.retcode == ReturnCode.Success
     @test residual_ok(A, sol.u, b1)
-    SuperLUDISTExt.cleanup_superludist_cache!(sol)
+    SuperLUDISTExt.cleanup_superludist_cache!(lincache)
 
     cache = init(LinearProblem(A, b1), alg)
     sol1 = solve!(cache)

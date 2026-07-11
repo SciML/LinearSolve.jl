@@ -94,20 +94,21 @@ end
     end
 
     @testset "basic 2-rank GMRES solve replicates full solution" begin
-        sol = solve(
+        lincache = SciMLBase.init(
             LinearProblem(A, b),
             PETScAlgorithm(:gmres; comm = MPI.COMM_WORLD);
             abstol = 1.0e-10,
             reltol = 1.0e-10
         )
-        pcache = sol.cache.cacheval
+        sol = solve!(lincache)
+        pcache = lincache.cacheval
 
         @test sol.retcode == SciMLBase.ReturnCode.Success
         @test norm(A * sol.u - b) / norm(b) < 1.0e-10
         @test sol.u ≈ x_ref atol = 1.0e-10
         @test pcache.rstart >= 0
         @test pcache.rend >= pcache.rstart
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(lincache)
     end
 
     @testset "cache reuse with new rhs preserves full-solution contract" begin
@@ -133,18 +134,19 @@ end
     end
 
     @testset "maxiters failure sets retcode" begin
-        sol = solve(
+        lincache = SciMLBase.init(
             LinearProblem(A, b),
             PETScAlgorithm(:gmres; comm = MPI.COMM_WORLD);
             abstol = 1.0e-16,
             reltol = 1.0e-16,
             maxiters = 1
         )
+        sol = solve!(lincache)
 
         @test sol.retcode == SciMLBase.ReturnCode.Failure
         @test sol.iters == 1
-        @test norm(A * sol.u - b) / norm(b) > sol.cache.reltol
-        PETScExt.cleanup_petsc_cache!(sol)
+        @test norm(A * sol.u - b) / norm(b) > lincache.reltol
+        PETScExt.cleanup_petsc_cache!(lincache)
     end
 end
 
@@ -209,10 +211,11 @@ end
     with_mpi() do distribute
         rp = mpi_row_partition(distribute, n)
         A, b, u = build_splitmat_diag(rp)
-        sol = solve(LinearProblem(A, b; u0 = u), PETScAlgorithm(:gmres); abstol = 1.0e-12)
+        cache = SciMLBase.init(LinearProblem(A, b; u0 = u), PETScAlgorithm(:gmres); abstol = 1.0e-12)
+        sol = solve!(cache)
         @test sol.retcode == SciMLBase.ReturnCode.Success
         assert_owned_approx(sol.u, 1.0)
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 
@@ -221,10 +224,11 @@ end
     with_mpi() do distribute
         rp = mpi_row_partition(distribute, n)
         A, b, u = build_splitmat_diag(rp)
-        sol = solve(LinearProblem(A, b; u0 = u), PETScAlgorithm(:cg); abstol = 1.0e-12)
+        cache = SciMLBase.init(LinearProblem(A, b; u0 = u), PETScAlgorithm(:cg); abstol = 1.0e-12)
+        sol = solve!(cache)
         @test sol.retcode == SciMLBase.ReturnCode.Success
         assert_owned_approx(sol.u, 1.0)
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 
@@ -233,14 +237,15 @@ end
     with_mpi() do distribute
         rp = mpi_row_partition(distribute, n)
         A, b, u = build_splitmat_diag(rp)
-        sol = solve(
+        cache = SciMLBase.init(
             LinearProblem(A, b; u0 = u),
             PETScAlgorithm(:gmres; pc_type = :jacobi);
             abstol = 1.0e-12
         )
+        sol = solve!(cache)
         @test sol.retcode == SciMLBase.ReturnCode.Success
         assert_owned_approx(sol.u, 1.0)
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 
@@ -251,10 +256,11 @@ end
         A, b, u = build_splitmat_diag(rp)
         P, _, _ = build_splitmat_diag(rp)
         alg = PETScAlgorithm(:gmres; pc_type = :jacobi, prec_matrix = P)
-        sol = solve(LinearProblem(A, b; u0 = u), alg; abstol = 1.0e-12)
+        cache = SciMLBase.init(LinearProblem(A, b; u0 = u), alg; abstol = 1.0e-12)
+        sol = solve!(cache)
         @test sol.retcode == SciMLBase.ReturnCode.Success
         assert_owned_approx(sol.u, 1.0)
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 
@@ -278,9 +284,10 @@ end
         u = PVector(map(rng -> zeros(length(rng)), rp), rp)
 
         alg = PETScAlgorithm(:gmres; pc_type = :jacobi)
-        sol = solve(LinearProblem(A, b; u0 = u), alg; abstol = 1.0e-10, reltol = 1.0e-10)
+        cache = SciMLBase.init(LinearProblem(A, b; u0 = u), alg; abstol = 1.0e-10, reltol = 1.0e-10)
+        sol = solve!(cache)
         @test sol.retcode == SciMLBase.ReturnCode.Success
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 
@@ -302,16 +309,17 @@ end
         b = PVector(map(rng -> ones(length(rng)), rp), rp)
         u = PVector(map(rng -> zeros(length(rng)), rp), rp)
 
-        sol = solve(
+        cache = SciMLBase.init(
             LinearProblem(A, b; u0 = u),
             PETScAlgorithm(:gmres);
             abstol = 1.0e-16,
             reltol = 1.0e-16,
             maxiters = 1
         )
+        sol = solve!(cache)
         @test sol.retcode == SciMLBase.ReturnCode.Failure
         @test sol.iters == 1
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 
@@ -333,15 +341,16 @@ end
         b = PVector(map(rng -> ones(length(rng)), rp), rp)
         u = PVector(map(rng -> zeros(length(rng)), rp), rp)
 
-        sol = solve(
+        cache = SciMLBase.init(
             LinearProblem(A, b; u0 = u),
             PETScAlgorithm(:gmres; ksp_options = (ksp_rtol = 0.9,));
             abstol = 0.0,
             reltol = 1.0e-12,
             maxiters = 100
         )
+        sol = solve!(cache)
         @test sol.retcode == SciMLBase.ReturnCode.APosterioriSafetyFailure
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 
@@ -416,10 +425,11 @@ end
     with_mpi() do distribute
         rp = mpi_row_partition(distribute, n)
         A, b, u = build_csr_diag(rp)
-        sol = solve(LinearProblem(A, b; u0 = u), PETScAlgorithm(:gmres); abstol = 1.0e-12)
+        cache = SciMLBase.init(LinearProblem(A, b; u0 = u), PETScAlgorithm(:gmres); abstol = 1.0e-12)
+        sol = solve!(cache)
         @test sol.retcode == SciMLBase.ReturnCode.Success
         assert_owned_approx(sol.u, 1.0)
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 
@@ -428,14 +438,15 @@ end
     with_mpi() do distribute
         rp = mpi_row_partition(distribute, n)
         A, b, u = build_csr_diag(rp)
-        sol = solve(
+        cache = SciMLBase.init(
             LinearProblem(A, b; u0 = u),
             PETScAlgorithm(:gmres; pc_type = :jacobi);
             abstol = 1.0e-12
         )
+        sol = solve!(cache)
         @test sol.retcode == SciMLBase.ReturnCode.Success
         assert_owned_approx(sol.u, 1.0)
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 
@@ -446,10 +457,11 @@ end
         A, b, u = build_csr_diag(rp)
         P, _, _ = build_csr_diag(rp)
         alg = PETScAlgorithm(:gmres; pc_type = :jacobi, prec_matrix = P)
-        sol = solve(LinearProblem(A, b; u0 = u), alg; abstol = 1.0e-12)
+        cache = SciMLBase.init(LinearProblem(A, b; u0 = u), alg; abstol = 1.0e-12)
+        sol = solve!(cache)
         @test sol.retcode == SciMLBase.ReturnCode.Success
         assert_owned_approx(sol.u, 1.0)
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 
@@ -528,10 +540,11 @@ end
     with_debug() do distribute
         rp = debug_row_partition(distribute, n)
         A, b, u = build_splitmat_diag(rp)
-        sol = solve(LinearProblem(A, b; u0 = u), PETScAlgorithm(:gmres); abstol = 1.0e-12)
+        cache = SciMLBase.init(LinearProblem(A, b; u0 = u), PETScAlgorithm(:gmres); abstol = 1.0e-12)
+        sol = solve!(cache)
         @test sol.retcode == SciMLBase.ReturnCode.Success
         assert_owned_approx(sol.u, 1.0)
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 
@@ -540,10 +553,11 @@ end
     with_debug() do distribute
         rp = debug_row_partition(distribute, n)
         A, b, u = build_splitmat_diag(rp)
-        sol = solve(LinearProblem(A, b; u0 = u), PETScAlgorithm(:cg); abstol = 1.0e-12)
+        cache = SciMLBase.init(LinearProblem(A, b; u0 = u), PETScAlgorithm(:cg); abstol = 1.0e-12)
+        sol = solve!(cache)
         @test sol.retcode == SciMLBase.ReturnCode.Success
         assert_owned_approx(sol.u, 1.0)
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 
@@ -552,14 +566,15 @@ end
     with_debug() do distribute
         rp = debug_row_partition(distribute, n)
         A, b, u = build_splitmat_diag(rp)
-        sol = solve(
+        cache = SciMLBase.init(
             LinearProblem(A, b; u0 = u),
             PETScAlgorithm(:gmres; pc_type = :jacobi);
             abstol = 1.0e-12
         )
+        sol = solve!(cache)
         @test sol.retcode == SciMLBase.ReturnCode.Success
         assert_owned_approx(sol.u, 1.0)
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 
@@ -570,10 +585,11 @@ end
         A, b, u = build_splitmat_diag(rp)
         P, _, _ = build_splitmat_diag(rp)
         alg = PETScAlgorithm(:gmres; pc_type = :jacobi, prec_matrix = P)
-        sol = solve(LinearProblem(A, b; u0 = u), alg; abstol = 1.0e-12)
+        cache = SciMLBase.init(LinearProblem(A, b; u0 = u), alg; abstol = 1.0e-12)
+        sol = solve!(cache)
         @test sol.retcode == SciMLBase.ReturnCode.Success
         assert_owned_approx(sol.u, 1.0)
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 
@@ -641,10 +657,11 @@ end
     with_debug() do distribute
         rp = debug_row_partition(distribute, n)
         A, b, u = build_csr_diag(rp)
-        sol = solve(LinearProblem(A, b; u0 = u), PETScAlgorithm(:gmres); abstol = 1.0e-12)
+        cache = SciMLBase.init(LinearProblem(A, b; u0 = u), PETScAlgorithm(:gmres); abstol = 1.0e-12)
+        sol = solve!(cache)
         @test sol.retcode == SciMLBase.ReturnCode.Success
         assert_owned_approx(sol.u, 1.0)
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 
@@ -653,14 +670,15 @@ end
     with_debug() do distribute
         rp = debug_row_partition(distribute, n)
         A, b, u = build_csr_diag(rp)
-        sol = solve(
+        cache = SciMLBase.init(
             LinearProblem(A, b; u0 = u),
             PETScAlgorithm(:gmres; pc_type = :jacobi);
             abstol = 1.0e-12
         )
+        sol = solve!(cache)
         @test sol.retcode == SciMLBase.ReturnCode.Success
         assert_owned_approx(sol.u, 1.0)
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 
@@ -671,10 +689,11 @@ end
         A, b, u = build_csr_diag(rp)
         P, _, _ = build_csr_diag(rp)
         alg = PETScAlgorithm(:gmres; pc_type = :jacobi, prec_matrix = P)
-        sol = solve(LinearProblem(A, b; u0 = u), alg; abstol = 1.0e-12)
+        cache = SciMLBase.init(LinearProblem(A, b; u0 = u), alg; abstol = 1.0e-12)
+        sol = solve!(cache)
         @test sol.retcode == SciMLBase.ReturnCode.Success
         assert_owned_approx(sol.u, 1.0)
-        PETScExt.cleanup_petsc_cache!(sol)
+        PETScExt.cleanup_petsc_cache!(cache)
     end
 end
 
@@ -744,10 +763,11 @@ end
     with_mpi() do distribute
         rp = mpi_row_partition(distribute, n)
         A, b, u = build_splitmat_diag(rp)
-        sol = solve(LinearProblem(A, b; u0 = u), PETScAlgorithm(:gmres); abstol = 1.0e-12)
+        cache = SciMLBase.init(LinearProblem(A, b; u0 = u), PETScAlgorithm(:gmres); abstol = 1.0e-12)
+        sol = solve!(cache)
         @test sol.retcode == SciMLBase.ReturnCode.Success
         # cleanup should not throw
-        PETScExt.cleanup_petsc_cache!(sol)
-        @test sol.cache.cacheval.ksp === nothing
+        PETScExt.cleanup_petsc_cache!(cache)
+        @test cache.cacheval.ksp === nothing
     end
 end

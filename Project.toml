@@ -1,6 +1,6 @@
 name = "LinearSolve"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
-version = "4.2.0"
+version = "4.3.0"
 authors = ["SciML"]
 
 [deps]
@@ -187,6 +187,7 @@ SparseArrays = "1.10"
 SparseColumnPivotedQR = "2"
 SparseMatricesCSR = "0.6"
 Sparspak = "0.3.9"
+StableRNGs = "1"
 SpecializingFactorizations = "0.1"
 StableRNGs = "1"
 StaticArrays = "1.9"

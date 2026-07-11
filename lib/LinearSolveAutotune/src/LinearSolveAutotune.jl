@@ -54,7 +54,18 @@ include("plotting.jl")
 include("telemetry.jl")
 include("preferences.jl")
 
-# Define the AutotuneResults struct
+"""
+    AutotuneResults
+
+Benchmark results returned by [`autotune_setup`](@ref).
+
+## Fields
+
+  - `results_df`: table of benchmark measurements, tested algorithms, element
+    types, matrix sizes, success flags, and any recorded errors.
+  - `sysinfo`: dictionary of system information collected with the benchmark,
+    including Julia, operating system, CPU, GPU, and BLAS details when available.
+"""
 struct AutotuneResults
     results_df::DataFrame
     sysinfo::Dict
@@ -139,7 +150,14 @@ function Base.show(io::IO, results::AutotuneResults)
     return println(io, "="^60)
 end
 
-# Plot method for AutotuneResults
+"""
+    plot(results::AutotuneResults; kwargs...)
+
+Create performance plots from the benchmark data in `results`.
+
+Keyword arguments are forwarded to the underlying Plots.jl layout call used to
+assemble the per-element-type plots.
+"""
 function Plots.plot(results::AutotuneResults; kwargs...)
     # Generate plots from the results data
     plots_dict = create_benchmark_plots(results.results_df)

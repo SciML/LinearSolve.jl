@@ -519,7 +519,8 @@ is_cusparse_csr(A) = false
 is_cusparse_csc(A) = false
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
-    GenericLUFactorization, SimpleLUFactorization, RFLUFactorization, ButterflyFactorization,
+    GenericLUFactorization, GESVFactorization, SimpleLUFactorization,
+    RFLUFactorization, ButterflyFactorization,
     NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
     UMFPACKFactorization, KLUFactorization, PureKLUFactorization,
     PureUMFPACKFactorization, SparseColumnPivotedQRFactorization, FastLUFactorization,

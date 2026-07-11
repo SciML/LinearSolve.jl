@@ -25,6 +25,15 @@ plot(results)
 share_results(results)
 ```
 
+## API
+
+```@docs
+LinearSolveAutotune.AutotuneResults
+LinearSolveAutotune.autotune_setup
+LinearSolveAutotune.share_results
+LinearSolveAutotune.plot(::LinearSolveAutotune.AutotuneResults)
+```
+
 This will:
 - Benchmark algorithms for `Float64` matrices by default
 - Test matrix sizes from tiny (5×5) through large (1000×1000) 

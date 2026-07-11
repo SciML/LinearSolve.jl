@@ -291,10 +291,9 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    # Build the instance from a 0×0 array of `A`'s own type so the cacheval slot
-    # matches the factorization `solve!` stores (built from `A`). This handles
-    # dense CPU arrays that aren't `Base.Array`, e.g. `FixedSizeArray`.
-    return ArrayInterface.lu_instance(similar(A, 0, 0)), Ref{BlasInt}()
+    # Ask `lu_instance` about `A` itself so wrapper-specific dispatch can choose
+    # the factorization container that `solve!` will store.
+    return ArrayInterface.lu_instance(A), Ref{BlasInt}()
 end
 
 function SciMLBase.solve!(

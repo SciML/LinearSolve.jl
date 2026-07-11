@@ -732,6 +732,26 @@ function __static_default_ldiv(A::SMatrix{N, N}, b) where {N}
 end
 __static_default_ldiv(A, b) = A \ b
 
+function __static_gesv_ldiv(A::SMatrix{N, N}, b) where {N}
+    if N <= 3
+        u = A \ b
+        ok = all(isfinite, u) || LinearAlgebra.issuccess(lu(A, check = false))
+        return u, ok
+    else
+        F = lu(A, check = false)
+        ok = LinearAlgebra.issuccess(F)
+        # StaticArrays' triangular solve throws on a zero pivot, so the failed
+        # branch must not touch `F \ b`. The placeholder mirrors `F \ b`'s
+        # promoted eltype to keep the return type-stable; the caller replaces
+        # `u` on failure.
+        u = ok ? F \ b : zero(b) / oneunit(eltype(A))
+        return u, ok
+    end
+end
+function __static_gesv_ldiv(A, b)
+    throw(ArgumentError("GESVFactorization requires a square matrix, got size $(size(A))"))
+end
+
 function SciMLBase.solve(
         prob::StaticLinearProblem,
         alg::Nothing, args...; kwargs...
@@ -759,6 +779,20 @@ function SciMLBase.solve(
             )
         end
         u = F \ prob.b
+    elseif alg isa GESVFactorization
+        # The static analog of the dense `gesv` driver: a one-shot
+        # factorize-and-solve whose singular failures are reported through the
+        # return code — no SVD rescue (that is the default algorithm's
+        # behavior, which gesv semantics do not include). Uses the direct
+        # small-size formulas, so this is the fastest explicit static
+        # algorithm at small N.
+        u, gesv_ok = __static_gesv_ldiv(prob.A, prob.b)
+        if !gesv_ok
+            u = prob.u0 !== nothing ? prob.u0 : __init_u0_from_Ab(prob.A, prob.b)
+            return SciMLBase.build_linear_solution(
+                alg, u, nothing, prob; retcode = ReturnCode.Failure
+            )
+        end
     elseif alg isa QRFactorization
         u = qr(prob.A) \ prob.b
     elseif alg isa CholeskyFactorization

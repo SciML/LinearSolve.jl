@@ -73,7 +73,7 @@ function SciMLBase.solve!(
     fact = LinearSolve.@get_cacheval(cache, :CudaOffloadLUFactorization)
     y = Array(ldiv!(CUDACore.CuArray(cache.u), fact, CUDACore.CuArray(cache.b)))
     cache.u .= y
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, y, nothing, nothing)
 end
 
 function LinearSolve.init_cacheval(
@@ -105,7 +105,7 @@ function SciMLBase.solve!(
     end
     y = Array(ldiv!(CUDACore.CuArray(cache.u), cache.cacheval, CUDACore.CuArray(cache.b)))
     cache.u .= y
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, y, nothing, nothing)
 end
 
 function LinearSolve.init_cacheval(
@@ -133,7 +133,7 @@ function SciMLBase.solve!(
     end
     y = Array(ldiv!(CUDACore.CuArray(cache.u), cache.cacheval, CUDACore.CuArray(cache.b)))
     cache.u .= y
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, y, nothing, nothing)
 end
 
 function LinearSolve.init_cacheval(
@@ -206,7 +206,7 @@ function SciMLBase.solve!(
     # Convert back to original precision
     y = Array(u_gpu_f32)
     cache.u .= Torig.(y)
-    return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, cache.u, nothing, nothing)
 end
 
 function LinearSolve.init_cacheval(

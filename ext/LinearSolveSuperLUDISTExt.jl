@@ -23,7 +23,6 @@ end
 
 cleanup_superludist_cache!(cache::SuperLUDISTCache) = (cache.factor = nothing; cache)
 cleanup_superludist_cache!(cache::LinearSolve.LinearCache) = cleanup_superludist_cache!(cache.cacheval)
-cleanup_superludist_cache!(sol::LinearSolution) = cleanup_superludist_cache!(sol.cache.cacheval)
 
 LinearSolve.needs_concrete_A(::LinearSolve.SuperLUDISTFactorization) = true
 
@@ -132,7 +131,7 @@ function _solve_failed_solution(
     )
     @SciMLMessage(msg, cache.verbose, :solver_failure)
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+        alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
     )
 end
 
@@ -189,7 +188,7 @@ function SciMLBase.solve!(
 
     _copy_solution!(cache.u, x)
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+        alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
     )
 end
 

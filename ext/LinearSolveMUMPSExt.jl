@@ -32,12 +32,9 @@ end
 
 cleanup_mumps_cache!(cache::MUMPSCache) = _finalize_mumps_cache!(cache)
 cleanup_mumps_cache!(cache::LinearSolve.LinearCache) = cleanup_mumps_cache!(cache.cacheval)
-cleanup_mumps_cache!(sol::LinearSolution) = cleanup_mumps_cache!(sol.cache.cacheval)
-
 """
     cleanup_mumps_cache!(cache::MUMPSCache)
     cleanup_mumps_cache!(cache::LinearCache)
-    cleanup_mumps_cache!(sol::LinearSolution)
 
 Destroy the live `MUMPS.Mumps` object owned by a LinearSolve cache and reset the
 cache to an empty state. Safe to call multiple times.
@@ -107,7 +104,7 @@ function _solve_failed_solution(
     )
     @SciMLMessage(msg, cache.verbose, :solver_failure)
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+        alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
     )
 end
 
@@ -172,7 +169,7 @@ function SciMLBase.solve!(
     end
 
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+        alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
     )
 end
 

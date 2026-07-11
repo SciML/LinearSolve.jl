@@ -106,7 +106,6 @@ end
 """
     cleanup_petsc_cache!(pcache::PETScCache)
     cleanup_petsc_cache!(cache::LinearCache)
-    cleanup_petsc_cache!(sol::LinearSolution)
 
 Destroy all PETSc objects owned by `pcache` and reset its state to empty.
 Safe to call multiple times — subsequent calls after the first are no-ops.
@@ -144,7 +143,6 @@ function cleanup_petsc_cache!(pcache::PETScCache)
 end
 
 cleanup_petsc_cache!(cache::LinearCache) = cleanup_petsc_cache!(cache.cacheval)
-cleanup_petsc_cache!(sol::LinearSolution) = cleanup_petsc_cache!(sol.cache.cacheval)
 
 # ── Cache initialisation ──────────────────────────────────────────────────────
 
@@ -836,7 +834,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm; kwargs...)
         failed !== nothing && return failed
     end
 
-    return build_linear_solution(alg, cache.u, resid, cache; retcode, iters)
+    return build_linear_solution(alg, cache.u, resid, nothing; retcode, iters)
 end
 
 end

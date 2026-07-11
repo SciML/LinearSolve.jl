@@ -342,7 +342,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::HYPREAlgorithm, args...; kwar
         copy!(cache.u, hcache.u)
     end
 
-    # Note: Inlining SciMLBase.build_linear_solution(alg, u, resid, cache; retcode, iters)
+    # Note: Inlining SciMLBase.build_linear_solution(alg, u, resid, nothing; retcode, iters)
     # since some of the functions used in there does not play well with HYPREVector.
 
     T = cache.u isa HYPREVector ? HYPRE_Complex : eltype(cache.u) # eltype(u)
@@ -354,10 +354,10 @@ function SciMLBase.solve!(cache::LinearCache, alg::HYPREAlgorithm, args...; kwar
 
     ret = SciMLBase.LinearSolution{
         T, N, typeof(cache.u), typeof(resid), typeof(alg),
-        typeof(cache), typeof(stats),
+        Nothing, typeof(stats),
     }(
         cache.u, resid, alg, retc,
-        iters, cache, stats
+        iters, nothing, stats
     )
 
     return ret

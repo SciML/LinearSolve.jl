@@ -54,7 +54,7 @@ function SciMLBase.solve!(
 
     u = solve_func(A, b, u, p, isfresh, Pl, Pr, cacheval; kwargs...)
     return SciMLBase.build_linear_solution(
-        alg, u, nothing, cache;
+        alg, u, nothing, nothing;
         retcode = ReturnCode.Success
     )
 end
@@ -106,7 +106,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::DirectLdiv!{false}, args...; 
     (; A, b, u) = cache
     ldiv!(u, A, b)
     return SciMLBase.build_linear_solution(
-        alg, u, nothing, cache;
+        alg, u, nothing, nothing;
         retcode = ReturnCode.Success
     )
 end
@@ -117,7 +117,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::DirectLdiv!{true}, args...; k
     (; A, b, u) = cache
     ldiv!(u, A, b)
     return SciMLBase.build_linear_solution(
-        alg, u, nothing, cache;
+        alg, u, nothing, nothing;
         retcode = ReturnCode.Success
     )
 end
@@ -157,7 +157,7 @@ function SciMLBase.solve!(
     # Perform ldiv! on the copy, preserving the original A
     ldiv!(u, cacheval, b)
     return SciMLBase.build_linear_solution(
-        alg, u, nothing, cache;
+        alg, u, nothing, nothing;
         retcode = ReturnCode.Success
     )
 end
@@ -173,7 +173,7 @@ function SciMLBase.solve!(
     # Perform ldiv! on the copy, preserving the original A
     ldiv!(u, cacheval, b)
     return SciMLBase.build_linear_solution(
-        alg, u, nothing, cache;
+        alg, u, nothing, nothing;
         retcode = ReturnCode.Success
     )
 end

@@ -25,14 +25,14 @@ function SciMLBase.solve!(
         if !LinearAlgebra.issuccess(fact)
             @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
             )
         end
 
         cache.isfresh = false
     end
     y = ldiv!(cache.u, LinearSolve.@get_cacheval(cache, :RFLUFactorization)[1], cache.b)
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
+    return SciMLBase.build_linear_solution(alg, y, nothing, nothing; retcode = ReturnCode.Success)
 end
 
 # Mixed precision RecursiveFactorization implementation
@@ -86,7 +86,7 @@ function SciMLBase.solve!(
 
         if !LinearAlgebra.issuccess(fact)
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
             )
         end
 
@@ -110,7 +110,7 @@ function SciMLBase.solve!(
     cache.u .= Torig.(u_32)
 
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+        alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
     )
 end
 
@@ -147,7 +147,7 @@ function SciMLBase.solve!(
 
     mul!(b, V, tmp)
     out .= @view b[1:n]
-    return SciMLBase.build_linear_solution(alg, out, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, out, nothing, nothing)
 end
 
 function LinearSolve.init_cacheval(

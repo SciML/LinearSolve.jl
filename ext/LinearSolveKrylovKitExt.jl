@@ -54,7 +54,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovKitJL; kwargs...)
 
     iters = info.numiter
     return SciMLBase.build_linear_solution(
-        alg, cache.u, resid, cache; retcode = retcode,
+        alg, cache.u, resid, nothing; retcode = retcode,
         iters = iters
     )
 end

@@ -158,7 +158,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::PardisoJL; kwargs
         cache.cacheval, u,
         SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)), b
     )
-    return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, cache.u, nothing, nothing)
 end
 
 # Add finalizer to release memory

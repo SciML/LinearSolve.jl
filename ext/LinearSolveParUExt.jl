@@ -225,7 +225,7 @@ function SciMLBase.solve!(
                 paru_cache.last_factorize_info = info
                 cache.isfresh = false
                 return SciMLBase.build_linear_solution(
-                    alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                    alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
                 )
             end
             paru_cache.sym = sym_ref[]
@@ -248,7 +248,7 @@ function SciMLBase.solve!(
             paru_cache.last_factorize_info = PARU_SINGULAR
             cache.isfresh = false
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Infeasible
             )
         elseif info != PARU_SUCCESS
             @SciMLMessage(
@@ -258,7 +258,7 @@ function SciMLBase.solve!(
             paru_cache.last_factorize_info = info
             cache.isfresh = false
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
             )
         end
         paru_cache.num = num_ref[]
@@ -274,7 +274,7 @@ function SciMLBase.solve!(
             cache.verbose, :solver_failure
         )
         return SciMLBase.build_linear_solution(
-            alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible
+            alg, cache.u, nothing, nothing; retcode = ReturnCode.Infeasible
         )
     elseif paru_cache.last_factorize_info != PARU_SUCCESS
         @SciMLMessage(
@@ -282,7 +282,7 @@ function SciMLBase.solve!(
             cache.verbose, :solver_failure
         )
         return SciMLBase.build_linear_solution(
-            alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+            alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
         )
     end
 
@@ -297,13 +297,13 @@ function SciMLBase.solve!(
     if info != PARU_SUCCESS
         @SciMLMessage("ParU solve failed (code $info)", cache.verbose, :solver_failure)
         return SciMLBase.build_linear_solution(
-            alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+            alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
         )
     end
 
     cache.u .= x_vec
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+        alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
     )
 end
 

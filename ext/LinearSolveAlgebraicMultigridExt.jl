@@ -41,7 +41,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::AlgebraicMultigridJL; kwargs.
     copyto!(cache.u, x)
 
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+        alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
     )
 end
 

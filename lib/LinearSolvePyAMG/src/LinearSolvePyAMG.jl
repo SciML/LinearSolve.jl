@@ -247,7 +247,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::PyAMG; kwargs...)
 
     resid = norm(cache.A * cache.u .- cache.b)
     return SciMLBase.build_linear_solution(
-        alg, cache.u, resid, cache;
+        alg, cache.u, resid, nothing;
         retcode = ReturnCode.Success
     )
 end

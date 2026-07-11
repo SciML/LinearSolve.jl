@@ -31,12 +31,12 @@ function SciMLBase.solve!(
     F = @get_cacheval(cache, :SpecializedLUFactorization)
     if !LinearAlgebra.issuccess(F)
         return SciMLBase.build_linear_solution(
-            alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+            alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
         )
     end
     ldiv!(cache.u, F, cache.b)
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+        alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
     )
 end
 
@@ -67,12 +67,12 @@ function SciMLBase.solve!(
     # issuccess only guards genuine numerical breakdown.
     if !LinearAlgebra.issuccess(F)
         return SciMLBase.build_linear_solution(
-            alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+            alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
         )
     end
     ldiv!(cache.u, F, cache.b)
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+        alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
     )
 end
 

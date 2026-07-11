@@ -79,7 +79,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::LinearSolve.CUSOL
         copyto!(cache.u, u_gpu)
     end
 
-    return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache; retcode = ReturnCode.Success)
+    return SciMLBase.build_linear_solution(alg, cache.u, nothing, nothing; retcode = ReturnCode.Success)
 end
 
 # Helper function for pattern checking

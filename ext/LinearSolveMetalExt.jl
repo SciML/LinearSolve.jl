@@ -36,7 +36,7 @@ function SciMLBase.solve!(
         cache.isfresh = false
     end
     y = ldiv!(cache.u, @get_cacheval(cache, :MetalLUFactorization), cache.b)
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, y, nothing, nothing)
 end
 
 # Mixed precision Metal LU implementation
@@ -96,7 +96,7 @@ function SciMLBase.solve!(
 
     # Convert back to original precision
     cache.u .= Torig.(u_f32)
-    return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, cache.u, nothing, nothing)
 end
 
 end

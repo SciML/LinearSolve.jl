@@ -156,7 +156,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::PartitionedSolversAlgorithm, 
         retcode = isfinite(resid) ? ReturnCode.Success : ReturnCode.Failure
     end
 
-    return SciMLBase.build_linear_solution(alg, cache.u, resid, cache; retcode, iters)
+    return SciMLBase.build_linear_solution(alg, cache.u, resid, nothing; retcode, iters)
 end
 
 end # module LinearSolvePartitionedSolversExt

@@ -142,7 +142,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::GinkgoJL; kwargs...)
     end
 
     resid = norm(cache.A * cache.u - cache.b)
-    return SciMLBase.build_linear_solution(alg, cache.u, resid, cache)
+    return SciMLBase.build_linear_solution(alg, cache.u, resid, nothing)
 end
 
 LinearSolve.update_tolerances_internal!(cache, alg::GinkgoJL, atol, rtol) = nothing

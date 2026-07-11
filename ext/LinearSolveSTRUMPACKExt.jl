@@ -248,7 +248,7 @@ function SciMLBase.solve!(
                 alg,
                 cache.u,
                 nothing,
-                cache;
+                nothing;
                 retcode = _retcode_from_strumpack(info)
             )
         end
@@ -278,7 +278,7 @@ function SciMLBase.solve!(
             alg,
             cache.u,
             nothing,
-            cache;
+            nothing;
             retcode = _retcode_from_strumpack(info)
         )
     end
@@ -288,7 +288,7 @@ function SciMLBase.solve!(
         alg,
         cache.u,
         nothing,
-        cache;
+        nothing;
         retcode = ReturnCode.Success
     )
 end

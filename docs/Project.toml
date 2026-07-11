@@ -13,7 +13,7 @@ LinearSolvePyAMG = {path = "../lib/LinearSolvePyAMG"}
 
 [compat]
 Documenter = "1"
-LinearSolve = "4"
+LinearSolve = "5"
 LinearSolveAutotune = "1.1"
 LinearSolvePyAMG = "1"
 SciMLOperators = "1"

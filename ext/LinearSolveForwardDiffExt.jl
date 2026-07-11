@@ -471,7 +471,7 @@ function SciMLBase.solve!(
     end
 
     return SciMLBase.build_linear_solution(
-        getfield(cache, :linear_cache).alg, getfield(cache, :dual_u), primal_sol.resid, cache;
+        getfield(cache, :linear_cache).alg, getfield(cache, :dual_u), primal_sol.resid, nothing;
         primal_sol.retcode, primal_sol.iters, primal_sol.stats
     )
 end
@@ -522,7 +522,7 @@ function _solve_direct_dual!(
     end
 
     return SciMLBase.build_linear_solution(
-        linear_cache.alg, getfield(cache, :dual_u), dual_sol.resid, cache;
+        linear_cache.alg, getfield(cache, :dual_u), dual_sol.resid, nothing;
         dual_sol.retcode, dual_sol.iters, dual_sol.stats
     )
 end

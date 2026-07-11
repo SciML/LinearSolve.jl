@@ -386,7 +386,7 @@ function PETScExt.postsolve_solution_check(cache, alg, pcache, A::PSparseMatrix,
 
     if res_norm > tol
         return SciMLBase.build_linear_solution(
-            alg, u, nothing, cache; retcode = ReturnCode.APosterioriSafetyFailure
+            alg, u, nothing, nothing; retcode = ReturnCode.APosterioriSafetyFailure
         )
     end
     return nothing

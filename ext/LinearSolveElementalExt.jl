@@ -84,7 +84,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::ElementalJL; kwargs...)
     x_jl = convert(Base.Matrix{T}, fact \ _b_to_elemental(cache.b, T))
     copyto!(cache.u, vec(x_jl))
 
-    return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache; retcode = ReturnCode.Success)
+    return SciMLBase.build_linear_solution(alg, cache.u, nothing, nothing; retcode = ReturnCode.Success)
 end
 
 end # module

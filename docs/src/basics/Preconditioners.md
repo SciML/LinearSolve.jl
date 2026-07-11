@@ -89,11 +89,11 @@ A = n * LA.I - rand(n, n)
 b = rand(n)
 
 prob = LS.LinearProblem(A, b)
-sol = LS.solve(prob, LS.KrylovJL_GMRES(precs = WeightedDiagonalPreconBuilder(w = 0.9)))
+cache = LS.init(prob, LS.KrylovJL_GMRES(precs = WeightedDiagonalPreconBuilder(w = 0.9)))
+sol = LS.solve!(cache)
 sol.u
 
 B = A .+ 0.1
-cache = sol.cache
 LS.reinit!(cache, A = B, reuse_precs = true)
 sol = LS.solve!(cache, LS.KrylovJL_GMRES(precs = WeightedDiagonalPreconBuilder(w = 0.9)))
 sol.u

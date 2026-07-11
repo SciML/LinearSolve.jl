@@ -368,7 +368,7 @@ function SciMLBase.solve!(
         if !LinearAlgebra.issuccess(fact[1])
             @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
             )
         end
         cache.isfresh = false
@@ -396,7 +396,7 @@ function SciMLBase.solve!(
     end
 
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+        alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
     )
 end
 
@@ -449,7 +449,7 @@ function SciMLBase.solve!(
         if !LinearAlgebra.issuccess(fact[1])
             @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
             )
         end
         cache.isfresh = false
@@ -483,6 +483,6 @@ function SciMLBase.solve!(
     end
 
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+        alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
     )
 end

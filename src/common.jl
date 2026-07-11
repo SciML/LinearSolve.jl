@@ -758,7 +758,7 @@ function SciMLBase.solve(
     )
     u = __static_default_ldiv(prob.A, prob.b)
     return SciMLBase.build_linear_solution(
-        alg, u, nothing, prob; retcode = ReturnCode.Success
+        alg, u, nothing, nothing; retcode = ReturnCode.Success
     )
 end
 
@@ -807,7 +807,7 @@ function SciMLBase.solve(
         return solve!(cache)
     end
     return SciMLBase.build_linear_solution(
-        alg, u, nothing, prob; retcode = ReturnCode.Success
+        alg, u, nothing, nothing; retcode = ReturnCode.Success
     )
 end
 

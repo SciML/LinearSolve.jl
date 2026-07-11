@@ -41,7 +41,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CliqueTreesFactor
     end
 
     ldiv!(u, cache.cacheval, b)
-    return SciMLBase.build_linear_solution(alg, u, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, u, nothing, nothing)
 end
 
 LinearSolve.PrecompileTools.@compile_workload begin

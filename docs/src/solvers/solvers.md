@@ -275,10 +275,10 @@ ParUFactorization
 !!! warning
 
     Call `cleanup_mumps_cache!` explicitly through the extension before
-    `MPI.Finalize()`:
+    `MPI.Finalize()`, using the `LinearCache` from an `init`/`solve!` cycle:
     ```julia
     MUMPSExt = Base.get_extension(LinearSolve, :LinearSolveMUMPSExt)
-    MUMPSExt.cleanup_mumps_cache!(sol)
+    MUMPSExt.cleanup_mumps_cache!(cache)
     ```
 
 ```@docs
@@ -768,8 +768,10 @@ PETSc objects live in C-managed memory outside Julia's GC.  Call
 
 ```julia
 PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
-PETScExt.cleanup_petsc_cache!(sol)   # after solve(...)
-PETScExt.cleanup_petsc_cache!(cache) # after init/solve! cycle
+
+cache = SciMLBase.init(prob, PETScAlgorithm(:gmres))
+sol = solve!(cache)
+PETScExt.cleanup_petsc_cache!(cache) # after the init/solve! cycle
 ```
 
 A GC finalizer is registered as a safety net, but explicit cleanup is strongly preferred.

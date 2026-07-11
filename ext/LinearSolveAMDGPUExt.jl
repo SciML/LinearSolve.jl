@@ -23,7 +23,7 @@ function SciMLBase.solve!(
 
     y = Array(b_gpu)
     cache.u .= y
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, y, nothing, nothing)
 end
 
 function LinearSolve.init_cacheval(
@@ -59,7 +59,7 @@ function SciMLBase.solve!(
 
     y = Array(b_gpu[1:n])
     cache.u .= y
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, y, nothing, nothing)
 end
 
 function LinearSolve.init_cacheval(

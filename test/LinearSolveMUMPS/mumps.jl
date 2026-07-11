@@ -31,10 +31,11 @@ end
     )
 
     alg = MUMPSFactorization()
-    sol = LinearSolve.solve(LinearProblem(A, b1), alg)
+    lincache = LinearSolve.init(LinearProblem(A, b1), alg)
+    sol = LinearSolve.solve!(lincache)
     @test sol.retcode == ReturnCode.Success
     @test residual_ok(A, sol.u, b1)
-    MUMPSExt.cleanup_mumps_cache!(sol)
+    MUMPSExt.cleanup_mumps_cache!(lincache)
 
     cache = LinearSolve.init(LinearProblem(A, b1), alg)
     sol1 = LinearSolve.solve!(cache)
@@ -63,13 +64,14 @@ end
     x = ComplexF64[1.0 - 1im, 2.0 + 0.5im]
     b = transpose(A) * x
 
-    sol = LinearSolve.solve(
+    cache = LinearSolve.init(
         LinearProblem(A, b),
         MUMPSFactorization(; transposed = true)
     )
+    sol = LinearSolve.solve!(cache)
     @test sol.retcode == ReturnCode.Success
     @test sol.u ≈ x atol = 1.0e-8 rtol = 1.0e-8
-    MUMPSExt.cleanup_mumps_cache!(sol)
+    MUMPSExt.cleanup_mumps_cache!(cache)
 end
 
 @testset "MUMPSFactorization rejects unsupported scalar types" begin

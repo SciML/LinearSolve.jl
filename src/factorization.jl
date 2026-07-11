@@ -23,7 +23,7 @@
                     :solver_failure
                 )
                 return SciMLBase.build_linear_solution(
-                    alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                    alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
                 )
             end
 
@@ -41,7 +41,7 @@
         end
 
         return SciMLBase.build_linear_solution(
-            alg, y, nothing, cache; retcode = ReturnCode.Success
+            alg, y, nothing, nothing; retcode = ReturnCode.Success
         )
     end
 end
@@ -140,7 +140,7 @@ function _check_residual_safety(cache::LinearCache, alg, A_original, y)
             return "Residual safety check failed: ‖A*x - b‖ = $(res_norm), tol = $(tol) (abstol = $(cache.abstol), reltol = $(cache.reltol), ‖b‖ = $(b_norm), ratio = $(res_norm / tol))"
         end
         return SciMLBase.build_linear_solution(
-            alg, y, nothing, cache; retcode = ReturnCode.APosterioriSafetyFailure
+            alg, y, nothing, nothing; retcode = ReturnCode.APosterioriSafetyFailure
         )
     end
     return nothing
@@ -353,7 +353,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
                     e isa LinearAlgebra.SingularException
                 @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
                 return SciMLBase.build_linear_solution(
-                    alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                    alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
                 )
             else
                 rethrow(e)
@@ -365,7 +365,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
                 !LinearAlgebra.issuccess(fact)
             @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
             )
         end
 
@@ -380,7 +380,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
         failed !== nothing && return failed
     end
 
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
+    return SciMLBase.build_linear_solution(alg, y, nothing, nothing; retcode = ReturnCode.Success)
 end
 
 function do_factorization(alg::LUFactorization, A, b, u)
@@ -446,7 +446,7 @@ function SciMLBase.solve!(
 
         if !LinearAlgebra.issuccess(fact)
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
             )
         end
 
@@ -461,7 +461,7 @@ function SciMLBase.solve!(
         failed !== nothing && return failed
     end
 
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
+    return SciMLBase.build_linear_solution(alg, y, nothing, nothing; retcode = ReturnCode.Success)
 end
 
 function init_cacheval(
@@ -592,7 +592,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::GESVFactorization; kwargs...)
         if !LinearAlgebra.issuccess(luf)
             @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
             )
         end
         cache.isfresh = false
@@ -601,7 +601,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::GESVFactorization; kwargs...)
     copyto!(cache.u, cache.b)
     ldiv!(luf, cache.u)
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+        alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
     )
 end
 
@@ -1582,7 +1582,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::CHOLMODFactorization; kwargs.
 
     cache.u .= @get_cacheval(cache, :CHOLMODFactorization) \ cache.b
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache;
+        alg, cache.u, nothing, nothing;
         retcode = ReturnCode.Success
     )
 end
@@ -1675,7 +1675,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization; 
                 !LinearAlgebra.issuccess(fact)
             @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
             )
         end
 
@@ -1690,7 +1690,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::NormalCholeskyFactorization; 
     else
         y = ldiv!(cache.u, @get_cacheval(cache, :NormalCholeskyFactorization), A' * cache.b)
     end
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
+    return SciMLBase.build_linear_solution(alg, y, nothing, nothing; retcode = ReturnCode.Success)
 end
 
 ## NormalBunchKaufmanFactorization
@@ -1738,7 +1738,7 @@ function SciMLBase.solve!(
     end
     y = ldiv!(cache.u, @get_cacheval(cache, :NormalBunchKaufmanFactorization), A' * cache.b)
     return SciMLBase.build_linear_solution(
-        alg, y, nothing, cache;
+        alg, y, nothing, nothing;
         retcode = ReturnCode.Success
     )
 end
@@ -1772,7 +1772,7 @@ function SciMLBase.solve!(
         cache.u .= A.diag .\ cache.b
     end
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache;
+        alg, cache.u, nothing, nothing;
         retcode = ReturnCode.Success
     )
 end

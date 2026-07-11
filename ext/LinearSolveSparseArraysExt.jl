@@ -288,12 +288,12 @@ end
         if F.status == UMFPACK_OK
             y = ldiv!(cache.u, F, cache.b)
             SciMLBase.build_linear_solution(
-                alg, y, nothing, cache; retcode = ReturnCode.Success
+                alg, y, nothing, nothing; retcode = ReturnCode.Success
             )
         else
             @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Infeasible
             )
         end
     end
@@ -485,7 +485,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
         y = ldiv!(cache.u, F, cache.b)
         if all(isfinite, y)
             SciMLBase.build_linear_solution(
-                alg, y, nothing, cache; retcode = ReturnCode.Success
+                alg, y, nothing, nothing; retcode = ReturnCode.Success
             )
         else
             # KLU can report `KLU_OK` on a numerically singular matrix (a
@@ -498,13 +498,13 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
                 cache.verbose, :solver_failure
             )
             SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Infeasible
             )
         end
     else
         @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
         SciMLBase.build_linear_solution(
-            alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible
+            alg, cache.u, nothing, nothing; retcode = ReturnCode.Infeasible
         )
     end
 end
@@ -661,7 +661,7 @@ function SciMLBase.solve!(
         y = ldiv!(cache.u, F, cache.b)
         if all(isfinite, y)
             SciMLBase.build_linear_solution(
-                alg, y, nothing, cache; retcode = ReturnCode.Success
+                alg, y, nothing, nothing; retcode = ReturnCode.Success
             )
         else
             # PureKLU (like SuiteSparse KLU) can report `KLU_OK` on a numerically
@@ -674,13 +674,13 @@ function SciMLBase.solve!(
                 cache.verbose, :solver_failure
             )
             SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Infeasible
             )
         end
     else
         @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
         SciMLBase.build_linear_solution(
-            alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible
+            alg, cache.u, nothing, nothing; retcode = ReturnCode.Infeasible
         )
     end
 end
@@ -780,7 +780,7 @@ function SciMLBase.solve!(
     F = LinearSolve.@get_cacheval(cache, :SparseColumnPivotedQRFactorization)
     y = LinearSolve._ldiv!(cache.u, F, cache.b)
     return SciMLBase.build_linear_solution(
-        alg, y, nothing, cache; retcode = ReturnCode.Success
+        alg, y, nothing, nothing; retcode = ReturnCode.Success
     )
 end
 

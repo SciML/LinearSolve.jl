@@ -133,7 +133,6 @@ function test_interface(alg; kw...)
         @test cache.isfresh == cache.cacheval.isfresh_A ==
             cache.cacheval.isfresh_b == cache.cacheval.isfresh_u == true
         y = solve!(cache)
-        cache = y.cache
         @test cache.isfresh == cache.cacheval.isfresh_A ==
             cache.cacheval.isfresh_b == cache.cacheval.isfresh_u == false
         @test A * to_array(y.u) ≈ b atol = atol rtol = rtol
@@ -143,7 +142,6 @@ function test_interface(alg; kw...)
         @test cache.isfresh == cache.cacheval.isfresh_A == true
         @test cache.cacheval.isfresh_b == cache.cacheval.isfresh_u == false
         y = solve!(cache; cache_kwargs...)
-        cache = y.cache
         @test cache.isfresh == cache.cacheval.isfresh_A ==
             cache.cacheval.isfresh_b == cache.cacheval.isfresh_u == false
         @test A * to_array(y.u) ≈ b atol = atol rtol = rtol
@@ -157,7 +155,6 @@ function test_interface(alg; kw...)
         @test cache.cacheval.isfresh_b
         @test cache.cacheval.isfresh_A == cache.cacheval.isfresh_u == false
         y = solve!(cache; cache_kwargs...)
-        cache = y.cache
         @test cache.isfresh == cache.cacheval.isfresh_A ==
             cache.cacheval.isfresh_b == cache.cacheval.isfresh_u == false
         @test A * to_array(y.u) ≈ to_array(b2) atol = atol rtol = rtol
@@ -167,13 +164,14 @@ end
 
 function test_retcode_failure()
     prob = failure_prob()
-    sol = solve(
+    cache = SciMLBase.init(
         prob, HYPREAlgorithm(HYPRE.PCG);
         abstol = 1.0e-12, reltol = 1.0e-12, maxiters = 1
     )
+    sol = solve!(cache)
     @test sol.retcode == SciMLBase.ReturnCode.MaxIters
     @test sol.iters == 1
-    return @test sol.resid > sol.cache.reltol
+    return @test sol.resid > cache.reltol
 end
 
 const comm = MPI.COMM_WORLD

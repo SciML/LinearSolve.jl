@@ -441,7 +441,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     end
 
     return SciMLBase.build_linear_solution(
-        alg, cache.u, Ref(resid), cache;
+        alg, cache.u, Ref(resid), nothing;
         iters = stats.niter, retcode, stats
     )
 end

@@ -661,7 +661,7 @@ function _do_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol)
             cache.verbose, :default_lu_fallback
         )
         return SciMLBase.build_linear_solution(
-            alg, cache.u, nothing, cache; retcode = rc, iters = iters, stats = nothing
+            alg, cache.u, nothing, nothing; retcode = rc, iters = iters, stats = nothing
         )
     end
     if cache.A === cache.cacheval.A_backup
@@ -670,7 +670,7 @@ function _do_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol)
             cache.verbose, :default_lu_fallback
         )
         return SciMLBase.build_linear_solution(
-            alg, cache.u, nothing, cache; retcode = rc, iters = iters, stats = nothing
+            alg, cache.u, nothing, nothing; retcode = rc, iters = iters, stats = nothing
         )
     end
     if reason === :residual_check
@@ -690,7 +690,7 @@ function _do_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol)
     qr_sol = SciMLBase.solve!(cache, QRFactorization(pivot))
     cache.cacheval.fell_back_to_qr = true
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache;
+        alg, cache.u, nothing, nothing;
         retcode = qr_sol.retcode, iters = qr_sol.iters, stats = nothing
     )
 end
@@ -708,7 +708,7 @@ function _reuse_qr_fallback(cache::LinearCache, alg)
     qr_sol = SciMLBase.solve!(cache, QRFactorization(pivot))
     # Use cache directly for type-stable inference (see _do_qr_fallback).
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache;
+        alg, cache.u, nothing, nothing;
         retcode = qr_sol.retcode, iters = qr_sol.iters, stats = nothing
     )
 end
@@ -763,7 +763,7 @@ function _do_sparse_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol)
     cache.cacheval.fell_back_to_qr = true
     cache.isfresh = false
     return SciMLBase.build_linear_solution(
-        alg, y, nothing, cache; retcode = ReturnCode.Success, iters = 0, stats = nothing
+        alg, y, nothing, nothing; retcode = ReturnCode.Success, iters = 0, stats = nothing
     )
 end
 
@@ -785,7 +785,7 @@ function _reuse_sparse_qr_fallback(cache::LinearCache, alg)
     end
     y = _ldiv!(cache.u, qr_fact, cache.b)
     return SciMLBase.build_linear_solution(
-        alg, y, nothing, cache; retcode = ReturnCode.Success, iters = 0, stats = nothing
+        alg, y, nothing, nothing; retcode = ReturnCode.Success, iters = 0, stats = nothing
     )
 end
 
@@ -821,7 +821,7 @@ function _default_sparse_lu_solve_with_fallback(
         end
     end
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache;
+        alg, cache.u, nothing, nothing;
         retcode = sol.retcode, iters = sol.iters, stats = nothing
     )
 end
@@ -857,7 +857,7 @@ function _default_lu_solve_with_fallback(
     end
     # Use cache directly for type-stable inference (see _do_qr_fallback).
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache;
+        alg, cache.u, nothing, nothing;
         retcode = sol.retcode, iters = sol.iters, stats = nothing
     )
 end
@@ -1014,7 +1014,7 @@ end
                             if _Aop === cache.A
                                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)))
                                 SciMLBase.build_linear_solution(
-                                    alg, cache.u, nothing, cache;
+                                    alg, cache.u, nothing, nothing;
                                     retcode = sol.retcode, iters = sol.iters, stats = nothing
                                 )
                             else
@@ -1022,7 +1022,7 @@ end
                                 setfield!(cache, :A, _Aop)
                                 _rawsol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)))
                                 _result = SciMLBase.build_linear_solution(
-                                    alg, cache.u, nothing, cache;
+                                    alg, cache.u, nothing, nothing;
                                     retcode = _rawsol.retcode, iters = _rawsol.iters,
                                     stats = nothing
                                 )
@@ -1041,7 +1041,7 @@ end
                         if !(cache.A isa Array)
                             sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)))
                             SciMLBase.build_linear_solution(
-                                alg, cache.u, nothing, cache;
+                                alg, cache.u, nothing, nothing;
                                 retcode = sol.retcode,
                                 iters = sol.iters, stats = nothing
                             )
@@ -1057,7 +1057,7 @@ end
                 newex = quote
                     sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)))
                     SciMLBase.build_linear_solution(
-                        alg, cache.u, nothing, cache;
+                        alg, cache.u, nothing, nothing;
                         retcode = sol.retcode,
                         iters = sol.iters, stats = nothing
                     )

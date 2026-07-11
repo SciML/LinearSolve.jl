@@ -173,7 +173,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::IterativeSolversJL; kwargs...
         resid = resid.current
     end
 
-    return SciMLBase.build_linear_solution(alg, cache.u, resid, cache; iters = i)
+    return SciMLBase.build_linear_solution(alg, cache.u, resid, nothing; iters = i)
 end
 
 purge_history!(iter, x, b) = nothing

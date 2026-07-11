@@ -120,7 +120,7 @@ function SciMLBase.solve!(
         HSL.ma57_solve!(hcache.ma57, cache.u, hcache.work)
 
         return SciMLBase.build_linear_solution(
-            alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+            alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
         )
     catch err
         if err isa HSL.Ma57Exception
@@ -131,7 +131,7 @@ function SciMLBase.solve!(
             )
             cache.isfresh = true
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
             )
         end
         rethrow(err)
@@ -169,7 +169,7 @@ function SciMLBase.solve!(
         HSL.ma97_solve!(hcache.ma97, cache.u)
 
         return SciMLBase.build_linear_solution(
-            alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+            alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
         )
     catch err
         if err isa HSL.Ma97Exception
@@ -180,7 +180,7 @@ function SciMLBase.solve!(
             )
             cache.isfresh = true
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
             )
         end
         rethrow(err)

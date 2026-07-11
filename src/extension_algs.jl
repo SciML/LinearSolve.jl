@@ -69,12 +69,8 @@ resources promptly:
 ```julia
 PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
 
-sol = solve(prob, PETScAlgorithm(:gmres))
-PETScExt.cleanup_petsc_cache!(sol)
-
-# Or via the cache directly:
-cache = SciMLBase.init(prob, PETScAlgorithm(:cg))
-solve!(cache)
+cache = SciMLBase.init(prob, PETScAlgorithm(:gmres))
+sol = solve!(cache)
 PETScExt.cleanup_petsc_cache!(cache)
 ```
 
@@ -95,12 +91,13 @@ n = 100
 A = sprand(n, n, 0.1); A = A + A' + 20I
 b = rand(n)
 
-sol = solve(
+cache = SciMLBase.init(
     LinearProblem(A, b),
     PETScAlgorithm(:gmres; pc_type = :ilu, ksp_options = (ksp_monitor = "",))
 )
+sol = solve!(cache)
 println("Residual: ", norm(A * sol.u - b) / norm(b))
-PETScExt.cleanup_petsc_cache!(sol)
+PETScExt.cleanup_petsc_cache!(cache)
 ```
 
 ## Distributed SparseMatrixCSC Example
@@ -115,16 +112,17 @@ n = 12
 A = spdiagm(-1 => -ones(n - 1), 0 => 4.0 .* ones(n), 1 => -ones(n - 1))
 b = ones(n)
 
-sol = solve(
+cache = SciMLBase.init(
     LinearProblem(A, b),
     PETScAlgorithm(:gmres; comm = MPI.COMM_WORLD);
     abstol = 1.0e-10,
     reltol = 1.0e-10
 )
+sol = solve!(cache)
 
 # sol.u is the full replicated solution on every rank.
 println(norm(A * sol.u - b) / norm(b))
-PETScExt.cleanup_petsc_cache!(sol)
+PETScExt.cleanup_petsc_cache!(cache)
 ```
 """
 struct PETScAlgorithm <: SciMLLinearSolveAlgorithm
@@ -1396,9 +1394,10 @@ MUMPSExt = Base.get_extension(LinearSolve, :LinearSolveMUMPSExt)
 
 A = sparse([4.0 1.0; 2.0 3.0])
 b = [1.0, 2.0]
-sol = solve(LinearProblem(A, b), MUMPSFactorization())
+cache = SciMLBase.init(LinearProblem(A, b), MUMPSFactorization())
+sol = solve!(cache)
 
-MUMPSExt.cleanup_mumps_cache!(sol)
+MUMPSExt.cleanup_mumps_cache!(cache)
 MPI.Finalize()
 ```
 
@@ -1414,8 +1413,9 @@ MPI.Init()
 MUMPSExt = Base.get_extension(LinearSolve, :LinearSolveMUMPSExt)
 A = sparse([4.0 1.0; 2.0 3.0])
 b = [1.0, 2.0]
-sol = solve(LinearProblem(A, b), MUMPSFactorization())
-MUMPSExt.cleanup_mumps_cache!(sol)
+cache = SciMLBase.init(LinearProblem(A, b), MUMPSFactorization())
+sol = solve!(cache)
+MUMPSExt.cleanup_mumps_cache!(cache)
 ```
 """
 struct MUMPSFactorization <: AbstractSparseFactorization

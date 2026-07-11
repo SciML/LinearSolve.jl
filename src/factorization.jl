@@ -585,7 +585,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::GESVFactorization; kwargs...)
         # so a singular denominator is reported through the return code.
         luf = lu!(Atarget; check = false)
         cache.cacheval = luf
-        if !issuccess(luf)
+        if !LinearAlgebra.issuccess(luf)
             @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure

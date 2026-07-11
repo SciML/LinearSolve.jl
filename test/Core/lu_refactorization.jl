@@ -7,6 +7,16 @@ using LinearSolve, LinearAlgebra, StableRNGs, Test
 # non-BLAS eltypes) is allocation-free on every supported version.
 const BLAS_IPIV_REUSE = VERSION >= v"1.11"
 
+# On Julia 1.11 exactly, `@allocated refactor_solve!(...)` at testset scope
+# still counts one boxed `LinearSolution` return (<= 48 bytes): 1.11 has the
+# `getrf!(A, ipiv)` reuse API but its escape analysis does not elide the
+# returned solution wrapper here; 1.12+ elides it fully. A leaked pivot vector
+# would add >= n * sizeof(Int) bytes on top, so the reuse assertion stays
+# meaningful under this ceiling. (CI runs lts/1/pre = 1.10/1.12+/pre, so this
+# only shows up on local 1.11 runs; the ceilings were introduced in #1082
+# assuming the 1.12 elision behavior.)
+const WRAPPER_CEILING = VERSION >= v"1.12" ? 0 : 48
+
 rng = StableRNG(42)
 
 function refactor_solve!(cache, Awork, A)
@@ -28,12 +38,18 @@ end
     # 1.10's compiler does not always elide the small `LU`/solution wrapper
     # constructions that 1.11+ removes, hence the small nonzero ceiling.
     @testset "$(name)" for (name, alg, maxalloc) in (
-            ("LUFactorization RowMaximum", LUFactorization(), BLAS_IPIV_REUSE ? 0 : nothing),
+            (
+                "LUFactorization RowMaximum", LUFactorization(),
+                BLAS_IPIV_REUSE ? WRAPPER_CEILING : nothing,
+            ),
             (
                 "LUFactorization NoPivot", LUFactorization(pivot = NoPivot()),
-                VERSION >= v"1.11" ? 0 : 64,
+                VERSION >= v"1.11" ? WRAPPER_CEILING : 64,
             ),
-            ("default algorithm", nothing, BLAS_IPIV_REUSE ? 0 : nothing),
+            (
+                "default algorithm", nothing,
+                BLAS_IPIV_REUSE ? WRAPPER_CEILING : nothing,
+            ),
         )
         cache = init(
             LinearProblem(copy(A1), copy(b)), alg;
@@ -163,7 +179,7 @@ end
     refactor_solve!(cache, Awork, A2)
     alloc = @allocated refactor_solve!(cache, Awork, A2)
     if BLAS_IPIV_REUSE
-        @test alloc == 0
+        @test alloc <= WRAPPER_CEILING
     end
     @test cache.u ≈ A2 \ b2
 end

@@ -266,15 +266,18 @@ _get_residualsafety(alg::GenericLUFactorization) = alg.residualsafety
 # Dense-LU refactorization buffer reuse: `lu`/`lu!` allocate a fresh pivot
 # vector (and, without aliasing, a fresh factors copy) on every `cache.A = X`
 # refactorization. When the cached `LU`'s buffers match the incoming matrix,
-# factorize through `LAPACK.getrf!` with the cached `ipiv` instead. The
+# factorize through `LAPACK.getrf!` (or, outside the LAPACK fast path, the
+# vendored `generic_lufact!`) with the cached `ipiv` instead. The
 # preallocated-`ipiv` `getrf!` method only exists on Julia >= 1.11; older
-# releases keep the allocating path.
+# releases keep the allocating LAPACK path, but `generic_lufact!` accepts a
+# provided `ipiv` on every supported Julia version.
+function _lu_cacheval_ipiv_matches(cacheval, A)
+    return cacheval isa LU &&
+        cacheval.ipiv isa Vector{BlasInt} &&
+        length(cacheval.ipiv) == min(size(A)...)
+end
 @static if VERSION >= v"1.11"
-    function _reusable_lu_cacheval(cacheval, A)
-        return cacheval isa LU &&
-            cacheval.ipiv isa Vector{BlasInt} &&
-            length(cacheval.ipiv) == min(size(A)...)
-    end
+    _reusable_lu_cacheval(cacheval, A) = _lu_cacheval_ipiv_matches(cacheval, A)
     function _lu_reusing_ipiv!(A, ipiv::Vector{BlasInt})
         factors, piv, info = LAPACK.getrf!(A, ipiv; check = false)
         return LU{eltype(factors), typeof(factors), typeof(piv)}(
@@ -312,8 +315,19 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
                 # so refactorize in place and skip the O(n²) copy `lu` makes.
                 pivot = _normalize_pivot(alg.pivot)
                 if A isa StridedMatrix{<:LinearAlgebra.BlasFloat} &&
-                        pivot isa RowMaximum && _reusable_lu_cacheval(cacheval, A)
-                    fact = _lu_reusing_ipiv!(A, cacheval.ipiv)
+                        pivot isa RowMaximum
+                    if _reusable_lu_cacheval(cacheval, A)
+                        fact = _lu_reusing_ipiv!(A, cacheval.ipiv)
+                    else
+                        fact = lu!(A, pivot; check = false)
+                    end
+                elseif A isa StridedMatrix &&
+                        pivot isa Union{RowMaximum, NoPivot, RowNonZero} &&
+                        _lu_cacheval_ipiv_matches(cacheval, A)
+                    # `lu!` on a strided matrix outside the LAPACK fast path runs
+                    # `generic_lufact!`, which would allocate a fresh pivot
+                    # vector; call it directly with the cached one instead.
+                    fact = generic_lufact!(A, pivot, cacheval.ipiv; check = false)
                 else
                     fact = lu!(A, pivot; check = false)
                 end

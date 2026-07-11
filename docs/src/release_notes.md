@@ -8,6 +8,9 @@
   - Dense `LUFactorization` refactorizations (`cache.A = X` then `solve!`) now reuse the
     cached pivot vector (and, without `alias_A`, the cached factors buffer) on
     Julia >= 1.11, making warm refactorization solves allocation-free.
+  - The dense `LUFactorization` pivot-buffer reuse with `alias_A = true` now also covers
+    the generic-kernel path (`NoPivot`/`RowNonZero` pivoting and non-BLAS element types),
+    on all supported Julia versions.
 
 ## v4.0
 

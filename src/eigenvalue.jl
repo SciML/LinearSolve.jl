@@ -1,129 +1,100 @@
-# `EigenvalueProblem`, `EigenvalueSolution`, `EigenvalueTarget`, and
-# `build_eigenvalue_solution` are defined natively in SciMLBase (analogous to
-# `LinearProblem`/`LinearSolution`) once an upstream release adds them. Older
-# SciMLBase versions lack them, so fall back to local definitions here,
-# preserving the same public interface either way. This mirrors the existing
-# `@static if isdefined(SciMLBase, :DiffEqArrayOperator)` gate further down in
-# this module for the same reason: keep a wide SciMLBase compat range instead
-# of forcing every LinearSolve user onto an upstream version they may not need.
-@static if isdefined(SciMLBase, :EigenvalueProblem)
-    using SciMLBase: EigenvalueProblem, EigenvalueSolution, EigenvalueTarget,
-        build_eigenvalue_solution
-else
-    """
-        EigenvalueTarget
+using SciMLBase: EigenvalueProblem, EigenvalueSolution, EigenvalueTarget,
+    build_eigenvalue_solution
 
-    Enum selecting which part of the spectrum is returned when only a subset of the
-    eigenpairs is requested (via `num_eigenpairs`) in an [`EigenvalueProblem`](@ref).
-    """
-    EnumX.@enumx EigenvalueTarget begin
-        "Eigenvalues of largest magnitude, `abs(λ)` largest."
-        LargestMagnitude
-        "Eigenvalues of smallest magnitude, `abs(λ)` smallest."
-        SmallestMagnitude
-        "Eigenvalues with the largest (most positive) real part."
-        LargestRealPart
-        "Eigenvalues with the smallest (most negative) real part."
-        SmallestRealPart
-        "Eigenvalues with the largest (most positive) imaginary part."
-        LargestImaginaryPart
-        "Eigenvalues with the smallest (most negative) imaginary part."
-        SmallestImaginaryPart
-    end
+"""
+    AbstractEigenvalueAlgorithm
 
-    """
-        EigenvalueProblem(A[, B], p = SciMLBase.NullParameters();
-            num_eigenpairs = nothing, eigentarget = EigenvalueTarget.LargestMagnitude,
-            shift = nothing, u0 = nothing)
-
-    Define a standard or generalized eigenvalue problem.
-
-    The standard problem is ``A v = λ v``. If `B` is supplied, the generalized problem
-    is ``A v = λ B v``.
-
-    ## Keyword arguments
-
-      - `num_eigenpairs`: the number of eigenpairs (eigenvalues together with their
-        eigenvectors) to compute. `nothing` (the default) requests every eigenpair for the
-        dense solver, or a solver-chosen default for the iterative backends.
-      - `eigentarget`: which part of the spectrum to return, as an
-        [`EigenvalueTarget`](@ref). Defaults to the eigenvalues of largest magnitude.
-      - `shift`: if supplied, return the eigenvalues nearest this shift (shift-and-invert).
-      - `u0`: optional initial guess for the iterative backends.
-    """
-    struct EigenvalueProblem{
-            AType, BType, NevType, TargetType, ShiftType, U0Type, PType, KType,
-        }
-        A::AType
-        B::BType
-        num_eigenpairs::NevType
-        eigentarget::TargetType
-        shift::ShiftType
-        u0::U0Type
-        p::PType
-        kwargs::KType
-    end
-
-    function EigenvalueProblem(
-            A, B = nothing, p = SciMLBase.NullParameters();
-            num_eigenpairs = nothing,
-            eigentarget::EigenvalueTarget.T = EigenvalueTarget.LargestMagnitude,
-            shift = nothing, u0 = nothing, kwargs...
-        )
-        return EigenvalueProblem{
-            typeof(A), typeof(B), typeof(num_eigenpairs), typeof(eigentarget),
-            typeof(shift), typeof(u0), typeof(p), typeof(kwargs),
-        }(A, B, num_eigenpairs, eigentarget, shift, u0, p, kwargs)
-    end
-
-    struct EigenvalueSolution{Tv, N, U, V, P, A, R, S} <: SciMLBase.AbstractNoTimeSolution{Tv, N}
-        u::U
-        vectors::V
-        prob::P
-        alg::A
-        retcode::ReturnCode.T
-        resid::R
-        stats::S
-    end
-
-    function build_eigenvalue_solution(
-            prob, alg, values, vectors;
-            retcode = ReturnCode.Success, resid = nothing, stats = nothing
-        )
-        Tv = eltype(eltype(values))
-        N = length((size(values)...,))
-        return EigenvalueSolution{
-            Tv, N, typeof(values), typeof(vectors), typeof(prob), typeof(alg),
-            typeof(resid), typeof(stats),
-        }(values, vectors, prob, alg, retcode, resid, stats)
-    end
-
-    export EigenvalueProblem, EigenvalueSolution, EigenvalueTarget
-end
-
+Base type for algorithms that solve an [`EigenvalueProblem`](@ref).
+"""
 abstract type AbstractEigenvalueAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
 
+"""
+    DenseEigen()
+
+Solve the `EigenvalueProblem` with `LinearAlgebra.eigen`. This is the default
+algorithm: it computes the full dense eigendecomposition and then selects the
+requested eigenpairs (via `num_eigenpairs`, `eigentarget`, or `shift`) from it.
+Best for small to moderately sized dense matrices where every eigenpair (or a
+sizable fraction of them) is needed.
+"""
 struct DenseEigen <: AbstractEigenvalueAlgorithm end
 
 # The iterative backends forward any extra keyword arguments to the underlying
 # solver (`Arpack.eigs`, `ArnoldiMethod.partialschur`, `KrylovKit.eigsolve`,
 # `JacobiDavidson.jdqr`). They are keyword-only: passing positional arguments is
 # an error, and unrecognized keywords are rejected by the underlying solver.
+"""
+    ArpackJL(; kwargs...)
+
+Solve the `EigenvalueProblem` with [Arpack.jl](https://github.com/JuliaLinearAlgebra/Arpack.jl)'s
+`eigs`, an iterative Krylov (implicitly restarted Arnoldi/Lanczos) solver well suited to
+computing a handful of extremal eigenpairs of a large sparse or structured matrix.
+Extra `kwargs` are forwarded to `Arpack.eigs`.
+
+!!! note
+
+    Using this solver requires loading Arpack.jl, i.e. `using Arpack`.
+"""
 struct ArpackJL{K <: NamedTuple} <: AbstractEigenvalueAlgorithm
     kwargs::K
 end
 ArpackJL(; kwargs...) = ArpackJL((; kwargs...))
 
+"""
+    ArnoldiMethodJL
+
+Algorithm type constructed by [`ArnoldiMethod`](@ref); see its docstring for details.
+"""
 struct ArnoldiMethodJL{K <: NamedTuple} <: AbstractEigenvalueAlgorithm
     kwargs::K
 end
+
+"""
+    ArnoldiMethod(; kwargs...)
+
+Solve the `EigenvalueProblem` with
+[ArnoldiMethod.jl](https://github.com/JuliaLinearAlgebra/ArnoldiMethod.jl)'s
+`partialschur`, a pure-Julia implicitly restarted Arnoldi method for large sparse or
+structured matrices. Does not support `eigentarget = EigenvalueTarget.SmallestMagnitude`
+directly; use `shift` for shift-and-invert instead, or another backend. Extra `kwargs`
+are forwarded to `ArnoldiMethod.partialschur`.
+
+!!! note
+
+    Using this solver requires loading ArnoldiMethod.jl, i.e. `using ArnoldiMethod`.
+"""
 ArnoldiMethod(; kwargs...) = ArnoldiMethodJL((; kwargs...))
 
+"""
+    KrylovKitEigen(; kwargs...)
+
+Solve the `EigenvalueProblem` with
+[KrylovKit.jl](https://github.com/Jutho/KrylovKit.jl)'s `eigsolve`, a Krylov solver
+supporting both standard and generalized eigenvalue problems, extremal and interior
+(shifted) targets. Extra `kwargs` are forwarded to `KrylovKit.eigsolve`.
+
+!!! note
+
+    Using this solver requires loading KrylovKit.jl, i.e. `using KrylovKit`.
+"""
 struct KrylovKitEigen{K <: NamedTuple} <: AbstractEigenvalueAlgorithm
     kwargs::K
 end
 KrylovKitEigen(; kwargs...) = KrylovKitEigen((; kwargs...))
 
+"""
+    JacobiDavidsonJL(; kwargs...)
+
+Solve the `EigenvalueProblem` with
+[JacobiDavidson.jl](https://github.com/haampie/JacobiDavidson.jl)'s `jdqr`, a
+target/interior method that finds the eigenvalues nearest a given `shift`. Does not
+support generalized eigenvalue problems (upstream `jdqz` is broken). Extra `kwargs` are
+forwarded to `JacobiDavidson.jdqr`.
+
+!!! note
+
+    Using this solver requires loading JacobiDavidson.jl, i.e. `using JacobiDavidson`.
+"""
 struct JacobiDavidsonJL{K <: NamedTuple} <: AbstractEigenvalueAlgorithm
     kwargs::K
 end

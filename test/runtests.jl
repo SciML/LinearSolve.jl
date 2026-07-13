@@ -109,8 +109,8 @@ else
             # activation as well as the test body). GPU, Pardiso, and HSL have no such
             # guard in the old dispatch, so they activate unconditionally via `env =`.
 
-            # Don't run Enzyme tests on prerelease or Julia >= 1.12 (Enzyme
-            # compatibility issues). See:
+            # Don't run the AD group on prerelease Julia (some AD backends lag
+            # behind Julia prereleases). See:
             # https://github.com/SciML/LinearSolve.jl/issues/817
             "AD" => function ()
                 if isempty(VERSION.prerelease)
@@ -118,10 +118,7 @@ else
                     @time @safetestset "Mooncake Derivative Rules" include("AD/mooncake.jl")
                     @time @safetestset "Static Arrays" include("AD/static_arrays.jl")
                     @time @safetestset "Caching Allocation Tests" include("AD/caching_allocation_tests.jl")
-                    # Disable Enzyme tests on Julia >= 1.12 due to compatibility issues
-                    if VERSION < v"1.12.0-"
-                        @time @safetestset "Enzyme Derivative Rules" include("AD/enzyme.jl")
-                    end
+                    @time @safetestset "Enzyme Derivative Rules" include("AD/enzyme.jl")
                 end
                 return nothing
             end,

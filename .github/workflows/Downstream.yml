@@ -23,7 +23,4 @@ jobs:
       repo: "${{ matrix.package.repo }}"
       group: "${{ matrix.package.group }}"
       julia-version: "lts"
-      # Allow downstream failures that are not caused by LinearSolve.jl
-      # See: https://github.com/SciML/LinearSolve.jl/issues/880
-      continue-on-error: true
     secrets: "inherit"

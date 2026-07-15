@@ -157,14 +157,27 @@ mutable struct KLUFactorization{Tv <: KLUTypes, Ti <: KLUITypes, Tklu <: Union{k
     end
 end
 
+_symbolic(K::AbstractKLUFactorization) = getfield(K, :(_symbolic))
+_numeric(K::AbstractKLUFactorization) = getfield(K, :(_numeric))
+_common(K::AbstractKLUFactorization) = getfield(K, :common)
+_commonref(K::AbstractKLUFactorization) = getfield(K, :commonref)
+_colptr(K::AbstractKLUFactorization) = getfield(K, :colptr)
+_rowval(K::AbstractKLUFactorization) = getfield(K, :rowval)
+_nzval(K::AbstractKLUFactorization) = getfield(K, :nzval)
+_set_symbolic!(K::AbstractKLUFactorization, x) = setfield!(K, :(_symbolic), Ptr{Cvoid}(x))
+_set_numeric!(K::AbstractKLUFactorization, x) = setfield!(K, :(_numeric), Ptr{Cvoid}(x))
+_set_nzval!(K::AbstractKLUFactorization, x) = setfield!(K, :nzval, x)
+
 function _free_symbolic(K::AbstractKLUFactorization{Tv, Ti}) where {Ti <: KLUITypes, Tv}
-    K._symbolic == C_NULL && return C_NULL
+    symbolic = _symbolic(K)
+    symbolic == C_NULL && return C_NULL
+    commonref = _commonref(K)
     if Ti == Int64
-        klu_l_free_symbolic(Ref(Ptr{klu_l_symbolic}(K._symbolic)), K.commonref)
+        klu_l_free_symbolic(Ref(Ptr{klu_l_symbolic}(symbolic)), commonref)
     elseif Ti == Int32
-        klu_free_symbolic(Ref(Ptr{klu_symbolic}(K._symbolic)), K.commonref)
+        klu_free_symbolic(Ref(Ptr{klu_symbolic}(symbolic)), commonref)
     end
-    return K._symbolic = C_NULL
+    return _set_symbolic!(K, C_NULL)
 end
 
 for Ti in KLUIndexTypes, Tv in KLUValueTypes
@@ -173,9 +186,10 @@ for Ti in KLUIndexTypes, Tv in KLUValueTypes
     ptr = _klu_name("numeric", :Float64, Ti)
     @eval begin
         function _free_numeric(K::AbstractKLUFactorization{$Tv, $Ti})
-            K._numeric == C_NULL && return C_NULL
-            $klufree(Ref(Ptr{$ptr}(K._numeric)), K.commonref)
-            return K._numeric = C_NULL
+            numeric = _numeric(K)
+            numeric == C_NULL && return C_NULL
+            $klufree(Ref(Ptr{$ptr}(numeric)), _commonref(K))
+            return _set_numeric!(K, C_NULL)
         end
     end
 end
@@ -193,12 +207,12 @@ function KLUFactorization(
     return KLUFactorization(n, decrement(A.colptr), decrement(A.rowval), copy(A.nzval))
 end
 
-size(K::AbstractKLUFactorization) = (K.n, K.n)
+size(K::AbstractKLUFactorization) = (getfield(K, :n), getfield(K, :n))
 function size(K::AbstractKLUFactorization, dim::Integer)
     if dim < 1
         throw(ArgumentError("size: dimension $dim out of range"))
     elseif dim == 1 || dim == 2
-        return Int(K.n)
+        return Int(getfield(K, :n))
     else
         return 1
     end
@@ -418,18 +432,19 @@ function show(io::IO, mime::MIME{Symbol("text/plain")}, K::AbstractKLUFactorizat
 end
 
 function klu_analyze!(K::KLUFactorization{Tv, Ti}; check = true) where {Tv, Ti <: KLUITypes}
-    if K._symbolic != C_NULL
+    if _symbolic(K) != C_NULL
         return K
     end
+    commonref = _commonref(K)
     if Ti == Int64
-        sym = klu_l_analyze(K.n, K.colptr, K.rowval, K.commonref)
+        sym = klu_l_analyze(getfield(K, :n), _colptr(K), _rowval(K), commonref)
     else
-        sym = klu_analyze(K.n, K.colptr, K.rowval, K.commonref)
+        sym = klu_analyze(getfield(K, :n), _colptr(K), _rowval(K), commonref)
     end
     if sym == C_NULL && check
-        kluerror(K.common)
+        kluerror(_common(K))
     else
-        K._symbolic = sym
+        _set_symbolic!(K, sym)
     end
     return K
 end
@@ -439,18 +454,19 @@ function klu_analyze!(
         K::KLUFactorization{Tv, Ti}, P::Vector{Ti},
         Q::Vector{Ti}; check = true
     ) where {Tv, Ti <: KLUITypes}
-    if K._symbolic != C_NULL
+    if _symbolic(K) != C_NULL
         return K
     end
+    commonref = _commonref(K)
     if Ti == Int64
-        sym = klu_l_analyze_given(K.n, K.colptr, K.rowval, P, Q, K.commonref)
+        sym = klu_l_analyze_given(getfield(K, :n), _colptr(K), _rowval(K), P, Q, commonref)
     else
-        sym = klu_analyze_given(K.n, K.colptr, K.rowval, P, Q, K.commonref)
+        sym = klu_analyze_given(getfield(K, :n), _colptr(K), _rowval(K), P, Q, commonref)
     end
     if sym == C_NULL && check
-        kluerror(K.common)
+        kluerror(_common(K))
     else
-        K._symbolic = sym
+        _set_symbolic!(K, sym)
     end
     return K
 end
@@ -462,24 +478,29 @@ for Tv in KLUValueTypes, Ti in KLUIndexTypes
         function klu_factor!(
                 K::KLUFactorization{$Tv, $Ti}; check = true, allowsingular = false
             )
-            K._symbolic == C_NULL && K.common.status >= KLU_OK && klu_analyze!(K)
-            if K._symbolic != C_NULL && K.common.status >= KLU_OK
-                K.common.halt_if_singular = !allowsingular && check
-                num = $factor(K.colptr, K.rowval, K.nzval, K._symbolic, K.commonref)
-                K.common.halt_if_singular = true
+            common = _common(K)
+            symbolic = _symbolic(K)
+            if symbolic == C_NULL && common.status >= KLU_OK
+                klu_analyze!(K)
+                symbolic = _symbolic(K)
+            end
+            if symbolic != C_NULL && common.status >= KLU_OK
+                common.halt_if_singular = !allowsingular && check
+                num = $factor(_colptr(K), _rowval(K), _nzval(K), symbolic, _commonref(K))
+                common.halt_if_singular = true
             else
                 num = C_NULL
             end
             if num == C_NULL && check
-                kluerror(K.common)
+                kluerror(common)
             else
                 if allowsingular
-                    K.common.status < KLU_OK && check && kluerror(K.common)
+                    common.status < KLU_OK && check && kluerror(common)
                 else
-                    (K.common.status == KLU_OK) || (check && kluerror(K.common))
+                    (common.status == KLU_OK) || (check && kluerror(common))
                 end
             end
-            K._numeric = num
+            _set_numeric!(K, num)
             return K
         end
     end
@@ -676,17 +697,18 @@ for Tv in KLUValueTypes, Ti in KLUIndexTypes
                 K::KLUFactorization{$Tv, $Ti}, nzval::Vector{$Tv};
                 check = true, allowsingular = false
             )
-            length(nzval) != length(K.nzval) && throw(DimensionMismatch())
-            K.nzval = nzval
-            K.common.halt_if_singular = !allowsingular && check
+            length(nzval) != length(_nzval(K)) && throw(DimensionMismatch())
+            _set_nzval!(K, nzval)
+            common = _common(K)
+            common.halt_if_singular = !allowsingular && check
             ok = $refactor(
-                K.colptr, K.rowval, K.nzval, K._symbolic, K._numeric, K.commonref
+                _colptr(K), _rowval(K), _nzval(K), _symbolic(K), _numeric(K), _commonref(K)
             )
-            K.common.halt_if_singular = true
-            if (ok == 1 || !check || (allowsingular && K.common.status >= KLU_OK))
+            common.halt_if_singular = true
+            if (ok == 1 || !check || (allowsingular && common.status >= KLU_OK))
                 return K
             else
-                kluerror(K.common)
+                kluerror(common)
             end
         end
     end
@@ -711,17 +733,19 @@ function klu!(
         check = true, allowsingular = false
     ) where {U}
     size(K) == size(S) || throw(ArgumentError("Sizes of K and S must match."))
-    increment!(K.colptr)
-    increment!(K.rowval)
+    colptr = _colptr(K)
+    rowval = _rowval(K)
+    increment!(colptr)
+    increment!(rowval)
     # what should happen here when check = false? This is not really a KLU error code.
-    K.colptr == S.colptr && K.rowval == S.rowval ||
+    colptr == S.colptr && rowval == S.rowval ||
         (
-        decrement!(K.colptr);
-        decrement!(K.rowval);
+        decrement!(colptr);
+        decrement!(rowval);
         throw(ArgumentError("The pattern of the original matrix must match the pattern of the refactor."))
     )
-    decrement!(K.colptr)
-    decrement!(K.rowval)
+    decrement!(colptr)
+    decrement!(rowval)
     return klu!(K, S.nzval; check, allowsingular)
 end
 
@@ -759,12 +783,12 @@ for Tv in KLUValueTypes, Ti in KLUIndexTypes
                 B::StridedVecOrMat{$Tv}; check = true
             )
             stride(B, 1) == 1 || throw(ArgumentError("B must have unit strides"))
-            klu._numeric == C_NULL && klu_factor!(klu)
+            _numeric(klu) == C_NULL && klu_factor!(klu)
             size(B, 1) == size(klu, 1) || throw(DimensionMismatch())
             isok = $solve(
-                klu._symbolic, klu._numeric, size(B, 1), size(B, 2), B, klu.commonref
+                _symbolic(klu), _numeric(klu), size(B, 1), size(B, 2), B, _commonref(klu)
             )
-            isok == 0 && check && kluerror(klu.common)
+            isok == 0 && check && kluerror(_common(klu))
             return B
         end
     end
@@ -776,13 +800,14 @@ for Tv in KLUValueTypes, Ti in KLUIndexTypes
     if Tv === :ComplexF64
         call = :(
             $tsolve(
-                klu._symbolic, klu._numeric, size(B, 1), size(B, 2), B, conj, klu.commonref
+                _symbolic(klu), _numeric(klu), size(B, 1), size(B, 2), B, conj,
+                _commonref(klu)
             )
         )
     else
         call = :(
             $tsolve(
-                klu._symbolic, klu._numeric, size(B, 1), size(B, 2), B, klu.commonref
+                _symbolic(klu), _numeric(klu), size(B, 1), size(B, 2), B, _commonref(klu)
             )
         )
     end
@@ -794,10 +819,10 @@ for Tv in KLUValueTypes, Ti in KLUIndexTypes
             conj = 1
             klu = parent(klu)
             stride(B, 1) == 1 || throw(ArgumentError("B must have unit strides"))
-            klu._numeric == C_NULL && klu_factor!(klu)
+            _numeric(klu) == C_NULL && klu_factor!(klu)
             size(B, 1) == size(klu, 1) || throw(DimensionMismatch())
             isok = $call
-            isok == 0 && check && kluerror(klu.common)
+            isok == 0 && check && kluerror(_common(klu))
             return B
         end
         function solve!(
@@ -807,10 +832,10 @@ for Tv in KLUValueTypes, Ti in KLUIndexTypes
             conj = 0
             klu = parent(klu)
             stride(B, 1) == 1 || throw(ArgumentError("B must have unit strides"))
-            klu._numeric == C_NULL && klu_factor!(klu)
+            _numeric(klu) == C_NULL && klu_factor!(klu)
             size(B, 1) == size(klu, 1) || throw(DimensionMismatch())
             isok = $call
-            isok == 0 && check && kluerror(klu.common)
+            isok == 0 && check && kluerror(_common(klu))
             return B
         end
     end

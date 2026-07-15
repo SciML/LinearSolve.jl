@@ -131,9 +131,12 @@ end
     # The dispatches occur in sparse_check_Ti and SparseMatrixCSC constructor
     # These are stdlib issues, not LinearSolve issues
     JET.@test_opt solve(prob_sparse, UMFPACKFactorization()) broken = true
-    # Passes since the 5.0 lightweight solution: with the cache no longer
-    # captured in the returned LinearSolution, the KLU solve is dispatch-clean.
-    JET.@test_opt solve(prob_sparse, KLUFactorization())
+    # KLU itself is dispatch-clean; scope JET to package and extension modules
+    # to avoid external logging reports from the singular failure path.
+    sparse_ext = Base.get_extension(LinearSolve, :LinearSolveSparseArraysExt)
+    JET.@test_opt target_modules = (LinearSolve, sparse_ext, sparse_ext.KLU, SciMLBase) solve(
+        prob_sparse, KLUFactorization()
+    )
     JET.@test_opt solve(prob_sparse_spd, CHOLMODFactorization()) broken = true
 
     # SparspakFactorization requires Sparspak to be loaded

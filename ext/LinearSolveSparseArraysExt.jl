@@ -451,7 +451,8 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
     if cache.isfresh
         cacheval = LinearSolve.@get_cacheval(cache, :KLUFactorization)
         if alg.reuse_symbolic
-            if length(cacheval.nzval) != length(nonzeros(A)) || alg.check_pattern && pattern_changed(cacheval, A)
+            if length(KLU._nzval(cacheval)) != length(nonzeros(A)) ||
+                    alg.check_pattern && pattern_changed(cacheval, A)
                 fact = KLU.klu(
                     SparseMatrixCSC(
                         size(A)..., getcolptr(A), rowvals(A),
@@ -481,32 +482,38 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
         cache.isfresh = false
     end
     F = LinearSolve.@get_cacheval(cache, :KLUFactorization)
-    return if F.common.status == KLU.KLU_OK
+    return if KLU._common(F).status == KLU.KLU_OK
         y = ldiv!(cache.u, F, cache.b)
         if all(isfinite, y)
             SciMLBase.build_linear_solution(
                 alg, y, nothing, nothing; retcode = ReturnCode.Success
             )
         else
-            # KLU can report `KLU_OK` on a numerically singular matrix (a
-            # tiny-but-nonzero pivot, common when explicit stored zeros mask a
-            # rank deficiency) yet produce non-finite output. Surface that as a
-            # failure instead of a silent NaN `Success`, matching the default
-            # solver's finiteness check.
-            @SciMLMessage(
-                "Solver produced non-finite values; matrix is likely singular",
-                cache.verbose, :solver_failure
-            )
-            SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, nothing; retcode = ReturnCode.Infeasible
-            )
+            _klu_infeasible_solution(alg, cache.u, cache.verbose, Val(:nonfinite))
         end
     else
-        @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
-        SciMLBase.build_linear_solution(
-            alg, cache.u, nothing, nothing; retcode = ReturnCode.Infeasible
-        )
+        _klu_infeasible_solution(alg, cache.u, cache.verbose, Val(:failed))
     end
+end
+
+Base.@noinline function _klu_infeasible_solution(alg, u, verbose, ::Val{:nonfinite})
+    # KLU can report `KLU_OK` on a numerically singular matrix (a tiny-but-nonzero
+    # pivot, common when explicit stored zeros mask a rank deficiency) yet produce
+    # non-finite output. Surface that as a failure instead of a silent NaN `Success`.
+    @SciMLMessage(
+        "Solver produced non-finite values; matrix is likely singular",
+        verbose, :solver_failure
+    )
+    return SciMLBase.build_linear_solution(
+        alg, u, nothing, nothing; retcode = ReturnCode.Infeasible
+    )
+end
+
+Base.@noinline function _klu_infeasible_solution(alg, u, verbose, ::Val{:failed})
+    @SciMLMessage("Solver failed", verbose, :solver_failure)
+    return SciMLBase.build_linear_solution(
+        alg, u, nothing, nothing; retcode = ReturnCode.Infeasible
+    )
 end
 
 # --- PureKLU: pure-Julia KLU, the default sparse LU (no SuiteSparse dependency) ---
@@ -941,14 +948,24 @@ function LinearSolve.pattern_changed(
     return true
 end
 
+function LinearSolve.pattern_changed(
+        fact::KLU.AbstractKLUFactorization,
+        A::SparseArrays.AbstractSparseMatrixCSC{<:Any, <:Integer}
+    )
+    return _sparse_pattern_changed(KLU._colptr(fact), KLU._rowval(fact), A)
+end
+
 function LinearSolve.pattern_changed(fact, A::SparseArrays.AbstractSparseMatrixCSC{<:Any, <:Integer})
-    colptr0 = fact.colptr # has 0-based indices
+    return _sparse_pattern_changed(fact.colptr, fact.rowval, A)
+end
+
+function _sparse_pattern_changed(colptr0, rowval0, A::SparseArrays.AbstractSparseMatrixCSC)
+    # Cached SuiteSparse/KLU patterns use 0-based indices; SparseMatrixCSC uses 1-based indices.
     colptr1 = SparseArrays.getcolptr(A) # has 1-based indices
     length(colptr0) == length(colptr1) || return true
     @inbounds for i in eachindex(colptr0)
         colptr0[i] + 1 == colptr1[i] || return true
     end
-    rowval0 = fact.rowval
     rowval1 = SparseArrays.rowvals(A)
     length(rowval0) == length(rowval1) || return true
     @inbounds for i in eachindex(rowval0)

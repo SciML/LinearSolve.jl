@@ -296,56 +296,61 @@ function SciMLBase.solve!(
     )
     __appleaccelerate_isavailable() ||
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
-    A = cache.A
-    A = convert(AbstractMatrix, A)
+    A_work = convert(AbstractMatrix, cache.A)
     check_safety = alg.residualsafety && cache.isfresh
     needs_backup = check_safety ||
         (cache.alg isa DefaultLinearSolver && cache.alg.safetyfallback && cache.isfresh)
-    A_original = needs_backup ? _copy_A_for_safety(cache) : A
+    A_original = needs_backup ? _copy_A_for_safety(cache) : A_work
     verbose = cache.verbose
     if cache.isfresh
         cacheval = @get_cacheval(cache, :AppleAccelerateLUFactorization)
-        if length(cacheval.ipiv) != min(size(A, 1), size(A, 2))
-            cacheval.ipiv = similar(A, Cint, min(size(A, 1), size(A, 2)))
+        if length(cacheval.ipiv) != min(size(A_work, 1), size(A_work, 2))
+            cacheval.ipiv = similar(
+                A_work, Cint, min(size(A_work, 1), size(A_work, 2))
+            )
         end
-        cacheval.factors = A
-        info_value = aa_getrf!(A, cacheval.ipiv, cacheval.info, false)
+        cacheval.factors = A_work
+        info_value = aa_getrf!(A_work, cacheval.ipiv, cacheval.info, false)
 
         if info_value != 0
             if verbose.blas_info != SciMLLogging.Silent() ||
                     verbose.blas_errors != SciMLLogging.Silent() ||
                     verbose.blas_invalid_args != SciMLLogging.Silent()
-                op_info = get_blas_operation_info(
-                    :dgetrf, A, cache.b,
+                failure_op_info = get_blas_operation_info(
+                    :dgetrf, A_work, cache.b,
                     condition = verbose.condition_number != SciMLLogging.Silent()
                 )
-                @SciMLMessage(cache.verbose, :condition_number) do
-                    if isinf(op_info.condition_number)
-                        return "Matrix condition number calculation failed."
-                    else
-                        return "Matrix condition number: $(round(op_info.condition_number, sigdigits = 4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf"
+                let op_info = failure_op_info
+                    @SciMLMessage(cache.verbose, :condition_number) do
+                        if isinf(op_info.condition_number)
+                            return "Matrix condition number calculation failed."
+                        else
+                            return "Matrix condition number: $(round(op_info.condition_number, sigdigits = 4)) for $(size(A_work, 1))×$(size(A_work, 2)) matrix in dgetrf"
+                        end
                     end
                 end
                 verb_option,
                     message = blas_info_msg(
-                    :dgetrf, info_value; extra_context = op_info
+                    :dgetrf, info_value; extra_context = failure_op_info
                 )
                 @SciMLMessage(message, verbose, verb_option)
             end
         else
             @SciMLMessage(cache.verbose, :blas_success) do
-                op_info = get_blas_operation_info(
-                    :dgetrf, A, cache.b,
+                success_op_info = get_blas_operation_info(
+                    :dgetrf, A_work, cache.b,
                     condition = verbose.condition_number != SciMLLogging.Silent()
                 )
-                @SciMLMessage(cache.verbose, :condition_number) do
-                    if isinf(op_info.condition_number)
-                        return "Matrix condition number calculation failed."
-                    else
-                        return "Matrix condition number: $(round(op_info.condition_number, sigdigits = 4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf"
+                let op_info = success_op_info
+                    @SciMLMessage(cache.verbose, :condition_number) do
+                        if isinf(op_info.condition_number)
+                            return "Matrix condition number calculation failed."
+                        else
+                            return "Matrix condition number: $(round(op_info.condition_number, sigdigits = 4)) for $(size(A_work, 1))×$(size(A_work, 2)) matrix in dgetrf"
+                        end
                     end
                 end
-                return "BLAS LU factorization (dgetrf) completed successfully for $(op_info.matrix_size) matrix"
+                return "BLAS LU factorization (dgetrf) completed successfully for $(success_op_info.matrix_size) matrix"
             end
         end
 
@@ -359,13 +364,13 @@ function SciMLBase.solve!(
     end
 
     cacheval = @get_cacheval(cache, :AppleAccelerateLUFactorization)
-    A = cacheval.factors
+    factors = cacheval.factors
     info = cacheval.info
     require_one_based_indexing(cache.u, cache.b)
-    m, n = size(A, 1), size(A, 2)
+    m, n = size(factors, 1), size(factors, 2)
     if m > n
         Bc = copy(cache.b)
-        aa_getrs!('N', cacheval.factors, cacheval.ipiv, Bc, info)
+        aa_getrs!('N', factors, cacheval.ipiv, Bc, info)
         if cache.b isa AbstractMatrix
             copyto!(cache.u, @view(Bc[1:n, :]))
         else
@@ -373,7 +378,7 @@ function SciMLBase.solve!(
         end
     else
         copyto!(cache.u, cache.b)
-        aa_getrs!('N', cacheval.factors, cacheval.ipiv, cache.u, info)
+        aa_getrs!('N', factors, cacheval.ipiv, cache.u, info)
     end
 
     if check_safety

@@ -5,15 +5,37 @@
 KrylovJL(args...; KrylovAlg = Krylov.gmres!,
     Pl = nothing, Pr = nothing,
     gmres_restart = 0, window = 0,
+    warm_start = :none,
     kwargs...)
 ```
 
 A generic wrapper over the Krylov.jl krylov-subspace iterative solvers.
+
+`warm_start` controls the initial guess used when the same cache is solved
+repeatedly (currently supported for GMRES and FGMRES; other methods ignore it):
+
+  - `:none` (default): every solve starts from zero.
+  - `:previous`: start from the previous solution `cache.u`.
+  - `:hegedus`: start from the previous solution rescaled by the Hegedüs trick,
+    `x₀ = ξ u` with `ξ = ⟨Au, b⟩ / ‖Au‖²`, which minimizes the initial residual
+    along the direction of the previous solution and hence guarantees
+    `‖b - A x₀‖ ≤ ‖b‖`.
+
+Warm starting costs one extra operator application per solve (two for
+`:hegedus`), so it pays off when successive solutions are correlated, e.g. for
+sequences of preconditioned solves inside implicit ODE integrators. Since the
+previous *solution* (not the previous Newton increment magnitude) is only a
+direction, `:hegedus` is the recommended safe choice; a raw `:previous` start
+can increase the initial residual when successive right-hand sides shrink. The
+stopping criterion is adjusted for warm-started solves (`reltol` is measured
+against `‖b‖` as in a cold start, not against the warm initial residual), so
+warm starting never changes the meaning of the tolerances.
 """
 struct KrylovJL{F, I, P, A, K} <: AbstractKrylovSubspaceMethod
     KrylovAlg::F
     gmres_restart::I
     window::I
+    warm_start::Symbol
     precs::P
     args::A
     kwargs::K
@@ -22,11 +44,18 @@ end
 function KrylovJL(
         args...; KrylovAlg = Krylov.gmres!,
         gmres_restart = 0, window = 0,
+        warm_start::Symbol = :none,
         precs = nothing,
         kwargs...
     )
+    warm_start in (:none, :previous, :hegedus) ||
+        throw(
+        ArgumentError(
+            "warm_start must be :none, :previous, or :hegedus, got :$warm_start"
+        )
+    )
     return KrylovJL(
-        KrylovAlg, gmres_restart, window,
+        KrylovAlg, gmres_restart, window, warm_start,
         precs, args, kwargs
     )
 end
@@ -58,10 +87,13 @@ end
 
 """
 ```julia
-KrylovJL_GMRES(args...; gmres_restart = 0, window = 0, kwargs...)
+KrylovJL_GMRES(args...; gmres_restart = 0, window = 0, warm_start = :none, kwargs...)
 ```
 
 A generic GMRES implementation for square non-Hermitian linear systems
+
+`warm_start` (`:none`, `:previous`, or `:hegedus`) selects the initial guess
+used when the same cache is solved repeatedly; see [`KrylovJL`](@ref).
 """
 function KrylovJL_GMRES(args...; kwargs...)
     return KrylovJL(args...; KrylovAlg = Krylov.gmres!, kwargs...)
@@ -69,10 +101,13 @@ end
 
 """
 ```julia
-KrylovJL_FGMRES(args...; gmres_restart = 0, window = 0, kwargs...)
+KrylovJL_FGMRES(args...; gmres_restart = 0, window = 0, warm_start = :none, kwargs...)
 ```
 
 A generic FGMRES implementation for square non-Hermitian linear systems
+
+`warm_start` (`:none`, `:previous`, or `:hegedus`) selects the initial guess
+used when the same cache is solved repeatedly; see [`KrylovJL`](@ref).
 """
 function KrylovJL_FGMRES(args...; kwargs...)
     return KrylovJL(args...; KrylovAlg = Krylov.fgmres!, kwargs...)
@@ -311,6 +346,40 @@ function _check_batched_rhs_support(alg::KrylovJL, b::AbstractMatrix)
     )
 end
 
+# Krylov.jl workspaces the `warm_start` option applies to: square-system
+# solvers with `Krylov.warm_start!` support where restarting from the previous
+# solution is meaningful.
+const _WARM_STARTABLE_WORKSPACES = Union{Krylov.GmresWorkspace, Krylov.FgmresWorkspace}
+
+"""
+    _krylov_warm_start!(workspace, cache, mode, M, atol, rtol) -> (atol, rtol)
+
+Warm start `workspace` from the previous solution `cache.u` (raw for
+`mode === :previous`, Hegedüs-rescaled for `mode === :hegedus`) and return the
+adjusted stopping tolerances. Krylov.jl measures `rtol` against the warm-start
+residual `‖M (b - A x₀)‖` rather than `‖M b‖`, so `rtol * ‖M b‖` is folded
+into `atol` (and `rtol` zeroed) to keep the stopping threshold identical to a
+cold start's. No-op (returning the tolerances unchanged) for unsupported
+workspaces and for zero or nonfinite previous solutions.
+"""
+function _krylov_warm_start!(workspace, cache, mode::Symbol, M, atol, rtol)
+    workspace isa _WARM_STARTABLE_WORKSPACES || return atol, rtol
+    u = cache.u
+    (u isa AbstractVector && eltype(u) <: Number) || return atol, rtol
+    unorm = norm(u)
+    (iszero(unorm) || !isfinite(unorm)) && return atol, rtol
+    if mode === :hegedus
+        Au = mul!(similar(cache.b), cache.A, u)
+        d = real(dot(Au, Au))
+        (iszero(d) || !isfinite(d)) && return atol, rtol
+        Krylov.warm_start!(workspace, (dot(Au, cache.b) / d) .* u)
+    else
+        Krylov.warm_start!(workspace, u)
+    end
+    bnorm = M === I ? norm(cache.b) : norm(ldiv!(similar(cache.b), M, cache.b))
+    return atol + rtol * bnorm, zero(rtol)
+end
+
 function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     if cache.precsisfresh && !isnothing(alg.precs)
         Pl, Pr = alg.precs(cache.A, cache.p)
@@ -354,6 +423,10 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     end
 
     krylovJL_verbose = verbosity_to_int(verbose.KrylovJL_verbosity)
+
+    if alg.warm_start !== :none
+        atol, rtol = _krylov_warm_start!(cacheval, cache, alg.warm_start, M, atol, rtol)
+    end
 
     args = (cacheval, cache.A, cache.b)
     # Filter out workspace creation parameters (memory, window) from kwargs

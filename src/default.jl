@@ -1117,8 +1117,8 @@ end
             end
         elseif alg == Symbol(DefaultAlgorithmChoice.AppleAccelerateLUFactorization)
             quote
-                A = getproperty(cache.cacheval, $(Meta.quot(alg)))[1]
-                aa_getrs!('T', A.factors, A.ipiv, dy)
+                A = getproperty(cache.cacheval, $(Meta.quot(alg)))
+                aa_getrs!('T', A.factors, A.ipiv, dy, A.info)
             end
         elseif alg in Symbol.(
                 (

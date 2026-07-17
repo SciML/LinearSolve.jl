@@ -109,6 +109,29 @@ end
     end
 end
 
+if LinearSolve.appleaccelerate_isavailable()
+    @testset "Apple Accelerate reuses its refactorization workspace" begin
+        n = 51
+        A1 = rand(rng, n, n) + n * I
+        A2 = rand(rng, n, n) + n * I
+        Asing = copy(A1)
+        Asing[:, 1] .= 0
+        b = rand(rng, n)
+        cache = init(LinearProblem(copy(A1), copy(b)), AppleAccelerateLUFactorization())
+        Awork = cache.A
+
+        @test solve!(cache).u ≈ A1 \ b
+        refactor_solve!(cache, Awork, A1)
+        @test @allocated(refactor_solve!(cache, Awork, A2)) <= WRAPPER_CEILING
+        @test cache.u ≈ A2 \ b
+
+        @test refactor_solve!(cache, Awork, Asing).retcode == ReturnCode.Failure
+        sol = refactor_solve!(cache, Awork, A1)
+        @test sol.retcode == ReturnCode.Success
+        @test sol.u ≈ A1 \ b
+    end
+end
+
 @testset "default algorithm QR safety fallback survives warm singular refactorization" begin
     n = 8
     Agood = rand(rng, n, n) + n * I

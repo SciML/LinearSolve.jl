@@ -87,6 +87,10 @@ else
             return @time @safetestset "SpecializingFactorizations" include("Core/specializing_factorizations.jl")
         end,
         groups = Dict(
+            "AppleAccelerate" => function ()
+                @time @safetestset "Apple Accelerate Refactorization Reuse" include("Core/lu_refactorization.jl")
+                return @time @safetestset "Apple Accelerate Mixed Precision" include("Core/test_mixed_precision.jl")
+            end,
             # STRUMPACK runs in the base env: STRUMPACK_jll is a base test dep (the
             # Core suite also probes the STRUMPACK extension), so this group adds no
             # deps.

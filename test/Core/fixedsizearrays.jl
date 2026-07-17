@@ -99,7 +99,8 @@ end
         slot = LinearSolve.init_cacheval(
             alg, A, v, v, nothing, nothing, 0, 0.0, 0.0, true, assump
         )
-        @test slot[1].factors isa FixedSizeArray
-        @test slot[1].ipiv isa FixedSizeArray
+        fact = alg isa AppleAccelerateLUFactorization ? slot : slot[1]
+        @test fact.factors isa FixedSizeArray
+        @test fact.ipiv isa FixedSizeArray
     end
 end

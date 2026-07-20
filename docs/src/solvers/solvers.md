@@ -63,8 +63,12 @@ when reduced precision is acceptable for the factorization step.
 
 For sparse LU-factorizations, `PureKLUFactorization` (a pure-Julia KLU with no
 SuiteSparse dependency, the default) if there is less structure to the sparsity
-pattern and `UMFPACKFactorization` if there is more structure. The SuiteSparse-backed
-`KLUFactorization` remains available as an explicit alternative.
+pattern and `SupernodalLUFactorization` (a pure-Julia supernodal
+left–right-looking LU implementing the Schenk & Gärtner method, no binary
+dependency) if there is more structure — so the default sparse LU stack is
+entirely pure Julia and no longer depends on `Base.USE_GPL_LIBS`. The
+SuiteSparse-backed `KLUFactorization` and `UMFPACKFactorization` remain
+available as explicit alternatives.
 For sparse QR-factorizations (used for non-square, rank-deficient, or least-squares
 systems, and as the fallback when the sparse LU hits a (near-)singular matrix), the
 same less-structure/more-structure split as the LU case applies:

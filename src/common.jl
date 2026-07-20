@@ -775,7 +775,7 @@ function SciMLBase.solve(
             # with the (zero-)initialized `u` instead of throwing.
             u = prob.u0 !== nothing ? prob.u0 : __init_u0_from_Ab(prob.A, prob.b)
             return SciMLBase.build_linear_solution(
-                alg, u, nothing, prob; retcode = ReturnCode.Failure
+                alg, u, nothing, nothing; retcode = ReturnCode.Failure
             )
         end
         u = F \ prob.b
@@ -790,7 +790,7 @@ function SciMLBase.solve(
         if !gesv_ok
             u = prob.u0 !== nothing ? prob.u0 : __init_u0_from_Ab(prob.A, prob.b)
             return SciMLBase.build_linear_solution(
-                alg, u, nothing, prob; retcode = ReturnCode.Failure
+                alg, u, nothing, nothing; retcode = ReturnCode.Failure
             )
         end
     elseif alg isa QRFactorization

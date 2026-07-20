@@ -1,4 +1,4 @@
-using LinearSolve, LinearAlgebra, SparseArrays, StableRNGs, Test
+using LinearSolve, LinearAlgebra, SparseArrays, StableRNGs, StaticArrays, Test
 
 # LinearSolve 5.0: `solve!`/`solve` return a lightweight `LinearSolution` that
 # no longer carries the `LinearCache` (`sol.cache === nothing`). Anyone who
@@ -49,6 +49,14 @@ rng = StableRNG(7)
     # also returns a cache-free solution
     sol = solve!(init(LinearProblem(copy(Asing), copy(b)), nothing; verbose = false))
     @test sol.cache === nothing
+
+    Astatic = @SMatrix [1.0 1.0; 1.0 1.0]
+    bstatic = @SVector [1.0, 1.0]
+    for alg in (LUFactorization(), GESVFactorization())
+        sol = solve(LinearProblem(Astatic, bstatic), alg)
+        @test sol.retcode == ReturnCode.Failure
+        @test sol.cache === nothing
+    end
 end
 
 @testset "warm aliased refactorize+solve loop is allocation-free" begin

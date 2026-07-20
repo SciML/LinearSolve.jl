@@ -230,6 +230,7 @@ LinearSolveSparseArraysExt.KLU.klu
 LinearSolveSparseArraysExt.KLU.klu!
 PureKLUFactorization
 PureUMFPACKFactorization
+SupernodalLUFactorization
 UMFPACKFactorization
 SparseColumnPivotedQRFactorization
 ```
@@ -240,6 +241,15 @@ SparseColumnPivotedQRFactorization
     dependency) and is the default sparse LU for "less structured" sparsity
     patterns, replacing the SuiteSparse-backed `KLUFactorization` in the default
     polyalgorithm.
+
+!!! note
+    
+    `SupernodalLUFactorization` is a pure-Julia implementation of the supernodal
+    left–right-looking sparse LU method of Schenk & Gärtner (from PurePardiso.jl,
+    no binary dependency). It is the strongest choice for "more structured"
+    (PDE-mesh-like) sparse systems, where it outperforms both `UMFPACKFactorization`
+    and `KLUFactorization`, and its numeric refactorization on an unchanged
+    sparsity pattern is allocation-free.
 
 !!! note
     

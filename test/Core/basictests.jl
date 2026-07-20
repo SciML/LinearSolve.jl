@@ -211,6 +211,37 @@ end
         @test X * solve!(cache) ≈ b1
     end
 
+    @testset "SupernodalLU Factorization" begin
+        A1 = sparse(A / 1)
+        b1 = rand(n)
+        x1 = zero(b)
+        A2 = sparse(A / 2)
+        b2 = rand(n)
+        x2 = zero(b)
+
+        prob1 = LinearProblem(A1, b1; u0 = x1)
+        prob2 = LinearProblem(A2, b2; u0 = x2)
+        test_interface(SupernodalLUFactorization(), prob1, prob2)
+        test_interface(SupernodalLUFactorization(reuse_symbolic = false), prob1, prob2)
+        test_interface(SupernodalLUFactorization(ordering = :nd), prob1, prob2)
+        test_interface(SupernodalLUFactorization(matching = false), prob1, prob2)
+
+        # Test that refactoring with a changed pattern is checked and handled.
+        cache = SciMLBase.init(prob1, SupernodalLUFactorization(); cache_kwargs...)
+        y = solve!(cache)
+        cache.A = A2
+        @test A2 * solve!(cache) ≈ b1
+        X = sprand(n, n, 0.8)
+        cache.A = X
+        @test X * solve!(cache) ≈ b1
+
+        # numerically singular systems surface as Infeasible, not NaN Success
+        Z = spzeros(4, 4)
+        Z[1, 1] = 1.0
+        zsol = solve(LinearProblem(Z, ones(4)), SupernodalLUFactorization())
+        @test zsol.retcode == ReturnCode.Infeasible
+    end
+
     @testset "Sparspak Factorization (Float64)" begin
         A1 = sparse(A / 1)
         b1 = rand(n)

@@ -243,8 +243,9 @@ mutable struct BLISLUCache{F, P, I}
     info::I
 end
 
-LinearSolve._cache_factorization(cacheval::BLISLUCache) =
+LinearSolve._cache_factorization(::BLISLUFactorization, cacheval::BLISLUCache) =
     LinearAlgebra.LU(cacheval.factors, cacheval.ipiv, Int(cacheval.info[]))
+LinearSolve._can_reuse_cache_factorization(::BLISLUFactorization, ::BLISLUCache) = true
 
 function LinearSolve.init_cacheval(
         alg::BLISLUFactorization,

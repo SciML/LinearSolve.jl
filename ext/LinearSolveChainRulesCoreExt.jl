@@ -31,16 +31,20 @@ function CRC.rrule(
 
     @assert sensealg isa LinearSolveAdjoint "Currently only `LinearSolveAdjoint` is supported for adjoint sensitivity analysis."
 
-    # Decide if we need to cache `A` and `b` for the reverse pass
+    A_ = nothing
     if sensealg.linsolve === missing
-        # We can reuse the factorization so no copy is needed
-        # Krylov Methods don't modify `A`, so it's safe to just reuse it
-        # No Copy is needed even for the default case
+        can_reuse_factorization = LinearSolve._can_reuse_cache_factorization(
+            alg, cache.cacheval
+        )
         if !(
-                alg isa AbstractFactorization || alg isa AbstractKrylovSubspaceMethod ||
+                can_reuse_factorization || alg isa AbstractKrylovSubspaceMethod ||
                     alg isa DefaultLinearSolver
             )
-            A_ = alias_A ? deepcopy(A) : A
+            A_ = if alg isa AbstractFactorization
+                deepcopy(A)
+            else
+                alias_A ? deepcopy(A) : A
+            end
         end
     else
         A_ = deepcopy(A)
@@ -53,7 +57,7 @@ function CRC.rrule(
 
         ∂u = hasproperty(∂sol, :u) ? ∂sol.u : ∂sol
         if sensealg.linsolve === missing
-            factorization = LinearSolve._cache_factorization(cache.cacheval)
+            factorization = LinearSolve._cache_factorization(alg, cache.cacheval)
             λ = if factorization !== nothing
                 factorization' \ ∂u
             elseif alg isa AbstractKrylovSubspaceMethod

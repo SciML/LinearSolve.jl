@@ -69,13 +69,17 @@ function Mooncake.rrule!!(
 
     @assert sensealg isa LinearSolveAdjoint "Currently only `LinearSolveAdjoint` is supported for adjoint sensitivity analysis."
 
-    # logic behind caching `A` and `b` for the reverse pass based on rrule above for SciMLBase.solve
+    A_ = nothing
     if sensealg.linsolve === missing
+        can_reuse_factorization = LinearSolve._can_reuse_cache_factorization(
+            alg, cache.cacheval
+        )
         if !(
-                alg isa LinearSolve.AbstractFactorization || alg isa LinearSolve.AbstractKrylovSubspaceMethod ||
+                can_reuse_factorization || alg isa LinearSolve.AbstractKrylovSubspaceMethod ||
                     alg isa LinearSolve.DefaultLinearSolver
             )
-            A_ = alias_A ? deepcopy(A) : A
+            A_ = alg isa LinearSolve.AbstractFactorization ? deepcopy(A) :
+                alias_A ? deepcopy(A) : A
         end
     else
         A_ = deepcopy(A)
@@ -93,7 +97,7 @@ function Mooncake.rrule!!(
         ∂u = sol.dx.data.u
 
         if sensealg.linsolve === missing
-            factorization = LinearSolve._cache_factorization(cache.cacheval)
+            factorization = LinearSolve._cache_factorization(alg, cache.cacheval)
             λ = if factorization !== nothing
                 factorization' \ ∂u
             elseif alg isa AbstractKrylovSubspaceMethod

@@ -287,8 +287,9 @@ mutable struct OpenBLASLUCache{F, P, I}
     info::I
 end
 
-_cache_factorization(cacheval::OpenBLASLUCache) =
+_cache_factorization(::OpenBLASLUFactorization, cacheval::OpenBLASLUCache) =
     LU(cacheval.factors, cacheval.ipiv, Int(cacheval.info[]))
+_can_reuse_cache_factorization(::OpenBLASLUFactorization, ::OpenBLASLUCache) = true
 
 function LinearSolve.init_cacheval(
         alg::OpenBLASLUFactorization, A, b, u, Pl, Pr,

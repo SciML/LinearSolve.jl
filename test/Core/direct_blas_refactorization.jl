@@ -37,7 +37,8 @@ function test_direct_blas_refactorization(alg, ::Type{T}) where {T}
     @test cache.cacheval.ipiv === ipiv_before
     @test cache.cacheval.factors === Awork
     @test cache.u ≈ A2 \ b
-    @test LinearSolve._cache_factorization(cache.cacheval) \ b ≈ A2 \ b
+    @test LinearSolve._cache_factorization(alg, cache.cacheval) \ b ≈ A2 \ b
+    @test LinearSolve._can_reuse_cache_factorization(alg, cache.cacheval)
 
     @test direct_blas_refactor_solve!(cache, Awork, Asing).retcode ==
         ReturnCode.Failure

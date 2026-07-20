@@ -116,9 +116,11 @@ end
     cacheval = LinearSolve.AppleAccelerateLUCache(
         fact.factors, Cint.(fact.ipiv), Ref{Cint}(Cint(fact.info))
     )
-    view = LinearSolve._cache_factorization(cacheval)
+    alg = AppleAccelerateLUFactorization()
+    view = LinearSolve._cache_factorization(alg, cacheval)
     @test eltype(view.ipiv) === LinearAlgebra.BlasInt
     @test view \ b ≈ A \ b
+    @test LinearSolve._can_reuse_cache_factorization(alg, cacheval)
 end
 
 if LinearSolve.appleaccelerate_isavailable()
@@ -136,7 +138,7 @@ if LinearSolve.appleaccelerate_isavailable()
         refactor_solve!(cache, Awork, A1)
         @test @allocated(refactor_solve!(cache, Awork, A2)) <= WRAPPER_CEILING
         @test cache.u ≈ A2 \ b
-        @test LinearSolve._cache_factorization(cache.cacheval) \ b ≈ A2 \ b
+        @test LinearSolve._cache_factorization(cache.alg, cache.cacheval) \ b ≈ A2 \ b
 
         @test refactor_solve!(cache, Awork, Asing).retcode == ReturnCode.Failure
         sol = refactor_solve!(cache, Awork, A1)

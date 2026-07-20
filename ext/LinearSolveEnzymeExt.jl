@@ -716,7 +716,9 @@ function EnzymeRules.reverse(
         # Add the contribution from direct `linsolve.u` modifications
         dy .+= dy2.u
 
-        factorization = LinearSolve._cache_factorization(_linsolve.cacheval)
+        factorization = LinearSolve._cache_factorization(
+            _linsolve.alg, _linsolve.cacheval
+        )
         z = if factorization !== nothing
             factorization' \ dy
         elseif _linsolve.alg isa LinearSolve.AbstractKrylovSubspaceMethod
@@ -727,7 +729,7 @@ function EnzymeRules.reverse(
                 abstol = _linsolve.abstol,
                 reltol = _linsolve.reltol,
                 verbose = _linsolve.verbose
-            )
+            ).u
         elseif _linsolve.alg isa LinearSolve.DefaultLinearSolver
             LinearSolve.defaultalg_adjoint_eval(_linsolve, dy)
         else

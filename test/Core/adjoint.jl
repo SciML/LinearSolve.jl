@@ -12,6 +12,38 @@ n = 4
 A = rand(n, n);
 b1 = rand(n);
 
+@testset "Adjoint factorization cache dispatch follows the solver" begin
+    factorization = lu(copy(A))
+    @test LinearSolve._cache_factorization(LUFactorization(), factorization) ===
+        factorization
+    @test LinearSolve._cache_factorization(
+        GenericLUFactorization(), (factorization, factorization.ipiv)
+    ) === factorization
+    @test LinearSolve._can_reuse_cache_factorization(
+        LUFactorization(), factorization
+    )
+
+    krylov = KrylovJL_GMRES()
+    @test isnothing(LinearSolve._cache_factorization(krylov, factorization))
+    @test !LinearSolve._can_reuse_cache_factorization(krylov, factorization)
+
+    default = LinearSolve.DefaultLinearSolver(
+        LinearSolve.DefaultAlgorithmChoice.LUFactorization
+    )
+    @test isnothing(LinearSolve._cache_factorization(default, factorization))
+    @test !LinearSolve._can_reuse_cache_factorization(default, factorization)
+end
+
+@testset "Uncached factorization adjoint fallback" begin
+    diagonal = rand(n) .+ 1
+    A_diagonal = Diagonal(diagonal)
+    f_diagonal(b) = sum(
+        solve(LinearProblem(A_diagonal, b), DiagonalFactorization()).u
+    )
+    db, = Zygote.gradient(f_diagonal, b1)
+    @test db ≈ inv.(diagonal)
+end
+
 function f(A, b1; alg = LUFactorization())
     prob = LinearProblem(A, b1)
 

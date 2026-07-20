@@ -1497,8 +1497,8 @@ end
                             matching = :auto, eps_pivot = 1e-8, threaded = false)`
 
 A pure-Julia implementation of the supernodal left–right-looking sparse LU
-method of O. Schenk and K. Gärtner (FGCS 20(3), 2004; ETNA 23, 2006 — the
-algorithm known from PARDISO), provided by PurePardiso.jl: supernodal BLAS-3
+method of O. Schenk and K. Gärtner (FGCS 20(3), 2004; ETNA 23, 2006),
+vendored self-contained in `src/SupernodalLU`: supernodal BLAS-3
 LU on the symmetric pattern of `A + Aᵀ`, pivoting restricted to supernode
 diagonal blocks with static pivot perturbation compensated by iterative
 refinement, and maximum-weight matching + scaling preprocessing for

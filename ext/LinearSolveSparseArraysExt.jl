@@ -31,9 +31,10 @@ include("../src/KLU/klu.jl")
 # PureKLU (pure-Julia, no SuiteSparse) is a hard dependency and the default
 # sparse LU; the SuiteSparse `KLUFactorization` above is unchanged.
 import PureKLU
-# PurePardiso (pure-Julia supernodal left-right-looking LU, Schenk-Gärtner
-# method) is a hard dependency: the BLAS-3 sparse LU for structured systems.
-import PurePardiso
+# SupernodalLU (pure-Julia supernodal left-right-looking LU, Schenk-Gärtner
+# method) is vendored in src/SupernodalLU: the BLAS-3 sparse LU for
+# structured systems.
+const SNLU = LinearSolve.SupernodalLU
 # SparseColumnPivotedQR (pure-Julia, rank-revealing column-pivoted sparse QR) is a
 # hard dependency: the default sparse QR and the singular-LU fallback.
 import SparseColumnPivotedQR
@@ -684,7 +685,7 @@ function SciMLBase.solve!(
 end
 
 # --- SupernodalLU: pure-Julia supernodal left-right-looking LU (Schenk-Gärtner) ---
-# The BLAS-3 sparse LU for structured (PDE-mesh-like) systems, from PurePardiso.
+# The BLAS-3 sparse LU for structured (PDE-mesh-like) systems (vendored in src/SupernodalLU).
 
 function LinearSolve.init_cacheval(
         alg::SupernodalLUFactorization, A::AbstractArray, b, u, Pl, Pr,
@@ -703,7 +704,7 @@ function LinearSolve.init_cacheval(
     return nothing
 end
 
-const PREALLOCATED_SUPERNODAL = PurePardiso.pplu(
+const PREALLOCATED_SUPERNODAL = SNLU.snlu(
     SparseMatrixCSC{Float64, Int64}(0, 0, [Int64(1)], Int64[], Float64[])
 )
 
@@ -716,14 +717,14 @@ function LinearSolve.init_cacheval(
     return PREALLOCATED_SUPERNODAL
 end
 
-# PurePardiso is pure Julia and factors any `Number` element type; the empty
+# SupernodalLU is pure Julia and factors any `Number` element type; the empty
 # cacheval carries the correct types so `pplu!`/`pplu` dispatch is concrete.
 function LinearSolve.init_cacheval(
         alg::SupernodalLUFactorization, A::AbstractSparseArray{T, Ti}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     ) where {T <: Number, Ti <: Integer}
-    return PurePardiso.pplu(
+    return SNLU.snlu(
         SparseMatrixCSC{T, Ti}(0, 0, [one(Ti)], Ti[], T[])
     )
 end
@@ -744,7 +745,7 @@ function LinearSolve.init_cacheval(
 end
 
 function LinearSolve.pattern_changed(
-        F::PurePardiso.PardisoLU, A::SparseArrays.AbstractSparseMatrixCSC
+        F::SNLU.SupernodalLUFactor, A::SparseArrays.AbstractSparseMatrixCSC
     )
     Aold = F.A
     return getcolptr(Aold) != getcolptr(A) || rowvals(Aold) != rowvals(A)
@@ -767,11 +768,11 @@ function SciMLBase.solve!(
                 !(alg.check_pattern && pattern_changed(cacheval, As))
             # numeric-only refactorization: reuses the analysis, matching, and
             # all numeric storage (allocation-free)
-            fact = PurePardiso.pplu!(cacheval, As)
+            fact = SNLU.snlu!(cacheval, As)
         else
             # `check = false`: static pivoting never aborts — numerically
             # singular systems surface through the finiteness check below.
-            fact = PurePardiso.pplu(
+            fact = SNLU.snlu(
                 As; ordering = alg.ordering, matching = alg.matching,
                 eps_pivot = alg.eps_pivot, threaded = alg.threaded, check = false
             )
@@ -780,13 +781,13 @@ function SciMLBase.solve!(
         cache.isfresh = false
     end
     F = LinearSolve.@get_cacheval(cache, :UMFPACKFactorization)
-    y = PurePardiso.solve!(cache.u, F, cache.b)
+    y = SNLU.solve!(cache.u, F, cache.b)
     # Static pivoting never aborts: a numerically singular system factors with
     # perturbed pivots and produces a finite but meaningless solution. When
     # pivots were perturbed (rare), verify the residual (one sparse mat-vec)
     # so singularity surfaces as `Infeasible` instead of a silent `Success`.
     ok = all(isfinite, y)
-    if ok && PurePardiso.nperturbed(F) > 0
+    if ok && SNLU.nperturbed(F) > 0
         r = F.A * y
         r .-= cache.b
         bn = LinearAlgebra.norm(cache.b)

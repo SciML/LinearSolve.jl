@@ -409,6 +409,7 @@ function defaultalg_symbol end
 
 include("verbosity.jl")
 include("blas_logging.jl")
+include("SupernodalLU/SupernodalLU.jl")
 include("generic_lufact.jl")
 include("eigenvalue.jl")
 include("common.jl")

@@ -13,7 +13,7 @@ using ArrayInterface: ArrayInterface
 using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!
 using SparseArrays: SparseArrays, AbstractSparseArray, AbstractSparseMatrixCSC,
     SparseMatrixCSC,
-    nonzeros, rowvals, getcolptr, sparse, sprand, dropzeros, nnz
+    nonzeros, rowvals, getcolptr, sparse, sprand, dropzeros!, nnz
 using SciMLLogging: @SciMLMessage
 
 @static if Base.USE_GPL_LIBS
@@ -41,6 +41,7 @@ import AMD
 
 LinearSolve.issparsematrixcsc(A::AbstractSparseMatrixCSC) = true
 LinearSolve.issparsematrix(A::AbstractSparseArray) = true
+LinearSolve.make_SparseMatrixCSC(A::SparseMatrixCSC) = A
 function LinearSolve.make_SparseMatrixCSC(A::AbstractSparseArray)
     return SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A))
 end
@@ -453,10 +454,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
         if alg.reuse_symbolic
             if length(cacheval.nzval) != length(nonzeros(A)) || alg.check_pattern && pattern_changed(cacheval, A)
                 fact = KLU.klu(
-                    SparseMatrixCSC(
-                        size(A)..., getcolptr(A), rowvals(A),
-                        nonzeros(A)
-                    ),
+                    LinearSolve.make_SparseMatrixCSC(A),
                     check = false
                 )
             else
@@ -470,10 +468,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
             # below maps that to `ReturnCode.Infeasible` instead. Fixes
             # https://github.com/SciML/LinearSolve.jl/issues/991.
             fact = KLU.klu(
-                SparseMatrixCSC(
-                    size(A)..., getcolptr(A), rowvals(A),
-                    nonzeros(A)
-                ),
+                LinearSolve.make_SparseMatrixCSC(A),
                 check = false
             )
         end
@@ -1093,8 +1088,10 @@ mutable struct SparseReduction{Tv, Ti}
 end
 
 function _persistent_reduced(
-        colptr::Vector{Ti}, rowval, m::Integer, k::Integer, mask, nzval::AbstractVector{Tv}
+        A::AbstractSparseMatrixCSC{Tv, Ti}, colptr::Vector{Ti}, rowval, mask,
+        nzval::AbstractVector{Tv}
     ) where {Ti, Tv}
+    _, k = size(A)
     keep = Int[]
     rcolptr = Vector{Ti}(undef, k + 1)
     rrowval = Ti[]
@@ -1110,7 +1107,13 @@ function _persistent_reduced(
         end
     end
     rcolptr[k + 1] = length(rrowval) + 1
-    return keep, SparseMatrixCSC(m, k, rcolptr, rrowval, rnzval)
+    reduced = deepcopy(LinearSolve.make_SparseMatrixCSC(A))
+    copyto!(getcolptr(reduced), rcolptr)
+    resize!(rowvals(reduced), length(rrowval))
+    copyto!(rowvals(reduced), rrowval)
+    resize!(nonzeros(reduced), length(rnzval))
+    copyto!(nonzeros(reduced), rnzval)
+    return keep, reduced
 end
 
 function LinearSolve.init_sparse_reduction(
@@ -1129,21 +1132,20 @@ function LinearSolve.init_sparse_reduction(
     end
     auto = nsz == NZ.Auto
     cache_union = nsz != NZ.Present     # Present => per-solve dropzeros from the start
-    m, k = size(A)
     colptr = copy(getcolptr(A))
     rowval = copy(rowvals(A))
     if active
         mask = Bool[!iszero(v) for v in nz]
         nstart_zeros = count(iszero, nz)
-        keep, reduced = _persistent_reduced(colptr, rowval, m, k, mask, nz)
+        keep, reduced = _persistent_reduced(A, colptr, rowval, mask, nz)
         return SparseReduction{Tv, Ti}(
             true, cache_union, auto, nstart_zeros, colptr, rowval, mask, keep, reduced,
             1, 0, nnz(reduced), false
         )
     else
-        empty = SparseMatrixCSC{Tv, Ti}(0, 0, Ti[1], Ti[], Tv[])
+        reduced = LinearSolve.make_SparseMatrixCSC(A)
         return SparseReduction{Tv, Ti}(
-            false, cache_union, auto, 0, colptr, rowval, Bool[], Int[], empty,
+            false, cache_union, auto, 0, colptr, rowval, Bool[], Int[], reduced,
             0, 0, 0, false
         )
     end
@@ -1163,7 +1165,8 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
     # per-solve dropzeros: drop this matrix's own zeros and let the inner solver
     # re-analyze when the pattern changes (no cross-solve union assumed).
     if !red.cache_union
-        new_reduced = dropzeros(A)
+        new_reduced = deepcopy(LinearSolve.make_SparseMatrixCSC(A))
+        dropzeros!(new_reduced)
         new_nnz = nnz(new_reduced)
         red.structure_changed = new_nnz != red.reduced_nnz
         red.reduced_nnz = new_nnz
@@ -1180,7 +1183,7 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
     end
     if grew
         red.keep, red.reduced = _persistent_reduced(
-            red.colptr, red.rowval, size(A, 1), size(A, 2), red.mask, nz
+            A, red.colptr, red.rowval, red.mask, nz
         )
         red.nanalyze += 1
         # auto mode: if more than NONPERSISTENT_ZERO_FRACTION of the starting zeros
@@ -1191,7 +1194,8 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
         if red.auto && red.nstart_zeros > 0 &&
                 activated > LinearSolve.NONPERSISTENT_ZERO_FRACTION * red.nstart_zeros
             red.cache_union = false
-            red.reduced = dropzeros(A)
+            red.reduced = deepcopy(LinearSolve.make_SparseMatrixCSC(A))
+            dropzeros!(red.reduced)
             # First per-solve reduction after switching from union caching.
             # No "previous" per-solve result, so no structure change yet.
             red.reduced_nnz = nnz(red.reduced)

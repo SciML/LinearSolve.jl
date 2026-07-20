@@ -309,7 +309,7 @@ function getproperty(
     end
     # Factor parts:
     if s === :(_L)
-        lnz = klu.lnz
+        lnz = Int(klu.lnz)
         Lp = Vector{Ti}(undef, klu.n + 1)
         Li = Vector{Ti}(undef, lnz)
         Lx = Vector{Float64}(undef, lnz)
@@ -317,7 +317,7 @@ function getproperty(
         _extract!(klu; Lp, Li, Lx, Lz)
         return Lp, Li, Lx, Lz
     elseif s === :(_U)
-        unz = klu.unz
+        unz = Int(klu.unz)
         Up = Vector{Ti}(undef, klu.n + 1)
         Ui = Vector{Ti}(undef, unz)
         Ux = Vector{Float64}(undef, unz)
@@ -325,7 +325,7 @@ function getproperty(
         _extract!(klu; Up, Ui, Ux, Uz)
         return Up, Ui, Ux, Uz
     elseif s === :(_F)
-        fnz = klu.nzoff
+        fnz = Int(klu.nzoff)
         # We often don't have an F, so create the right vectors for an empty SparseMatrixCSC
         if fnz == 0
             Fp = zeros(Ti, klu.n + 1)

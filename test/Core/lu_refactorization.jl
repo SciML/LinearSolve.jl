@@ -109,6 +109,18 @@ end
     end
 end
 
+@testset "Apple factorization views use the stdlib pivot type" begin
+    A = [4.0 1.0; 2.0 3.0]
+    b = [1.0, 2.0]
+    fact = lu(A)
+    cacheval = LinearSolve.AppleAccelerateLUCache(
+        fact.factors, Cint.(fact.ipiv), Ref{Cint}(Cint(fact.info))
+    )
+    view = LinearSolve._cache_factorization(cacheval)
+    @test eltype(view.ipiv) === LinearAlgebra.BlasInt
+    @test view \ b ≈ A \ b
+end
+
 if LinearSolve.appleaccelerate_isavailable()
     @testset "Apple Accelerate reuses its refactorization workspace" begin
         n = 51

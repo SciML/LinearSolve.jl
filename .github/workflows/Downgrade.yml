@@ -17,6 +17,4 @@ jobs:
     with:
       julia-version: "lts"
       group: "Core"
-      # Resolver.jl cannot minimum-resolve KrylovPreconditioners' historical Arpack/LightGraphs graph.
-      no_promote: "Mooncake,KrylovPreconditioners"
     secrets: "inherit"

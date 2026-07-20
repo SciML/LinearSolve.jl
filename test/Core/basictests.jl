@@ -1,7 +1,7 @@
 using LinearSolve, LinearAlgebra, SparseArrays, MultiFloats, ForwardDiff
 using SciMLOperators: SciMLOperators, MatrixOperator, FunctionOperator, WOperator
 using RecursiveFactorization, Sparspak, FastLapackInterface
-using IterativeSolvers, KrylovKit, MKL_jll, KrylovPreconditioners
+using IterativeSolvers, KrylovKit, MKL_jll
 using Test
 import CliqueTrees, Random
 
@@ -481,7 +481,7 @@ end
 
     @testset "KrylovJL" begin
         kwargs = (; gmres_restart = 5)
-        precs = (A, p = nothing) -> (BlockJacobiPreconditioner(A, 2), I)
+        precs = (A, p = nothing) -> (Diagonal(inv.(diag(A))), I)
         algorithms = (
             ("Default", KrylovJL(; kwargs...)),
             ("CG", KrylovJL_CG(; kwargs...)),
@@ -507,7 +507,7 @@ end
 
         function countingprecs(A, p = nothing)
             num_precs_calls += 1
-            (BlockJacobiPreconditioner(A, 2), I)
+            (Diagonal(inv.(diag(A))), I)
         end
 
         n = 10

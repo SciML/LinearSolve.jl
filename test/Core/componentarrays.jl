@@ -27,7 +27,8 @@ using LinearSolve: OperatorAssumptions
             true,
             assump,
         )
-        @test slot[1].factors isa ComponentMatrix
+        workspace = alg isa MKLLUFactorization ? slot[1] : slot
+        @test workspace.factors isa ComponentMatrix
     end
 
     slot = LinearSolve.init_cacheval(

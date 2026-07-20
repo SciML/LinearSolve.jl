@@ -716,10 +716,9 @@ function EnzymeRules.reverse(
         # Add the contribution from direct `linsolve.u` modifications
         dy .+= dy2.u
 
-        z = if _linsolve.cacheval isa Factorization
-            _linsolve.cacheval' \ dy
-        elseif _linsolve.cacheval isa Tuple && _linsolve.cacheval[1] isa Factorization
-            _linsolve.cacheval[1]' \ dy
+        factorization = LinearSolve._cache_factorization(_linsolve.cacheval)
+        z = if factorization !== nothing
+            factorization' \ dy
         elseif _linsolve.alg isa LinearSolve.AbstractKrylovSubspaceMethod
             # Doesn't modify `A`, so it's safe to just reuse it
             invprob = LinearSolve.LinearProblem(transpose(_linsolve.A), dy)

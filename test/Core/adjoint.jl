@@ -3,6 +3,10 @@ using LinearSolve, LinearAlgebra, Test
 using FiniteDiff, RecursiveFactorization
 using Random
 
+if Sys.islinux()
+    import LAPACK_jll, blis_jll
+end
+
 Random.seed!(1234)
 n = 4
 A = rand(n, n);
@@ -103,11 +107,16 @@ db22 = ForwardDiff.gradient(x -> f4(eltype(x).(A), eltype(x).(b1), x), copy(b1))
 
 A = rand(n, n);
 b1 = rand(n);
-for alg in (
-        LUFactorization(),
-        RFLUFactorization(),
-        KrylovJL_GMRES(),
-    )
+adjoint_algs = Any[
+    LUFactorization(),
+    RFLUFactorization(),
+    KrylovJL_GMRES(),
+]
+LinearSolve.useopenblas && push!(adjoint_algs, OpenBLASLUFactorization())
+if Base.get_extension(LinearSolve, :LinearSolveBLISExt) !== nothing
+    push!(adjoint_algs, LinearSolve.BLISLUFactorization())
+end
+for alg in adjoint_algs
     @show alg
     function fb(b)
         prob = LinearProblem(A, b)

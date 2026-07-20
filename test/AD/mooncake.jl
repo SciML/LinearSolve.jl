@@ -28,6 +28,27 @@ db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x), copy(b1))
 @test gradient[2] ≈ dA2
 @test gradient[3] ≈ db12
 
+@testset "OpenBLAS solve! reverse rule" begin
+    A = [3.0 1.0; 1.0 2.0]
+    b = [1.0, 2.0]
+
+    function openblas_solve!(A, b)
+        cache = init(LinearProblem(A, b), OpenBLASLUFactorization())
+        return sum(solve!(cache).u)
+    end
+
+    rule = Mooncake.build_rrule(openblas_solve!, copy(A), copy(b))
+    value, gradient = Mooncake.value_and_pullback!!(
+        rule, 1.0, openblas_solve!, copy(A), copy(b)
+    )
+    dA = FiniteDiff.finite_difference_gradient(A -> openblas_solve!(A, b), A)
+    db = FiniteDiff.finite_difference_gradient(b -> openblas_solve!(A, b), b)
+
+    @test value ≈ openblas_solve!(A, b)
+    @test gradient[2] ≈ dA
+    @test gradient[3] ≈ db
+end
+
 # Second test
 A = rand(n, n);
 b1 = rand(n);

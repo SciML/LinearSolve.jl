@@ -56,6 +56,13 @@ macro get_cacheval(cache, algsym)
     end
 end
 
+_cache_factorization(cacheval::Factorization) = cacheval
+function _cache_factorization(cacheval::Tuple)
+    return !isempty(cacheval) && first(cacheval) isa Factorization ?
+        first(cacheval) : nothing
+end
+_cache_factorization(cacheval) = nothing
+
 # Normalize deprecated Val-based pivot arguments to PivotingStrategy types.
 # Julia 1.12 deprecated Val(true)/Val(false) in favor of RowMaximum()/NoPivot().
 _normalize_pivot(pivot::LinearAlgebra.PivotingStrategy) = pivot

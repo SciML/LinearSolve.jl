@@ -270,6 +270,9 @@ mutable struct AppleAccelerateLUCache{F, P, I}
     info::I
 end
 
+_cache_factorization(cacheval::AppleAccelerateLUCache) =
+    LU(cacheval.factors, cacheval.ipiv, Int(cacheval.info[]))
+
 function LinearSolve.init_cacheval(
         alg::AppleAccelerateLUFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},

@@ -93,10 +93,9 @@ function Mooncake.rrule!!(
         ∂u = sol.dx.data.u
 
         if sensealg.linsolve === missing
-            λ = if cache.cacheval isa Factorization
-                cache.cacheval' \ ∂u
-            elseif cache.cacheval isa Tuple && cache.cacheval[1] isa Factorization
-                first(cache.cacheval)' \ ∂u
+            factorization = LinearSolve._cache_factorization(cache.cacheval)
+            λ = if factorization !== nothing
+                factorization' \ ∂u
             elseif alg isa AbstractKrylovSubspaceMethod
                 invprob = LinearProblem(adjoint(cache.A), ∂u)
                 solve(invprob, alg; cache.abstol, cache.reltol, cache.verbose).u

@@ -9,6 +9,10 @@ struct WorkspaceAndFactors{W, F}
     factors::F
 end
 
+LinearSolve._custom_cache_factorization(
+    ::Union{FastLUFactorization, FastQRFactorization}, cacheval::WorkspaceAndFactors
+) = cacheval.factors
+
 function LinearSolve.init_cacheval(
         ::FastLUFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},

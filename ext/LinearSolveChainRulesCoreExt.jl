@@ -57,12 +57,15 @@ function CRC.rrule(
 
         ∂u = hasproperty(∂sol, :u) ? ∂sol.u : ∂sol
         if sensealg.linsolve === missing
-            factorization = LinearSolve._cache_factorization(alg, cache.cacheval)
-            λ = if factorization !== nothing
-                factorization' \ ∂u
+            cached_adjoint_solution = LinearSolve._adjoint_factorization_solve(
+                alg, cache.cacheval, cache.A, ∂u
+            )
+            λ = if cached_adjoint_solution !== nothing
+                cached_adjoint_solution
             elseif alg isa AbstractKrylovSubspaceMethod
-                invprob = LinearProblem(adjoint(cache.A), ∂u)
-                solve(invprob, alg; cache.abstol, cache.reltol, cache.verbose).u
+                LinearSolve._adjoint_krylov_solve(
+                    alg, cache.A, ∂u; cache.abstol, cache.reltol, cache.verbose
+                )
             elseif alg isa DefaultLinearSolver
                 LinearSolve.defaultalg_adjoint_eval(cache, ∂u)
             else

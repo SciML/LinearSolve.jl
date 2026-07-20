@@ -56,34 +56,6 @@ macro get_cacheval(cache, algsym)
     end
 end
 
-"""
-    _cache_factorization(alg, cacheval)
-
-Return the factorization cached by `alg` for reuse in an adjoint solve, or
-`nothing` when its cache does not expose one. The `AbstractFactorization`
-methods are the fallback for the standard cache layouts used by LinearSolve:
-a `Factorization` stored directly or as the first element of a tuple. Solvers
-with custom cache layouts must provide solver-specific methods for both this
-function and `_can_reuse_cache_factorization`.
-
-Non-factorization algorithms intentionally return `nothing` regardless of
-cache shape, so a Krylov or custom solver cannot be mistaken for a direct
-factorization solver.
-"""
-_cache_factorization(::AbstractFactorization, cacheval::Factorization) = cacheval
-function _cache_factorization(::AbstractFactorization, cacheval::Tuple)
-    return !isempty(cacheval) && first(cacheval) isa Factorization ?
-        first(cacheval) : nothing
-end
-_cache_factorization(::SciMLLinearSolveAlgorithm, cacheval) = nothing
-
-# Custom caches may not contain a valid factorization view until after `solve!`.
-_can_reuse_cache_factorization(::AbstractFactorization, ::Factorization) = true
-function _can_reuse_cache_factorization(::AbstractFactorization, cacheval::Tuple)
-    return !isempty(cacheval) && first(cacheval) isa Factorization
-end
-_can_reuse_cache_factorization(::SciMLLinearSolveAlgorithm, cacheval) = false
-
 # Normalize deprecated Val-based pivot arguments to PivotingStrategy types.
 # Julia 1.12 deprecated Val(true)/Val(false) in favor of RowMaximum()/NoPivot().
 _normalize_pivot(pivot::LinearAlgebra.PivotingStrategy) = pivot

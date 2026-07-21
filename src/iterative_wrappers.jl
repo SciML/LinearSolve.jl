@@ -22,14 +22,28 @@ repeatedly (currently supported for GMRES and FGMRES; other methods ignore it):
     `‖b - A x₀‖ ≤ ‖b‖`.
 
 Warm starting costs one extra operator application per solve (two for
-`:hegedus`), so it pays off when successive solutions are correlated, e.g. for
-sequences of preconditioned solves inside implicit ODE integrators. Since the
-previous *solution* (not the previous Newton increment magnitude) is only a
-direction, `:hegedus` is the recommended safe choice; a raw `:previous` start
-can increase the initial residual when successive right-hand sides shrink. The
-stopping criterion is adjusted for warm-started solves (`reltol` is measured
-against `‖b‖` as in a cold start, not against the warm initial residual), so
-warm starting never changes the meaning of the tolerances.
+`:hegedus`, plus one preconditioner application when a left preconditioner is
+set). Benchmarks on stiff PDE Newton-Krylov solves (Brusselator, Allen-Cahn,
+Burgers, advection-diffusion with KenCarp47/TRBDF2/FBDF + ILU) show `:hegedus`
+reliably reduces GMRES iteration counts (median ≈ -17%), but wall time only
+improves when each solve performs substantial Krylov work (≳5 iterations per
+solve); with a preconditioner strong enough that solves take ≲3 iterations the
+fixed per-solve overhead dominates the savings. `:previous` typically
+*increases* Newton-Krylov iteration counts — the previous Newton increment
+overshoots as the iteration converges — and is intended for sequences whose
+solutions vary slowly, not for Newton loops.
+
+!!! warning
+
+    Do not enable `warm_start` inside Rosenbrock-type (W-method) integrators
+    such as `Rodas5P`. They have no outer Newton iteration to absorb
+    within-tolerance differences in stage solves, and warm starting there can
+    degrade accuracy and trigger step-rejection feedback loops (observed:
+    `:previous` producing 500x slowdowns and inaccurate results).
+
+The stopping criterion is adjusted for warm-started solves (`reltol` is
+measured against `‖M b‖` as in a cold start, not against the warm initial
+residual), so warm starting never changes the meaning of the tolerances.
 """
 struct KrylovJL{F, I, P, A, K} <: AbstractKrylovSubspaceMethod
     KrylovAlg::F

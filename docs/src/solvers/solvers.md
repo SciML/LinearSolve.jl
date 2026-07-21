@@ -958,7 +958,7 @@ PETScAlgorithm
 
     `LinearSolvePyAMG` is a sub-library of LinearSolve.jl. Using these solvers
     requires adding it: `using LinearSolvePyAMG`. The Python
-    [PyAMG](https://pyamg.readthedocs.io) library is installed automatically via
+    [PyAMG](https://github.com/pyamg/pyamg) library is installed automatically via
     CondaPkg.jl; no manual Python setup is required.
 
 `PyAMG(; method = :RugeStuben, accel = nothing, kwargs...)` — Algebraic Multigrid

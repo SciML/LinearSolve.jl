@@ -37,12 +37,7 @@ end
 
 OpenBLASLUFactorization(; residualsafety::Bool = false) = OpenBLASLUFactorization(residualsafety)
 
-# Check if OpenBLAS is available
-@static if !@isdefined(OpenBLAS_jll)
-    __openblas_isavailable() = false
-else
-    __openblas_isavailable() = OpenBLAS_jll.is_available()
-end
+__openblas_isavailable() = useopenblas
 
 @inline function openblas_getrf!(
         A::AbstractMatrix{<:ComplexF64}, ipiv::AbstractVector{BlasInt},
@@ -290,6 +285,21 @@ end
 _custom_cache_factorization(::OpenBLASLUFactorization, cacheval::OpenBLASLUCache) =
     LU(cacheval.factors, cacheval.ipiv, Int(cacheval.info[]))
 
+@inline function _direct_lu_factorize!(
+        cacheval::OpenBLASLUCache, A_work, ::OpenBLASLUFactorization
+    )
+    cacheval.factors = A_work
+    return openblas_getrf!(A_work, cacheval.ipiv, cacheval.info, false)
+end
+
+@inline function _direct_lu_solve!(
+        cacheval::OpenBLASLUCache, u, b, ::OpenBLASLUFactorization
+    )
+    copyto!(u, b)
+    openblas_getrs!('N', cacheval.factors, cacheval.ipiv, u, cacheval.info)
+    return u
+end
+
 function LinearSolve.init_cacheval(
         alg::OpenBLASLUFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
@@ -329,8 +339,7 @@ function SciMLBase.solve!(
                 A_work, BlasInt, min(size(A_work, 1), size(A_work, 2))
             )
         end
-        cacheval.factors = A_work
-        info_value = openblas_getrf!(A_work, cacheval.ipiv, cacheval.info, false)
+        info_value = _direct_lu_factorize!(cacheval, A_work, alg)
 
         if info_value != 0
             if verbose.blas_info != SciMLLogging.Silent() ||
@@ -397,8 +406,7 @@ function SciMLBase.solve!(
             copyto!(cache.u, 1, Bc, 1, n)
         end
     else
-        copyto!(cache.u, cache.b)
-        openblas_getrs!('N', factors, cacheval.ipiv, cache.u, info)
+        _direct_lu_solve!(cacheval, cache.u, cache.b, alg)
     end
 
     if check_safety

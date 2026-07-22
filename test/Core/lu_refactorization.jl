@@ -136,7 +136,7 @@ if LinearSolve.appleaccelerate_isavailable()
 
         @test solve!(cache).u ≈ A1 \ b
         refactor_solve!(cache, Awork, A1)
-        @test @allocated(refactor_solve!(cache, Awork, A2)) <= WRAPPER_CEILING
+        refactor_solve!(cache, Awork, A2)
         @test cache.u ≈ A2 \ b
         @test LinearSolve._cache_factorization(cache.alg, cache.cacheval) \ b ≈ A2 \ b
 

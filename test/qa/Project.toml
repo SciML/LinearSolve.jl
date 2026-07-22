@@ -1,19 +1,27 @@
 [deps]
+AllocCheck = "9b6a8646-10ed-4001-bbdc-1d2f46dfbb1a"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+LAPACK_jll = "51474c39-65e3-53ba-86ba-03b1b862ec14"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
 SciMLTesting = "09d9d899-5365-40a9-917a-5f67fddea283"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+blis_jll = "6136c539-28a5-5bf0-87cc-b183200dce32"
 
 [sources]
 LinearSolve = {path = "../.."}
 
 [compat]
+AllocCheck = "0.2"
 Aqua = "0.8"
 JET = "0.9, 0.11"
+LAPACK_jll = "3"
+LinearAlgebra = "1.10"
 LinearSolve = "5"
 SafeTestsets = "0.1, 1"
 SciMLTesting = "2.1"
 Test = "<0.0.1, 1"
+blis_jll = "0.9.0"
 julia = "1.10"

@@ -90,7 +90,9 @@ else
         groups = Dict(
             "AppleAccelerate" => function ()
                 @time @safetestset "Apple Accelerate Refactorization Reuse" include("Core/lu_refactorization.jl")
-                return @time @safetestset "Apple Accelerate Mixed Precision" include("Core/test_mixed_precision.jl")
+                @time @safetestset "Apple Accelerate Mixed Precision" include("Core/test_mixed_precision.jl")
+                activate_group_env(joinpath(@__DIR__, "qa"))
+                return @time @safetestset "Apple Accelerate Allocation QA" include("qa/allocations.jl")
             end,
             # STRUMPACK runs in the base env: STRUMPACK_jll is a base test dep (the
             # Core suite also probes the STRUMPACK extension), so this group adds no
@@ -224,6 +226,7 @@ else
                 activate_group_env(joinpath(@__DIR__, "qa"))
                 @time @safetestset "Quality Assurance" include("qa/qa.jl")
                 @time @safetestset "JET Tests" include("qa/jet.jl")
+                @time @safetestset "Allocation QA" include("qa/allocations.jl")
             end
             return nothing
         end,

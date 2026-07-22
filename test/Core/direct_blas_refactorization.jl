@@ -4,7 +4,6 @@ if Sys.islinux()
     import LAPACK_jll, blis_jll
 end
 
-const DIRECT_BLAS_WRAPPER_CEILING = VERSION >= v"1.12" ? 0 : 48
 const direct_blas_rng = StableRNG(42)
 
 function direct_blas_refactor_solve!(cache, Awork, A)
@@ -32,8 +31,7 @@ function test_direct_blas_refactorization(alg, ::Type{T}) where {T}
 
     direct_blas_refactor_solve!(cache, Awork, A1)
     ipiv_before = cache.cacheval.ipiv
-    alloc = @allocated direct_blas_refactor_solve!(cache, Awork, A2)
-    @test alloc <= DIRECT_BLAS_WRAPPER_CEILING
+    direct_blas_refactor_solve!(cache, Awork, A2)
     @test cache.cacheval.ipiv === ipiv_before
     @test cache.cacheval.factors === Awork
     @test cache.u ≈ A2 \ b
@@ -67,8 +65,7 @@ function test_direct_blas_resize(alg)
 
     Awork = cache.A
     direct_blas_refactor_solve!(cache, Awork, A2)
-    return @test @allocated(direct_blas_refactor_solve!(cache, Awork, A2)) <=
-        DIRECT_BLAS_WRAPPER_CEILING
+    return @test direct_blas_refactor_solve!(cache, Awork, A2).u ≈ A2 \ b2
 end
 
 if LinearSolve.useopenblas

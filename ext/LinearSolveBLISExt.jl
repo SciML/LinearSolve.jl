@@ -246,6 +246,21 @@ end
 LinearSolve._custom_cache_factorization(::BLISLUFactorization, cacheval::BLISLUCache) =
     LinearAlgebra.LU(cacheval.factors, cacheval.ipiv, Int(cacheval.info[]))
 
+@inline function LinearSolve._direct_lu_factorize!(
+        cacheval::BLISLUCache, A_work, ::BLISLUFactorization
+    )
+    cacheval.factors = A_work
+    return getrf!(A_work, cacheval.ipiv, cacheval.info, false)
+end
+
+@inline function LinearSolve._direct_lu_solve!(
+        cacheval::BLISLUCache, u, b, ::BLISLUFactorization
+    )
+    copyto!(u, b)
+    getrs!('N', cacheval.factors, cacheval.ipiv, u, cacheval.info)
+    return u
+end
+
 function LinearSolve.init_cacheval(
         alg::BLISLUFactorization,
         A::DenseMatrix{<:Union{Float32, Float64, ComplexF32, ComplexF64}}, b, u, Pl, Pr,
@@ -270,8 +285,7 @@ function SciMLBase.solve!(
                 A_work, BlasInt, min(size(A_work, 1), size(A_work, 2))
             )
         end
-        cacheval.factors = A_work
-        info_value = getrf!(A_work, cacheval.ipiv, cacheval.info, false)
+        info_value = LinearSolve._direct_lu_factorize!(cacheval, A_work, alg)
 
         if info_value != 0
             if verbose.blas_info != SciMLLogging.Silent() || verbose.blas_errors != SciMLLogging.Silent() ||
@@ -332,8 +346,7 @@ function SciMLBase.solve!(
         getrs!('N', factors, cacheval.ipiv, Bc, info)
         copyto!(cache.u, 1, Bc, 1, n)
     else
-        copyto!(cache.u, cache.b)
-        getrs!('N', factors, cacheval.ipiv, cache.u, info)
+        LinearSolve._direct_lu_solve!(cacheval, cache.u, cache.b, alg)
     end
 
     return SciMLBase.build_linear_solution(alg, cache.u, nothing, nothing; retcode = ReturnCode.Success)

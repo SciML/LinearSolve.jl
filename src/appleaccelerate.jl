@@ -275,6 +275,21 @@ _custom_cache_factorization(
 ) =
     LU(cacheval.factors, BlasInt.(cacheval.ipiv), Int(cacheval.info[]))
 
+@inline function _direct_lu_factorize!(
+        cacheval::AppleAccelerateLUCache, A_work, ::AppleAccelerateLUFactorization
+    )
+    cacheval.factors = A_work
+    return aa_getrf!(A_work, cacheval.ipiv, cacheval.info, false)
+end
+
+@inline function _direct_lu_solve!(
+        cacheval::AppleAccelerateLUCache, u, b, ::AppleAccelerateLUFactorization
+    )
+    copyto!(u, b)
+    aa_getrs!('N', cacheval.factors, cacheval.ipiv, u, cacheval.info)
+    return u
+end
+
 function LinearSolve.init_cacheval(
         alg::AppleAccelerateLUFactorization, A, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
@@ -314,8 +329,7 @@ function SciMLBase.solve!(
                 A_work, Cint, min(size(A_work, 1), size(A_work, 2))
             )
         end
-        cacheval.factors = A_work
-        info_value = aa_getrf!(A_work, cacheval.ipiv, cacheval.info, false)
+        info_value = _direct_lu_factorize!(cacheval, A_work, alg)
 
         if info_value != 0
             if verbose.blas_info != SciMLLogging.Silent() ||
@@ -382,8 +396,7 @@ function SciMLBase.solve!(
             copyto!(cache.u, 1, Bc, 1, n)
         end
     else
-        copyto!(cache.u, cache.b)
-        aa_getrs!('N', factors, cacheval.ipiv, cache.u, info)
+        _direct_lu_solve!(cacheval, cache.u, cache.b, alg)
     end
 
     if check_safety

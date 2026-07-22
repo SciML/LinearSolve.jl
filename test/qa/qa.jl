@@ -29,6 +29,7 @@ scimlbase_reexports = Tuple(names(LinearSolve.SciMLBase; all = false, imported =
 run_qa(
     LinearSolve;
     explicit_imports = true,
+    reexports_allow = scimlbase_reexports,
     api_docs_kwargs = (; rendered = true, docs_src, rendered_ignore = scimlbase_reexports),
     # Recursive ambiguities are tracked separately; placeholder until resolved.
     aqua_broken = (:ambiguities,),

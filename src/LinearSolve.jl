@@ -409,6 +409,7 @@ function defaultalg_symbol end
 
 include("verbosity.jl")
 include("blas_logging.jl")
+include("SupernodalLU/SupernodalLU.jl")
 include("generic_lufact.jl")
 include("eigenvalue.jl")
 include("common.jl")
@@ -523,6 +524,7 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
     RFLUFactorization, ButterflyFactorization,
     NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
     UMFPACKFactorization, KLUFactorization, PureKLUFactorization,
+    SupernodalLUFactorization,
     PureUMFPACKFactorization, SparseColumnPivotedQRFactorization, FastLUFactorization,
     FastQRFactorization,
     SparspakFactorization, DiagonalFactorization, CholeskyFactorization,

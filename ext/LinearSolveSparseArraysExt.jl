@@ -7,7 +7,7 @@ using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
     NormalCholeskyFactorization,
     OperatorAssumptions, LinearVerbosity,
     QRFactorization, RFLUFactorization, UMFPACKFactorization,
-    SparseColumnPivotedQRFactorization, solve
+    SparseColumnPivotedQRFactorization, SupernodalLUFactorization, solve
 using SciMLOperators: AbstractSciMLOperator, has_concretization
 using ArrayInterface: ArrayInterface
 using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!
@@ -31,6 +31,10 @@ include("../src/KLU/klu.jl")
 # PureKLU (pure-Julia, no SuiteSparse) is a hard dependency and the default
 # sparse LU; the SuiteSparse `KLUFactorization` above is unchanged.
 import PureKLU
+# SupernodalLU (pure-Julia supernodal left-right-looking LU, Schenk-Gärtner
+# method) is vendored in src/SupernodalLU: the BLAS-3 sparse LU for
+# structured systems.
+const SNLU = LinearSolve.SupernodalLU
 # SparseColumnPivotedQR (pure-Julia, rank-revealing column-pivoted sparse QR) is a
 # hard dependency: the default sparse QR and the singular-LU fallback.
 import SparseColumnPivotedQR
@@ -680,6 +684,130 @@ function SciMLBase.solve!(
     end
 end
 
+# --- SupernodalLU: pure-Julia supernodal left-right-looking LU (Schenk-Gärtner) ---
+# The BLAS-3 sparse LU for structured (PDE-mesh-like) systems (vendored in src/SupernodalLU).
+
+function LinearSolve.init_cacheval(
+        alg::SupernodalLUFactorization, A::AbstractArray, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
+function LinearSolve.init_cacheval(
+        alg::SupernodalLUFactorization, A::LinearSolve.GPUArraysCore.AnyGPUArray, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
+const PREALLOCATED_SUPERNODAL = SNLU.snlu(
+    SparseMatrixCSC{Float64, Int64}(0, 0, [Int64(1)], Int64[], Float64[])
+)
+
+function LinearSolve.init_cacheval(
+        alg::SupernodalLUFactorization, A::AbstractSparseArray{Float64, Int64}, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return PREALLOCATED_SUPERNODAL
+end
+
+# SupernodalLU is pure Julia and factors any `Number` element type; the empty
+# cacheval carries the correct types so `pplu!`/`pplu` dispatch is concrete.
+function LinearSolve.init_cacheval(
+        alg::SupernodalLUFactorization, A::AbstractSparseArray{T, Ti}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    ) where {T <: Number, Ti <: Integer}
+    return SNLU.snlu(
+        SparseMatrixCSC{T, Ti}(0, 0, [one(Ti)], Ti[], T[])
+    )
+end
+
+function LinearSolve.init_cacheval(
+        alg::SupernodalLUFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    if has_concretization(A)
+        return LinearSolve.init_cacheval(
+            alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
+            maxiters, abstol, reltol, verbose, assumptions
+        )
+    else
+        nothing
+    end
+end
+
+function LinearSolve.pattern_changed(
+        F::SNLU.SupernodalLUFactor, A::SparseArrays.AbstractSparseMatrixCSC
+    )
+    Aold = F.A
+    return getcolptr(Aold) != getcolptr(A) || rowvals(Aold) != rowvals(A)
+end
+
+function SciMLBase.solve!(
+        cache::LinearSolve.LinearCache, alg::SupernodalLUFactorization; kwargs...
+    )
+    A = cache.A
+    A = LinearSolve.reduce_operand!(cache.sparse_reduction, A)
+    A = convert(AbstractMatrix, A)
+    if cache.isfresh
+        # SupernodalLU occupies the default polyalgorithm's `:UMFPACKFactorization`
+        # slot (the default's UMFPACK choice resolves to it), so it reads that
+        # field; for standalone use the symbol is ignored.
+        cacheval = LinearSolve.@get_cacheval(cache, :UMFPACKFactorization)
+        As = SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A))
+        if alg.reuse_symbolic && size(cacheval) == size(As) &&
+                nnz(cacheval.A) == nnz(As) &&
+                !(alg.check_pattern && pattern_changed(cacheval, As))
+            # numeric-only refactorization: reuses the analysis, matching, and
+            # all numeric storage (allocation-free)
+            fact = SNLU.snlu!(cacheval, As)
+        else
+            # `check = false`: static pivoting never aborts — numerically
+            # singular systems surface through the finiteness check below.
+            fact = SNLU.snlu(
+                As; ordering = alg.ordering, matching = alg.matching,
+                eps_pivot = alg.eps_pivot, threaded = alg.threaded, check = false
+            )
+        end
+        cache.cacheval = fact
+        cache.isfresh = false
+    end
+    F = LinearSolve.@get_cacheval(cache, :UMFPACKFactorization)
+    y = SNLU.solve!(cache.u, F, cache.b)
+    # Static pivoting never aborts: a numerically singular system factors with
+    # perturbed pivots and produces a finite but meaningless solution. When
+    # pivots were perturbed (rare), verify the residual (one sparse mat-vec)
+    # so singularity surfaces as `Infeasible` instead of a silent `Success`.
+    ok = all(isfinite, y)
+    if ok && SNLU.nperturbed(F) > 0
+        r = F.A * y
+        r .-= cache.b
+        bn = LinearAlgebra.norm(cache.b)
+        ok = LinearAlgebra.norm(r) <= 1.0e-6 * max(bn, floatmin(real(eltype(r))))
+    end
+    return if ok
+        SciMLBase.build_linear_solution(
+            alg, y, nothing, nothing; retcode = ReturnCode.Success
+        )
+    else
+        @SciMLMessage(
+            "Solver produced a non-finite or inaccurate solution; matrix is likely singular",
+            cache.verbose, :solver_failure
+        )
+        SciMLBase.build_linear_solution(
+            alg, cache.u, nothing, nothing; retcode = ReturnCode.Infeasible
+        )
+    end
+end
+
 # --- SparseColumnPivotedQR: pure-Julia rank-revealing column-pivoted sparse QR ---
 # The default sparse QR (non-square sparse systems) and the singular-LU fallback.
 
@@ -963,42 +1091,35 @@ function LinearSolve.use_klulike_sparse_structure(A::AbstractSparseMatrixCSC, b)
         (size(b, 1) <= 10_000 && length(nonzeros(A)) / length(A) < 2.0e-4)
 end
 
-@static if Base.USE_GPL_LIBS
-    function LinearSolve.defaultalg(
-            A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
-            assump::OperatorAssumptions{Bool}
-        ) where {Ti}
-        klulike = LinearSolve.use_klulike_sparse_structure(A, b)
-        if assump.issq
-            # Less structure → PureKLU (pure-Julia); more structure → UMFPACK.
-            if klulike
-                LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KLUFactorization)
-            else
-                LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.UMFPACKFactorization)
-            end
+function LinearSolve.defaultalg(
+        A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
+        assump::OperatorAssumptions{Bool}
+    ) where {Ti}
+    klulike = LinearSolve.use_klulike_sparse_structure(A, b)
+    return if assump.issq
+        # Less structure → PureKLU; more structure → the pure-Julia supernodal
+        # left-right-looking LU (both slots resolve to pure-Julia solvers, so
+        # the sparse LU default no longer depends on Base.USE_GPL_LIBS).
+        if klulike
+            LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KLUFactorization)
         else
-            # Same split for sparse QR: less structure → SparseColumnPivotedQR
-            # (pure-Julia); more structure → SuiteSparse SPQR (`QRFactorization`).
+            LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.UMFPACKFactorization)
+        end
+    else
+        @static if Base.USE_GPL_LIBS
+            # Sparse QR: less structure → SparseColumnPivotedQR (pure-Julia);
+            # more structure → SuiteSparse SPQR (`QRFactorization`).
             if klulike
                 LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization)
             else
                 LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.QRFactorization)
             end
-        end
-    end
-else
-    function LinearSolve.defaultalg(
-            A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
-            assump::OperatorAssumptions{Bool}
-        ) where {Ti}
-        # No SuiteSparse (UMFPACK/SPQR) available: always use the pure-Julia solvers.
-        if assump.issq
-            LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KLUFactorization)
         else
+            # No SuiteSparse SPQR available: pure-Julia sparse QR throughout.
             LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization)
         end
     end
-end # @static if Base.USE_GPL_LIBS
+end
 
 # SPQR Handling
 function LinearSolve.init_cacheval(

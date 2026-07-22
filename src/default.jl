@@ -459,7 +459,12 @@ function algchoice_to_alg(alg::Symbol)
         # available when requested explicitly.
         PureKLUFactorization()
     elseif alg === :UMFPACKFactorization
-        UMFPACKFactorization()
+        # The default polyalgorithm's "UMFPACK" slot resolves to the pure-Julia
+        # supernodal left-right-looking LU (Schenk-Gärtner method, vendored in
+        # src/SupernodalLU), which outperforms UMFPACK on the "more structured" systems this slot
+        # is selected for. The SuiteSparse `UMFPACKFactorization` is unchanged
+        # and remains available when requested explicitly.
+        SupernodalLUFactorization()
     elseif alg === :KrylovJL_GMRES
         KrylovJL_GMRES()
     elseif alg === :GenericLUFactorization

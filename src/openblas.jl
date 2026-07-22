@@ -39,6 +39,40 @@ OpenBLASLUFactorization(; residualsafety::Bool = false) = OpenBLASLUFactorizatio
 
 __openblas_isavailable() = useopenblas
 
+# Resolve Julia 1.13 lazy JLL products once so solves call fixed function pointers.
+const _openblas_handle = Ref{Ptr{Cvoid}}(C_NULL)
+const _openblas_zgetrf = Ref{Ptr{Cvoid}}(C_NULL)
+const _openblas_cgetrf = Ref{Ptr{Cvoid}}(C_NULL)
+const _openblas_dgetrf = Ref{Ptr{Cvoid}}(C_NULL)
+const _openblas_sgetrf = Ref{Ptr{Cvoid}}(C_NULL)
+const _openblas_zgetrs = Ref{Ptr{Cvoid}}(C_NULL)
+const _openblas_cgetrs = Ref{Ptr{Cvoid}}(C_NULL)
+const _openblas_dgetrs = Ref{Ptr{Cvoid}}(C_NULL)
+const _openblas_sgetrs = Ref{Ptr{Cvoid}}(C_NULL)
+
+function _init_openblas_symbols!()
+    @static if VERSION >= v"1.13.0-DEV.0" && useopenblas
+        handle = Libdl.dlopen(libopenblas)
+        _openblas_handle[] = handle
+        _openblas_zgetrf[] = Libdl.dlsym(handle, @blasfunc(zgetrf_))
+        _openblas_cgetrf[] = Libdl.dlsym(handle, @blasfunc(cgetrf_))
+        _openblas_dgetrf[] = Libdl.dlsym(handle, @blasfunc(dgetrf_))
+        _openblas_sgetrf[] = Libdl.dlsym(handle, @blasfunc(sgetrf_))
+        _openblas_zgetrs[] = Libdl.dlsym(handle, @blasfunc(zgetrs_))
+        _openblas_cgetrs[] = Libdl.dlsym(handle, @blasfunc(cgetrs_))
+        _openblas_dgetrs[] = Libdl.dlsym(handle, @blasfunc(dgetrs_))
+        _openblas_sgetrs[] = Libdl.dlsym(handle, @blasfunc(sgetrs_))
+    end
+    return nothing
+end
+
+macro _openblas_function(symbol, pointer)
+    if VERSION >= v"1.13.0-DEV.0"
+        return :($(esc(pointer))[])
+    end
+    return :(($(esc(symbol)), libopenblas))
+end
+
 @inline function openblas_getrf!(
         A::AbstractMatrix{<:ComplexF64}, ipiv::AbstractVector{BlasInt},
         info::Ref{BlasInt}, check::Bool
@@ -53,7 +87,7 @@ __openblas_isavailable() = useopenblas
     length(ipiv) == min(m, n) ||
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs $(min(m, n))"))
     ccall(
-        (@blasfunc(zgetrf_), libopenblas), Cvoid,
+        @_openblas_function(@blasfunc(zgetrf_), _openblas_zgetrf), Cvoid,
         (
             Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt},
@@ -78,7 +112,7 @@ end
     length(ipiv) == min(m, n) ||
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs $(min(m, n))"))
     ccall(
-        (@blasfunc(cgetrf_), libopenblas), Cvoid,
+        @_openblas_function(@blasfunc(cgetrf_), _openblas_cgetrf), Cvoid,
         (
             Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt},
@@ -103,7 +137,7 @@ end
     length(ipiv) == min(m, n) ||
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs $(min(m, n))"))
     ccall(
-        (@blasfunc(dgetrf_), libopenblas), Cvoid,
+        @_openblas_function(@blasfunc(dgetrf_), _openblas_dgetrf), Cvoid,
         (
             Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt},
@@ -128,7 +162,7 @@ end
     length(ipiv) == min(m, n) ||
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs $(min(m, n))"))
     ccall(
-        (@blasfunc(sgetrf_), libopenblas), Cvoid,
+        @_openblas_function(@blasfunc(sgetrf_), _openblas_sgetrf), Cvoid,
         (
             Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt},
@@ -160,7 +194,7 @@ function openblas_getrs!(
     end
     nrhs = size(B, 2)
     ccall(
-        (@blasfunc(zgetrs_), libopenblas), Cvoid,
+        @_openblas_function(@blasfunc(zgetrs_), _openblas_zgetrs), Cvoid,
         (
             Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt}, Ptr{BlasInt}, Clong,
@@ -193,7 +227,7 @@ function openblas_getrs!(
     end
     nrhs = size(B, 2)
     ccall(
-        (@blasfunc(cgetrs_), libopenblas), Cvoid,
+        @_openblas_function(@blasfunc(cgetrs_), _openblas_cgetrs), Cvoid,
         (
             Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt}, Ptr{BlasInt}, Clong,
@@ -226,7 +260,7 @@ function openblas_getrs!(
     end
     nrhs = size(B, 2)
     ccall(
-        (@blasfunc(dgetrs_), libopenblas), Cvoid,
+        @_openblas_function(@blasfunc(dgetrs_), _openblas_dgetrs), Cvoid,
         (
             Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{Float64}, Ref{BlasInt}, Ptr{BlasInt}, Clong,
@@ -259,7 +293,7 @@ function openblas_getrs!(
     end
     nrhs = size(B, 2)
     ccall(
-        (@blasfunc(sgetrs_), libopenblas), Cvoid,
+        @_openblas_function(@blasfunc(sgetrs_), _openblas_sgetrs), Cvoid,
         (
             Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{Float32}, Ref{BlasInt}, Ptr{BlasInt}, Clong,

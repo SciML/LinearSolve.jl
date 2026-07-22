@@ -16,6 +16,40 @@ using SciMLBase: ReturnCode
 const global libblis = blis_jll.blis
 const global liblapack = LAPACK_jll.liblapack
 
+# Resolve Julia 1.13 lazy JLL products once so solves call fixed function pointers.
+const _lapack_handle = Ref{Ptr{Cvoid}}(C_NULL)
+const _lapack_zgetrf = Ref{Ptr{Cvoid}}(C_NULL)
+const _lapack_cgetrf = Ref{Ptr{Cvoid}}(C_NULL)
+const _lapack_dgetrf = Ref{Ptr{Cvoid}}(C_NULL)
+const _lapack_sgetrf = Ref{Ptr{Cvoid}}(C_NULL)
+const _lapack_zgetrs = Ref{Ptr{Cvoid}}(C_NULL)
+const _lapack_cgetrs = Ref{Ptr{Cvoid}}(C_NULL)
+const _lapack_dgetrs = Ref{Ptr{Cvoid}}(C_NULL)
+const _lapack_sgetrs = Ref{Ptr{Cvoid}}(C_NULL)
+
+function __init__()
+    @static if VERSION >= v"1.13.0-DEV.0"
+        handle = Libdl.dlopen(liblapack)
+        _lapack_handle[] = handle
+        _lapack_zgetrf[] = Libdl.dlsym(handle, @blasfunc(zgetrf_))
+        _lapack_cgetrf[] = Libdl.dlsym(handle, @blasfunc(cgetrf_))
+        _lapack_dgetrf[] = Libdl.dlsym(handle, @blasfunc(dgetrf_))
+        _lapack_sgetrf[] = Libdl.dlsym(handle, @blasfunc(sgetrf_))
+        _lapack_zgetrs[] = Libdl.dlsym(handle, @blasfunc(zgetrs_))
+        _lapack_cgetrs[] = Libdl.dlsym(handle, @blasfunc(cgetrs_))
+        _lapack_dgetrs[] = Libdl.dlsym(handle, @blasfunc(dgetrs_))
+        _lapack_sgetrs[] = Libdl.dlsym(handle, @blasfunc(sgetrs_))
+    end
+    return nothing
+end
+
+macro _lapack_function(symbol, pointer)
+    if VERSION >= v"1.13.0-DEV.0"
+        return :($(esc(pointer))[])
+    end
+    return :(($(esc(symbol)), liblapack))
+end
+
 LinearSolve.useblis(x::Nothing) = true
 
 @inline function getrf!(
@@ -30,7 +64,7 @@ LinearSolve.useblis(x::Nothing) = true
     length(ipiv) == min(m, n) ||
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs $(min(m, n))"))
     ccall(
-        (@blasfunc(zgetrf_), liblapack), Cvoid,
+        @_lapack_function(@blasfunc(zgetrf_), _lapack_zgetrf), Cvoid,
         (
             Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt},
@@ -53,7 +87,7 @@ end
     length(ipiv) == min(m, n) ||
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs $(min(m, n))"))
     ccall(
-        (@blasfunc(cgetrf_), liblapack), Cvoid,
+        @_lapack_function(@blasfunc(cgetrf_), _lapack_cgetrf), Cvoid,
         (
             Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt},
@@ -76,7 +110,7 @@ end
     length(ipiv) == min(m, n) ||
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs $(min(m, n))"))
     ccall(
-        (@blasfunc(dgetrf_), liblapack), Cvoid,
+        @_lapack_function(@blasfunc(dgetrf_), _lapack_dgetrf), Cvoid,
         (
             Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt},
@@ -99,7 +133,7 @@ end
     length(ipiv) == min(m, n) ||
         throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs $(min(m, n))"))
     ccall(
-        (@blasfunc(sgetrf_), liblapack), Cvoid,
+        @_lapack_function(@blasfunc(sgetrf_), _lapack_sgetrf), Cvoid,
         (
             Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32},
             Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt},
@@ -129,7 +163,7 @@ function getrs!(
     end
     nrhs = size(B, 2)
     ccall(
-        (@blasfunc(zgetrs_), liblapack), Cvoid,
+        @_lapack_function(@blasfunc(zgetrs_), _lapack_zgetrs), Cvoid,
         (
             Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt}, Ptr{BlasInt}, Clong,
@@ -160,7 +194,7 @@ function getrs!(
     end
     nrhs = size(B, 2)
     ccall(
-        (@blasfunc(cgetrs_), liblapack), Cvoid,
+        @_lapack_function(@blasfunc(cgetrs_), _lapack_cgetrs), Cvoid,
         (
             Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{ComplexF32}, Ref{BlasInt}, Ptr{BlasInt}, Clong,
@@ -191,7 +225,7 @@ function getrs!(
     end
     nrhs = size(B, 2)
     ccall(
-        (@blasfunc(dgetrs_), liblapack), Cvoid,
+        @_lapack_function(@blasfunc(dgetrs_), _lapack_dgetrs), Cvoid,
         (
             Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float64}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{Float64}, Ref{BlasInt}, Ptr{BlasInt}, Clong,
@@ -222,7 +256,7 @@ function getrs!(
     end
     nrhs = size(B, 2)
     ccall(
-        (@blasfunc(sgetrs_), liblapack), Cvoid,
+        @_lapack_function(@blasfunc(sgetrs_), _lapack_sgetrs), Cvoid,
         (
             Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{Float32}, Ref{BlasInt},
             Ptr{BlasInt}, Ptr{Float32}, Ref{BlasInt}, Ptr{BlasInt}, Clong,

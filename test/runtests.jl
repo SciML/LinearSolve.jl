@@ -66,6 +66,7 @@ else
             @time @safetestset "Batched RHS" include("Core/batch.jl")
             @time @safetestset "GESV Factorization" include("Core/gesv.jl")
             @time @safetestset "LU Refactorization Reuse" include("Core/lu_refactorization.jl")
+            @time @safetestset "Direct BLAS Refactorization Reuse" include("Core/direct_blas_refactorization.jl")
             @time @safetestset "Lightweight Solution (no cache)" include("Core/lightweight_solution.jl")
             @time @safetestset "Return codes" include("Core/retcodes.jl")
             @time @safetestset "Re-solve" include("Core/resolve.jl")
@@ -88,6 +89,12 @@ else
             return @time @safetestset "SpecializingFactorizations" include("Core/specializing_factorizations.jl")
         end,
         groups = Dict(
+            "AppleAccelerate" => function ()
+                @time @safetestset "Apple Accelerate Refactorization Reuse" include("Core/lu_refactorization.jl")
+                @time @safetestset "Apple Accelerate Mixed Precision" include("Core/test_mixed_precision.jl")
+                activate_group_env(joinpath(@__DIR__, "qa"))
+                return @time @safetestset "Apple Accelerate Allocation QA" include("qa/allocations.jl")
+            end,
             # STRUMPACK runs in the base env: STRUMPACK_jll is a base test dep (the
             # Core suite also probes the STRUMPACK extension), so this group adds no
             # deps.
@@ -220,6 +227,7 @@ else
                 activate_group_env(joinpath(@__DIR__, "qa"))
                 @time @safetestset "Quality Assurance" include("qa/qa.jl")
                 @time @safetestset "JET Tests" include("qa/jet.jl")
+                @time @safetestset "Allocation QA" include("qa/allocations.jl")
             end
             return nothing
         end,

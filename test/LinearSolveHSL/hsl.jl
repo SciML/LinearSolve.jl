@@ -40,6 +40,11 @@ else
         @test sol1.retcode == ReturnCode.Success
         @test sol2.retcode == ReturnCode.Success
         @test A * sol2.u ≈ b2 rtol = 1.0e-9 atol = 1.0e-11
+        adjoint_rhs = rand(Float64, n)
+        adjoint_solution = LinearSolve._adjoint_factorization_solve(
+            cache.alg, cache.cacheval, cache.A, adjoint_rhs
+        )
+        @test adjoint(A) * adjoint_solution ≈ adjoint_rhs rtol = 1.0e-9 atol = 1.0e-11
     end
 
     @testset "HSL MA97 wrapper" begin
@@ -63,6 +68,11 @@ else
         @test sol1.retcode == ReturnCode.Success
         @test sol2.retcode == ReturnCode.Success
         @test A * sol2.u ≈ b2 rtol = 1.0e-9 atol = 1.0e-11
+        adjoint_rhs = rand(Float64, n)
+        adjoint_solution = LinearSolve._adjoint_factorization_solve(
+            cache.alg, cache.cacheval, cache.A, adjoint_rhs
+        )
+        @test adjoint(A) * adjoint_solution ≈ adjoint_rhs rtol = 1.0e-9 atol = 1.0e-11
 
         Ac = ComplexF64.(A)
         bc = rand(ComplexF64, n)

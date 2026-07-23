@@ -779,6 +779,19 @@ function SciMLBase.solve!(
     )
 end
 
+LinearSolve._custom_can_reuse_adjoint_factorization(
+    ::SparseColumnPivotedQRFactorization,
+    ::SCPQR.SparseColumnPivotedQRFactorization
+) = true
+
+function LinearSolve._custom_adjoint_factorization_solve(
+        ::SparseColumnPivotedQRFactorization,
+        factorization::SCPQR.SparseColumnPivotedQRFactorization,
+        A, b
+    )
+    return adjoint(factorization) \ b
+end
+
 # SparseColumnPivotedQR's ldiv! only accepts vector right-hand sides; batched
 # (matrix) right-hand sides solve column-by-column against the one factorization.
 function LinearSolve._ldiv!(

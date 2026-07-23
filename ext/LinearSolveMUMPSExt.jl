@@ -173,4 +173,29 @@ function SciMLBase.solve!(
     )
 end
 
+LinearSolve._custom_can_reuse_adjoint_factorization(
+    ::LinearSolve.MUMPSFactorization, cache::MUMPSCache
+) = true
+
+function LinearSolve._custom_adjoint_factorization_solve(
+        alg::LinearSolve.MUMPSFactorization, cache::MUMPSCache, A, b
+    )
+    solver = cache.solver
+    solver === nothing && return nothing
+    solution = similar(b)
+    reverse_transposed = !alg.transposed
+    # MUMPS exposes transpose but not adjoint solves. Conjugating both sides
+    # turns a transpose solve with the cached factors into an adjoint solve.
+    rhs = eltype(A) <: Real ? b : conj.(b)
+    MUMPS.associate_rhs!(solver, rhs)
+    reverse_transposed && transpose!(solver)
+    try
+        MUMPS.mumps_solve!(solver; rhs_changed = true)
+        MUMPS.get_sol!(solution, solver)
+    finally
+        reverse_transposed && transpose!(solver)
+    end
+    return eltype(A) <: Real ? solution : conj.(solution)
+end
+
 end

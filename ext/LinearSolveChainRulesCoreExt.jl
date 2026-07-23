@@ -7,7 +7,7 @@ using LinearSolve: SciMLLinearSolveAlgorithm, AbstractFactorization,
 using SciMLBase: SciMLBase, LinearProblem, init, solve, solve!
 using SciMLOperators: issquare
 using ChainRulesCore: ChainRulesCore, NoTangent
-using LinearAlgebra: Factorization, adjoint
+using LinearAlgebra: adjoint
 
 const CRC = ChainRulesCore
 
@@ -31,16 +31,20 @@ function CRC.rrule(
 
     @assert sensealg isa LinearSolveAdjoint "Currently only `LinearSolveAdjoint` is supported for adjoint sensitivity analysis."
 
-    # Decide if we need to cache `A` and `b` for the reverse pass
+    A_ = nothing
     if sensealg.linsolve === missing
-        # We can reuse the factorization so no copy is needed
-        # Krylov Methods don't modify `A`, so it's safe to just reuse it
-        # No Copy is needed even for the default case
+        can_reuse_factorization = LinearSolve._can_reuse_cache_factorization(
+            alg, cache.cacheval
+        )
         if !(
-                alg isa AbstractFactorization || alg isa AbstractKrylovSubspaceMethod ||
+                can_reuse_factorization || alg isa AbstractKrylovSubspaceMethod ||
                     alg isa DefaultLinearSolver
             )
-            A_ = alias_A ? deepcopy(A) : A
+            A_ = if alg isa AbstractFactorization
+                deepcopy(A)
+            else
+                alias_A ? deepcopy(A) : A
+            end
         end
     else
         A_ = deepcopy(A)
@@ -53,13 +57,15 @@ function CRC.rrule(
 
         ∂u = hasproperty(∂sol, :u) ? ∂sol.u : ∂sol
         if sensealg.linsolve === missing
-            λ = if cache.cacheval isa Factorization
-                cache.cacheval' \ ∂u
-            elseif cache.cacheval isa Tuple && cache.cacheval[1] isa Factorization
-                first(cache.cacheval)' \ ∂u
+            cached_adjoint_solution = LinearSolve._adjoint_factorization_solve(
+                alg, cache.cacheval, cache.A, ∂u
+            )
+            λ = if cached_adjoint_solution !== nothing
+                cached_adjoint_solution
             elseif alg isa AbstractKrylovSubspaceMethod
-                invprob = LinearProblem(adjoint(cache.A), ∂u)
-                solve(invprob, alg; cache.abstol, cache.reltol, cache.verbose).u
+                LinearSolve._adjoint_krylov_solve(
+                    alg, cache.A, ∂u; cache.abstol, cache.reltol, cache.verbose
+                )
             elseif alg isa DefaultLinearSolver
                 LinearSolve.defaultalg_adjoint_eval(cache, ∂u)
             else

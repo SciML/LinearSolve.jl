@@ -75,6 +75,21 @@ for alg in algs
     @test sol11.u ≈ sol31.u
     @test sol12.u ≈ sol32.u
     @test sol13.u ≈ sol33.u
+    adjoint_rhs = rand(n)
+    adjoint_solution = LinearSolve._adjoint_factorization_solve(
+        alg, linsolve.cacheval, linsolve.A, adjoint_rhs
+    )
+    @test adjoint(A2) * adjoint_solution ≈ adjoint_rhs
+
+    complex_A = complex.(A2, sprand(n, n, 0.1))
+    complex_b = rand(ComplexF64, n)
+    complex_cache = init(LinearProblem(complex_A, complex_b), alg)
+    solve!(complex_cache)
+    complex_adjoint_rhs = rand(ComplexF64, n)
+    complex_adjoint_solution = LinearSolve._adjoint_factorization_solve(
+        alg, complex_cache.cacheval, complex_cache.A, complex_adjoint_rhs
+    )
+    @test adjoint(complex_A) * complex_adjoint_solution ≈ complex_adjoint_rhs
 end
 
 # Test for problem from #497

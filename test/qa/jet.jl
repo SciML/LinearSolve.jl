@@ -171,10 +171,9 @@ end
 
 @testset "JET Tests for Default Solver" begin
     # Test the default solver selection
-    # These tests have various runtime dispatch issues in stdlib code:
-    # - Dense: Captured variables in appleaccelerate.jl (platform-specific)
-    # - Sparse: Runtime dispatch in SparseArrays stdlib, Base.show, etc.
-    JET.@test_opt solve(prob) broken = true
+    # Julia 1.10 reports runtime dispatch through stdlib and Krylov fallback paths.
+    JET.@test_opt solve(prob) broken = VERSION < v"1.12.0-"
+    # Sparse has runtime dispatch in SparseArrays stdlib, Base.show, etc.
     JET.@test_opt solve(prob_sparse) broken = true
 end
 

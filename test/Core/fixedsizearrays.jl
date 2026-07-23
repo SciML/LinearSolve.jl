@@ -83,10 +83,10 @@ end
 end
 
 # The BLAS-direct LU caches (`MKL`, `OpenBLAS`, `AppleAccelerate`, `BLIS`) store
-# a factorization built from `A` into a type-parameterized `cacheval` slot, so
-# `init_cacheval` must produce a slot whose container matches `A`. This holds
-# regardless of whether the corresponding BLAS binary is present, so the type
-# check runs everywhere even when the solver itself can't.
+# factorization buffers built from `A` in a type-parameterized `cacheval` slot,
+# so `init_cacheval` must produce buffers whose container matches `A`. This
+# holds regardless of whether the corresponding BLAS binary is present, so the
+# type check runs everywhere even when the solver itself can't.
 @testset "BLAS LU init_cacheval slot tracks the FixedSizeArray container" begin
     n = 20
     A = FixedSizeArray(rand(n, n) + n * I)
@@ -99,7 +99,8 @@ end
         slot = LinearSolve.init_cacheval(
             alg, A, v, v, nothing, nothing, 0, 0.0, 0.0, true, assump
         )
-        @test slot[1].factors isa FixedSizeArray
-        @test slot[1].ipiv isa FixedSizeArray
+        workspace = alg isa MKLLUFactorization ? slot[1] : slot
+        @test workspace.factors isa FixedSizeArray
+        @test workspace.ipiv isa FixedSizeArray
     end
 end

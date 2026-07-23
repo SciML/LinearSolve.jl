@@ -439,7 +439,7 @@ end
 
     # Test BLIS if extension is available
     if Base.get_extension(LinearSolve, :LinearSolveBLISExt) !== nothing
-        push!(test_algs, BLISLUFactorization())
+        push!(test_algs, LinearSolve.BLISLUFactorization())
     end
 
     @testset "Concrete Factorizations" begin

@@ -27,6 +27,31 @@ db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x), copy(b1))
 @test dA ≈ dA2
 @test db1 ≈ db12
 
+@testset "OpenBLAS solve! reverse rule" begin
+    A = [3.0 1.0; 1.0 2.0]
+    b = [1.0, 2.0]
+    dA = zeros(size(A))
+    db = zeros(size(b))
+
+    function openblas_solve!(A, b)
+        cache = init(LinearProblem(A, b), OpenBLASLUFactorization())
+        return sum(solve!(cache).u)
+    end
+
+    Enzyme.autodiff(
+        Reverse, openblas_solve!, Duplicated(copy(A), dA), Duplicated(copy(b), db)
+    )
+    expected_dA = FiniteDiff.finite_difference_gradient(
+        A -> openblas_solve!(A, b), A
+    )
+    expected_db = FiniteDiff.finite_difference_gradient(
+        b -> openblas_solve!(A, b), b
+    )
+
+    @test dA ≈ expected_dA
+    @test db ≈ expected_db
+end
+
 A = rand(n, n);
 dA = zeros(n, n);
 b1 = rand(n);

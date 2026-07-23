@@ -23,9 +23,20 @@ the same thing in every mode.
 """
 EnumX.@enumx WarmStart begin
     """
+    `WarmStart.Auto`
+
+    Default. Let the context decide. In standalone LinearSolve use this behaves
+    as `WarmStart.None` (cold start), so it never changes behavior on its own. A
+    higher-level caller that knows the surrounding algorithm may resolve it to a
+    concrete mode: OrdinaryDiffEq.jl, for instance, resolves `Auto` to
+    `WarmStart.Hegedus` for Newton-based integrators and leaves it as a cold
+    start for Rosenbrock/W-methods (see the warning above).
+    """
+    Auto
+    """
     `WarmStart.None`
 
-    Default. Every solve starts from a zero initial guess (cold start).
+    Every solve starts from a zero initial guess (cold start).
     """
     None
     """
@@ -64,15 +75,16 @@ end
 KrylovJL(args...; KrylovAlg = Krylov.gmres!,
     Pl = nothing, Pr = nothing,
     gmres_restart = 0, window = 0,
-    warm_start = WarmStart.None,
+    warm_start = WarmStart.Auto,
     kwargs...)
 ```
 
 A generic wrapper over the Krylov.jl krylov-subspace iterative solvers.
 
 `warm_start` (a [`WarmStart`](@ref) value) selects the initial guess used when
-the same cache is solved repeatedly (GMRES and FGMRES only): `WarmStart.None`
-(default), `WarmStart.Previous`, or the recommended `WarmStart.Hegedus`.
+the same cache is solved repeatedly (GMRES and FGMRES only): `WarmStart.Auto`
+(default; cold start unless a caller resolves it), `WarmStart.None`,
+`WarmStart.Previous`, or the recommended `WarmStart.Hegedus`.
 """
 struct KrylovJL{F, I, P, A, K} <: AbstractKrylovSubspaceMethod
     KrylovAlg::F
@@ -87,7 +99,7 @@ end
 function KrylovJL(
         args...; KrylovAlg = Krylov.gmres!,
         gmres_restart = 0, window = 0,
-        warm_start::WarmStart.T = WarmStart.None,
+        warm_start::WarmStart.T = WarmStart.Auto,
         precs = nothing,
         kwargs...
     )
@@ -124,7 +136,7 @@ end
 
 """
 ```julia
-KrylovJL_GMRES(args...; gmres_restart = 0, window = 0, warm_start = WarmStart.None, kwargs...)
+KrylovJL_GMRES(args...; gmres_restart = 0, window = 0, warm_start = WarmStart.Auto, kwargs...)
 ```
 
 A generic GMRES implementation for square non-Hermitian linear systems
@@ -138,7 +150,7 @@ end
 
 """
 ```julia
-KrylovJL_FGMRES(args...; gmres_restart = 0, window = 0, warm_start = WarmStart.None, kwargs...)
+KrylovJL_FGMRES(args...; gmres_restart = 0, window = 0, warm_start = WarmStart.Auto, kwargs...)
 ```
 
 A generic FGMRES implementation for square non-Hermitian linear systems
@@ -461,7 +473,9 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
 
     krylovJL_verbose = verbosity_to_int(verbose.KrylovJL_verbosity)
 
-    if alg.warm_start != WarmStart.None
+    # Auto resolves to a cold start in standalone LinearSolve; only Previous and
+    # Hegedus actually warm start (a context-aware caller rewrites Auto upstream).
+    if alg.warm_start == WarmStart.Previous || alg.warm_start == WarmStart.Hegedus
         atol, rtol = _krylov_warm_start!(cacheval, cache, alg.warm_start, M, atol, rtol)
     end
 

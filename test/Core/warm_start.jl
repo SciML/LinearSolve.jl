@@ -14,9 +14,22 @@ tol = 1.0e-10
 @testset "warm_start validation" begin
     # a plain Symbol is no longer accepted; the option is a WarmStart enum value
     @test_throws TypeError KrylovJL_GMRES(warm_start = :hegedus)
-    @test KrylovJL_GMRES().warm_start === WarmStart.None
+    @test KrylovJL_GMRES().warm_start === WarmStart.Auto
+    @test KrylovJL_GMRES(warm_start = WarmStart.None).warm_start === WarmStart.None
     @test KrylovJL_GMRES(warm_start = WarmStart.Previous).warm_start === WarmStart.Previous
     @test KrylovJL_FGMRES(warm_start = WarmStart.Hegedus).warm_start === WarmStart.Hegedus
+end
+
+@testset "Auto behaves as a cold start standalone" begin
+    # Auto (the default) must not warm start on its own: an identical resolve
+    # pays the full iteration count, exactly like None.
+    for alg in (KrylovJL_GMRES(), KrylovJL_GMRES(warm_start = WarmStart.None))
+        cache = init(LinearProblem(A1, b1), alg; abstol = tol, reltol = tol)
+        solve!(cache)
+        cache.b = copy(b1)
+        solve!(cache)
+        @test cache.cacheval.stats.niter > 1
+    end
 end
 
 @testset "correctness across repeated solves: $(alg.KrylovAlg) warm_start=$(alg.warm_start)" for alg in (

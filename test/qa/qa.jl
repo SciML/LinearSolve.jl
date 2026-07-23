@@ -9,7 +9,7 @@ catch
 end
 unanalyzable_mods = (
     LinearSolve.OperatorCondition, LinearSolve.DefaultAlgorithmChoice,
-    LinearSolve.NonstructuralZeros,
+    LinearSolve.NonstructuralZeros, LinearSolve.WarmStart,
 )
 if klu_mod !== nothing
     unanalyzable_mods = (unanalyzable_mods..., klu_mod)

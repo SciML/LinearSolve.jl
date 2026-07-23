@@ -1,55 +1,84 @@
 ## Krylov.jl
 
 """
+    EnumX.@enumx WarmStart
+
+Selects the initial guess used by a [`KrylovJL`](@ref) GMRES/FGMRES algorithm
+when the same cache is solved repeatedly (`cache.b = newb; solve!(cache)`), e.g.
+the sequence of linear solves inside an implicit ODE integrator's Newton
+iteration. Other Krylov methods ignore the setting. The previous solution stored
+in `cache.u` seeds the next solve via `Krylov.warm_start!`.
+
+Warm-started solves keep the cold-start stopping criterion: `reltol` is measured
+against `‖M b‖`, not against the warm initial residual, so the tolerances mean
+the same thing in every mode.
+
+!!! warning
+
+    Do not use warm starting inside Rosenbrock-type (W-method) integrators such
+    as `Rodas5P`. They have no outer Newton iteration to absorb within-tolerance
+    differences in stage solves, and warm starting there can degrade accuracy
+    and trigger step-rejection feedback loops (observed: `WarmStart.Previous`
+    producing 500x slowdowns and inaccurate results).
+"""
+EnumX.@enumx WarmStart begin
+    """
+    `WarmStart.None`
+
+    Default. Every solve starts from a zero initial guess (cold start).
+    """
+    None
+    """
+    `WarmStart.Previous`
+
+    Start from the previous solution `cache.u` unchanged. Only appropriate when
+    successive *solutions* vary slowly. Inside a Newton iteration the linear
+    unknown is the Newton increment, whose magnitude shrinks as the iteration
+    converges, so the raw previous increment typically overshoots and *increases*
+    the iteration count; prefer `WarmStart.Hegedus` there. Costs one extra
+    operator application per solve.
+    """
+    Previous
+    """
+    `WarmStart.Hegedus`
+
+    Start from the previous solution rescaled by the Hegedüs trick, `x₀ = ξ u`
+    with `ξ = ⟨Au, b⟩ / ‖Au‖²`, which minimizes the initial residual along the
+    direction of the previous solution and hence guarantees `‖b - A x₀‖ ≤ ‖b‖`
+    (never worse than a cold start). Costs two extra operator applications per
+    solve, plus one preconditioner application when a left preconditioner is set.
+
+    Recommended when warm starting is wanted. Benchmarks on stiff PDE
+    Newton-Krylov solves (Brusselator, Allen-Cahn, Burgers, advection-diffusion
+    with KenCarp47/TRBDF2/FBDF + ILU) show it reliably reduces GMRES iteration
+    counts (median ≈ -17%), but wall time only improves when each solve performs
+    substantial Krylov work (≳5 iterations per solve); with a preconditioner
+    strong enough that solves take ≲3 iterations the fixed per-solve overhead
+    dominates the savings.
+    """
+    Hegedus
+end
+
+"""
 ```julia
 KrylovJL(args...; KrylovAlg = Krylov.gmres!,
     Pl = nothing, Pr = nothing,
     gmres_restart = 0, window = 0,
-    warm_start = :none,
+    warm_start = WarmStart.None,
     kwargs...)
 ```
 
 A generic wrapper over the Krylov.jl krylov-subspace iterative solvers.
 
-`warm_start` controls the initial guess used when the same cache is solved
-repeatedly (currently supported for GMRES and FGMRES; other methods ignore it):
-
-  - `:none` (default): every solve starts from zero.
-  - `:previous`: start from the previous solution `cache.u`.
-  - `:hegedus`: start from the previous solution rescaled by the Hegedüs trick,
-    `x₀ = ξ u` with `ξ = ⟨Au, b⟩ / ‖Au‖²`, which minimizes the initial residual
-    along the direction of the previous solution and hence guarantees
-    `‖b - A x₀‖ ≤ ‖b‖`.
-
-Warm starting costs one extra operator application per solve (two for
-`:hegedus`, plus one preconditioner application when a left preconditioner is
-set). Benchmarks on stiff PDE Newton-Krylov solves (Brusselator, Allen-Cahn,
-Burgers, advection-diffusion with KenCarp47/TRBDF2/FBDF + ILU) show `:hegedus`
-reliably reduces GMRES iteration counts (median ≈ -17%), but wall time only
-improves when each solve performs substantial Krylov work (≳5 iterations per
-solve); with a preconditioner strong enough that solves take ≲3 iterations the
-fixed per-solve overhead dominates the savings. `:previous` typically
-*increases* Newton-Krylov iteration counts — the previous Newton increment
-overshoots as the iteration converges — and is intended for sequences whose
-solutions vary slowly, not for Newton loops.
-
-!!! warning
-
-    Do not enable `warm_start` inside Rosenbrock-type (W-method) integrators
-    such as `Rodas5P`. They have no outer Newton iteration to absorb
-    within-tolerance differences in stage solves, and warm starting there can
-    degrade accuracy and trigger step-rejection feedback loops (observed:
-    `:previous` producing 500x slowdowns and inaccurate results).
-
-The stopping criterion is adjusted for warm-started solves (`reltol` is
-measured against `‖M b‖` as in a cold start, not against the warm initial
-residual), so warm starting never changes the meaning of the tolerances.
+`warm_start` (a [`WarmStart`](@ref) value) selects the initial guess used when
+the same cache is solved repeatedly (GMRES and FGMRES only): `WarmStart.None`
+(default), `WarmStart.Previous`, or the recommended `WarmStart.Hegedus`.
 """
 struct KrylovJL{F, I, P, A, K} <: AbstractKrylovSubspaceMethod
     KrylovAlg::F
     gmres_restart::I
     window::I
-    warm_start::Symbol
+    warm_start::WarmStart.T
     precs::P
     args::A
     kwargs::K
@@ -58,15 +87,9 @@ end
 function KrylovJL(
         args...; KrylovAlg = Krylov.gmres!,
         gmres_restart = 0, window = 0,
-        warm_start::Symbol = :none,
+        warm_start::WarmStart.T = WarmStart.None,
         precs = nothing,
         kwargs...
-    )
-    warm_start in (:none, :previous, :hegedus) ||
-        throw(
-        ArgumentError(
-            "warm_start must be :none, :previous, or :hegedus, got :$warm_start"
-        )
     )
     return KrylovJL(
         KrylovAlg, gmres_restart, window, warm_start,
@@ -101,13 +124,13 @@ end
 
 """
 ```julia
-KrylovJL_GMRES(args...; gmres_restart = 0, window = 0, warm_start = :none, kwargs...)
+KrylovJL_GMRES(args...; gmres_restart = 0, window = 0, warm_start = WarmStart.None, kwargs...)
 ```
 
 A generic GMRES implementation for square non-Hermitian linear systems
 
-`warm_start` (`:none`, `:previous`, or `:hegedus`) selects the initial guess
-used when the same cache is solved repeatedly; see [`KrylovJL`](@ref).
+`warm_start` (a [`WarmStart`](@ref) value) selects the initial guess used when
+the same cache is solved repeatedly; see [`KrylovJL`](@ref).
 """
 function KrylovJL_GMRES(args...; kwargs...)
     return KrylovJL(args...; KrylovAlg = Krylov.gmres!, kwargs...)
@@ -115,13 +138,13 @@ end
 
 """
 ```julia
-KrylovJL_FGMRES(args...; gmres_restart = 0, window = 0, warm_start = :none, kwargs...)
+KrylovJL_FGMRES(args...; gmres_restart = 0, window = 0, warm_start = WarmStart.None, kwargs...)
 ```
 
 A generic FGMRES implementation for square non-Hermitian linear systems
 
-`warm_start` (`:none`, `:previous`, or `:hegedus`) selects the initial guess
-used when the same cache is solved repeatedly; see [`KrylovJL`](@ref).
+`warm_start` (a [`WarmStart`](@ref) value) selects the initial guess used when
+the same cache is solved repeatedly; see [`KrylovJL`](@ref).
 """
 function KrylovJL_FGMRES(args...; kwargs...)
     return KrylovJL(args...; KrylovAlg = Krylov.fgmres!, kwargs...)
@@ -369,20 +392,20 @@ const _WARM_STARTABLE_WORKSPACES = Union{Krylov.GmresWorkspace, Krylov.FgmresWor
     _krylov_warm_start!(workspace, cache, mode, M, atol, rtol) -> (atol, rtol)
 
 Warm start `workspace` from the previous solution `cache.u` (raw for
-`mode === :previous`, Hegedüs-rescaled for `mode === :hegedus`) and return the
+`WarmStart.Previous`, Hegedüs-rescaled for `WarmStart.Hegedus`) and return the
 adjusted stopping tolerances. Krylov.jl measures `rtol` against the warm-start
 residual `‖M (b - A x₀)‖` rather than `‖M b‖`, so `rtol * ‖M b‖` is folded
 into `atol` (and `rtol` zeroed) to keep the stopping threshold identical to a
 cold start's. No-op (returning the tolerances unchanged) for unsupported
 workspaces and for zero or nonfinite previous solutions.
 """
-function _krylov_warm_start!(workspace, cache, mode::Symbol, M, atol, rtol)
+function _krylov_warm_start!(workspace, cache, mode::WarmStart.T, M, atol, rtol)
     workspace isa _WARM_STARTABLE_WORKSPACES || return atol, rtol
     u = cache.u
     (u isa AbstractVector && eltype(u) <: Number) || return atol, rtol
     unorm = norm(u)
     (iszero(unorm) || !isfinite(unorm)) && return atol, rtol
-    if mode === :hegedus
+    if mode == WarmStart.Hegedus
         Au = mul!(similar(cache.b), cache.A, u)
         d = real(dot(Au, Au))
         (iszero(d) || !isfinite(d)) && return atol, rtol
@@ -438,7 +461,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
 
     krylovJL_verbose = verbosity_to_int(verbose.KrylovJL_verbosity)
 
-    if alg.warm_start !== :none
+    if alg.warm_start != WarmStart.None
         atol, rtol = _krylov_warm_start!(cacheval, cache, alg.warm_start, M, atol, rtol)
     end
 

@@ -362,6 +362,11 @@ KrylovJL_LSMR
 KrylovJL_CRAIGMR
 KrylovJL_MINARES
 KrylovJL
+WarmStart
+WarmStart.Auto
+WarmStart.None
+WarmStart.Previous
+WarmStart.Hegedus
 ```
 
 ### MKL.jl

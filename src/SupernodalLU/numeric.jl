@@ -33,8 +33,9 @@
 # Every workspace the numeric phase touches is preallocated on the
 # factorization object, and the factorized matrix `V = M[qf,qf]` (with `M` the
 # possibly matched/scaled input) plus its transpose are refreshed in place
-# through precomputed position maps — so `snlu!` refactorization and `solve!`
-# are allocation-free after the first factorization (the PureKLU guarantee).
+# through precomputed position maps — so `solve!` is allocation-free and
+# `snlu!` refactorization allocates only the small `LinearSolution` each
+# dense block cache's `solve!` returns (~64 B per cached supernode).
 
 """
     SupernodalLUFactor
@@ -76,6 +77,9 @@ mutable struct SupernodalLUFactor{Tv, Ti <: Integer}
     ir_dx::Vector{Tv}                # iterative-refinement correction
     btmp::Vector{Tv}                 # in-place ldiv! RHS copy
     threaded::Bool                   # use the etree-parallel numeric phase
+    # dense LinearSolve caches for large diagonal blocks (nothing = built-in
+    # kernel); runtime-typed, accessed through the _cache_lu! barrier
+    bcaches::Vector{Any}
 end
 
 nperturbed(F::SupernodalLUFactor) = F.nperturbed
@@ -164,16 +168,15 @@ end
     return nothing
 end
 
-# ---- overridable dense-kernel hooks ---------------------------------------
-# The package extension (RecursiveFactorization + TriangularSolve, the same
-# components LinearSolve.jl's default dense LU prefers at supernode block
-# sizes) overrides these for Float32/Float64 panels; the defaults run the
-# built-in blocked kernel and stdlib BLAS.  A plain LAPACK-getrf fast path was
-# measured and is NOT used: at supernode block sizes the mandatory block
-# backup + call overhead cancels getrf's gains (±5 % vs the built-in kernel),
-# while RecursiveFactorization is a genuine win.  `scratch` is free workspace
-# the getrf hook may resize (backs up the block so a too-small pivot can fall
-# back to the static-perturbation kernel).
+# ---- dense diagonal-block factorization via LinearSolve ------------------
+# Supernodes at or above the dense-cache threshold own a dense `LinearCache`
+# over a view of their diagonal block (built in `_snlu_build`), so the block
+# getrf runs through LinearSolve's own dense `init`/`solve!` machinery and
+# automatically uses whatever the dense default resolves to (RFLU when
+# RecursiveFactorization is loaded, MKL/LAPACK/generic otherwise).  Blocks
+# below the threshold — and non-BLAS element types — use the built-in
+# static-perturbation kernel directly.  `scratch` backs up the block so a
+# below-ε‖A‖ pivot can fall back to that kernel in every case.
 
 @inline function _backup_block!(scratch::Vector{Tv}, W::Matrix{Tv}, np::Int) where {Tv}
     length(scratch) < np * np && resize!(scratch, np * np)
@@ -215,25 +218,57 @@ end
     return _block_lu!(W, np, epsv, ipiv)
 end
 
-function _block_getrf!(
-        W::Matrix{Tv}, np::Int, epsv, ipiv::AbstractVector{Int},
-        scratch::Vector{Tv}
+# Factor supernode s's diagonal block: through the supernode's dense
+# LinearSolve cache when it has one, else the built-in kernel.
+#
+# The cache owns a dedicated np×np `Matrix` (`bc.A`); the block is copied in,
+# factored by LinearSolve's dense machinery, and copied back only if every
+# pivot clears ε‖A‖.  So the panel itself stays pristine on the reject path —
+# the static-perturbation kernel then reruns on the untouched block, and no
+# separate backup copy is needed.
+function _dense_block_factor!(
+        F, s::Int, np::Int, epsv, ipiv::AbstractVector{Int}, scratch
+    )
+    Ws = F.W[s]
+    bc = F.bcaches[s]
+    bc === nothing && return _block_lu!(Ws, np, epsv, ipiv)
+    ok = _cache_lu!(bc, Ws, np, epsv, ipiv)
+    ok && return 0
+    @inbounds for j in 1:np
+        ipiv[j] = j
+    end
+    return _block_lu!(Ws, np, epsv, ipiv)
+end
+
+# Run the dense factorization through LinearSolve's `solve!` on the block
+# cache (a function barrier over the runtime-typed cache).  Returns `true`
+# when the factorization was accepted and written back into the panel.
+function _cache_lu!(
+        bc, W::Matrix{Tv}, np::Int, epsv, ipiv::AbstractVector{Int}
     ) where {Tv}
-    return _block_lu!(W, np, epsv, ipiv)
+    Bm = bc.A::Matrix{Tv}
+    @inbounds for c in 1:np, r in 1:np
+        Bm[r, c] = W[r, c]
+    end
+    bc.isfresh = true
+    SciMLBase.solve!(bc)
+    fact = _lu_from_cacheval(bc.cacheval)
+    fac = fact.factors
+    @inbounds for j in 1:np
+        abs(fac[j, j]) >= epsv || return false
+    end
+    fip = fact.ipiv
+    @inbounds for j in 1:np
+        ipiv[j] = Int(fip[j])
+    end
+    @inbounds for c in 1:np, r in 1:np
+        W[r, c] = fac[r, c]
+    end
+    return true
 end
 
-
-# L21 := L21 · U11⁻¹
-function _panel_rdiv!(W::Matrix{Tv}, np::Int, len::Int) where {Tv}
-    rdiv!(view(W, (np + 1):len, 1:np), UpperTriangular(view(W, 1:np, 1:np)))
-    return nothing
-end
-
-# U12 := L11⁻¹ · U12
-function _panel_ldiv!(W::Matrix{Tv}, np::Int, Z::Matrix{Tv}) where {Tv}
-    ldiv!(UnitLowerTriangular(view(W, 1:np, 1:np)), Z)
-    return nothing
-end
+_lu_from_cacheval(cv::LinearAlgebra.LU) = cv
+_lu_from_cacheval(cv::Tuple) = _lu_from_cacheval(first(cv))
 
 # Transpose of V with a position map: Vt.nzval[q] == V.nzval[Tpos[q]] forever
 # (structure is static), so refactorization refreshes Vt by one gather pass.
@@ -443,7 +478,7 @@ function _process_supernode!(
         for a in 1:np
             ipv[a] = a
         end
-        npert = _block_getrf!(Ws, np, epsv, ipv, buf)
+        npert = _dense_block_factor!(F, s, np, epsv, ipv, buf)
         _apply_ipiv!(Zs, ipv, np, nu)
         # fold the block row swaps (sequential, LAPACK-style) into prow; the
         # touched range c1:c2 belongs exclusively to this supernode
@@ -455,8 +490,8 @@ function _process_supernode!(
         end
 
         if nu > 0
-            _panel_rdiv!(Ws, np, len)
-            _panel_ldiv!(Ws, np, Zs)
+            rdiv!(view(Ws, (np + 1):len, 1:np), UpperTriangular(view(Ws, 1:np, 1:np)))
+            ldiv!(UnitLowerTriangular(view(Ws, 1:np, 1:np)), Zs)
         end
 
         for a in 1:np
@@ -528,7 +563,8 @@ end
 # owns one private (relmap, ipiv, buf) workspace, and every supernode still
 # applies its contributions in static-schedule order — same pivot sequence
 # and structure as serial, with entry-level rounding differences only from
-# BLAS-parallel sums.
+# BLAS-parallel sums.  The per-supernode dense block caches need no locking:
+# each supernode is processed exactly once, by exactly one task.
 function _core_threaded!(F::SupernodalLUFactor{Tv}, epsv) where {Tv}
     sym = F.sym
     rows = sym.rows

@@ -40,7 +40,7 @@ function snlu(
         A::SparseMatrixCSC{Tv, Ti}; ordering::Symbol = :amd,
         eps_pivot::Float64 = 1.0e-8, matching::Union{Symbol, Bool} = :auto,
         relax::Bool = true, maxsuper::Int = 512, check::Bool = true,
-        threaded::Bool = false
+        threaded::Bool = false, dense_alg = nothing, dense_threshold::Int = 64
     ) where {Tv, Ti <: Integer}
     domatch = matching === true || (matching === :auto && needs_matching(A))
     if domatch
@@ -50,14 +50,16 @@ function snlu(
             sym = snlu_symbolic(B; ordering = ordering, relax = relax, maxsuper = maxsuper)
             return _snlu_build(
                 sym, A, B, ms;
-                eps_pivot = eps_pivot, check = check, threaded = threaded
+                eps_pivot = eps_pivot, check = check, threaded = threaded,
+                dense_alg = dense_alg, dense_threshold = dense_threshold
             )
         end
     end
     sym = snlu_symbolic(A; ordering = ordering, relax = relax, maxsuper = maxsuper)
     F = _snlu_build(
         sym, A, A, nothing;
-        eps_pivot = eps_pivot, check = check, threaded = threaded
+        eps_pivot = eps_pivot, check = check, threaded = threaded,
+        dense_alg = dense_alg, dense_threshold = dense_threshold
     )
     # Self-healing retry: mass pivot perturbation means the ε·‖A‖ threshold
     # dwarfed legitimate pivots (huge global dynamic range) — a case the
@@ -73,7 +75,8 @@ function snlu(
             sym2 = snlu_symbolic(B; ordering = ordering, relax = relax, maxsuper = maxsuper)
             F2 = _snlu_build(
                 sym2, A, B, ms;
-                eps_pivot = eps_pivot, check = check, threaded = threaded
+                eps_pivot = eps_pivot, check = check, threaded = threaded,
+                dense_alg = dense_alg, dense_threshold = dense_threshold
             )
             F2.nperturbed < F.nperturbed && return F2
         end
@@ -89,12 +92,54 @@ phase 22 given phase 11).
 """
 function snlu(
         sym::SymbolicAnalysis, A::SparseMatrixCSC{Tv, Ti};
-        eps_pivot::Float64 = 1.0e-8, check::Bool = true, threaded::Bool = false
+        eps_pivot::Float64 = 1.0e-8, check::Bool = true, threaded::Bool = false,
+        dense_alg = nothing, dense_threshold::Int = 64
     ) where {Tv, Ti <: Integer}
     return _snlu_build(
         sym, A, A, nothing;
-        eps_pivot = eps_pivot, check = check, threaded = threaded
+        eps_pivot = eps_pivot, check = check, threaded = threaded,
+        dense_alg = dense_alg, dense_threshold = dense_threshold
     )
+end
+
+# Dense LinearSolve caches for the diagonal blocks: every supernode whose
+# pivot block is at least `dense_threshold` wide (BLAS element types only)
+# gets a dense `LinearCache` over a view of its panel block, so the block
+# getrf runs through LinearSolve's dense `init`/`solve!` with `dense_alg`
+# (default: whatever `LinearSolve.defaultalg` resolves to for that block —
+# RFLU when RecursiveFactorization is loaded, MKL/LAPACK/generic otherwise;
+# resolved once at analysis time).  Small blocks and generic element types
+# use the built-in static-perturbation kernel.
+function _dense_block_caches(
+        W::Vector{Matrix{Tv}}, sym::SymbolicAnalysis, dense_alg, dense_threshold::Int
+    ) where {Tv}
+    nsuper = length(sym.sstart) - 1
+    bcaches = Vector{Any}(nothing, nsuper)
+    Tv <: LinearAlgebra.BLAS.BlasFloat || return bcaches
+    assump = LinearSolve.OperatorAssumptions(true)
+    for s in 1:nsuper
+        np = sym.sstart[s + 1] - sym.sstart[s]
+        np >= dense_threshold || continue
+        B = Matrix{Tv}(undef, np, np)   # cache-owned block buffer
+        b = zeros(Tv, np)
+        alg = dense_alg
+        if alg === nothing
+            # `A === nothing` is LinearSolve's documented stand-in for "dense
+            # matrix" in `defaultalg` (our block is a strided view, which the
+            # dense branch does not match on), so this resolves exactly the
+            # dense default for this block's size and element type.
+            da = LinearSolve.defaultalg(nothing, b, assump)
+            alg = da isa LinearSolve.DefaultLinearSolver ?
+                LinearSolve.algchoice_to_alg(Symbol(da.alg)) : da
+        end
+        bcaches[s] = SciMLBase.init(
+            LinearSolve.LinearProblem(B, b),
+            alg;
+            alias = SciMLBase.LinearAliasSpecifier(alias_A = true, alias_b = true),
+            assumptions = assump
+        )
+    end
+    return bcaches
 end
 
 # Allocate all numeric state (panels, V/Vt + position maps, every workspace)
@@ -103,7 +148,8 @@ end
 function _snlu_build(
         sym::SymbolicAnalysis, A::SparseMatrixCSC{Tv, Ti},
         M::SparseMatrixCSC{Tv, Ti}, ms::Union{MatchScale, Nothing};
-        eps_pivot::Float64 = 1.0e-8, check::Bool = true, threaded::Bool = false
+        eps_pivot::Float64 = 1.0e-8, check::Bool = true, threaded::Bool = false,
+        dense_alg = nothing, dense_threshold::Int = 64
     ) where {Tv, Ti <: Integer}
     n = sym.n
     size(A) == (n, n) || throw(DimensionMismatch("matrix/symbolic size mismatch"))
@@ -131,7 +177,8 @@ function _snlu_build(
         zeros(Int, n), Vector{Int}(undef, n), Vector{Int}(undef, n),
         Matrix{Tv}(undef, n, 0),
         Vector{Tv}(undef, n), Vector{Tv}(undef, n), Vector{Tv}(undef, n),
-        threaded
+        threaded,
+        _dense_block_caches(W, sym, dense_alg, dense_threshold)
     )
     _build_vpos!(F, A)
     _factor_core!(F)
@@ -144,7 +191,10 @@ end
 
 Refactorize with new values on the SAME sparsity pattern (PARDISO phase 22
 with reuse of phase-11 analysis, matching, and all numeric storage).
-Allocation-free after the first factorization.
+Solves are allocation-free; refactorization allocates only the small
+`LinearSolution` object returned by each dense block cache's `solve!`
+(~64 B per cached supernode, independent of problem size — none at all with
+`dense_threshold = typemax(Int)`).
 """
 function snlu!(F::SupernodalLUFactor{Tv}, A::SparseMatrixCSC{Tv}) where {Tv}
     size(A) == (F.sym.n, F.sym.n) || throw(DimensionMismatch())

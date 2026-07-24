@@ -41,7 +41,7 @@ end
     end
 end
 
-@testset "zero-allocation refactorization and solve" begin
+@testset "allocation-free solve; bounded refactorization allocation" begin
     A = poisson2d(40)
     n = size(A, 1)
     b = randn(n)
@@ -49,8 +49,16 @@ end
     F = SNLU.snlu(A)
     SNLU.snlu!(F, A)
     SNLU.solve!(x, F, b)
-    @test (@allocated SNLU.snlu!(F, A)) == 0
+    # Solves allocate nothing.  Refactorization allocates only the small
+    # `LinearSolution` object each dense block cache's `solve!` returns —
+    # a fixed ~64 B per cached supernode, independent of problem size.
     @test (@allocated SNLU.solve!(x, F, b)) == 0
+    ncache = count(!isnothing, F.bcaches)
+    @test (@allocated SNLU.snlu!(F, A)) <= 128 * max(ncache, 1)
+    # with the dense caches disabled the built-in kernel is fully allocation-free
+    Fb = SNLU.snlu(A; dense_threshold = typemax(Int))
+    SNLU.snlu!(Fb, A)
+    @test (@allocated SNLU.snlu!(Fb, A)) == 0
 end
 
 @testset "matching engages on zero/weak diagonals" begin

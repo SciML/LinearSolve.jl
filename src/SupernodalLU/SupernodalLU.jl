@@ -14,17 +14,24 @@
 #
 # Internal to LinearSolve: the public surface is `SupernodalLUFactorization`.
 # Entry points here are `snlu` (analyze + factor), `snlu!` (refactorize, same
-# pattern, allocation-free), `solve!`, and the `snlu_symbolic` analysis.
-# The dense panel kernels (`_block_getrf!`, `_panel_rdiv!`, `_panel_ldiv!`)
-# are overridable hooks: LinearSolveRecursiveFactorizationExt routes them
-# through RecursiveFactorization/TriangularSolve — the same components the
-# default dense LU prefers — whenever RecursiveFactorization is loaded.
+# pattern), `solve!`, and the `snlu_symbolic` analysis.
+# Each supernode's dense diagonal block is factored through LinearSolve's own
+# dense `init`/`solve!` machinery (a per-supernode dense `LinearCache` over a
+# view of the panel), so the sparse solver automatically uses whatever
+# LinearSolve's dense default resolves to — RFLUFactorization when
+# RecursiveFactorization is loaded, MKL/LAPACK/generic otherwise — with no
+# backend-specific wiring here.  Static pivoting is preserved by an
+# optimistic fast path: accept the dense factorization iff every pivot
+# clears the ε‖A‖ threshold, else restore the block and rerun the built-in
+# static-perturbation kernel.
 
 module SupernodalLU
 
 using SparseArrays: SparseMatrixCSC, sparse, getcolptr, rowvals, nonzeros, nnz, spzeros
 using LinearAlgebra: LinearAlgebra, SingularException, UpperTriangular,
     UnitLowerTriangular, ldiv!, rdiv!, mul!, norm, BLAS
+using ..LinearSolve: LinearSolve
+using SciMLBase: SciMLBase
 
 include("amd.jl")          # vendored BSD-3 SuiteSparse AMD port (module AMD)
 include("ordering.jl")

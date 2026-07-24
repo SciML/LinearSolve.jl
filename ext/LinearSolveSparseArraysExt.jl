@@ -774,7 +774,8 @@ function SciMLBase.solve!(
             # singular systems surface through the finiteness check below.
             fact = SNLU.snlu(
                 As; ordering = alg.ordering, matching = alg.matching,
-                eps_pivot = alg.eps_pivot, threaded = alg.threaded, check = false
+                eps_pivot = alg.eps_pivot, threaded = alg.threaded,
+                dense_alg = alg.dense_alg, check = false
             )
         end
         cache.cacheval = fact

@@ -1507,8 +1507,9 @@ unsymmetric systems. No binary dependencies.
 This is the strongest choice for "more structured" sparse systems (2D/3D
 PDE-mesh-like patterns), where it outperforms both `UMFPACKFactorization`
 and `KLUFactorization`. For very sparse circuit-like systems, prefer
-`PureKLUFactorization`/`KLUFactorization`. Numeric refactorization on an
-unchanged sparsity pattern is allocation-free. Loading
+`PureKLUFactorization`/`KLUFactorization`. Solves are allocation-free and
+numeric refactorization on an unchanged sparsity pattern allocates only a
+fixed ~64 B per cached supernode block (independent of problem size). Loading
 `RecursiveFactorization` (e.g. for `RFLUFactorization`, the default dense
 LU) additionally routes the dense panel kernels through
 RecursiveFactorization/TriangularSolve automatically.
@@ -1531,6 +1532,12 @@ RecursiveFactorization/TriangularSolve automatically.
   - `threaded`: opt-in supernodal-elimination-tree parallel factorization
     (uses `Threads.nthreads()` tasks plus BLAS threads on the tree top; do
     not run other BLAS work concurrently). Defaults to `false`.
+  - `dense_alg`: the dense LU algorithm used for the supernode diagonal
+    blocks, through LinearSolve's own dense `init`/`solve!` machinery.
+    `nothing` (default) resolves each block through `LinearSolve.defaultalg`
+    — `RFLUFactorization` when RecursiveFactorization is loaded, MKL/LAPACK/
+    generic LU otherwise — so the sparse solver always shares the dense
+    default's engine.
 """
 Base.@kwdef struct SupernodalLUFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool = true
@@ -1539,6 +1546,7 @@ Base.@kwdef struct SupernodalLUFactorization <: AbstractSparseFactorization
     matching::Union{Symbol, Bool} = :auto
     eps_pivot::Float64 = 1.0e-8
     threaded::Bool = false
+    dense_alg::Union{Nothing, AbstractDenseFactorization} = nothing
 end
 
 function init_cacheval(

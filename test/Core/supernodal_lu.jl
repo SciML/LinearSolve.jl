@@ -61,6 +61,37 @@ end
     @test (@allocated SNLU.snlu!(Fb, A)) == 0
 end
 
+@testset "auto refinement only for perturbed pivots" begin
+    # MC64 matching improves conditioning, so a matched factor with no
+    # perturbed pivot needs no refinement (refining there cost ~2.1x/solve).
+    n = 400
+    P = sparse(collect(n:-1:1), collect(1:n), 2.0 .+ rand(n), n, n)
+    Fm = SNLU.snlu(P)
+    @test Fm.matched
+    @test SNLU.nperturbed(Fm) == 0
+    @test SNLU._auto_refine(Fm) == 0
+    b = randn(n)
+    x = similar(b)
+    SNLU.solve!(x, Fm, b)
+    @test norm(P * x - b) <= 1.0e-12 * norm(b)
+    # a perturbed factor still refines
+    D = 10.0 .^ range(-9, 9; length = 200)
+    Ap = spdiagm(0 => D, 1 => fill(1.0e-9, 199), -1 => fill(1.0e-9, 199))
+    Fp = SNLU.snlu(Ap; matching = false, check = false)
+    @test SNLU.nperturbed(Fp) > 0
+    @test SNLU._auto_refine(Fp) == 3
+end
+
+@testset "allocation-free residual check on a perturbed factor" begin
+    Z = sprand(300, 300, 0.02) + 1.0e-14I
+    cache = init(LinearProblem(Z, randn(300)), SupernodalLUFactorization())
+    solve!(cache)
+    resolve(c) = solve!(c)
+    resolve(cache)
+    resolve(cache)
+    @test (@allocated resolve(cache)) == 0
+end
+
 @testset "matching engages on zero/weak diagonals" begin
     n = 40
     P = sparse(collect(n:-1:1), collect(1:n), 2.0 .+ rand(n), n, n)

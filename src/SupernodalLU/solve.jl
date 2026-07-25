@@ -157,7 +157,11 @@ function _solve_once!(X::AbstractMatrix{Tv}, F::SupernodalLUFactor{Tv}, B::Abstr
     return X
 end
 
-_auto_refine(F::SupernodalLUFactor) = (F.nperturbed > 0 || F.matched) ? 3 : 0
+# Refinement exists to recover the accuracy lost to *perturbed* pivots.  MC64
+# matching improves conditioning rather than degrading it, so a matched factor
+# with no perturbed pivot needs none — refining there measured a 2.0-2.2x cost
+# per solve for a residual change of ~1.5e-15 -> 7e-16.
+_auto_refine(F::SupernodalLUFactor) = F.nperturbed > 0 ? 3 : 0
 
 """
     solve!(x, F::SupernodalLUFactor, b; refine=:auto) -> x

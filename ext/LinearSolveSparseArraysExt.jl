@@ -786,7 +786,8 @@ function SciMLBase.solve!(
     # so singularity surfaces as `Infeasible` instead of a silent `Success`.
     ok = all(isfinite, y)
     if ok && SNLU.nperturbed(F) > 0
-        r = F.A * y
+        r = F.ir_r                      # factor-owned residual buffer
+        LinearAlgebra.mul!(r, F.A, y)
         r .-= cache.b
         bn = LinearAlgebra.norm(cache.b)
         ok = LinearAlgebra.norm(r) <= 1.0e-6 * max(bn, floatmin(real(eltype(r))))

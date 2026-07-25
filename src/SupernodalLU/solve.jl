@@ -12,6 +12,79 @@
 # factor-row space (update rows via `rowsfac`), the back solve in column space
 # (U12 columns are the un-permuted column ids in `rows`).
 
+# Supernode panels are small — for a 2D Poisson factorization the pivot block
+# width `np` has mean ~12 and median 6 — so the BLAS `trsv`/`gemv` calls that
+# would serve them are dominated by call overhead rather than arithmetic: a
+# 12x12 unit-triangular solve (~72 flops) measured ~260 ns through BLAS.  Below
+# `PANEL_BLAS_CUTOFF` the sweeps therefore use the column-oriented kernels
+# below, which are the same algorithms written out with `@inbounds`/`@simd`;
+# above it BLAS wins and is used unchanged.  Measured on `_solve_panels!`:
+# -43 % (n=400), -40 % (n=1600), -37 % (n=3600), -35 % (n=10000), taking a
+# poisson-2D k=40 solve from 124 us to ~77 us (UMFPACK 71 us, PureKLU 66 us).
+# BLAS thread count is irrelevant at these sizes (123.1 us at 1 thread vs
+# 122.8 us at 64).  Results are bit-comparable to the BLAS path to ~2e-16.
+const PANEL_BLAS_CUTOFF = 64
+
+# x := L11 \ x for the unit-lower-triangular pivot block stored in W[1:np,1:np]
+# (column-oriented forward substitution: subtract each solved entry's column).
+@inline function _unit_lower_solve!(W::AbstractMatrix{Tv}, x::AbstractVector{Tv}, np::Int) where {Tv}
+    @inbounds for j in 1:np
+        xj = x[j]
+        iszero(xj) && continue
+        @simd for i in (j + 1):np
+            x[i] = muladd(-W[i, j], xj, x[i])
+        end
+    end
+    return nothing
+end
+
+# x := U11 \ x for the upper-triangular pivot block (column-oriented backward
+# substitution; the diagonal carries U's pivots).
+@inline function _upper_solve!(W::AbstractMatrix{Tv}, x::AbstractVector{Tv}, np::Int) where {Tv}
+    @inbounds for j in np:-1:1
+        xj = x[j] / W[j, j]
+        x[j] = xj
+        iszero(xj) && continue
+        @simd for i in 1:(j - 1)
+            x[i] = muladd(-W[i, j], xj, x[i])
+        end
+    end
+    return nothing
+end
+
+# t := A * x for the L21 block W[np+1:np+nu, 1:np] (column-oriented gemv).
+@inline function _panel_gemv!(
+        t::AbstractVector{Tv}, W::AbstractMatrix{Tv}, x::AbstractVector{Tv},
+        np::Int, nu::Int
+    ) where {Tv}
+    @inbounds for k in 1:nu
+        t[k] = zero(Tv)
+    end
+    @inbounds for j in 1:np
+        xj = x[j]
+        iszero(xj) && continue
+        @simd for k in 1:nu
+            t[k] = muladd(W[np + k, j], xj, t[k])
+        end
+    end
+    return nothing
+end
+
+# x := x - Z * t for the U12 block (column-oriented gemv, accumulating into x).
+@inline function _panel_gemv_sub!(
+        x::AbstractVector{Tv}, Z::AbstractMatrix{Tv}, t::AbstractVector{Tv},
+        np::Int, nu::Int
+    ) where {Tv}
+    @inbounds for k in 1:nu
+        tk = t[k]
+        iszero(tk) && continue
+        @simd for i in 1:np
+            x[i] = muladd(-Z[i, k], tk, x[i])
+        end
+    end
+    return nothing
+end
+
 # y := U \ (L \ (P * y)) in permuted space; y enters as V-row-ordered rhs.
 function _solve_panels!(y::AbstractVector{Tv}, F::SupernodalLUFactor{Tv}) where {Tv}
     sym = F.sym
@@ -26,11 +99,19 @@ function _solve_panels!(y::AbstractVector{Tv}, F::SupernodalLUFactor{Tv}) where 
         nu = length(Rf)
         Ws = F.W[s]
         xb = view(y, c1:c2)
-        ldiv!(UnitLowerTriangular(view(Ws, 1:np, 1:np)), xb)
+        if np < PANEL_BLAS_CUTOFF
+            _unit_lower_solve!(Ws, xb, np)
+        else
+            ldiv!(UnitLowerTriangular(view(Ws, 1:np, 1:np)), xb)
+        end
         if nu > 0
             length(buf) < nu && resize!(buf, max(nu, 2 * length(buf)))
             t = view(buf, 1:nu)
-            mul!(t, view(Ws, (np + 1):(np + nu), 1:np), xb)
+            if np < PANEL_BLAS_CUTOFF
+                _panel_gemv!(t, Ws, xb, np, nu)
+            else
+                mul!(t, view(Ws, (np + 1):(np + nu), 1:np), xb)
+            end
             @simd for k in 1:nu
                 y[Rf[k]] -= t[k]
             end
@@ -50,9 +131,17 @@ function _solve_panels!(y::AbstractVector{Tv}, F::SupernodalLUFactor{Tv}) where 
             @simd for k in 1:nu
                 t[k] = y[R[k]]
             end
-            mul!(xb, F.Z[s], t, -one(Tv), one(Tv))
+            if np < PANEL_BLAS_CUTOFF
+                _panel_gemv_sub!(xb, F.Z[s], t, np, nu)
+            else
+                mul!(xb, F.Z[s], t, -one(Tv), one(Tv))
+            end
         end
-        ldiv!(UpperTriangular(view(Ws, 1:np, 1:np)), xb)
+        if np < PANEL_BLAS_CUTOFF
+            _upper_solve!(Ws, xb, np)
+        else
+            ldiv!(UpperTriangular(view(Ws, 1:np, 1:np)), xb)
+        end
     end
     return y
 end

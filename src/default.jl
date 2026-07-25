@@ -10,7 +10,7 @@ mutable struct DefaultLinearSolverInit{
     DirectLdiv!::T4
     SparspakFactorization::T5
     KLUFactorization::T6
-    UMFPACKFactorization::T7
+    SupernodalLUFactorization::T7
     KrylovJL_GMRES::T8
     GenericLUFactorization::T9
     RFLUFactorization::T10
@@ -35,7 +35,7 @@ mutable struct DefaultLinearSolverInit{
     a_backup_allocated::Bool  # true once A_backup has been replaced with a private buffer
     fell_back_to_qr::Bool  # true after QR fallback; reuse QR until matrix is refreshed
     # Persistent-nonstructural-zero reduction state, shared across the sparse
-    # sub-algorithm slots (KLU/UMFPACK + the QR fallback all factor the one reduced
+    # sub-algorithm slots (the two sparse LU slots + the QR fallback all factor
     # matrix). `nothing` when inactive / non-sparse. See `init_sparse_reduction`.
     sparse_reduction::TR
 end
@@ -458,8 +458,8 @@ function algchoice_to_alg(alg::Symbol)
         # PureKLU. The SuiteSparse `KLUFactorization` is unchanged and remains
         # available when requested explicitly.
         PureKLUFactorization()
-    elseif alg === :UMFPACKFactorization
-        UMFPACKFactorization()
+    elseif alg === :SupernodalLUFactorization
+        SupernodalLUFactorization()
     elseif alg === :KrylovJL_GMRES
         KrylovJL_GMRES()
     elseif alg === :GenericLUFactorization
@@ -602,7 +602,7 @@ defaultalg_symbol(::Type{<:QRFactorization{ColumnNorm}}) = :QRFactorizationPivot
 const _SPARSE_ONLY_ALGORITHMS = Symbol.(
     (
         DefaultAlgorithmChoice.KLUFactorization,
-        DefaultAlgorithmChoice.UMFPACKFactorization,
+        DefaultAlgorithmChoice.SupernodalLUFactorization,
         DefaultAlgorithmChoice.SparspakFactorization,
         DefaultAlgorithmChoice.CHOLMODFactorization,
         DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization,
@@ -616,7 +616,7 @@ const _SPARSE_ONLY_ALGORITHMS = Symbol.(
 const _SPARSE_LU_FALLBACK_ALGORITHMS = Symbol.(
     (
         DefaultAlgorithmChoice.KLUFactorization,
-        DefaultAlgorithmChoice.UMFPACKFactorization,
+        DefaultAlgorithmChoice.SupernodalLUFactorization,
         DefaultAlgorithmChoice.SparspakFactorization,
     )
 )
@@ -717,7 +717,7 @@ end
     _do_sparse_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol)
 
 Perform column-pivoted sparse QR (`SparseColumnPivotedQRFactorization`) fallback
-after a sparse LU (`KLUFactorization`, `UMFPACKFactorization`,
+after a sparse LU (`KLUFactorization`, `SupernodalLUFactorization`,
 `SparspakFactorization`) solve failed or produced non-finite output.
 
 Sparse LU does not modify `cache.A` in place — UMFPACK and KLU wrap a
@@ -1125,7 +1125,7 @@ end
                     DefaultAlgorithmChoice.LUFactorization,
                     DefaultAlgorithmChoice.QRFactorization,
                     DefaultAlgorithmChoice.KLUFactorization,
-                    DefaultAlgorithmChoice.UMFPACKFactorization,
+                    DefaultAlgorithmChoice.SupernodalLUFactorization,
                     DefaultAlgorithmChoice.LDLtFactorization,
                     DefaultAlgorithmChoice.SparspakFactorization,
                     DefaultAlgorithmChoice.BunchKaufmanFactorization,

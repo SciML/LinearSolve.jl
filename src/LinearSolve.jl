@@ -310,7 +310,7 @@ EnumX.@enumx DefaultAlgorithmChoice begin
     DirectLdiv!
     SparspakFactorization
     KLUFactorization
-    UMFPACKFactorization
+    SupernodalLUFactorization
     KrylovJL_GMRES
     GenericLUFactorization
     RFLUFactorization

@@ -1496,6 +1496,72 @@ function init_cacheval(
 end
 
 """
+`SupernodalLUFactorization(; reuse_symbolic = true, check_pattern = true, ordering = :amd,
+                            matching = :auto, eps_pivot = 1e-8, threaded = false)`
+
+A pure-Julia implementation of the supernodal left–right-looking sparse LU
+method of O. Schenk and K. Gärtner (FGCS 20(3), 2004; ETNA 23, 2006),
+vendored self-contained in `src/SupernodalLU`: supernodal BLAS-3
+LU on the symmetric pattern of `A + Aᵀ`, pivoting restricted to supernode
+diagonal blocks with static pivot perturbation compensated by iterative
+refinement, and maximum-weight matching + scaling preprocessing for
+unsymmetric systems. No binary dependencies.
+
+This is the strongest choice for "more structured" sparse systems (2D/3D
+PDE-mesh-like patterns), where it outperforms both `UMFPACKFactorization`
+and `KLUFactorization`. For very sparse circuit-like systems, prefer
+`PureKLUFactorization`/`KLUFactorization`. Solves are allocation-free and
+numeric refactorization on an unchanged sparsity pattern allocates only a
+fixed ~64 B per cached supernode block (independent of problem size). Loading
+`RecursiveFactorization` (e.g. for `RFLUFactorization`, the default dense
+LU) additionally routes the dense panel kernels through
+RecursiveFactorization/TriangularSolve automatically.
+
+## Keyword Arguments
+
+  - `reuse_symbolic`: reuse the cached symbolic analysis (and all numeric
+    storage) across solves when the sparsity pattern is unchanged. Defaults
+    to `true`.
+  - `check_pattern`: check whether the sparsity pattern changed before
+    reusing the analysis. Defaults to `true`.
+  - `ordering`: fill-reducing ordering, `:amd` (default), `:nd`
+    (pure-Julia nested dissection — best for large 3D meshes), or
+    `:natural`.
+  - `matching`: maximum-weight matching + scaling preprocessing, `:auto`
+    (default — enabled when the diagonal is structurally weak), `true`, or
+    `false`.
+  - `eps_pivot`: static pivoting perturbation threshold (relative to
+    `‖A‖`). Defaults to `1e-8`.
+  - `threaded`: opt-in supernodal-elimination-tree parallel factorization
+    (uses `Threads.nthreads()` tasks plus BLAS threads on the tree top; do
+    not run other BLAS work concurrently). Defaults to `false`.
+  - `dense_alg`: the dense LU algorithm used for the supernode diagonal
+    blocks, through LinearSolve's own dense `init`/`solve!` machinery.
+    `nothing` (default) resolves each block through `LinearSolve.defaultalg`
+    — `RFLUFactorization` when RecursiveFactorization is loaded, MKL/LAPACK/
+    generic LU otherwise — so the sparse solver always shares the dense
+    default's engine.
+"""
+Base.@kwdef struct SupernodalLUFactorization <: AbstractSparseFactorization
+    reuse_symbolic::Bool = true
+    check_pattern::Bool = true
+    ordering::Symbol = :amd
+    matching::Union{Symbol, Bool} = :auto
+    eps_pivot::Float64 = 1.0e-8
+    threaded::Bool = false
+    dense_alg::Union{Nothing, AbstractDenseFactorization} = nothing
+end
+
+function init_cacheval(
+        alg::SupernodalLUFactorization,
+        A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
+"""
 `SparseColumnPivotedQRFactorization(; reuse_symbolic = true, ordering = :default)`
 
 A pure-Julia, rank-revealing column-pivoted sparse QR factorization, provided by

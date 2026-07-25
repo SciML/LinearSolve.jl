@@ -758,10 +758,7 @@ function SciMLBase.solve!(
     A = LinearSolve.reduce_operand!(cache.sparse_reduction, A)
     A = convert(AbstractMatrix, A)
     if cache.isfresh
-        # SupernodalLU occupies the default polyalgorithm's `:UMFPACKFactorization`
-        # slot (the default's UMFPACK choice resolves to it), so it reads that
-        # field; for standalone use the symbol is ignored.
-        cacheval = LinearSolve.@get_cacheval(cache, :UMFPACKFactorization)
+        cacheval = LinearSolve.@get_cacheval(cache, :SupernodalLUFactorization)
         As = SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A))
         if alg.reuse_symbolic && size(cacheval) == size(As) &&
                 nnz(cacheval.A) == nnz(As) &&
@@ -781,7 +778,7 @@ function SciMLBase.solve!(
         cache.cacheval = fact
         cache.isfresh = false
     end
-    F = LinearSolve.@get_cacheval(cache, :UMFPACKFactorization)
+    F = LinearSolve.@get_cacheval(cache, :SupernodalLUFactorization)
     y = SNLU.solve!(cache.u, F, cache.b)
     # Static pivoting never aborts: a numerically singular system factors with
     # perturbed pivots and produces a finite but meaningless solution. When
@@ -1105,35 +1102,42 @@ function LinearSolve.use_klulike_sparse_structure(A::AbstractSparseMatrixCSC, b)
         (size(b, 1) <= 10_000 && length(nonzeros(A)) / length(A) < 2.0e-4)
 end
 
-function LinearSolve.defaultalg(
-        A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
-        assump::OperatorAssumptions{Bool}
-    ) where {Ti}
-    klulike = LinearSolve.use_klulike_sparse_structure(A, b)
-    return if assump.issq
-        # Less structure → PureKLU; more structure → the pure-Julia supernodal
-        # left-right-looking LU (both slots resolve to pure-Julia solvers, so
-        # the sparse LU default no longer depends on Base.USE_GPL_LIBS).
-        if klulike
-            LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KLUFactorization)
+@static if Base.USE_GPL_LIBS
+    function LinearSolve.defaultalg(
+            A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
+            assump::OperatorAssumptions{Bool}
+        ) where {Ti}
+        klulike = LinearSolve.use_klulike_sparse_structure(A, b)
+        if assump.issq
+            # Less structure → PureKLU (pure-Julia); more structure → UMFPACK.
+            if klulike
+                LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KLUFactorization)
+            else
+                LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.UMFPACKFactorization)
+            end
         else
-            LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.UMFPACKFactorization)
-        end
-    else
-        @static if Base.USE_GPL_LIBS
-            # Sparse QR: less structure → SparseColumnPivotedQR (pure-Julia);
-            # more structure → SuiteSparse SPQR (`QRFactorization`).
+            # Same split for sparse QR: less structure → SparseColumnPivotedQR
+            # (pure-Julia); more structure → SuiteSparse SPQR (`QRFactorization`).
             if klulike
                 LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization)
             else
                 LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.QRFactorization)
             end
+        end
+    end
+else
+    function LinearSolve.defaultalg(
+            A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
+            assump::OperatorAssumptions{Bool}
+        ) where {Ti}
+        # No SuiteSparse (UMFPACK/SPQR) available: always use the pure-Julia solvers.
+        if assump.issq
+            LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KLUFactorization)
         else
-            # No SuiteSparse SPQR available: pure-Julia sparse QR throughout.
             LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization)
         end
     end
-end
+end # @static if Base.USE_GPL_LIBS
 
 # SPQR Handling
 function LinearSolve.init_cacheval(

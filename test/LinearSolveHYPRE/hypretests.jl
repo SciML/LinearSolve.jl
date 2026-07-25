@@ -174,6 +174,19 @@ function test_retcode_failure()
     return @test sol.resid > cache.reltol
 end
 
+function test_update_tolerances()
+    prob = failure_prob()
+    cache = SciMLBase.init(
+        prob, HYPREAlgorithm(HYPRE.PCG);
+        abstol = 1.0e-12, reltol = 1.0e-12, maxiters = 1
+    )
+    @test cache.cacheval.solver === nothing
+    LinearSolve.update_tolerances!(cache; abstol = 1.0e-6, reltol = 1.0e-6)
+    @test cache.abstol == 1.0e-6
+    @test cache.reltol == 1.0e-6
+    return @test cache.cacheval.solver === nothing
+end
+
 const comm = MPI.COMM_WORLD
 
 # HYPRE.BiCGSTAB
@@ -226,6 +239,11 @@ test_interface(HYPREAlgorithm(HYPRE.PCG), Pl = HYPRE.BoomerAMG)
 test_interface(HYPREAlgorithm(HYPRE.PCG(comm)))
 test_interface(HYPREAlgorithm(HYPRE.PCG(comm)), Pl = HYPRE.BoomerAMG())
 test_retcode_failure()
+test_update_tolerances()
+
+@test LinearSolve.needs_concrete_A(HYPREAlgorithm(HYPRE.GMRES))
+@test LinearSolve.needs_concrete_A(HYPREAlgorithm(HYPRE.PCG))
+@test LinearSolve.needs_concrete_A(HYPREAlgorithm(HYPRE.BoomerAMG))
 
 # Test MPI execution
 # Pass the active project explicitly: the group env (test/hypre) is activated

@@ -5,7 +5,7 @@ using HYPRE.LibHYPRE: HYPRE_Complex, HYPREError, HYPRE_ERROR_CONV
 using HYPRE: HYPRE, HYPREMatrix, HYPRESolver, HYPREVector
 using LinearSolve: HYPREAlgorithm, LinearCache, LinearProblem, LinearSolve,
     OperatorAssumptions, default_tol, init_cacheval, __issquare,
-    __conditioning, LinearSolveAdjoint, LinearVerbosity
+    __conditioning, LinearSolveAdjoint, LinearVerbosity, needs_concrete_A
 using SciMLLogging: SciMLLogging, verbosity_to_int, @SciMLMessage
 using SciMLBase: LinearProblem, LinearAliasSpecifier, SciMLBase
 using Setfield: @set!
@@ -20,6 +20,19 @@ mutable struct HYPRECache
     isfresh_A::Bool
     isfresh_b::Bool
     isfresh_u::Bool
+end
+
+LinearSolve.needs_concrete_A(::HYPREAlgorithm) = true
+
+function LinearSolve.update_tolerances_internal!(cache, alg::HYPREAlgorithm, abstol, reltol)
+    # The HYPRE solver is created lazily in solve!, so any tolerance change is
+    # naturally picked up from cache.abstol/cache.reltol the next time the
+    # solver is instantiated. Mark the cached solver as stale so it gets
+    # recreated with the updated tolerances.
+    if cache.cacheval isa HYPRECache && cache.cacheval.solver !== nothing
+        cache.cacheval.solver = nothing
+    end
+    return nothing
 end
 
 function LinearSolve.init_cacheval(

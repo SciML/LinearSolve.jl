@@ -121,7 +121,7 @@ prob = LinearProblem(sprand(1000, 1000, 0.5), zeros(1000))
 solve(prob)
 
 @test LinearSolve.defaultalg(sprand(11000, 11000, 0.001), zeros(11000)).alg ===
-    LinearSolve.DefaultAlgorithmChoice.UMFPACKFactorization
+    LinearSolve.DefaultAlgorithmChoice.SupernodalLUFactorization
 prob = LinearProblem(sprand(11000, 11000, 0.5), zeros(11000))
 solve(prob)
 
@@ -491,7 +491,7 @@ let
     # Just past the fast-path boundary on a dense matrix → UMFPACK
     A_past = sprand(1_001, 1_001, 0.5) + I
     @test LinearSolve.defaultalg(A_past, rand(1_001), LinearSolve.OperatorAssumptions(true)).alg ===
-        LinearSolve.DefaultAlgorithmChoice.UMFPACKFactorization
+        LinearSolve.DefaultAlgorithmChoice.SupernodalLUFactorization
 
     # Medium-size, very sparse (density < 2e-4) → density branch picks KLU
     n = 9_000
@@ -503,7 +503,7 @@ let
     # Medium-size, dense sparse → UMFPACK
     A_med_dense = sprand(5_000, 5_000, 0.5) + I
     @test LinearSolve.defaultalg(A_med_dense, rand(5_000), LinearSolve.OperatorAssumptions(true)).alg ===
-        LinearSolve.DefaultAlgorithmChoice.UMFPACKFactorization
+        LinearSolve.DefaultAlgorithmChoice.SupernodalLUFactorization
 end
 
 # === Sparse LU → SPQR fallback ===
@@ -559,7 +559,7 @@ let
     A_u[1, :] .= 0
     A_u = sparse(A_u)
     @test LinearSolve.defaultalg(A_u, ones(n_u), LinearSolve.OperatorAssumptions(true)).alg ===
-        LinearSolve.DefaultAlgorithmChoice.UMFPACKFactorization
+        LinearSolve.DefaultAlgorithmChoice.SupernodalLUFactorization
     sol_u = solve(LinearProblem(A_u, ones(n_u)))
     @test sol_u.retcode === ReturnCode.Success
     # Sanity: a non-singular matrix should NOT fall back.

@@ -1102,42 +1102,35 @@ function LinearSolve.use_klulike_sparse_structure(A::AbstractSparseMatrixCSC, b)
         (size(b, 1) <= 10_000 && length(nonzeros(A)) / length(A) < 2.0e-4)
 end
 
-@static if Base.USE_GPL_LIBS
-    function LinearSolve.defaultalg(
-            A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
-            assump::OperatorAssumptions{Bool}
-        ) where {Ti}
-        klulike = LinearSolve.use_klulike_sparse_structure(A, b)
-        if assump.issq
-            # Less structure → PureKLU (pure-Julia); more structure → UMFPACK.
-            if klulike
-                LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KLUFactorization)
-            else
-                LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.UMFPACKFactorization)
-            end
+function LinearSolve.defaultalg(
+        A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
+        assump::OperatorAssumptions{Bool}
+    ) where {Ti}
+    klulike = LinearSolve.use_klulike_sparse_structure(A, b)
+    return if assump.issq
+        # Less structure → PureKLU; more structure → the supernodal LU.  Both
+        # are pure Julia, so the sparse LU default does not depend on
+        # Base.USE_GPL_LIBS.
+        if klulike
+            LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KLUFactorization)
         else
-            # Same split for sparse QR: less structure → SparseColumnPivotedQR
-            # (pure-Julia); more structure → SuiteSparse SPQR (`QRFactorization`).
+            LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.SupernodalLUFactorization)
+        end
+    else
+        @static if Base.USE_GPL_LIBS
+            # Sparse QR: less structure → SparseColumnPivotedQR (pure-Julia);
+            # more structure → SuiteSparse SPQR (`QRFactorization`).
             if klulike
                 LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization)
             else
                 LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.QRFactorization)
             end
-        end
-    end
-else
-    function LinearSolve.defaultalg(
-            A::AbstractSparseMatrixCSC{<:Union{Float64, ComplexF64}, Ti}, b,
-            assump::OperatorAssumptions{Bool}
-        ) where {Ti}
-        # No SuiteSparse (UMFPACK/SPQR) available: always use the pure-Julia solvers.
-        if assump.issq
-            LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.KLUFactorization)
         else
+            # No SuiteSparse SPQR available: pure-Julia sparse QR throughout.
             LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization)
         end
     end
-end # @static if Base.USE_GPL_LIBS
+end
 
 # SPQR Handling
 function LinearSolve.init_cacheval(

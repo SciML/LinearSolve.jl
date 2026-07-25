@@ -161,6 +161,31 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::PardisoJL; kwargs
     return SciMLBase.build_linear_solution(alg, cache.u, nothing, nothing)
 end
 
+LinearSolve._custom_can_reuse_adjoint_factorization(
+    ::PardisoJL, ::Pardiso.AbstractPardisoSolver
+) = true
+
+function LinearSolve._custom_adjoint_factorization_solve(
+        ::PardisoJL, solver::Pardiso.AbstractPardisoSolver, A, b
+    )
+    transposed_iparm = Pardiso.get_iparm(solver, 12)
+    solution = similar(b)
+    # Pardiso sees the CSC storage as CSR for transpose(A). With transpose mode
+    # disabled, conjugating both sides solves the adjoint system for complex A.
+    rhs = eltype(A) <: Real ? b : conj.(b)
+    Pardiso.set_iparm!(solver, 12, 0)
+    Pardiso.set_phase!(solver, Pardiso.SOLVE_ITERATIVE_REFINE)
+    try
+        Pardiso.pardiso(
+            solver, solution,
+            SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)), rhs
+        )
+    finally
+        Pardiso.set_iparm!(solver, 12, transposed_iparm)
+    end
+    return eltype(A) <: Real ? solution : conj.(solution)
+end
+
 # Add finalizer to release memory
 # Pardiso.set_phase!(cache.cacheval, Pardiso.RELEASE_ALL)
 

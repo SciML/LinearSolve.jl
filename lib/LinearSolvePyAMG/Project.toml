@@ -1,7 +1,7 @@
 name = "LinearSolvePyAMG"
 uuid = "7a56c47d-7ab1-4e99-b0e3-2952e463d64a"
 authors = ["SciML"]
-version = "1.3.0"
+version = "1.3.1"
 
 [deps]
 CondaPkg = "992eb4ea-22a4-4c89-a5bb-47a3300528ab"

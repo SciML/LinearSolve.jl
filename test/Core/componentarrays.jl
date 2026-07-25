@@ -27,7 +27,8 @@ using LinearSolve: OperatorAssumptions
             true,
             assump,
         )
-        @test slot[1].factors isa ComponentMatrix
+        workspace = alg isa MKLLUFactorization ? slot[1] : slot
+        @test workspace.factors isa ComponentMatrix
     end
 
     slot = LinearSolve.init_cacheval(
@@ -43,8 +44,8 @@ using LinearSolve: OperatorAssumptions
         true,
         assump,
     )
-    @test slot[1].factors isa ComponentMatrix
-    @test slot[1].ipiv isa Vector{Cint}
+    @test slot.factors isa ComponentMatrix
+    @test slot.ipiv isa Vector{Cint}
 end
 
 @testset "dense ComponentMatrix default solve" begin

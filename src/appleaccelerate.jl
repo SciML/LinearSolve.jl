@@ -31,11 +31,9 @@ else
     end
 end
 
-function aa_getrf!(
-        A::AbstractMatrix{<:ComplexF64};
-        ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
-        info = Ref{Cint}(),
-        check = false
+@inline function aa_getrf!(
+        A::AbstractMatrix{<:ComplexF64}, ipiv::AbstractVector{Cint},
+        info::Ref{Cint}, check::Bool
     )
     __appleaccelerate_isavailable() ||
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
@@ -44,9 +42,7 @@ function aa_getrf!(
     chkstride1(A)
     m, n = size(A)
     lda = max(1, stride(A, 2))
-    if isempty(ipiv)
-        ipiv = similar(A, Cint, min(size(A, 1), size(A, 2)))
-    end
+    length(ipiv) == min(m, n) || throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs $(min(m, n))"))
     ccall(
         ("zgetrf_", libacc), Cvoid,
         (
@@ -56,14 +52,12 @@ function aa_getrf!(
         m, n, A, lda, ipiv, info
     )
     info[] < 0 && throw(ArgumentError("Invalid arguments sent to LAPACK dgetrf_"))
-    return A, ipiv, BlasInt(info[]), info #Error code is stored in LU factorization type
+    return BlasInt(info[])
 end
 
-function aa_getrf!(
-        A::AbstractMatrix{<:ComplexF32};
-        ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
-        info = Ref{Cint}(),
-        check = false
+@inline function aa_getrf!(
+        A::AbstractMatrix{<:ComplexF32}, ipiv::AbstractVector{Cint},
+        info::Ref{Cint}, check::Bool
     )
     __appleaccelerate_isavailable() ||
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
@@ -72,9 +66,7 @@ function aa_getrf!(
     chkstride1(A)
     m, n = size(A)
     lda = max(1, stride(A, 2))
-    if isempty(ipiv)
-        ipiv = similar(A, Cint, min(size(A, 1), size(A, 2)))
-    end
+    length(ipiv) == min(m, n) || throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs $(min(m, n))"))
     ccall(
         ("cgetrf_", libacc), Cvoid,
         (
@@ -84,14 +76,12 @@ function aa_getrf!(
         m, n, A, lda, ipiv, info
     )
     info[] < 0 && throw(ArgumentError("Invalid arguments sent to LAPACK dgetrf_"))
-    return A, ipiv, BlasInt(info[]), info #Error code is stored in LU factorization type
+    return BlasInt(info[])
 end
 
-function aa_getrf!(
-        A::AbstractMatrix{<:Float64};
-        ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
-        info = Ref{Cint}(),
-        check = false
+@inline function aa_getrf!(
+        A::AbstractMatrix{<:Float64}, ipiv::AbstractVector{Cint},
+        info::Ref{Cint}, check::Bool
     )
     __appleaccelerate_isavailable() ||
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
@@ -100,9 +90,7 @@ function aa_getrf!(
     chkstride1(A)
     m, n = size(A)
     lda = max(1, stride(A, 2))
-    if isempty(ipiv)
-        ipiv = similar(A, Cint, min(size(A, 1), size(A, 2)))
-    end
+    length(ipiv) == min(m, n) || throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs $(min(m, n))"))
     ccall(
         ("dgetrf_", libacc), Cvoid,
         (
@@ -112,14 +100,12 @@ function aa_getrf!(
         m, n, A, lda, ipiv, info
     )
     info[] < 0 && throw(ArgumentError("Invalid arguments sent to LAPACK dgetrf_"))
-    return A, ipiv, BlasInt(info[]), info #Error code is stored in LU factorization type
+    return BlasInt(info[])
 end
 
-function aa_getrf!(
-        A::AbstractMatrix{<:Float32};
-        ipiv = similar(A, Cint, min(size(A, 1), size(A, 2))),
-        info = Ref{Cint}(),
-        check = false
+@inline function aa_getrf!(
+        A::AbstractMatrix{<:Float32}, ipiv::AbstractVector{Cint},
+        info::Ref{Cint}, check::Bool
     )
     __appleaccelerate_isavailable() ||
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
@@ -128,9 +114,7 @@ function aa_getrf!(
     chkstride1(A)
     m, n = size(A)
     lda = max(1, stride(A, 2))
-    if isempty(ipiv)
-        ipiv = similar(A, Cint, min(size(A, 1), size(A, 2)))
-    end
+    length(ipiv) == min(m, n) || throw(DimensionMismatch("ipiv has length $(length(ipiv)), but needs $(min(m, n))"))
 
     ccall(
         ("sgetrf_", libacc), Cvoid,
@@ -141,15 +125,15 @@ function aa_getrf!(
         m, n, A, lda, ipiv, info
     )
     info[] < 0 && throw(ArgumentError("Invalid arguments sent to LAPACK dgetrf_"))
-    return A, ipiv, BlasInt(info[]), info #Error code is stored in LU factorization type
+    return BlasInt(info[])
 end
 
 function aa_getrs!(
         trans::AbstractChar,
         A::AbstractMatrix{<:ComplexF64},
         ipiv::AbstractVector{Cint},
-        B::AbstractVecOrMat{<:ComplexF64};
-        info = Ref{Cint}()
+        B::AbstractVecOrMat{<:ComplexF64},
+        info::Ref{Cint}
     )
     __appleaccelerate_isavailable() ||
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
@@ -180,8 +164,8 @@ function aa_getrs!(
         trans::AbstractChar,
         A::AbstractMatrix{<:ComplexF32},
         ipiv::AbstractVector{Cint},
-        B::AbstractVecOrMat{<:ComplexF32};
-        info = Ref{Cint}()
+        B::AbstractVecOrMat{<:ComplexF32},
+        info::Ref{Cint}
     )
     __appleaccelerate_isavailable() ||
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
@@ -213,8 +197,8 @@ function aa_getrs!(
         trans::AbstractChar,
         A::AbstractMatrix{<:Float64},
         ipiv::AbstractVector{Cint},
-        B::AbstractVecOrMat{<:Float64};
-        info = Ref{Cint}()
+        B::AbstractVecOrMat{<:Float64},
+        info::Ref{Cint}
     )
     __appleaccelerate_isavailable() ||
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
@@ -246,8 +230,8 @@ function aa_getrs!(
         trans::AbstractChar,
         A::AbstractMatrix{<:Float32},
         ipiv::AbstractVector{Cint},
-        B::AbstractVecOrMat{<:Float32};
-        info = Ref{Cint}()
+        B::AbstractVecOrMat{<:Float32},
+        info::Ref{Cint}
     )
     __appleaccelerate_isavailable() ||
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
@@ -280,10 +264,30 @@ _get_residualsafety(alg::AppleAccelerateLUFactorization) = alg.residualsafety
 default_alias_A(::AppleAccelerateLUFactorization, ::Any, ::Any) = false
 default_alias_b(::AppleAccelerateLUFactorization, ::Any, ::Any) = false
 
-const PREALLOCATED_APPLE_LU = begin
-    A = rand(0, 0)
-    luinst = ArrayInterface.lu_instance(A)
-    LU(luinst.factors, similar(A, Cint, 0), luinst.info), Ref{Cint}()
+mutable struct AppleAccelerateLUCache{F, P, I}
+    factors::F
+    ipiv::P
+    info::I
+end
+
+_custom_cache_factorization(
+    ::AppleAccelerateLUFactorization, cacheval::AppleAccelerateLUCache
+) =
+    LU(cacheval.factors, BlasInt.(cacheval.ipiv), Int(cacheval.info[]))
+
+@inline function _direct_lu_factorize!(
+        cacheval::AppleAccelerateLUCache, A_work, ::AppleAccelerateLUFactorization
+    )
+    cacheval.factors = A_work
+    return aa_getrf!(A_work, cacheval.ipiv, cacheval.info, false)
+end
+
+@inline function _direct_lu_solve!(
+        cacheval::AppleAccelerateLUCache, u, b, ::AppleAccelerateLUFactorization
+    )
+    copyto!(u, b)
+    aa_getrs!('N', cacheval.factors, cacheval.ipiv, u, cacheval.info)
+    return u
 end
 
 function LinearSolve.init_cacheval(
@@ -291,7 +295,8 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    return PREALLOCATED_APPLE_LU
+    A0 = Matrix{Float64}(undef, 0, 0)
+    return AppleAccelerateLUCache(A0, Vector{Cint}(undef, 0), Ref{Cint}())
 end
 
 function LinearSolve.init_cacheval(
@@ -300,10 +305,9 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    # Ask `lu_instance` about `A` itself so wrapper-specific dispatch can choose
-    # the factorization container that `solve!` will store.
-    luinst = ArrayInterface.lu_instance(A)
-    return LU(luinst.factors, similar(luinst.ipiv, Cint, 0), luinst.info), Ref{Cint}()
+    return AppleAccelerateLUCache(
+        A, similar(A, Cint, min(size(A, 1), size(A, 2))), Ref{Cint}()
+    )
 end
 
 function SciMLBase.solve!(
@@ -312,60 +316,64 @@ function SciMLBase.solve!(
     )
     __appleaccelerate_isavailable() ||
         error("Error, AppleAccelerate binary is missing but solve is being called. Report this issue")
-    A = cache.A
-    A = convert(AbstractMatrix, A)
+    A_work = convert(AbstractMatrix, cache.A)
     check_safety = alg.residualsafety && cache.isfresh
     needs_backup = check_safety ||
         (cache.alg isa DefaultLinearSolver && cache.alg.safetyfallback && cache.isfresh)
-    A_original = needs_backup ? _copy_A_for_safety(cache) : A
+    A_original = needs_backup ? _copy_A_for_safety(cache) : A_work
     verbose = cache.verbose
     if cache.isfresh
         cacheval = @get_cacheval(cache, :AppleAccelerateLUFactorization)
-        res = aa_getrf!(A; ipiv = cacheval[1].ipiv, info = cacheval[2])
-        fact = LU(res[1:3]...), res[4]
-        cache.cacheval = fact
-
-        info_value = res[3]
+        if length(cacheval.ipiv) != min(size(A_work, 1), size(A_work, 2))
+            cacheval.ipiv = similar(
+                A_work, Cint, min(size(A_work, 1), size(A_work, 2))
+            )
+        end
+        info_value = _direct_lu_factorize!(cacheval, A_work, alg)
 
         if info_value != 0
             if verbose.blas_info != SciMLLogging.Silent() ||
                     verbose.blas_errors != SciMLLogging.Silent() ||
                     verbose.blas_invalid_args != SciMLLogging.Silent()
-                op_info = get_blas_operation_info(
-                    :dgetrf, A, cache.b,
+                failure_op_info = get_blas_operation_info(
+                    :dgetrf, A_work, cache.b,
                     condition = verbose.condition_number != SciMLLogging.Silent()
                 )
-                @SciMLMessage(cache.verbose, :condition_number) do
-                    if isinf(op_info.condition_number)
-                        return "Matrix condition number calculation failed."
-                    else
-                        return "Matrix condition number: $(round(op_info.condition_number, sigdigits = 4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf"
+                let op_info = failure_op_info
+                    @SciMLMessage(cache.verbose, :condition_number) do
+                        if isinf(op_info.condition_number)
+                            return "Matrix condition number calculation failed."
+                        else
+                            return "Matrix condition number: $(round(op_info.condition_number, sigdigits = 4)) for $(size(A_work, 1))×$(size(A_work, 2)) matrix in dgetrf"
+                        end
                     end
                 end
                 verb_option,
                     message = blas_info_msg(
-                    :dgetrf, info_value; extra_context = op_info
+                    :dgetrf, info_value; extra_context = failure_op_info
                 )
                 @SciMLMessage(message, verbose, verb_option)
             end
         else
             @SciMLMessage(cache.verbose, :blas_success) do
-                op_info = get_blas_operation_info(
-                    :dgetrf, A, cache.b,
+                success_op_info = get_blas_operation_info(
+                    :dgetrf, A_work, cache.b,
                     condition = verbose.condition_number != SciMLLogging.Silent()
                 )
-                @SciMLMessage(cache.verbose, :condition_number) do
-                    if isinf(op_info.condition_number)
-                        return "Matrix condition number calculation failed."
-                    else
-                        return "Matrix condition number: $(round(op_info.condition_number, sigdigits = 4)) for $(size(A, 1))×$(size(A, 2)) matrix in dgetrf"
+                let op_info = success_op_info
+                    @SciMLMessage(cache.verbose, :condition_number) do
+                        if isinf(op_info.condition_number)
+                            return "Matrix condition number calculation failed."
+                        else
+                            return "Matrix condition number: $(round(op_info.condition_number, sigdigits = 4)) for $(size(A_work, 1))×$(size(A_work, 2)) matrix in dgetrf"
+                        end
                     end
                 end
-                return "BLAS LU factorization (dgetrf) completed successfully for $(op_info.matrix_size) matrix"
+                return "BLAS LU factorization (dgetrf) completed successfully for $(success_op_info.matrix_size) matrix"
             end
         end
 
-        if !LinearAlgebra.issuccess(fact[1])
+        if info_value != 0
             @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
@@ -374,20 +382,21 @@ function SciMLBase.solve!(
         cache.isfresh = false
     end
 
-    A, info = @get_cacheval(cache, :AppleAccelerateLUFactorization)
+    cacheval = @get_cacheval(cache, :AppleAccelerateLUFactorization)
+    factors = cacheval.factors
+    info = cacheval.info
     require_one_based_indexing(cache.u, cache.b)
-    m, n = size(A, 1), size(A, 2)
+    m, n = size(factors, 1), size(factors, 2)
     if m > n
         Bc = copy(cache.b)
-        aa_getrs!('N', A.factors, A.ipiv, Bc; info)
+        aa_getrs!('N', factors, cacheval.ipiv, Bc, info)
         if cache.b isa AbstractMatrix
             copyto!(cache.u, @view(Bc[1:n, :]))
         else
             copyto!(cache.u, 1, Bc, 1, n)
         end
     else
-        copyto!(cache.u, cache.b)
-        aa_getrs!('N', A.factors, A.ipiv, cache.u; info)
+        _direct_lu_solve!(cacheval, cache.u, cache.b, alg)
     end
 
     if check_safety
@@ -421,9 +430,10 @@ function LinearSolve.init_cacheval(
     A_32 = similar(A, T32)
     b_32 = similar(b, T32)
     u_32 = similar(u, T32)
-    luinst = ArrayInterface.lu_instance(rand(T32, 0, 0))
+    ipiv = similar(A_32, Cint, min(size(A_32, 1), size(A_32, 2)))
+    luinst = LU(A_32, ipiv, zero(BlasInt))
     # Return tuple with pre-allocated arrays
-    return (LU(luinst.factors, similar(A_32, Cint, 0), luinst.info), Ref{Cint}(), A_32, b_32, u_32)
+    return (luinst, Ref{Cint}(), A_32, b_32, u_32)
 end
 
 function SciMLBase.solve!(
@@ -442,11 +452,9 @@ function SciMLBase.solve!(
         # Compute 32-bit type on demand and copy A
         T32 = eltype(A) <: Complex ? ComplexF32 : Float32
         A_32 .= T32.(A)
-        res = aa_getrf!(A_32; ipiv = luinst.ipiv, info = info)
-        fact = (LU(res[1:3]...), res[4], A_32, b_32, u_32)
-        cache.cacheval = fact
+        info_value = aa_getrf!(A_32, luinst.ipiv, info, false)
 
-        if !LinearAlgebra.issuccess(fact[1])
+        if info_value != 0
             @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
@@ -468,7 +476,7 @@ function SciMLBase.solve!(
     b_32 .= T32.(cache.b)
 
     if m > n
-        aa_getrs!('N', A_lu.factors, A_lu.ipiv, b_32; info)
+        aa_getrs!('N', A_lu.factors, A_lu.ipiv, b_32, info)
         # Convert back to original precision
         if cache.b isa AbstractMatrix
             cache.u .= Torig.(@view(b_32[1:n, :]))
@@ -477,7 +485,7 @@ function SciMLBase.solve!(
         end
     else
         copyto!(u_32, b_32)
-        aa_getrs!('N', A_lu.factors, A_lu.ipiv, u_32; info)
+        aa_getrs!('N', A_lu.factors, A_lu.ipiv, u_32, info)
         # Convert back to original precision
         cache.u .= Torig.(u_32)
     end

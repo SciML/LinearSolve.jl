@@ -719,3 +719,34 @@ end
     @test getfield(cache, :dual_linear_cache) === inner
     @test ≈(sol3, Matrix(A2) \ b2, rtol = 1.0e-9)
 end
+
+struct ReinterpretTestTag end
+
+@testset "Default algorithm selection uses primal values (issue with reinterpret-wrapped duals)" begin
+    # `solve(prob)` with no algorithm must select the default from the *primal*
+    # A/b (what the inner LinearCache actually solves with), not the dual types.
+    # A reinterpret/reshape-wrapped Dual A (as produced by PreallocationTools'
+    # get_tmp) is not a DenseMatrix, so dual-type-based selection picks
+    # KrylovJL_GMRES — but the primal cache is a dense Matrix whose default-solver
+    # Krylov cacheval slots are initialized as Nothing, giving a TypeError in
+    # __setfield! at solve time.
+    DualT = ForwardDiff.Dual{ForwardDiff.Tag{ReinterpretTestTag, Float64}, Float64, 1}
+
+    A_buf = zeros(2)
+    b_buf = zeros(2)
+    A = reshape(reinterpret(DualT, A_buf), 1, 1)
+    b = reinterpret(DualT, b_buf)
+    A[1, 1] = DualT(2.0, ForwardDiff.Partials((1.0,)))
+    b[1] = DualT(3.0, ForwardDiff.Partials((0.5,)))
+
+    @test !(A isa DenseMatrix)  # the wrapper that triggered dual-based GMRES selection
+
+    sol = solve(LinearProblem(A, b))
+    # u = b/A = 1.5, du = (db - u * dA)/A = (0.5 - 1.5)/2 = -0.5
+    @test ForwardDiff.value(sol.u[1]) ≈ 1.5
+    @test ForwardDiff.partials(sol.u[1])[1] ≈ -0.5
+
+    # The init entry point selects from primal values too and must agree.
+    cache = init(LinearProblem(A, b), nothing)
+    @test solve!(cache).u ≈ sol.u
+end

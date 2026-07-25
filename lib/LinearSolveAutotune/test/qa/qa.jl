@@ -1,9 +1,12 @@
 using SciMLTesting, LinearSolveAutotune, Test
 using JET
 
+docs_src = normpath(joinpath(pkgdir(LinearSolveAutotune), "..", "..", "docs", "src"))
+
 run_qa(
     LinearSolveAutotune;
     explicit_imports = true,
+    api_docs_kwargs = (; rendered = true, docs_src),
     jet_kwargs = (; target_defined_modules = true),
     ei_kwargs = (;
         # BlasFloat (LinearAlgebra.BLAS, reached via LinearAlgebra) and Base.run.

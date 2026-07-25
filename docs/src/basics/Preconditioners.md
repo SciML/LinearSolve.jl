@@ -136,7 +136,7 @@ The following preconditioners match the interface of LinearSolve.jl.
       + `AlgebraicMultigrid.smoothed_aggregation(A)`
   - [PyAMG via LinearSolvePyAMG.jl](https://github.com/SciML/LinearSolve.jl/tree/main/lib/LinearSolvePyAMG):
     Implementations of the algebraic multigrid method backed by the Python
-    [PyAMG](https://pyamg.readthedocs.io) library via PythonCall.jl.
+    [PyAMG](https://github.com/pyamg/pyamg) library via PythonCall.jl.
     The Python dependency is installed automatically via CondaPkg.jl.
     Provides the following solvers through the standard LinearSolve interface:
 

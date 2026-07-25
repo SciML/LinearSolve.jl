@@ -33,6 +33,7 @@ an iterative Krylov-based backend is preferred, since these only ever factorize/
 ### LinearAlgebra (built-in)
 
 ```@docs
+AbstractEigenvalueAlgorithm
 DenseEigen
 ```
 
@@ -54,6 +55,7 @@ ArpackJL
 
 ```@docs
 ArnoldiMethod
+ArnoldiMethodJL
 ```
 
 ### KrylovKit.jl

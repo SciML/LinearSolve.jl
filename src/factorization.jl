@@ -152,6 +152,9 @@ _ldiv!(x, A, b::SVector) = (x .= A \ b)
 _ldiv!(::SVector, A, b::SVector) = (A \ b)
 _ldiv!(::SVector, A, b) = (A \ b)
 
+function _direct_lu_factorize! end
+function _direct_lu_solve! end
+
 # Build a column-pivoted sparse QR factorization of `A` (the default sparse-LU
 # singular fallback). The method is provided by the SparseArrays extension over
 # SparseColumnPivotedQR.jl; this generic declaration lets `src/default.jl` call it.

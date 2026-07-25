@@ -9,7 +9,7 @@ catch
 end
 unanalyzable_mods = (
     LinearSolve.OperatorCondition, LinearSolve.DefaultAlgorithmChoice,
-    LinearSolve.NonstructuralZeros,
+    LinearSolve.NonstructuralZeros, LinearSolve.WarmStart,
 )
 if klu_mod !== nothing
     unanalyzable_mods = (unanalyzable_mods..., klu_mod)
@@ -23,10 +23,14 @@ sciml_logging_macro_imports = (
     :None, :Minimal, :Standard, :Detailed, :All,
 )
 extension_imports = (Symbol("@set!"),)
+docs_src = normpath(joinpath(@__DIR__, "..", "..", "docs", "src"))
+scimlbase_reexports = Tuple(names(LinearSolve.SciMLBase; all = false, imported = false))
 
 run_qa(
     LinearSolve;
     explicit_imports = true,
+    reexports_allow = scimlbase_reexports,
+    api_docs_kwargs = (; rendered = true, docs_src, rendered_ignore = scimlbase_reexports),
     # Recursive ambiguities are tracked separately; placeholder until resolved.
     aqua_broken = (:ambiguities,),
     aqua_kwargs = (;
@@ -70,3 +74,7 @@ run_qa(
     # https://github.com/SciML/LinearSolve.jl/issues/1058
     ei_broken = (:all_qualified_accesses_are_public,),
 )
+
+if klu_mod !== nothing
+    run_api_docs(klu_mod; rendered = true, docs_src)
+end

@@ -326,6 +326,21 @@ function SciMLBase.init(
     )
 end
 
+# `solve(prob)` resolves `alg::Nothing` itself (common.jl) before `init` is called,
+# which would select from the *dual* A/b types. The algorithm always executes on the
+# primal arrays (`nodual_value(A)`), so selection must see those instead: e.g. a
+# reinterpret-wrapped Dual A is not a `DenseMatrix` and would select KrylovJL_GMRES,
+# while the primal cache is a dense `Matrix` whose default-solver Krylov cacheval
+# slots are initialized as `Nothing` (see `_init_default_cacheval`).
+function SciMLBase.solve(
+        prob::DualAbstractLinearProblem, ::Nothing, args...;
+        assump = OperatorAssumptions(issquare(prob.A)), kwargs...
+    )
+    new_A = nodual_value(prob.A)
+    new_b = nodual_value(prob.b)
+    return solve(prob, defaultalg(new_A, new_b, assump), args...; kwargs...)
+end
+
 function __dual_init(
         prob::DualAbstractLinearProblem, alg::SciMLLinearSolveAlgorithm,
         args...;

@@ -1,12 +1,142 @@
 using Zygote, ForwardDiff
 using LinearSolve, LinearAlgebra, Test
 using FiniteDiff, RecursiveFactorization
-using Random
+using InteractiveUtils, Random, SparseArrays
+import CliqueTrees
+
+struct UnregisteredFactorization <: LinearSolve.AbstractFactorization end
+
+function factorization_leaf_types(T)
+    children = subtypes(T)
+    isempty(children) && return Any[T]
+    return reduce(vcat, factorization_leaf_types.(children); init = Any[])
+end
+
+if Sys.islinux()
+    import LAPACK_jll, blis_jll
+end
 
 Random.seed!(1234)
 n = 4
 A = rand(n, n);
 b1 = rand(n);
+
+@testset "Adjoint factorization cache dispatch follows the solver" begin
+    factorization = lu(copy(A))
+    @test LinearSolve._cache_factorization(LUFactorization(), factorization) ===
+        factorization
+    @test LinearSolve._cache_factorization(
+        GenericLUFactorization(), (factorization, factorization.ipiv)
+    ) === factorization
+    @test LinearSolve._can_reuse_cache_factorization(
+        LUFactorization(), factorization
+    )
+
+    krylov = KrylovJL_GMRES()
+    @test isnothing(LinearSolve._cache_factorization(krylov, factorization))
+    @test !LinearSolve._can_reuse_cache_factorization(krylov, factorization)
+
+    default = LinearSolve.DefaultLinearSolver(
+        LinearSolve.DefaultAlgorithmChoice.LUFactorization
+    )
+    @test isnothing(LinearSolve._cache_factorization(default, factorization))
+    @test !LinearSolve._can_reuse_cache_factorization(default, factorization)
+
+    unregistered = UnregisteredFactorization()
+    @test isnothing(LinearSolve._cache_factorization(unregistered, factorization))
+    @test !LinearSolve._can_reuse_cache_factorization(unregistered, factorization)
+end
+
+@testset "Complex Krylov adjoint solve" begin
+    A_complex = ComplexF64[3 + 1im 1 - 2im; 2 + 0.5im 4 - 1im]
+    rhs_complex = ComplexF64[0.7 + 0.2im, -0.3 + 0.4im]
+    adjoint_solution = LinearSolve._adjoint_krylov_solve(
+        KrylovJL_GMRES(), A_complex, rhs_complex;
+        abstol = 1.0e-12, reltol = 1.0e-12, verbose = false
+    )
+    @test adjoint(A_complex) * adjoint_solution ≈ rhs_complex
+end
+
+@testset "Every factorization algorithm declares its adjoint reuse policy" begin
+    for T in factorization_leaf_types(LinearSolve.AbstractFactorization)
+        parentmodule(T) === LinearSolve || continue
+        reuse = LinearSolve._adjoint_factorization_reuse(T)
+        @test !(reuse isa LinearSolve._UnspecifiedAdjointFactorizationReuse)
+    end
+end
+
+@testset "Solver-specific cached adjoint solves" begin
+    A_local = [4.0 1.0; 2.0 3.0]
+    b_local = [1.0, 2.0]
+    adjoint_rhs = [0.7, -0.3]
+
+    for alg in (
+            NormalCholeskyFactorization(),
+            NormalBunchKaufmanFactorization(),
+            SimpleLUFactorization(),
+        )
+        cache = init(LinearProblem(copy(A_local), copy(b_local)), alg)
+        @test LinearSolve._can_reuse_cache_factorization(alg, cache.cacheval)
+        solve!(cache)
+        adjoint_solution = LinearSolve._adjoint_factorization_solve(
+            alg, cache.cacheval, cache.A, adjoint_rhs
+        )
+        @test adjoint(A_local) * adjoint_solution ≈ adjoint_rhs
+    end
+
+    tall_A = [4.0 1.0; 2.0 3.0; 1.0 -1.0]
+    tall_b = [1.0, 2.0, -0.5]
+    tall_adjoint_rhs = [0.7, -0.3]
+    for alg in (NormalCholeskyFactorization(), NormalBunchKaufmanFactorization())
+        cache = init(LinearProblem(copy(tall_A), copy(tall_b)), alg)
+        solve!(cache)
+        adjoint_solution = LinearSolve._adjoint_factorization_solve(
+            alg, cache.cacheval, cache.A, tall_adjoint_rhs
+        )
+        @test adjoint_solution ≈ tall_A * ((adjoint(tall_A) * tall_A) \ tall_adjoint_rhs)
+        @test adjoint(tall_A) * adjoint_solution ≈ tall_adjoint_rhs
+    end
+
+    sparse_A = sparse(A_local)
+    sparse_alg = SparseColumnPivotedQRFactorization()
+    sparse_cache = init(LinearProblem(copy(sparse_A), copy(b_local)), sparse_alg)
+    @test LinearSolve._can_reuse_cache_factorization(
+        sparse_alg, sparse_cache.cacheval
+    )
+    solve!(sparse_cache)
+    sparse_adjoint_solution = LinearSolve._adjoint_factorization_solve(
+        sparse_alg, sparse_cache.cacheval, sparse_cache.A, adjoint_rhs
+    )
+    @test adjoint(sparse_A) * sparse_adjoint_solution ≈ adjoint_rhs
+
+    clique_A = sparse([4.0 1.0; 1.0 3.0])
+    clique_alg = CliqueTreesFactorization()
+    clique_cache = init(LinearProblem(copy(clique_A), copy(b_local)), clique_alg)
+    @test LinearSolve._can_reuse_cache_factorization(
+        clique_alg, clique_cache.cacheval
+    )
+    solve!(clique_cache)
+    clique_adjoint_solution = LinearSolve._adjoint_factorization_solve(
+        clique_alg, clique_cache.cacheval, clique_cache.A, adjoint_rhs
+    )
+    @test adjoint(clique_A) * clique_adjoint_solution ≈ adjoint_rhs
+
+    for alg in (NormalCholeskyFactorization(), SimpleLUFactorization(), sparse_alg)
+        A_alg = alg isa SparseColumnPivotedQRFactorization ? sparse_A : A_local
+        db, = Zygote.gradient(b -> sum(solve(LinearProblem(A_alg, b), alg).u), b_local)
+        @test db ≈ adjoint(A_local) \ ones(2)
+    end
+end
+
+@testset "Uncached factorization adjoint fallback" begin
+    diagonal = rand(n) .+ 1
+    A_diagonal = Diagonal(diagonal)
+    f_diagonal(b) = sum(
+        solve(LinearProblem(A_diagonal, b), DiagonalFactorization()).u
+    )
+    db, = Zygote.gradient(f_diagonal, b1)
+    @test db ≈ inv.(diagonal)
+end
 
 function f(A, b1; alg = LUFactorization())
     prob = LinearProblem(A, b1)
@@ -103,11 +233,16 @@ db22 = ForwardDiff.gradient(x -> f4(eltype(x).(A), eltype(x).(b1), x), copy(b1))
 
 A = rand(n, n);
 b1 = rand(n);
-for alg in (
-        LUFactorization(),
-        RFLUFactorization(),
-        KrylovJL_GMRES(),
-    )
+adjoint_algs = Any[
+    LUFactorization(),
+    RFLUFactorization(),
+    KrylovJL_GMRES(),
+]
+LinearSolve.useopenblas && push!(adjoint_algs, OpenBLASLUFactorization())
+if Base.get_extension(LinearSolve, :LinearSolveBLISExt) !== nothing
+    push!(adjoint_algs, LinearSolve.BLISLUFactorization())
+end
+for alg in adjoint_algs
     @show alg
     function fb(b)
         prob = LinearProblem(A, b)

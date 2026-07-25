@@ -23,6 +23,12 @@ versions = ["lts", "1", "pre"]
 runner = "self-hosted"
 num_threads = 2
 
+# Keep the direct Accelerate refactorization allocation contract covered on Apple hardware.
+[AppleAccelerate]
+versions = ["lts", "1", "pre"]
+os = ["macos-latest"]
+num_threads = 2
+
 [LinearSolveSTRUMPACK]
 versions = ["lts", "1", "pre"]
 runner = "self-hosted"

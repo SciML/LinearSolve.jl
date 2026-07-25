@@ -157,4 +157,23 @@ function LinearSolve.init_cacheval(
     return ws = RecursiveFactorization.🦋workspace(A, b), RecursiveFactorization.lu!(rand(1, 1), Val(false), alg.thread)
 end
 
+LinearSolve._custom_can_reuse_adjoint_factorization(
+    ::ButterflyFactorization, ::Tuple
+) = true
+
+function LinearSolve._custom_adjoint_factorization_solve(
+        ::ButterflyFactorization, cacheval::Tuple, A, b::AbstractVector
+    )
+    workspace, factorization = cacheval
+    n = workspace.n
+    T = promote_type(eltype(workspace.U), eltype(b))
+    padded_rhs = zeros(T, size(workspace.U, 1))
+    copyto!(view(padded_rhs, 1:n), b)
+    transformed_rhs = adjoint(workspace.V) * padded_rhs
+    upper_solution = adjoint(factorization.U) \ transformed_rhs
+    factorization_solution = adjoint(factorization.L) \ upper_solution
+    solution = workspace.U * factorization_solution
+    return solution[1:n]
+end
+
 end

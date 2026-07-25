@@ -109,6 +109,44 @@ end
     end
 end
 
+@testset "Apple factorization views use the stdlib pivot type" begin
+    A = [4.0 1.0; 2.0 3.0]
+    b = [1.0, 2.0]
+    fact = lu(A)
+    cacheval = LinearSolve.AppleAccelerateLUCache(
+        fact.factors, Cint.(fact.ipiv), Ref{Cint}(Cint(fact.info))
+    )
+    alg = AppleAccelerateLUFactorization()
+    view = LinearSolve._cache_factorization(alg, cacheval)
+    @test eltype(view.ipiv) === LinearAlgebra.BlasInt
+    @test view \ b ≈ A \ b
+    @test LinearSolve._can_reuse_cache_factorization(alg, cacheval)
+end
+
+if LinearSolve.appleaccelerate_isavailable()
+    @testset "Apple Accelerate reuses its refactorization workspace" begin
+        n = 51
+        A1 = rand(rng, n, n) + n * I
+        A2 = rand(rng, n, n) + n * I
+        Asing = copy(A1)
+        Asing[:, 1] .= 0
+        b = rand(rng, n)
+        cache = init(LinearProblem(copy(A1), copy(b)), AppleAccelerateLUFactorization())
+        Awork = cache.A
+
+        @test solve!(cache).u ≈ A1 \ b
+        refactor_solve!(cache, Awork, A1)
+        refactor_solve!(cache, Awork, A2)
+        @test cache.u ≈ A2 \ b
+        @test LinearSolve._cache_factorization(cache.alg, cache.cacheval) \ b ≈ A2 \ b
+
+        @test refactor_solve!(cache, Awork, Asing).retcode == ReturnCode.Failure
+        sol = refactor_solve!(cache, Awork, A1)
+        @test sol.retcode == ReturnCode.Success
+        @test sol.u ≈ A1 \ b
+    end
+end
+
 @testset "default algorithm QR safety fallback survives warm singular refactorization" begin
     n = 8
     Agood = rand(rng, n, n) + n * I

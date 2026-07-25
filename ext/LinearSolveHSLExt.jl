@@ -138,6 +138,19 @@ function SciMLBase.solve!(
     end
 end
 
+LinearSolve._custom_can_reuse_adjoint_factorization(
+    ::LinearSolve.HSLMA57Factorization, ::HSLMA57Cache
+) = true
+
+function LinearSolve._custom_adjoint_factorization_solve(
+        ::LinearSolve.HSLMA57Factorization, hcache::HSLMA57Cache, A, b
+    )
+    solution = copy(b)
+    _resize_ma57_work!(hcache, b)
+    HSL.ma57_solve!(hcache.ma57, solution, hcache.work)
+    return solution
+end
+
 function SciMLBase.solve!(
         cache::LinearSolve.LinearCache,
         alg::LinearSolve.HSLMA97Factorization;
@@ -185,6 +198,18 @@ function SciMLBase.solve!(
         end
         rethrow(err)
     end
+end
+
+LinearSolve._custom_can_reuse_adjoint_factorization(
+    ::LinearSolve.HSLMA97Factorization, ::HSLMA97Cache
+) = true
+
+function LinearSolve._custom_adjoint_factorization_solve(
+        ::LinearSolve.HSLMA97Factorization, hcache::HSLMA97Cache, A, b
+    )
+    solution = copy(b)
+    HSL.ma97_solve!(hcache.ma97, solution)
+    return solution
 end
 
 end

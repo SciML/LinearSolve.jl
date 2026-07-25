@@ -1200,6 +1200,13 @@ end
 # so `init_sparse_reduction` returns a concrete type either way — type-stable.
 mutable struct SparseReduction{Tv, Ti}
     active::Bool
+    # `Auto` only: the activation decision is deferred until the first solve whose matrix
+    # carries a nonzero. A cache is commonly initialized from a *prototype* — the intended
+    # sparsity pattern with values not filled in yet (all zero) — which says nothing about
+    # nonstructural zeros. Taking it at face value activates the reduction on an all-zero
+    # mask, and the first real solve then bloats the union and degrades to per-solve
+    # dropzeros for the rest of the run. Deciding on the first filled matrix sees real values.
+    pending::Bool
     cache_union::Bool             # true: union caching; false: per-solve dropzeros
     auto::Bool                    # may switch union -> per-solve on bloat
     nstart_zeros::Int             # # stored entries zero on the starting matrix
@@ -1255,15 +1262,18 @@ function LinearSolve.init_sparse_reduction(
     nsz = LinearSolve.__nonstructural_zeros(assumptions)
     NZ = LinearSolve.NonstructuralZeros
     nz = nonzeros(A)
+    auto = nsz == NZ.Auto
+    # An all-zero starting matrix is a prototype whose values are not filled in yet: its zero
+    # fraction carries no information, so defer the `Auto` decision to the first filled solve.
+    pending = auto && !isempty(nz) && all(iszero, nz)
     active = if nsz == NZ.Persistent || nsz == NZ.Present
         true
-    elseif nsz == NZ.None
+    elseif nsz == NZ.None || pending
         false
-    else  # Auto
+    else  # Auto, on a matrix that carries values
         !isempty(nz) &&
             count(iszero, nz) / length(nz) >= LinearSolve.PERSISTENT_ZERO_FRACTION_THRESHOLD
     end
-    auto = nsz == NZ.Auto
     cache_union = nsz != NZ.Present     # Present => per-solve dropzeros from the start
     colptr = copy(getcolptr(A))
     rowval = copy(rowvals(A))
@@ -1272,19 +1282,43 @@ function LinearSolve.init_sparse_reduction(
         nstart_zeros = count(iszero, nz)
         keep, reduced = _persistent_reduced(A, colptr, rowval, mask, nz)
         return SparseReduction{Tv, Ti}(
-            true, cache_union, auto, nstart_zeros, colptr, rowval, mask, keep, reduced,
-            1, 0, nnz(reduced), false
+            true, false, cache_union, auto, nstart_zeros, colptr, rowval, mask, keep,
+            reduced, 1, 0, nnz(reduced), false
         )
     else
         reduced = LinearSolve.make_SparseMatrixCSC(A)
         return SparseReduction{Tv, Ti}(
-            false, cache_union, auto, 0, colptr, rowval, Bool[], Int[], reduced,
+            false, pending, cache_union, auto, 0, colptr, rowval, Bool[], Int[], reduced,
             0, 0, 0, false
         )
     end
 end
 
+# Resolve a deferred `Auto` activation (see `SparseReduction.pending`) against the first
+# matrix that carries values. A still-all-zero matrix remains uninformative, so keep waiting;
+# there is nothing worth reducing in it either way.
+function _resolve_pending!(red::SparseReduction, A)
+    nz = nonzeros(A)
+    (isempty(nz) || all(iszero, nz)) && return red
+    red.pending = false
+    count(iszero, nz) / length(nz) >=
+        LinearSolve.PERSISTENT_ZERO_FRACTION_THRESHOLD || return red
+    red.active = true
+    red.nstart_zeros = count(iszero, nz)
+    red.colptr = copy(getcolptr(A))
+    red.rowval = copy(rowvals(A))
+    red.mask = Bool[!iszero(v) for v in nz]
+    red.keep, red.reduced = _persistent_reduced(A, red.colptr, red.rowval, red.mask, nz)
+    red.nanalyze += 1
+    red.reduced_nnz = nnz(red.reduced)
+    # The operand handed to the factorization now has a different structure than the one the
+    # cache was initialized with, so cached symbolic factorizations must be redone.
+    red.structure_changed = true
+    return red
+end
+
 function LinearSolve.reduce_operand!(red::SparseReduction, A)
+    red.pending && _resolve_pending!(red, A)
     red.active || return A
     nz = nonzeros(A)
     # A change in the stored nnz breaks union caching: an explicit `Persistent`
@@ -1319,6 +1353,15 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
             A, red.colptr, red.rowval, red.mask, nz
         )
         red.nanalyze += 1
+        # The union only ever grows, so once it covers every stored entry no future matrix
+        # can have anything dropped: the reduction is dead weight from here on. Deactivating
+        # is safe rather than merely cheap — `reduced` currently equals the full pattern, so
+        # the operand handed to the factorization keeps the same structure it just had.
+        if length(red.keep) == length(red.mask)
+            red.active = false
+            red.structure_changed = false
+            return A
+        end
         # auto mode: if more than NONPERSISTENT_ZERO_FRACTION of the starting zeros
         # have activated, the zeros are not persistent — stop caching the union and
         # drop per solve instead (this matrix's own zeros only). `activated` is

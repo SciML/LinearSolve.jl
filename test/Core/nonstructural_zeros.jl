@@ -282,4 +282,64 @@ reduction(cache) = cache.cacheval.sparse_reduction
         @test sol2.u ≈ Matrix(A_new2) \ b rtol = 1.0e-8
         @test !reduction(cache).cache_union
     end
+
+    @testset "auto defers the decision on an all-zero starting matrix" begin
+        # A cache is often initialized from a *prototype*: the intended sparsity pattern
+        # with values not filled in yet. Its zero fraction says nothing about
+        # nonstructural zeros, so `auto` must not decide from it -- taking it at face
+        # value activates on an all-zero mask, and the first filled solve then bloats the
+        # union and latches per-solve dropzeros while dropping nothing.
+        proto = copy(mats[1])
+        nonzeros(proto) .= 0.0
+
+        cache = init(LinearProblem(copy(proto), copy(b)))   # auto
+        @test !reduction(cache).active
+        @test reduction(cache).pending
+
+        # filled with a matrix that genuinely carries nonstructural zeros: activate
+        filled = copy(mats[1])
+        cache.A = copy(filled)
+        sol = solve!(cache)
+        @test sol.retcode == ReturnCode.Success
+        @test sol.u ≈ Matrix(filled) \ b rtol = 1.0e-8
+        @test !reduction(cache).pending
+        @test reduction(cache).active && reduction(cache).cache_union
+        @test reduction(cache).reduced_nnz < nnz(filled)
+
+        # filled with a matrix that has no droppable zeros: stay inactive
+        dense_valued = copy(mats[1])
+        nonzeros(dense_valued) .= 1.5
+        c2 = init(LinearProblem(copy(proto), copy(b)))
+        @test c2.cacheval.sparse_reduction.pending
+        c2.A = copy(dense_valued)
+        sol2 = solve!(c2)
+        @test sol2.retcode == ReturnCode.Success
+        @test sol2.u ≈ Matrix(dense_valued) \ b rtol = 1.0e-8
+        @test !reduction(c2).pending
+        @test !reduction(c2).active
+    end
+
+    @testset "auto deactivates once the union covers every stored entry" begin
+        # The union only grows, so when it covers the whole stored pattern nothing can
+        # ever be dropped again: the reduction is dead weight and must switch off rather
+        # than fall back to allocating a per-solve dropzeros copy that drops nothing.
+        start = copy(mats[1])                      # has stored zeros -> auto activates
+        cache = init(LinearProblem(copy(start), copy(b)))
+        @test reduction(cache).active
+        full = copy(mats[1])
+        nonzeros(full) .= 2.0                      # every stored entry becomes nonzero
+        cache.A = copy(full)
+        sol = solve!(cache)
+        @test sol.retcode == ReturnCode.Success
+        @test sol.u ≈ Matrix(full) \ b rtol = 1.0e-8
+        @test !reduction(cache).active
+        # and it keeps solving correctly afterwards, with no reduction overhead
+        full2 = copy(full)
+        nonzeros(full2) .= 3.0
+        cache.A = copy(full2)
+        sol2 = solve!(cache)
+        @test sol2.retcode == ReturnCode.Success
+        @test sol2.u ≈ Matrix(full2) \ b rtol = 1.0e-8
+        @test !reduction(cache).active
+    end
 end

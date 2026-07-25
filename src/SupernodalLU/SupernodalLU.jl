@@ -27,7 +27,7 @@
 
 module SupernodalLU
 
-using SparseArrays: SparseMatrixCSC, sparse, getcolptr, rowvals, nonzeros, nnz, spzeros
+using SparseArrays: SparseMatrixCSC, sparse, getcolptr, rowvals, nonzeros, nnz
 using LinearAlgebra: LinearAlgebra, SingularException, UpperTriangular,
     UnitLowerTriangular, ldiv!, rdiv!, mul!, norm, BLAS
 using ..LinearSolve: LinearSolve

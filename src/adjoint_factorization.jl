@@ -75,6 +75,7 @@ end
 for Alg in (
         DiagonalFactorization,
         PureUMFPACKFactorization,
+        SupernodalLUFactorization,
         SparspakFactorization,
         STRUMPACKFactorization,
         CudaOffloadLUFactorization,

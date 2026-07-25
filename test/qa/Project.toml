@@ -11,7 +11,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 blis_jll = "6136c539-28a5-5bf0-87cc-b183200dce32"
 
 [sources]
-LinearSolve = {path = "../.."}
+LinearSolve = {path = "/home/crackauc/sandbox/tmp_20260717_160127_87884/LinearSolve.jl"}
 
 [compat]
 AllocCheck = "0.2"

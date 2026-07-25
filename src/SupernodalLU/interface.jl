@@ -115,7 +115,7 @@ function _dense_block_caches(
     ) where {Tv}
     nsuper = length(sym.sstart) - 1
     bcaches = Vector{Any}(nothing, nsuper)
-    Tv <: LinearAlgebra.BLAS.BlasFloat || return bcaches
+    Tv <: LinearAlgebra.BlasFloat || return bcaches
     assump = LinearSolve.OperatorAssumptions(true)
     for s in 1:nsuper
         np = sym.sstart[s + 1] - sym.sstart[s]

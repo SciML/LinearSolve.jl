@@ -24,6 +24,23 @@ function poisson2d(k)
     return sparse(Is, Js, V, n, n)
 end
 
+function poisson3d(k)
+    n = k^3
+    Is = Int[]; Js = Int[]; V = Float64[]
+    idx(i, j, l) = ((l - 1) * k + (j - 1)) * k + i
+    for l in 1:k, j in 1:k, i in 1:k
+        c = idx(i, j, l)
+        push!(Is, c); push!(Js, c); push!(V, 6.0)
+        for (di, dj, dl) in ((1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1))
+            ii, jj, ll = i + di, j + dj, l + dl
+            if 1 <= ii <= k && 1 <= jj <= k && 1 <= ll <= k
+                push!(Is, c); push!(Js, idx(ii, jj, ll)); push!(V, -1.0)
+            end
+        end
+    end
+    return sparse(Is, Js, V, n, n)
+end
+
 @testset "factor identity A[p,q] = L*U" begin
     for A in (
             sprand(60, 60, 0.15) + 10I,
@@ -179,6 +196,41 @@ end
     xc = similar(bc)
     SNLU.solve!(xc, Fc, bc)
     @test norm(C * xc - bc) <= 1.0e-11 * norm(bc)
+end
+
+@testset "hand-rolled panel kernels agree with the BLAS path" begin
+    # Below PANEL_BLAS_CUTOFF the sweeps use the in-package kernels; the two
+    # paths must agree to round-off.  Compare against a factor whose panels
+    # are all forced onto the BLAS path via a cutoff of 0.
+    for A in (poisson2d(25), sprand(800, 800, 0.01) + 12I)
+        n = size(A, 1)
+        F = SNLU.snlu(A)
+        b = randn(n)
+        x = similar(b)
+        SNLU.solve!(x, F, b; refine = 0)
+        @test norm(A * x - b) <= 1.0e-11 * norm(b)
+        @test norm(x - (A \ b)) <= 1.0e-9 * norm(x)
+        # multi-RHS goes through the gemm path and must match column-wise
+        B = randn(n, 3)
+        X = similar(B)
+        SNLU.solve!(X, F, B; refine = 0)
+        for r in 1:3
+            xr = similar(b)
+            SNLU.solve!(xr, F, view(B, :, r); refine = 0)
+            @test X[:, r] ≈ xr rtol = 1.0e-12
+        end
+    end
+    # a factorization with panels wider than the cutoff exercises both sides
+    A3 = poisson3d(16)
+    F3 = SNLU.snlu(A3; ordering = :nd)
+    widest = maximum(
+        F3.sym.sstart[s + 1] - F3.sym.sstart[s] for s in 1:(length(F3.sym.sstart) - 1)
+    )
+    @test widest >= SNLU.PANEL_BLAS_CUTOFF     # both branches are reached
+    b3 = randn(size(A3, 1))
+    x3 = similar(b3)
+    SNLU.solve!(x3, F3, b3; refine = 0)
+    @test norm(A3 * x3 - b3) <= 1.0e-11 * norm(b3)
 end
 
 @testset "multi-RHS" begin

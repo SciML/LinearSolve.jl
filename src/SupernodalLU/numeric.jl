@@ -77,8 +77,15 @@ mutable struct SupernodalLUFactor{Tv, Ti <: Integer}
     ir_dx::Vector{Tv}                # iterative-refinement correction
     btmp::Vector{Tv}                 # in-place ldiv! RHS copy
     threaded::Bool                   # use the etree-parallel numeric phase
-    # dense LinearSolve caches for large diagonal blocks (nothing = built-in
-    # kernel); runtime-typed, accessed through the _cache_lu! barrier
+    # Dense LinearSolve caches for large diagonal blocks (`nothing` = built-in
+    # kernel).  Deliberately `Vector{Any}`: the solve path never touches it and
+    # `_cache_lu!` is a function barrier, so the only dynamic dispatch is one
+    # call per cached supernode per factorization (tens of calls against
+    # hundreds of ms of GEMM).  Narrowing it to `Vector{Union{Nothing, C}}` for
+    # union-splitting was tried and measured 2.3-2.7 % *slower* on
+    # poisson3d_28/poisson2d_256, and it breaks `init_cacheval`'s cacheval
+    # type-pinning (the empty prototype has no caches, so its element type
+    # cannot match a real factorization's).  Do not retry.
     bcaches::Vector{Any}
 end
 

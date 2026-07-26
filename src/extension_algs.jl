@@ -167,7 +167,7 @@ struct PETScAlgorithm <: SciMLLinearSolveAlgorithm
 end
 
 """
-`HYPREAlgorithm(solver; comm = nothing, Pl = nothing)`
+`HYPREAlgorithm(solver; comm = nothing)`
 
 [HYPRE.jl](https://github.com/fredrikekre/HYPRE.jl) is an interface to
 [`hypre`](https://computing.llnl.gov/projects/hypre-scalable-linear-solvers-multigrid-methods)
@@ -201,7 +201,8 @@ The single positional argument `solver` has the following choices:
 
   - `comm`: optional MPI communicator used to auto-construct distributed
     `HYPREMatrix` / `HYPREVector` inputs from plain Julia sparse matrices and vectors.
-  - `Pl`: A choice of left preconditioner.
+
+Preconditioners are passed to `solve`/`init` via the `Pl` keyword argument.
 
 ## Example
 

@@ -22,9 +22,6 @@ function LinearSolve.GinkgoJL_GMRES(args...; executor = :omp, kwargs...)
     return GinkgoJL(args...; KrylovAlg = :gmres, executor = executor, kwargs...)
 end
 
-LinearSolve.default_alias_A(::GinkgoJL, ::Any, ::Any) = true
-LinearSolve.default_alias_b(::GinkgoJL, ::Any, ::Any) = true
-LinearSolve.needs_concrete_A(::GinkgoJL) = true
 
 """
     _to_gko_csr_inmem(A, exec) -> gko_matrix_csr_f32_i32

@@ -103,7 +103,9 @@ as they serve different use cases and are not typically the focus of dense matri
 
 ## Trait Functions
 
-These trait functions help determine algorithm capabilities and requirements:
+These trait functions help determine algorithm capabilities and requirements.
+The full set, and which of them an algorithm has to define, is on the
+[Linear Solver Algorithm Interface](@ref) page.
 
 ```@docs
 LinearSolve.needs_concrete_A
@@ -154,9 +156,10 @@ LinearSolve.LUSolver
 When adding a new linear solver algorithm to LinearSolve.jl:
 
 1. **Choose the appropriate abstract type**: Inherit from the most specific abstract type that fits your algorithm
-2. **Implement required methods**: At minimum, implement `solve!` and possibly `init_cacheval`
-3. **Consider trait functions**: Override trait functions like `needs_concrete_A` if needed
-4. **Document thoroughly**: Add comprehensive docstrings following the patterns shown here
+2. **Implement the required methods**: `SciMLBase.solve!` and `needs_concrete_A`, plus `init_cacheval` if the algorithm caches anything
+3. **Define traits next to the struct**: never in a package extension — see [Linear Solver Algorithm Interface](@ref)
+4. **Check compliance**: `LinearSolve.algorithm_interface_issues(alg)` should come back empty
+5. **Document thoroughly**: Add comprehensive docstrings following the patterns shown here
 
 ### Performance Considerations
 
@@ -173,3 +176,7 @@ When adding new functionality:
 - Verify caching behavior works correctly
 - Ensure trait functions return appropriate values
 - Test integration with the automatic algorithm selection system
+
+Every algorithm the package knows about is swept against the algorithm interface
+in `test/Core/interface.jl`; a new algorithm is covered by that sweep
+automatically.

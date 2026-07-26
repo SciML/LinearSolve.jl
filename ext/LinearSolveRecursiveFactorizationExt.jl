@@ -2,7 +2,7 @@ module LinearSolveRecursiveFactorizationExt
 
 using LinearSolve: LinearSolve, userecursivefactorization, LinearCache, @get_cacheval,
     RFLUFactorization, ButterflyFactorization, RF32MixedLUFactorization,
-    default_alias_A, default_alias_b, LinearVerbosity
+    LinearVerbosity
 using LinearSolve.LinearAlgebra, LinearSolve.ArrayInterface, RecursiveFactorization
 using SciMLBase: SciMLBase, ReturnCode
 using SciMLLogging: @SciMLMessage
@@ -36,8 +36,6 @@ function SciMLBase.solve!(
 end
 
 # Mixed precision RecursiveFactorization implementation
-LinearSolve.default_alias_A(::RF32MixedLUFactorization, ::Any, ::Any) = false
-LinearSolve.default_alias_b(::RF32MixedLUFactorization, ::Any, ::Any) = false
 
 const PREALLOCATED_RF32_LU = begin
     A = rand(Float32, 0, 0)

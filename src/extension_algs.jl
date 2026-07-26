@@ -166,6 +166,9 @@ struct PETScAlgorithm <: SciMLLinearSolveAlgorithm
     end
 end
 
+# PETSc assembles an AIJ matrix from the entries of `A`.
+needs_concrete_A(::PETScAlgorithm) = true
+
 """
 `HYPREAlgorithm(solver; comm = nothing)`
 
@@ -245,6 +248,9 @@ struct HYPREAlgorithm <: SciMLLinearSolveAlgorithm
     end
 end
 
+# HYPRE builds its own IJMatrix from the entries of `A`.
+needs_concrete_A(::HYPREAlgorithm) = true
+
 """
 `PartitionedSolversAlgorithm(solver = nothing; kwargs...)`
 
@@ -295,6 +301,9 @@ struct PartitionedSolversAlgorithm <: SciMLLinearSolveAlgorithm
         end
     end
 end
+
+# PartitionedSolvers operates on the entries of a `PSparseMatrix`.
+needs_concrete_A(::PartitionedSolversAlgorithm) = true
 
 # Debug: About to define CudaOffloadLUFactorization
 """
@@ -949,6 +958,10 @@ struct GinkgoJL{F, E, A, K} <: LinearSolve.AbstractKrylovSubspaceMethod
     kwargs::K
 end
 
+# Unlike the other Krylov wrappers, Ginkgo copies `A` into its own device-side
+# sparse format instead of applying it as an operator.
+needs_concrete_A(::GinkgoJL) = true
+
 """
 ```julia
 GinkgoJL_CG(args...; executor = :omp, kwargs...)
@@ -1290,6 +1303,9 @@ function AlgebraicMultigridJL(args...; kwargs...)
 end
 
 needs_concrete_A(::AlgebraicMultigridJL) = true
+
+# The AMG solve reads `cache.reltol` on every `solve!`.
+update_tolerances_internal!(cache, ::AlgebraicMultigridJL, abstol, reltol) = nothing
 
 """
 `ParUFactorization(;reuse_symbolic=true)`

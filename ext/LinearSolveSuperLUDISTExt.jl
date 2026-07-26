@@ -24,8 +24,6 @@ end
 cleanup_superludist_cache!(cache::SuperLUDISTCache) = (cache.factor = nothing; cache)
 cleanup_superludist_cache!(cache::LinearSolve.LinearCache) = cleanup_superludist_cache!(cache.cacheval)
 
-LinearSolve.needs_concrete_A(::LinearSolve.SuperLUDISTFactorization) = true
-
 function LinearSolve.init_cacheval(
         alg::LinearSolve.SuperLUDISTFactorization, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions

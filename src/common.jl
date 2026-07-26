@@ -811,6 +811,18 @@ function SciMLBase.solve(
     )
 end
 
+"""
+    LinearSolve.update_tolerances!(cache; abstol = nothing, reltol = nothing)
+
+Change the convergence tolerances of an existing `LinearCache` in place. The
+`abstol`/`reltol` fields are updated and then
+[`update_tolerances_internal!`](@ref) gives the algorithm a chance to propagate
+the new values into `cache.cacheval`.
+
+Not every algorithm has tolerances to update: factorizations, and algorithms
+that do not define `update_tolerances_internal!`, throw instead of silently
+ignoring the request.
+"""
 function update_tolerances!(cache; abstol = nothing, reltol = nothing)
     if abstol !== nothing
         cache.abstol = abstol

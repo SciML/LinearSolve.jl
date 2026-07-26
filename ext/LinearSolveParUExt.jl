@@ -307,6 +307,4 @@ function SciMLBase.solve!(
     )
 end
 
-LinearSolve.needs_concrete_A(::LinearSolve.ParUFactorization) = true
-
 end # module LinearSolveParUExt

@@ -902,3 +902,7 @@ end
 
     PETScExt.cleanup_petsc_cache!(cache)
 end
+
+@testset "Algorithm interface" begin
+    @test isempty(LinearSolve.algorithm_interface_issues(PETScAlgorithm(:gmres)))
+end

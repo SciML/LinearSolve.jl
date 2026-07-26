@@ -46,8 +46,6 @@ strongly preferred for deterministic teardown.
 """
 cleanup_mumps_cache!
 
-LinearSolve.needs_concrete_A(::LinearSolve.MUMPSFactorization) = true
-
 function LinearSolve.init_cacheval(
         alg::LinearSolve.MUMPSFactorization, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions

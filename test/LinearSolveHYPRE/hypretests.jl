@@ -244,6 +244,7 @@ test_update_tolerances()
 @test LinearSolve.needs_concrete_A(HYPREAlgorithm(HYPRE.GMRES))
 @test LinearSolve.needs_concrete_A(HYPREAlgorithm(HYPRE.PCG))
 @test LinearSolve.needs_concrete_A(HYPREAlgorithm(HYPRE.BoomerAMG))
+@test isempty(LinearSolve.algorithm_interface_issues(HYPREAlgorithm(HYPRE.PCG)))
 
 # Test MPI execution
 # Pass the active project explicitly: the group env (test/hypre) is activated

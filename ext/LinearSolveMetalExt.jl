@@ -12,8 +12,6 @@ using LinearSolve: ArrayInterface, MKLLUFactorization, MetalOffload32MixedLUFact
 
 end
 
-default_alias_A(::MetalLUFactorization, ::Any, ::Any) = false
-default_alias_b(::MetalLUFactorization, ::Any, ::Any) = false
 
 function LinearSolve.init_cacheval(
         alg::MetalLUFactorization, A::AbstractArray, b, u, Pl, Pr,
@@ -40,8 +38,6 @@ function SciMLBase.solve!(
 end
 
 # Mixed precision Metal LU implementation
-default_alias_A(::MetalOffload32MixedLUFactorization, ::Any, ::Any) = false
-default_alias_b(::MetalOffload32MixedLUFactorization, ::Any, ::Any) = false
 
 function LinearSolve.init_cacheval(
         alg::MetalOffload32MixedLUFactorization, A, b, u, Pl, Pr,

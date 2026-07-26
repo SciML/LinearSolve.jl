@@ -21,8 +21,6 @@ function LinearSolve.KrylovKitJL_GMRES(args...; kwargs...)
     return KrylovKitJL(args...; KrylovAlg = KrylovKit.GMRES, kwargs...)
 end
 
-LinearSolve.default_alias_A(::KrylovKitJL, ::Any, ::Any) = true
-LinearSolve.default_alias_b(::KrylovKitJL, ::Any, ::Any) = true
 
 function SciMLBase.solve!(cache::LinearCache, alg::KrylovKitJL; kwargs...)
     # KrylovKit doesn't use Pl/Pr, so warn if the user set one

@@ -145,3 +145,7 @@ end
         LinearProblem(A, b), PartitionedSolversAlgorithm()
     )
 end
+
+@testset "Algorithm interface" begin
+    @test isempty(LinearSolve.algorithm_interface_issues(PartitionedSolversAlgorithm()))
+end

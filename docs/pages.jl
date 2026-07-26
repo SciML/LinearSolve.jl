@@ -25,6 +25,7 @@ pages = [
     ],
     "Solvers" => Any["solvers/solvers.md", "solvers/eigenvalue_solvers.md"],
     "Advanced" => Any[
+        "advanced/algorithm_interface.md",
         "advanced/developing.md",
         "advanced/custom.md",
         "advanced/internal_api.md",

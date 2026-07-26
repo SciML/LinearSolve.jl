@@ -1,4 +1,10 @@
 needs_concrete_A(alg::DefaultLinearSolver) = true
+
+# Every algorithm the default can dispatch to either ignores the tolerances
+# (the factorizations) or reads `cache.abstol`/`cache.reltol` at solve time (the
+# Krylov slots), so updating the `LinearCache` fields is enough.
+update_tolerances_internal!(cache, ::DefaultLinearSolver, abstol, reltol) = nothing
+
 mutable struct DefaultLinearSolverInit{
         T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12,
         T13, T14, T15, T16, T17, T18, T19, T20, T21, T22, T23, T24, T25,

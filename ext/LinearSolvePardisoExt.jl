@@ -7,8 +7,6 @@ using LinearSolve: PardisoJL, LinearVerbosity
 using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_bool
 using LinearSolve.SciMLBase
 
-LinearSolve.needs_concrete_A(alg::PardisoJL) = true
-
 # TODO schur complement functionality
 
 function LinearSolve.init_cacheval(

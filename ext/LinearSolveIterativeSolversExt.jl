@@ -56,8 +56,6 @@ function LinearSolve.IterativeSolversJL_MINRES(args...; kwargs...)
 end
 
 LinearSolve._isidentity_struct(::IterativeSolvers.Identity) = true
-LinearSolve.default_alias_A(::IterativeSolversJL, ::Any, ::Any) = true
-LinearSolve.default_alias_b(::IterativeSolversJL, ::Any, ::Any) = true
 
 function LinearSolve.init_cacheval(
         alg::IterativeSolversJL, A, b, u, Pl, Pr, maxiters::Int,

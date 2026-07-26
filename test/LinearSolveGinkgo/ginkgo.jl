@@ -20,3 +20,7 @@ using Ginkgo
     @test GinkgoJL_GMRES() isa GinkgoJL
     @test_throws ErrorException solve(prob, GinkgoJL_GMRES(); reltol = 1.0f-4, maxiters = 500)
 end
+
+@testset "Algorithm interface" begin
+    @test isempty(LinearSolve.algorithm_interface_issues(GinkgoJL_CG()))
+end

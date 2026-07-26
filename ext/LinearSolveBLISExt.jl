@@ -268,8 +268,6 @@ function getrs!(
     return B
 end
 
-default_alias_A(::BLISLUFactorization, ::Any, ::Any) = false
-default_alias_b(::BLISLUFactorization, ::Any, ::Any) = false
 
 mutable struct BLISLUCache{F, P, I}
     factors::F

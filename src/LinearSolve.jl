@@ -103,6 +103,26 @@ specialized subtypes rather than directly from this type.
 This type integrates with the SciMLBase ecosystem, providing a consistent
 interface for linear algebra operations across the Julia scientific computing
 ecosystem.
+
+## Interface
+
+A concrete algorithm `MyAlg <: SciMLLinearSolveAlgorithm` must implement
+
+  - `SciMLBase.solve!(cache::LinearCache, alg::MyAlg; kwargs...)`
+  - [`LinearSolve.needs_concrete_A`](@ref)`(alg::MyAlg)::Bool`
+
+and may implement [`init_cacheval`](@ref), [`default_alias_A`](@ref),
+[`default_alias_b`](@ref), [`needs_square_A`](@ref) and
+[`update_tolerances_internal!`](@ref), each of which has a default. Subtyping
+one of the categorized abstract types below supplies `needs_concrete_A` and the
+aliasing defaults; subtyping `SciMLLinearSolveAlgorithm` directly does not, so
+such algorithms must define `needs_concrete_A` themselves. Traits belong next to
+the algorithm struct rather than in a package extension, since downstream
+solvers query them before the backend is loaded.
+
+[`LinearSolve.algorithm_interface_issues`](@ref) checks an algorithm against
+this interface. See the "Linear Solver Algorithm Interface" page of the
+documentation for the full contract.
 """
 abstract type SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
 
@@ -252,13 +272,19 @@ a concrete matrix representation or can work with abstract operators.
 ## Usage
 
 This trait is used internally by LinearSolve.jl to optimize algorithm dispatch
-and determine when matrix operators need to be converted to concrete arrays.
+and determine when matrix operators need to be converted to concrete arrays. It
+is also queried by downstream solvers such as OrdinaryDiffEq.jl and
+NonlinearSolve.jl to decide whether to assemble a concrete Jacobian, which is
+why every algorithm must implement it, and why it must be implemented next to
+the algorithm struct rather than in a package extension: the callers run before
+the backend package is necessarily loaded.
 
 ## Algorithm-Specific Behavior
 
   - `AbstractFactorization`: `true` (needs explicit matrix entries for factorization)
   - `AbstractKrylovSubspaceMethod`: `false` (only needs matrix-vector products)
   - `AbstractSolveFunction`: `false` (depends on the wrapped function's requirements)
+  - Direct subtypes of `SciMLLinearSolveAlgorithm`: no default; defining this is required
 
 ## Example
 
@@ -413,6 +439,7 @@ include("SupernodalLU/SupernodalLU.jl")
 include("generic_lufact.jl")
 include("eigenvalue.jl")
 include("common.jl")
+include("interface.jl")
 include("extension_algs.jl")
 include("factorization.jl")
 include("appleaccelerate.jl")

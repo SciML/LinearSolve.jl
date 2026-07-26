@@ -100,3 +100,7 @@ end
         @test norm(A2 * sol2.u - cache.b) / norm(cache.b) < 1.0e-5
     end
 end
+
+@testset "Algorithm interface" begin
+    @test isempty(LinearSolve.algorithm_interface_issues(PyAMG()))
+end

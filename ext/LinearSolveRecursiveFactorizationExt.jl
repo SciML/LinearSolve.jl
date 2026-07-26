@@ -4,6 +4,7 @@ using LinearSolve: LinearSolve, userecursivefactorization, LinearCache, @get_cac
     RFLUFactorization, ButterflyFactorization, RF32MixedLUFactorization,
     default_alias_A, default_alias_b, LinearVerbosity
 using LinearSolve.LinearAlgebra, LinearSolve.ArrayInterface, RecursiveFactorization
+using TriangularSolve: TriangularSolve
 using SciMLBase: SciMLBase, ReturnCode
 using SciMLLogging: @SciMLMessage
 
@@ -31,8 +32,57 @@ function SciMLBase.solve!(
 
         cache.isfresh = false
     end
-    y = ldiv!(cache.u, LinearSolve.@get_cacheval(cache, :RFLUFactorization)[1], cache.b)
+    y = _rf_ldiv!(
+        cache.u, LinearSolve.@get_cacheval(cache, :RFLUFactorization)[1], cache.b, Val(T)
+    )
     return SciMLBase.build_linear_solution(alg, y, nothing, nothing; retcode = ReturnCode.Success)
+end
+
+# Apply an RF factorization to a right-hand side.
+#
+# `RecursiveFactorization` already routes its own `lu!` through TriangularSolve,
+# but the `ldiv!` that consumes the factorization only does so for the pivotless
+# `NotIPIV` case (RecursiveFactorization/src/lu.jl); a pivoted `LU` falls back to
+# LinearAlgebra, i.e. BLAS `trsv`/`trsm`.  For a matrix right-hand side that
+# leaves a consistent ~1.6x on the table at every size we measured, because
+# TriangularSolve's blocked kernels beat `trsm` here:
+#
+#   n     BLAS trsm   TriangularSolve
+#   32     2.19 us      1.37 us  (1.60x)
+#   64     6.27 us      3.76 us  (1.67x)
+#   128   21.02 us     12.72 us  (1.65x)
+#   256   86.08 us     54.07 us  (1.59x)
+#   500  276.20 us    175.81 us  (1.58x)
+#
+# For a single vector right-hand side TriangularSolve has no advantage (it has
+# no vector kernel, and reshaping to n x 1 measured 1.09x at n=128 but 0.88x by
+# n=256), so vectors keep the stdlib path.
+@inline function _rf_ldiv!(
+        u::AbstractVector, fact::LinearAlgebra.LU, b::AbstractVector, ::Val
+    )
+    return ldiv!(u, fact, b)
+end
+
+function _rf_ldiv!(
+        U::AbstractMatrix{T}, fact::LinearAlgebra.LU{T, <:StridedMatrix{T}},
+        B::AbstractMatrix{T}, ::Val{Thread}
+    ) where {T <: LinearAlgebra.BlasFloat, Thread}
+    # A single column is the vector case in disguise: measured 0.87-0.90x at
+    # n >= 256, so it keeps the stdlib path.
+    size(B, 2) == 1 && return ldiv!(U, fact, B)
+    U === B || copyto!(U, B)
+    LinearAlgebra._ipiv_rows!(fact, 1:length(fact.ipiv), U)
+    F = fact.factors
+    TriangularSolve.ldiv!(UnitLowerTriangular(F), U, Val(Thread))
+    TriangularSolve.ldiv!(UpperTriangular(F), U, Val(Thread))
+    return U
+end
+
+# Non-strided or non-BLAS element types keep the stdlib path.
+@inline function _rf_ldiv!(
+        U::AbstractMatrix, fact::LinearAlgebra.LU, B::AbstractMatrix, ::Val
+    )
+    return ldiv!(U, fact, B)
 end
 
 # Mixed precision RecursiveFactorization implementation

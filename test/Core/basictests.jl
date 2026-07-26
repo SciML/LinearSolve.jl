@@ -211,6 +211,24 @@ end
         @test X * solve!(cache) ≈ b1
     end
 
+    @testset "RFLUFactorization multi-RHS" begin
+        # The extension routes matrix right-hand sides through TriangularSolve;
+        # results must match the stdlib path exactly in behaviour.
+        Random.seed!(7)
+        for n in (8, 40), nrhs in (1, 3)
+            Ar = rand(n, n) + n * I
+            Br = rand(n, nrhs)
+            sol = solve(LinearProblem(copy(Ar), copy(Br)), RFLUFactorization())
+            @test sol.u ≈ Ar \ Br
+            # cache reuse path
+            cache = SciMLBase.init(LinearProblem(copy(Ar), copy(Br)), RFLUFactorization())
+            @test solve!(cache).u ≈ Ar \ Br
+            A2 = Ar + I
+            cache.A = copy(A2)
+            @test solve!(cache).u ≈ A2 \ Br
+        end
+    end
+
     @testset "SupernodalLU Factorization" begin
         A1 = sparse(A / 1)
         b1 = rand(n)

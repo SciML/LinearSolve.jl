@@ -763,4 +763,15 @@ function update_partials_list!(partial_matrix::SparseMatrixCSC, list_cache)
     return list_cache
 end
 
+
+# The MC64 matching in the vendored SupernodalLU solver runs its combinatorial
+# side (the max-product assignment) in Float64, so it needs a real magnitude
+# for a `Dual` entry.  Only the *ordering* of candidate pivots is decided from
+# these numbers; the factorization itself stays in Dual arithmetic, so taking
+# the primal here loses nothing.  Without this, `snlu` on a Dual matrix with a
+# missing or weak structural diagonal - exactly when `matching = :auto`
+# engages - throws `MethodError: no method matching Float64(::Dual)`.
+@inline LinearSolve.SupernodalLU._costabs(x::Dual) =
+    LinearSolve.SupernodalLU._costabs(ForwardDiff.value(x))
+
 end

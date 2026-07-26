@@ -274,6 +274,23 @@ function _cache_lu!(
     return true
 end
 
+# Panel triangular solves (L21 := L21·U11⁻¹ and U12 := L11⁻¹·U12).  These are
+# BLAS-3 trsms against the just-factored diagonal block, not linear solves in
+# the LinearSolve sense, so they are plain overridable hooks: the defaults
+# below use the stdlib triangular solves, and
+# LinearSolveRecursiveFactorizationExt routes them through TriangularSolve —
+# the same library RecursiveFactorization (and hence the RFLU dense default)
+# already uses internally for its own trsms.
+function _panel_rdiv!(W::Matrix{Tv}, np::Int, len::Int) where {Tv}
+    rdiv!(view(W, (np + 1):len, 1:np), UpperTriangular(view(W, 1:np, 1:np)))
+    return nothing
+end
+
+function _panel_ldiv!(W::Matrix{Tv}, np::Int, Z::Matrix{Tv}) where {Tv}
+    ldiv!(UnitLowerTriangular(view(W, 1:np, 1:np)), Z)
+    return nothing
+end
+
 _lu_from_cacheval(cv::LinearAlgebra.LU) = cv
 _lu_from_cacheval(cv::Tuple) = _lu_from_cacheval(first(cv))
 
@@ -497,8 +514,8 @@ function _process_supernode!(
         end
 
         if nu > 0
-            rdiv!(view(Ws, (np + 1):len, 1:np), UpperTriangular(view(Ws, 1:np, 1:np)))
-            ldiv!(UnitLowerTriangular(view(Ws, 1:np, 1:np)), Zs)
+            _panel_rdiv!(Ws, np, len)
+            _panel_ldiv!(Ws, np, Zs)
         end
 
         for a in 1:np

@@ -224,4 +224,31 @@ function LinearSolve._custom_adjoint_factorization_solve(
     return solution[1:n]
 end
 
+# ---- SupernodalLU panel triangular solves ---------------------------------
+# The vendored supernodal sparse LU (src/SupernodalLU) applies two BLAS-3
+# trsms per supernode against its just-factored diagonal block: the L21 panel
+# on the right by U11, and the U12 panel on the left by unit-L11.  Route them
+# through TriangularSolve, which RecursiveFactorization already depends on
+# and uses for its own trsms — so when RFLU is the dense default, the sparse
+# solver's panel work runs on the same kernels.  Measured: recovers the
+# 2D-mesh refactorization gap left by the stdlib trsms.
+const SNLU = LinearSolve.SupernodalLU
+const SNLUTypes = Union{Float32, Float64}
+
+function SNLU._panel_rdiv!(W::Matrix{Tv}, np::Int, len::Int) where {Tv <: SNLUTypes}
+    len > np || return nothing
+    TriangularSolve.rdiv!(
+        view(W, (np + 1):len, 1:np), UpperTriangular(view(W, 1:np, 1:np)), Val(false)
+    )
+    return nothing
+end
+
+function SNLU._panel_ldiv!(W::Matrix{Tv}, np::Int, Z::Matrix{Tv}) where {Tv <: SNLUTypes}
+    isempty(Z) && return nothing
+    TriangularSolve.ldiv!(
+        UnitLowerTriangular(view(W, 1:np, 1:np)), Z, Val(false)
+    )
+    return nothing
+end
+
 end

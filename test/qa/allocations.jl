@@ -1,4 +1,4 @@
-using AllocCheck, LinearAlgebra, LinearSolve, Test
+using AllocCheck, LinearAlgebra, LinearSolve, SparseArrays, Test
 
 if Sys.islinux()
     import LAPACK_jll, blis_jll
@@ -60,5 +60,55 @@ if LinearSolve.appleaccelerate_isavailable()
         for T in (Float32, Float64, ComplexF32, ComplexF64)
             test_allocation_free_refactorization(AppleAccelerateLUFactorization(), T)
         end
+    end
+end
+
+# SupernodalLU: the triangular sweeps run entirely off buffers owned by the
+# factorization, whose sizes are known from the symbolic analysis, so they
+# carry no growth branch and AllocCheck can prove them allocation-free
+# statically (rather than sampling `@allocated`).  The user-facing `solve!`
+# keeps a one-time scratch sizing, so it is asserted at runtime instead.
+@check_allocs allocation_checked_supernodal_sweeps!(y, F) =
+    LinearSolve.SupernodalLU._solve_panels!(y, F)
+
+function poisson2d_qa(k)
+    n = k * k
+    Is = Int[]; Js = Int[]; V = Float64[]
+    idx(i, j) = (j - 1) * k + i
+    for j in 1:k, i in 1:k
+        c = idx(i, j)
+        push!(Is, c); push!(Js, c); push!(V, 4.0)
+        i > 1 && (push!(Is, c); push!(Js, idx(i - 1, j)); push!(V, -1.0))
+        i < k && (push!(Is, c); push!(Js, idx(i + 1, j)); push!(V, -1.0))
+        j > 1 && (push!(Is, c); push!(Js, idx(i, j - 1)); push!(V, -1.0))
+        j < k && (push!(Is, c); push!(Js, idx(i, j + 1)); push!(V, -1.0))
+    end
+    return sparse(Is, Js, V, n, n)
+end
+
+@testset "SupernodalLU solve sweeps are provably allocation-free" begin
+    for A in (
+            SparseArrays.spdiagm(
+                0 => fill(4.0, 200), 1 => fill(-1.0, 199), -1 => fill(-1.0, 199)
+            ),
+            poisson2d_qa(30),                 # real panels: maxnu > 1
+        )
+        n = size(A, 1)
+        F = LinearSolve.SupernodalLU.snlu(A)
+        LinearSolve.SupernodalLU._ensure_panel_scratch!(F, 1)
+        y = ones(n)
+        allocation_checked_supernodal_sweeps!(y, F)   # throws if it can allocate
+        @test true
+        # the full solve!, which owns the one-time sizing, is zero at runtime
+        b = ones(n)
+        x = similar(b)
+        LinearSolve.SupernodalLU.solve!(x, F, b; refine = 0)
+        @test @allocated(LinearSolve.SupernodalLU.solve!(x, F, b; refine = 0)) == 0
+        @test norm(A * x - b) <= 1.0e-8 * norm(b)
+        # multi-RHS reuses the factor-owned scratch once sized
+        B = ones(n, 3)
+        X = similar(B)
+        LinearSolve.SupernodalLU.solve!(X, F, B; refine = 0)
+        @test @allocated(LinearSolve.SupernodalLU.solve!(X, F, B; refine = 0)) == 0
     end
 end

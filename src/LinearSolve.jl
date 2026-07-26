@@ -435,7 +435,6 @@ function defaultalg_symbol end
 
 include("verbosity.jl")
 include("blas_logging.jl")
-include("SupernodalLU/SupernodalLU.jl")
 include("generic_lufact.jl")
 include("eigenvalue.jl")
 include("common.jl")
@@ -453,6 +452,9 @@ include("preconditioners.jl")
 include("preferences.jl")
 include("solve_function.jl")
 include("default.jl")
+# after default.jl: the vendored solver caches its dense diagonal blocks
+# with LinearSolve's own default solver, so it needs DefaultLinearSolver{,Init}
+include("SupernodalLU/SupernodalLU.jl")
 include("init.jl")
 include("adjoint.jl") # LinearSolveAdjoint struct definition only; rrules are in ChainRulesCore ext
 

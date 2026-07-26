@@ -110,36 +110,40 @@ end
 # RFLU when RecursiveFactorization is loaded, MKL/LAPACK/generic otherwise;
 # resolved once at analysis time).  Small blocks and generic element types
 # use the built-in static-perturbation kernel.
+# One dense block cache over an `np x np` buffer.  `dense_alg === nothing`
+# means LinearSolve's default solver, which is the point: its cache type is
+# `LinearCache{..., DefaultLinearSolver, DefaultLinearSolverInit{...}}`, which
+# holds a slot for every candidate algorithm and picks between them with a
+# runtime enum.  The type therefore depends only on the element type - not on
+# which algorithm the default happens to select on this machine - so the whole
+# factorization type is inferable from its inputs and `init_cacheval`'s empty
+# prototype matches every real factorization by construction.  The extra slots
+# cost nothing measurable: the block buffer dominates (35 796 B vs 34 264 B at
+# np = 64, 2 112 724 B vs 2 105 816 B at np = 512).
+function _block_cache(::Type{Tv}, alg, np::Int) where {Tv}
+    return SciMLBase.init(
+        LinearSolve.LinearProblem(Matrix{Tv}(undef, np, np), zeros(Tv, np)),
+        alg;
+        alias = SciMLBase.LinearAliasSpecifier(alias_A = true, alias_b = true),
+        assumptions = LinearSolve.OperatorAssumptions(true)
+    )
+end
+
+
 function _dense_block_caches(
-        W::Vector{Matrix{Tv}}, sym::SymbolicAnalysis, dense_alg, dense_threshold::Int
+        ::Type{Tv}, sym::SymbolicAnalysis, alg, dense_threshold::Int
     ) where {Tv}
     nsuper = length(sym.sstart) - 1
-    bcaches = Vector{Any}(nothing, nsuper)
-    Tv <: LinearAlgebra.BlasFloat || return bcaches
-    assump = LinearSolve.OperatorAssumptions(true)
+    bcaches = Any[]
+    bcacheidx = zeros(Int, nsuper)
+    Tv <: LinearAlgebra.BlasFloat || return bcaches, bcacheidx
     for s in 1:nsuper
         np = sym.sstart[s + 1] - sym.sstart[s]
         np >= dense_threshold || continue
-        B = Matrix{Tv}(undef, np, np)   # cache-owned block buffer
-        b = zeros(Tv, np)
-        alg = dense_alg
-        if alg === nothing
-            # `A === nothing` is LinearSolve's documented stand-in for "dense
-            # matrix" in `defaultalg` (our block is a strided view, which the
-            # dense branch does not match on), so this resolves exactly the
-            # dense default for this block's size and element type.
-            da = LinearSolve.defaultalg(nothing, b, assump)
-            alg = da isa LinearSolve.DefaultLinearSolver ?
-                LinearSolve.algchoice_to_alg(Symbol(da.alg)) : da
-        end
-        bcaches[s] = SciMLBase.init(
-            LinearSolve.LinearProblem(B, b),
-            alg;
-            alias = SciMLBase.LinearAliasSpecifier(alias_A = true, alias_b = true),
-            assumptions = assump
-        )
+        push!(bcaches, _block_cache(Tv, alg, np))
+        bcacheidx[s] = length(bcaches)
     end
-    return bcaches
+    return bcaches, bcacheidx
 end
 
 # Allocate all numeric state (panels, V/Vt + position maps, every workspace)
@@ -166,6 +170,22 @@ function _snlu_build(
     end
     V = M[sym.qf, sym.qf]
     Vt, Tpos = _transpose_map(V)
+    return _snlu_assemble(
+        sym, A, M, ms, W, Z, rowsfac, V, Vt, Tpos, dense_alg, dense_threshold,
+        eps_pivot, threaded, check
+    )
+end
+
+function _snlu_assemble(
+        sym::SymbolicAnalysis, A::SparseMatrixCSC{Tv, Ti},
+        M::SparseMatrixCSC{Tv, Ti}, ms::Union{MatchScale, Nothing},
+        W::Vector{Matrix{Tv}}, Z::Vector{Matrix{Tv}}, rowsfac::Vector{Vector{Int}},
+        V::SparseMatrixCSC{Tv, Ti}, Vt::SparseMatrixCSC{Tv, Ti}, Tpos::Vector{Int},
+        dense_alg, dense_threshold::Int, eps_pivot::Float64, threaded::Bool,
+        check::Bool
+    ) where {Tv, Ti <: Integer}
+    n = sym.n
+    bcaches, bcacheidx = _dense_block_caches(Tv, sym, dense_alg, dense_threshold)
     F = SupernodalLUFactor{Tv, Ti}(
         sym, W, Z, collect(1:n), collect(1:n), rowsfac, 0, NaN, eps_pivot,
         A, Vector{Tv}(undef, n), Vector{Tv}(undef, 64),
@@ -178,7 +198,7 @@ function _snlu_build(
         Matrix{Tv}(undef, n, 0),
         Vector{Tv}(undef, n), Vector{Tv}(undef, n), Vector{Tv}(undef, n),
         threaded,
-        _dense_block_caches(W, sym, dense_alg, dense_threshold)
+        bcaches, bcacheidx
     )
     _build_vpos!(F, A)
     _factor_core!(F)

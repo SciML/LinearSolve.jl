@@ -704,28 +704,31 @@ function LinearSolve.init_cacheval(
     return nothing
 end
 
-const PREALLOCATED_SUPERNODAL = SNLU.snlu(
-    SparseMatrixCSC{Float64, Int64}(0, 0, [Int64(1)], Int64[], Float64[])
-)
-
 function LinearSolve.init_cacheval(
         alg::SupernodalLUFactorization, A::AbstractSparseArray{Float64, Int64}, b, u,
         Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
-    return PREALLOCATED_SUPERNODAL
+    return SNLU.snlu(
+        SparseMatrixCSC{Float64, Int64}(0, 0, [Int64(1)], Int64[], Float64[]);
+        dense_alg = alg.dense_alg
+    )
 end
 
-# SupernodalLU is pure Julia and factors any `Number` element type; the empty
-# cacheval carries the correct types so `pplu!`/`pplu` dispatch is concrete.
+# SupernodalLU is pure Julia and factors any `Number` element type.  The empty
+# prototype must resolve the same dense block algorithm as a real
+# factorization (hence `dense_alg = alg.dense_alg`), because the block-cache
+# type is part of the factorization type and the cacheval field is pinned to
+# whatever this returns.
 function LinearSolve.init_cacheval(
         alg::SupernodalLUFactorization, A::AbstractSparseArray{T, Ti}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     ) where {T <: Number, Ti <: Integer}
     return SNLU.snlu(
-        SparseMatrixCSC{T, Ti}(0, 0, [one(Ti)], Ti[], T[])
+        SparseMatrixCSC{T, Ti}(0, 0, [one(Ti)], Ti[], T[]);
+        dense_alg = alg.dense_alg
     )
 end
 

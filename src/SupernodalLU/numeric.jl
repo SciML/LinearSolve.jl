@@ -77,16 +77,29 @@ mutable struct SupernodalLUFactor{Tv, Ti <: Integer}
     ir_dx::Vector{Tv}                # iterative-refinement correction
     btmp::Vector{Tv}                 # in-place ldiv! RHS copy
     threaded::Bool                   # use the etree-parallel numeric phase
-    # Dense LinearSolve caches for large diagonal blocks (`nothing` = built-in
-    # kernel).  Deliberately `Vector{Any}`: the solve path never touches it and
-    # `_cache_lu!` is a function barrier, so the only dynamic dispatch is one
-    # call per cached supernode per factorization (tens of calls against
-    # hundreds of ms of GEMM).  Narrowing it to `Vector{Union{Nothing, C}}` for
-    # union-splitting was tried and measured 2.3-2.7 % *slower* on
-    # poisson3d_28/poisson2d_256, and it breaks `init_cacheval`'s cacheval
-    # type-pinning (the empty prototype has no caches, so its element type
-    # cannot match a real factorization's).  Do not retry.
+    # Dense LinearSolve caches for the diagonal blocks at or above
+    # `dense_threshold`; everything narrower uses the built-in kernel, which is
+    # the overwhelming majority (0.6 % of supernodes are cached on
+    # poisson2d_256, 1.3 % on poisson3d_28 - the median supernode is 1-5
+    # columns wide).  Stored sparsely: `bcaches` holds only the blocks that
+    # have one and `bcacheidx[s]` indexes into it, 0 meaning "no cache", so
+    # there is no mostly-empty full-length vector and no nullability check on
+    # the lookup.
+    #
+    # The element type is deliberately `Any`.  Each entry is a `LinearCache`
+    # over the block, and a `LinearCache` type carries 13 parameters; putting
+    # it in `SupernodalLUFactor`'s own parameters pushes the *sparse default
+    # solver's* cacheval - which holds a `SupernodalLUFactor` in one of its 30
+    # slots - past Julia's type-complexity limit, so inference widens it and
+    # `@inferred init(prob, nothing)` fails for sparse matrices
+    # (test/Core/default_algs.jl).  Keeping the caches out of the type leaves
+    # `SupernodalLUFactor{Tv, Ti}` fully concrete and inferable from its
+    # inputs, which matters far more: the solve path never touches this field,
+    # and `_cache_lu!` is a function barrier, so the only dynamic dispatch is
+    # one call per cached supernode per factorization - tens of calls against
+    # hundreds of ms of GEMM.
     bcaches::Vector{Any}
+    bcacheidx::Vector{Int}
 end
 
 nperturbed(F::SupernodalLUFactor) = F.nperturbed
@@ -237,9 +250,9 @@ function _dense_block_factor!(
         F, s::Int, np::Int, epsv, ipiv::AbstractVector{Int}, scratch
     )
     Ws = F.W[s]
-    bc = F.bcaches[s]
-    bc === nothing && return _block_lu!(Ws, np, epsv, ipiv)
-    ok = _cache_lu!(bc, Ws, np, epsv, ipiv)
+    i = F.bcacheidx[s]
+    i == 0 && return _block_lu!(Ws, np, epsv, ipiv)
+    ok = _cache_lu!(F.bcaches[i], Ws, np, epsv, ipiv)
     ok && return 0
     @inbounds for j in 1:np
         ipiv[j] = j
@@ -259,7 +272,7 @@ function _cache_lu!(
     end
     bc.isfresh = true
     SciMLBase.solve!(bc)
-    fact = _lu_from_cacheval(bc.cacheval)
+    fact = _block_lu_of(bc)
     fac = fact.factors
     @inbounds for j in 1:np
         abs(fac[j, j]) >= epsv || return false
@@ -293,6 +306,35 @@ end
 
 _lu_from_cacheval(cv::LinearAlgebra.LU) = cv
 _lu_from_cacheval(cv::Tuple) = _lu_from_cacheval(first(cv))
+
+# The default solver keeps one slot per candidate algorithm and records the
+# choice in a runtime enum, so pull the factorization out of the slot that was
+# actually used.  Written as a literal-symbol chain rather than
+# `getfield(cv, Symbol(choice))` so every branch stays concrete; the result is
+# a small union of `LU` types, which Julia union-splits.
+function _lu_from_cacheval(cv::LinearSolve.DefaultLinearSolverInit, choice)
+    DAC = LinearSolve.DefaultAlgorithmChoice
+    if choice === DAC.LUFactorization
+        return _lu_from_cacheval(cv.LUFactorization)
+    elseif choice === DAC.RFLUFactorization
+        return _lu_from_cacheval(cv.RFLUFactorization)
+    elseif choice === DAC.MKLLUFactorization
+        return _lu_from_cacheval(cv.MKLLUFactorization)
+    elseif choice === DAC.AppleAccelerateLUFactorization
+        return _lu_from_cacheval(cv.AppleAccelerateLUFactorization)
+    elseif choice === DAC.GenericLUFactorization
+        return _lu_from_cacheval(cv.GenericLUFactorization)
+    elseif choice === DAC.BLISLUFactorization
+        return _lu_from_cacheval(cv.BLISLUFactorization)
+    end
+    throw(ArgumentError("SupernodalLU: dense block solver resolved to $choice, which does not expose an LU factorization; pass `dense_alg` explicitly"))
+end
+
+# Factorization behind a block cache, whichever solver the cache is using.
+@inline _block_lu_of(bc) = _lu_from_cacheval(bc.cacheval)
+@inline function _block_lu_of(bc::LinearSolve.LinearCache{<:Any, <:Any, <:Any, <:Any, <:LinearSolve.DefaultLinearSolver})
+    return _lu_from_cacheval(bc.cacheval, bc.alg.alg)
+end
 
 # Transpose of V with a position map: Vt.nzval[q] == V.nzval[Tpos[q]] forever
 # (structure is static), so refactorization refreshes Vt by one gather pass.
@@ -677,13 +719,16 @@ function _core_threaded!(F::SupernodalLUFactor{Tv}, epsv) where {Tv}
                     relmap = zeros(Int, sym.n)
                     ipiv = Vector{Int}(undef, sym.n)
                     buf = Vector{Tv}(undef, 64)
-                    acc = 0
+                    # `local`: without it this shares the enclosing function's
+                    # `acc`, which boxes it (killing inference) and races every
+                    # worker against the others' perturbation counts.
+                    local nloc = 0
                     for (lo, hi) in q
                         for s in lo:hi
-                            acc += _process_supernode!(F, s, epsv, relmap, ipiv, buf)
+                            nloc += _process_supernode!(F, s, epsv, relmap, ipiv, buf)
                         end
                     end
-                    Threads.atomic_add!(npert_par, acc)
+                    Threads.atomic_add!(npert_par, nloc)
                 end
             end
         end

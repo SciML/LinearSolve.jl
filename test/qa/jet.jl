@@ -256,3 +256,44 @@ end
         end
     end
 end
+
+@testset "JET Tests for SupernodalLU" begin
+    # The dense block caches are concretely typed, so the repeated-use paths -
+    # solve and numeric refactorization, i.e. the ODE/Newton workload - must be
+    # free of runtime dispatch.  Analysis is scoped to the solver module, as
+    # elsewhere in this file, so Base error-path noise (show/AssertionError
+    # reachable from sparse indexing) does not mask our own code.
+    SNLU_MOD = LinearSolve.SupernodalLU
+    n = 60
+    A_snlu = SparseArrays.spdiagm(
+        0 => fill(4.0, n), 1 => fill(-1.0, n - 1), -1 => fill(-1.0, n - 1)
+    )
+    b_snlu = ones(n)
+    F_snlu = SNLU_MOD.snlu(A_snlu)
+    x_snlu = similar(b_snlu)
+
+    # The solve path never touches the block caches, so it must be free of
+    # runtime dispatch.
+    JET.@test_opt target_modules = (SNLU_MOD,) SNLU_MOD.solve!(x_snlu, F_snlu, b_snlu)
+    JET.@test_opt target_modules = (SNLU_MOD,) SNLU_MOD._solve_panels!(x_snlu, F_snlu)
+
+    # Factorization carries exactly one dispatch per *cached* supernode: the
+    # `_cache_lu!` barrier, whose cache argument is deliberately untyped (see
+    # the `bcaches` field docs - putting the cache type in the factorization
+    # type breaks `@inferred init(prob, nothing)` for sparse matrices, because
+    # the sparse default holds a SupernodalLUFactor in its cacheval).  Tens of
+    # calls against hundreds of ms of GEMM; the alternative costs far more.
+    JET.@test_opt target_modules = (SNLU_MOD,) SNLU_MOD.snlu!(F_snlu, A_snlu) broken = true
+    JET.@test_opt target_modules = (SNLU_MOD,) SNLU_MOD.snlu(A_snlu) broken = true
+
+    # The factorization object itself is concrete, and its block-cache vector
+    # is a two-member union rather than Any.
+    @test isconcretetype(typeof(F_snlu))
+    @test typeof(F_snlu) === SNLU_MOD.SupernodalLUFactor{Float64, Int}
+
+    # The factorization type itself is fully concrete and inferable from its
+    # inputs, which is what the sparse default solver depends on.
+    @test isconcretetype(
+        Core.Compiler.return_type(SNLU_MOD.snlu, Tuple{typeof(A_snlu)})
+    )
+end

@@ -185,6 +185,7 @@ struct SymbolicAnalysis
     rows::Vector{Vector{Int}}  # update rows (> last column) of each supernode
     snof::Vector{Int}        # column -> supernode
     nnzL::Int                # entries in L panels incl. unit diagonal & padding
+    maxnu::Int               # widest update-row set over all supernodes
     ccp::Vector{Int}         # contribution schedule: target s gets ccp[s]:ccp[s+1]-1
     cd::Vector{Int}          # ... from descendant cd[k]
     cj1::Vector{Int}         # ... starting at rows[cd[k]][cj1[k]]
@@ -396,5 +397,6 @@ function snlu_symbolic(
         end
     end
     ccp, cd, cj1 = _contrib_schedule(sstart, rows, snof)
-    return SymbolicAnalysis(n, qf, parentF, sstart, rows, snof, nnzL, ccp, cd, cj1)
+    maxnu = ns == 0 ? 0 : maximum(length, rows)
+    return SymbolicAnalysis(n, qf, parentF, sstart, rows, snof, nnzL, maxnu, ccp, cd, cj1)
 end

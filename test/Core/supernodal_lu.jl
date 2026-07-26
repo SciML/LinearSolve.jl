@@ -70,7 +70,7 @@ end
     # `LinearSolution` object each dense block cache's `solve!` returns —
     # a fixed ~64 B per cached supernode, independent of problem size.
     @test (@allocated SNLU.solve!(x, F, b)) == 0
-    ncache = count(!isnothing, F.bcaches)
+    ncache = length(F.bcaches)
     @test (@allocated SNLU.snlu!(F, A)) <= 128 * max(ncache, 1)
     # with the dense caches disabled the built-in kernel is fully allocation-free
     Fb = SNLU.snlu(A; dense_threshold = typemax(Int))
@@ -114,6 +114,45 @@ end
     resolve(cache)
     resolve(cache)
     @test (@allocated resolve(cache)) < 256
+end
+
+@testset "block caches are concretely typed and inference-clean" begin
+    A = poisson2d(70)
+    F = SNLU.snlu(A)
+    @test length(F.bcaches) > 0
+    # the caches stay out of the factorization type, so it is fully concrete
+    # and inferable - which the sparse default solver depends on, since it
+    # holds a SupernodalLUFactor in one of its cacheval slots
+    @test typeof(F) === SNLU.SupernodalLUFactor{Float64, Int}
+    @test isconcretetype(typeof(F))
+    @test count(!iszero, F.bcacheidx) == length(F.bcaches)
+    @test isconcretetype(typeof(F))
+    b = randn(size(A, 1))
+    x = similar(b)
+    @inferred SNLU.solve!(x, F, b)
+    @test norm(A * x - b) <= 1.0e-11 * norm(b)
+    # element types that never cache a block collapse to Vector{Nothing}
+    T = spdiagm(0 => fill(big"4.0", 30), 1 => fill(big"-1.0", 29), -1 => fill(big"-1.0", 29))
+    Fb = SNLU.snlu(T)
+    @test isempty(Fb.bcaches)
+    @test all(iszero, Fb.bcacheidx)
+    @test isconcretetype(typeof(Fb))
+    # the LinearSolve cacheval prototype must have the same type as a real
+    # factorization, for every dense_alg setting
+    As = sparse(1.0I, 2000, 2000) + spdiagm(1 => fill(0.1, 1999))
+    bs = randn(2000)
+    for alg in (
+            SupernodalLUFactorization(),
+            SupernodalLUFactorization(dense_alg = LUFactorization()),
+            SupernodalLUFactorization(dense_alg = GenericLUFactorization()),
+        )
+        cache = init(LinearProblem(As, bs), alg)
+        sol = solve!(cache)
+        @test norm(As * sol.u - bs) <= 1.0e-10 * norm(bs)
+        cache.A = As
+        sol2 = solve!(cache)               # exercises cacheval reassignment
+        @test norm(As * sol2.u - bs) <= 1.0e-10 * norm(bs)
+    end
 end
 
 @testset "matching engages on zero/weak diagonals" begin

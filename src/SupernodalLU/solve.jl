@@ -85,7 +85,17 @@ end
     return nothing
 end
 
+# Ensure the panel scratch can hold the widest update-row set times `nrhs`.
+# Called once per solve so the sweeps below carry no growth branch and are
+# provably allocation-free (see the AllocCheck test in test/qa/allocations.jl).
+@inline function _ensure_panel_scratch!(F::SupernodalLUFactor, nrhs::Int)
+    need = F.sym.maxnu * nrhs
+    length(F.gbuf) < need && resize!(F.gbuf, need)
+    return nothing
+end
+
 # y := U \ (L \ (P * y)) in permuted space; y enters as V-row-ordered rhs.
+# Precondition: `_ensure_panel_scratch!(F, 1)` has been called.
 function _solve_panels!(y::AbstractVector{Tv}, F::SupernodalLUFactor{Tv}) where {Tv}
     sym = F.sym
     sstart = sym.sstart
@@ -105,7 +115,6 @@ function _solve_panels!(y::AbstractVector{Tv}, F::SupernodalLUFactor{Tv}) where 
             ldiv!(UnitLowerTriangular(view(Ws, 1:np, 1:np)), xb)
         end
         if nu > 0
-            length(buf) < nu && resize!(buf, max(nu, 2 * length(buf)))
             t = view(buf, 1:nu)
             if np < PANEL_BLAS_CUTOFF
                 _panel_gemv!(t, Ws, xb, np, nu)
@@ -126,7 +135,6 @@ function _solve_panels!(y::AbstractVector{Tv}, F::SupernodalLUFactor{Tv}) where 
         Ws = F.W[s]
         xb = view(y, c1:c2)
         if nu > 0
-            length(buf) < nu && resize!(buf, max(nu, 2 * length(buf)))
             t = view(buf, 1:nu)
             @simd for k in 1:nu
                 t[k] = y[R[k]]
@@ -147,6 +155,7 @@ function _solve_panels!(y::AbstractVector{Tv}, F::SupernodalLUFactor{Tv}) where 
 end
 
 # Multi-RHS variant: same sweeps with gemm-shaped updates on an n×nrhs block.
+# Precondition: `_ensure_panel_scratch!(F, nrhs)` has been called.
 function _solve_panels!(Y::AbstractMatrix{Tv}, F::SupernodalLUFactor{Tv}) where {Tv}
     sym = F.sym
     sstart = sym.sstart
@@ -163,7 +172,6 @@ function _solve_panels!(Y::AbstractMatrix{Tv}, F::SupernodalLUFactor{Tv}) where 
         Yb = view(Y, c1:c2, :)
         ldiv!(UnitLowerTriangular(view(Ws, 1:np, 1:np)), Yb)
         if nu > 0
-            length(buf) < nu * nrhs && resize!(buf, max(nu * nrhs, 2 * length(buf)))
             T = reshape(view(buf, 1:(nu * nrhs)), nu, nrhs)
             mul!(T, view(Ws, (np + 1):(np + nu), 1:np), Yb)
             for r in 1:nrhs, k in 1:nu
@@ -180,7 +188,6 @@ function _solve_panels!(Y::AbstractMatrix{Tv}, F::SupernodalLUFactor{Tv}) where 
         Ws = F.W[s]
         Yb = view(Y, c1:c2, :)
         if nu > 0
-            length(buf) < nu * nrhs && resize!(buf, max(nu * nrhs, 2 * length(buf)))
             T = reshape(view(buf, 1:(nu * nrhs)), nu, nrhs)
             for r in 1:nrhs, k in 1:nu
                 T[k, r] = Y[R[k], r]
@@ -203,6 +210,7 @@ function _solve_once!(x::AbstractVector{Tv}, F::SupernodalLUFactor{Tv}, b::Abstr
     rp = F.rowperm
     Rs = F.Rs
     Cs = F.Cs
+    _ensure_panel_scratch!(F, 1)
     @inbounds for k in 1:n
         i = rp[p[k]]
         y[k] = Rs[i] * b[i]
@@ -229,6 +237,7 @@ function _solve_once!(X::AbstractMatrix{Tv}, F::SupernodalLUFactor{Tv}, B::Abstr
     n = F.sym.n
     nrhs = size(B, 2)
     Y = _scratch_mat!(F, nrhs)
+    _ensure_panel_scratch!(F, nrhs)
     p = F.p
     qf = F.sym.qf
     rp = F.rowperm

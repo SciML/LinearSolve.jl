@@ -97,6 +97,21 @@ end
         F = LinearSolve.SupernodalLU.snlu(A)
         LinearSolve.SupernodalLU._ensure_panel_scratch!(F, 1)
         y = ones(n)
+        # DIAGNOSTIC: dump every AllocCheck error with its location before the
+        # assertion, so the macOS/aarch64 failure can be read off CI.
+        let errs = AllocCheck.check_allocs(
+                LinearSolve.SupernodalLU._solve_panels!,
+                (typeof(y), typeof(F))
+            )
+            println("=== ALLOCCHECK n=", n, " maxnu=", F.sym.maxnu,
+                " nerrs=", length(errs), " ===")
+            for e in errs
+                println("---- ", typeof(e))
+                showerror(stdout, e)
+                println()
+            end
+            flush(stdout)
+        end
         allocation_checked_supernodal_sweeps!(y, F)   # throws if it can allocate
         @test true
         # the full solve!, which owns the one-time sizing, is zero at runtime

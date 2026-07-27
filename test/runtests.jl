@@ -230,6 +230,9 @@ else
                 @time @safetestset "Quality Assurance" include("qa/qa.jl")
                 @time @safetestset "JET Tests" include("qa/jet.jl")
                 @time @safetestset "Allocation QA" include("qa/allocations.jl")
+                @time @safetestset "SupernodalLU Allocation QA" include(
+                    "qa/supernodal_allocations.jl"
+                )
             end
             return nothing
         end,

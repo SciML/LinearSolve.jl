@@ -307,6 +307,22 @@ end
 _lu_from_cacheval(cv::LinearAlgebra.LU) = cv
 _lu_from_cacheval(cv::Tuple) = _lu_from_cacheval(first(cv))
 
+# The direct-BLAS backends (Apple Accelerate, BLIS, OpenBLAS) do not keep an
+# `LU` in their cacheval at all: each owns a mutable cache holding the factored
+# matrix and the getrf pivot vector, which `_custom_cache_factorization` only
+# wraps in an `LU` on demand.  `_cache_lu!` reads exactly `.factors`/`.ipiv`,
+# with the same LAPACK semantics, so hand the cacheval straight back instead of
+# allocating a throwaway wrapper per block.  On a Mac this is the path the
+# *default* dense solver takes, so without it every `snlu` with a supernode at
+# or above `dense_threshold` is a `MethodError`.  `hasfield` on a concrete type
+# folds at compile time, so the check costs nothing at runtime.
+function _lu_from_cacheval(cv)
+    if hasfield(typeof(cv), :factors) && hasfield(typeof(cv), :ipiv)
+        return cv
+    end
+    throw(ArgumentError("SupernodalLU: dense block solver cacheval $(typeof(cv)) does not expose an LU factorization; pass `dense_alg` explicitly"))
+end
+
 # The default solver keeps one slot per candidate algorithm and records the
 # choice in a runtime enum, so pull the factorization out of the slot that was
 # actually used.  Written as a literal-symbol chain rather than

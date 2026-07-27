@@ -750,3 +750,28 @@ struct ReinterpretTestTag end
     cache = init(LinearProblem(A, b), nothing)
     @test solve!(cache).u ≈ sol.u
 end
+
+@testset "SupernodalLU matching accepts Dual entries" begin
+    # MC64 matching decides its assignment in Float64, so it needs a real
+    # magnitude per entry.  An anti-diagonal matrix has no structural diagonal
+    # at all, so `matching = :auto` engages and the factorization goes through
+    # `_costabs` — which threw on Duals until the ForwardDiff extension
+    # supplied the primal-extracting overload its docstring promised.
+    SNLU = LinearSolve.SupernodalLU
+    n = 40
+    vals = [ForwardDiff.Dual{Nothing}(2.0 + i / n, 1.0) for i in 1:n]
+    P = sparse(collect(n:-1:1), collect(1:n), vals, n, n)
+    @test SNLU.needs_matching(P)
+    F = SNLU.snlu(P)
+    @test F.matched
+
+    # Solving must be right in both the value and the derivative.  With
+    # A(t) = diag-reversed(2 + i/n + t) and b fixed, each x_i = b_j / a_i, so
+    # dx_i/dt = -b_j / a_i^2.
+    b = randn(n)
+    x = similar(b, eltype(vals))
+    SNLU.solve!(x, F, ForwardDiff.Dual{Nothing}.(b, 0.0))
+    @test ForwardDiff.value.(x) ≈ [b[n + 1 - i] / (2.0 + i / n) for i in 1:n] rtol = 1.0e-10
+    @test ForwardDiff.partials.(x, 1) ≈
+        [-b[n + 1 - i] / (2.0 + i / n)^2 for i in 1:n] rtol = 1.0e-10
+end

@@ -115,6 +115,25 @@ let As_bf = sparse(BigFloat.([1 2 3; 2 4 6; 1 1 1])), bs_bf = BigFloat.([1, 2, 3
     @test all(isfinite, sol.u)
 end
 
+# Single-precision sparse has no UMFPACK/KLU (SuiteSparse) support, so the
+# default polyalgorithm — which eagerly builds a cacheval for *every* slot, not
+# just the selected one — must not try to allocate an UMFPACK cacheval for it.
+@testset "Sparse $T with $Ti indices" for T in (Float32, ComplexF32),
+        Ti in (Int64, Int32)
+
+    n = 20
+    A32 = sparse(Ti.(1:n), Ti.(1:n), fill(T(n), n), n, n) +
+        sparse(Ti.(1:(n - 1)), Ti.(2:n), fill(T(1), n - 1), n, n)
+    b32 = ones(T, n)
+    @test A32 isa SparseMatrixCSC{T, Ti}
+    @test LinearSolve.defaultalg(A32, b32, LinearSolve.OperatorAssumptions(true)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.KLUFactorization
+    sol32 = solve(LinearProblem(A32, b32))
+    @test SciMLBase.successful_retcode(sol32.retcode)
+    @test eltype(sol32.u) === T
+    @test norm(A32 * sol32.u - b32) / norm(b32) < 1.0f-5
+end
+
 @test LinearSolve.defaultalg(sprand(10^4, 10^4, 1.0e-5) + I, zeros(1000)).alg ===
     LinearSolve.DefaultAlgorithmChoice.KLUFactorization
 prob = LinearProblem(sprand(1000, 1000, 0.5), zeros(1000))

@@ -128,6 +128,11 @@ end
     )
 end # @static if Base.USE_GPL_LIBS
 
+# UMFPACK's `UmfpackLU` only exists for `Float64`/`ComplexF64` (SuiteSparse's
+# `UMFVTypes`). The other BLAS eltypes are not a subset of it, so cachevals for
+# UMFPACK-backed algorithms must be bounded by this, not by `BLASELTYPES`.
+const UMFPACKELTYPES = Union{Float64, ComplexF64}
+
 function LinearSolve.init_cacheval(
         alg::LUFactorization, A::AbstractSparseArray{<:Number, <:Integer}, b, u,
         Pl, Pr,
@@ -169,7 +174,7 @@ end
             Pl, Pr,
             maxiters::Int, abstol, reltol,
             verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
-        ) where {T <: BLASELTYPES}
+        ) where {T <: UMFPACKELTYPES}
         if LinearSolve.is_cusparse(A)
             LinearSolve.cudss_loaded(A) ? ArrayInterface.lu_instance(A) : nothing
         else
@@ -185,7 +190,7 @@ end
             Pl, Pr,
             maxiters::Int, abstol, reltol,
             verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
-        ) where {T <: BLASELTYPES}
+        ) where {T <: UMFPACKELTYPES}
         if LinearSolve.is_cusparse(A)
             LinearSolve.cudss_loaded(A) ? ArrayInterface.lu_instance(A) : nothing
         else
@@ -197,6 +202,21 @@ end
         end
     end
 end # @static if Base.USE_GPL_LIBS
+
+# Single-precision sparse: no UMFPACK cacheval exists, but a cuDSS-backed
+# CuSparse matrix still needs its `lu_instance`.
+function LinearSolve.init_cacheval(
+        alg::LUFactorization, A::AbstractSparseArray{T, <:Union{Int32, Int64}}, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    ) where {T <: BLASELTYPES}
+    if LinearSolve.is_cusparse(A)
+        return LinearSolve.cudss_loaded(A) ? ArrayInterface.lu_instance(A) : nothing
+    else
+        return nothing
+    end
+end
 
 function LinearSolve.init_cacheval(
         alg::LUFactorization, A::LinearSolve.GPUArraysCore.AnyGPUArray, b, u,
@@ -231,7 +251,7 @@ end
             Pl, Pr,
             maxiters::Int, abstol, reltol,
             verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
-        ) where {T <: BLASELTYPES}
+        ) where {T <: UMFPACKELTYPES}
         SparseArrays.UMFPACK.UmfpackLU(
             SparseMatrixCSC{T, Int64}(
                 zero(Int64), zero(Int64), [Int64(1)], Int64[], T[]
@@ -244,7 +264,7 @@ end
             Pl, Pr,
             maxiters::Int, abstol, reltol,
             verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
-        ) where {T <: BLASELTYPES}
+        ) where {T <: UMFPACKELTYPES}
         SparseArrays.UMFPACK.UmfpackLU(
             SparseMatrixCSC{T, Int32}(
                 zero(Int32), zero(Int32), [Int32(1)], Int32[], T[]

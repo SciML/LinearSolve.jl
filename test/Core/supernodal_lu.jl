@@ -155,6 +155,36 @@ end
     end
 end
 
+# The direct-BLAS backends do not keep an `LU` in their cacheval — they keep a
+# mutable cache holding the factored matrix and the pivots — so the block
+# factorization has to read the factors out of that instead.  The rest of this
+# file loads RecursiveFactorization, which makes the *default* dense solver
+# resolve to RFLU everywhere, so the backends are named explicitly here: on a
+# Mac the default resolves to Apple Accelerate, and without this every `snlu`
+# with a supernode at or above `dense_threshold` was a `MethodError`.
+@testset "block caches over the direct-BLAS backends" begin
+    A = poisson2d(30)
+    b = randn(size(A, 1))
+    xref = Matrix(A) \ b
+    algs = Any[]
+    LinearSolve.appleaccelerate_isavailable() &&
+        push!(algs, AppleAccelerateLUFactorization())
+    LinearSolve.useopenblas && push!(algs, OpenBLASLUFactorization())
+    Base.get_extension(LinearSolve, :LinearSolveBLISExt) !== nothing &&
+        push!(algs, LinearSolve.BLISLUFactorization())
+    @test !isempty(algs)        # every platform has at least one of these
+    for alg in algs, thr in (4, 64)
+        F = SNLU.snlu(A; dense_alg = alg, dense_threshold = thr)
+        @test length(F.bcaches) > 0
+        x = similar(b)
+        SNLU.solve!(x, F, b)
+        @test norm(x - xref) <= 1.0e-9 * norm(xref)
+        SNLU.snlu!(F, A)                   # refactorize through the same caches
+        SNLU.solve!(x, F, b)
+        @test norm(x - xref) <= 1.0e-9 * norm(xref)
+    end
+end
+
 @testset "matching engages on zero/weak diagonals" begin
     n = 40
     P = sparse(collect(n:-1:1), collect(1:n), 2.0 .+ rand(n), n, n)

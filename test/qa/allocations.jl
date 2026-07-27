@@ -63,69 +63,7 @@ if LinearSolve.appleaccelerate_isavailable()
     end
 end
 
-# SupernodalLU: the triangular sweeps run entirely off buffers owned by the
-# factorization, whose sizes are known from the symbolic analysis, so they
-# carry no growth branch and AllocCheck can prove them allocation-free
-# statically (rather than sampling `@allocated`).  The user-facing `solve!`
-# keeps a one-time scratch sizing, so it is asserted at runtime instead.
-@check_allocs allocation_checked_supernodal_sweeps!(y, F) =
-    LinearSolve.SupernodalLU._solve_panels!(y, F)
-
-# What the sweeps can be *proved* about depends on the Julia version, because
-# above `PANEL_BLAS_CUTOFF` they hand off to LinearAlgebra's `ldiv!`/`mul!`,
-# whose wrappers are not statically clean on every release: 1.10 and 1.13 leave
-# a `generic_trimatdiv!` dynamic dispatch plus boxed `MulAddMul`/`SubArray`
-# values that AllocCheck reports (`triangular.jl`, `matmul.jl` — stdlib frames,
-# no SupernodalLU code involved), and 1.11 allocates them for real on the
-# `SubArray`-matrix path the multi-RHS sweep takes.  1.12 folds all of it away.
-# So pin each assertion to the versions that can carry it rather than weakening
-# it everywhere; the sweeps carry no growth branch on any version, which is what
-# these are here to protect.
-const STATIC_SWEEP_PROOF = v"1.12" <= VERSION < v"1.13"
-const RUNTIME_MULTIRHS_ZERO = VERSION < v"1.11" || VERSION >= v"1.12"
-
-function poisson2d_qa(k)
-    n = k * k
-    Is = Int[]; Js = Int[]; V = Float64[]
-    idx(i, j) = (j - 1) * k + i
-    for j in 1:k, i in 1:k
-        c = idx(i, j)
-        push!(Is, c); push!(Js, c); push!(V, 4.0)
-        i > 1 && (push!(Is, c); push!(Js, idx(i - 1, j)); push!(V, -1.0))
-        i < k && (push!(Is, c); push!(Js, idx(i + 1, j)); push!(V, -1.0))
-        j > 1 && (push!(Is, c); push!(Js, idx(i, j - 1)); push!(V, -1.0))
-        j < k && (push!(Is, c); push!(Js, idx(i, j + 1)); push!(V, -1.0))
-    end
-    return sparse(Is, Js, V, n, n)
-end
-
-@testset "SupernodalLU solve sweeps are provably allocation-free" begin
-    for A in (
-            SparseArrays.spdiagm(
-                0 => fill(4.0, 200), 1 => fill(-1.0, 199), -1 => fill(-1.0, 199)
-            ),
-            poisson2d_qa(30),                 # real panels: maxnu > 1
-        )
-        n = size(A, 1)
-        F = LinearSolve.SupernodalLU.snlu(A)
-        LinearSolve.SupernodalLU._ensure_panel_scratch!(F, 1)
-        y = ones(n)
-        if STATIC_SWEEP_PROOF
-            allocation_checked_supernodal_sweeps!(y, F)   # throws if it can allocate
-            @test true
-        end
-        # the full solve!, which owns the one-time sizing, is zero at runtime
-        b = ones(n)
-        x = similar(b)
-        LinearSolve.SupernodalLU.solve!(x, F, b; refine = 0)
-        @test @allocated(LinearSolve.SupernodalLU.solve!(x, F, b; refine = 0)) == 0
-        @test norm(A * x - b) <= 1.0e-8 * norm(b)
-        # multi-RHS reuses the factor-owned scratch once sized
-        B = ones(n, 3)
-        X = similar(B)
-        LinearSolve.SupernodalLU.solve!(X, F, B; refine = 0)
-        if RUNTIME_MULTIRHS_ZERO
-            @test @allocated(LinearSolve.SupernodalLU.solve!(X, F, B; refine = 0)) == 0
-        end
-    end
-end
+# SupernodalLU's sweep proof lives in `qa/supernodal_allocations.jl`, which only
+# the QA group includes: this file also runs under `[AppleAccelerate]`, which
+# covers `pre`, and that proof only holds on 1.12 (it bottoms out in stdlib
+# `ldiv!`/`mul!` wrappers).  The direct-BLAS proofs above hold on every release.

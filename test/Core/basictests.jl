@@ -1,5 +1,6 @@
 using LinearSolve, LinearAlgebra, SparseArrays, MultiFloats, ForwardDiff
-using SciMLOperators: SciMLOperators, MatrixOperator, FunctionOperator, WOperator
+using SciMLOperators: SciMLOperators, MatrixOperator, FunctionOperator, WOperator,
+    cache_operator
 using RecursiveFactorization, Sparspak, FastLapackInterface
 using IterativeSolvers, KrylovKit, MKL_jll
 using Test

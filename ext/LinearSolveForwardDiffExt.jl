@@ -8,6 +8,7 @@ using SparseArrays
 using ForwardDiff
 using ForwardDiff: Dual, Partials
 using SciMLBase
+using SciMLOperators: issquare
 using RecursiveArrayTools
 using SciMLLogging
 using ArrayInterface

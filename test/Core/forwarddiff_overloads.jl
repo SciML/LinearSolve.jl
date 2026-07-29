@@ -32,6 +32,16 @@ function dual_isapprox(x, y; rtol)
     )
 end
 
+@testset "ForwardDiff square-system initialization" begin
+    A_dual = [
+        ForwardDiff.Dual(2.0, 1.0) ForwardDiff.Dual(1.0, 0.0)
+        ForwardDiff.Dual(1.0, 0.0) ForwardDiff.Dual(3.0, 1.0)
+    ]
+    b_dual = [ForwardDiff.Dual(1.0, 1.0), ForwardDiff.Dual(2.0, 0.0)]
+    sol = solve(LinearProblem(A_dual, b_dual), LUFactorization())
+    @test dual_isapprox(sol.u, A_dual \ b_dual; rtol = 1.0e-9)
+end
+
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 prob = LinearProblem(A, b)
 backslash_x_p = A \ b

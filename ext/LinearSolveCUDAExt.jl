@@ -11,7 +11,6 @@ using LinearSolve: LinearSolve, is_cusparse, defaultalg, cudss_loaded, DefaultLi
     CUDAOffload32MixedLUFactorization,
     SparspakFactorization, KLUFactorization, UMFPACKFactorization, LinearVerbosity
 using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase, LinearSolve.ArrayInterface
-using SciMLBase: AbstractSciMLOperator
 
 LinearSolve.usecuda(x::Nothing) = CUDACore.functional()
 

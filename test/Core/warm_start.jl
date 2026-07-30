@@ -87,6 +87,25 @@ end
     @test norm(A1 * cache.u - 1.0e-3 .* b1) < 1.0e-8
 end
 
+@testset "hegedus rejects a non-predictive previous direction" begin
+    b_previous = [1.0, 0.0]
+    b_nearly_orthogonal = [0.1, sqrt(0.99)]
+    for alg in (
+            KrylovJL_GMRES(warm_start = WarmStart.Hegedus),
+            KrylovJL_FGMRES(warm_start = WarmStart.Hegedus),
+        )
+        cache = init(
+            LinearProblem(Diagonal(ones(2)), b_previous), alg;
+            abstol = 0.0, reltol = 0.997
+        )
+        solve!(cache)
+        cache.b = b_nearly_orthogonal
+        solve!(cache)
+        @test cache.cacheval.stats.niter > 0
+        @test cache.u ≈ b_nearly_orthogonal
+    end
+end
+
 @testset "warm start with preconditioners" begin
     precs = (A, p) -> (Diagonal(diag(A)), I)
     for mode in (WarmStart.Previous, WarmStart.Hegedus)

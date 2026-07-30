@@ -173,8 +173,8 @@ end
     Base.get_extension(LinearSolve, :LinearSolveBLISExt) !== nothing &&
         push!(algs, LinearSolve.BLISLUFactorization())
     @test !isempty(algs)        # every platform has at least one of these
-    for alg in algs, thr in (4, 64)
-        F = SNLU.snlu(A; dense_alg = alg, dense_threshold = thr)
+    for alg in algs, threshold in (4, 64)
+        F = SNLU.snlu(A; dense_alg = alg, dense_threshold = threshold)
         @test length(F.bcaches) > 0
         x = similar(b)
         SNLU.solve!(x, F, b)

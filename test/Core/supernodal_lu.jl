@@ -97,6 +97,12 @@ end
     Fp = SNLU.snlu(Ap; matching = false, check = false)
     @test SNLU.nperturbed(Fp) > 0
     @test SNLU._auto_refine(Fp) == 3
+    # `refine` resolves by dispatch, so an unknown symbol says what is accepted
+    # instead of reaching `Int(::Symbol)`
+    @test SNLU._refine_steps(Fp, 2) == 2
+    @test SNLU._refine_steps(Fp, :auto) == 3
+    bp = randn(size(Ap, 1))
+    @test_throws ArgumentError SNLU.solve!(similar(bp), Fp, bp; refine = :bogus)
 end
 
 @testset "residual check does not allocate a work vector" begin

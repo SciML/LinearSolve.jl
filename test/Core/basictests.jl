@@ -187,6 +187,23 @@ end
         @test X * solve!(cache) ≈ b1
     end
 
+    @testset "KLU factor parts" begin
+        KLU = Base.get_extension(LinearSolve, :LinearSolveSparseArraysExt).KLU
+        # Block-triangular so the off-diagonal `F` part is non-empty
+        Abt = sparse([rand(3, 3) + 3I rand(3, 3); zeros(3, 3) rand(3, 3) + 3I])
+        for At in (sparse(A / 1), Abt)
+            K = KLU.klu(At)
+            @test (K.Rs .\ At)[K.p, K.q] ≈ K.L * K.U + K.F
+            @test sort(K.p) == 1:size(At, 1)
+            @test sort(K.q) == 1:size(At, 1)
+            @test length(K.R) == K.nblocks + 1
+            @test K.R[1] == 1
+            @test K.R[end] == size(At, 1) + 1
+        end
+        # unfactored handles still report what is missing
+        @test_throws ArgumentError KLU.KLUFactorization(sparse(A / 1)).lnz
+    end
+
     @testset "PureKLU Factorization" begin
         A1 = sparse(A / 1)
         b1 = rand(n)

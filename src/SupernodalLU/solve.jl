@@ -261,6 +261,16 @@ end
 # per solve for a residual change of ~1.5e-15 -> 7e-16.
 _auto_refine(F::SupernodalLUFactor) = F.nperturbed > 0 ? 3 : 0
 
+# Dispatch on the `refine` type rather than branching on its value: a value
+# branch leaves `Int(refine::Symbol)` reachable, which is both a runtime
+# dispatch and a MethodError instead of a usable message for a bad symbol.
+_refine_steps(::SupernodalLUFactor, refine::Integer) = Int(refine)
+function _refine_steps(F::SupernodalLUFactor, refine::Symbol)
+    refine === :auto ||
+        throw(ArgumentError("`refine` must be `:auto` or an integer number of steps"))
+    return _auto_refine(F)
+end
+
 """
     solve!(x, F::SupernodalLUFactor, b; refine=:auto) -> x
     solve(F::SupernodalLUFactor, b; refine=:auto) -> x
@@ -277,7 +287,7 @@ function solve!(
         x::AbstractVector{Tv}, F::SupernodalLUFactor{Tv}, b::AbstractVector;
         refine::Union{Symbol, Integer} = :auto
     ) where {Tv}
-    nref = refine === :auto ? _auto_refine(F) : Int(refine)
+    nref = _refine_steps(F, refine)
     _solve_once!(x, F, b)
     if nref > 0
         r = F.ir_r
@@ -301,7 +311,7 @@ function solve!(
         refine::Union{Symbol, Integer} = :auto
     ) where {Tv}
     size(X) == size(B) || throw(DimensionMismatch("X and B sizes differ"))
-    nref = refine === :auto ? _auto_refine(F) : Int(refine)
+    nref = _refine_steps(F, refine)
     if nref == 0
         return _solve_once!(X, F, B)
     end

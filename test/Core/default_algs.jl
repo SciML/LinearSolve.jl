@@ -1,5 +1,5 @@
 using LinearSolve, RecursiveFactorization, LinearAlgebra, SparseArrays, Test
-using SciMLOperators: FunctionOperator
+using SciMLOperators: FunctionOperator, MatrixOperator, WOperator
 
 @test LinearSolve.defaultalg(nothing, zeros(3)).alg === LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
 prob = LinearProblem(rand(3, 3), rand(3))
@@ -358,7 +358,6 @@ sol_qr2 = solve(
 
 # Regression test for https://github.com/SciML/LinearSolve.jl/issues/890
 # WOperator with init_cacheval overload that unwraps A.J (as OrdinaryDiffEqDifferentiation does)
-using SciMLOperators: WOperator, MatrixOperator
 function LinearSolve.init_cacheval(
         alg::LinearSolve.DefaultLinearSolver, A::WOperator, b, u,
         Pl, Pr,

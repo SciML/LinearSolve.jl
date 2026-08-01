@@ -1,7 +1,7 @@
 module LinearSolveCUDSSExt
 
-using LinearSolve: LinearSolve, cudss_loaded
-using CUDSS
+using LinearSolve: LinearSolve
+using CUDSS: CUDSS
 
 LinearSolve.cudss_loaded(A::CUDSS.cuSPARSE.CuSparseMatrixCSR) = true
 

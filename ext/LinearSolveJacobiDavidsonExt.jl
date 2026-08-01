@@ -1,8 +1,8 @@
 module LinearSolveJacobiDavidsonExt
 
-using LinearSolve
-using LinearAlgebra
-using JacobiDavidson
+using LinearSolve: LinearSolve
+using LinearAlgebra: LinearAlgebra, eigen
+using JacobiDavidson: JacobiDavidson
 using SciMLBase: SciMLBase, ReturnCode
 
 function SciMLBase.solve(
@@ -34,7 +34,7 @@ function SciMLBase.solve(
         values, vectors, nev, prob.eigentarget, prob.shift
     )
     retcode = length(values) >= nev ? ReturnCode.Success : ReturnCode.ConvergenceFailure
-    return LinearSolve.build_eigenvalue_solution(
+    return SciMLBase.build_eigenvalue_solution(
         prob, alg, values, vectors; retcode, stats = out[end]
     )
 end

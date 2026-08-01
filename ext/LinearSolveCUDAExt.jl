@@ -1,16 +1,17 @@
 module LinearSolveCUDAExt
 
-using cuSOLVER
+using cuSOLVER: cuSOLVER
+# cuSOLVER is the only trigger, and it is what exposes the rest of the CUDA stack to
+# this extension; cuSPARSE and CUDACore are not reachable on their own from here.
 CUDACore = cuSOLVER.CUDACore
 cuSPARSE = cuSOLVER.cuSPARSE
 
-using LinearSolve: LinearSolve, is_cusparse, defaultalg, cudss_loaded, DefaultLinearSolver,
-    DefaultAlgorithmChoice, ALREADY_WARNED_CUDSS, LinearCache,
-    error_no_cudss_lu, init_cacheval, OperatorAssumptions,
+using LinearSolve: LinearSolve, OperatorAssumptions,
     CudaOffloadFactorization, CudaOffloadLUFactorization, CudaOffloadQRFactorization,
     CUDAOffload32MixedLUFactorization,
     SparspakFactorization, KLUFactorization, UMFPACKFactorization, LinearVerbosity
-using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase, LinearSolve.ArrayInterface
+using LinearAlgebra: LinearAlgebra, LU, ldiv!, lu, qr
+using SciMLBase: SciMLBase
 
 LinearSolve.usecuda(x::Nothing) = CUDACore.functional()
 

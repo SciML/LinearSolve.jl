@@ -1,6 +1,15 @@
 module LinearSolveBandedMatricesExt
 
-using BandedMatrices, LinearAlgebra, LinearSolve
+using BandedMatrices: BandedMatrices, BandedMatrix
+using LinearAlgebra: LinearAlgebra, ColumnNorm, NoPivot, Symmetric, lu, lu!, qr, qr!
+# The `@eval` loops below generate `init_cacheval` methods for every algorithm type,
+# which ExplicitImports cannot see, so they are all imported explicitly here.
+using LinearSolve: LinearSolve, LUFactorization, OperatorAssumptions, QRFactorization,
+    AppleAccelerateLUFactorization, BunchKaufmanFactorization, CHOLMODFactorization,
+    CholeskyFactorization, DiagonalFactorization, GenericLUFactorization,
+    KLUFactorization, LDLtFactorization, MKLLUFactorization,
+    NormalCholeskyFactorization, RFLUFactorization, SVDFactorization,
+    SparspakFactorization, UMFPACKFactorization
 import LinearSolve: defaultalg,
     do_factorization, init_cacheval, DefaultLinearSolver,
     DefaultAlgorithmChoice, LinearVerbosity

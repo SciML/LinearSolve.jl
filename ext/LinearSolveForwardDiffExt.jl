@@ -1,17 +1,18 @@
 module LinearSolveForwardDiffExt
 
-using LinearSolve
-using LinearSolve: SciMLLinearSolveAlgorithm, __init, LinearVerbosity, DefaultLinearSolver,
-    DefaultAlgorithmChoice, defaultalg, reinit!, default_alias_A
-using LinearAlgebra
-using SparseArrays
-using ForwardDiff
-using ForwardDiff: Dual, Partials
-using SciMLBase
+using LinearSolve: LinearSolve, SciMLLinearSolveAlgorithm, __init, LinearVerbosity,
+    DefaultLinearSolver, GenericLUFactorization, LinearSolveAdjoint,
+    OperatorAssumptions, PureKLUFactorization, SparspakFactorization, defaultalg,
+    default_alias_A
+using ConcreteStructs: @concrete
+using LinearAlgebra: LinearAlgebra, mul!
+using SparseArrays: SparseArrays, SparseMatrixCSC, nonzeros
+using ForwardDiff: ForwardDiff, Dual, Partials
+using SciMLBase: SciMLBase, LinearAliasSpecifier, LinearProblem, init, solve, solve!
 using SciMLOperators: issquare
-using RecursiveArrayTools
-using SciMLLogging
-using ArrayInterface
+using RecursiveArrayTools: RecursiveArrayTools
+using SciMLLogging: SciMLLogging
+using ArrayInterface: ArrayInterface
 
 const DualLinearProblem = LinearProblem{
     <:Union{Number, <:AbstractArray, Nothing}, iip,
@@ -40,7 +41,7 @@ const DualAbstractLinearProblem = Union{
     DualLinearProblem, DualALinearProblem, DualBLinearProblem,
 }
 
-LinearSolve.@concrete mutable struct DualLinearCache{DT}
+@concrete mutable struct DualLinearCache{DT}
     linear_cache
 
     partials_A

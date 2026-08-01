@@ -1,12 +1,11 @@
 module LinearSolveMooncakeExt
 
-using Mooncake
-using Mooncake: @from_chainrules, MinimalCtx, ReverseMode, NoRData, increment!!, @is_primitive, primal, zero_fcodual, CoDual, rdata, fdata
+using Mooncake: Mooncake, @from_chainrules, MinimalCtx, ReverseMode, NoRData,
+    @is_primitive, primal, zero_fcodual, CoDual, rdata, fdata
 using LinearSolve: LinearSolve, SciMLLinearSolveAlgorithm, init, solve!, LinearProblem,
     LinearCache, AbstractKrylovSubspaceMethod, DefaultLinearSolver, LinearSolveAdjoint,
-    defaultalg_adjoint_eval, solve, LUFactorization
-using LinearSolve.LinearAlgebra
-using SciMLBase
+    OperatorAssumptions, defaultalg, solve
+using SciMLBase: SciMLBase
 
 @from_chainrules MinimalCtx Tuple{typeof(SciMLBase.solve), LinearProblem, Nothing} true ReverseMode
 @from_chainrules MinimalCtx Tuple{

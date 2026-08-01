@@ -1,6 +1,7 @@
 module LinearSolveBlockDiagonalsExt
 
-using LinearSolve, BlockDiagonals
+using LinearSolve: LinearSolve, SimpleGMRES
+using BlockDiagonals: BlockDiagonals, BlockDiagonal, blocksizes
 
 function LinearSolve.init_cacheval(
         alg::SimpleGMRES{false}, A::BlockDiagonal, b, args...;

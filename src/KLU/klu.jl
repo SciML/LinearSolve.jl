@@ -270,70 +270,80 @@ function Base.propertynames(::AbstractKLUFactorization, private::Bool = false)
     end
 end
 
+function _symbolic_struct(klu::AbstractKLUFactorization{Tv, Ti}) where {Tv <: KLUTypes, Ti <: KLUITypes}
+    symptr = getfield(klu, :(_symbolic))
+    symptr == C_NULL &&
+        throw(ArgumentError("This KLUFactorization has not yet been analyzed. Try `klu_analyze!`."))
+    return if Ti == Int64
+        unsafe_load(Ptr{klu_l_symbolic}(symptr))
+    else
+        unsafe_load(Ptr{klu_symbolic}(symptr))
+    end
+end
+
+function _numeric_struct(klu::AbstractKLUFactorization{Tv, Ti}) where {Tv <: KLUTypes, Ti <: KLUITypes}
+    numptr = getfield(klu, :(_numeric))
+    numptr == C_NULL &&
+        throw(ArgumentError("This KLUFactorization has not yet been factored. Try `klu_factor!`."))
+    return if Ti == Int64
+        unsafe_load(Ptr{klu_l_numeric}(numptr))
+    else
+        unsafe_load(Ptr{klu_numeric}(numptr))
+    end
+end
+
 function getproperty(
         klu::AbstractKLUFactorization{Tv, Ti},
         s::Symbol
     ) where {Tv <: KLUTypes, Ti <: KLUITypes}
     # Forwards to the numeric struct:
     if s ∈ (:lnz, :unz, :nzoff)
-        klu._numeric == C_NULL &&
-            throw(ArgumentError("This KLUFactorization has not yet been factored. Try `klu_factor!`."))
-        return getproperty(klu.numeric, s)
+        return getproperty(_numeric_struct(klu), s)
     end
     if s ∈ (:nblocks, :maxblock)
-        klu._symbolic == C_NULL &&
-            throw(ArgumentError("This KLUFactorization has not yet been analyzed. Try `klu_analyze!`."))
-        return getproperty(klu.symbolic, s)
+        return getproperty(_symbolic_struct(klu), s)
     end
     if s === :symbolic
-        klu._symbolic == C_NULL &&
-            throw(ArgumentError("This KLUFactorization has not yet been analyzed. Try `klu_analyze!`."))
-        if Ti == Int64
-            return unsafe_load(Ptr{klu_l_symbolic}(klu._symbolic))
-        else
-            return unsafe_load(Ptr{klu_symbolic}(klu._symbolic))
-        end
+        return _symbolic_struct(klu)
     end
     if s === :numeric
-        klu._numeric == C_NULL &&
-            throw(ArgumentError("This KLUFactorization has not yet been factored. Try `klu_factor!`."))
-        if Ti == Int64
-            return unsafe_load(Ptr{klu_l_numeric}(klu._numeric))
-        else
-            return unsafe_load(Ptr{klu_numeric}(klu._numeric))
-        end
+        return _numeric_struct(klu)
     end
     # Non-overloaded parts:
     if s ∉ (:L, :U, :F, :p, :q, :R, :Rs, :(_L), :(_U), :(_F))
         return getfield(klu, s)
     end
-    # Factor parts:
+    # Factor parts: the sizes come from `_numeric_struct` rather than from
+    # `klu.lnz` etc., because reading them back through this same `getproperty`
+    # is a self-recursive call that inference abandons — the resulting `Any`
+    # sizes make the `_extract!` keyword calls below uninferable.
+    n = getfield(klu, :n)
     if s === :(_L)
-        lnz = Int(klu.lnz)
-        Lp = Vector{Ti}(undef, klu.n + 1)
+        lnz = Int(_numeric_struct(klu).lnz)
+        Lp = Vector{Ti}(undef, n + 1)
         Li = Vector{Ti}(undef, lnz)
         Lx = Vector{Float64}(undef, lnz)
         Lz = Tv == Float64 ? C_NULL : Vector{Float64}(undef, lnz)
         _extract!(klu; Lp, Li, Lx, Lz)
         return Lp, Li, Lx, Lz
     elseif s === :(_U)
-        unz = Int(klu.unz)
-        Up = Vector{Ti}(undef, klu.n + 1)
+        unz = Int(_numeric_struct(klu).unz)
+        Up = Vector{Ti}(undef, n + 1)
         Ui = Vector{Ti}(undef, unz)
         Ux = Vector{Float64}(undef, unz)
         Uz = Tv == Float64 ? C_NULL : Vector{Float64}(undef, unz)
         _extract!(klu; Up, Ui, Ux, Uz)
         return Up, Ui, Ux, Uz
     elseif s === :(_F)
-        fnz = Int(klu.nzoff)
+        fnz = Int(_numeric_struct(klu).nzoff)
         # We often don't have an F, so create the right vectors for an empty SparseMatrixCSC
         if fnz == 0
-            Fp = zeros(Ti, klu.n + 1)
+            Fp = zeros(Ti, n + 1)
             Fi = Vector{Ti}()
             Fx = Vector{Float64}()
             Fz = Tv == Float64 ? C_NULL : Vector{Float64}()
         else
-            Fp = Vector{Ti}(undef, klu.n + 1)
+            Fp = Vector{Ti}(undef, n + 1)
             Fi = Vector{Ti}(undef, fnz)
             Fx = Vector{Float64}(undef, fnz)
             Fz = Tv == Float64 ? C_NULL : Vector{Float64}(undef, fnz)
@@ -360,22 +370,25 @@ function getproperty(
         end
         return Fp, Fi, Fx, Fz
     end
-    if s ∈ (:q, :p, :R, :Rs)
-        if s === :Rs
-            out = Vector{Float64}(undef, klu.n)
-        elseif s === :R
-            out = Vector{Ti}(undef, klu.nblocks + 1)
-        else
-            out = Vector{Ti}(undef, klu.n)
-        end
-        # This tuple construction feels hacky, there's a better way I'm sure.
-        s === :q && (s = :Q)
-        s === :p && (s = :P)
-        _extract!(klu; NamedTuple{(s,)}((out,))...)
-        if s ∈ (:Q, :P, :R)
-            increment!(out)
-        end
-        return out
+    # Each branch names its keyword literally: splatting a `NamedTuple{(s,)}`
+    # built from a non-constant `s` makes the keyword call uninferable, and the
+    # `pairs(::NamedTuple)` eltype computation it lands in dispatches at runtime.
+    if s === :Rs
+        Rs = Vector{Float64}(undef, n)
+        _extract!(klu; Rs)
+        return Rs
+    elseif s === :R
+        R = Vector{Ti}(undef, Int(_symbolic_struct(klu).nblocks) + 1)
+        _extract!(klu; R)
+        return increment!(R)
+    elseif s === :q
+        Q = Vector{Ti}(undef, n)
+        _extract!(klu; Q)
+        return increment!(Q)
+    elseif s === :p
+        P = Vector{Ti}(undef, n)
+        _extract!(klu; P)
+        return increment!(P)
     end
     return if s ∈ (:L, :U, :F)
         if s === :L

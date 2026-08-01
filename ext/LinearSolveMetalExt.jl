@@ -2,7 +2,6 @@ module LinearSolveMetalExt
 
 using Metal, LinearSolve
 using LinearAlgebra, SciMLBase
-using SciMLBase: AbstractSciMLOperator
 using LinearSolve: ArrayInterface, MKLLUFactorization, MetalOffload32MixedLUFactorization,
     @get_cacheval, LinearCache, SciMLBase, OperatorAssumptions, LinearVerbosity
 

@@ -1411,7 +1411,7 @@ function init_cacheval(
 end
 
 """
-`PureKLUFactorization(; reuse_symbolic = true, check_pattern = true, use_fma = true, fully_preallocated = nothing)`
+`PureKLUFactorization(; reuse_symbolic = true, check_pattern = true, use_fma = true, fully_preallocated = nothing, tol = 0.001)`
 
 A pure-Julia port of SuiteSparse's KLU sparse LU solver, provided by
 [PureKLU.jl](https://github.com/SciML/PureKLU.jl). It has no SuiteSparse binary
@@ -1438,12 +1438,17 @@ in the default polyalgorithm.
     SuiteSparse `KLUFactorization`. Defaults to `true`.
   - `fully_preallocated`: PureKLU's `fully_preallocated` option. `nothing` (default) lets
     PureKLU choose automatically based on the maximum block size.
+  - `tol`: Pivot on a column's diagonal instead of largest entry if it is at least `tol` times
+    larger in magnitude. Set `tol = 1.0` for partial pivoting, and `tol = 0.0` to always use the
+    diagonal. Only applies to the initial factorization; refactorizations reuse the existing
+    pivot ordering. Defaults to `0.001`.
 """
 Base.@kwdef struct PureKLUFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool = true
     check_pattern::Bool = true
     use_fma::Bool = true
     fully_preallocated::Union{Bool, Nothing} = nothing
+    tol::Float64 = 0.001
 end
 
 function init_cacheval(

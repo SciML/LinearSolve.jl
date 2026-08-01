@@ -653,10 +653,11 @@ function SciMLBase.solve!(
                         size(A)..., getcolptr(A), rowvals(A),
                         nonzeros(A)
                     ),
-                    check = false, use_fma = alg.use_fma,
+                    check = false, use_fma = alg.use_fma, tol = alg.tol,
                     fully_preallocated = alg.fully_preallocated
                 )
             else
+                # Refactorization reuses pivot ordering; `tol` does not apply
                 fact = PureKLU.klu!(cacheval, nonzeros(A), check = false)
             end
         else
@@ -668,7 +669,7 @@ function SciMLBase.solve!(
                     size(A)..., getcolptr(A), rowvals(A),
                     nonzeros(A)
                 ),
-                check = false, use_fma = alg.use_fma,
+                check = false, use_fma = alg.use_fma, tol = alg.tol,
                 fully_preallocated = alg.fully_preallocated
             )
         end

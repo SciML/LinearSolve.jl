@@ -1,7 +1,7 @@
 module LinearSolveArpackExt
 
-using LinearSolve
-using Arpack
+using LinearSolve: LinearSolve
+using Arpack: Arpack
 using SciMLBase: SciMLBase, ReturnCode
 
 function SciMLBase.solve(
@@ -24,7 +24,7 @@ function SciMLBase.solve(
     end
     retcode = nconv >= length(values) ? ReturnCode.Success : ReturnCode.ConvergenceFailure
     stats = (; nconv, niter, nmult)
-    return LinearSolve.build_eigenvalue_solution(
+    return SciMLBase.build_eigenvalue_solution(
         prob, alg, values, vectors; retcode, resid, stats
     )
 end

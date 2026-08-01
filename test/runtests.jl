@@ -227,12 +227,18 @@ else
         qa = function ()
             if isempty(VERSION.prerelease)
                 activate_group_env(joinpath(@__DIR__, "qa"))
-                @time @safetestset "Quality Assurance" include("qa/qa.jl")
+                # qa.jl runs last: it loads the extension trigger packages so that
+                # ExplicitImports can analyze the extensions, and package loading is
+                # process-global. Several of those extensions change algorithm
+                # selection (LinearSolveBLISExt makes BLIS the default LU, for
+                # instance), which would otherwise perturb the JET and allocation
+                # assertions below.
                 @time @safetestset "JET Tests" include("qa/jet.jl")
                 @time @safetestset "Allocation QA" include("qa/allocations.jl")
                 @time @safetestset "SupernodalLU Allocation QA" include(
                     "qa/supernodal_allocations.jl"
                 )
+                @time @safetestset "Quality Assurance" include("qa/qa.jl")
             end
             return nothing
         end,

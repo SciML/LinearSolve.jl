@@ -1,7 +1,9 @@
 module LinearSolveKrylovKitExt
 
-using LinearSolve, KrylovKit, LinearAlgebra
-using LinearSolve: LinearCache, DEFAULT_PRECS
+using KrylovKit: KrylovKit
+using LinearAlgebra: LinearAlgebra, I, factorize
+using LinearSolve: LinearSolve, KrylovKitJL, LinearCache, DEFAULT_PRECS
+using SciMLBase: SciMLBase, ReturnCode
 using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_int
 
 function LinearSolve.KrylovKitJL(
@@ -82,7 +84,7 @@ function SciMLBase.solve(
         values, vecmat, nev, prob.eigentarget, prob.shift
     )
     retcode = info.converged >= length(values) ? ReturnCode.Success : ReturnCode.ConvergenceFailure
-    return LinearSolve.build_eigenvalue_solution(
+    return SciMLBase.build_eigenvalue_solution(
         prob, alg, values, vecmat; retcode, resid = info.normres, stats = info
     )
 end

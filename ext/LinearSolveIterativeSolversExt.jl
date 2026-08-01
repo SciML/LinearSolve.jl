@@ -1,11 +1,13 @@
 module LinearSolveIterativeSolversExt
 
-using LinearSolve, LinearAlgebra
-using LinearSolve: LinearCache, DEFAULT_PRECS, LinearVerbosity
+using LinearSolve: LinearSolve, LinearCache, DEFAULT_PRECS, LinearVerbosity,
+    OperatorAssumptions
 import LinearSolve: IterativeSolversJL
+using SciMLBase: SciMLBase
+using LinearAlgebra: LinearAlgebra, norm
 using SciMLLogging: SciMLLogging, @SciMLMessage
 
-using IterativeSolvers
+using IterativeSolvers: IterativeSolvers
 
 function LinearSolve.IterativeSolversJL(
         args...;

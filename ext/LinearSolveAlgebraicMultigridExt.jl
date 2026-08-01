@@ -1,7 +1,9 @@
 module LinearSolveAlgebraicMultigridExt
 
-using LinearSolve, AlgebraicMultigrid, LinearAlgebra
-using LinearSolve: LinearCache, LinearVerbosity, OperatorAssumptions
+using AlgebraicMultigrid: AlgebraicMultigrid
+using LinearAlgebra: LinearAlgebra
+using LinearSolve: LinearSolve, AlgebraicMultigridJL, LinearCache, LinearVerbosity,
+    OperatorAssumptions
 using SciMLBase: SciMLBase, ReturnCode
 
 function LinearSolve.init_cacheval(

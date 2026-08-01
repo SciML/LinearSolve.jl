@@ -1,9 +1,10 @@
 module LinearSolveRecursiveFactorizationExt
 
-using LinearSolve: LinearSolve, userecursivefactorization, LinearCache, @get_cacheval,
-    RFLUFactorization, ButterflyFactorization, RF32MixedLUFactorization,
-    LinearVerbosity
-using LinearSolve.LinearAlgebra, LinearSolve.ArrayInterface, RecursiveFactorization
+using LinearSolve: LinearSolve, RFLUFactorization, ButterflyFactorization,
+    RF32MixedLUFactorization, LinearVerbosity
+using ArrayInterface: ArrayInterface
+using LinearAlgebra: LinearAlgebra, UnitLowerTriangular, UpperTriangular, ldiv!, mul!
+using RecursiveFactorization: RecursiveFactorization
 using TriangularSolve: TriangularSolve
 using SciMLBase: SciMLBase, ReturnCode
 using SciMLLogging: @SciMLMessage
@@ -191,7 +192,7 @@ function SciMLBase.solve!(
     mul!(tmp, U', b)
 
     # TriangularSolve.ldiv!
-    RecursiveFactorization.ldiv!(F, tmp, thread)
+    TriangularSolve.ldiv!(F, tmp, thread)
 
     mul!(b, V, tmp)
     out .= @view b[1:n]

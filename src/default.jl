@@ -1162,8 +1162,12 @@ end
                 )
             end
         else
+            # Interpolate the algorithm name at generator time: inside `quote`, the
+            # `$(alg)` of a string literal is left as a reference to a runtime binding
+            # `alg`, which does not exist in the generated method.
+            msg = "Default linear solver with algorithm $(alg) is currently not supported by Enzyme rules on LinearSolve.jl. Please open an issue on LinearSolve.jl detailing which algorithm is missing the adjoint handling"
             quote
-                error("Default linear solver with algorithm $(alg) is currently not supported by Enzyme rules on LinearSolve.jl. Please open an issue on LinearSolve.jl detailing which algorithm is missing the adjoint handling")
+                error($msg)
             end
         end
 

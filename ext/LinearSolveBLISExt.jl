@@ -1,15 +1,15 @@
 module LinearSolveBLISExt
 
-using Libdl
-using blis_jll
-using LAPACK_jll
-using LinearAlgebra
-using LinearSolve
+using Libdl: Libdl
+using blis_jll: blis_jll
+using LAPACK_jll: LAPACK_jll
 
-using LinearAlgebra: BlasInt
-using LinearAlgebra.LAPACK: require_one_based_indexing, chkfinite, chkstride1,
-    @blasfunc, chkargsok
-using LinearSolve: BLISLUFactorization, @get_cacheval, LinearCache, SciMLBase, LinearVerbosity, get_blas_operation_info, blas_info_msg
+using Base: require_one_based_indexing
+using LinearAlgebra: LinearAlgebra, LAPACK, BlasInt
+using LinearAlgebra.LAPACK: chkfinite, chkstride1, @blasfunc, chkargsok
+using LinearSolve: LinearSolve, BLISLUFactorization, @get_cacheval, LinearCache,
+    SciMLBase, LinearVerbosity, OperatorAssumptions, get_blas_operation_info,
+    blas_info_msg
 using SciMLLogging: SciMLLogging, @SciMLMessage
 using SciMLBase: ReturnCode
 

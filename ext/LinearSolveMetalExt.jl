@@ -1,9 +1,11 @@
 module LinearSolveMetalExt
 
-using Metal, LinearSolve
-using LinearAlgebra, SciMLBase
-using LinearSolve: ArrayInterface, MKLLUFactorization, MetalOffload32MixedLUFactorization,
-    @get_cacheval, LinearCache, SciMLBase, OperatorAssumptions, LinearVerbosity
+using Metal: Metal, MtlArray, MtlVector
+using LinearAlgebra: LinearAlgebra, LU, ldiv!, lu
+using SciMLBase: SciMLBase
+using LinearSolve: LinearSolve, ArrayInterface, MetalLUFactorization,
+    MetalOffload32MixedLUFactorization, @get_cacheval, LinearCache, OperatorAssumptions,
+    LinearVerbosity
 
 @static if Sys.isapple()
 

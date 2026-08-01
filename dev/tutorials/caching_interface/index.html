@@ -14,25 +14,25 @@ prob = LS.LinearProblem(A, b1)
 linsolve = LS.init(prob)
 sol1 = LS.solve!(linsolve)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">retcode: Success
 u: 4-element Vector{Float64}:
-  1.1279727347838722
- -1.1857655743412667
-  0.4971619911353348
-  1.1281178971044554</code></pre><pre><code class="language-julia hljs">linsolve.b = b2
+  1.1093110174582592
+  0.8129101490995551
+ -0.23524857284248502
+ -0.3628802806267628</code></pre><pre><code class="language-julia hljs">linsolve.b = b2
 sol2 = LS.solve!(linsolve)
 
 sol2.u</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">4-element Vector{Float64}:
-  0.6331338489810991
-  0.054354057901890046
-  0.5317815445206218
- -0.16114864284935404</code></pre><p>Then refactorization will occur when a new <code>A</code> is given:</p><pre><code class="language-julia hljs">A2 = rand(n, n)
+ -3.3316293607602656
+ -2.026156688787897
+  3.3752388340595285
+  3.9929627381190693</code></pre><p>Then refactorization will occur when a new <code>A</code> is given:</p><pre><code class="language-julia hljs">A2 = rand(n, n)
 linsolve.A = A2
 sol3 = LS.solve!(linsolve)
 
 sol3.u</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">4-element Vector{Float64}:
-  0.8075578310624544
- -0.45176458206969433
-  0.027529846254275524
- -0.06260668525851128</code></pre><p>The factorization occurs on the first solve, and it stores the factorization in the cache: the <code>linsolve</code> object returned by <code>init</code> is updated in-place to know not to re-solve the factorization. Keep the object from <code>init</code> around to reuse it; the solution returned by <code>solve!</code> is a lightweight value type that only carries the answer (<code>sol.u</code>, <code>sol.resid</code>, <code>sol.retcode</code>, ...), so its <code>cache</code> field is <code>nothing</code> (as of LinearSolve.jl 5.0).</p><p>The advantage of course with import LinearSolve.jl in this form is that it is efficient while being agnostic to the linear solver. One can easily swap in iterative solvers, sparse solvers, etc. and it will do all the tricks like caching the symbolic factorization if the sparsity pattern is unchanged.</p><h2 id="Reusing-the-Symbolic-Factorization-with-Sparse-Matrices"><a class="docs-heading-anchor" href="#Reusing-the-Symbolic-Factorization-with-Sparse-Matrices">Reusing the Symbolic Factorization with Sparse Matrices</a><a id="Reusing-the-Symbolic-Factorization-with-Sparse-Matrices-1"></a><a class="docs-heading-anchor-permalink" href="#Reusing-the-Symbolic-Factorization-with-Sparse-Matrices" title="Permalink"></a></h2><p>For sparse factorizations such as <code>UMFPACKFactorization</code> and <code>KLUFactorization</code>, a significantly expensive part of a solve is often the <em>symbolic</em> factorization: the analysis of the sparsity pattern that determines the fill-in and elimination ordering. The subsequent <em>numeric</em> factorization, which computes the actual <code>L</code> and <code>U</code> factor values, is not cheap but must be recomputed for every change in the values of <code>A</code>. Thus storing the symbolic factorization can lead to some sizable gains.</p><p>A very common case (for example, the Newton steps of a nonlinear solve or the time steps of an implicit ODE/PDE integrator) is that <code>A</code> keeps the <strong>same sparsity pattern</strong> across solves while only its stored values change. In that case, the symbolic factorization can be reused and only the numeric factorization needs to be redone. This is controlled by the <code>reuse_symbolic</code> keyword on the sparse factorization algorithms, which <strong>defaults to <code>true</code></strong> — so you get this behavior automatically and do not need to set it:</p><pre><code class="language-julia hljs">solver = LS.UMFPACKFactorization()   # reuse_symbolic = true by default</code></pre><p>When a new <code>A</code> with an unchanged pattern is given, LinearSolve.jl reuses the cached symbolic factorization and performs only the numeric refactorization. By default it also runs a <code>check_pattern</code> pass to confirm the pattern really is unchanged; if your pattern is guaranteed constant, you can set <code>check_pattern = false</code> to skip that check for a little extra speed. Set <code>reuse_symbolic = false</code> only if the sparsity pattern may change between solves.</p><h3 id="Updating-the-values-of-A"><a class="docs-heading-anchor" href="#Updating-the-values-of-A">Updating the values of <code>A</code></a><a id="Updating-the-values-of-A-1"></a><a class="docs-heading-anchor-permalink" href="#Updating-the-values-of-A" title="Permalink"></a></h3><p>The caching interface tracks whether the factorization is stale through the assignment <code>linsolve.A = A</code>. <strong>Mutating the stored values of <code>A</code> in place does not, on its own, tell the cache that <code>A</code> has changed</strong>, so the next <code>solve!</code> will silently reuse the old factorization and return a stale (wrong) result:</p><pre><code class="language-julia hljs">linsolve.A.nzval .*= 2   # in-place edit: NOT seen by the cache
+ -1.0590722595119773
+  2.0363211044489167
+  1.8764676979727732
+ -1.7598459457658222</code></pre><p>The factorization occurs on the first solve, and it stores the factorization in the cache: the <code>linsolve</code> object returned by <code>init</code> is updated in-place to know not to re-solve the factorization. Keep the object from <code>init</code> around to reuse it; the solution returned by <code>solve!</code> is a lightweight value type that only carries the answer (<code>sol.u</code>, <code>sol.resid</code>, <code>sol.retcode</code>, ...), so its <code>cache</code> field is <code>nothing</code> (as of LinearSolve.jl 5.0).</p><p>The advantage of course with import LinearSolve.jl in this form is that it is efficient while being agnostic to the linear solver. One can easily swap in iterative solvers, sparse solvers, etc. and it will do all the tricks like caching the symbolic factorization if the sparsity pattern is unchanged.</p><h2 id="Reusing-the-Symbolic-Factorization-with-Sparse-Matrices"><a class="docs-heading-anchor" href="#Reusing-the-Symbolic-Factorization-with-Sparse-Matrices">Reusing the Symbolic Factorization with Sparse Matrices</a><a id="Reusing-the-Symbolic-Factorization-with-Sparse-Matrices-1"></a><a class="docs-heading-anchor-permalink" href="#Reusing-the-Symbolic-Factorization-with-Sparse-Matrices" title="Permalink"></a></h2><p>For sparse factorizations such as <code>UMFPACKFactorization</code> and <code>KLUFactorization</code>, a significantly expensive part of a solve is often the <em>symbolic</em> factorization: the analysis of the sparsity pattern that determines the fill-in and elimination ordering. The subsequent <em>numeric</em> factorization, which computes the actual <code>L</code> and <code>U</code> factor values, is not cheap but must be recomputed for every change in the values of <code>A</code>. Thus storing the symbolic factorization can lead to some sizable gains.</p><p>A very common case (for example, the Newton steps of a nonlinear solve or the time steps of an implicit ODE/PDE integrator) is that <code>A</code> keeps the <strong>same sparsity pattern</strong> across solves while only its stored values change. In that case, the symbolic factorization can be reused and only the numeric factorization needs to be redone. This is controlled by the <code>reuse_symbolic</code> keyword on the sparse factorization algorithms, which <strong>defaults to <code>true</code></strong> — so you get this behavior automatically and do not need to set it:</p><pre><code class="language-julia hljs">solver = LS.UMFPACKFactorization()   # reuse_symbolic = true by default</code></pre><p>When a new <code>A</code> with an unchanged pattern is given, LinearSolve.jl reuses the cached symbolic factorization and performs only the numeric refactorization. By default it also runs a <code>check_pattern</code> pass to confirm the pattern really is unchanged; if your pattern is guaranteed constant, you can set <code>check_pattern = false</code> to skip that check for a little extra speed. Set <code>reuse_symbolic = false</code> only if the sparsity pattern may change between solves.</p><h3 id="Updating-the-values-of-A"><a class="docs-heading-anchor" href="#Updating-the-values-of-A">Updating the values of <code>A</code></a><a id="Updating-the-values-of-A-1"></a><a class="docs-heading-anchor-permalink" href="#Updating-the-values-of-A" title="Permalink"></a></h3><p>The caching interface tracks whether the factorization is stale through the assignment <code>linsolve.A = A</code>. <strong>Mutating the stored values of <code>A</code> in place does not, on its own, tell the cache that <code>A</code> has changed</strong>, so the next <code>solve!</code> will silently reuse the old factorization and return a stale (wrong) result:</p><pre><code class="language-julia hljs">linsolve.A.nzval .*= 2   # in-place edit: NOT seen by the cache
 LS.solve!(linsolve)      # reuses the old factorization -&gt; wrong answer</code></pre><p>The supported way to signal that the values changed is to assign <code>A</code> back into the cache. Reassigning the <em>same</em> (now-mutated) matrix object is fine and still reuses the symbolic factorization when the pattern is unchanged:</p><pre><code class="language-julia hljs">import LinearSolve as LS
 import LinearAlgebra as LA
 import SparseArrays
@@ -51,23 +51,23 @@ linsolve.A = A      # triggers refactorization; symbolic part is reused
 sol2 = LS.solve!(linsolve)
 
 sol2.u</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">100-element Vector{Float64}:
- -0.004969151136056948
-  0.04117325718931585
-  0.037204279894827115
-  0.018503682541649417
-  0.015865194849876772
-  0.041134649031340266
-  0.0009328902065593412
-  0.038813536605330566
-  0.023926671366135868
-  0.004105944357969059
+  0.041265669451281704
+  0.024138250553492675
+  0.021600635128692654
+  0.034998776349225186
+  0.0389779656369162
+ -0.004802513287090577
+  0.03196760180766226
+  8.95765170597948e-5
+  0.04000662066366668
+ -0.00914964142707878
   ⋮
-  0.013978561475750377
-  0.009917240670051064
-  0.01091218559009725
-  0.018806003228579626
- -0.0033978014605742443
-  0.02307751959055431
- -0.0029477965658474695
-  0.009045483645537571
-  0.04600967194586518</code></pre><p>Because the pattern is unchanged, <code>sol2</code> reuses the cached symbolic factorization and only redoes the (cheaper) numeric factorization.</p><div class="admonition is-info" id="Note-ef39018396c70184"><header class="admonition-header">Note<a class="admonition-anchor" href="#Note-ef39018396c70184" title="Permalink"></a></header><div class="admonition-body"><p>Internally, the cache uses an <code>isfresh</code> flag to mark the factorization as stale, and assigning <code>linsolve.A = A</code> sets it. If you must edit <code>A</code>&#39;s values in place and want to avoid touching the matrix field, you can equivalently set <code>linsolve.isfresh = true</code> directly. Prefer <code>linsolve.A = A</code>, as <code>isfresh</code> is an internal detail. Either way, <code>reuse_symbolic = true</code> ensures the symbolic factorization is reused as long as the sparsity pattern is the same.</p></div></div></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../linear/">« Getting Started with Solving Linear Systems in Julia</a><a class="docs-footer-nextpage" href="../hypre_mpi/">Solving Linear Systems with HYPRE and MPI »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Saturday 1 August 2026 08:15">Saturday 1 August 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+ -0.004783873776374568
+  0.035876641566370236
+  0.03460204798040415
+  0.023651788104323453
+  0.022407108296300788
+  0.004925640049021701
+  0.03264501493883277
+  0.024700653162700374
+  0.03900949324313639</code></pre><p>Because the pattern is unchanged, <code>sol2</code> reuses the cached symbolic factorization and only redoes the (cheaper) numeric factorization.</p><div class="admonition is-info" id="Note-ef39018396c70184"><header class="admonition-header">Note<a class="admonition-anchor" href="#Note-ef39018396c70184" title="Permalink"></a></header><div class="admonition-body"><p>Internally, the cache uses an <code>isfresh</code> flag to mark the factorization as stale, and assigning <code>linsolve.A = A</code> sets it. If you must edit <code>A</code>&#39;s values in place and want to avoid touching the matrix field, you can equivalently set <code>linsolve.isfresh = true</code> directly. Prefer <code>linsolve.A = A</code>, as <code>isfresh</code> is an internal detail. Either way, <code>reuse_symbolic = true</code> ensures the symbolic factorization is reused as long as the sparsity pattern is the same.</p></div></div></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../linear/">« Getting Started with Solving Linear Systems in Julia</a><a class="docs-footer-nextpage" href="../hypre_mpi/">Solving Linear Systems with HYPRE and MPI »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Saturday 1 August 2026 09:37">Saturday 1 August 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

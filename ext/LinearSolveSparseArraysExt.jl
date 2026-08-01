@@ -55,7 +55,7 @@ end
 
 function LinearSolve.init_cacheval(
         alg::RFLUFactorization,
-        A::Union{AbstractSparseArray, LinearSolve.SciMLOperators.AbstractSciMLOperator}, b, u, Pl, Pr,
+        A::Union{AbstractSparseArray, AbstractSciMLOperator}, b, u, Pl, Pr,
         maxiters::Int,
         abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )

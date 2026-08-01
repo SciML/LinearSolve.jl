@@ -15,11 +15,11 @@ using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, Bunc
     cholesky, cholesky!, diagind, dot, inv, ldiv!, ldlt!, lu, lu!, mul!,
     norm,
     qr, qr!, svd, svd!
-using SciMLBase: SciMLBase, LinearAliasSpecifier, AbstractSciMLOperator,
+using SciMLBase: SciMLBase, LinearAliasSpecifier,
     init, solve!, reinit!, solve, ReturnCode, LinearProblem
 using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator,
     MatrixOperator,
-    has_ldiv!, issquare, has_concretization
+    has_ldiv!, issquare
 using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_int,
     AbstractVerbositySpecifier, AbstractVerbosityPreset,
     Silent, InfoLevel, WarnLevel, MessageLevel, None, Minimal, Standard, Detailed, All

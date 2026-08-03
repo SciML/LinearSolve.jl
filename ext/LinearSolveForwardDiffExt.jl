@@ -54,6 +54,10 @@ const DualAbstractLinearProblem = Union{
 
     # Cached intermediate values for calculations
     rhs_list
+    # p x m scratch with the partial index contiguous, used by the fused
+    # xp_linsolve_rhs!. Sized from ∂A's rows, which differ from length(b) for a
+    # non-square system. `nothing` when there is no dense Dual matrix to sweep.
+    partials_scratch
     dual_u0_cache
     primal_u_cache
     primal_b_cache
@@ -174,6 +178,59 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
     cache.linear_cache.u .= cache.primal_u_cache
 
     return sol
+end
+
+# Fused rhs construction for a dense Dual matrix.
+#
+# The generic method below materialises `p` separate derivative matrices via
+# update_partials_list! and then issues `p` mul! calls, i.e. p+1 passes over ∂A.
+# That materialisation exists only so each matvec can reach BLAS gemv, but gemv
+# is BLAS-2, where a plain loop is competitive, so the extra matrices and passes
+# buy nothing.
+#
+# Here rhs_k = ∂b_k - (∂A_k) * u is accumulated for all k in a single sweep of
+# ∂A, reading each element exactly once. The accumulator is a p x m scratch so
+# the innermost loop over the partial index is stride-1; accumulating straight
+# into rhs_list would instead be a strided write across p separate vectors,
+# which measures markedly slower than this.
+function xp_linsolve_rhs!(
+        uu, ∂_A::AbstractMatrix{<:Partials},
+        ∂_b::AbstractVector{<:Partials}, cache::DualLinearCache
+    )
+    rhs_list = cache.rhs_list
+    m, n = size(∂_A)
+    p = length(first(∂_A))
+
+    # Use the cached scratch when it matches, otherwise fall back to a local one.
+    # Never assign to the field: DualLinearCache is @concrete, so its declared
+    # type is fixed at construction.
+    cached = cache.partials_scratch
+    scratch = (cached isa Matrix && size(cached) == (p, m)) ? cached :
+        Matrix{eltype(first(rhs_list))}(undef, p, m)
+
+    @inbounds for i in 1:m
+        bi = ∂_b[i]
+        for k in 1:p
+            scratch[k, i] = bi[k]
+        end
+    end
+    @inbounds for j in 1:n
+        uj = uu[j]
+        for i in 1:m
+            aij = ∂_A[i, j]
+            for k in 1:p
+                scratch[k, i] -= aij[k] * uj
+            end
+        end
+    end
+    @inbounds for k in 1:p
+        rk = rhs_list[k]
+        for i in 1:m
+            rk[i] = scratch[k, i]
+        end
+    end
+
+    return rhs_list
 end
 
 function xp_linsolve_rhs!(
@@ -399,6 +456,18 @@ function __dual_init(
     else
         rhs_list = nothing
     end
+    # Scratch for the fused rhs construction: p rows (partial index) x m columns,
+    # so accumulating all p partials for one row of ∂A is contiguous. Allocated
+    # here rather than on first use because DualLinearCache is @concrete: a field
+    # initialised to `nothing` is typed Nothing and cannot later hold a Matrix.
+    partials_scratch = if isnothing(rhs_list) || !(∂_A isa AbstractMatrix{<:Partials}) ||
+                          _use_direct_dual_solve(alg)
+        # direct-Dual algorithms never build partial right-hand sides
+        nothing
+    else
+        Matrix{eltype(first(rhs_list))}(undef, length(rhs_list), size(∂_A, 1))
+    end
+
     # Use b for restructuring if sizes match (square system), otherwise use u (non-square)
     # This preserves ComponentArray structure from b when possible
     dual_u_init = if length(non_partial_cache.u) == length(b)
@@ -429,6 +498,7 @@ function __dual_init(
         partials_A_list,
         partials_b_list,
         rhs_list,
+        partials_scratch,
         similar(non_partial_cache.u),  # Use u's size, not b's size
         similar(non_partial_cache.u),  # primal_u_cache
         similar(new_b),                # primal_b_cache

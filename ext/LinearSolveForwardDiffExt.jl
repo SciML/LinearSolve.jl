@@ -58,6 +58,10 @@ const DualAbstractLinearProblem = Union{
     # `reinterpret` of ∂A. Sized from ∂A's rows, which differ from length(b) for a
     # non-square system. `nothing` when there is no dense Dual matrix to sweep.
     partials_scratch
+    # `vec` of the above, aliasing the same buffer. Held rather than recomputed
+    # because the gemv wants the flat form and the scatter wants the p x m form,
+    # and `vec` escapes into BLAS, so it cannot be elided at the call site.
+    partials_scratch_flat
     dual_u0_cache
     primal_u_cache
     primal_b_cache
@@ -207,9 +211,9 @@ function xp_linsolve_rhs!(
     )
     rhs_list = cache.rhs_list
     scratch = cache.partials_scratch
+    rhs_flat = cache.partials_scratch_flat
     V = eltype(scratch)
 
-    rhs_flat = vec(scratch)
     rhs_flat .= reinterpret(V, ∂_b)
     mul!(rhs_flat, reinterpret(V, ∂_A), uu, -1, 1)
 
@@ -456,6 +460,7 @@ function __dual_init(
     else
         nothing
     end
+    partials_scratch_flat = isnothing(partials_scratch) ? nothing : vec(partials_scratch)
 
     # Use b for restructuring if sizes match (square system), otherwise use u (non-square)
     # This preserves ComponentArray structure from b when possible
@@ -488,6 +493,7 @@ function __dual_init(
         partials_b_list,
         rhs_list,
         partials_scratch,
+        partials_scratch_flat,
         similar(non_partial_cache.u),  # Use u's size, not b's size
         similar(non_partial_cache.u),  # primal_u_cache
         similar(new_b),                # primal_b_cache

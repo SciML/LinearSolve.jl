@@ -309,17 +309,12 @@ function linearsolve_dual_solution!(
         dual_u::AbstractArray{DT}, u::AbstractArray,
         partials
     ) where {T, V, N, DT <: Dual{T, V, N}}
-    # Direct in-place construction of dual numbers without temporary allocations
-    n_partials = length(partials)
-    for i in eachindex(u, dual_u)
-        # Extract partials for this element directly
-        partial_vals = ntuple(Val(N)) do j
-            V(partials[j][i])
-        end
-
-        # Construct dual number in-place
-        dual_u[i] = DT(u[i], Partials{N, V}(partial_vals))
-    end
+    # Broadcast rather than an indexed loop so this runs on a GPU-resident u.
+    # `partials` is a Vector of N arrays, one per partial: hoisting it into a
+    # tuple first keeps the per-element work a plain combine over N arrays,
+    # with no indexing into `partials` left inside the kernel.
+    partial_arrays = ntuple(j -> partials[j], Val(N))
+    dual_u .= ((uu, pp...) -> DT(uu, Partials{N, V}(convert.(V, pp)))).(u, partial_arrays...)
 
     return dual_u
 end
@@ -751,52 +746,37 @@ nodual_value(x::Dual{T, V, P}) where {T, V <: AbstractFloat, P} = ForwardDiff.va
 nodual_value(x::Dual{T, V, P}) where {T, V <: Dual, P} = x.value  # Keep the inner dual intact
 nodual_value(x::Tuple) = map(nodual_value, x)
 function nodual_value(x::AbstractArray{<:Dual})
-    return nodual_value!(similar(x, typeof(nodual_value(first(x)))), x)
+    # valtype rather than `typeof(nodual_value(first(x)))`: identical answer for
+    # both the AbstractFloat and the nested-Dual case above, without the scalar
+    # read of `first(x)`, which a GPU array disallows.
+    return nodual_value!(similar(x, ForwardDiff.valtype(eltype(x))), x)
 end
 nodual_value!(out, x) = map!(nodual_value, out, x) # Update in-place
 
+# Both of these are one broadcast per partial index rather than a scalar loop,
+# so a GPU-resident ∂A/∂b works. Kept as separate vector/matrix methods, not one
+# AbstractArray method, so the SparseMatrixCSC specialisations below stay
+# strictly more specific and no ambiguity is introduced.
 function update_partials_list!(partial_matrix::AbstractVector{T}, list_cache) where {T}
-    p = eachindex(first(partial_matrix))
-    for i in p
-        for j in eachindex(partial_matrix)
-            @inbounds list_cache[i][j] = partial_matrix[j][i]
-        end
+    for k in eachindex(list_cache)
+        list_cache[k] .= getindex.(partial_matrix, k)
     end
     return list_cache
 end
 
 function update_partials_list!(partial_matrix::AbstractMatrix{T}, list_cache) where {T}
-    p = length(first(partial_matrix))
-    m, n = size(partial_matrix)
-    for k in 1:p
-        for i in 1:m
-            for j in 1:n
-                @inbounds list_cache[k][i, j] = partial_matrix[i, j][k]
-            end
-        end
+    for k in eachindex(list_cache)
+        list_cache[k] .= getindex.(partial_matrix, k)
     end
     return list_cache
 end
 
 function partials_to_list(partial_matrix::AbstractVector{T}) where {T}
-    p = eachindex(first(partial_matrix))
-    return [[partial[i] for partial in partial_matrix] for i in p]
+    return [getindex.(partial_matrix, k) for k in 1:ForwardDiff.npartials(T)]
 end
 
 function partials_to_list(partial_matrix::AbstractMatrix{T}) where {T}
-    p = length(first(partial_matrix))
-    m, n = size(partial_matrix)
-    res_list = fill(zeros(typeof(partial_matrix[1, 1][1]), m, n), p)
-    for k in 1:p
-        res = zeros(typeof(partial_matrix[1, 1][1]), m, n)
-        for i in 1:m
-            for j in 1:n
-                res[i, j] = partial_matrix[i, j][k]
-            end
-        end
-        res_list[k] = res
-    end
-    return res_list
+    return [getindex.(partial_matrix, k) for k in 1:ForwardDiff.npartials(T)]
 end
 
 # Specializations for sparse matrices

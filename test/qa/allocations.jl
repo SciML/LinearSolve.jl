@@ -1,4 +1,4 @@
-using AllocCheck, LinearAlgebra, LinearSolve, SparseArrays, Test
+using AllocCheck, ForwardDiff, LinearAlgebra, LinearSolve, SparseArrays, Test
 
 if Sys.islinux()
     import LAPACK_jll, blis_jll
@@ -60,6 +60,72 @@ if LinearSolve.appleaccelerate_isavailable()
         for T in (Float32, Float64, ComplexF32, ComplexF64)
             test_allocation_free_refactorization(AppleAccelerateLUFactorization(), T)
         end
+    end
+end
+
+# The ForwardDiff split path rebuilds the `p` partial right-hand sides through
+# `xp_linsolve_rhs!` on every solve!, and everything it touches is cache-owned
+# scratch. So the budget is a hard zero rather than "no worse than the primal
+# solve": a per-call allocation here is per-Newton-step garbage in an AD-driven
+# ODE solve, which is where this path is actually used.
+const DUAL_XP_LINSOLVE_RHS! = getproperty(
+    Base.get_extension(LinearSolve, :LinearSolveForwardDiffExt), :xp_linsolve_rhs!
+)
+
+function dual_linear_problem(n, p)
+    A = [
+        ForwardDiff.Dual{Nothing}(
+                float(i == j ? 10 + i : 0.3 * (i + j)), ntuple(k -> 0.1k + 0.01 * (i + j), p)
+            ) for i in 1:n, j in 1:n
+    ]
+    b = [ForwardDiff.Dual{Nothing}(float(i), ntuple(k -> 0.05k + 0.1i, p)) for i in 1:n]
+    return A, b
+end
+
+function dual_rhs_kernel(cache)
+    return DUAL_XP_LINSOLVE_RHS!(
+        cache.linear_cache.u, getfield(cache, :partials_A),
+        getfield(cache, :partials_b), cache
+    )
+end
+
+# Both measurements go through a function barrier deliberately. At global scope
+# the returned LinearSolution cannot be proven dead and `@allocated` reports a
+# spurious 32 bytes on every version, which is more than the regressions this is
+# guarding against and would mask them entirely.
+function dual_solve_allocations(cache)
+    solve!(cache)
+    solve!(cache)
+    return @allocated solve!(cache)
+end
+
+function dual_rhs_allocations(cache)
+    solve!(cache)
+    dual_rhs_kernel(cache)
+    dual_rhs_kernel(cache)
+    return @allocated dual_rhs_kernel(cache)
+end
+
+@testset "ForwardDiff Dual solve! is allocation-free" begin
+    # Two shapes so that a per-element or per-partial allocation cannot hide in
+    # a case small enough for the optimizer to unroll.
+    @testset "n = $n, p = $p" for (n, p) in ((6, 3), (32, 8))
+        A, b = dual_linear_problem(n, p)
+        A_primal = ForwardDiff.value.(A)
+        b_primal = ForwardDiff.value.(b)
+
+        # The fused dense-∂A rhs construction on its own.
+        @test dual_rhs_allocations(init(LinearProblem(A, b), LUFactorization())) == 0
+
+        # Whole solve!, for each way partials can enter the problem: Dual b only
+        # and Dual A only take different `xp_linsolve_rhs!` methods than both.
+        @test dual_solve_allocations(init(LinearProblem(A, b), LUFactorization())) == 0
+        @test dual_solve_allocations(
+            init(LinearProblem(A_primal, b), LUFactorization())
+        ) == 0
+        @test dual_solve_allocations(
+            init(LinearProblem(A, b_primal), LUFactorization())
+        ) == 0
     end
 end
 

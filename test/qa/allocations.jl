@@ -107,9 +107,11 @@ function dual_rhs_allocations(cache)
 end
 
 @testset "ForwardDiff Dual solve! is allocation-free" begin
-    # Two shapes so that a per-element or per-partial allocation cannot hide in
-    # a case small enough for the optimizer to unroll.
-    @testset "n = $n, p = $p" for (n, p) in ((6, 3), (32, 8))
+    # Shapes chosen to straddle DUAL_RHS_GEMV_CUTOFF so both branches of the
+    # fused kernel are covered: m*n*p is 108 and 8192 (hand loop) against 49152
+    # (gemv). The two small ones also guard against a per-element or per-partial
+    # allocation hiding in a case small enough for the optimizer to unroll.
+    @testset "n = $n, p = $p" for (n, p) in ((6, 3), (32, 8), (64, 12))
         A, b = dual_linear_problem(n, p)
         A_primal = ForwardDiff.value.(A)
         b_primal = ForwardDiff.value.(b)

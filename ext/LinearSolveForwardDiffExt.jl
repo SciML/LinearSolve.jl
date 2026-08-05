@@ -205,10 +205,42 @@ end
 # AbstractMatrix{<:Partials} and would be captured here, but its partials are not
 # a contiguous block to reinterpret. Sparse ∂A stays on the list-based method
 # below, which has a sparsity-aware update_partials_list!.
+#
+# Small problems take a hand-written loop instead, see _use_scalar_dual_rhs.
 function xp_linsolve_rhs!(
         uu, ∂_A::DenseMatrix{<:Partials},
         ∂_b::DenseVector{<:Partials}, cache::DualLinearCache
     )
+    if _use_scalar_dual_rhs(∂_A, ∂_b, uu)
+        return _xp_linsolve_rhs_scalar!(uu, ∂_A, ∂_b, cache)
+    end
+    return _xp_linsolve_rhs_gemv!(uu, ∂_A, ∂_b, cache)
+end
+
+# Work below which the loop beats the gemv, counted in scalar multiply-adds
+# (m * n * p). The gemv's advantage is asymptotic -- it pays a fixed BLAS call
+# overhead the loop does not -- so on the kernel alone the loop is ~3x faster at
+# 5x5 and ~1.4x at 10x10, the two are level around 20x20, and the gemv pulls
+# ahead from there (to 4x at 200x200 under OpenBLAS).
+#
+# The exact value is a hedge rather than a sharp optimum, for two reasons. The
+# crossover is BLAS-dependent: OpenBLAS turns over near 20x20, MKL's gemv is
+# weaker for these tall-skinny shapes and does not turn over until nearer
+# 100x100. And end-to-end the choice barely registers -- whole `solve!` differs
+# by under 3% either way at every size measured, because the rhs construction is
+# a small share of a solve. This sits between the two crossovers, so neither
+# backend is badly served.
+const DUAL_RHS_GEMV_CUTOFF = 30_000
+
+# Only a plain Array is eligible for the loop: it indexes elements scalarly,
+# which is exactly what a GPU array forbids. Anything else -- a CuArray, a
+# JLArray -- always takes the gemv, where the work lands in CUBLAS.
+@inline function _use_scalar_dual_rhs(∂_A::Array, ∂_b::Array, uu::Array)
+    return length(∂_A) * ForwardDiff.npartials(eltype(∂_A)) < DUAL_RHS_GEMV_CUTOFF
+end
+@inline _use_scalar_dual_rhs(∂_A, ∂_b, uu) = false
+
+function _xp_linsolve_rhs_gemv!(uu, ∂_A, ∂_b, cache::DualLinearCache)
     rhs_list = cache.rhs_list
     scratch = cache.partials_scratch
     rhs_flat = cache.partials_scratch_flat
@@ -219,6 +251,43 @@ function xp_linsolve_rhs!(
 
     for k in eachindex(rhs_list)
         rhs_list[k] .= view(scratch, k, :)
+    end
+
+    return rhs_list
+end
+
+# Same arithmetic as the gemv path, accumulated by hand into the same p x m
+# scratch. The partial index is innermost so the accumulator is walked
+# contiguously and ∂A is still read exactly once.
+function _xp_linsolve_rhs_scalar!(uu, ∂_A, ∂_b, cache::DualLinearCache)
+    rhs_list = cache.rhs_list
+    scratch = cache.partials_scratch
+    m, n = size(∂_A)
+    # From the type, not size(scratch, 1): as a compile-time constant the
+    # innermost loop over the partial index unrolls, which is most of the point
+    # of this path. A runtime `p` measures several times slower.
+    p = ForwardDiff.npartials(eltype(∂_A))
+
+    @inbounds for i in 1:m
+        bi = ∂_b[i]
+        for k in 1:p
+            scratch[k, i] = bi[k]
+        end
+    end
+    @inbounds for j in 1:n
+        uj = uu[j]
+        for i in 1:m
+            aij = ∂_A[i, j]
+            for k in 1:p
+                scratch[k, i] -= aij[k] * uj
+            end
+        end
+    end
+    @inbounds for k in 1:p
+        rk = rhs_list[k]
+        for i in 1:m
+            rk[i] = scratch[k, i]
+        end
     end
 
     return rhs_list

@@ -494,36 +494,44 @@ using the same relative threshold LAPACK's `xGELSY` (and therefore `A \\ b`) use
 to truncate the rank: a factorization is called rank-deficient when the smallest
 `|R[i, i]|` falls at or below `min(m, n) * eps * max|R[i, i]|`.
 
+This scans the `R` diagonal rather than reading a LAPACK `info` because
+unpivoted QR has none to read: `geqrf`/`geqrt` only set `info < 0` for an
+illegal argument and return `info == 0` on an exactly rank-deficient matrix, and
+`QRCompactWY` correspondingly stores only `factors` and `T` with no `issuccess`
+method. That is the same reason `_notsuccessful(::QRCompactWY)` above hand-scans
+for an exact zero on the diagonal; this is that scan with a relative threshold,
+so it also catches a merely negligible entry.
+
 Unpivoted QR does not order the diagonal of `R` by magnitude, so this is a
-heuristic rather than a rank-revealing test — it can miss a deficiency that only
+heuristic rather than a rank-revealing test: it can miss a deficiency that only
 column pivoting would expose (Kahan-style matrices). It exists so the default
 algorithm can keep unpivoted QR on the fast path and only pay for a pivoted
 refactorization when the cheap check says the answer would otherwise be garbage;
-see `_default_qr_solve_with_fallback`. Returns `false` for factorization types
-where the test does not apply (SPQR, GPU factorizations without scalar indexing),
-which leaves the existing behavior untouched.
+see `_default_qr_solve_with_fallback`. Factorization types the test does not
+apply to (SPQR, GPU) return `false` and keep their existing behavior.
 """
 @inline _qr_rank_deficient(F) = false
 
+# GPU factorizations cannot be indexed elementwise. Mirrors the GPU method on
+# `_notsuccessful` above, and is constrained on the same `T` as the scanning
+# method below so that it is strictly more specific (no dispatch ambiguity).
 @inline function _qr_rank_deficient(
-        F::Union{LinearAlgebra.QRCompactWY, LinearAlgebra.QR}
-    )
-    # Dispatch on the storage so GPU factorizations (which cannot be indexed
-    # elementwise) and exotic element types fall through to the `false` method
-    # below without an ambiguity against the type-parameter-constrained methods.
-    return _qr_rank_deficient(F, F.factors)
+        ::LinearAlgebra.QRCompactWY{
+            T, A,
+        }
+    ) where {T <: BLASELTYPES, A <: GPUArraysCore.AnyGPUArray}
+    return false
 end
 
-@inline _qr_rank_deficient(F, factors) = false
-
 @inline function _qr_rank_deficient(
-        F, factors::AbstractMatrix{T}
-    ) where {T <: BLASELTYPES}
-    ArrayInterface.fast_scalar_indexing(factors) || return false
+        F::LinearAlgebra.QRCompactWY{
+            T, A,
+        }
+    ) where {T <: BLASELTYPES, A}
     (m, n) = size(F)
     mn = min(m, n)
     mn == 0 && return false
-    R = view(factors, 1:mn, 1:n)
+    R = view(F.factors, 1:mn, 1:n)
     dmin = typemax(real(T))
     dmax = zero(real(T))
     for x in @view R[diagind(R)]

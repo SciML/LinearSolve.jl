@@ -54,6 +54,14 @@ const DualAbstractLinearProblem = Union{
 
     # Cached intermediate values for calculations
     rhs_list
+    # p x m gemv output for the fused xp_linsolve_rhs!, laid out to match
+    # `reinterpret` of ∂A. Sized from ∂A's rows, which differ from length(b) for a
+    # non-square system. `nothing` when there is no dense Dual matrix to sweep.
+    partials_scratch
+    # `vec` of the above, aliasing the same buffer. Held rather than recomputed
+    # because the gemv wants the flat form and the scatter wants the p x m form,
+    # and `vec` escapes into BLAS, so it cannot be elided at the call site.
+    partials_scratch_flat
     dual_u0_cache
     primal_u_cache
     primal_b_cache
@@ -176,6 +184,115 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
     return sol
 end
 
+# Fused rhs construction for a dense Dual matrix.
+#
+# The generic method below materialises `p` separate derivative matrices via
+# update_partials_list! and then issues `p` mul! calls, i.e. p+1 passes over ∂A.
+# That materialisation exists only so each matvec can reach BLAS gemv.
+#
+# A `Partials{p,V}` stores its p components contiguously, so reinterpreting a
+# dense m x n array of them as `V` already gives a strided (p*m) x n matrix whose
+# row (i-1)*p + k holds partial k of row i — the transpose is a no-op view rather
+# than a copy. All p right-hand sides rhs_k = ∂b_k - (∂A_k) * u are then a single
+# gemv against that view: one pass over ∂A, nothing materialised, and the work
+# still goes through BLAS (or CUBLAS, for a GPU-resident ∂A).
+#
+# `partials_scratch` receives the result: it is p x m, matching the reinterpreted
+# layout element for element, so `vec` of it is the gemv output vector. rhs_list
+# is p separate vectors, which is why the result cannot be accumulated in place.
+#
+# Dense, not AbstractMatrix: a SparseMatrixCSC{<:Partials} is an
+# AbstractMatrix{<:Partials} and would be captured here, but its partials are not
+# a contiguous block to reinterpret. Sparse ∂A stays on the list-based method
+# below, which has a sparsity-aware update_partials_list!.
+#
+# Small problems take a hand-written loop instead, see _use_scalar_dual_rhs.
+function xp_linsolve_rhs!(
+        uu, ∂_A::DenseMatrix{<:Partials},
+        ∂_b::DenseVector{<:Partials}, cache::DualLinearCache
+    )
+    if _use_scalar_dual_rhs(∂_A, ∂_b, uu)
+        return _xp_linsolve_rhs_scalar!(uu, ∂_A, ∂_b, cache)
+    end
+    return _xp_linsolve_rhs_gemv!(uu, ∂_A, ∂_b, cache)
+end
+
+# Work below which the loop beats the gemv, counted in scalar multiply-adds
+# (m * n * p). The gemv's advantage is asymptotic -- it pays a fixed BLAS call
+# overhead the loop does not -- so on the kernel alone the loop is ~3x faster at
+# 5x5 and ~1.4x at 10x10, the two are level around 20x20, and the gemv pulls
+# ahead from there (to 4x at 200x200 under OpenBLAS).
+#
+# The exact value is a hedge rather than a sharp optimum, for two reasons. The
+# crossover is BLAS-dependent: OpenBLAS turns over near 20x20, MKL's gemv is
+# weaker for these tall-skinny shapes and does not turn over until nearer
+# 100x100. And end-to-end the choice barely registers -- whole `solve!` differs
+# by under 3% either way at every size measured, because the rhs construction is
+# a small share of a solve. This sits between the two crossovers, so neither
+# backend is badly served.
+const DUAL_RHS_GEMV_CUTOFF = 30_000
+
+# Only a plain Array is eligible for the loop: it indexes elements scalarly,
+# which is exactly what a GPU array forbids. Anything else -- a CuArray, a
+# JLArray -- always takes the gemv, where the work lands in CUBLAS.
+@inline function _use_scalar_dual_rhs(∂_A::Array, ∂_b::Array, uu::Array)
+    return length(∂_A) * ForwardDiff.npartials(eltype(∂_A)) < DUAL_RHS_GEMV_CUTOFF
+end
+@inline _use_scalar_dual_rhs(∂_A, ∂_b, uu) = false
+
+function _xp_linsolve_rhs_gemv!(uu, ∂_A, ∂_b, cache::DualLinearCache)
+    rhs_list = cache.rhs_list
+    scratch = cache.partials_scratch
+    rhs_flat = cache.partials_scratch_flat
+    V = eltype(scratch)
+
+    rhs_flat .= reinterpret(V, ∂_b)
+    mul!(rhs_flat, reinterpret(V, ∂_A), uu, -1, 1)
+
+    for k in eachindex(rhs_list)
+        rhs_list[k] .= view(scratch, k, :)
+    end
+
+    return rhs_list
+end
+
+# Same arithmetic as the gemv path, accumulated by hand into the same p x m
+# scratch. The partial index is innermost so the accumulator is walked
+# contiguously and ∂A is still read exactly once.
+function _xp_linsolve_rhs_scalar!(uu, ∂_A, ∂_b, cache::DualLinearCache)
+    rhs_list = cache.rhs_list
+    scratch = cache.partials_scratch
+    m, n = size(∂_A)
+    # From the type, not size(scratch, 1): as a compile-time constant the
+    # innermost loop over the partial index unrolls, which is most of the point
+    # of this path. A runtime `p` measures several times slower.
+    p = ForwardDiff.npartials(eltype(∂_A))
+
+    @inbounds for i in 1:m
+        bi = ∂_b[i]
+        for k in 1:p
+            scratch[k, i] = bi[k]
+        end
+    end
+    @inbounds for j in 1:n
+        uj = uu[j]
+        for i in 1:m
+            aij = ∂_A[i, j]
+            for k in 1:p
+                scratch[k, i] -= aij[k] * uj
+            end
+        end
+    end
+    @inbounds for k in 1:p
+        rk = rhs_list[k]
+        for i in 1:m
+            rk[i] = scratch[k, i]
+        end
+    end
+
+    return rhs_list
+end
+
 function xp_linsolve_rhs!(
         uu, ∂_A::Union{<:Partials, <:AbstractArray{<:Partials}},
         ∂_b::Union{<:Partials, <:AbstractArray{<:Partials}}, cache::DualLinearCache
@@ -261,17 +378,12 @@ function linearsolve_dual_solution!(
         dual_u::AbstractArray{DT}, u::AbstractArray,
         partials
     ) where {T, V, N, DT <: Dual{T, V, N}}
-    # Direct in-place construction of dual numbers without temporary allocations
-    n_partials = length(partials)
-    for i in eachindex(u, dual_u)
-        # Extract partials for this element directly
-        partial_vals = ntuple(Val(N)) do j
-            V(partials[j][i])
-        end
-
-        # Construct dual number in-place
-        dual_u[i] = DT(u[i], Partials{N, V}(partial_vals))
-    end
+    # Broadcast rather than an indexed loop so this runs on a GPU-resident u.
+    # `partials` is a Vector of N arrays, one per partial: hoisting it into a
+    # tuple first keeps the per-element work a plain combine over N arrays,
+    # with no indexing into `partials` left inside the kernel.
+    partial_arrays = ntuple(j -> partials[j], Val(N))
+    dual_u .= ((uu, pp...) -> DT(uu, Partials{N, V}(convert.(V, pp)))).(u, partial_arrays...)
 
     return dual_u
 end
@@ -399,6 +511,21 @@ function __dual_init(
     else
         rhs_list = nothing
     end
+    # Scratch for the fused rhs construction: p rows (partial index) x m columns,
+    # matching the layout of `reinterpret(V, ∂_A)`. Allocated here rather than on
+    # first use because DualLinearCache is @concrete: a field initialised to
+    # `nothing` is typed Nothing and cannot later hold a matrix. The condition
+    # mirrors the fused method's signature exactly, so that method can use the
+    # field unconditionally; `∂_A`/`∂_b` keep their type and size for the life of
+    # the cache, since setA!/setb! update them in place.
+    partials_scratch = if ∂_A isa DenseMatrix{<:Partials} && ∂_b isa DenseVector{<:Partials}
+        V = eltype(eltype(∂_A))
+        similar(∂_A, V, ForwardDiff.npartials(eltype(∂_A)), size(∂_A, 1))
+    else
+        nothing
+    end
+    partials_scratch_flat = isnothing(partials_scratch) ? nothing : vec(partials_scratch)
+
     # Use b for restructuring if sizes match (square system), otherwise use u (non-square)
     # This preserves ComponentArray structure from b when possible
     dual_u_init = if length(non_partial_cache.u) == length(b)
@@ -429,6 +556,8 @@ function __dual_init(
         partials_A_list,
         partials_b_list,
         rhs_list,
+        partials_scratch,
+        partials_scratch_flat,
         similar(non_partial_cache.u),  # Use u's size, not b's size
         similar(non_partial_cache.u),  # primal_u_cache
         similar(new_b),                # primal_b_cache
@@ -686,52 +815,37 @@ nodual_value(x::Dual{T, V, P}) where {T, V <: AbstractFloat, P} = ForwardDiff.va
 nodual_value(x::Dual{T, V, P}) where {T, V <: Dual, P} = x.value  # Keep the inner dual intact
 nodual_value(x::Tuple) = map(nodual_value, x)
 function nodual_value(x::AbstractArray{<:Dual})
-    return nodual_value!(similar(x, typeof(nodual_value(first(x)))), x)
+    # valtype rather than `typeof(nodual_value(first(x)))`: identical answer for
+    # both the AbstractFloat and the nested-Dual case above, without the scalar
+    # read of `first(x)`, which a GPU array disallows.
+    return nodual_value!(similar(x, ForwardDiff.valtype(eltype(x))), x)
 end
 nodual_value!(out, x) = map!(nodual_value, out, x) # Update in-place
 
+# Both of these are one broadcast per partial index rather than a scalar loop,
+# so a GPU-resident ∂A/∂b works. Kept as separate vector/matrix methods, not one
+# AbstractArray method, so the SparseMatrixCSC specialisations below stay
+# strictly more specific and no ambiguity is introduced.
 function update_partials_list!(partial_matrix::AbstractVector{T}, list_cache) where {T}
-    p = eachindex(first(partial_matrix))
-    for i in p
-        for j in eachindex(partial_matrix)
-            @inbounds list_cache[i][j] = partial_matrix[j][i]
-        end
+    for k in eachindex(list_cache)
+        list_cache[k] .= getindex.(partial_matrix, k)
     end
     return list_cache
 end
 
 function update_partials_list!(partial_matrix::AbstractMatrix{T}, list_cache) where {T}
-    p = length(first(partial_matrix))
-    m, n = size(partial_matrix)
-    for k in 1:p
-        for i in 1:m
-            for j in 1:n
-                @inbounds list_cache[k][i, j] = partial_matrix[i, j][k]
-            end
-        end
+    for k in eachindex(list_cache)
+        list_cache[k] .= getindex.(partial_matrix, k)
     end
     return list_cache
 end
 
 function partials_to_list(partial_matrix::AbstractVector{T}) where {T}
-    p = eachindex(first(partial_matrix))
-    return [[partial[i] for partial in partial_matrix] for i in p]
+    return [getindex.(partial_matrix, k) for k in 1:ForwardDiff.npartials(T)]
 end
 
 function partials_to_list(partial_matrix::AbstractMatrix{T}) where {T}
-    p = length(first(partial_matrix))
-    m, n = size(partial_matrix)
-    res_list = fill(zeros(typeof(partial_matrix[1, 1][1]), m, n), p)
-    for k in 1:p
-        res = zeros(typeof(partial_matrix[1, 1][1]), m, n)
-        for i in 1:m
-            for j in 1:n
-                res[i, j] = partial_matrix[i, j][k]
-            end
-        end
-        res_list[k] = res
-    end
-    return res_list
+    return [getindex.(partial_matrix, k) for k in 1:ForwardDiff.npartials(T)]
 end
 
 # Specializations for sparse matrices

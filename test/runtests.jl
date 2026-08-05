@@ -81,6 +81,7 @@ else
             @time @safetestset "ComponentArrays" include("Core/componentarrays.jl")
             @time @safetestset "Adjoint Sensitivity" include("Core/adjoint.jl")
             @time @safetestset "ForwardDiff Overloads" include("Core/forwarddiff_overloads.jl")
+            @time @safetestset "ForwardDiff GPU Arrays" include("Core/forwarddiff_gpu.jl")
             @time @safetestset "Traits" include("Core/traits.jl")
             @time @safetestset "Algorithm Interface" include("Core/interface.jl")
             @time @safetestset "Verbosity" include("Core/verbosity.jl")

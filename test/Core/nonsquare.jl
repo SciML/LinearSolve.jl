@@ -95,6 +95,101 @@ prob = LinearProblem(A, b)
 res = A \ b
 @test solve(prob).u ≈ res
 
+# Rank-deficient least squares: the default is unpivoted QR, which cannot solve a
+# rank-deficient system — it used to return all-zeros with `ReturnCode.Failure`
+# (exactly-singular) or an overflowing solution with `ReturnCode.Success`
+# (numerically singular). The default now falls back to column-pivoted QR, which
+# truncates the rank the same way `A \ b` does.
+# Regression test for https://github.com/SciML/LinearSolve.jl/issues/531
+@testset "Rank-deficient least squares" begin
+    @testset "tall, exactly rank-deficient" begin
+        A = rand(10, 4)
+        A[:, 1] .= 0    # a column of all zeros
+        b = rand(10)
+        res = A \ b
+        sol = solve(LinearProblem(copy(A), copy(b)))
+        @test sol.retcode === ReturnCode.Success
+        @test sol.u ≈ res
+        # Column-pivoted QR and SVD reach the same answer directly.
+        @test solve(LinearProblem(copy(A), copy(b)), QRFactorization(ColumnNorm())).u ≈ res
+        @test solve(LinearProblem(copy(A), copy(b)), SVDFactorization()).u ≈ res
+    end
+
+    @testset "tall, rank-deficient by duplicate column" begin
+        A = rand(10, 4)
+        A[:, 3] .= A[:, 2]
+        b = rand(10)
+        sol = solve(LinearProblem(copy(A), copy(b)))
+        @test sol.retcode === ReturnCode.Success
+        @test sol.u ≈ A \ b
+    end
+
+    @testset "tall, numerically rank-deficient" begin
+        # Not exactly singular, so the factorization "succeeds" and the failure is
+        # silent without the rank check.
+        A = rand(10, 4)
+        A[:, 1] .= 1.0e-14 .* A[:, 2]
+        b = rand(10)
+        sol = solve(LinearProblem(copy(A), copy(b)))
+        @test sol.retcode === ReturnCode.Success
+        @test sol.u ≈ A \ b
+        @test all(isfinite, sol.u)
+    end
+
+    @testset "wide, rank-deficient" begin
+        A = rand(3, 6)
+        A[:, 2] .= 0
+        b = rand(3)
+        sol = solve(LinearProblem(copy(A), copy(b)))
+        @test sol.retcode === ReturnCode.Success
+        @test sol.u ≈ A \ b
+    end
+
+    @testset "square but singular" begin
+        A = rand(5, 5)
+        A[:, 3] .= 0
+        b = rand(5)
+        sol = solve(
+            LinearProblem(copy(A), copy(b)),
+            assumptions = OperatorAssumptions(
+                true; condition = OperatorCondition.VeryIllConditioned
+            )
+        )
+        @test sol.retcode === ReturnCode.Success
+        @test sol.u ≈ qr(A, ColumnNorm()) \ b
+    end
+
+    @testset "cache reuse after the pivoted-QR fallback" begin
+        A = rand(10, 4)
+        A[:, 1] .= 0
+        b1 = rand(10)
+        b2 = rand(10)
+        cache = init(LinearProblem(copy(A), copy(b1)))
+        @test solve!(cache).u ≈ A \ b1
+        @test cache.cacheval.fell_back_to_qr
+        # Only `b` changes: the pivoted QR is reused, not the unpivoted one.
+        cache.b = b2
+        @test solve!(cache).u ≈ A \ b2
+        # A fresh full-rank `A` resets the fallback and stays on unpivoted QR.
+        # `cache.A = X` stores `X` itself and the in-place QR overwrites it, so
+        # compute the reference first and hand the cache a copy.
+        A_full = rand(10, 4)
+        res_full = A_full \ b2
+        cache.A = copy(A_full)
+        @test !cache.cacheval.fell_back_to_qr
+        @test solve!(cache).u ≈ res_full
+        @test !cache.cacheval.fell_back_to_qr
+    end
+
+    @testset "full rank does not trigger the fallback" begin
+        A = rand(10, 4)
+        b = rand(10)
+        cache = init(LinearProblem(copy(A), copy(b)))
+        @test solve!(cache).u ≈ A \ b
+        @test !cache.cacheval.fell_back_to_qr
+    end
+end
+
 # Least-squares Krylov solvers with preconditioning: identity-equivalent counting
 # preconditioner verifies Pl/Pr are actually forwarded to Krylov (not silently dropped).
 mutable struct CountingDiagPrec

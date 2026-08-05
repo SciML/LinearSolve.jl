@@ -486,6 +486,54 @@ end
 @inline _notsuccessful(F) = hasmethod(LinearAlgebra.issuccess, (typeof(F),)) ?
     !LinearAlgebra.issuccess(F) : false
 
+"""
+    _qr_rank_deficient(F)
+
+Cheap `O(min(m, n))` rank-deficiency test for an *unpivoted* QR factorization,
+using the same relative threshold LAPACK's `xGELSY` (and therefore `A \\ b`) uses
+to truncate the rank: a factorization is called rank-deficient when the smallest
+`|R[i, i]|` falls at or below `min(m, n) * eps * max|R[i, i]|`.
+
+Unpivoted QR does not order the diagonal of `R` by magnitude, so this is a
+heuristic rather than a rank-revealing test — it can miss a deficiency that only
+column pivoting would expose (Kahan-style matrices). It exists so the default
+algorithm can keep unpivoted QR on the fast path and only pay for a pivoted
+refactorization when the cheap check says the answer would otherwise be garbage;
+see `_default_qr_solve_with_fallback`. Returns `false` for factorization types
+where the test does not apply (SPQR, GPU factorizations without scalar indexing),
+which leaves the existing behavior untouched.
+"""
+@inline _qr_rank_deficient(F) = false
+
+@inline function _qr_rank_deficient(
+        F::Union{LinearAlgebra.QRCompactWY, LinearAlgebra.QR}
+    )
+    # Dispatch on the storage so GPU factorizations (which cannot be indexed
+    # elementwise) and exotic element types fall through to the `false` method
+    # below without an ambiguity against the type-parameter-constrained methods.
+    return _qr_rank_deficient(F, F.factors)
+end
+
+@inline _qr_rank_deficient(F, factors) = false
+
+@inline function _qr_rank_deficient(
+        F, factors::AbstractMatrix{T}
+    ) where {T <: BLASELTYPES}
+    ArrayInterface.fast_scalar_indexing(factors) || return false
+    (m, n) = size(F)
+    mn = min(m, n)
+    mn == 0 && return false
+    R = view(factors, 1:mn, 1:n)
+    dmin = typemax(real(T))
+    dmax = zero(real(T))
+    for x in @view R[diagind(R)]
+        a = abs(x)
+        a < dmin && (dmin = a)
+        a > dmax && (dmax = a)
+    end
+    return dmin <= mn * eps(real(T)) * dmax
+end
+
 # Solver Specific Traits
 ## Needs Square Matrix
 """

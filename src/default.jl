@@ -684,6 +684,11 @@ function _do_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol)
             "LU solve residual check failed, falling back to QR factorization. `A` is potentially ill-conditioned.",
             cache.verbose, :default_lu_fallback
         )
+    elseif reason === :qr_rank_deficient
+        @SciMLMessage(
+            "Unpivoted QR detected a rank-deficient `A`, falling back to column-pivoted QR so the least-squares solution matches `A \\ b`.",
+            cache.verbose, :default_lu_fallback
+        )
     else
         @SciMLMessage(
             "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.",
@@ -869,6 +874,51 @@ function _default_lu_solve_with_fallback(
 end
 
 """
+    _default_qr_solve_with_fallback(cache::LinearCache, alg::DefaultLinearSolver, sol)
+
+Post-process an unpivoted-QR solve result: if the factorization failed, the
+solution contains NaN/Inf, or the `R` diagonal says `A` is rank-deficient, redo
+the solve with column-pivoted QR. Otherwise return the QR solution directly.
+
+Unpivoted QR is the default for non-square (and for ill-conditioned square)
+dense problems because it is up to ~3x cheaper than `geqp3`, but it cannot solve
+a rank-deficient least-squares problem: the triangular solve divides by a zero
+(or negligible) diagonal entry and returns garbage — all-zeros with
+`ReturnCode.Failure` for an exact zero, an overflowing solution with
+`ReturnCode.Success` for a nearly-zero one (issue #531). Column-pivoted QR
+truncates the rank the same way LAPACK's `xGELSY` does, so the fallback
+reproduces `A \\ b`.
+
+The fallback only triggers for factorizations the check applies to, so sparse
+(SPQR) and GPU defaults keep their current behavior.
+"""
+function _default_qr_solve_with_fallback(
+        cache::LinearCache, alg::DefaultLinearSolver, sol
+    )
+    # `DenseMatrix` (not just "not GPU") because `fell_back_to_qr` reuse on the
+    # next solve routes dense and sparse to different helpers. All of these are
+    # decided by the cache's type, so the branch folds away at compile time.
+    if alg.safetyfallback && cache.cacheval isa DefaultLinearSolverInit &&
+            cache.A isa DenseMatrix && _qr_fallback_pivot(cache.A) isa ColumnNorm
+        if sol.retcode === ReturnCode.Failure
+            return _do_qr_fallback(cache, alg, sol, :qr_rank_deficient)
+        end
+        if sol.retcode === ReturnCode.Success &&
+                (
+                any(!isfinite, sol.u) ||
+                    _qr_rank_deficient(getfield(cache.cacheval, :QRFactorization))
+            )
+            return _do_qr_fallback(cache, alg, sol, :qr_rank_deficient)
+        end
+    end
+    # Use cache directly for type-stable inference (see _do_qr_fallback).
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, nothing;
+        retcode = sol.retcode, iters = sol.iters, stats = nothing
+    )
+end
+
+"""
     _algchoice_to_alg_with_safety(alg::Symbol)
 
 Like `algchoice_to_alg`, but generates an expression that passes
@@ -963,6 +1013,14 @@ end
                 end
                 sol = SciMLBase.solve!(cache, $inner_alg_expr)
                 _default_lu_solve_with_fallback(cache, alg, sol)
+            end
+        elseif alg == Symbol(DefaultAlgorithmChoice.QRFactorization)
+            # Unpivoted QR (dense non-square, or ill-conditioned square): on a
+            # rank-deficient `A` it cannot produce the least-squares solution, so
+            # redo the solve with column-pivoted QR.
+            newex = quote
+                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)))
+                _default_qr_solve_with_fallback(cache, alg, sol)
             end
         else
             if alg in LinearSolve._SPARSE_ONLY_ALGORITHMS

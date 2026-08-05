@@ -195,17 +195,23 @@ sol1 = solve(prob)
 sol2 = solve(prob, LinearSolve.KrylovJL_CRAIGMR())
 @test sol1.u == sol2.u
 
-# Default for Underdetermined problem but the size is a long rectangle
+# Default for Underdetermined problem but the size is a long rectangle.
+# `A` is rank-deficient, so the unpivoted-QR default falls back to column-pivoted
+# QR and returns the same least-squares solution as `A \ b` (it used to report
+# `ReturnCode.Failure` with an all-zero `u`).
+# https://github.com/SciML/LinearSolve.jl/issues/531
 A = [
     2.0 1.0
     0.0 0.0
     0.0 0.0
 ]
 b = [1.0, 0.0, 0.0]
-prob = LinearProblem(A, b)
+res = A \ b
+prob = LinearProblem(copy(A), copy(b))
 sol = solve(prob)
 
-@test !SciMLBase.successful_retcode(sol.retcode)
+@test SciMLBase.successful_retcode(sol.retcode)
+@test sol.u ≈ res
 
 ## Show that we cannot select a default alg once by checking the rank, since it might change
 ## later in the cache
@@ -223,15 +229,22 @@ sol = solve!(cache)
 
 @test sol.u ≈ [0.0, 1.0]
 
-cache.A = [
+A_deficient = [
     2.0 1.0
     0.0 0.0
     0.0 0.0
 ]
+# Reference computed up front: `cache.A = X` stores `X` itself and the in-place
+# QR overwrites it.
+res_deficient = A_deficient \ b
+cache.A = copy(A_deficient)
 
 sol = solve!(cache)
 
-@test !SciMLBase.successful_retcode(sol.retcode)
+# The rank dropped between solves; the pivoted-QR fallback handles it in the
+# cache just as it does on a fresh solve.
+@test SciMLBase.successful_retcode(sol.retcode)
+@test sol.u ≈ res_deficient
 
 ## Non-square Sparse Defaults
 # https://github.com/SciML/NonlinearSolve.jl/issues/599

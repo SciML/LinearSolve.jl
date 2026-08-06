@@ -227,6 +227,22 @@ end
         X = sprand(n, n, 0.8)
         cache.A = X
         @test X * solve!(cache) ≈ b1
+
+        # Partial pivoting tolerance option
+        @test PureKLUFactorization().tol == 0.001 # default value
+        function rowperm(tol)
+            A = sparse([1.0e-3 1.0; 1.0 1.0])
+            b = [1.0, 2.0]
+            alg = PureKLUFactorization(; tol)
+            cache = SciMLBase.init(LinearProblem(A, b), alg)
+            solve!(cache)
+            return cache.cacheval.p # row permutation vector
+        end
+        @test rowperm(0.0) == [1, 2] # below threshold: pivot on diagonal entry
+        @test rowperm(1.0e-4) == [1, 2] # below threshold: pivot on diagonal entry
+        @test rowperm(1.0e-3) == [1, 2] # at threshold: pivot on diagonal entry
+        @test rowperm(1.0e-2) == [2, 1] # above threshold: pivot on largest entry
+        @test rowperm(1.0) == [2, 1] # above threshold: pivot on largest entry
     end
 
     @testset "RFLUFactorization multi-RHS" begin

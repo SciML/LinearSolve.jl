@@ -621,6 +621,15 @@ Julia's built in `qr`. Equivalent to calling `qr!(A)`.
   - On sparse matrices, this will use SPQR from SparseArrays
   - On CuMatrix, it will use a CUDA-accelerated QR from CuSolver.
   - On BandedMatrix and BlockBandedMatrix, it will use a banded QR.
+
+With the default `NoPivot()` this is not rank-revealing, so it cannot solve a
+rank-deficient (least-squares) system: it reports `ReturnCode.Failure` when a
+diagonal entry of `R` is exactly zero, and can return an overflowing solution
+when one is merely negligible. Pass `ColumnNorm()` for a rank-revealing
+factorization that truncates the rank the way `A \\ b` does. The default
+algorithm handles this automatically — it starts with the cheaper unpivoted QR
+and re-solves with `QRFactorization(ColumnNorm())` if `A` turns out to be
+rank-deficient.
 """
 struct QRFactorization{P} <: AbstractDenseFactorization
     pivot::P

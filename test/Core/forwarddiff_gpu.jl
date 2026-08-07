@@ -10,6 +10,13 @@ using Test
 # rather than a smoke test -- the whole split-Dual path (partials extraction,
 # rhs construction, back-solves, dual reassembly) has to stay in broadcasts and
 # BLAS-level calls, or they error instead of merely running slowly.
+#
+# The device solves use KrylovJL_GMRES, not an LU factorization: JLArray ships
+# no native `lu` (real GPU backends get theirs from CUSOLVER etc.), and since
+# JLArrays 0.3.2 (JuliaGPU/GPUArrays.jl#549) `unsafe_convert(Ptr, ::JLArray)`
+# throws, so the stdlib LAPACK fallback that used to silently factorize the
+# underlying CPU buffer errors instead of running. A Krylov solve is the path
+# that genuinely honors the GPU contract here, which is what this file proves.
 
 const N_PARTIALS = 3
 
@@ -58,7 +65,10 @@ end
         # supported implementation rather than mere self-consistency.
         reference = solve(LinearProblem(A_case, b_case), LUFactorization()).u
 
-        cache = init(LinearProblem(JLArray(A_case), JLArray(b_case)), LUFactorization())
+        cache = init(
+            LinearProblem(JLArray(A_case), JLArray(b_case)), KrylovJL_GMRES();
+            abstol = 1.0e-14, reltol = 1.0e-14
+        )
         solution = Array(solve!(cache).u)
         @test value_error(solution, reference) < 1.0e-12
         @test partials_error(solution, reference) < 1.0e-12
@@ -72,7 +82,10 @@ end
     end
 
     @testset "A reassigned between solves" begin
-        cache = init(LinearProblem(JLArray(A), JLArray(b)), LUFactorization())
+        cache = init(
+            LinearProblem(JLArray(A), JLArray(b)), KrylovJL_GMRES();
+            abstol = 1.0e-14, reltol = 1.0e-14
+        )
         solve!(cache)
 
         A2 = A .+ ForwardDiff.Dual{Nothing}(0.5, ntuple(k -> 0.02k, N_PARTIALS))

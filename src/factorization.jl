@@ -1470,7 +1470,7 @@ function init_cacheval(
 end
 
 """
-`PureUMFPACKFactorization(; reuse_symbolic = true, check_pattern = true)`
+`PureUMFPACKFactorization(; reuse_symbolic = true, check_pattern = true, throwerror = true)`
 
 A pure-Julia port of SuiteSparse's UMFPACK unsymmetric sparse LU solver, provided
 by [PureUMFPACK.jl](https://github.com/SciML/PureUMFPACK.jl). It has no SuiteSparse
@@ -1494,10 +1494,23 @@ binary dependency and supports generic element types in addition to
     pattern is unchanged. Defaults to `true`.
   - `check_pattern`: check whether the sparsity pattern changed before reusing the
     cached factorization. Defaults to `true`.
+  - `throwerror`: whether to throw an error if PureUMFPACK.jl is not loaded. Defaults
+    to `true`.
 """
-Base.@kwdef struct PureUMFPACKFactorization <: AbstractSparseFactorization
-    reuse_symbolic::Bool = true
-    check_pattern::Bool = true
+struct PureUMFPACKFactorization <: AbstractSparseFactorization
+    reuse_symbolic::Bool
+    check_pattern::Bool
+
+    function PureUMFPACKFactorization(
+            ; reuse_symbolic = true, check_pattern = true, throwerror = true
+        )
+        ext = Base.get_extension(@__MODULE__, :LinearSolvePureUMFPACKExt)
+        return if throwerror && ext === nothing
+            error("PureUMFPACKFactorization requires that PureUMFPACK is loaded, i.e. `using PureUMFPACK`")
+        else
+            new(reuse_symbolic, check_pattern)
+        end
+    end
 end
 
 function init_cacheval(

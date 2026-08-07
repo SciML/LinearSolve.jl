@@ -1,6 +1,7 @@
 using LinearSolve, Test
 using SparseArrays, LinearAlgebra
 using Krylov
+using Random
 
 m, n = 13, 3
 
@@ -193,6 +194,11 @@ end
 # truncates the rank the same way `A \ b` does.
 # Regression test for https://github.com/SciML/LinearSolve.jl/issues/531
 @testset "Rank-deficient least squares" begin
+    # Seeded: these probe behavior around the rank-detection threshold, so an
+    # unlucky draw decides which side of the cutoff a matrix falls on. Keep them
+    # reproducible rather than intermittently red.
+    Random.seed!(0x0531)
+
     @testset "tall, exactly rank-deficient" begin
         A = rand(10, 4)
         A[:, 1] .= 0    # a column of all zeros
@@ -218,8 +224,19 @@ end
     @testset "tall, numerically rank-deficient" begin
         # Not exactly singular, so the factorization "succeeds" and the failure is
         # silent without the rank check.
+        #
+        # The scaling has to put the deficiency clearly below the rank threshold.
+        # `_qr_rank_deficient` compares against `min(m, n) * eps * max|R[i, i]|`,
+        # the same relative cutoff LAPACK's `xGELSY` (and therefore `A \ b`) uses,
+        # and a ~1e-14 scaling lands *on* that boundary: once the second column is
+        # orthogonalized against the first, `R[2, 2]` is eps-level noise that
+        # straddles the cutoff from draw to draw. There, unpivoted QR plus this
+        # heuristic and the pivoted QR behind `\` can legitimately disagree --
+        # measured over 300 seeds, a 1e-14 scaling disagreed on ~3% of draws, which
+        # is what made this test intermittently fail. 1e-18 is unambiguously
+        # rank-deficient and agreed on every draw.
         A = rand(10, 4)
-        A[:, 1] .= 1.0e-14 .* A[:, 2]
+        A[:, 1] .= 1.0e-18 .* A[:, 2]
         b = rand(10)
         sol = solve(LinearProblem(copy(A), copy(b)))
         @test sol.retcode === ReturnCode.Success

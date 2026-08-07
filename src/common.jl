@@ -481,6 +481,35 @@ function _check_batched_rhs_support(alg::DefaultLinearSolver, b::AbstractMatrix)
     return nothing
 end
 
+"""
+    _check_square_A_support(alg, A)
+
+Throw an informative `ArgumentError` at `init` time when a non-square `A` is
+used with an algorithm that requires a square one (see [`needs_square_A`](@ref)).
+
+Without this, a non-square `A` reaches the factorization and fails there, in a
+different way for each algorithm and with no indication of what to use instead:
+`DimensionMismatch: matrix is not square` from LU and Cholesky, `ArgumentError:
+Bunch-Kaufman decomposition is only valid for...`, or `FieldError: type Array has
+no field diag` from `DiagonalFactorization`. Least-squares and minimum-norm
+systems are solved by the default algorithm and by the algorithms named in the
+message.
+"""
+_check_square_A_support(alg, A) = nothing
+function _check_square_A_support(alg::SciMLLinearSolveAlgorithm, A)
+    (needs_square_A(alg) && !issquare(A)) && throw(
+        ArgumentError(
+            "$(nameof(typeof(alg))) requires a square `A`, got $(size(A, 1))x$(size(A, 2)). " *
+                "A non-square system is solved in the least-squares (tall `A`) or " *
+                "minimum-norm (wide `A`) sense by the default algorithm, i.e. " *
+                "`solve(prob)`, or by `QRFactorization(ColumnNorm())`, " *
+                "`SVDFactorization()`, and the least-squares Krylov methods " *
+                "`KrylovJL_LSMR()` (tall) / `KrylovJL_CRAIGMR()` (wide)."
+        )
+    )
+    return nothing
+end
+
 function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm, args...; kwargs...)
     return __init(prob, alg, args...; kwargs...)
 end
@@ -571,6 +600,7 @@ function __init(
     end
 
     _check_batched_rhs_support(alg, b)
+    _check_square_A_support(alg, A)
 
     u0_ = u0 !== nothing ? u0 : __init_u0_from_Ab(A, b)
 

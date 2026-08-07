@@ -1095,10 +1095,13 @@ end
         sol_amg = solve(prob_amg, AlgebraicMultigridJL(), reltol = 1.0e-8)
         @test norm(A_amg * sol_amg.u - b_amg) < 1.0e-8
 
-        # Non-square matrix should throw
+        # Non-square matrix should throw. `needs_square_A(::AlgebraicMultigridJL)`
+        # is true, so this is now rejected at `init` with an `ArgumentError`
+        # naming the least-squares alternatives, rather than reaching the
+        # solver and tripping its `AssertionError`.
         A_rect = sparse([1.0 1.0 0.0; 0.0 1.0 1.0])
         b_rect = [1.0, 1.0]
-        @test_throws AssertionError solve(LinearProblem(A_rect, b_rect), AlgebraicMultigridJL())
+        @test_throws ArgumentError solve(LinearProblem(A_rect, b_rect), AlgebraicMultigridJL())
     end
 end
 

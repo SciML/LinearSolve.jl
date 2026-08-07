@@ -548,12 +548,44 @@ end
     needs_square_A(alg)
 
 Returns `true` if the algorithm requires a square matrix.
+
+`init` enforces this: an algorithm that returns `true` and is handed a
+non-square `A` throws an `ArgumentError` naming the algorithms that do solve
+least-squares/minimum-norm systems, rather than letting a `DimensionMismatch`
+(or worse) escape from inside the factorization. Anything not listed below falls
+back to the conservative `true`, so a new algorithm is rejected on non-square
+input until it is declared otherwise.
 """
 needs_square_A(::Nothing) = false  # Linear Solve automatically will use a correct alg!
 needs_square_A(alg::SciMLLinearSolveAlgorithm) = true
 for alg in (
+        # Same reason as the `Nothing` method above: by the time `init` runs, an
+        # unspecified algorithm has already been resolved to a
+        # `DefaultLinearSolver`, and the polyalgorithm picks a non-square-capable
+        # algorithm (pivoted QR, sparse column-pivoted QR, or a least-squares
+        # Krylov method) for a non-square `A` itself.
+        :DefaultLinearSolver,
         :QRFactorization, :FastQRFactorization, :NormalCholeskyFactorization,
         :NormalBunchKaufmanFactorization,
+        # Rank-revealing/least-squares capable: `svd` and the column-pivoted
+        # sparse QR both accept a non-square `A` and return the same answer as
+        # `A \ b`. `SparseColumnPivotedQRFactorization` is in fact the default
+        # for non-square sparse systems, so it must not be rejected here.
+        :SVDFactorization, :SparseColumnPivotedQRFactorization,
+        # Rank-revealing column-pivoted QR (`geqp3`): documented to return the
+        # least-squares solution for any shape, including rank-deficient.
+        :SpecializedQRFactorization,
+        # QR-based GPU offloads. These cannot be exercised on a machine without
+        # the corresponding GPU, and a QR is least-squares capable in principle,
+        # so they are declared permissive: enforcing `true` here would newly
+        # reject a shape that may work today.
+        :CudaOffloadQRFactorization, :AMDGPUOffloadQRFactorization,
+        :CudaOffloadFactorization,
+        # A wrapper around a user-supplied factorization: whether a non-square
+        # `A` is allowed depends on `fact_alg`, and the default (`factorize`) as
+        # well as the obvious choices (`qr`, `svd`) all handle it. Leave the
+        # rejection to the wrapped factorization.
+        :GenericFactorization,
     )
     @eval needs_square_A(::$(alg)) = false
 end
@@ -565,8 +597,8 @@ for kralg in (
     @eval needs_square_A(::KrylovJL{$(typeof(kralg))}) = false
 end
 for alg in (
-        :LUFactorization, :FastLUFactorization, :SVDFactorization,
-        :GenericFactorization, :GenericLUFactorization, :SimpleLUFactorization,
+        :LUFactorization, :FastLUFactorization,
+        :GenericLUFactorization, :SimpleLUFactorization,
         :RFLUFactorization, :ButterflyFactorization, :UMFPACKFactorization, :KLUFactorization, :SparspakFactorization,
         :DiagonalFactorization, :CholeskyFactorization, :BunchKaufmanFactorization,
         :CHOLMODFactorization, :LDLtFactorization, :AppleAccelerateLUFactorization,

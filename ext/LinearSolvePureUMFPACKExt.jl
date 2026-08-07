@@ -2,7 +2,7 @@ module LinearSolvePureUMFPACKExt
 
 using LinearSolve: LinearSolve, PureUMFPACKFactorization, OperatorAssumptions,
     LinearVerbosity
-using PureUMFPACK: PureLU, splu
+using PureUMFPACK: PureUMFPACK, PureLU, splu
 using SparseArrays: SparseArrays, AbstractSparseArray, SparseMatrixCSC,
     nonzeros, rowvals, getcolptr
 using SciMLOperators: AbstractSciMLOperator, has_concretization
@@ -76,10 +76,7 @@ function SciMLBase.solve!(
     # A zero on U's diagonal means a singular (or numerically singular) factor;
     # PureUMFPACK with `check = false` produces it instead of throwing.
     return if !any(iszero, diag(F.U))
-        # `\` rather than `PureUMFPACK.solve`: the latter is unexported and only
-        # marked `public` on Julia >= 1.11, so it reads as a non-public access on the
-        # LTS. `\` is `solve(F, b)` with the default `refine = 0`.
-        y = F \ cache.b
+        y = PureUMFPACK.solve(F, cache.b)
         copyto!(cache.u, y)
         SciMLBase.build_linear_solution(
             alg, cache.u, nothing, nothing; retcode = ReturnCode.Success

@@ -95,6 +95,97 @@ prob = LinearProblem(A, b)
 res = A \ b
 @test solve(prob).u ≈ res
 
+# `needs_square_A` is enforced at `init`: an algorithm that requires a square `A`
+# and is handed a non-square one now throws an `ArgumentError` naming the
+# least-squares alternatives, instead of leaking a `DimensionMismatch` (LU,
+# Cholesky), an `ArgumentError` about Bunch-Kaufman validity, or a `FieldError`
+# about `Array` having no `diag` field from deep inside the factorization.
+# Regression test for https://github.com/SciML/LinearSolve.jl/issues/546
+@testset "needs_square_A enforcement" begin
+    A_tall = rand(12, 4)
+    b_tall = rand(12)
+    A_wide = rand(4, 12)
+    b_wide = rand(4)
+    res_tall = A_tall \ b_tall
+
+    @testset "square-only algorithms are rejected" begin
+        for alg in (
+                LUFactorization(), GenericLUFactorization(), SimpleLUFactorization(),
+                CholeskyFactorization(), BunchKaufmanFactorization(),
+                DiagonalFactorization(), LDLtFactorization(),
+            )
+            @test LinearSolve.needs_square_A(alg)
+            # Rejected for both orientations, and at `init` rather than `solve`.
+            @test_throws ArgumentError init(
+                LinearProblem(copy(A_tall), copy(b_tall)), alg
+            )
+            @test_throws ArgumentError solve(
+                LinearProblem(copy(A_tall), copy(b_tall)), alg
+            )
+            @test_throws ArgumentError solve(
+                LinearProblem(copy(A_wide), copy(b_wide)), alg
+            )
+        end
+        # The message names what to use instead.
+        err = try
+            solve(LinearProblem(copy(A_tall), copy(b_tall)), LUFactorization())
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("requires a square `A`", err)
+        @test occursin("12x4", err)
+        @test occursin("QRFactorization(ColumnNorm())", err)
+        @test occursin("SVDFactorization()", err)
+    end
+
+    @testset "non-square-capable algorithms are unaffected" begin
+        # These were all marked as needing a square `A` while solving non-square
+        # systems correctly, so the trait had to be corrected before it could be
+        # enforced.
+        for alg in (
+                SVDFactorization(), GenericFactorization(),
+                GenericFactorization(fact_alg = qr), QRFactorization(),
+                QRFactorization(ColumnNorm()), NormalCholeskyFactorization(),
+                KrylovJL_LSMR(),
+            )
+            @test !LinearSolve.needs_square_A(alg)
+            @test solve(LinearProblem(copy(A_tall), copy(b_tall)), alg).u ≈ res_tall
+        end
+    end
+
+    @testset "the default algorithm is never rejected" begin
+        # `solve(prob)` resolves to a `DefaultLinearSolver` before `init` runs, so
+        # the trait must be false for it too or every non-square default solve
+        # would throw.
+        @test !LinearSolve.needs_square_A(
+            LinearSolve.defaultalg(A_tall, b_tall, OperatorAssumptions(false))
+        )
+        @test solve(LinearProblem(copy(A_tall), copy(b_tall))).u ≈ res_tall
+        @test solve(LinearProblem(copy(A_wide), copy(b_wide))).u ≈ A_wide \ b_wide
+
+        A_sparse = sprand(12, 4, 0.7)
+        while rank(Matrix(A_sparse)) < 4
+            A_sparse = sprand(12, 4, 0.7)
+        end
+        b_sparse = rand(12)
+        @test solve(LinearProblem(copy(A_sparse), copy(b_sparse))).u ≈
+            Matrix(A_sparse) \ b_sparse
+        # The sparse non-square default itself must not be rejected either.
+        @test !LinearSolve.needs_square_A(SparseColumnPivotedQRFactorization())
+    end
+
+    @testset "square problems are unaffected" begin
+        A_sq = rand(6, 6)
+        b_sq = rand(6)
+        for alg in (LUFactorization(), CholeskyFactorization(), nothing)
+            A_use = alg isa CholeskyFactorization ? A_sq'A_sq + 6I : A_sq
+            sol = alg === nothing ? solve(LinearProblem(copy(A_use), copy(b_sq))) :
+                solve(LinearProblem(copy(A_use), copy(b_sq)), alg)
+            @test sol.u ≈ A_use \ b_sq
+        end
+    end
+end
+
 # Rank-deficient least squares: the default is unpivoted QR, which cannot solve a
 # rank-deficient system — it used to return all-zeros with `ReturnCode.Failure`
 # (exactly-singular) or an overflowing solution with `ReturnCode.Success`

@@ -66,6 +66,7 @@ else
             @time @safetestset "Batched RHS" include("Core/batch.jl")
             @time @safetestset "GESV Factorization" include("Core/gesv.jl")
             @time @safetestset "LU Refactorization Reuse" include("Core/lu_refactorization.jl")
+            @time @safetestset "Scalar Back-Solve" include("Core/scalar_backsolve.jl")
             @time @safetestset "Direct BLAS Refactorization Reuse" include("Core/direct_blas_refactorization.jl")
             @time @safetestset "Lightweight Solution (no cache)" include("Core/lightweight_solution.jl")
             @time @safetestset "Return codes" include("Core/retcodes.jl")

@@ -152,6 +152,54 @@ _ldiv!(x, A, b::SVector) = (x .= A \ b)
 _ldiv!(::SVector, A, b::SVector) = (A \ b)
 _ldiv!(::SVector, A, b) = (A \ b)
 
+# Below this size a single-vector LU back-solve is dominated by the cost of
+# entering BLAS rather than by its arithmetic: `getrs!` measures ~290 ns
+# independent of `n`. The measured crossover is `n ~ 192` against multithreaded
+# BLAS and `n ~ 300` pinned to one thread; 64 stays well under both, and matches
+# the `PANEL_BLAS_CUTOFF` SupernodalLU picked for the same reason.
+const DENSE_BLAS_CUTOFF = 64
+
+@inline function _scalar_lu_ldiv!(
+        x::AbstractVector, factors::AbstractMatrix, ipiv::AbstractVector
+    )
+    n = length(x)
+    @inbounds for i in eachindex(ipiv)
+        p = ipiv[i]
+        if p != i
+            x[i], x[p] = x[p], x[i]
+        end
+    end
+    @inbounds for j in 1:n
+        xj = x[j]
+        @simd for i in (j + 1):n
+            x[i] -= factors[i, j] * xj
+        end
+    end
+    @inbounds for j in n:-1:1
+        x[j] /= factors[j, j]
+        xj = x[j]
+        @simd for i in 1:(j - 1)
+            x[i] -= factors[i, j] * xj
+        end
+    end
+    return x
+end
+
+# Restricting the pivot to `Vector` keeps RecursiveFactorization's pivotless
+# `NotIPIV` factorizations on their own `ldiv!`, which is already BLAS-free.
+function _ldiv!(
+        x::StridedVector{T}, A::LinearAlgebra.LU{T, <:StridedMatrix{T}, <:Vector{<:Integer}},
+        b::StridedVector{T}
+    ) where {T <: LinearAlgebra.BlasFloat}
+    factors = A.factors
+    n = size(factors, 1)
+    if n > DENSE_BLAS_CUTOFF || n != size(factors, 2) || length(x) != n || length(b) != n
+        return ldiv!(x, A, b)
+    end
+    x === b || copyto!(x, b)
+    return _scalar_lu_ldiv!(x, factors, A.ipiv)
+end
+
 function _direct_lu_factorize! end
 function _direct_lu_solve! end
 
@@ -455,7 +503,7 @@ function SciMLBase.solve!(
 
         cache.isfresh = false
     end
-    y = ldiv!(
+    y = _ldiv!(
         cache.u, LinearSolve.@get_cacheval(cache, :GenericLUFactorization)[1], cache.b
     )
 

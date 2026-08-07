@@ -124,10 +124,20 @@ run_qa(
     LinearSolve;
     explicit_imports = true,
     reexports_allow = scimlbase_reexports,
-    api_docs_kwargs = (; rendered = true, docs_src, rendered_ignore = scimlbase_reexports),
-    # Recursive ambiguities are tracked separately; placeholder until resolved.
-    aqua_broken = (:ambiguities,),
+    # `scimlbase_reexports` covers both checks: `names(SciMLBase)` includes the
+    # module's own name, so re-exporting it puts `:SciMLBase` in LinearSolve's public
+    # API, where the docstring check counts it as undocumented. It is SciMLBase's name
+    # to document, not LinearSolve's, hence the same ignore list as the rendered check.
+    api_docs_kwargs = (;
+        rendered = true, docs_src,
+        ignore = scimlbase_reexports, rendered_ignore = scimlbase_reexports,
+    ),
     aqua_kwargs = (;
+        # `MKL_jll` is not stale: `src/LinearSolve.jl` and `src/mkl.jl` load it
+        # (`using MKL_jll: MKL_jll` / `libmkl_rt`) behind a `@static if` gated on a
+        # `Preferences.@load_preference`, so MKL can be opted out of at build time.
+        # Aqua analyzes the source without resolving that branch and cannot see the
+        # use, so the dependency has to be ignored here rather than dropped.
         deps_compat = (; ignore = [:MKL_jll]),
         stale_deps = (; ignore = [:MKL_jll]),
         piracies = (; treat_as_own = [LinearProblem, EigenvalueProblem]),

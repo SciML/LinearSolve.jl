@@ -250,6 +250,11 @@ Julia's built in generic LU factorization. Equivalent to calling LinearAlgebra.g
 Supports arbitrary number types but does not achieve as good scaling as BLAS-based LU implementations.
 Has low overhead and is good for small matrices.
 
+The back-solve is a pure-Julia column-oriented triangular solve (apply `ipiv`, unit-lower
+forward, upper backward) rather than `ldiv!(::LU, ·)` / OpenBLAS `getrs!`. That avoids the
+~290 ns BLAS call floor that otherwise dominates at the small-`N` sizes where this algorithm
+is the default (see SciML/LinearSolve.jl#1145).
+
 ## Positional Arguments
 
   - pivot: The choice of pivoting. Defaults to `LinearAlgebra.RowMaximum()`. The other choice is
@@ -261,6 +266,81 @@ struct GenericLUFactorization{P} <: AbstractDenseFactorization
 end
 
 GenericLUFactorization(pivot = RowMaximum(); residualsafety::Bool = false) = GenericLUFactorization(pivot, residualsafety)
+
+# Pure-Julia LU back-solve used by GenericLUFactorization. A pivoted LU vector
+# solve at small N is a handful of flops but ~290 ns through OpenBLAS/MKL
+# getrs! (call overhead); the same algorithm written out as scalar loops is
+# several times faster up through at least N≈80 (#1145). Always used for
+# GenericLU — no BLAS cutoff — so the path stays dependency- and vendor-free.
+# Multi-RHS applies the row permutation once, then runs the triangular sweeps
+# per column (nrhs == 1 is the hot path for Newton/ODE).
+@inline function _naive_lu_ldiv!(
+        fac::AbstractMatrix, ipiv::AbstractVector, b::AbstractVector
+    )
+    n = length(b)
+    @inbounds for i in eachindex(ipiv)
+        p = ipiv[i]
+        if p != i
+            b[i], b[p] = b[p], b[i]
+        end
+    end
+    @inbounds for j in 1:n
+        bj = b[j]
+        for i in (j + 1):n
+            b[i] = muladd(-fac[i, j], bj, b[i])
+        end
+    end
+    @inbounds for j in n:-1:1
+        b[j] /= fac[j, j]
+        bj = b[j]
+        for i in 1:(j - 1)
+            b[i] = muladd(-fac[i, j], bj, b[i])
+        end
+    end
+    return b
+end
+
+@inline function _naive_lu_ldiv!(
+        fac::AbstractMatrix, ipiv::AbstractVector, B::AbstractMatrix
+    )
+    n = size(B, 1)
+    nrhs = size(B, 2)
+    @inbounds for i in eachindex(ipiv)
+        p = ipiv[i]
+        if p != i
+            for col in 1:nrhs
+                B[i, col], B[p, col] = B[p, col], B[i, col]
+            end
+        end
+    end
+    @inbounds for j in 1:n
+        for col in 1:nrhs
+            bj = B[j, col]
+            for i in (j + 1):n
+                B[i, col] = muladd(-fac[i, j], bj, B[i, col])
+            end
+        end
+    end
+    @inbounds for j in n:-1:1
+        invd = inv(fac[j, j])
+        for col in 1:nrhs
+            B[j, col] *= invd
+            bj = B[j, col]
+            for i in 1:(j - 1)
+                B[i, col] = muladd(-fac[i, j], bj, B[i, col])
+            end
+        end
+    end
+    return B
+end
+
+# 3-arg form matching `ldiv!(x, F, b)`: copy when `x !== b`, then in-place solve.
+function _generic_lu_ldiv!(x, F::LU, b)
+    if x !== b
+        copyto!(x, b)
+    end
+    return _naive_lu_ldiv!(F.factors, F.ipiv, x)
+end
 
 # Trait methods for types defined in this file (must come after struct definitions)
 _get_residualsafety(alg::LUFactorization) = alg.residualsafety
@@ -455,9 +535,14 @@ function SciMLBase.solve!(
 
         cache.isfresh = false
     end
-    y = ldiv!(
-        cache.u, LinearSolve.@get_cacheval(cache, :GenericLUFactorization)[1], cache.b
-    )
+    F = LinearSolve.@get_cacheval(cache, :GenericLUFactorization)[1]
+    # Prefer the pure-Julia back-solve for `LinearAlgebra.LU` (the common
+    # cacheval). Non-stdlib LU types (e.g. StaticArrays) keep their own `ldiv!`.
+    y = if F isa LinearAlgebra.LU
+        _generic_lu_ldiv!(cache.u, F, cache.b)
+    else
+        ldiv!(cache.u, F, cache.b)
+    end
 
     if check_safety
         failed = _check_residual_safety(cache, alg, A_original, y)

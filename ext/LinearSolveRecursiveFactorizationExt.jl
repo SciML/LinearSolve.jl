@@ -3,7 +3,8 @@ module LinearSolveRecursiveFactorizationExt
 using LinearSolve: LinearSolve, RFLUFactorization, ButterflyFactorization,
     RF32MixedLUFactorization, LinearVerbosity
 using ArrayInterface: ArrayInterface
-using LinearAlgebra: LinearAlgebra, UnitLowerTriangular, UpperTriangular, ldiv!, mul!
+using LinearAlgebra: LinearAlgebra, UnitLowerTriangular, UpperTriangular,
+    LowerTriangular, ldiv!, mul!
 using RecursiveFactorization: RecursiveFactorization
 using TriangularSolve: TriangularSolve
 using SciMLBase: SciMLBase, ReturnCode
@@ -44,20 +45,35 @@ end
 # `RecursiveFactorization` already routes its own `lu!` through TriangularSolve,
 # but the `ldiv!` that consumes the factorization only does so for the pivotless
 # `NotIPIV` case (RecursiveFactorization/src/lu.jl); a pivoted `LU` falls back to
-# LinearAlgebra, i.e. BLAS `trsv`/`trsm`.  For a matrix right-hand side that
-# leaves a consistent ~1.6x on the table at every size we measured, because
-# TriangularSolve's blocked kernels beat `trsm` here:
+# LinearAlgebra, i.e. BLAS `trsv`/`trsm`.
 #
-#   n     BLAS trsm   TriangularSolve
-#   32     2.19 us      1.37 us  (1.60x)
-#   64     6.27 us      3.76 us  (1.67x)
-#   128   21.02 us     12.72 us  (1.65x)
-#   256   86.08 us     54.07 us  (1.59x)
-#   500  276.20 us    175.81 us  (1.58x)
+# TriangularSolve exposes blocked kernels for
+#   ldiv!(::LowerTriangular/UnitLowerTriangular, ::AbstractMatrix)
+#   rdiv!(::AbstractMatrix, ::UpperTriangular/UnitUpperTriangular)
+# but has no `ldiv!(::UpperTriangular, ...)` — that call hits the catch-all and
+# silently becomes `LinearAlgebra.ldiv!` (BLAS trsm).  The L leg therefore goes
+# through TS directly; the U leg is rewritten via the exchange-matrix identity
+#   U X = B  ⇔  (J U J) (J X) = J B
+# with L = J U J lower-triangular, so both legs hit TS kernels.  L = J U J is
+# materialized contiguously: a reverse-view of the packed factors has negative
+# strides that TriangularSolve mishandles at larger n (silent wrong answers).
+# A native upper-triangular `ldiv!` in TriangularSolve would remove that copy
+# (see SciML/LinearSolve.jl#1146).
+#
+# Full multi-RHS solve vs stdlib `ldiv!(::LU, ·)`, 1 BLAS thread, with the
+# per-solve J*U*J materialization included:
+#
+#   n    nrhs   stdlib     both-TS
+#   64     4    8.2 us      3.7 us  (2.2x)
+#  128     8   25.7 us     16.0 us  (1.6x)
+#  256     8   84.0 us     61.9 us  (1.4x)
+#  500     4  232 us      161 us    (1.4x)
 #
 # For a single vector right-hand side TriangularSolve has no advantage (it has
 # no vector kernel, and reshaping to n x 1 measured 1.09x at n=128 but 0.88x by
-# n=256), so vectors keep the stdlib path.
+# n=256), so vectors keep the stdlib path.  Complex BlasFloat also keeps the
+# stdlib U leg: TS only specialises Float32/Float64, so the reverse rewrite
+# would only add a useless copy before falling through to LinearAlgebra.
 @inline function _rf_ldiv!(
         u::AbstractVector, fact::LinearAlgebra.LU, b::AbstractVector, ::Val
     )
@@ -75,7 +91,30 @@ function _rf_ldiv!(
     LinearAlgebra._ipiv_rows!(fact, 1:length(fact.ipiv), U)
     F = fact.factors
     TriangularSolve.ldiv!(UnitLowerTriangular(F), U, Val(Thread))
-    TriangularSolve.ldiv!(UpperTriangular(F), U, Val(Thread))
+    _rf_upper_ldiv!(F, U, Val(Thread))
+    return U
+end
+
+# U X = B via L (J X) = J B with L = J U J lower-triangular (TS has lower ldiv!).
+function _rf_upper_ldiv!(
+        F::AbstractMatrix{T}, U::AbstractMatrix{T}, thread::Val
+    ) where {T <: Union{Float32, Float64}}
+    n = size(F, 1)
+    L = Matrix{T}(undef, n, n)
+    @inbounds for j in 1:n, i in j:n
+        L[i, j] = F[n + 1 - i, n + 1 - j]
+    end
+    reverse!(U, dims = 1)
+    TriangularSolve.ldiv!(LowerTriangular(L), U, thread)
+    reverse!(U, dims = 1)
+    return U
+end
+
+# Complex / other BlasFloat: no TS upper kernel either way; avoid the O(n²) copy.
+@inline function _rf_upper_ldiv!(
+        F::AbstractMatrix, U::AbstractMatrix, thread::Val
+    )
+    TriangularSolve.ldiv!(UpperTriangular(F), U, thread)
     return U
 end
 

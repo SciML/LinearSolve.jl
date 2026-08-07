@@ -246,10 +246,12 @@ end
     end
 
     @testset "RFLUFactorization multi-RHS" begin
-        # The extension routes matrix right-hand sides through TriangularSolve;
-        # results must match the stdlib path exactly in behaviour.
+        # Matrix RHS: L leg via TS UnitLower; U leg via exchange-matrix rewrite
+        # into TS Lower (TriangularSolve has no UpperTriangular ldiv! — #1146).
+        # nrhs == 1 stays on the stdlib path.  Include n large enough that a
+        # negative-stride reverse-view of the factors would miscompute.
         Random.seed!(7)
-        for n in (8, 40), nrhs in (1, 3)
+        for n in (8, 40, 128), nrhs in (1, 3, 8)
             Ar = rand(n, n) + n * I
             Br = rand(n, nrhs)
             sol = solve(LinearProblem(copy(Ar), copy(Br)), RFLUFactorization())
@@ -261,6 +263,10 @@ end
             cache.A = copy(A2)
             @test solve!(cache).u ≈ A2 \ Br
         end
+        # Float32 multi-RHS (same reverse-U path as Float64)
+        A32 = Float32.(rand(64, 64) + 64 * I)
+        B32 = Float32.(rand(64, 4))
+        @test solve(LinearProblem(copy(A32), copy(B32)), RFLUFactorization()).u ≈ A32 \ B32
     end
 
     @testset "SupernodalLU Factorization" begin

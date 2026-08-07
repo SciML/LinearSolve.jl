@@ -45,15 +45,18 @@ end
 # but the `ldiv!` that consumes the factorization only does so for the pivotless
 # `NotIPIV` case (RecursiveFactorization/src/lu.jl); a pivoted `LU` falls back to
 # LinearAlgebra, i.e. BLAS `trsv`/`trsm`.  For a matrix right-hand side that
-# leaves a consistent ~1.6x on the table at every size we measured, because
-# TriangularSolve's blocked kernels beat `trsm` here:
+# leaves money on the table at every size we measured, because TriangularSolve's
+# blocked kernels beat `trsm` on both legs.  TriangularSolve >= 0.2.2 provides
+# the native upper-triangular ldiv!; earlier versions silently sent the U leg
+# back to BLAS through the TriangularSolve catch-all.  Solve-only, 1 BLAS
+# thread, nrhs = 8:
 #
-#   n     BLAS trsm   TriangularSolve
-#   32     2.19 us      1.37 us  (1.60x)
-#   64     6.27 us      3.76 us  (1.67x)
-#   128   21.02 us     12.72 us  (1.65x)
-#   256   86.08 us     54.07 us  (1.59x)
-#   500  276.20 us    175.81 us  (1.58x)
+#   U leg (upper ldiv!):            L leg (unit-lower ldiv!):
+#   n     trsm        TS            trsm        TS
+#   64      4.09 us    1.78 us        5.06 us    1.62 us
+#   128    12.36 us    6.27 us       12.57 us    4.42 us
+#   256    49.18 us   22.04 us       48.93 us   19.08 us
+#   500   154.79 us   79.64 us      150.16 us   75.22 us
 #
 # For a single vector right-hand side TriangularSolve has no advantage (it has
 # no vector kernel, and reshaping to n x 1 measured 1.09x at n=128 but 0.88x by

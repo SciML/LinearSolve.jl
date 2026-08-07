@@ -509,6 +509,15 @@ algorithm can keep unpivoted QR on the fast path and only pay for a pivoted
 refactorization when the cheap check says the answer would otherwise be garbage;
 see `_default_qr_solve_with_fallback`. Factorization types the test does not
 apply to (SPQR, GPU) return `false` and keep their existing behavior.
+
+Being a threshold test, it is decisive only away from the threshold. For a matrix
+sitting *on* the cutoff -- say a column scaled to roughly `1e-14` of another, where
+the corresponding `R` diagonal entry lands at eps-level noise -- whether this fires
+depends on rounding, and the answer can differ from `A \\ b`, which reaches the
+same cutoff through a genuinely rank-revealing pivoted QR with better numerics.
+Clearly rank-deficient input is handled; input engineered to sit at the boundary is
+inherently ambiguous, and callers who need a decision there should ask for
+`QRFactorization(ColumnNorm())` or `SVDFactorization()` directly.
 """
 @inline _qr_rank_deficient(F) = false
 

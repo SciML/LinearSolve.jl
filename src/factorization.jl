@@ -253,7 +253,9 @@ Has low overhead and is good for small matrices.
 The back-solve is a pure-Julia column-oriented triangular solve (apply `ipiv`, unit-lower
 forward, upper backward) rather than `ldiv!(::LU, ·)` / OpenBLAS `getrs!`. That avoids the
 ~290 ns BLAS call floor that otherwise dominates at the small-`N` sizes where this algorithm
-is the default (see SciML/LinearSolve.jl#1145).
+is the default (see SciML/LinearSolve.jl#1145). `Adjoint`/`Transpose` operators, whose
+factors are stored through the lazy wrapper, get an orientation-specialized kernel that
+traverses the underlying parent column-contiguously (see SciML/LinearSolve.jl#1159).
 
 ## Positional Arguments
 
@@ -329,6 +331,78 @@ end
             for i in 1:(j - 1)
                 B[i, col] = muladd(-fac[i, j], bj, B[i, col])
             end
+        end
+    end
+    return B
+end
+
+# Orientation-specialized back-solve for the Adjoint/Transpose-wrapped strided
+# factors that `init_cacheval` produces for adjoint/transpose operators (#1159).
+# The column-oriented sweeps above would walk the wrapper's parent at stride N;
+# these run the same solves in inner-product form so the parent is traversed
+# column-contiguously. Indexing through the wrapper keeps conj correct for
+# complex Adjoint factors.
+const _AdjTransStridedFactors = Union{
+    Adjoint{<:Any, <:StridedMatrix}, Transpose{<:Any, <:StridedMatrix},
+}
+
+@inline function _naive_lu_ldiv!(
+        fac::_AdjTransStridedFactors, ipiv::AbstractVector, b::AbstractVector
+    )
+    n = length(b)
+    @inbounds for i in eachindex(ipiv)
+        p = ipiv[i]
+        if p != i
+            b[i], b[p] = b[p], b[i]
+        end
+    end
+    @inbounds for i in 2:n
+        acc = b[i]
+        @simd for j in 1:(i - 1)
+            acc = muladd(-fac[i, j], b[j], acc)
+        end
+        b[i] = acc
+    end
+    @inbounds for i in n:-1:1
+        acc = b[i]
+        @simd for j in (i + 1):n
+            acc = muladd(-fac[i, j], b[j], acc)
+        end
+        b[i] = acc / fac[i, i]
+    end
+    return b
+end
+
+@inline function _naive_lu_ldiv!(
+        fac::_AdjTransStridedFactors, ipiv::AbstractVector, B::AbstractMatrix
+    )
+    n = size(B, 1)
+    nrhs = size(B, 2)
+    @inbounds for i in eachindex(ipiv)
+        p = ipiv[i]
+        if p != i
+            for col in 1:nrhs
+                B[i, col], B[p, col] = B[p, col], B[i, col]
+            end
+        end
+    end
+    @inbounds for i in 2:n
+        for col in 1:nrhs
+            acc = B[i, col]
+            @simd for j in 1:(i - 1)
+                acc = muladd(-fac[i, j], B[j, col], acc)
+            end
+            B[i, col] = acc
+        end
+    end
+    @inbounds for i in n:-1:1
+        invd = inv(fac[i, i])
+        for col in 1:nrhs
+            acc = B[i, col]
+            @simd for j in (i + 1):n
+                acc = muladd(-fac[i, j], B[j, col], acc)
+            end
+            B[i, col] = acc * invd
         end
     end
     return B

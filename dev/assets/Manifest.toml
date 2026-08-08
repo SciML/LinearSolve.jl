@@ -1499,9 +1499,9 @@ version = "4.3.6"
 
 [[deps.RecursiveFactorization]]
 deps = ["LinearAlgebra", "LoopVectorization", "Polyester", "PrecompileTools", "SparseBandedMatrices", "StrideArraysCore", "TriangularSolve", "VectorizedRNG"]
-git-tree-sha1 = "5908f99c0729c88ef032e5ef10f29b69ab1d453c"
+git-tree-sha1 = "a7271876548a7d5b932162a1688b0b8f792b74a1"
 uuid = "f2c3362d-daeb-58d1-803e-2bc74f2840b4"
-version = "0.2.26"
+version = "0.2.27"
 
 [[deps.Reexport]]
 git-tree-sha1 = "45e428421666073eab6f2da5c9d310d99bb12f9b"

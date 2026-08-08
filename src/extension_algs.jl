@@ -472,6 +472,10 @@ is in the works.
 - Optimized specifically for Float32 and Float64 element types
 - Recursive blocking strategy provides excellent cache performance
 - Multi-threading can provide significant speedups on multi-core systems
+- Back-solves avoid BLAS: a matrix right-hand side runs TriangularSolve's blocked
+  kernels, and a single right-hand side up to size 256 runs the same pure-Julia
+  triangular solve `GenericLUFactorization` uses, which skips the ~290 ns
+  `getrs!` call floor (see SciML/LinearSolve.jl#1161)
 
 ## Requirements
 Using this solver requires that RecursiveFactorization.jl is loaded: `using RecursiveFactorization`

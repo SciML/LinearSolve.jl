@@ -68,9 +68,39 @@ end
 #   256    49.18 us   22.04 us       48.93 us   19.08 us
 #   500   154.79 us   79.64 us      150.16 us   75.22 us
 #
-# For a single vector right-hand side TriangularSolve has no advantage (it has
-# no vector kernel, and reshaping to n x 1 measured 1.09x at n=128 but 0.88x by
-# n=256), so vectors keep the stdlib path.
+# A single right-hand side is a different problem: `ldiv!(u, ::LU, b)` reaches
+# OpenBLAS `getrs!`, whose ~290 ns call floor dominates the whole solve at the
+# sizes where RFLU is the dense default (10 < N <= 100).  LinearSolve's in-tree
+# naive kernel (#1151, orientation-specialized in #1162) applies the pivots and
+# both triangular sweeps in one pass and wins until its unblocked sweep falls
+# out of cache; TriangularSolve 0.2.4's vector `ldiv!` also beats `getrs!`, but
+# is 0-8% behind the naive kernel at every size and stops at its own n = 128
+# cutoff.  Vector back-solve, min-of-N ns, RF's pivoted `lu!` in every arm and
+# only the back-solve differing:
+#
+#   n     getrs!   naive kernel   TriangularSolve 0.2.4
+#     8      459     169 (0.37x)      220 (0.48x)
+#    20      829     439 (0.53x)      499 (0.60x)
+#    64     2620    1830 (0.70x)     1890 (0.72x)
+#   128     6080    4810 (0.79x)     4830 (0.79x)
+#   256    17710   15750 (0.89x)    18160 (1.03x)
+#   400    38900   40660 (1.05x)    39320 (1.01x)
+const NAIVE_LDIV_MAXSIZE = 256
+
+# The kernel is `@inbounds`, so restrict it to a square factorization whose
+# pivot vector matches the right-hand side; anything else keeps the stdlib path.
+@inline function _rf_ldiv!(
+        u::StridedVector{T}, fact::LinearAlgebra.LU{T, <:StridedMatrix{T}},
+        b::StridedVector{T}, ::Val
+    ) where {T <: LinearAlgebra.BlasFloat}
+    m, k = size(fact.factors)
+    n = length(b)
+    usable = m == k == n == length(u) == length(fact.ipiv) && n <= NAIVE_LDIV_MAXSIZE
+    usable || return ldiv!(u, fact, b)
+    u === b || copyto!(u, b)
+    return LinearSolve._naive_lu_ldiv!(fact.factors, fact.ipiv, u)
+end
+
 @inline function _rf_ldiv!(
         u::AbstractVector, fact::LinearAlgebra.LU, b::AbstractVector, ::Val
     )
@@ -81,9 +111,12 @@ function _rf_ldiv!(
         U::AbstractMatrix{T}, fact::LinearAlgebra.LU{T, <:StridedMatrix{T}},
         B::AbstractMatrix{T}, ::Val{Thread}
     ) where {T <: LinearAlgebra.BlasFloat, Thread}
-    # A single column is the vector case in disguise: measured 0.87-0.90x at
-    # n >= 256, so it keeps the stdlib path.
-    size(B, 2) == 1 && return ldiv!(U, fact, B)
+    # A single column is the vector case in disguise, so it goes to the vector
+    # method rather than to `trsm`-sized kernels.
+    if size(B, 2) == 1 && size(U, 2) == 1
+        _rf_ldiv!(view(U, :, 1), fact, view(B, :, 1), Val(Thread))
+        return U
+    end
     U === B || copyto!(U, B)
     LinearAlgebra._ipiv_rows!(fact, 1:length(fact.ipiv), U)
     F = fact.factors

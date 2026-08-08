@@ -52,26 +52,41 @@ end
     return nothing
 end
 
-# Multi-RHS pivot-block solves.  Two calls that look natural here are avoided.
+# Multi-RHS pivot-block solves.  Three backends, picked by panel width.
 #
-# `LinearAlgebra.ldiv!` on a triangular wrapper heap-allocates a fixed 64 B per
-# call on Julia 1.11 for a matrix right-hand side (not for a vector, and not on
-# 1.10 or 1.12), which breaks the allocation-free guarantee for every panel of
-# every sweep.
+# `LinearAlgebra.ldiv!` on a triangular wrapper is not one of them: it
+# heap-allocates a fixed 64 B per call on Julia 1.11 for a matrix right-hand
+# side (not for a vector, and not on 1.10 or 1.12), which breaks the
+# allocation-free guarantee for every panel of every sweep.
 #
-# `BLAS.trsm!` is the wrong shape for supernode panels.  At a median panel width
-# of 6 the call is dominated by overhead rather than arithmetic -- the same
-# reason `PANEL_BLAS_CUTOFF` exists for the single-RHS sweeps -- and because it
-# is BLAS-threaded, its cost per call depends on the thread count and on what
-# else is running.  On a quiet machine it overtakes the column kernels from
-# np~16 with nrhs>=4; under load its small-panel calls degrade by orders of
-# magnitude while the column kernels, which use no BLAS, are unaffected.  The
-# kernels are therefore the default at every panel size: predictable beats
-# marginally-faster-when-idle for a block this small.
+#   np <= PANEL_KERNEL_MAX_NP   the in-tree column kernels.  Supernode panels
+#                               are small -- median width 6 for a 2D Poisson
+#                               factorization -- and at that size any library
+#                               call is dominated by its own overhead.
+#   above, up to PANEL_BLAS_MIN_NP
+#                               `TriangularSolve.ldiv!` when it is available,
+#                               i.e. when RecursiveFactorization is loaded; see
+#                               the hooks below.  It is the same library
+#                               RecursiveFactorization uses for its own trsms,
+#                               and it carries its own small-size cutoffs, so
+#                               the extension hands it the whole band rather
+#                               than re-deriving where it stops winning.
+#                               Without it this band falls back to BLAS.
+#   np > PANEL_BLAS_MIN_NP      `BLAS.trsm!`, whose blocked sweep is what wins
+#                               once the triangle no longer fits in cache.
 #
-# `TriangularSolve.ldiv!` is faster than either and is not BLAS-threaded, but it
-# only helps the forward sweep -- it has no `UpperTriangular` kernel at all.  It
-# lives behind the hooks below so the optional dependency stays optional.
+# The boundaries follow the dense back-solve work rather than a fresh
+# measurement of this kernel: #1169 puts the in-tree-kernel/BLAS crossover at
+# 256, and #1164 confirms 256 for a `Matrix` orientation (512 wrapped) while
+# finding multi-RHS sweeps still ahead through N=1000.  Those were measured on
+# whole LU back-solves, not on supernode panels, so treat both numbers as
+# provisional -- SciML/LinearSolve.jl#1172 tracks measuring them here directly.
+const PANEL_KERNEL_MAX_NP = 256
+const PANEL_BLAS_MIN_NP = 1024
+
+# `trsm!` needs a BLAS element type in a strided array; everything else stays on
+# the kernels, which are generic and beat the stdlib fallback for those types.
+@inline _panel_blas_eligible(::Type{Tv}) where {Tv} = Tv <: LinearAlgebra.BlasFloat
 
 @inline function _unit_lower_solve!(W::AbstractMatrix{Tv}, X::AbstractMatrix{Tv}, np::Int) where {Tv}
     @inbounds for r in axes(X, 2)
@@ -87,18 +102,57 @@ end
     return nothing
 end
 
-# Overridable hooks for the solve-phase pivot-block trsms, the same arrangement
-# the factorization phase uses for `_panel_rdiv!`/`_panel_ldiv!` in numeric.jl:
-# these are dense triangular sub-solves, not linear solves in the LinearSolve
-# sense, so `defaultalg` never sees them and cannot improve them.
-# LinearSolveRecursiveFactorizationExt overrides the forward sweep to route
-# through TriangularSolve, the library RecursiveFactorization already uses for
-# its own trsms.
-_panel_solve_unit_lower!(Ws::AbstractMatrix{Tv}, Yb::AbstractMatrix{Tv}, np::Int) where {Tv} =
+# `trsm!` for the BLAS element types; anything else keeps the kernels.
+_panel_unit_lower_trsm!(Ws::AbstractMatrix{Tv}, Yb::AbstractMatrix{Tv}, np::Int) where {Tv} =
     _unit_lower_solve!(Ws, Yb, np)
+function _panel_unit_lower_trsm!(
+        Ws::StridedMatrix{Tv}, Yb::StridedMatrix{Tv}, np::Int
+    ) where {Tv <: LinearAlgebra.BlasFloat}
+    BLAS.trsm!('L', 'L', 'N', 'U', one(Tv), view(Ws, 1:np, 1:np), Yb)
+    return nothing
+end
 
-_panel_solve_upper!(Ws::AbstractMatrix{Tv}, Yb::AbstractMatrix{Tv}, np::Int) where {Tv} =
+_panel_upper_trsm!(Ws::AbstractMatrix{Tv}, Yb::AbstractMatrix{Tv}, np::Int) where {Tv} =
     _upper_solve!(Ws, Yb, np)
+function _panel_upper_trsm!(
+        Ws::StridedMatrix{Tv}, Yb::StridedMatrix{Tv}, np::Int
+    ) where {Tv <: LinearAlgebra.BlasFloat}
+    BLAS.trsm!('L', 'U', 'N', 'N', one(Tv), view(Ws, 1:np, 1:np), Yb)
+    return nothing
+end
+
+# Overridable hooks for the solve-phase pivot-block trsms, the same arrangement
+# the factorization phase uses for `_panel_rdiv!`/`_panel_ldiv!` in numeric.jl.
+# They exist because nothing else can reach these calls: `TriangularSolve.ldiv!`
+# is a distinct function from `LinearAlgebra.ldiv!` rather than an extension of
+# it, so a bare `ldiv!` here can never dispatch to it however the environment is
+# set up; and `defaultalg` selects algorithms for a `LinearProblem`, which a
+# dense triangular sub-solve inside a sweep is not.  Routing has to be explicit.
+#
+# These defaults cover the no-TriangularSolve case: kernels, then BLAS.
+# LinearSolveRecursiveFactorizationExt overrides both to slot TriangularSolve
+# into the middle band.
+function _panel_solve_unit_lower!(
+        Ws::AbstractMatrix{Tv}, Yb::AbstractMatrix{Tv}, np::Int
+    ) where {Tv}
+    if np <= PANEL_KERNEL_MAX_NP || !_panel_blas_eligible(Tv)
+        _unit_lower_solve!(Ws, Yb, np)
+    else
+        _panel_unit_lower_trsm!(Ws, Yb, np)
+    end
+    return nothing
+end
+
+function _panel_solve_upper!(
+        Ws::AbstractMatrix{Tv}, Yb::AbstractMatrix{Tv}, np::Int
+    ) where {Tv}
+    if np <= PANEL_KERNEL_MAX_NP || !_panel_blas_eligible(Tv)
+        _upper_solve!(Ws, Yb, np)
+    else
+        _panel_upper_trsm!(Ws, Yb, np)
+    end
+    return nothing
+end
 
 # t := A * x for the L21 block W[np+1:np+nu, 1:np] (column-oriented gemv).
 @inline function _panel_gemv!(

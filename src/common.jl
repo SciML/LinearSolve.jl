@@ -254,18 +254,27 @@ mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, Tlv <: Linear
     alias_A::Bool
 end
 
-function Base.setproperty!(cache::LinearCache, name::Symbol, x)
+# `@inline` is load-bearing: `name` must constant-propagate into the body so the
+# branch chain and `fieldtype` fold away. Without it, the warm refactorization
+# loop's `cache.isfresh = false`-style assignments inside `solve!` degrade to
+# dynamic calls and allocate, breaking the 0-byte ceilings in
+# test/Core/lu_refactorization.jl on the default-algorithm paths.
+@inline function Base.setproperty!(cache::LinearCache, name::Symbol, x)
     # Default `setproperty!` semantics convert to the field's declared type; this
     # override must do the same, or an update whose eltype differs from the cache's
     # (an integer `cache.b = [1, 0, ...]` after the init-time integer-to-float
     # promotion, or Float32 data into a Float64 cache) throws a raw `TypeError`
-    # from `setfield!`. `convert` is the identity for an already-matching array, so
-    # the `===` alias check in the `:A` branch below still sees the caller's
-    # object. `:cacheval` is exempt: for the default solver it stores into a slot
-    # of the cacheval rather than the field itself, so the field's type is not the
-    # right conversion target.
+    # from `setfield!`. The `isa` guard keeps the matching-type hot path (e.g. the
+    # warm `cache.A = Awork` refactorization loop, which asserts 0 allocations)
+    # from ever reaching `convert`: an already-matching `x` passes through
+    # untouched even if constant propagation of `name` fails, so the `===` alias
+    # check in the `:A` branch below still sees the caller's object. `:cacheval`
+    # is exempt: for the default solver it stores into a slot of the cacheval
+    # rather than the field itself, so the field's type is not the right
+    # conversion target.
     if name !== :cacheval
-        x = convert(fieldtype(typeof(cache), name), x)
+        FT = fieldtype(typeof(cache), name)
+        x isa FT || (x = convert(FT, x))
     end
     if name === :A
         setfield!(cache, :isfresh, true)

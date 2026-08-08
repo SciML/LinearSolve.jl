@@ -221,3 +221,10 @@ end
     end
     @test cache.u ≈ A2 \ b2
 end
+
+# The warm default-algorithm ceiling must hold without RecursiveFactorization
+# loaded: the AppleAccelerate CI group includes only this file, so the default
+# resolves to the platform BLAS path (MKL/Accelerate), which regressed to 64
+# bytes when `setproperty!` grew past the inlining budget and `name` stopped
+# constant-propagating. The ceilings above already catch this in that group; this
+# comment records why `setproperty!(::LinearCache, ...)` carries `@inline`.

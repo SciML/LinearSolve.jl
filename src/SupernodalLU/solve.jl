@@ -52,6 +52,43 @@ end
     return nothing
 end
 
+# Multi-RHS pivot-block solves.  `LinearAlgebra.ldiv!` on a triangular wrapper
+# heap-allocates a fixed 64 B per call on Julia 1.11 for a matrix right-hand
+# side (not for a vector, and not on 1.10 or 1.12), which breaks the
+# allocation-free guarantee for every panel of every sweep.  Applying the
+# single-RHS kernels per column below the cutoff and calling `BLAS.trsm!`
+# directly above it keeps both paths free of that wrapper.
+@inline function _unit_lower_solve!(W::AbstractMatrix{Tv}, X::AbstractMatrix{Tv}, np::Int) where {Tv}
+    @inbounds for r in axes(X, 2)
+        _unit_lower_solve!(W, view(X, :, r), np)
+    end
+    return nothing
+end
+
+@inline function _upper_solve!(W::AbstractMatrix{Tv}, X::AbstractMatrix{Tv}, np::Int) where {Tv}
+    @inbounds for r in axes(X, 2)
+        _upper_solve!(W, view(X, :, r), np)
+    end
+    return nothing
+end
+
+# `trsm!` covers the BLAS element types; anything else falls back to `ldiv!`.
+_panel_unit_lower_trsm!(A::AbstractMatrix, B::AbstractMatrix) =
+    ldiv!(UnitLowerTriangular(A), B)
+function _panel_unit_lower_trsm!(
+        A::StridedMatrix{Tv}, B::StridedMatrix{Tv}
+    ) where {Tv <: LinearAlgebra.BlasFloat}
+    return BLAS.trsm!('L', 'L', 'N', 'U', one(Tv), A, B)
+end
+
+_panel_upper_trsm!(A::AbstractMatrix, B::AbstractMatrix) =
+    ldiv!(UpperTriangular(A), B)
+function _panel_upper_trsm!(
+        A::StridedMatrix{Tv}, B::StridedMatrix{Tv}
+    ) where {Tv <: LinearAlgebra.BlasFloat}
+    return BLAS.trsm!('L', 'U', 'N', 'N', one(Tv), A, B)
+end
+
 # t := A * x for the L21 block W[np+1:np+nu, 1:np] (column-oriented gemv).
 @inline function _panel_gemv!(
         t::AbstractVector{Tv}, W::AbstractMatrix{Tv}, x::AbstractVector{Tv},
@@ -170,7 +207,11 @@ function _solve_panels!(Y::AbstractMatrix{Tv}, F::SupernodalLUFactor{Tv}) where 
         nu = length(Rf)
         Ws = F.W[s]
         Yb = view(Y, c1:c2, :)
-        ldiv!(UnitLowerTriangular(view(Ws, 1:np, 1:np)), Yb)
+        if np < PANEL_BLAS_CUTOFF
+            _unit_lower_solve!(Ws, Yb, np)
+        else
+            _panel_unit_lower_trsm!(view(Ws, 1:np, 1:np), Yb)
+        end
         if nu > 0
             T = reshape(view(buf, 1:(nu * nrhs)), nu, nrhs)
             mul!(T, view(Ws, (np + 1):(np + nu), 1:np), Yb)
@@ -194,7 +235,11 @@ function _solve_panels!(Y::AbstractMatrix{Tv}, F::SupernodalLUFactor{Tv}) where 
             end
             mul!(Yb, F.Z[s], T, -one(Tv), one(Tv))
         end
-        ldiv!(UpperTriangular(view(Ws, 1:np, 1:np)), Yb)
+        if np < PANEL_BLAS_CUTOFF
+            _upper_solve!(Ws, Yb, np)
+        else
+            _panel_upper_trsm!(view(Ws, 1:np, 1:np), Yb)
+        end
     end
     return Y
 end

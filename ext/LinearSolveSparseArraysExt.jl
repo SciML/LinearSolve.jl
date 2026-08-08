@@ -1124,15 +1124,17 @@ end
             )
             (A \ b)
         end
+        # SPQR's `\`, like CHOLMOD's, has no method for an `SVector`
+        # right-hand side, so solve against a `Vector` copy.
         function LinearSolve._ldiv!(
                 ::SVector, A::SparseArrays.SPQR.QRSparse, b::SVector
             )
-            (A \ b)
+            (A \ Vector(b))
         end
         function LinearSolve._ldiv!(
                 x::AbstractVector, A::SparseArrays.SPQR.QRSparse, b::SVector
             )
-            x .= A \ b
+            x .= A \ Vector(b)
         end
     end
 
@@ -1145,19 +1147,28 @@ end
         x .= A \ b
     end
 
+    # Disambiguate the CHOLMOD `_ldiv!(::AbstractVecOrMat, ::Factor,
+    # ::AbstractVecOrMat)` above against LinearSolve's generic `SVector`
+    # methods (src/factorization.jl), mirroring the SPQR trio. These must be
+    # per-type: a `Union` in the factor position is less specific than
+    # `CHOLMOD.Factor`, so a Union-typed method covers the intersections
+    # without resolving them (LinearSolve.jl#1141).
+    # CHOLMOD's `\` has no method for an `SVector` right-hand side, so those
+    # bodies solve against a `Vector` copy.
     function LinearSolve._ldiv!(
-            ::SVector,
-            A::Union{SparseArrays.CHOLMOD.Factor, SparseArrays.SPQR.QRSparse},
-            b::AbstractVector
+            ::SVector, A::SparseArrays.CHOLMOD.Factor, b::AbstractVecOrMat
         )
         (A \ b)
     end
     function LinearSolve._ldiv!(
-            ::SVector,
-            A::Union{SparseArrays.CHOLMOD.Factor, SparseArrays.SPQR.QRSparse},
-            b::SVector
+            ::SVector, A::SparseArrays.CHOLMOD.Factor, b::SVector
         )
-        (A \ b)
+        (A \ Vector(b))
+    end
+    function LinearSolve._ldiv!(
+            x::AbstractVecOrMat, A::SparseArrays.CHOLMOD.Factor, b::SVector
+        )
+        x .= A \ Vector(b)
     end
 end # @static if Base.USE_GPL_LIBS
 

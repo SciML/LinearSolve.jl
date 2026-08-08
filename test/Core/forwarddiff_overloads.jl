@@ -855,3 +855,23 @@ end
     @test ForwardDiff.partials.(x, 1) ≈
         [-b[n + 1 - i] / (2.0 + i / n)^2 for i in 1:n] rtol = 1.0e-10
 end
+
+@testset "Iterative algorithms get the partials right through the split path" begin
+    # The split path re-solves the primal cache once per partial, updating `b`
+    # in place — which `SimpleGMRES` missed, giving partials off by ~3e-2.
+    n = 6
+    p = 3
+    A = [
+        ForwardDiff.Dual{Nothing}(
+                float(i == j ? 10 + i : 0.3 * (i + j)),
+                ntuple(k -> 0.1k + 0.01 * (i + j), p)
+            ) for i in 1:n, j in 1:n
+    ]
+    b = [ForwardDiff.Dual{Nothing}(float(i), ntuple(k -> 0.05k + 0.1i, p)) for i in 1:n]
+    reference = solve(LinearProblem(A, b), LUFactorization()).u
+
+    @testset "$(nameof(typeof(alg)))" for alg in (KrylovJL_GMRES(), SimpleGMRES())
+        u = solve(LinearProblem(A, b), alg; abstol = 1.0e-14, reltol = 1.0e-14).u
+        @test dual_isapprox(u, reference; rtol = 1.0e-10)
+    end
+end

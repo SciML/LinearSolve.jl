@@ -1,6 +1,6 @@
 name = "LinearSolve"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
-version = "5.6.0"
+version = "5.6.1"
 authors = ["SciML"]
 
 [deps]
@@ -177,7 +177,7 @@ PureUMFPACK = "1"
 Random = "1.10"
 RecursiveArrayTools = "3.37, 4"
 RecursiveFactorization = "0.2.26"
-TriangularSolve = "0.2"
+TriangularSolve = "0.2.2"
 Reexport = "1.2.2"
 STRUMPACK_jll = "8"
 SafeTestsets = "0.1"

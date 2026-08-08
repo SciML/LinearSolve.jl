@@ -255,4 +255,36 @@ function SNLU._panel_ldiv!(W::Matrix{Tv}, np::Int, Z::Matrix{Tv}) where {Tv <: S
     return nothing
 end
 
+# Solve-phase forward sweep.  TriangularSolve's `UnitLowerTriangular` kernel
+# beats the in-repo column kernels at every panel width that occurs (a
+# poisson-2D k=30 factorization has 70 panels, np 1..71, median 8), by roughly
+# 1.4-6x per call for nrhs>=2 and growing with nrhs, and unlike `BLAS.trsm!` it
+# is not BLAS-threaded, so it does not degrade when the machine is busy.
+# End-to-end on that factorization it is worth ~1.2-1.4x on the whole solve.
+# A single column is the vector case in disguise -- TriangularSolve has no
+# vector kernel and the column kernels lead -- so nrhs == 1 keeps the fallback.
+function SNLU._panel_solve_unit_lower!(
+        Ws::Matrix{Tv}, Yb::AbstractMatrix{Tv}, np::Int
+    ) where {Tv <: SNLUTypes}
+    size(Yb, 2) == 1 && return SNLU._unit_lower_solve!(Ws, Yb, np)
+    TriangularSolve.ldiv!(UnitLowerTriangular(view(Ws, 1:np, 1:np)), Yb, Val(false))
+    return nothing
+end
+
+# The back sweep is deliberately *not* overridden: as of TriangularSolve 0.2.1
+# there is no `UpperTriangular` method at all (only `LowerTriangular` and
+# `UnitLowerTriangular`), so `TriangularSolve.ldiv!(UpperTriangular(...), ...)`
+# falls through to
+#
+#   ldiv!(A, B, ::Val = Val(true)) = LinearAlgebra.ldiv!(A, B)
+#
+# at TriangularSolve.jl:750.  That is a catch-all with untyped arguments, so it
+# reaches `LinearAlgebra.ldiv!` through a runtime dispatch -- strictly worse
+# than calling `LinearAlgebra.ldiv!` directly, and that is the triangular
+# wrapper path that allocates on Julia 1.11 in the first place.
+#
+# Note this also applies to `_rf_ldiv!` above, whose `UpperTriangular` call is
+# the same forwarding stub: the 1.58-1.67x it documents comes from the
+# `UnitLowerTriangular` half only.
+
 end

@@ -461,6 +461,22 @@ sol_glu_rs = solve(
 )
 @test sol_glu_rs.retcode === ReturnCode.APosterioriSafetyFailure
 
+# Callers with backend convergence metadata pass it through the failing check (#1166)
+cache_meta = init(LinearProblem(copy(A_nearsing), copy(b_nearsing)), LUFactorization())
+sol_meta = LinearSolve._check_residual_safety(
+    cache_meta, cache_meta.alg, A_nearsing, ones(n); iters = 7, resid = 1.25
+)
+@test sol_meta.retcode === ReturnCode.APosterioriSafetyFailure
+@test sol_meta.iters == 7
+@test sol_meta.resid == 1.25
+# Defaults keep the failure solution type-identical to the success path
+sol_default_meta = LinearSolve._check_residual_safety(
+    cache_meta, cache_meta.alg, A_nearsing, ones(n)
+)
+@test sol_default_meta.retcode === ReturnCode.APosterioriSafetyFailure
+@test sol_default_meta.iters == 0
+@test sol_default_meta.resid === nothing
+
 # Default LUFactorization() on near-singular matrix → ReturnCode.Success (no check)
 sol_lu_default = solve(
     LinearProblem(copy(A_nearsing), copy(b_nearsing)),

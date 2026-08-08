@@ -562,6 +562,37 @@ end
         test_interface(SimpleGMRES(; restart), prob1, prob2)
     end
 
+    # Every way of re-entering `solve!` has to rebuild the cacheval's initial
+    # residual, not just the `cache.b = ...` setproperty hook.
+    @testset "Simple GMRES resolve: restart = $restart, blocksize = $blocksize" for
+        restart in (true, false), blocksize in (0, 2)
+
+        nr = 6
+        Ar = [
+            float(i == j ? 10 + i : 0.3 * (i + j)) *
+                (blocksize == 0 || (i - 1) ÷ blocksize == (j - 1) ÷ blocksize)
+                for i in 1:nr, j in 1:nr
+        ]
+        br = float.(1:nr)
+        br2 = [0.3i + 1 for i in 1:nr]
+        alg = SimpleGMRES(; restart, blocksize)
+
+        @testset "$desc" for (desc, update_b!, expected) in (
+                ("b mutated in place", (c, b) -> (c.b .= b), br2),
+                ("b replaced", (c, b) -> (c.b = copy(b)), br2),
+                ("b unchanged", (c, b) -> nothing, br),
+            )
+            cache = init(
+                LinearProblem(copy(Ar), copy(br)), alg; abstol = 1.0e-12, reltol = 1.0e-12
+            )
+            @test solve!(cache).u ≈ Ar \ br rtol = 1.0e-13
+            update_b!(cache, br2)
+            # Tighter than the requested tolerance on purpose: a resolve off
+            # stale state still lands near the answer, just orders short of it.
+            @test solve!(cache).u ≈ Ar \ expected rtol = 1.0e-13
+        end
+    end
+
     @testset "KrylovJL" begin
         kwargs = (; gmres_restart = 5)
         precs = (A, p = nothing) -> (Diagonal(inv.(diag(A))), I)

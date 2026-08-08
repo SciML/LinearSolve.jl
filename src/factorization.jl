@@ -408,10 +408,22 @@ end
     return B
 end
 
+# Single-vector sweeps lose to `ldiv!`'s blocked path once the factors fall
+# out of cache: measured crossover ≈ N 400 for `Matrix` factors and ≈ 900 for
+# the wrapped orientations (min-times vs BLAS getrs!/the generic wrapped path,
+# EPYC 7502; 1.14x/1.24x/1.35x slower at N = 512/1000/2000 for `Matrix`).
+# Multi-RHS sweeps win at every size measured (through N = 1000, nrhs = 4), so
+# only vectors defer.
+_naive_ldiv_cutoff(::AbstractMatrix) = 256
+_naive_ldiv_cutoff(::_AdjTransStridedFactors) = 512
+
 # 3-arg form matching `ldiv!(x, F, b)`: copy when `x !== b`, then in-place solve.
 function _generic_lu_ldiv!(x, F::LU, b)
     if x !== b
         copyto!(x, b)
+    end
+    if x isa AbstractVector && length(x) > _naive_ldiv_cutoff(F.factors)
+        return ldiv!(F, x)
     end
     return _naive_lu_ldiv!(F.factors, F.ipiv, x)
 end

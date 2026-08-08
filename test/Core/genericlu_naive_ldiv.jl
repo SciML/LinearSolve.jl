@@ -76,6 +76,18 @@ end
     @test sol.u ≈ A \ b rtol = 1.0e-12
 end
 
+@testset "vector solves above the naive-kernel cutoff defer to ldiv!" begin
+    for (mk, n) in ((identity, 600), (adjoint, 600), (adjoint, 1200))
+        A = rand(n, n) + n * I
+        b = rand(n)
+        sol = solve(LinearProblem(mk(copy(A)), copy(b)), GenericLUFactorization())
+        @test sol.u ≈ Matrix(mk(A)) \ b rtol = 1.0e-10 * n
+        B = rand(n, 3)
+        solB = solve(LinearProblem(mk(copy(A)), copy(B)), GenericLUFactorization())
+        @test solB.u ≈ Matrix(mk(A)) \ B rtol = 1.0e-10 * n
+    end
+end
+
 @testset "GenericLU back-solve on Adjoint/Transpose operators" begin
     for T in (Float64, Float32, ComplexF64, ComplexF32, BigFloat),
             wrap in (adjoint, transpose)

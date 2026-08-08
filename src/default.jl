@@ -153,6 +153,18 @@ function defaultalg(
     return defaultalg(A.A, b, assump)
 end
 
+# Fix ambiguity with the `AbstractSciMLOperator`/`AnyGPUArray` method below: a
+# `MatrixOperator` with a GPU `b` matches both, and neither is more specific.
+# Unwrapping to `A.A` is what the `MatrixOperator` method above does, and it is the
+# better answer here too -- a concretized operator does not need the operator-only
+# Krylov fallback.
+function defaultalg(
+        A::MatrixOperator, b::GPUArraysCore.AnyGPUArray,
+        assump::OperatorAssumptions{Bool}
+    )
+    return defaultalg(A.A, b, assump)
+end
+
 function defaultalg(A, b, assump::OperatorAssumptions{Nothing})
     issq = issquare(A)
     return defaultalg(

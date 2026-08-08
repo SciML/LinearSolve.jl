@@ -119,6 +119,54 @@ function LinearSolve.init_cacheval(
     return LinearSolve.do_factorization(alg, newA, b, u)
 end
 
+# The method above is specific on `A` (a sparse `Symmetric`/`Hermitian`) but generic
+# on the algorithm, while LinearSolve declares
+# `init_cacheval(::GenericFactorization{typeof(f)}, ::AbstractMatrix, ...)` for each
+# wrapped factorization function -- specific on the algorithm, generic on `A`. Neither
+# is more specific than the other, so every combination is ambiguous. Define the
+# intersections here; a sparse `Symmetric`/`Hermitian` operand takes the sparse path
+# above regardless of which factorization function is wrapped.
+for f in (
+        :(LinearAlgebra.lu), :(LinearAlgebra.lu!),
+        :(LinearAlgebra.qr), :(LinearAlgebra.qr!),
+        :(LinearAlgebra.svd), :(LinearAlgebra.svd!),
+        :(LinearAlgebra.cholesky), :(LinearAlgebra.cholesky!),
+    )
+    @eval function LinearSolve.init_cacheval(
+            alg::GenericFactorization{typeof($f)},
+            A::Union{
+                Hermitian{T, <:SparseMatrixCSC},
+                Symmetric{T, <:SparseMatrixCSC},
+            }, b, u, Pl, Pr,
+            maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+            assumptions::OperatorAssumptions
+        ) where {T}
+        newA = copy(convert(AbstractMatrix, A))
+        return LinearSolve.do_factorization(alg, newA, b, u)
+    end
+end
+
+# The Bunch-Kaufman pair needs a single method rather than one per function: the
+# LinearSolve side declares both in one signature (`Union{GenericFactorization{
+# typeof(bunchkaufman)}, GenericFactorization{typeof(bunchkaufman!)}}`), and splitting
+# the intersection across two methods leaves the original pair ambiguous even though
+# the two together cover it.
+function LinearSolve.init_cacheval(
+        alg::Union{
+            GenericFactorization{typeof(LinearAlgebra.bunchkaufman)},
+            GenericFactorization{typeof(LinearAlgebra.bunchkaufman!)},
+        },
+        A::Union{
+            Hermitian{T, <:SparseMatrixCSC},
+            Symmetric{T, <:SparseMatrixCSC},
+        }, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions
+    ) where {T}
+    newA = copy(convert(AbstractMatrix, A))
+    return LinearSolve.do_factorization(alg, newA, b, u)
+end
+
 @static if Base.USE_GPL_LIBS
     const PREALLOCATED_UMFPACK = SparseArrays.UMFPACK.UmfpackLU(
         SparseMatrixCSC(
@@ -1063,6 +1111,26 @@ end
         function LinearSolve._ldiv!(
                 x::AbstractVector,
                 A::SparseArrays.SPQR.QRSparse, b::AbstractVector
+            )
+            x .= A \ b
+        end
+
+        # Disambiguate the method above against the `SVector` methods below and
+        # against LinearSolve's generic `_ldiv!(x, A, b::SVector)`: `SVector` is an
+        # `AbstractVector`, so those overlap without either being more specific.
+        # An `SVector` output cannot be written into, hence the `A \ b` returns.
+        function LinearSolve._ldiv!(
+                ::SVector, A::SparseArrays.SPQR.QRSparse, b::AbstractVector
+            )
+            (A \ b)
+        end
+        function LinearSolve._ldiv!(
+                ::SVector, A::SparseArrays.SPQR.QRSparse, b::SVector
+            )
+            (A \ b)
+        end
+        function LinearSolve._ldiv!(
+                x::AbstractVector, A::SparseArrays.SPQR.QRSparse, b::SVector
             )
             x .= A \ b
         end

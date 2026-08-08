@@ -254,7 +254,28 @@ mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, Tlv <: Linear
     alias_A::Bool
 end
 
-function Base.setproperty!(cache::LinearCache, name::Symbol, x)
+# `@inline` is load-bearing: `name` must constant-propagate into the body so the
+# branch chain and `fieldtype` fold away. Without it, the warm refactorization
+# loop's `cache.isfresh = false`-style assignments inside `solve!` degrade to
+# dynamic calls and allocate, breaking the 0-byte ceilings in
+# test/Core/lu_refactorization.jl on the default-algorithm paths.
+@inline function Base.setproperty!(cache::LinearCache, name::Symbol, x)
+    # Default `setproperty!` semantics convert to the field's declared type; this
+    # override must do the same, or an update whose eltype differs from the cache's
+    # (an integer `cache.b = [1, 0, ...]` after the init-time integer-to-float
+    # promotion, or Float32 data into a Float64 cache) throws a raw `TypeError`
+    # from `setfield!`. The `isa` guard keeps the matching-type hot path (e.g. the
+    # warm `cache.A = Awork` refactorization loop, which asserts 0 allocations)
+    # from ever reaching `convert`: an already-matching `x` passes through
+    # untouched even if constant propagation of `name` fails, so the `===` alias
+    # check in the `:A` branch below still sees the caller's object. `:cacheval`
+    # is exempt: for the default solver it stores into a slot of the cacheval
+    # rather than the field itself, so the field's type is not the right
+    # conversion target.
+    if name !== :cacheval
+        FT = fieldtype(typeof(cache), name)
+        x isa FT || (x = convert(FT, x))
+    end
     if name === :A
         setfield!(cache, :isfresh, true)
         setfield!(cache, :precsisfresh, true)
@@ -338,8 +359,95 @@ given floating point type, ensuring numerical accuracy appropriate for that prec
 default_tol(::Type{T}) where {T} = √(eps(T))
 default_tol(::Type{Complex{T}}) where {T} = √(eps(T))
 default_tol(::Type{<:Rational}) = 0
-default_tol(::Type{<:Integer}) = 0
+# Integer problems are promoted to float at `init` (the same promotion `\` performs,
+# since division does not stay in the integers), so their default tolerance is the
+# promoted type's, not the 0 of exact arithmetic. `Rational` stays exact above.
+default_tol(::Type{T}) where {T <: Integer} = default_tol(float(T))
 default_tol(::Type{Any}) = 0
+
+"""
+    __promote_int_arrays(A, b, u0) -> (A, b, u0)
+
+Promote arrays with integer-like element types (`Integer` or
+`Complex{<:Integer}`, which includes `Bool` and `BigInt`) the way `\\` does,
+and return everything else -- floats, `Rational` (division is closed, solves are
+exact), duals, operators -- unchanged, identically (`===`).
+
+Division does not stay in the integers, and LinearSolve factorizes and
+back-substitutes into preallocated storage, so without this promotion an integer
+`A`, `b`, or `u0` surfaces as an `InexactError` from deep inside `ldiv!` or a
+`MethodError` from the QR and Krylov wrappers (issue #206).
+
+The target type is the *joint* promotion of `eltype(A)` and `eltype(b)`, floated
+only if that joint type is itself still integer-like. This is what makes mixed
+problems match `A \\ b`: an integer `b` against a `Rational` `A` becomes
+`Rational` (the solve stays exact), against a `BigFloat` `A` becomes `BigFloat`
+(no precision loss), against a `Float32` `A` becomes `Float32`, and only
+all-integer problems become `Float64` (`BigInt` becomes `BigFloat`). Conversion
+goes through `convert(AbstractArray{T}, x)`, which preserves the container:
+structured wrappers (`Symmetric`, `Tridiagonal`, `Diagonal`, `Adjoint`,
+`Transpose`), sparse matrices, and static arrays keep their structure, while
+`BitArray`s become the `Array`s they must (there is no float bit-array).
+
+Abstractly-typed integer arrays (`Vector{Integer}`, `Union` eltypes) have no
+computable `float` eltype, so they promote to the `Float64`/`ComplexF64` default
+instead of crashing in `float(::AbstractArray)`.
+"""
+function __promote_int_arrays(A, b, u0)
+    a_int = A isa AbstractArray && _integer_like_eltype(eltype(A))
+    b_int = b isa AbstractArray && _integer_like_eltype(eltype(b))
+    u_int = u0 isa AbstractArray && _integer_like_eltype(eltype(u0))
+    (a_int || b_int || u_int) || return (A, b, u0)
+    TA = A isa AbstractArray ? eltype(A) : eltype(b)
+    Tb = b isa AbstractArray ? eltype(b) : TA
+    T = if isconcretetype(TA) && isconcretetype(Tb)
+        Tj = promote_type(TA, Tb)
+        _integer_like_eltype(Tj) ? float(Tj) : Tj
+    else
+        (TA <: Complex || Tb <: Complex) ? ComplexF64 : Float64
+    end
+    return (
+        a_int ? convert(AbstractArray{T}, A) : A,
+        b_int ? convert(AbstractArray{T}, b) : b,
+        u_int ? convert(AbstractArray{T}, u0) : u0,
+    )
+end
+
+_integer_like_eltype(::Type{<:Integer}) = true
+_integer_like_eltype(::Type{Complex{T}}) where {T} = _integer_like_eltype(T)
+_integer_like_eltype(::Type) = false
+
+"""
+    __wants_int_promotion(alg)
+
+Whether integer-like `A`/`b`/`u0` should be promoted to float for `alg`; see
+[`__promote_int_arrays`](@ref). `false` for the `AbstractSolveFunction` family
+(`LinearSolveFunction`, `DirectLdiv!`): those wrap user-supplied solve semantics
+-- a `LinearSolveFunction` may implement exact integer or GF(2)/`Bool`
+arithmetic, and `DirectLdiv!` calls `ldiv!` on exactly what it was given -- so
+LinearSolve must hand them the user's arrays untouched.
+"""
+__wants_int_promotion(::Union{SciMLLinearSolveAlgorithm, Nothing}) = true
+__wants_int_promotion(::AbstractSolveFunction) = false
+
+"""
+    __promote_int_problem(prob, alg) -> LinearProblem
+
+Apply [`__promote_int_arrays`](@ref) to a `LinearProblem` before the default
+algorithm is chosen. Promotion inside `__init` alone is not enough for
+`solve(prob)`: `defaultalg` would select on the unpromoted types while every
+cacheval is built from the promoted ones, and the two can disagree -- a
+`BitMatrix` or integer `Adjoint`/`Transpose` is not a `DenseMatrix`, so
+`defaultalg` picks a Krylov method whose workspace slot is then typed for the
+dense float matrix the cache actually holds. Returns `prob` itself (`===`) when
+nothing needs promoting.
+"""
+function __promote_int_problem(prob::LinearProblem, alg)
+    __wants_int_promotion(alg) || return prob
+    A, b, u0 = __promote_int_arrays(prob.A, prob.b, prob.u0)
+    (A === prob.A && b === prob.b && u0 === prob.u0) && return prob
+    return SciMLBase.remake(prob; A, b, u0)
+end
 
 """
     default_alias_A(alg, A, b) -> Bool
@@ -530,6 +638,21 @@ function __init(
     )
     (; A, b, u0, p) = prob
 
+    # Integer-eltype problems are solved as their float (or joint-promoted)
+    # counterparts, matching `\`; see `__promote_int_arrays`. This happens before
+    # the aliasing/copy blocks and before any cacheval is built, so every
+    # downstream type sees the promoted problem. `solve(prob)`/`init(prob)` also
+    # promote before `defaultalg` (see `__promote_int_problem`), making this a
+    # no-op there; doing it here as well covers direct `init(prob, alg)` calls.
+    if __wants_int_promotion(alg)
+        A, b, u0 = __promote_int_arrays(A, b, u0)
+    end
+    # The promoted counterpart of `prob.A` (identity when nothing promotes): the
+    # DefaultLinearSolver cacheval below types its `A_backup` from this rather
+    # than from the working `A`, and it must be the promoted type or the backup
+    # copy of the float working matrix throws `InexactError` into integer storage.
+    A_original = A
+
     if haskey(kwargs, :alias_A) || haskey(kwargs, :alias_b)
         aliases = LinearAliasSpecifier()
 
@@ -604,9 +727,17 @@ function __init(
 
     u0_ = u0 !== nothing ? u0 : __init_u0_from_Ab(A, b)
 
-    # Guard against type mismatch for user-specified reltol/abstol
-    reltol = real(eltype(prob.b))(SciMLBase.value(reltol))
-    abstol = real(eltype(prob.b))(SciMLBase.value(abstol))
+    # Guard against type mismatch for user-specified reltol/abstol. Use the working
+    # `b`, not `prob.b`: an integer `b` has been promoted to float above, and
+    # converting a float tolerance to the original integer eltype would throw
+    # `InexactError: Int64(1.0e-8)`. Algorithms exempted from promotion
+    # (`AbstractSolveFunction`) keep their integer `b`, so an integer eltype is
+    # still floated here for the tolerance itself.
+    Ttol = let T = real(eltype(b))
+        _integer_like_eltype(T) ? float(T) : T
+    end
+    reltol = Ttol(SciMLBase.value(reltol))
+    abstol = Ttol(SciMLBase.value(abstol))
 
     precs = if hasproperty(alg, :precs)
         isnothing(alg.precs) ? DEFAULT_PRECS : alg.precs
@@ -626,13 +757,18 @@ function __init(
         # TODO: deprecate once all docs are updated to the new form
         #@warn "passing Preconditioners at `init`/`solve` time is deprecated. Instead add a `precs` function to your algorithm."
     end
-    # For DefaultLinearSolver, pass original prob.A so the A_backup field gets the
-    # correct type at construction time (prob.A may be e.g. WOperator while the
-    # converted A used for sub-caches may be a different concrete type).
+    # For DefaultLinearSolver, pass the uncopied original `A` so the A_backup field
+    # gets the correct type at construction time (it may be e.g. a WOperator while
+    # the converted A used for sub-caches is a different concrete type). This is
+    # `A_original`, not `prob.A`: for an integer problem the backup must be typed
+    # on the promoted float matrix, or the safety-fallback's `copyto!` of the float
+    # working matrix into it throws `InexactError` (first solve for wrappers like
+    # `Symmetric{Int}` whose promoted copy holds non-integral values, and any cache
+    # reuse that assigns a fractional `A`).
     cacheval = if alg isa DefaultLinearSolver
         init_cacheval(
             alg, A, b, u0_, Pl, Pr, maxiters, abstol, reltol, init_cache_verb,
-            assumptions, prob.A
+            assumptions, A_original
         )
     else
         init_cacheval(
@@ -701,6 +837,9 @@ function SciMLBase.solve(
         prob::LinearProblem, ::Nothing, args...;
         assump = OperatorAssumptions(issquare(prob.A)), kwargs...
     )
+    # Promote integer-eltype problems before choosing the algorithm, so the choice
+    # and the cache agree on the types; see `__promote_int_problem`.
+    prob = __promote_int_problem(prob, nothing)
     return solve(prob, defaultalg(prob.A, prob.b, assump), args...; kwargs...)
 end
 

@@ -521,6 +521,9 @@ function SciMLBase.init(
         assumptions = OperatorAssumptions(issquare(prob.A)),
         kwargs...
     )
+    # Promote integer-eltype problems before choosing the algorithm, so the choice
+    # and the cache agree on the types; see `__promote_int_problem` in common.jl.
+    prob = __promote_int_problem(prob, nothing)
     return SciMLBase.init(
         prob, defaultalg(prob.A, prob.b, assumptions), args...; assumptions, kwargs...
     )

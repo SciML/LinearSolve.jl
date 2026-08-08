@@ -184,9 +184,9 @@ function SciMLBase.solve!(
         fact, A_gpu_f32, b_gpu_f32, u_gpu_f32 = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
         if isempty(A_gpu_f32)
             m, n = size(cache.A)
-            A_gpu_f32 = CuMatrix{T32}(undef, m, n)
-            b_gpu_f32 = CuVector{T32}(undef, size(cache.b, 1))
-            u_gpu_f32 = CuVector{T32}(undef, size(cache.u, 1))
+            A_gpu_f32 = CUDACore.CuMatrix{T32}(undef, m, n)
+            b_gpu_f32 = CUDACore.CuVector{T32}(undef, size(cache.b, 1))
+            u_gpu_f32 = CUDACore.CuVector{T32}(undef, size(cache.u, 1))
         end
         A_f32 = T32.(cache.A)
         copyto!(A_gpu_f32, A_f32)
@@ -213,19 +213,19 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    if !CUDA.functional()
+    if !CUDACore.functional()
         return nothing
     end
 
     T32 = eltype(A) <: Complex ? ComplexF32 : Float32
     noUnitT = typeof(zero(T32))
     luT = LinearAlgebra.lutype(noUnitT)
-    ipiv = CuVector{Int32}(undef, 0)
+    ipiv = CUDACore.CuVector{Int32}(undef, 0)
     info = zero(LinearAlgebra.BlasInt)
-    fact = LU{luT}(CuMatrix{T32}(undef, 0, 0), ipiv, info)
-    A_gpu_f32 = CuMatrix{T32}(undef, 0, 0)
-    b_gpu_f32 = CuVector{T32}(undef, 0)
-    u_gpu_f32 = CuVector{T32}(undef, 0)
+    fact = LU{luT}(CUDACore.CuMatrix{T32}(undef, 0, 0), ipiv, info)
+    A_gpu_f32 = CUDACore.CuMatrix{T32}(undef, 0, 0)
+    b_gpu_f32 = CUDACore.CuVector{T32}(undef, 0)
+    u_gpu_f32 = CUDACore.CuVector{T32}(undef, 0)
     return (fact, A_gpu_f32, b_gpu_f32, u_gpu_f32)
 end
 

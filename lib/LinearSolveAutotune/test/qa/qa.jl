@@ -6,6 +6,9 @@ docs_src = normpath(joinpath(pkgdir(LinearSolveAutotune), "..", "..", "docs", "s
 run_qa(
     LinearSolveAutotune;
     explicit_imports = true,
+    # `plot` is deliberately re-exported from Plots: the package extends it with
+    # AutotuneResults methods and exports it as the plotting entry point.
+    reexports_allow = (:plot,),
     api_docs_kwargs = (; rendered = true, docs_src),
     jet_kwargs = (; target_defined_modules = true),
     ei_kwargs = (;
@@ -25,17 +28,4 @@ run_qa(
             ),
         ),
     ),
-    # Heavy `using LinearAlgebra, Statistics, Random, Printf, Base64, Plots, ...`
-    # brings ~55 names implicitly; making them explicit is a source refactor tracked
-    # in https://github.com/SciML/LinearSolve.jl/issues/1058
-    ei_broken = (:no_implicit_imports,),
-    # JET reports 8 pre-existing latent issues in the telemetry/GPU-detection
-    # source (parse/split union splits and try/catch variable-scope leaks in
-    # telemetry.jl + gpu_detection.jl). These predate this QA conversion: the
-    # prior `JET.test_package(LinearSolveAutotune; target_defined_modules=true)`
-    # call surfaced the identical 8 reports, and #1033 (which added this QA group)
-    # merged with the same QA(julia 1) lane red. Fixing them is a telemetry-source
-    # task tracked in https://github.com/SciML/LinearSolve.jl/issues/1058; mark the
-    # JET check known-broken so it auto-flags once those source bugs are fixed.
-    jet_broken = true,
 )

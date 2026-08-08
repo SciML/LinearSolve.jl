@@ -65,6 +65,7 @@ else
             @time @safetestset "EigenvalueProblem" include("Core/eigenvalue.jl")
             @time @safetestset "Batched RHS" include("Core/batch.jl")
             @time @safetestset "GenericLU naive back-solve" include("Core/genericlu_naive_ldiv.jl")
+            @time @safetestset "RFLU unpivoted ipiv" include("Core/rflu_nopivot_ipiv.jl")
             @time @safetestset "GESV Factorization" include("Core/gesv.jl")
             @time @safetestset "LU Refactorization Reuse" include("Core/lu_refactorization.jl")
             @time @safetestset "Direct BLAS Refactorization Reuse" include("Core/direct_blas_refactorization.jl")

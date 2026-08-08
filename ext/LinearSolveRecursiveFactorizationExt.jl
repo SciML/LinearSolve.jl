@@ -11,6 +11,15 @@ using SciMLLogging: @SciMLMessage
 
 LinearSolve.userecursivefactorization(A::Union{Nothing, AbstractMatrix}) = true
 
+# `RecursiveFactorization.lu!(A, ipiv, Val(false), ...)` only fills a
+# caller-supplied `ipiv` on Julia < 1.8; on newer releases it expects its own
+# `NotIPIV` sentinel for the unpivoted case and leaves this vector undefined.
+# The resulting `LU` is then handed to consumers (`getrs!`, `_ipiv_rows!`, the
+# naive kernel) that all apply `ipiv` unconditionally, so seed the identity
+# permutation ourselves.
+@inline _init_unpivoted!(ipiv, ::Val{true}) = ipiv
+@inline _init_unpivoted!(ipiv, ::Val{false}) = copyto!(ipiv, eachindex(ipiv))
+
 function SciMLBase.solve!(
         cache::LinearSolve.LinearCache, alg::RFLUFactorization{P, T};
         kwargs...
@@ -22,6 +31,7 @@ function SciMLBase.solve!(
         if length(ipiv) != min(size(A)...)
             ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
         end
+        _init_unpivoted!(ipiv, Val(P))
         fact = RecursiveFactorization.lu!(A, ipiv, Val(P), Val(T), check = false)
         cache.cacheval = (fact, ipiv)
         if !LinearAlgebra.issuccess(fact)
@@ -133,6 +143,7 @@ function SciMLBase.solve!(
             resize!(ipiv, min(size(A_32)...))
         end
 
+        _init_unpivoted!(ipiv, Val(P))
         fact = RecursiveFactorization.lu!(A_32, ipiv, Val(P), Val(T), check = false)
         cache.cacheval = (fact, ipiv, A_32, b_32, u_32)
 

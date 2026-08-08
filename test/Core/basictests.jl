@@ -268,9 +268,9 @@ end
         # modes.  pivot = Val(false) crashed before the routing fix:
         # RecursiveFactorization returns the caller-supplied ipiv unwritten, and
         # the old backsolve handed it to LAPACK.getrs! / _ipiv_rows! (segfault /
-        # BoundsError on garbage pivots).  n = 300 covers the region above
-        # TriangularSolve's vector-entry cutoff (128): the n×1 reshape keeps it
-        # on the native matrix kernels there too.
+        # BoundsError on garbage pivots).  n = 300 covers the region where
+        # TriangularSolve < 0.2.5 used to defer vectors to BLAS: with 0.2.5 the
+        # vector legs stay on its native kernels at every size.
         Random.seed!(11)
         for pivot in (Val(true), Val(false)), n2 in (8, 40, 300)
             Ar = rand(n2, n2) + 2n2 * I
@@ -306,11 +306,10 @@ end
         if ext !== nothing
             for T in (Float64, Float32)
                 MT = Matrix{T}
-                # RT is the type the vector path actually hands TriangularSolve
-                # (the allocation-free n-by-1 view-reshape of cache.u)
-                RT = typeof(reshape(view(zeros(T, 4), :), 4, 1))
-                @test RT <: StridedMatrix{T}
-                for BT in (MT, RT)
+                # matrix legs and the vector legs the vector path hands
+                # TriangularSolve directly (native vector kernels need
+                # TriangularSolve >= 0.2.5)
+                for BT in (MT, Vector{T})
                     @test ext._ts_native_backsolve(UnitLowerTriangular{T, MT}, BT)
                     @test ext._ts_native_backsolve(UpperTriangular{T, MT}, BT)
                 end

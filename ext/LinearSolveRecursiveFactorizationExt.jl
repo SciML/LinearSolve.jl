@@ -44,11 +44,9 @@ end
 #
 # Policy: wherever TriangularSolve has a native kernel (Float32/Float64 with a
 # strided right-hand side), both backsolve legs must run on TriangularSolve —
-# never on a BLAS kernel (`getrs!`/`trsm`/`trsv`).  TriangularSolve's kernels
-# only take strided *matrix* right-hand sides (its vector entry point defers to
-# BLAS above a size cutoff), so vectors are presented as n×1 matrices via a
-# zero-copy reshape.  Matrix right-hand sides, solve-only, 1 BLAS thread,
-# nrhs = 8 (TriangularSolve vs BLAS trsm, measured for #1117/#1153):
+# never on a BLAS kernel (`getrs!`/`trsm`/`trsv`).  Matrix right-hand sides,
+# solve-only, 1 BLAS thread, nrhs = 8 (TriangularSolve vs BLAS trsm, measured
+# for #1117/#1153):
 #
 #   U leg (upper ldiv!):            L leg (unit-lower ldiv!):
 #   n     trsm        TS            trsm        TS
@@ -57,9 +55,10 @@ end
 #   256    49.18 us   22.04 us       48.93 us   19.08 us
 #   500   154.79 us   79.64 us      150.16 us   75.22 us
 #
-# A single right-hand side wins below ~n=128 (0.78-0.98x of getrs!) and costs
-# up to ~2.3x (1 thread) / ~1.2x (threaded) around n=512-1000; the policy
-# deliberately keeps it on TriangularSolve at every size.
+# Vector right-hand sides use TriangularSolve's native vector entry, which
+# requires TriangularSolve >= 0.2.5 (compat-enforced): BLAS-free and faster
+# than `getrs!` at every size (0.33-0.79x, 1 thread; older TriangularSolve
+# deferred vectors to BLAS `trsv` above n=128).
 #
 # The `Pivot` flag must come from the algorithm, not from `fact.ipiv`:
 # RecursiveFactorization's pivot-free `lu!` returns the caller-supplied ipiv
@@ -71,17 +70,11 @@ function _rf_ldiv!(
         u::StridedVector{T}, fact::LinearAlgebra.LU{T, <:StridedMatrix{T}},
         b::AbstractVector{T}, ::Val{Pivot}, ::Val{Thread}
     ) where {T <: Union{Float32, Float64}, Pivot, Thread}
-    # view-then-reshape keeps this allocation-free: both wrappers are immutable
-    # and passed by value, unlike reshape(::Vector), which heap-allocates a
-    # Matrix header (measured 48 bytes/solve, breaking the allocation-free
-    # re-solve contract of test/Core/lu_refactorization.jl).
-    um = reshape(view(u, :), length(u), 1)
-    um isa StridedMatrix{T} || return _rf_stdlib_ldiv!(u, fact, b, Val(Pivot))
     u === b || copyto!(u, b)
     Pivot && LinearAlgebra._ipiv_rows!(fact, 1:length(fact.ipiv), u)
     F = fact.factors
-    TriangularSolve.ldiv!(UnitLowerTriangular(F), um, Val(Thread))
-    TriangularSolve.ldiv!(UpperTriangular(F), um, Val(Thread))
+    TriangularSolve.ldiv!(UnitLowerTriangular(F), u, Val(Thread))
+    TriangularSolve.ldiv!(UpperTriangular(F), u, Val(Thread))
     return u
 end
 

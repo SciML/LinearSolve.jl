@@ -172,7 +172,16 @@ end
 @testset "JET Tests for Default Solver" begin
     # Test the default solver selection
     # Julia 1.10 reports runtime dispatch through stdlib and Krylov fallback paths.
-    JET.@test_opt solve(prob) broken = VERSION < v"1.12.0-"
+    #
+    # `target_modules` for the same reason as the MKLLUFactorization test above:
+    # JET analyzes every branch of the generated DefaultLinearSolver `solve!`
+    # regardless of which one would run, and the MKL branch's failure-logging
+    # path (`get_blas_operation_info`'s `string(::Type)`) dispatches inside
+    # Base's `show` machinery. Those frames are stdlib-internal; real dispatch
+    # in LinearSolve/SciMLBase code is still reported. This was masked until
+    # the KLU getproperty fix (#1148) let the suite get past the sparse testset.
+    JET.@test_opt target_modules = (LinearSolve, SciMLBase) solve(prob) broken =
+        VERSION < v"1.12.0-"
     # Sparse has runtime dispatch in SparseArrays stdlib, Base.show, etc.
     JET.@test_opt solve(prob_sparse) broken = true
 end

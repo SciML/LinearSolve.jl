@@ -332,6 +332,20 @@ end
                 @test m_mat !== m_mat_fb
             end
         end
+
+        # Factorization cells (dispatch-audited in RecursiveFactorization's own
+        # test suite): RFLU's factorization is RecursiveFactorization.lu!,
+        # whose Float32/Float64 path runs on BLAS-free recursive kernels with
+        # TriangularSolve panel solves.  Complex eltypes factor correctly (see
+        # above) but their panel solves fall back to LAPACK, so that cell must
+        # stay reachable only by explicitly requesting RFLUFactorization: the
+        # default algorithm must not route complex matrices to it.
+        @test LinearSolve.userecursivefactorization(rand(2, 2))
+        algc64 = LinearSolve.defaultalg(
+            rand(ComplexF64, 100, 100), rand(ComplexF64, 100),
+            LinearSolve.OperatorAssumptions(true)
+        )
+        @test algc64.alg !== LinearSolve.DefaultAlgorithmChoice.RFLUFactorization
     end
 
     @testset "SupernodalLU Factorization" begin

@@ -52,6 +52,71 @@ end
     return nothing
 end
 
+# Multi-RHS pivot-block solves.  Two things make `LinearAlgebra.ldiv!` on a
+# triangular wrapper the wrong call here.  It heap-allocates a fixed 64 B per
+# call on Julia 1.11 for a matrix right-hand side (not for a vector, and not on
+# 1.10 or 1.12), breaking the allocation-free guarantee for every panel of
+# every sweep.  And for BLAS element types it reaches `trsm!` at every size,
+# which loses badly on the narrow, small panels that dominate.
+#
+# `PANEL_BLAS_CUTOFF` is the wrong criterion for these sweeps: it is a pure `np`
+# threshold tuned for the single-RHS gemv shapes, whereas here the crossover is
+# two-dimensional.  Measured kernels vs `trsm!` on Float64, cross-checked at 1
+# and 8 BLAS threads, over np in 4..512 and nrhs in 1..32:
+#
+#   * nrhs <= 3    kernels win at every `np` tested, up to 512 (1.1-4x).  A wide
+#                  panel does not rescue `trsm!` if the block stays narrow.
+#   * np < 16      kernels win at every `nrhs` tested, up to 32 (1.0-2.9x).
+#                  This is the common case: median panel width is 6.
+#   * otherwise    `trsm!` wins once the block is big enough to amortize the
+#                  call (1.1-7x), which tracks `np * nrhs` rather than either
+#                  dimension alone -- np=16,nrhs=4 still favours the kernels
+#                  (1.7x) while np=24,nrhs=6 already favours `trsm!` (1.2x).
+#
+# Differences inside the 1.0-1.3x band are near run-to-run noise, so the
+# thresholds are deliberately coarse.
+const PANEL_TRSM_MIN_NP = 16
+const PANEL_TRSM_MIN_NRHS = 4
+const PANEL_TRSM_MIN_WORK = 128
+
+# Non-BLAS element types have no `trsm!` to reach for, and the kernels also beat
+# the generic `ldiv!` for them (measured 1.1-1.2x on Float16 at every size), so
+# they always take the kernels.
+@inline _panel_use_trsm(::Type{Tv}, np::Int, nrhs::Int) where {Tv} =
+    Tv <: LinearAlgebra.BlasFloat && np >= PANEL_TRSM_MIN_NP &&
+    nrhs >= PANEL_TRSM_MIN_NRHS && np * nrhs >= PANEL_TRSM_MIN_WORK
+
+@inline function _unit_lower_solve!(W::AbstractMatrix{Tv}, X::AbstractMatrix{Tv}, np::Int) where {Tv}
+    @inbounds for r in axes(X, 2)
+        _unit_lower_solve!(W, view(X, :, r), np)
+    end
+    return nothing
+end
+
+@inline function _upper_solve!(W::AbstractMatrix{Tv}, X::AbstractMatrix{Tv}, np::Int) where {Tv}
+    @inbounds for r in axes(X, 2)
+        _upper_solve!(W, view(X, :, r), np)
+    end
+    return nothing
+end
+
+# `trsm!` covers the BLAS element types; anything else falls back to `ldiv!`.
+_panel_unit_lower_trsm!(A::AbstractMatrix, B::AbstractMatrix) =
+    ldiv!(UnitLowerTriangular(A), B)
+function _panel_unit_lower_trsm!(
+        A::StridedMatrix{Tv}, B::StridedMatrix{Tv}
+    ) where {Tv <: LinearAlgebra.BlasFloat}
+    return BLAS.trsm!('L', 'L', 'N', 'U', one(Tv), A, B)
+end
+
+_panel_upper_trsm!(A::AbstractMatrix, B::AbstractMatrix) =
+    ldiv!(UpperTriangular(A), B)
+function _panel_upper_trsm!(
+        A::StridedMatrix{Tv}, B::StridedMatrix{Tv}
+    ) where {Tv <: LinearAlgebra.BlasFloat}
+    return BLAS.trsm!('L', 'U', 'N', 'N', one(Tv), A, B)
+end
+
 # t := A * x for the L21 block W[np+1:np+nu, 1:np] (column-oriented gemv).
 @inline function _panel_gemv!(
         t::AbstractVector{Tv}, W::AbstractMatrix{Tv}, x::AbstractVector{Tv},
@@ -170,7 +235,11 @@ function _solve_panels!(Y::AbstractMatrix{Tv}, F::SupernodalLUFactor{Tv}) where 
         nu = length(Rf)
         Ws = F.W[s]
         Yb = view(Y, c1:c2, :)
-        ldiv!(UnitLowerTriangular(view(Ws, 1:np, 1:np)), Yb)
+        if _panel_use_trsm(Tv, np, nrhs)
+            _panel_unit_lower_trsm!(view(Ws, 1:np, 1:np), Yb)
+        else
+            _unit_lower_solve!(Ws, Yb, np)
+        end
         if nu > 0
             T = reshape(view(buf, 1:(nu * nrhs)), nu, nrhs)
             mul!(T, view(Ws, (np + 1):(np + nu), 1:np), Yb)
@@ -194,7 +263,11 @@ function _solve_panels!(Y::AbstractMatrix{Tv}, F::SupernodalLUFactor{Tv}) where 
             end
             mul!(Yb, F.Z[s], T, -one(Tv), one(Tv))
         end
-        ldiv!(UpperTriangular(view(Ws, 1:np, 1:np)), Yb)
+        if _panel_use_trsm(Tv, np, nrhs)
+            _panel_upper_trsm!(view(Ws, 1:np, 1:np), Yb)
+        else
+            _upper_solve!(Ws, Yb, np)
+        end
     end
     return Y
 end

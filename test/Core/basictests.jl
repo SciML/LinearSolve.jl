@@ -263,6 +263,91 @@ end
         end
     end
 
+    @testset "RFLUFactorization backsolve routing (TriangularSolve, both pivots)" begin
+        # Correctness for vector and matrix right-hand sides under both pivot
+        # modes.  pivot = Val(false) crashed before the routing fix:
+        # RecursiveFactorization returns the caller-supplied ipiv unwritten, and
+        # the old backsolve handed it to LAPACK.getrs! / _ipiv_rows! (segfault /
+        # BoundsError on garbage pivots).  n = 300 covers the region above
+        # TriangularSolve's vector-entry cutoff (128): the n×1 reshape keeps it
+        # on the native matrix kernels there too.
+        Random.seed!(11)
+        for pivot in (Val(true), Val(false)), n2 in (8, 40, 300)
+            Ar = rand(n2, n2) + 2n2 * I
+            br = rand(n2)
+            Br = rand(n2, 3)
+            alg2 = RFLUFactorization(pivot, Val(true))
+            @test solve(LinearProblem(copy(Ar), copy(br)), alg2).u ≈ Ar \ br
+            @test solve(LinearProblem(copy(Ar), copy(Br)), alg2).u ≈ Ar \ Br
+            # a single-column matrix takes the same TriangularSolve route
+            B1 = Br[:, 1:1]
+            @test solve(LinearProblem(copy(Ar), copy(B1)), alg2).u ≈ Ar \ B1
+        end
+
+        # ComplexF64 has no TriangularSolve kernels; it keeps the stdlib path
+        # and must stay correct under both pivot modes.
+        for pivot in (Val(true), Val(false))
+            Ac = rand(ComplexF64, 20, 20) + 40I
+            bc = rand(ComplexF64, 20)
+            Bc = rand(ComplexF64, 20, 2)
+            algc = RFLUFactorization(pivot, Val(true))
+            @test solve(LinearProblem(copy(Ac), copy(bc)), algc).u ≈ Ac \ bc
+            @test solve(LinearProblem(copy(Ac), copy(Bc)), algc).u ≈ Ac \ Bc
+        end
+
+        # Dispatch audit: never-BLAS enforcement.  The extension's TS-routing
+        # methods must be selected for Float64/Float32 strided inputs, and
+        # TriangularSolve must resolve both backsolve legs to its native
+        # kernels — never to its LinearAlgebra (BLAS) catch-all.  These
+        # assertions fail if a TriangularSolve or extension restructuring
+        # silently reintroduces a BLAS fallback.
+        ext = Base.get_extension(LinearSolve, :LinearSolveRecursiveFactorizationExt)
+        @test ext !== nothing
+        if ext !== nothing
+            for T in (Float64, Float32)
+                MT = Matrix{T}
+                # RT is the type the vector path actually hands TriangularSolve
+                # (the allocation-free n-by-1 view-reshape of cache.u)
+                RT = typeof(reshape(view(zeros(T, 4), :), 4, 1))
+                @test RT <: StridedMatrix{T}
+                for BT in (MT, RT)
+                    @test ext._ts_native_backsolve(UnitLowerTriangular{T, MT}, BT)
+                    @test ext._ts_native_backsolve(UpperTriangular{T, MT}, BT)
+                end
+                LUT = LU{T, MT, Vector{LinearAlgebra.BlasInt}}
+                m_vec = which(
+                    ext._rf_ldiv!, Tuple{Vector{T}, LUT, Vector{T}, Val{true}, Val{true}}
+                )
+                m_mat = which(ext._rf_ldiv!, Tuple{MT, LUT, MT, Val{true}, Val{true}})
+                CMT = Matrix{ComplexF64}
+                CLUT = LU{ComplexF64, CMT, Vector{LinearAlgebra.BlasInt}}
+                m_vec_fb = which(
+                    ext._rf_ldiv!,
+                    Tuple{Vector{ComplexF64}, CLUT, Vector{ComplexF64}, Val{true}, Val{true}}
+                )
+                m_mat_fb = which(ext._rf_ldiv!, Tuple{CMT, CLUT, CMT, Val{true}, Val{true}})
+                # the strided real methods are the TS-routing ones, not the
+                # stdlib fallbacks the complex types resolve to
+                @test m_vec !== m_vec_fb
+                @test m_mat !== m_mat_fb
+            end
+        end
+
+        # Factorization cells (dispatch-audited in RecursiveFactorization's own
+        # test suite): RFLU's factorization is RecursiveFactorization.lu!,
+        # whose Float32/Float64 path runs on BLAS-free recursive kernels with
+        # TriangularSolve panel solves.  Complex eltypes factor correctly (see
+        # above) but their panel solves fall back to LAPACK, so that cell must
+        # stay reachable only by explicitly requesting RFLUFactorization: the
+        # default algorithm must not route complex matrices to it.
+        @test LinearSolve.userecursivefactorization(rand(2, 2))
+        algc64 = LinearSolve.defaultalg(
+            rand(ComplexF64, 100, 100), rand(ComplexF64, 100),
+            LinearSolve.OperatorAssumptions(true)
+        )
+        @test algc64.alg !== LinearSolve.DefaultAlgorithmChoice.RFLUFactorization
+    end
+
     @testset "SupernodalLU Factorization" begin
         A1 = sparse(A / 1)
         b1 = rand(n)

@@ -933,7 +933,7 @@ version = "1.12.0"
 
 [[deps.LinearSolve]]
 deps = ["AMD", "ArrayInterface", "ConcreteStructs", "DocStringExtensions", "EnumX", "GPUArraysCore", "InteractiveUtils", "Krylov", "Libdl", "LinearAlgebra", "MKL_jll", "Markdown", "OpenBLAS_jll", "PrecompileTools", "Preferences", "PureKLU", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLLogging", "SciMLOperators", "Setfield", "SparseArrays", "SparseColumnPivotedQR", "StaticArraysCore"]
-path = "/home/runner/_work/LinearSolve.jl/LinearSolve.jl"
+path = "/home/runner/work/LinearSolve.jl/LinearSolve.jl"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 version = "5.6.1"
 
@@ -1874,9 +1874,9 @@ version = "0.11.3"
 
 [[deps.TriangularSolve]]
 deps = ["CloseOpenIntervals", "IfElse", "LayoutPointers", "LinearAlgebra", "LoopVectorization", "Polyester", "Static", "VectorizationBase"]
-git-tree-sha1 = "c8c6d04641a6a61c409938796e5437fe19229001"
+git-tree-sha1 = "092d76489940341d0d8bd50484137273cc6c98a1"
 uuid = "d5829a12-d9aa-46ab-831f-fb7c9ab06edf"
-version = "0.2.2"
+version = "0.2.3"
 
 [[deps.URIs]]
 git-tree-sha1 = "3b0738bd7c5645641845da25cbd99800b8718689"

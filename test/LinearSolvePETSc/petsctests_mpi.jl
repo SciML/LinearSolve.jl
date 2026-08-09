@@ -350,6 +350,10 @@ end
         )
         sol = solve!(cache)
         @test sol.retcode == SciMLBase.ReturnCode.APosterioriSafetyFailure
+        # Backend convergence metadata survives the failing safety check (#1166)
+        @test sol.iters > 0
+        @test sol.resid isa Float64
+        @test sol.resid > 0
         PETScExt.cleanup_petsc_cache!(cache)
     end
 end

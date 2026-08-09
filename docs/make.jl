@@ -4,7 +4,6 @@ using LinearSolvePyAMG
 using SparseArrays
 using Documenter
 
-const LinearSolveSparseArraysExt = Base.get_extension(LinearSolve, :LinearSolveSparseArraysExt)
 
 cp("./docs/Manifest.toml", "./docs/src/assets/Manifest.toml", force = true)
 cp("./docs/Project.toml", "./docs/src/assets/Project.toml", force = true)
@@ -21,7 +20,7 @@ makedocs(
         LinearSolve.SciMLBase,
         LinearSolveAutotune,
         LinearSolvePyAMG,
-        LinearSolveSparseArraysExt.KLU,
+        LinearSolve.KLU,
     ],
     clean = true, doctest = false, linkcheck = true,
     warnonly = [:docs_block, :missing_docs],

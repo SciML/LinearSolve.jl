@@ -27,14 +27,12 @@ sol = solve(prob, PyAMG(accel = "gmres"))
 """
 module LinearSolvePyAMG
 
-using LinearSolve
-using LinearAlgebra
-using SparseArrays
-using PythonCall
-using CondaPkg
+using LinearSolve: LinearSolve, LinearCache, LinearVerbosity, OperatorAssumptions
+using LinearAlgebra: norm
+using SparseArrays: SparseMatrixCSC, sparse
+using PythonCall: Py, pyimport, pyconvert
+using CondaPkg: CondaPkg
 using SciMLBase: SciMLBase, ReturnCode
-
-import LinearSolve: LinearCache, LinearVerbosity, OperatorAssumptions
 
 # ---------------------------------------------------------------------------
 # Algorithm types

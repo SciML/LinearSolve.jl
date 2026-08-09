@@ -64,6 +64,8 @@ else
             @time @safetestset "Basic Tests" include("Core/basictests.jl")
             @time @safetestset "EigenvalueProblem" include("Core/eigenvalue.jl")
             @time @safetestset "Batched RHS" include("Core/batch.jl")
+            @time @safetestset "GenericLU naive back-solve" include("Core/genericlu_naive_ldiv.jl")
+            @time @safetestset "Blocked generic_lufact! kernel" include("Core/blocked_lufact.jl")
             @time @safetestset "GESV Factorization" include("Core/gesv.jl")
             @time @safetestset "LU Refactorization Reuse" include("Core/lu_refactorization.jl")
             @time @safetestset "Direct BLAS Refactorization Reuse" include("Core/direct_blas_refactorization.jl")
@@ -81,6 +83,7 @@ else
             @time @safetestset "ComponentArrays" include("Core/componentarrays.jl")
             @time @safetestset "Adjoint Sensitivity" include("Core/adjoint.jl")
             @time @safetestset "ForwardDiff Overloads" include("Core/forwarddiff_overloads.jl")
+            @time @safetestset "ForwardDiff GPU Arrays" include("Core/forwarddiff_gpu.jl")
             @time @safetestset "Traits" include("Core/traits.jl")
             @time @safetestset "Algorithm Interface" include("Core/interface.jl")
             @time @safetestset "Verbosity" include("Core/verbosity.jl")
@@ -227,12 +230,18 @@ else
         qa = function ()
             if isempty(VERSION.prerelease)
                 activate_group_env(joinpath(@__DIR__, "qa"))
-                @time @safetestset "Quality Assurance" include("qa/qa.jl")
+                # qa.jl runs last: it loads the extension trigger packages so that
+                # ExplicitImports can analyze the extensions, and package loading is
+                # process-global. Several of those extensions change algorithm
+                # selection (LinearSolveBLISExt makes BLIS the default LU, for
+                # instance), which would otherwise perturb the JET and allocation
+                # assertions below.
                 @time @safetestset "JET Tests" include("qa/jet.jl")
                 @time @safetestset "Allocation QA" include("qa/allocations.jl")
                 @time @safetestset "SupernodalLU Allocation QA" include(
                     "qa/supernodal_allocations.jl"
                 )
+                @time @safetestset "Quality Assurance" include("qa/qa.jl")
             end
             return nothing
         end,

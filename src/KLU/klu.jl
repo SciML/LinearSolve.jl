@@ -7,6 +7,10 @@ export klu, klu!
 
 const libklu = :libklu
 const libsuitesparseconfig = :libsuitesparseconfig
+# Upstream KLU.jl never defines these two, leaving every AMD/BTF wrapper below an
+# `UndefVarError` waiting to happen.
+const libamd = :libamd
+const libbtf = :libbtf
 using Base: Ptr, Cvoid, Cint, Cdouble, Cchar, Csize_t
 include("wrappers.jl")
 
@@ -270,128 +274,172 @@ function Base.propertynames(::AbstractKLUFactorization, private::Bool = false)
     end
 end
 
+function _symbolic_struct(klu::AbstractKLUFactorization{Tv, Ti}) where {Tv <: KLUTypes, Ti <: KLUITypes}
+    symptr = getfield(klu, :(_symbolic))
+    symptr == C_NULL &&
+        throw(ArgumentError("This KLUFactorization has not yet been analyzed. Try `klu_analyze!`."))
+    return if Ti == Int64
+        unsafe_load(Ptr{klu_l_symbolic}(symptr))
+    else
+        unsafe_load(Ptr{klu_symbolic}(symptr))
+    end
+end
+
+function _numeric_struct(klu::AbstractKLUFactorization{Tv, Ti}) where {Tv <: KLUTypes, Ti <: KLUITypes}
+    numptr = getfield(klu, :(_numeric))
+    numptr == C_NULL &&
+        throw(ArgumentError("This KLUFactorization has not yet been factored. Try `klu_factor!`."))
+    return if Ti == Int64
+        unsafe_load(Ptr{klu_l_numeric}(numptr))
+    else
+        unsafe_load(Ptr{klu_numeric}(numptr))
+    end
+end
+
 function getproperty(
         klu::AbstractKLUFactorization{Tv, Ti},
         s::Symbol
     ) where {Tv <: KLUTypes, Ti <: KLUITypes}
     # Forwards to the numeric struct:
     if s ∈ (:lnz, :unz, :nzoff)
-        klu._numeric == C_NULL &&
-            throw(ArgumentError("This KLUFactorization has not yet been factored. Try `klu_factor!`."))
-        return getproperty(klu.numeric, s)
+        return getproperty(_numeric_struct(klu), s)
     end
     if s ∈ (:nblocks, :maxblock)
-        klu._symbolic == C_NULL &&
-            throw(ArgumentError("This KLUFactorization has not yet been analyzed. Try `klu_analyze!`."))
-        return getproperty(klu.symbolic, s)
+        return getproperty(_symbolic_struct(klu), s)
     end
     if s === :symbolic
-        klu._symbolic == C_NULL &&
-            throw(ArgumentError("This KLUFactorization has not yet been analyzed. Try `klu_analyze!`."))
-        if Ti == Int64
-            return unsafe_load(Ptr{klu_l_symbolic}(klu._symbolic))
-        else
-            return unsafe_load(Ptr{klu_symbolic}(klu._symbolic))
-        end
+        return _symbolic_struct(klu)
     end
     if s === :numeric
-        klu._numeric == C_NULL &&
-            throw(ArgumentError("This KLUFactorization has not yet been factored. Try `klu_factor!`."))
-        if Ti == Int64
-            return unsafe_load(Ptr{klu_l_numeric}(klu._numeric))
-        else
-            return unsafe_load(Ptr{klu_numeric}(klu._numeric))
-        end
+        return _numeric_struct(klu)
     end
     # Non-overloaded parts:
     if s ∉ (:L, :U, :F, :p, :q, :R, :Rs, :(_L), :(_U), :(_F))
         return getfield(klu, s)
     end
-    # Factor parts:
+    # Factor parts live in concrete helper functions (`_extract_L` and friends)
+    # rather than inline: everything they need comes from `getfield`/
+    # `_numeric_struct` directly, because reading `klu.lnz` or `klu._L` back
+    # through this same `getproperty` is a self-recursive call that inference
+    # abandons — the resulting `Any` values made the `_extract!` keyword calls
+    # (and, in the `:L`/`:U`/`:F` branch below, the tuple destructure) uninferable,
+    # to the point of admitting scalar iteration of a `SparseMatrixCSC` (#1148).
     if s === :(_L)
-        lnz = Int(klu.lnz)
-        Lp = Vector{Ti}(undef, klu.n + 1)
-        Li = Vector{Ti}(undef, lnz)
-        Lx = Vector{Float64}(undef, lnz)
-        Lz = Tv == Float64 ? C_NULL : Vector{Float64}(undef, lnz)
-        _extract!(klu; Lp, Li, Lx, Lz)
-        return Lp, Li, Lx, Lz
+        return _extract_L(klu)
     elseif s === :(_U)
-        unz = Int(klu.unz)
-        Up = Vector{Ti}(undef, klu.n + 1)
-        Ui = Vector{Ti}(undef, unz)
-        Ux = Vector{Float64}(undef, unz)
-        Uz = Tv == Float64 ? C_NULL : Vector{Float64}(undef, unz)
-        _extract!(klu; Up, Ui, Ux, Uz)
-        return Up, Ui, Ux, Uz
+        return _extract_U(klu)
     elseif s === :(_F)
-        fnz = Int(klu.nzoff)
-        # We often don't have an F, so create the right vectors for an empty SparseMatrixCSC
-        if fnz == 0
-            Fp = zeros(Ti, klu.n + 1)
-            Fi = Vector{Ti}()
-            Fx = Vector{Float64}()
-            Fz = Tv == Float64 ? C_NULL : Vector{Float64}()
-        else
-            Fp = Vector{Ti}(undef, klu.n + 1)
-            Fi = Vector{Ti}(undef, fnz)
-            Fx = Vector{Float64}(undef, fnz)
-            Fz = Tv == Float64 ? C_NULL : Vector{Float64}(undef, fnz)
-            _extract!(klu; Fp, Fi, Fx, Fz)
-            # F is *not* sorted on output, so we'll have to do it here:
-            for i in 1:(length(Fp) - 1)
-                # find each segment
-                first = Fp[i] + 1
-                last = Fp[i + 1]
-                first > last && (continue)
-                first == length(Fi) && (break)
-                # sort each column of rowval, nzval, and Fz for complex numbers if necessary
-                #by the ascending permutation of rowval.
-                Fiview = view(Fi, first:last)
-                Fxview = view(Fx, first:last)
-                P = sortperm(Fiview)
-                Fiview .= Fiview[P]
-                Fxview .= Fxview[P]
-                if Fz != C_NULL && length(Fz) == length(Fx)
-                    Fzview = view(Fz, first:last)
-                    Fzview .= Fzview[P]
-                end
-            end
-        end
-        return Fp, Fi, Fx, Fz
+        return _extract_F(klu)
     end
-    if s ∈ (:q, :p, :R, :Rs)
-        if s === :Rs
-            out = Vector{Float64}(undef, klu.n)
-        elseif s === :R
-            out = Vector{Ti}(undef, klu.nblocks + 1)
-        else
-            out = Vector{Ti}(undef, klu.n)
-        end
-        # This tuple construction feels hacky, there's a better way I'm sure.
-        s === :q && (s = :Q)
-        s === :p && (s = :P)
-        _extract!(klu; NamedTuple{(s,)}((out,))...)
-        if s ∈ (:Q, :P, :R)
-            increment!(out)
-        end
-        return out
+    n = getfield(klu, :n)
+    # Each branch names its keyword literally: splatting a `NamedTuple{(s,)}`
+    # built from a non-constant `s` makes the keyword call uninferable, and the
+    # `pairs(::NamedTuple)` eltype computation it lands in dispatches at runtime.
+    if s === :Rs
+        Rs = Vector{Float64}(undef, n)
+        _extract!(klu; Rs)
+        return Rs
+    elseif s === :R
+        R = Vector{Ti}(undef, Int(_symbolic_struct(klu).nblocks) + 1)
+        _extract!(klu; R)
+        return increment!(R)
+    elseif s === :q
+        Q = Vector{Ti}(undef, n)
+        _extract!(klu; Q)
+        return increment!(Q)
+    elseif s === :p
+        P = Vector{Ti}(undef, n)
+        _extract!(klu; P)
+        return increment!(P)
     end
     return if s ∈ (:L, :U, :F)
+        # Call the concrete helpers directly rather than reading `klu._L` etc.
+        # back through this `getproperty`: that self-recursive read was inferred
+        # as a Union spanning every branch of this function — including the
+        # `SparseMatrixCSC` this branch returns — so the destructure admitted
+        # `indexed_iterate(::SparseMatrixCSC, ::Int)`, i.e. scalar iteration of a
+        # sparse matrix, and JET reported the whole downstream cascade (#1148).
         if s === :L
-            p, i, x, z = klu._L
+            _assemble_factor(klu, _extract_L(klu))
         elseif s === :U
-            p, i, x, z = klu._U
-        elseif s === :F
-            p, i, x, z = klu._F
-        end
-        if Tv == Float64
-            return SparseMatrixCSC(klu.n, klu.n, increment!(p), increment!(i), x)
+            _assemble_factor(klu, _extract_U(klu))
         else
-            return SparseMatrixCSC(
-                klu.n, klu.n, increment!(p), increment!(i), Complex.(x, z)
-            )
+            _assemble_factor(klu, _extract_F(klu))
         end
+    end
+end
+
+# Concrete factor-part extraction, shared by `getproperty`'s `:_L`/`:_U`/`:_F`
+# (raw tuples) and `:L`/`:U`/`:F` (assembled `SparseMatrixCSC`) branches. These
+# read sizes via `_numeric_struct`/`getfield` only — never through
+# `getproperty(klu, ...)`, which would be self-recursive and uninferable (#1148).
+function _extract_L(klu::AbstractKLUFactorization{Tv, Ti}) where {Tv, Ti}
+    n = getfield(klu, :n)
+    lnz = Int(_numeric_struct(klu).lnz)
+    Lp = Vector{Ti}(undef, n + 1)
+    Li = Vector{Ti}(undef, lnz)
+    Lx = Vector{Float64}(undef, lnz)
+    Lz = Tv == Float64 ? C_NULL : Vector{Float64}(undef, lnz)
+    _extract!(klu; Lp, Li, Lx, Lz)
+    return Lp, Li, Lx, Lz
+end
+
+function _extract_U(klu::AbstractKLUFactorization{Tv, Ti}) where {Tv, Ti}
+    n = getfield(klu, :n)
+    unz = Int(_numeric_struct(klu).unz)
+    Up = Vector{Ti}(undef, n + 1)
+    Ui = Vector{Ti}(undef, unz)
+    Ux = Vector{Float64}(undef, unz)
+    Uz = Tv == Float64 ? C_NULL : Vector{Float64}(undef, unz)
+    _extract!(klu; Up, Ui, Ux, Uz)
+    return Up, Ui, Ux, Uz
+end
+
+function _extract_F(klu::AbstractKLUFactorization{Tv, Ti}) where {Tv, Ti}
+    n = getfield(klu, :n)
+    fnz = Int(_numeric_struct(klu).nzoff)
+    # We often don't have an F, so create the right vectors for an empty SparseMatrixCSC
+    if fnz == 0
+        Fp = zeros(Ti, n + 1)
+        Fi = Vector{Ti}()
+        Fx = Vector{Float64}()
+        Fz = Tv == Float64 ? C_NULL : Vector{Float64}()
+    else
+        Fp = Vector{Ti}(undef, n + 1)
+        Fi = Vector{Ti}(undef, fnz)
+        Fx = Vector{Float64}(undef, fnz)
+        Fz = Tv == Float64 ? C_NULL : Vector{Float64}(undef, fnz)
+        _extract!(klu; Fp, Fi, Fx, Fz)
+        # F is *not* sorted on output, so we'll have to do it here:
+        for i in 1:(length(Fp) - 1)
+            # find each segment
+            first = Fp[i] + 1
+            last = Fp[i + 1]
+            first > last && (continue)
+            first == length(Fi) && (break)
+            # sort each column of rowval, nzval, and Fz for complex numbers if necessary
+            #by the ascending permutation of rowval.
+            Fiview = view(Fi, first:last)
+            Fxview = view(Fx, first:last)
+            P = sortperm(Fiview)
+            Fiview .= Fiview[P]
+            Fxview .= Fxview[P]
+            if Fz != C_NULL && length(Fz) == length(Fx)
+                Fzview = view(Fz, first:last)
+                Fzview .= Fzview[P]
+            end
+        end
+    end
+    return Fp, Fi, Fx, Fz
+end
+
+function _assemble_factor(klu::AbstractKLUFactorization{Tv}, parts) where {Tv}
+    p, i, x, z = parts
+    n = getfield(klu, :n)
+    return if Tv == Float64
+        SparseMatrixCSC(n, n, increment!(p), increment!(i), x)
+    else
+        SparseMatrixCSC(n, n, increment!(p), increment!(i), Complex.(x, z))
     end
 end
 

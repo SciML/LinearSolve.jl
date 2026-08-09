@@ -1,13 +1,22 @@
-module LinearSolveSparseArraysExt
+# SparseArrays support for LinearSolve: the former `ext/LinearSolveSparseArraysExt.jl`,
+# moved here verbatim apart from its module header and import list.
+#
+# SparseArrays is an unconditional `[deps]` entry (`src/SupernodalLU` loads it at
+# package load time), so the extension always loaded -- but it loaded *after* the root
+# module precompiled, invalidating the default-path methods the root
+# `@compile_workload` had just cached. In `src/` the methods exist before the workload
+# runs.
+#
+# Kept as one self-contained unit so it can be excised again if SparseArrays ever
+# becomes genuinely optional. To turn it back into an extension: move this file to
+# `ext/`, wrap it in `module LinearSolveSparseArraysExt ... end` with a
+# `using LinearSolve: ...` import list, point its `include` back at
+# `../src/KLU/klu.jl`, restore the `getcolptr`/`rowvals`/`nonzeros` stubs and drop the
+# `include` in `src/LinearSolve.jl`, restore the `[extensions]` entry, and re-add
+# SparseArrays to the trigger lists of the fourteen extensions that co-trigger on it
+# (CUSOLVERRF, CliqueTrees, Enzyme, Ginkgo, HSL, MUMPS, PETSc, PETScMPI, ParU,
+# PureUMFPACK, Pardiso, SuperLUDIST, STRUMPACK, Sparspak).
 
-using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
-    CHOLMODFactorization, GenericFactorization,
-    GenericLUFactorization,
-    KLUFactorization, PureKLUFactorization, LUFactorization,
-    NormalCholeskyFactorization,
-    OperatorAssumptions, LinearVerbosity,
-    QRFactorization, RFLUFactorization, UMFPACKFactorization,
-    SparseColumnPivotedQRFactorization, SupernodalLUFactorization, solve
 using SciMLOperators: AbstractSciMLOperator, has_concretization
 using ArrayInterface: ArrayInterface
 using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!
@@ -27,7 +36,7 @@ import StaticArraysCore: SVector
 # requiring the user does `using KLU`
 # But there's no reason to require it because SparseArrays will already
 # load SuiteSparse and thus all of the underlying KLU code
-include("../src/KLU/klu.jl")
+include("KLU/klu.jl")
 # PureKLU (pure-Julia, no SuiteSparse) is a hard dependency and the default
 # sparse LU; the SuiteSparse `KLUFactorization` above is unchanged.
 import PureKLU
@@ -55,7 +64,7 @@ end
 
 function LinearSolve.init_cacheval(
         alg::RFLUFactorization,
-        A::Union{AbstractSparseArray, LinearSolve.SciMLOperators.AbstractSciMLOperator}, b, u, Pl, Pr,
+        A::Union{AbstractSparseArray, AbstractSciMLOperator}, b, u, Pl, Pr,
         maxiters::Int,
         abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
@@ -108,6 +117,54 @@ end
 
 function LinearSolve.init_cacheval(
         alg::GenericFactorization,
+        A::Union{
+            Hermitian{T, <:SparseMatrixCSC},
+            Symmetric{T, <:SparseMatrixCSC},
+        }, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions
+    ) where {T}
+    newA = copy(convert(AbstractMatrix, A))
+    return LinearSolve.do_factorization(alg, newA, b, u)
+end
+
+# The method above is specific on `A` (a sparse `Symmetric`/`Hermitian`) but generic
+# on the algorithm, while LinearSolve declares
+# `init_cacheval(::GenericFactorization{typeof(f)}, ::AbstractMatrix, ...)` for each
+# wrapped factorization function -- specific on the algorithm, generic on `A`. Neither
+# is more specific than the other, so every combination is ambiguous. Define the
+# intersections here; a sparse `Symmetric`/`Hermitian` operand takes the sparse path
+# above regardless of which factorization function is wrapped.
+for f in (
+        :(LinearAlgebra.lu), :(LinearAlgebra.lu!),
+        :(LinearAlgebra.qr), :(LinearAlgebra.qr!),
+        :(LinearAlgebra.svd), :(LinearAlgebra.svd!),
+        :(LinearAlgebra.cholesky), :(LinearAlgebra.cholesky!),
+    )
+    @eval function LinearSolve.init_cacheval(
+            alg::GenericFactorization{typeof($f)},
+            A::Union{
+                Hermitian{T, <:SparseMatrixCSC},
+                Symmetric{T, <:SparseMatrixCSC},
+            }, b, u, Pl, Pr,
+            maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+            assumptions::OperatorAssumptions
+        ) where {T}
+        newA = copy(convert(AbstractMatrix, A))
+        return LinearSolve.do_factorization(alg, newA, b, u)
+    end
+end
+
+# The Bunch-Kaufman pair needs a single method rather than one per function: the
+# LinearSolve side declares both in one signature (`Union{GenericFactorization{
+# typeof(bunchkaufman)}, GenericFactorization{typeof(bunchkaufman!)}}`), and splitting
+# the intersection across two methods leaves the original pair ambiguous even though
+# the two together cover it.
+function LinearSolve.init_cacheval(
+        alg::Union{
+            GenericFactorization{typeof(LinearAlgebra.bunchkaufman)},
+            GenericFactorization{typeof(LinearAlgebra.bunchkaufman!)},
+        },
         A::Union{
             Hermitian{T, <:SparseMatrixCSC},
             Symmetric{T, <:SparseMatrixCSC},
@@ -653,10 +710,11 @@ function SciMLBase.solve!(
                         size(A)..., getcolptr(A), rowvals(A),
                         nonzeros(A)
                     ),
-                    check = false, use_fma = alg.use_fma,
+                    check = false, use_fma = alg.use_fma, tol = alg.tol,
                     fully_preallocated = alg.fully_preallocated
                 )
             else
+                # Refactorization reuses pivot ordering; `tol` does not apply
                 fact = PureKLU.klu!(cacheval, nonzeros(A), check = false)
             end
         else
@@ -668,7 +726,7 @@ function SciMLBase.solve!(
                     size(A)..., getcolptr(A), rowvals(A),
                     nonzeros(A)
                 ),
-                check = false, use_fma = alg.use_fma,
+                check = false, use_fma = alg.use_fma, tol = alg.tol,
                 fully_preallocated = alg.fully_preallocated
             )
         end
@@ -1003,12 +1061,13 @@ end # @static if Base.USE_GPL_LIBS
 function LinearSolve.init_cacheval(
         alg::NormalCholeskyFactorization,
         A::Union{
-            AbstractSparseArray{T}, LinearSolve.GPUArraysCore.AnyGPUArray,
-            Symmetric{T, <:AbstractSparseArray{T}},
+            AbstractSparseArray{<:BLASELTYPES},
+            LinearSolve.GPUArraysCore.AnyGPUArray,
+            Symmetric{<:BLASELTYPES, <:AbstractSparseArray},
         }, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
-    ) where {T <: BLASELTYPES}
+    )
     return if LinearSolve.is_cusparse_csc(A)
         nothing
     elseif LinearSolve.is_cusparse_csr(A) && !LinearSolve.cudss_loaded(A)
@@ -1065,6 +1124,28 @@ end
             )
             x .= A \ b
         end
+
+        # Disambiguate the method above against the `SVector` methods below and
+        # against LinearSolve's generic `_ldiv!(x, A, b::SVector)`: `SVector` is an
+        # `AbstractVector`, so those overlap without either being more specific.
+        # An `SVector` output cannot be written into, hence the `A \ b` returns.
+        function LinearSolve._ldiv!(
+                ::SVector, A::SparseArrays.SPQR.QRSparse, b::AbstractVector
+            )
+            (A \ b)
+        end
+        # SPQR's `\`, like CHOLMOD's, has no method for an `SVector`
+        # right-hand side, so solve against a `Vector` copy.
+        function LinearSolve._ldiv!(
+                ::SVector, A::SparseArrays.SPQR.QRSparse, b::SVector
+            )
+            (A \ Vector(b))
+        end
+        function LinearSolve._ldiv!(
+                x::AbstractVector, A::SparseArrays.SPQR.QRSparse, b::SVector
+            )
+            x .= A \ Vector(b)
+        end
     end
 
     # SPQR has no in-place matrix (batched) ldiv! on any current Julia version,
@@ -1076,19 +1157,28 @@ end
         x .= A \ b
     end
 
+    # Disambiguate the CHOLMOD `_ldiv!(::AbstractVecOrMat, ::Factor,
+    # ::AbstractVecOrMat)` above against LinearSolve's generic `SVector`
+    # methods (src/factorization.jl), mirroring the SPQR trio. These must be
+    # per-type: a `Union` in the factor position is less specific than
+    # `CHOLMOD.Factor`, so a Union-typed method covers the intersections
+    # without resolving them (LinearSolve.jl#1141).
+    # CHOLMOD's `\` has no method for an `SVector` right-hand side, so those
+    # bodies solve against a `Vector` copy.
     function LinearSolve._ldiv!(
-            ::SVector,
-            A::Union{SparseArrays.CHOLMOD.Factor, SparseArrays.SPQR.QRSparse},
-            b::AbstractVector
+            ::SVector, A::SparseArrays.CHOLMOD.Factor, b::AbstractVecOrMat
         )
         (A \ b)
     end
     function LinearSolve._ldiv!(
-            ::SVector,
-            A::Union{SparseArrays.CHOLMOD.Factor, SparseArrays.SPQR.QRSparse},
-            b::SVector
+            ::SVector, A::SparseArrays.CHOLMOD.Factor, b::SVector
         )
-        (A \ b)
+        (A \ Vector(b))
+    end
+    function LinearSolve._ldiv!(
+            x::AbstractVecOrMat, A::SparseArrays.CHOLMOD.Factor, b::SVector
+        )
+        x .= A \ Vector(b)
     end
 end # @static if Base.USE_GPL_LIBS
 
@@ -1191,7 +1281,9 @@ function LinearSolve.init_cacheval(
 end
 
 LinearSolve.PrecompileTools.@compile_workload begin
-    A = sprand(4, 4, 0.3) + I
+    # `local` because `LinearSolve` already has a stray module-global `A`, which
+    # otherwise makes this soft-scope assignment ambiguous.
+    local A = sprand(4, 4, 0.3) + I
     b = rand(4)
     prob = LinearProblem(A, b)
     sol = solve(prob, PureKLUFactorization())
@@ -1409,6 +1501,4 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
         red.nrefactor += 1
     end
     return red.reduced
-end
-
 end

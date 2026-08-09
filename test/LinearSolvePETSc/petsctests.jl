@@ -259,6 +259,30 @@ end
     PETScExt.cleanup_petsc_cache!(cache)
 end
 
+@testset "Serial: safety-check failure keeps convergence metadata" begin
+    # KSP converges by its own loose rtol, but the true residual fails
+    # LinearSolve's a-posteriori check; iters/resid must survive (#1166).
+    n = 100
+    A = sprand(n, n, 0.05) + 10I
+    A = A'A
+    b = rand(n)
+
+    cache = SciMLBase.init(
+        LinearProblem(A, b),
+        PETScAlgorithm(:gmres; ksp_options = (ksp_rtol = 0.9,));
+        abstol = 0.0,
+        reltol = 1.0e-12,
+        maxiters = 100
+    )
+    sol = solve!(cache)
+
+    @test sol.retcode == SciMLBase.ReturnCode.APosterioriSafetyFailure
+    @test sol.iters > 0
+    @test sol.resid isa Float64
+    @test sol.resid > 0
+    PETScExt.cleanup_petsc_cache!(cache)
+end
+
 @testset "Serial: Cleanup" begin
     n = 50
     A = sprand(n, n, 0.1) + 10I; A = A'A; b = rand(n)

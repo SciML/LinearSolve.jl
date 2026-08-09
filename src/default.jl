@@ -153,6 +153,18 @@ function defaultalg(
     return defaultalg(A.A, b, assump)
 end
 
+# Fix ambiguity with the `AbstractSciMLOperator`/`AnyGPUArray` method below: a
+# `MatrixOperator` with a GPU `b` matches both, and neither is more specific.
+# Unwrapping to `A.A` is what the `MatrixOperator` method above does, and it is the
+# better answer here too -- a concretized operator does not need the operator-only
+# Krylov fallback.
+function defaultalg(
+        A::MatrixOperator, b::GPUArraysCore.AnyGPUArray,
+        assump::OperatorAssumptions{Bool}
+    )
+    return defaultalg(A.A, b, assump)
+end
+
 function defaultalg(A, b, assump::OperatorAssumptions{Nothing})
     issq = issquare(A)
     return defaultalg(
@@ -388,6 +400,18 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
                         DefaultAlgorithmChoice.RFLUFactorization
                         #elseif A === nothing || A isa Matrix
                         #    alg = FastLUFactorization()
+                        # Blocked generic_lufact! beats vendor getrf ≥ 2x through N = 32
+                        # everywhere, and through 256 vs OpenBLAS (badly tuned small-N
+                        # threading — same fact the RFLU 500 band above encodes).
+                    elseif (
+                            matrix_size <= 32 ||
+                                (isopenblas() && matrix_size <= 256)
+                        ) &&
+                            (
+                            A === nothing ? eltype(b) <: Union{Float32, Float64} :
+                                eltype(A) <: Union{Float32, Float64}
+                        )
+                        DefaultAlgorithmChoice.GenericLUFactorization
                     elseif usemkl &&
                             b isa DenseArray && !(b isa GPUArraysCore.AnyGPUArray) &&
                             eltype(b) <: Union{Float32, Float64, ComplexF32, ComplexF64}
@@ -509,6 +533,9 @@ function SciMLBase.init(
         assumptions = OperatorAssumptions(issquare(prob.A)),
         kwargs...
     )
+    # Promote integer-eltype problems before choosing the algorithm, so the choice
+    # and the cache agree on the types; see `__promote_int_problem` in common.jl.
+    prob = __promote_int_problem(prob, nothing)
     return SciMLBase.init(
         prob, defaultalg(prob.A, prob.b, assumptions), args...; assumptions, kwargs...
     )
@@ -684,6 +711,11 @@ function _do_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol)
             "LU solve residual check failed, falling back to QR factorization. `A` is potentially ill-conditioned.",
             cache.verbose, :default_lu_fallback
         )
+    elseif reason === :qr_rank_deficient
+        @SciMLMessage(
+            "Unpivoted QR detected a rank-deficient `A`, falling back to column-pivoted QR so the least-squares solution matches `A \\ b`.",
+            cache.verbose, :default_lu_fallback
+        )
     else
         @SciMLMessage(
             "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.",
@@ -733,8 +765,8 @@ restoration step like in the dense path's `_do_qr_fallback`.
 
 Unlike the dense path, we do not recurse through `solve!(cache, QRFactorization(...))`
 to compute the QR. We compute the rank-revealing column-pivoted sparse QR
-directly via `sparse_colpivqr_factorize(cache.A)` (implemented in the SparseArrays
-extension over SparseColumnPivotedQR.jl) and stash it in the dedicated
+directly via `sparse_colpivqr_factorize(cache.A)` (implemented in
+`src/sparsearrays.jl` over SparseColumnPivotedQR.jl) and stash it in the dedicated
 `:SparseColumnPivotedQRFactorization` slot ourselves with `setfield!`. That slot
 is pre-initialized to a `SparseColumnPivotedQRFactorization` of the matching element type for the
 `SparseMatrixCSC{<:Union{Float64, ComplexF64}, <:Integer}` cases that the sparse
@@ -869,6 +901,51 @@ function _default_lu_solve_with_fallback(
 end
 
 """
+    _default_qr_solve_with_fallback(cache::LinearCache, alg::DefaultLinearSolver, sol)
+
+Post-process an unpivoted-QR solve result: if the factorization failed, the
+solution contains NaN/Inf, or the `R` diagonal says `A` is rank-deficient, redo
+the solve with column-pivoted QR. Otherwise return the QR solution directly.
+
+Unpivoted QR is the default for non-square (and for ill-conditioned square)
+dense problems because it is up to ~3x cheaper than `geqp3`, but it cannot solve
+a rank-deficient least-squares problem: the triangular solve divides by a zero
+(or negligible) diagonal entry and returns garbage — all-zeros with
+`ReturnCode.Failure` for an exact zero, an overflowing solution with
+`ReturnCode.Success` for a nearly-zero one (issue #531). Column-pivoted QR
+truncates the rank the same way LAPACK's `xGELSY` does, so the fallback
+reproduces `A \\ b`.
+
+The fallback only triggers for factorizations the check applies to, so sparse
+(SPQR) and GPU defaults keep their current behavior.
+"""
+function _default_qr_solve_with_fallback(
+        cache::LinearCache, alg::DefaultLinearSolver, sol
+    )
+    # `DenseMatrix` (not just "not GPU") because `fell_back_to_qr` reuse on the
+    # next solve routes dense and sparse to different helpers. All of these are
+    # decided by the cache's type, so the branch folds away at compile time.
+    if alg.safetyfallback && cache.cacheval isa DefaultLinearSolverInit &&
+            cache.A isa DenseMatrix && _qr_fallback_pivot(cache.A) isa ColumnNorm
+        if sol.retcode === ReturnCode.Failure
+            return _do_qr_fallback(cache, alg, sol, :qr_rank_deficient)
+        end
+        if sol.retcode === ReturnCode.Success &&
+                (
+                any(!isfinite, sol.u) ||
+                    _qr_rank_deficient(getfield(cache.cacheval, :QRFactorization))
+            )
+            return _do_qr_fallback(cache, alg, sol, :qr_rank_deficient)
+        end
+    end
+    # Use cache directly for type-stable inference (see _do_qr_fallback).
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, nothing;
+        retcode = sol.retcode, iters = sol.iters, stats = nothing
+    )
+end
+
+"""
     _algchoice_to_alg_with_safety(alg::Symbol)
 
 Like `algchoice_to_alg`, but generates an expression that passes
@@ -963,6 +1040,14 @@ end
                 end
                 sol = SciMLBase.solve!(cache, $inner_alg_expr)
                 _default_lu_solve_with_fallback(cache, alg, sol)
+            end
+        elseif alg == Symbol(DefaultAlgorithmChoice.QRFactorization)
+            # Unpivoted QR (dense non-square, or ill-conditioned square): on a
+            # rank-deficient `A` it cannot produce the least-squares solution, so
+            # redo the solve with column-pivoted QR.
+            newex = quote
+                sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)))
+                _default_qr_solve_with_fallback(cache, alg, sol)
             end
         else
             if alg in LinearSolve._SPARSE_ONLY_ALGORITHMS
@@ -1162,8 +1247,12 @@ end
                 )
             end
         else
+            # Interpolate the algorithm name at generator time: inside `quote`, the
+            # `$(alg)` of a string literal is left as a reference to a runtime binding
+            # `alg`, which does not exist in the generated method.
+            msg = "Default linear solver with algorithm $(alg) is currently not supported by Enzyme rules on LinearSolve.jl. Please open an issue on LinearSolve.jl detailing which algorithm is missing the adjoint handling"
             quote
-                error("Default linear solver with algorithm $(alg) is currently not supported by Enzyme rules on LinearSolve.jl. Please open an issue on LinearSolve.jl detailing which algorithm is missing the adjoint handling")
+                error($msg)
             end
         end
 

@@ -1,9 +1,8 @@
 module LinearSolveChainRulesCoreExt
 
-using LinearSolve
-using LinearSolve: SciMLLinearSolveAlgorithm, AbstractFactorization,
+using LinearSolve: LinearSolve, SciMLLinearSolveAlgorithm, AbstractFactorization,
     AbstractKrylovSubspaceMethod, DefaultLinearSolver, OperatorAssumptions,
-    defaultalg, default_alias_A, defaultalg_adjoint_eval, LinearSolveAdjoint
+    defaultalg, default_alias_A, LinearSolveAdjoint
 using SciMLBase: SciMLBase, LinearProblem, init, solve, solve!
 using SciMLOperators: issquare
 using ChainRulesCore: ChainRulesCore, NoTangent

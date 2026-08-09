@@ -32,6 +32,16 @@ function dual_isapprox(x, y; rtol)
     )
 end
 
+@testset "ForwardDiff square-system initialization" begin
+    A_dual = [
+        ForwardDiff.Dual(2.0, 1.0) ForwardDiff.Dual(1.0, 0.0)
+        ForwardDiff.Dual(1.0, 0.0) ForwardDiff.Dual(3.0, 1.0)
+    ]
+    b_dual = [ForwardDiff.Dual(1.0, 1.0), ForwardDiff.Dual(2.0, 0.0)]
+    sol = solve(LinearProblem(A_dual, b_dual), LUFactorization())
+    @test dual_isapprox(sol.u, A_dual \ b_dual; rtol = 1.0e-9)
+end
+
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 prob = LinearProblem(A, b)
 backslash_x_p = A \ b
@@ -614,36 +624,106 @@ end
 # The DualLinearCache tracks partials-list validity for A and b independently,
 # so mutating only one side does not force the other's partials to be recomputed
 # (relevant e.g. in an ODE where A is fixed while b changes, and vice versa).
+#
+# A flag means "this list is in sync with the partials it was built from". The
+# property that has to hold everywhere is the one-way implication: a flag is
+# never true while its list is stale, because every consumer of a list trusts
+# the flag. The converse does not hold. The fused dense-∂A rhs path reads
+# neither list, so it leaves both flags alone and they stay false after a
+# mutation -- that is the honest state rather than a missed refresh, since
+# nothing on that path consumes the lists. The paths that do consume them
+# (sparse ∂A, and the non-square normal-equations branch) still refresh on
+# solve!.
+function partials_lists_in_sync(cache)
+    function in_sync(∂, list)
+        (isnothing(∂) || isnothing(list)) && return true
+        return all(
+            k -> all(i -> list[k][i] == ∂[i][k], eachindex(∂)), eachindex(list)
+        )
+    end
+    return (
+        in_sync(getfield(cache, :partials_A), getfield(cache, :partials_A_list)),
+        in_sync(getfield(cache, :partials_b), getfield(cache, :partials_b_list)),
+    )
+end
+
+# A valid flag pointing at a stale list would make a consumer silently use wrong
+# derivative data, which is the failure this whole mechanism exists to prevent.
+function test_flags_never_overstate(cache)
+    A_in_sync, b_in_sync = partials_lists_in_sync(cache)
+    @test !getfield(cache, :A_partials_valid) || A_in_sync
+    return @test !getfield(cache, :b_partials_valid) || b_in_sync
+end
+
 @testset "DualLinearCache separate A/b partials validity" begin
     A, b = h([ForwardDiff.Dual(10.0, 1.0, 0.0), ForwardDiff.Dual(10.0, 0.0, 1.0)])
-    cache = init(LinearProblem(A, b), LUFactorization())
-
-    # Both lists start valid (populated lazily on first solve).
-    @test getfield(cache, :A_partials_valid)
-    @test getfield(cache, :b_partials_valid)
-
-    # Mutating only b invalidates b's list and leaves A's untouched.
     _, new_b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
-    cache.b = new_b
-    @test getfield(cache, :A_partials_valid)
-    @test !getfield(cache, :b_partials_valid)
-
-    # Solving revalidates both, and the result still matches the reference.
-    x_p = solve!(cache)
-    @test getfield(cache, :A_partials_valid)
-    @test getfield(cache, :b_partials_valid)
-    @test ≈(x_p, A \ new_b, rtol = 1.0e-9)
-
-    # Symmetrically, mutating only A invalidates A's list and leaves b's untouched.
     new_A, _ = h([ForwardDiff.Dual(2.0, 1.0, 0.0), ForwardDiff.Dual(2.0, 0.0, 1.0)])
-    cache.A = new_A
-    @test !getfield(cache, :A_partials_valid)
-    @test getfield(cache, :b_partials_valid)
 
-    x_p = solve!(cache)
-    @test getfield(cache, :A_partials_valid)
-    @test getfield(cache, :b_partials_valid)
-    @test ≈(x_p, new_A \ new_b, rtol = 1.0e-9)
+    @testset "invalidation is tracked per side" begin
+        cache = init(LinearProblem(A, b), LUFactorization())
+
+        # Both lists start valid (populated eagerly at init).
+        @test getfield(cache, :A_partials_valid)
+        @test getfield(cache, :b_partials_valid)
+        test_flags_never_overstate(cache)
+
+        # Mutating only b invalidates b's list and leaves A's untouched.
+        cache.b = new_b
+        @test getfield(cache, :A_partials_valid)
+        @test !getfield(cache, :b_partials_valid)
+        test_flags_never_overstate(cache)
+
+        # Symmetrically for A.
+        cache.A = new_A
+        @test !getfield(cache, :A_partials_valid)
+        test_flags_never_overstate(cache)
+    end
+
+    @testset "dense ∂A: the fused rhs path consumes neither list" begin
+        cache = init(LinearProblem(A, b), LUFactorization())
+
+        cache.b = new_b
+        x_p = solve!(cache)
+        @test ≈(x_p, A \ new_b, rtol = 1.0e-9)
+        @test !getfield(cache, :b_partials_valid)
+        test_flags_never_overstate(cache)
+
+        cache.A = new_A
+        x_p = solve!(cache)
+        @test ≈(x_p, new_A \ new_b, rtol = 1.0e-9)
+        @test !getfield(cache, :A_partials_valid)
+        test_flags_never_overstate(cache)
+    end
+
+    @testset "sparse ∂A: solve! revalidates the lists it consumes" begin
+        cache = init(LinearProblem(sparse(A), b), KLUFactorization())
+
+        cache.b = new_b
+        @test !getfield(cache, :b_partials_valid)
+        x_p = solve!(cache)
+        @test getfield(cache, :b_partials_valid)
+        test_flags_never_overstate(cache)
+        @test ≈(x_p, Matrix(A) \ new_b, rtol = 1.0e-9)
+    end
+
+    @testset "non-square: solve! revalidates the lists it consumes" begin
+        # Full rank: `i + 0.3j` would span only {(1:5), ones} and leave A'A
+        # singular, making the normal-equations reference meaningless.
+        A_ns = [
+            ForwardDiff.Dual(sin(1.7i + 2.3j) + (i == j), 0.1i, 0.2j)
+                for i in 1:5, j in 1:3
+        ]
+        b_ns = [ForwardDiff.Dual(1.0 * i, 0.3i, 0.1i) for i in 1:5]
+        cache = init(LinearProblem(A_ns, b_ns), QRFactorization())
+
+        cache.b = b_ns
+        @test !getfield(cache, :b_partials_valid)
+        x_p = solve!(cache)
+        @test getfield(cache, :b_partials_valid)
+        test_flags_never_overstate(cache)
+        @test ≈(x_p, (A_ns' * A_ns) \ (A_ns' * b_ns), rtol = 1.0e-7)
+    end
 end
 
 @testset "Sparse matrices" begin
@@ -774,4 +854,24 @@ end
     @test ForwardDiff.value.(x) ≈ [b[n + 1 - i] / (2.0 + i / n) for i in 1:n] rtol = 1.0e-10
     @test ForwardDiff.partials.(x, 1) ≈
         [-b[n + 1 - i] / (2.0 + i / n)^2 for i in 1:n] rtol = 1.0e-10
+end
+
+@testset "Iterative algorithms get the partials right through the split path" begin
+    # The split path re-solves the primal cache once per partial, updating `b`
+    # in place — which `SimpleGMRES` missed, giving partials off by ~3e-2.
+    n = 6
+    p = 3
+    A = [
+        ForwardDiff.Dual{Nothing}(
+                float(i == j ? 10 + i : 0.3 * (i + j)),
+                ntuple(k -> 0.1k + 0.01 * (i + j), p)
+            ) for i in 1:n, j in 1:n
+    ]
+    b = [ForwardDiff.Dual{Nothing}(float(i), ntuple(k -> 0.05k + 0.1i, p)) for i in 1:n]
+    reference = solve(LinearProblem(A, b), LUFactorization()).u
+
+    @testset "$(nameof(typeof(alg)))" for alg in (KrylovJL_GMRES(), SimpleGMRES())
+        u = solve(LinearProblem(A, b), alg; abstol = 1.0e-14, reltol = 1.0e-14).u
+        @test dual_isapprox(u, reference; rtol = 1.0e-10)
+    end
 end

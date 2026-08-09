@@ -1,5 +1,6 @@
 using LinearSolve, LinearAlgebra, SparseArrays, MultiFloats, ForwardDiff
-using SciMLOperators: SciMLOperators, MatrixOperator, FunctionOperator, WOperator
+using SciMLOperators: SciMLOperators, MatrixOperator, FunctionOperator, WOperator,
+    cache_operator
 using RecursiveFactorization, Sparspak, FastLapackInterface
 using IterativeSolvers, KrylovKit, MKL_jll
 using Test
@@ -186,6 +187,23 @@ end
         @test X * solve!(cache) ≈ b1
     end
 
+    @testset "KLU factor parts" begin
+        KLU = LinearSolve.KLU
+        # Block-triangular so the off-diagonal `F` part is non-empty
+        Abt = sparse([rand(3, 3) + 3I rand(3, 3); zeros(3, 3) rand(3, 3) + 3I])
+        for At in (sparse(A / 1), Abt)
+            K = KLU.klu(At)
+            @test (K.Rs .\ At)[K.p, K.q] ≈ K.L * K.U + K.F
+            @test sort(K.p) == 1:size(At, 1)
+            @test sort(K.q) == 1:size(At, 1)
+            @test length(K.R) == K.nblocks + 1
+            @test K.R[1] == 1
+            @test K.R[end] == size(At, 1) + 1
+        end
+        # unfactored handles still report what is missing
+        @test_throws ArgumentError KLU.KLUFactorization(sparse(A / 1)).lnz
+    end
+
     @testset "PureKLU Factorization" begin
         A1 = sparse(A / 1)
         b1 = rand(n)
@@ -209,6 +227,22 @@ end
         X = sprand(n, n, 0.8)
         cache.A = X
         @test X * solve!(cache) ≈ b1
+
+        # Partial pivoting tolerance option
+        @test PureKLUFactorization().tol == 0.001 # default value
+        function rowperm(tol)
+            A = sparse([1.0e-3 1.0; 1.0 1.0])
+            b = [1.0, 2.0]
+            alg = PureKLUFactorization(; tol)
+            cache = SciMLBase.init(LinearProblem(A, b), alg)
+            solve!(cache)
+            return cache.cacheval.p # row permutation vector
+        end
+        @test rowperm(0.0) == [1, 2] # below threshold: pivot on diagonal entry
+        @test rowperm(1.0e-4) == [1, 2] # below threshold: pivot on diagonal entry
+        @test rowperm(1.0e-3) == [1, 2] # at threshold: pivot on diagonal entry
+        @test rowperm(1.0e-2) == [2, 1] # above threshold: pivot on largest entry
+        @test rowperm(1.0) == [2, 1] # above threshold: pivot on largest entry
     end
 
     @testset "RFLUFactorization multi-RHS" begin
@@ -227,6 +261,90 @@ end
             cache.A = copy(A2)
             @test solve!(cache).u ≈ A2 \ Br
         end
+    end
+
+    @testset "RFLUFactorization backsolve routing (TriangularSolve, both pivots)" begin
+        # Correctness for vector and matrix right-hand sides under both pivot
+        # modes.  pivot = Val(false) crashed before the routing fix:
+        # RecursiveFactorization returns the caller-supplied ipiv unwritten, and
+        # the old backsolve handed it to LAPACK.getrs! / _ipiv_rows! (segfault /
+        # BoundsError on garbage pivots).  n = 300 covers the region where
+        # TriangularSolve < 0.2.5 used to defer vectors to BLAS: with 0.2.5 the
+        # vector legs stay on its native kernels at every size.
+        Random.seed!(11)
+        for pivot in (Val(true), Val(false)), n2 in (8, 40, 300)
+            Ar = rand(n2, n2) + 2n2 * I
+            br = rand(n2)
+            Br = rand(n2, 3)
+            alg2 = RFLUFactorization(pivot, Val(true))
+            @test solve(LinearProblem(copy(Ar), copy(br)), alg2).u ≈ Ar \ br
+            @test solve(LinearProblem(copy(Ar), copy(Br)), alg2).u ≈ Ar \ Br
+            # a single-column matrix takes the same TriangularSolve route
+            B1 = Br[:, 1:1]
+            @test solve(LinearProblem(copy(Ar), copy(B1)), alg2).u ≈ Ar \ B1
+        end
+
+        # ComplexF64 has no TriangularSolve kernels; it keeps the stdlib path
+        # and must stay correct under both pivot modes.
+        for pivot in (Val(true), Val(false))
+            Ac = rand(ComplexF64, 20, 20) + 40I
+            bc = rand(ComplexF64, 20)
+            Bc = rand(ComplexF64, 20, 2)
+            algc = RFLUFactorization(pivot, Val(true))
+            @test solve(LinearProblem(copy(Ac), copy(bc)), algc).u ≈ Ac \ bc
+            @test solve(LinearProblem(copy(Ac), copy(Bc)), algc).u ≈ Ac \ Bc
+        end
+
+        # Dispatch audit: never-BLAS enforcement.  The extension's TS-routing
+        # methods must be selected for Float64/Float32 strided inputs, and
+        # TriangularSolve must resolve both backsolve legs to its native
+        # kernels — never to its LinearAlgebra (BLAS) catch-all.  These
+        # assertions fail if a TriangularSolve or extension restructuring
+        # silently reintroduces a BLAS fallback.
+        ext = Base.get_extension(LinearSolve, :LinearSolveRecursiveFactorizationExt)
+        @test ext !== nothing
+        if ext !== nothing
+            for T in (Float64, Float32)
+                MT = Matrix{T}
+                # matrix legs and the vector legs the vector path hands
+                # TriangularSolve directly (native vector kernels need
+                # TriangularSolve >= 0.2.5)
+                for BT in (MT, Vector{T})
+                    @test ext._ts_native_backsolve(UnitLowerTriangular{T, MT}, BT)
+                    @test ext._ts_native_backsolve(UpperTriangular{T, MT}, BT)
+                end
+                LUT = LU{T, MT, Vector{LinearAlgebra.BlasInt}}
+                m_vec = which(
+                    ext._rf_ldiv!, Tuple{Vector{T}, LUT, Vector{T}, Val{true}, Val{true}}
+                )
+                m_mat = which(ext._rf_ldiv!, Tuple{MT, LUT, MT, Val{true}, Val{true}})
+                CMT = Matrix{ComplexF64}
+                CLUT = LU{ComplexF64, CMT, Vector{LinearAlgebra.BlasInt}}
+                m_vec_fb = which(
+                    ext._rf_ldiv!,
+                    Tuple{Vector{ComplexF64}, CLUT, Vector{ComplexF64}, Val{true}, Val{true}}
+                )
+                m_mat_fb = which(ext._rf_ldiv!, Tuple{CMT, CLUT, CMT, Val{true}, Val{true}})
+                # the strided real methods are the TS-routing ones, not the
+                # stdlib fallbacks the complex types resolve to
+                @test m_vec !== m_vec_fb
+                @test m_mat !== m_mat_fb
+            end
+        end
+
+        # Factorization cells (dispatch-audited in RecursiveFactorization's own
+        # test suite): RFLU's factorization is RecursiveFactorization.lu!,
+        # whose Float32/Float64 path runs on BLAS-free recursive kernels with
+        # TriangularSolve panel solves.  Complex eltypes factor correctly (see
+        # above) but their panel solves fall back to LAPACK, so that cell must
+        # stay reachable only by explicitly requesting RFLUFactorization: the
+        # default algorithm must not route complex matrices to it.
+        @test LinearSolve.userecursivefactorization(rand(2, 2))
+        algc64 = LinearSolve.defaultalg(
+            rand(ComplexF64, 100, 100), rand(ComplexF64, 100),
+            LinearSolve.OperatorAssumptions(true)
+        )
+        @test algc64.alg !== LinearSolve.DefaultAlgorithmChoice.RFLUFactorization
     end
 
     @testset "SupernodalLU Factorization" begin
@@ -526,6 +644,37 @@ end
 
     @testset "Simple GMRES: restart = $restart" for restart in (true, false)
         test_interface(SimpleGMRES(; restart), prob1, prob2)
+    end
+
+    # Every way of re-entering `solve!` has to rebuild the cacheval's initial
+    # residual, not just the `cache.b = ...` setproperty hook.
+    @testset "Simple GMRES resolve: restart = $restart, blocksize = $blocksize" for
+        restart in (true, false), blocksize in (0, 2)
+
+        nr = 6
+        Ar = [
+            float(i == j ? 10 + i : 0.3 * (i + j)) *
+                (blocksize == 0 || (i - 1) ÷ blocksize == (j - 1) ÷ blocksize)
+                for i in 1:nr, j in 1:nr
+        ]
+        br = float.(1:nr)
+        br2 = [0.3i + 1 for i in 1:nr]
+        alg = SimpleGMRES(; restart, blocksize)
+
+        @testset "$desc" for (desc, update_b!, expected) in (
+                ("b mutated in place", (c, b) -> (c.b .= b), br2),
+                ("b replaced", (c, b) -> (c.b = copy(b)), br2),
+                ("b unchanged", (c, b) -> nothing, br),
+            )
+            cache = init(
+                LinearProblem(copy(Ar), copy(br)), alg; abstol = 1.0e-12, reltol = 1.0e-12
+            )
+            @test solve!(cache).u ≈ Ar \ br rtol = 1.0e-13
+            update_b!(cache, br2)
+            # Tighter than the requested tolerance on purpose: a resolve off
+            # stale state still lands near the answer, just orders short of it.
+            @test solve!(cache).u ≈ Ar \ expected rtol = 1.0e-13
+        end
     end
 
     @testset "KrylovJL" begin
@@ -1061,10 +1210,13 @@ end
         sol_amg = solve(prob_amg, AlgebraicMultigridJL(), reltol = 1.0e-8)
         @test norm(A_amg * sol_amg.u - b_amg) < 1.0e-8
 
-        # Non-square matrix should throw
+        # Non-square matrix should throw. `needs_square_A(::AlgebraicMultigridJL)`
+        # is true, so this is now rejected at `init` with an `ArgumentError`
+        # naming the least-squares alternatives, rather than reaching the
+        # solver and tripping its `AssertionError`.
         A_rect = sparse([1.0 1.0 0.0; 0.0 1.0 1.0])
         b_rect = [1.0, 1.0]
-        @test_throws AssertionError solve(LinearProblem(A_rect, b_rect), AlgebraicMultigridJL())
+        @test_throws ArgumentError solve(LinearProblem(A_rect, b_rect), AlgebraicMultigridJL())
     end
 end
 
@@ -1098,5 +1250,168 @@ end
         reinit!(cache_pyamg; b = b_pyamg2)
         sol_pyamg2 = solve!(cache_pyamg)
         @test norm(A_pyamg * sol_pyamg2.u - b_pyamg2) < 1.0e-6
+    end
+end
+
+# Integer-eltype problems are promoted to float at `init`, matching `\` (division
+# does not stay in the integers). Previously every such input threw an opaque
+# `InexactError` from inside `ldiv!` or a `MethodError` from the QR/Krylov wrappers.
+# Regression test for https://github.com/SciML/LinearSolve.jl/issues/206
+@testset "Integer eltype promotion (#206)" begin
+    # The MWE from the issue: float A, integer b.
+    A206 = [
+        1.0 0.0 -1.0 0.0
+        0.0 -3152.28 0.0 3152.28
+        0.388658 0.921382 -1.76854 -1.45868
+        0.921382 -0.388658 1.45868 1.76854
+    ]
+    b206 = [0, 0, 1, 0]
+    res206 = A206 \ b206
+
+    @testset "float A, integer b" begin
+        for alg in (
+                nothing, LUFactorization(), GenericLUFactorization(),
+                QRFactorization(), KrylovJL_GMRES(),
+            )
+            prob = LinearProblem(copy(A206), copy(b206))
+            sol = alg === nothing ? solve(prob) : solve(prob, alg)
+            @test sol.retcode === ReturnCode.Success
+            @test eltype(sol.u) == Float64
+            @test sol.u ≈ res206
+        end
+        # A float tolerance with an integer `b` used to throw
+        # `InexactError: Int64(1.0e-8)` from the init-time tolerance conversion.
+        @test solve(LinearProblem(copy(A206), copy(b206)), reltol = 1.0e-8).u ≈ res206
+    end
+
+    @testset "integer A" begin
+        Ai = [4 1 0 0; 1 4 1 0; 0 1 4 1; 0 0 1 4]
+        @test solve(LinearProblem(copy(Ai), copy(b206))).u ≈ Ai \ b206
+        # Large enough to leave the small-matrix default path.
+        Random.seed!(206)
+        Al = rand(1:9, 50, 50) + 200I
+        bl = rand(1:9, 50)
+        @test solve(LinearProblem(copy(Al), copy(bl))).u ≈ Al \ bl
+        # Sparse and structured containers keep their structure through `float`.
+        @test solve(LinearProblem(sparse(Ai), copy(b206))).u ≈ Float64.(Ai) \ b206
+        @test solve(LinearProblem(Diagonal([2, 4, 5, 8]), copy(b206))).u ≈
+            Diagonal([2, 4, 5, 8]) \ b206
+        @test solve(
+            LinearProblem(Tridiagonal([1, 1, 1], [4, 4, 4, 4], [1, 1, 1]), copy(b206))
+        ).u ≈ Tridiagonal([1, 1, 1], [4, 4, 4, 4], [1, 1, 1]) \ b206
+    end
+
+    @testset "other integer-like eltypes" begin
+        # Bool is an Integer; Complex{Int} and BigInt promote to ComplexF64/BigFloat.
+        @test solve(LinearProblem(copy(A206), [false, false, true, false])).u ≈ res206
+        solc = solve(LinearProblem(copy(A206), Complex{Int}[0, 0, 1, 0]))
+        @test eltype(solc.u) == ComplexF64
+        @test solc.u ≈ res206
+        Abig = big.([4 1 0 0; 1 4 1 0; 0 1 4 1; 0 0 1 4])
+        solb = solve(LinearProblem(Abig, big.(b206)))
+        @test eltype(solb.u) == BigFloat
+        @test solb.u ≈ Abig \ big.(b206)
+    end
+
+    @testset "integer u0 and batched integer b" begin
+        # `u0` must be on the problem: a `u0` kwarg to `solve` lands in `__init`'s
+        # trailing kwargs and is silently ignored.
+        sol = solve(LinearProblem(copy(A206), copy(b206); u0 = [0, 0, 0, 0]))
+        @test eltype(sol.u) == Float64
+        @test sol.u ≈ res206
+        B = [0 1; 0 2; 1 3; 0 4]
+        solB = solve(LinearProblem(copy(A206), copy(B)))
+        @test solB.u ≈ A206 \ Float64.(B)
+    end
+
+    @testset "wrapped and abstractly-typed integer A" begin
+        # Adjoint/Transpose/BitMatrix are not `DenseMatrix`, so these only work if
+        # promotion happens before `defaultalg` sees the type: choosing on the
+        # unpromoted wrapper while the cache holds the promoted dense matrix left
+        # the Krylov workspace slot typed `Nothing` and threw a `TypeError`.
+        Ai = [4 1 0 0; 1 4 1 0; 0 1 4 1; 0 0 1 4]
+        @test solve(LinearProblem(adjoint(copy(Ai)), copy(b206))).u ≈ Ai' \ b206
+        @test solve(LinearProblem(transpose(copy(Ai)), copy(b206))).u ≈
+            transpose(Ai) \ b206
+        Abit = Bool[1 0 0 0; 1 1 0 0; 0 1 1 0; 0 0 1 1]
+        @test solve(LinearProblem(copy(Abit), copy(b206))).u ≈ Abit \ b206
+        # Symmetric{Int} with a float b: `A` is promoted while `b` is not; the
+        # default solver's `A_backup` must be typed on the promoted matrix or the
+        # first solve's safety backup throws `InexactError` from integer storage.
+        As = Symmetric([4 1 0 0; 1 4 1 0; 0 1 4 1; 0 0 1 4])
+        bf = [0.0, 0.0, 1.0, 0.0]
+        @test solve(LinearProblem(As, copy(bf))).u ≈ As \ bf
+        # Abstractly-typed integer arrays cannot go through `float(::AbstractArray)`;
+        # they promote to the Float64 default instead of crashing.
+        solabs = solve(LinearProblem(copy(A206), Integer[0, 0, 1, 0]))
+        @test eltype(solabs.u) == Float64
+        @test solabs.u ≈ res206
+    end
+
+    @testset "mixed exact/integer matches \\ via joint promotion" begin
+        # An integer operand against a Rational one promotes to Rational, so the
+        # solve stays exact, matching `\` -- not to Float64, which would have
+        # returned float-accuracy values (or worse, dressed them as Rationals).
+        Ar = Rational{Int}[4 1 0 0; 1 4 1 0; 0 1 4 1; 0 0 1 4]
+        solra = solve(LinearProblem(copy(Ar), copy(b206)))
+        @test eltype(solra.u) == Rational{Int}
+        @test solra.u == Ar \ b206
+        Ai = [4 1 0 0; 1 4 1 0; 0 1 4 1; 0 0 1 4]
+        brat = Rational{Int}[0, 0, 1, 0]
+        solrb = solve(LinearProblem(copy(Ai), copy(brat)))
+        @test eltype(solrb.u) == Rational{Int}
+        # Deliberate divergence from `\` here: `factorize(::Matrix{Int})` sends
+        # Base to Float64 for this orientation, while the joint promotion keeps
+        # the exact Rational solve (value-equal to floating accuracy).
+        @test solrb.u == Rational{Int}.(Ai) \ brat
+        @test solrb.u ≈ Ai \ brat
+        # An integer operand against Float32/BigFloat takes that type, not Float64.
+        @test eltype(solve(LinearProblem(Float32.(A206), copy(b206))).u) == Float32
+        @test eltype(solve(LinearProblem(big.(A206), copy(b206))).u) == BigFloat
+    end
+
+    @testset "cache reuse after integer init" begin
+        # The promoted cache's `A_backup` must accept any float update: assigning a
+        # fractional `A` after an all-integer init used to throw `InexactError`
+        # from the Int-typed backup during the safety copy.
+        Ai = [4 1 0 0; 1 4 1 0; 0 1 4 1; 0 0 1 4]
+        cache = init(LinearProblem(copy(Ai), copy(b206)))
+        @test solve!(cache).u ≈ Ai \ b206
+        Afrac = [0.5 0.1 0.0 0.0; 0.1 0.5 0.1 0.0; 0.0 0.1 0.5 0.1; 0.0 0.0 0.1 0.5]
+        cache.A = copy(Afrac)
+        @test solve!(cache).u ≈ Afrac \ b206
+    end
+
+    @testset "AbstractSolveFunction receives the user's arrays" begin
+        # Custom solve functions define their own semantics (exact integer solves,
+        # GF(2) arithmetic on Bool arrays); promotion must not touch their inputs.
+        received = Ref{Any}(nothing)
+        function record_solve!(A, b, u, p, isfresh, Pl, Pr, cacheval; kwargs...)
+            received[] = (typeof(A), typeof(b))
+            u .= b .÷ 2
+            return u
+        end
+        Ai = [2 0; 0 2]
+        sol = solve(LinearProblem(copy(Ai), [4, 4]), LinearSolveFunction(record_solve!))
+        @test received[] == (Matrix{Int}, Vector{Int})
+        @test sol.u == [2, 2]
+        @test eltype(sol.u) == Int
+    end
+
+    @testset "cache reuse converts integer updates" begin
+        cache = init(LinearProblem(copy(A206), copy(b206)))
+        @test solve!(cache).u ≈ res206
+        # `cache.b`/`cache.A` are float-typed fields; assigning integer arrays
+        # converts through `setproperty!` rather than reintroducing integer storage.
+        cache.b = [1, 0, 0, 0]
+        @test solve!(cache).u ≈ A206 \ [1.0, 0, 0, 0]
+    end
+
+    @testset "Rational stays exact (not promoted)" begin
+        Ar = Rational{Int}[4 1 0 0; 1 4 1 0; 0 1 4 1; 0 0 1 4]
+        br = Rational{Int}[0, 0, 1, 0]
+        sol = solve(LinearProblem(copy(Ar), copy(br)))
+        @test eltype(sol.u) == Rational{Int}
+        @test sol.u == Ar \ br
     end
 end

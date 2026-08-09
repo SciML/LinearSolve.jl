@@ -1,10 +1,11 @@
 module LinearSolveKernelAbstractionsExt
 
-using LinearSolve, KernelAbstractions
+using LinearSolve: LinearSolve
+using KernelAbstractions: KernelAbstractions, @Const, @index, @kernel, get_backend
 
 LinearSolve.__is_extension_loaded(::Val{:KernelAbstractions}) = true
 
-using GPUArraysCore
+using GPUArraysCore: GPUArraysCore
 
 function LinearSolve._fast_sym_givens!(c, s, R, nr::Int, inner_iter::Int, bsize::Int, Hbis)
     backend = get_backend(Hbis)

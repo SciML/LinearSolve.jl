@@ -34,6 +34,25 @@ this is only recommended for Float32 matrices. Choose `CudaOffloadLUFactorizatio
 performance on well-conditioned problems, or `CudaOffloadQRFactorization` for better numerical 
 stability on ill-conditioned problems.
 
+#### Non-Square and Least-Squares Systems
+
+A non-square `A` is solved in the least-squares (tall `A`) or minimum-norm
+(wide `A`) sense, matching `A \ b`. The default algorithm uses an unpivoted
+`QRFactorization()` for the overdetermined case because it is up to ~3x cheaper
+than a column-pivoted QR, and automatically re-solves with
+`QRFactorization(ColumnNorm())` when the factorization shows that `A` is
+rank-deficient — an unpivoted QR cannot solve a rank-deficient system, and would
+otherwise return either all zeros with `ReturnCode.Failure` or an overflowing
+solution. The wide case always uses the column-pivoted QR.
+
+If you select an algorithm explicitly, pick one that can handle a rank-deficient
+`A` when that is a possibility: `QRFactorization(ColumnNorm())` (rank-revealing,
+the same rank truncation LAPACK's `xGELSY` and hence `A \ b` uses),
+`SVDFactorization()` (slowest, most robust), or the least-squares Krylov methods
+`KrylovJL_LSMR()` (tall) and `KrylovJL_CRAIGMR()` (wide). An explicitly requested
+`QRFactorization()` reports `ReturnCode.Failure` on an exactly rank-deficient
+matrix rather than falling back.
+
 #### Mixed Precision Methods
 
 For large well-conditioned problems where memory bandwidth is the bottleneck, mixed precision 
@@ -230,8 +249,8 @@ FastQRFactorization
 
 ```@docs
 KLUFactorization
-LinearSolveSparseArraysExt.KLU.klu
-LinearSolveSparseArraysExt.KLU.klu!
+LinearSolve.KLU.klu
+LinearSolve.KLU.klu!
 PureKLUFactorization
 PureUMFPACKFactorization
 SupernodalLUFactorization

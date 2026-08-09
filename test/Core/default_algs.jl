@@ -1,4 +1,5 @@
 using LinearSolve, RecursiveFactorization, LinearAlgebra, SparseArrays, Test
+using SciMLOperators: FunctionOperator, MatrixOperator, WOperator
 
 @test LinearSolve.defaultalg(nothing, zeros(3)).alg === LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
 prob = LinearProblem(rand(3, 3), rand(3))
@@ -13,6 +14,44 @@ else
 end
 prob = LinearProblem(rand(50, 50), rand(50))
 solve(prob)
+
+# RF loaded: unconditional GenericLU ends at 10, RFLU (Accelerate on Apple) from 11
+@test LinearSolve.defaultalg(nothing, zeros(10)).alg ===
+    LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
+if LinearSolve.appleaccelerate_isavailable()
+    @test LinearSolve.defaultalg(nothing, zeros(11)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization
+else
+    @test LinearSolve.defaultalg(nothing, zeros(11)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.RFLUFactorization
+end
+
+# the raised GenericLU band is Float32/Float64-only; complex stays on BLAS
+let complex_alg = if LinearSolve.appleaccelerate_isavailable()
+        LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization
+    elseif LinearSolve.usemkl
+        LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization
+    else
+        LinearSolve.DefaultAlgorithmChoice.LUFactorization
+    end
+    for n in (32, 256)
+        @test LinearSolve.defaultalg(nothing, zeros(ComplexF64, n)).alg === complex_alg
+    end
+end
+
+# RF loaded: the GenericLU band stays shadowed by the RFLU band on every vendor
+let expected = LinearSolve.appleaccelerate_isavailable() ?
+        LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization :
+        LinearSolve.DefaultAlgorithmChoice.RFLUFactorization
+    for n in (16, 32, 100)
+        @test LinearSolve.defaultalg(nothing, zeros(n)).alg === expected
+    end
+    if LinearSolve.isopenblas()
+        for n in (128, 256, 500)
+            @test LinearSolve.defaultalg(nothing, zeros(n)).alg === expected
+        end
+    end
+end
 
 if LinearSolve.usemkl
     @test LinearSolve.defaultalg(nothing, zeros(600)).alg ===
@@ -194,17 +233,23 @@ sol1 = solve(prob)
 sol2 = solve(prob, LinearSolve.KrylovJL_CRAIGMR())
 @test sol1.u == sol2.u
 
-# Default for Underdetermined problem but the size is a long rectangle
+# Default for Underdetermined problem but the size is a long rectangle.
+# `A` is rank-deficient, so the unpivoted-QR default falls back to column-pivoted
+# QR and returns the same least-squares solution as `A \ b` (it used to report
+# `ReturnCode.Failure` with an all-zero `u`).
+# https://github.com/SciML/LinearSolve.jl/issues/531
 A = [
     2.0 1.0
     0.0 0.0
     0.0 0.0
 ]
 b = [1.0, 0.0, 0.0]
-prob = LinearProblem(A, b)
+res = A \ b
+prob = LinearProblem(copy(A), copy(b))
 sol = solve(prob)
 
-@test !SciMLBase.successful_retcode(sol.retcode)
+@test SciMLBase.successful_retcode(sol.retcode)
+@test sol.u ≈ res
 
 ## Show that we cannot select a default alg once by checking the rank, since it might change
 ## later in the cache
@@ -222,15 +267,22 @@ sol = solve!(cache)
 
 @test sol.u ≈ [0.0, 1.0]
 
-cache.A = [
+A_deficient = [
     2.0 1.0
     0.0 0.0
     0.0 0.0
 ]
+# Reference computed up front: `cache.A = X` stores `X` itself and the in-place
+# QR overwrites it.
+res_deficient = A_deficient \ b
+cache.A = copy(A_deficient)
 
 sol = solve!(cache)
 
-@test !SciMLBase.successful_retcode(sol.retcode)
+# The rank dropped between solves; the pivoted-QR fallback handles it in the
+# cache just as it does on a fresh solve.
+@test SciMLBase.successful_retcode(sol.retcode)
+@test sol.u ≈ res_deficient
 
 ## Non-square Sparse Defaults
 # https://github.com/SciML/NonlinearSolve.jl/issues/599
@@ -357,7 +409,6 @@ sol_qr2 = solve(
 
 # Regression test for https://github.com/SciML/LinearSolve.jl/issues/890
 # WOperator with init_cacheval overload that unwraps A.J (as OrdinaryDiffEqDifferentiation does)
-using SciMLOperators: WOperator, MatrixOperator
 function LinearSolve.init_cacheval(
         alg::LinearSolve.DefaultLinearSolver, A::WOperator, b, u,
         Pl, Pr,
@@ -447,6 +498,22 @@ sol_glu_rs = solve(
     GenericLUFactorization(residualsafety = true)
 )
 @test sol_glu_rs.retcode === ReturnCode.APosterioriSafetyFailure
+
+# Callers with backend convergence metadata pass it through the failing check (#1166)
+cache_meta = init(LinearProblem(copy(A_nearsing), copy(b_nearsing)), LUFactorization())
+sol_meta = LinearSolve._check_residual_safety(
+    cache_meta, cache_meta.alg, A_nearsing, ones(n); iters = 7, resid = 1.25
+)
+@test sol_meta.retcode === ReturnCode.APosterioriSafetyFailure
+@test sol_meta.iters == 7
+@test sol_meta.resid == 1.25
+# Defaults keep the failure solution type-identical to the success path
+sol_default_meta = LinearSolve._check_residual_safety(
+    cache_meta, cache_meta.alg, A_nearsing, ones(n)
+)
+@test sol_default_meta.retcode === ReturnCode.APosterioriSafetyFailure
+@test sol_default_meta.iters == 0
+@test sol_default_meta.resid === nothing
 
 # Default LUFactorization() on near-singular matrix → ReturnCode.Success (no check)
 sol_lu_default = solve(

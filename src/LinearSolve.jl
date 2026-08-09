@@ -15,11 +15,11 @@ using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, Bunc
     cholesky, cholesky!, diagind, dot, inv, ldiv!, ldlt!, lu, lu!, mul!,
     norm,
     qr, qr!, svd, svd!
-using SciMLBase: SciMLBase, LinearAliasSpecifier, AbstractSciMLOperator,
+using SciMLBase: SciMLBase, LinearAliasSpecifier,
     init, solve!, reinit!, solve, ReturnCode, LinearProblem
 using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator,
     MatrixOperator,
-    has_ldiv!, issquare, has_concretization
+    has_ldiv!, issquare
 using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_int,
     AbstractVerbositySpecifier, AbstractVerbosityPreset,
     Silent, InfoLevel, WarnLevel, MessageLevel, None, Minimal, Standard, Detailed, All
@@ -324,11 +324,6 @@ issparsematrix(A) = false
 make_SparseMatrixCSC(A) = nothing
 makeempty_SparseMatrixCSC(A) = nothing
 
-# Stub functions for SparseArrays - overridden in extension
-getcolptr(A) = error("SparseArrays extension not loaded")
-rowvals(A) = error("SparseArrays extension not loaded")
-nonzeros(A) = error("SparseArrays extension not loaded")
-
 EnumX.@enumx DefaultAlgorithmChoice begin
     LUFactorization
     QRFactorization
@@ -436,6 +431,7 @@ function defaultalg_symbol end
 include("verbosity.jl")
 include("blas_logging.jl")
 include("generic_lufact.jl")
+include("blocked_lufact.jl")
 include("eigenvalue.jl")
 include("common.jl")
 include("interface.jl")
@@ -454,6 +450,8 @@ include("solve_function.jl")
 include("default.jl")
 # after default.jl: the vendored solver caches its dense diagonal blocks
 # with LinearSolve's own default solver, so it needs DefaultLinearSolver{,Init}
+function supernodal_panel_solve! end
+function supernodal_panel_solve_backend! end
 include("SupernodalLU/SupernodalLU.jl")
 include("init.jl")
 include("adjoint.jl") # LinearSolveAdjoint struct definition only; rrules are in ChainRulesCore ext
@@ -486,18 +484,115 @@ end
 @inline _notsuccessful(F) = hasmethod(LinearAlgebra.issuccess, (typeof(F),)) ?
     !LinearAlgebra.issuccess(F) : false
 
+"""
+    _qr_rank_deficient(F)
+
+Cheap `O(min(m, n))` rank-deficiency test for an *unpivoted* QR factorization,
+using the same relative threshold LAPACK's `xGELSY` (and therefore `A \\ b`) uses
+to truncate the rank: a factorization is called rank-deficient when the smallest
+`|R[i, i]|` falls at or below `min(m, n) * eps * max|R[i, i]|`.
+
+This scans the `R` diagonal rather than reading a LAPACK `info` because
+unpivoted QR has none to read: `geqrf`/`geqrt` only set `info < 0` for an
+illegal argument and return `info == 0` on an exactly rank-deficient matrix, and
+`QRCompactWY` correspondingly stores only `factors` and `T` with no `issuccess`
+method. That is the same reason `_notsuccessful(::QRCompactWY)` above hand-scans
+for an exact zero on the diagonal; this is that scan with a relative threshold,
+so it also catches a merely negligible entry.
+
+Unpivoted QR does not order the diagonal of `R` by magnitude, so this is a
+heuristic rather than a rank-revealing test: it can miss a deficiency that only
+column pivoting would expose (Kahan-style matrices). It exists so the default
+algorithm can keep unpivoted QR on the fast path and only pay for a pivoted
+refactorization when the cheap check says the answer would otherwise be garbage;
+see `_default_qr_solve_with_fallback`. Factorization types the test does not
+apply to (SPQR, GPU) return `false` and keep their existing behavior.
+
+Being a threshold test, it is decisive only away from the threshold. For a matrix
+sitting *on* the cutoff -- say a column scaled to roughly `1e-14` of another, where
+the corresponding `R` diagonal entry lands at eps-level noise -- whether this fires
+depends on rounding, and the answer can differ from `A \\ b`, which reaches the
+same cutoff through a genuinely rank-revealing pivoted QR with better numerics.
+Clearly rank-deficient input is handled; input engineered to sit at the boundary is
+inherently ambiguous, and callers who need a decision there should ask for
+`QRFactorization(ColumnNorm())` or `SVDFactorization()` directly.
+"""
+@inline _qr_rank_deficient(F) = false
+
+# GPU factorizations cannot be indexed elementwise. Mirrors the GPU method on
+# `_notsuccessful` above, and is constrained on the same `T` as the scanning
+# method below so that it is strictly more specific (no dispatch ambiguity).
+@inline function _qr_rank_deficient(
+        ::LinearAlgebra.QRCompactWY{
+            T, A,
+        }
+    ) where {T <: BLASELTYPES, A <: GPUArraysCore.AnyGPUArray}
+    return false
+end
+
+@inline function _qr_rank_deficient(
+        F::LinearAlgebra.QRCompactWY{
+            T, A,
+        }
+    ) where {T <: BLASELTYPES, A}
+    (m, n) = size(F)
+    mn = min(m, n)
+    mn == 0 && return false
+    R = view(F.factors, 1:mn, 1:n)
+    dmin = typemax(real(T))
+    dmax = zero(real(T))
+    for x in @view R[diagind(R)]
+        a = abs(x)
+        a < dmin && (dmin = a)
+        a > dmax && (dmax = a)
+    end
+    return dmin <= mn * eps(real(T)) * dmax
+end
+
 # Solver Specific Traits
 ## Needs Square Matrix
 """
     needs_square_A(alg)
 
 Returns `true` if the algorithm requires a square matrix.
+
+`init` enforces this: an algorithm that returns `true` and is handed a
+non-square `A` throws an `ArgumentError` naming the algorithms that do solve
+least-squares/minimum-norm systems, rather than letting a `DimensionMismatch`
+(or worse) escape from inside the factorization. Anything not listed below falls
+back to the conservative `true`, so a new algorithm is rejected on non-square
+input until it is declared otherwise.
 """
 needs_square_A(::Nothing) = false  # Linear Solve automatically will use a correct alg!
 needs_square_A(alg::SciMLLinearSolveAlgorithm) = true
 for alg in (
+        # Same reason as the `Nothing` method above: by the time `init` runs, an
+        # unspecified algorithm has already been resolved to a
+        # `DefaultLinearSolver`, and the polyalgorithm picks a non-square-capable
+        # algorithm (pivoted QR, sparse column-pivoted QR, or a least-squares
+        # Krylov method) for a non-square `A` itself.
+        :DefaultLinearSolver,
         :QRFactorization, :FastQRFactorization, :NormalCholeskyFactorization,
         :NormalBunchKaufmanFactorization,
+        # Rank-revealing/least-squares capable: `svd` and the column-pivoted
+        # sparse QR both accept a non-square `A` and return the same answer as
+        # `A \ b`. `SparseColumnPivotedQRFactorization` is in fact the default
+        # for non-square sparse systems, so it must not be rejected here.
+        :SVDFactorization, :SparseColumnPivotedQRFactorization,
+        # Rank-revealing column-pivoted QR (`geqp3`): documented to return the
+        # least-squares solution for any shape, including rank-deficient.
+        :SpecializedQRFactorization,
+        # QR-based GPU offloads. These cannot be exercised on a machine without
+        # the corresponding GPU, and a QR is least-squares capable in principle,
+        # so they are declared permissive: enforcing `true` here would newly
+        # reject a shape that may work today.
+        :CudaOffloadQRFactorization, :AMDGPUOffloadQRFactorization,
+        :CudaOffloadFactorization,
+        # A wrapper around a user-supplied factorization: whether a non-square
+        # `A` is allowed depends on `fact_alg`, and the default (`factorize`) as
+        # well as the obvious choices (`qr`, `svd`) all handle it. Leave the
+        # rejection to the wrapped factorization.
+        :GenericFactorization,
     )
     @eval needs_square_A(::$(alg)) = false
 end
@@ -509,8 +604,8 @@ for kralg in (
     @eval needs_square_A(::KrylovJL{$(typeof(kralg))}) = false
 end
 for alg in (
-        :LUFactorization, :FastLUFactorization, :SVDFactorization,
-        :GenericFactorization, :GenericLUFactorization, :SimpleLUFactorization,
+        :LUFactorization, :FastLUFactorization,
+        :GenericLUFactorization, :SimpleLUFactorization,
         :RFLUFactorization, :ButterflyFactorization, :UMFPACKFactorization, :KLUFactorization, :SparspakFactorization,
         :DiagonalFactorization, :CholeskyFactorization, :BunchKaufmanFactorization,
         :CHOLMODFactorization, :LDLtFactorization, :AppleAccelerateLUFactorization,
@@ -533,6 +628,11 @@ useblis(x) = false
 usecuda(x) = false
 usemetal(x) = false
 
+# Formerly ext/LinearSolveSparseArraysExt.jl; kept as one excisable unit, see its
+# header. Order matters both ways: after the traits above, which its own workload
+# calls, and before the workload below, which it would otherwise invalidate.
+include("sparsearrays.jl")
+
 PrecompileTools.@compile_workload begin
     A = rand(4, 4)
     b = rand(4)
@@ -540,6 +640,12 @@ PrecompileTools.@compile_workload begin
     sol = solve(prob)
     sol = solve(prob, LUFactorization())
     sol = solve(prob, KrylovJL_GMRES())
+    # 80 x 80 is past both `GenericLUFactorization` size switches: the blocked
+    # driver (panel, trsm, row swaps) and the register-blocked Schur kernel,
+    # neither of which the 4 x 4 problem above reaches.
+    Ablocked = rand(80, 80) + 80I
+    bblocked = rand(80)
+    sol = solve(LinearProblem(Ablocked, bblocked), GenericLUFactorization())
 end
 
 ALREADY_WARNED_CUDSS = Ref{Bool}(false)
@@ -554,7 +660,7 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
     RFLUFactorization, ButterflyFactorization,
     NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
     UMFPACKFactorization, KLUFactorization, PureKLUFactorization,
-    SupernodalLUFactorization,
+    SupernodalLUFactorization, supernodal_panel_solve!, supernodal_panel_solve_backend!,
     PureUMFPACKFactorization, SparseColumnPivotedQRFactorization, FastLUFactorization,
     FastQRFactorization,
     SparspakFactorization, DiagonalFactorization, CholeskyFactorization,

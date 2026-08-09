@@ -1,7 +1,8 @@
 module LinearSolveSpecializingFactorizationsExt
 
-using LinearSolve, LinearAlgebra
-using LinearSolve: LinearCache, OperatorAssumptions, LinearVerbosity, @get_cacheval
+using LinearAlgebra: LinearAlgebra, ldiv!
+using LinearSolve: LinearSolve, LinearCache, OperatorAssumptions, LinearVerbosity,
+    SpecializedLUFactorization, SpecializedQRFactorization, @get_cacheval
 using SciMLBase: SciMLBase, ReturnCode
 using SpecializingFactorizations: specializinglu, specializinglu!,
     specializingqr, specializingqr!

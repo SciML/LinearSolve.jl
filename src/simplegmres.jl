@@ -87,10 +87,37 @@ end
     warm_start::Bool
 end
 
-function update_cacheval!(cache::LinearCache, cacheval::SimpleGMRESCache, name::Symbol, x)
-    (name != :b || cache.isfresh) && return cacheval
-    vec(cacheval.w) .= vec(x)
-    fill!(cacheval.x, 0)
+"""
+    reinit_cacheval!(cacheval::SimpleGMRESCache, b)
+
+Re-establish the starting iterate and the initial residual `r₀` that
+`solve!(::SimpleGMRESCache, ::LinearCache)` consumes, so that the cache can be
+solved again against `b`.
+
+A `SimpleGMRESCache` is single-use as built: `w` doubles as the Arnoldi scratch
+vector `ANvₖ`, and the solution is accumulated into `x` in place. Re-entering
+`solve!` without this leaves `r₀` holding the last Krylov vector and `x` holding
+the previous solution, and leaves the tolerance `ε` scaled by the *first* right
+hand side's norm.
+"""
+function reinit_cacheval!(cacheval::SimpleGMRESCache, b)
+    (; A, Δx, q, x, w, Pl, PlisI, restart, warm_start) = cacheval
+    T = eltype(x)
+
+    cacheval.b = b
+    fill!(x, zero(T))
+    if warm_start
+        mul!(w, A, Δx)
+        axpby!(one(T), b, -one(T), w)
+        restart && axpy!(one(T), Δx, x)
+    else
+        vec(w) .= vec(b)
+    end
+
+    r₀ = PlisI ? w : q
+    PlisI || ldiv!(r₀, Pl, w)  # r₀ = Pl(b - Ax₀)
+    cacheval.β = _norm2(r₀)
+    cacheval.ε = cacheval.abstol + cacheval.reltol * cacheval.β
     return cacheval
 end
 
@@ -160,6 +187,10 @@ function SciMLBase.solve!(cache::LinearCache, alg::SimpleGMRES; kwargs...)
         )
         cache.cacheval = solver
         cache.isfresh = false
+    else
+        # Unconditional: an in-place `cache.b .= ...` reaches no hook, and a
+        # resolve against an unchanged `b` needs the reset just as much.
+        reinit_cacheval!(cache.cacheval, cache.b)
     end
     return SciMLBase.solve!(cache.cacheval, cache)
 end

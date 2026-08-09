@@ -109,16 +109,24 @@ function _copy_A_for_safety(cache::LinearCache)
 end
 
 """
-    _check_residual_safety(cache::LinearCache, alg, A_original, y)
+    _check_residual_safety(cache::LinearCache, alg, A_original, y; iters = 0, resid = nothing)
 
 Post-solve residual check for LU algorithms with `residualsafety=true`.
 Computes `‖A*y - b‖` and returns an `APosterioriSafetyFailure` solution if it
 exceeds `abstol + reltol * ‖b‖`. Returns `nothing` if the residual is acceptable.
 
+Iterative callers can pass their backend's convergence metadata through `iters`
+and `resid` so a failing check still reports it. The defaults keep the failure
+solution type-identical to the success path (`resid = nothing`): substituting the
+check's own `res_norm` here would put a `Float64`/`Nothing` union in `solve!`'s
+return type for every LU algorithm, breaking the concrete-return QA invariant.
+
 When inside `DefaultLinearSolver`, uses the pre-allocated `residual_buf` from
 `DefaultLinearSolverInit` (non-allocating). For standalone use, allocates a buffer.
 """
-function _check_residual_safety(cache::LinearCache, alg, A_original, y)
+function _check_residual_safety(
+        cache::LinearCache, alg, A_original, y; iters::Int = 0, resid = nothing
+    )
     b = cache.b
     if cache.alg isa DefaultLinearSolver
         buf = cache.cacheval.residual_buf
@@ -140,7 +148,8 @@ function _check_residual_safety(cache::LinearCache, alg, A_original, y)
             return "Residual safety check failed: ‖A*x - b‖ = $(res_norm), tol = $(tol) (abstol = $(cache.abstol), reltol = $(cache.reltol), ‖b‖ = $(b_norm), ratio = $(res_norm / tol))"
         end
         return SciMLBase.build_linear_solution(
-            alg, y, nothing, nothing; retcode = ReturnCode.APosterioriSafetyFailure
+            alg, y, resid, nothing;
+            retcode = ReturnCode.APosterioriSafetyFailure, iters
         )
     end
     return nothing
@@ -156,7 +165,7 @@ function _direct_lu_factorize! end
 function _direct_lu_solve! end
 
 # Build a column-pivoted sparse QR factorization of `A` (the default sparse-LU
-# singular fallback). The method is provided by the SparseArrays extension over
+# singular fallback). The method is provided by `src/sparsearrays.jl` over
 # SparseColumnPivotedQR.jl; this generic declaration lets `src/default.jl` call it.
 function sparse_colpivqr_factorize end
 
@@ -164,7 +173,7 @@ function sparse_colpivqr_factorize end
 # pure-Julia "KLU-style" solver for less-structured problems (small, or medium and
 # very sparse) — `PureKLUFactorization` for LU and `SparseColumnPivotedQRFactorization`
 # for QR — while `false` selects the SuiteSparse solver for more structure (UMFPACK
-# for LU, SPQR for QR). The SparseArrays extension provides the real method for
+# for LU, SPQR for QR). `src/sparsearrays.jl` provides the real method for
 # sparse matrices; the generic fallback prefers the pure-Julia option.
 use_klulike_sparse_structure(A, b) = true
 
@@ -228,6 +237,12 @@ Julia's built in `lu`. Equivalent to calling `lu!(A)`
   - On CuMatrix, it will use a CUDA-accelerated LU from CuSolver.
   - On BandedMatrix and BlockBandedMatrix, it will use a banded LU.
 
+The back-solve is size-aware for LAPACK-eligible dense factors: single-vector solves at
+or below a measured crossover (`N = 256` for `Matrix` factors) use the same pure-Julia
+triangular sweeps as `GenericLUFactorization`, which beat `getrs!`'s call and blocking
+overhead at those sizes; larger vectors and matrix right-hand sides use `ldiv!`
+(LAPACK `getrs!`).
+
 ## Positional Arguments
 
   - pivot: The choice of pivoting. Defaults to `LinearAlgebra.RowMaximum()`. The other choice is
@@ -247,8 +262,30 @@ LUFactorization(pivot) = LUFactorization(; pivot = RowMaximum())
 `GenericLUFactorization(pivot=LinearAlgebra.RowMaximum())`
 
 Julia's built in generic LU factorization. Equivalent to calling LinearAlgebra.generic_lufact!.
-Supports arbitrary number types but does not achieve as good scaling as BLAS-based LU implementations.
-Has low overhead and is good for small matrices.
+Supports arbitrary number types. Has low overhead and is good for small matrices.
+
+For `StridedMatrix{Float64}`/`StridedMatrix{Float32}` with `RowMaximum` pivoting the
+factorization runs a blocked pure-Julia kernel (panel factorization + packed Schur
+update, the LAPACK `getrf` structure) instead of the scalar textbook loop. The Schur
+update is a register-blocked microkernel written on Base's `VecElement` tuples and
+LLVM's `fmuladd` intrinsic, so the algorithm stays dependency-free — no
+LoopVectorization, no SIMD.jl, no CPU feature detection — while scaling far beyond the
+scalar kernel: on machines with a weak or unavailable BLAS it is competitive with (or
+faster than) OpenBLAS/MKL `getrf` up to a few hundred unknowns. Other element types and
+pivots keep the scalar generic path.
+
+The back-solve is a pure-Julia column-oriented triangular solve (apply `ipiv`, unit-lower
+forward, upper backward) rather than `ldiv!(::LU, ·)` / OpenBLAS `getrs!`. That avoids the
+~290 ns BLAS call floor that otherwise dominates at the small-`N` sizes where this algorithm
+is the default (see SciML/LinearSolve.jl#1145). `Adjoint`/`Transpose` operators, whose
+factors are stored through the lazy wrapper, get an orientation-specialized kernel that
+traverses the underlying parent column-contiguously (see SciML/LinearSolve.jl#1159).
+
+The generic back-solve is used at every size, with no BLAS deferral: explicitly selecting
+this algorithm selects the pure-Julia path for both the factorization and the solve. Note
+that above `N ≈ 400` a single-vector generic sweep is slower than `getrs!`; if BLAS is
+acceptable at large sizes, use `LUFactorization` (whose back-solve is size-aware) or the
+default algorithm instead.
 
 ## Positional Arguments
 
@@ -261,6 +298,193 @@ struct GenericLUFactorization{P} <: AbstractDenseFactorization
 end
 
 GenericLUFactorization(pivot = RowMaximum(); residualsafety::Bool = false) = GenericLUFactorization(pivot, residualsafety)
+
+# Pure-Julia LU back-solve used by GenericLUFactorization. A pivoted LU vector
+# solve at small N is a handful of flops but ~290 ns through OpenBLAS/MKL
+# getrs! (call overhead); the same algorithm written out as scalar loops is
+# several times faster up through at least N≈80 (#1145). Always used for
+# GenericLU — no BLAS cutoff — so the path stays dependency- and vendor-free.
+# Multi-RHS applies the row permutation once, then runs the triangular sweeps
+# per column (nrhs == 1 is the hot path for Newton/ODE).
+@inline function _naive_lu_ldiv!(
+        fac::AbstractMatrix, ipiv::AbstractVector, b::AbstractVector
+    )
+    n = length(b)
+    @inbounds for i in eachindex(ipiv)
+        p = ipiv[i]
+        if p != i
+            b[i], b[p] = b[p], b[i]
+        end
+    end
+    @inbounds for j in 1:n
+        bj = b[j]
+        for i in (j + 1):n
+            b[i] = muladd(-fac[i, j], bj, b[i])
+        end
+    end
+    @inbounds for j in n:-1:1
+        b[j] /= fac[j, j]
+        bj = b[j]
+        for i in 1:(j - 1)
+            b[i] = muladd(-fac[i, j], bj, b[i])
+        end
+    end
+    return b
+end
+
+@inline function _naive_lu_ldiv!(
+        fac::AbstractMatrix, ipiv::AbstractVector, B::AbstractMatrix
+    )
+    n = size(B, 1)
+    nrhs = size(B, 2)
+    @inbounds for i in eachindex(ipiv)
+        p = ipiv[i]
+        if p != i
+            for col in 1:nrhs
+                B[i, col], B[p, col] = B[p, col], B[i, col]
+            end
+        end
+    end
+    @inbounds for j in 1:n
+        for col in 1:nrhs
+            bj = B[j, col]
+            for i in (j + 1):n
+                B[i, col] = muladd(-fac[i, j], bj, B[i, col])
+            end
+        end
+    end
+    @inbounds for j in n:-1:1
+        invd = inv(fac[j, j])
+        for col in 1:nrhs
+            B[j, col] *= invd
+            bj = B[j, col]
+            for i in 1:(j - 1)
+                B[i, col] = muladd(-fac[i, j], bj, B[i, col])
+            end
+        end
+    end
+    return B
+end
+
+# Orientation-specialized back-solve for the Adjoint/Transpose-wrapped strided
+# factors that `init_cacheval` produces for adjoint/transpose operators (#1159).
+# The column-oriented sweeps above would walk the wrapper's parent at stride N;
+# these run the same solves in inner-product form so the parent is traversed
+# column-contiguously. Indexing through the wrapper keeps conj correct for
+# complex Adjoint factors.
+const _AdjTransStridedFactors = Union{
+    Adjoint{<:Any, <:StridedMatrix}, Transpose{<:Any, <:StridedMatrix},
+}
+
+@inline function _naive_lu_ldiv!(
+        fac::_AdjTransStridedFactors, ipiv::AbstractVector, b::AbstractVector
+    )
+    n = length(b)
+    @inbounds for i in eachindex(ipiv)
+        p = ipiv[i]
+        if p != i
+            b[i], b[p] = b[p], b[i]
+        end
+    end
+    @inbounds for i in 2:n
+        acc = b[i]
+        @simd for j in 1:(i - 1)
+            acc = muladd(-fac[i, j], b[j], acc)
+        end
+        b[i] = acc
+    end
+    @inbounds for i in n:-1:1
+        acc = b[i]
+        @simd for j in (i + 1):n
+            acc = muladd(-fac[i, j], b[j], acc)
+        end
+        b[i] = acc / fac[i, i]
+    end
+    return b
+end
+
+@inline function _naive_lu_ldiv!(
+        fac::_AdjTransStridedFactors, ipiv::AbstractVector, B::AbstractMatrix
+    )
+    n = size(B, 1)
+    nrhs = size(B, 2)
+    @inbounds for i in eachindex(ipiv)
+        p = ipiv[i]
+        if p != i
+            for col in 1:nrhs
+                B[i, col], B[p, col] = B[p, col], B[i, col]
+            end
+        end
+    end
+    @inbounds for i in 2:n
+        for col in 1:nrhs
+            acc = B[i, col]
+            @simd for j in 1:(i - 1)
+                acc = muladd(-fac[i, j], B[j, col], acc)
+            end
+            B[i, col] = acc
+        end
+    end
+    @inbounds for i in n:-1:1
+        invd = inv(fac[i, i])
+        for col in 1:nrhs
+            acc = B[i, col]
+            @simd for j in (i + 1):n
+                acc = muladd(-fac[i, j], B[j, col], acc)
+            end
+            B[i, col] = acc * invd
+        end
+    end
+    return B
+end
+
+# 3-arg form matching `ldiv!(x, F, b)`: copy when `x !== b`, then in-place solve.
+# No size cutoff here, ever: choosing `GenericLUFactorization` is choosing the
+# generic back-solve; the size-aware path is `_smart_lu_ldiv!` below.
+function _generic_lu_ldiv!(x, F::LU, b)
+    if x !== b
+        copyto!(x, b)
+    end
+    return _naive_lu_ldiv!(F.factors, F.ipiv, x)
+end
+
+# Measured single-vector crossover vs `ldiv!` (min-times, 1 BLAS thread, EPYC
+# 7502): naive wins to ≈ N 400 on `Matrix` factors and ≈ 900 on the wrapped
+# orientations, then loses 1.14x/1.24x/1.35x at N = 512/1000/2000 (`Matrix`).
+_naive_ldiv_cutoff(::AbstractMatrix) = 256
+_naive_ldiv_cutoff(::_AdjTransStridedFactors) = 512
+
+# Branch predicate of `_smart_lu_ldiv!` below. Split out so the selection is
+# observable directly: the naive kernel and `getrs!` agree to within an ulp, so
+# comparing their outputs bitwise is not a reliable way to tell which one ran.
+_use_naive_lu_ldiv(x, F, b) = false
+
+function _use_naive_lu_ldiv(
+        x::StridedVector{T},
+        F::LU{T, <:Union{StridedMatrix{T}, _AdjTransStridedFactors}},
+        b::StridedVector{T}
+    ) where {T <: BLASELTYPES}
+    return !(
+        x isa GPUArraysCore.AnyGPUArray || b isa GPUArraysCore.AnyGPUArray ||
+            F.factors isa GPUArraysCore.AnyGPUArray
+    ) && length(x) <= _naive_ldiv_cutoff(F.factors)
+end
+
+# Size-aware back-solve for `ldiv!`-baseline algorithms (`LUFactorization` and
+# the defaults routed to it): single vectors at or below the crossover take the
+# naive kernel; everything else (larger vectors, multi-RHS, non-BLAS/GPU) keeps
+# `ldiv!`. Explicit generic selections never consult this cutoff.
+_smart_lu_ldiv!(x, F, b) = _ldiv!(x, F, b)
+
+function _smart_lu_ldiv!(
+        x::StridedVector{T},
+        F::LU{T, <:Union{StridedMatrix{T}, _AdjTransStridedFactors}},
+        b::StridedVector{T}
+    ) where {T <: BLASELTYPES}
+    _use_naive_lu_ldiv(x, F, b) || return _ldiv!(x, F, b)
+    x !== b && copyto!(x, b)
+    return _naive_lu_ldiv!(F.factors, F.ipiv, x)
+end
 
 # Trait methods for types defined in this file (must come after struct definitions)
 _get_residualsafety(alg::LUFactorization) = alg.residualsafety
@@ -376,7 +600,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
     end
 
     F = @get_cacheval(cache, :LUFactorization)
-    y = _ldiv!(cache.u, F, cache.b)
+    y = _smart_lu_ldiv!(cache.u, F, cache.b)
 
     if check_safety
         failed = _check_residual_safety(cache, alg, A_original, y)
@@ -455,9 +679,14 @@ function SciMLBase.solve!(
 
         cache.isfresh = false
     end
-    y = ldiv!(
-        cache.u, LinearSolve.@get_cacheval(cache, :GenericLUFactorization)[1], cache.b
-    )
+    F = LinearSolve.@get_cacheval(cache, :GenericLUFactorization)[1]
+    # Prefer the pure-Julia back-solve for `LinearAlgebra.LU` (the common
+    # cacheval). Non-stdlib LU types (e.g. StaticArrays) keep their own `ldiv!`.
+    y = if F isa LinearAlgebra.LU
+        _generic_lu_ldiv!(cache.u, F, cache.b)
+    else
+        ldiv!(cache.u, F, cache.b)
+    end
 
     if check_safety
         failed = _check_residual_safety(cache, alg, A_original, y)
@@ -621,6 +850,15 @@ Julia's built in `qr`. Equivalent to calling `qr!(A)`.
   - On sparse matrices, this will use SPQR from SparseArrays
   - On CuMatrix, it will use a CUDA-accelerated QR from CuSolver.
   - On BandedMatrix and BlockBandedMatrix, it will use a banded QR.
+
+With the default `NoPivot()` this is not rank-revealing, so it cannot solve a
+rank-deficient (least-squares) system: it reports `ReturnCode.Failure` when a
+diagonal entry of `R` is exactly zero, and can return an overflowing solution
+when one is merely negligible. Pass `ColumnNorm()` for a rank-revealing
+factorization that truncates the rank the way `A \\ b` does. The default
+algorithm handles this automatically — it starts with the cheaper unpivoted QR
+and re-solves with `QRFactorization(ColumnNorm())` if `A` turns out to be
+rank-deficient.
 """
 struct QRFactorization{P} <: AbstractDenseFactorization
     pivot::P
@@ -1411,7 +1649,7 @@ function init_cacheval(
 end
 
 """
-`PureKLUFactorization(; reuse_symbolic = true, check_pattern = true, use_fma = true, fully_preallocated = nothing)`
+`PureKLUFactorization(; reuse_symbolic = true, check_pattern = true, use_fma = true, fully_preallocated = nothing, tol = 0.001)`
 
 A pure-Julia port of SuiteSparse's KLU sparse LU solver, provided by
 [PureKLU.jl](https://github.com/SciML/PureKLU.jl). It has no SuiteSparse binary
@@ -1438,12 +1676,17 @@ in the default polyalgorithm.
     SuiteSparse `KLUFactorization`. Defaults to `true`.
   - `fully_preallocated`: PureKLU's `fully_preallocated` option. `nothing` (default) lets
     PureKLU choose automatically based on the maximum block size.
+  - `tol`: Pivot on a column's diagonal instead of largest entry if it is at least `tol` times
+    larger in magnitude. Set `tol = 1.0` for partial pivoting, and `tol = 0.0` to always use the
+    diagonal. Only applies to the initial factorization; refactorizations reuse the existing
+    pivot ordering. Defaults to `0.001`.
 """
 Base.@kwdef struct PureKLUFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool = true
     check_pattern::Bool = true
     use_fma::Bool = true
     fully_preallocated::Union{Bool, Nothing} = nothing
+    tol::Float64 = 0.001
 end
 
 function init_cacheval(
@@ -1456,7 +1699,7 @@ function init_cacheval(
 end
 
 """
-`PureUMFPACKFactorization(; reuse_symbolic = true, check_pattern = true)`
+`PureUMFPACKFactorization(; reuse_symbolic = true, check_pattern = true, throwerror = true)`
 
 A pure-Julia port of SuiteSparse's UMFPACK unsymmetric sparse LU solver, provided
 by [PureUMFPACK.jl](https://github.com/SciML/PureUMFPACK.jl). It has no SuiteSparse
@@ -1480,10 +1723,23 @@ binary dependency and supports generic element types in addition to
     pattern is unchanged. Defaults to `true`.
   - `check_pattern`: check whether the sparsity pattern changed before reusing the
     cached factorization. Defaults to `true`.
+  - `throwerror`: whether to throw an error if PureUMFPACK.jl is not loaded. Defaults
+    to `true`.
 """
-Base.@kwdef struct PureUMFPACKFactorization <: AbstractSparseFactorization
-    reuse_symbolic::Bool = true
-    check_pattern::Bool = true
+struct PureUMFPACKFactorization <: AbstractSparseFactorization
+    reuse_symbolic::Bool
+    check_pattern::Bool
+
+    function PureUMFPACKFactorization(
+            ; reuse_symbolic = true, check_pattern = true, throwerror = true
+        )
+        ext = Base.get_extension(@__MODULE__, :LinearSolvePureUMFPACKExt)
+        return if throwerror && ext === nothing
+            error("PureUMFPACKFactorization requires that PureUMFPACK is loaded, i.e. `using PureUMFPACK`")
+        else
+            new(reuse_symbolic, check_pattern)
+        end
+    end
 end
 
 function init_cacheval(

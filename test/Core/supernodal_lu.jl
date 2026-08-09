@@ -97,6 +97,12 @@ end
     Fp = SNLU.snlu(Ap; matching = false, check = false)
     @test SNLU.nperturbed(Fp) > 0
     @test SNLU._auto_refine(Fp) == 3
+    # `refine` resolves by dispatch, so an unknown symbol says what is accepted
+    # instead of reaching `Int(::Symbol)`
+    @test SNLU._refine_steps(Fp, 2) == 2
+    @test SNLU._refine_steps(Fp, :auto) == 3
+    bp = randn(size(Ap, 1))
+    @test_throws ArgumentError SNLU.solve!(similar(bp), Fp, bp; refine = :bogus)
 end
 
 @testset "residual check does not allocate a work vector" begin
@@ -173,8 +179,8 @@ end
     Base.get_extension(LinearSolve, :LinearSolveBLISExt) !== nothing &&
         push!(algs, LinearSolve.BLISLUFactorization())
     @test !isempty(algs)        # every platform has at least one of these
-    for alg in algs, thr in (4, 64)
-        F = SNLU.snlu(A; dense_alg = alg, dense_threshold = thr)
+    for alg in algs, threshold in (4, 64)
+        F = SNLU.snlu(A; dense_alg = alg, dense_threshold = threshold)
         @test length(F.bcaches) > 0
         x = similar(b)
         SNLU.solve!(x, F, b)
@@ -309,4 +315,38 @@ end
     X = similar(B)
     SNLU.solve!(X, F, B)
     @test norm(A * X - B) <= 1.0e-11 * norm(B)
+end
+
+@testset "multi-RHS panel solve tiers" begin
+    for np in (8, SNLU.PANEL_BLAS_MIN_NP, SNLU.PANEL_BLAS_MIN_NP + 256), nrhs in (1, 4)
+        W = Matrix{Float64}(I, np, np)
+        for j in 1:np, i in 1:np
+            i == j && continue
+            W[i, j] = randn() / sqrt(np)
+        end
+        Y0 = randn(np, nrhs)
+        Y = copy(Y0)
+        SNLU._panel_solve_unit_lower!(W, Y, np)
+        @test Y ≈ UnitLowerTriangular(W) \ Y0 rtol = 1.0e-12
+        copyto!(Y, Y0)
+        SNLU._panel_solve_upper!(W, Y, np)
+        @test Y ≈ UpperTriangular(W) \ Y0 rtol = 1.0e-12
+    end
+end
+
+@testset "public SupernodalLU panel benchmark hook" begin
+    W = Matrix{Float64}(I, 8, 8)
+    for j in 1:8, i in 1:8
+        i == j && continue
+        W[i, j] = randn() / sqrt(8)
+    end
+    Y0 = randn(8, 2)
+    for algorithm in (:kernel, :blas)
+        Y = copy(Y0)
+        supernodal_panel_solve!(W, Y, 8; algorithm, operation = :lower)
+        @test Y ≈ UnitLowerTriangular(W) \ Y0 rtol = 1.0e-12
+        copyto!(Y, Y0)
+        supernodal_panel_solve!(W, Y, 8; algorithm, operation = :upper)
+        @test Y ≈ UpperTriangular(W) \ Y0 rtol = 1.0e-12
+    end
 end

@@ -1,8 +1,8 @@
 module LinearSolveArnoldiMethodExt
 
-using LinearAlgebra
-using LinearSolve
-import ArnoldiMethod: partialschur, partialeigen, LM, LR, SR, LI, SI
+using LinearAlgebra: LinearAlgebra, I, factorize
+using LinearSolve: LinearSolve
+using ArnoldiMethod: ArnoldiMethod, partialschur, partialeigen, LM, LR, SR, LI, SI
 using SciMLBase: SciMLBase, ReturnCode
 
 function SciMLBase.solve(
@@ -25,7 +25,7 @@ function SciMLBase.solve(
         values, vectors, nev, prob.eigentarget, prob.shift
     )
     retcode = history.converged ? ReturnCode.Success : ReturnCode.ConvergenceFailure
-    return LinearSolve.build_eigenvalue_solution(
+    return SciMLBase.build_eigenvalue_solution(
         prob, alg, values, vectors; retcode, stats = history
     )
 end

@@ -1,12 +1,9 @@
 module LinearSolveEnzymeExt
 
-using LinearSolve: LinearSolve, SciMLLinearSolveAlgorithm, init, solve!, LinearProblem,
-    LinearCache, AbstractKrylovSubspaceMethod, DefaultLinearSolver,
-    defaultalg_adjoint_eval, solve
-using LinearSolve.LinearAlgebra
-using EnzymeCore
-using EnzymeCore: EnzymeRules
-using SparseArrays: AbstractSparseMatrix, AbstractSparseMatrixCSC, SparseMatrixCSC
+using LinearSolve: LinearSolve
+using LinearAlgebra: LinearAlgebra, diag
+using EnzymeCore: EnzymeCore, EnzymeRules, Active, Const, Duplicated
+using SparseArrays: AbstractSparseMatrixCSC, SparseMatrixCSC
 
 @inline EnzymeCore.EnzymeRules.inactive_type(::Type{<:LinearSolve.SciMLLinearSolveAlgorithm}) = true
 
@@ -18,7 +15,7 @@ using SparseArrays: AbstractSparseMatrix, AbstractSparseMatrixCSC, SparseMatrixC
 # change the sparsity pattern, corrupting both shadow AND primal. We must operate
 # directly on nzval to preserve the sparsity pattern.
 
-using SparseArrays: nonzeros, rowvals, getcolptr, nzrange
+using SparseArrays: nonzeros, rowvals, getcolptr
 
 """
     _safe_add!(dst, src)

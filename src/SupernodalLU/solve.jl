@@ -52,6 +52,164 @@ end
     return nothing
 end
 
+# Multi-RHS pivot-block solves.  Three backends, picked by panel width.
+#
+# `LinearAlgebra.ldiv!` on a triangular wrapper is not one of them: it
+# heap-allocates a fixed 64 B per call on Julia 1.11 for a matrix right-hand
+# side (not for a vector, and not on 1.10 or 1.12), which breaks the
+# allocation-free guarantee for every panel of every sweep.
+#
+#   nrhs == 1                   the in-tree column kernels at every panel width.
+#   no TriangularSolve          kernels through `PANEL_KERNEL_MAX_NP`, then BLAS.
+#   TriangularSolve available   TriangularSolve through `PANEL_BLAS_MIN_NP`, then
+#                               BLAS (apart from the one-column case above).
+#
+# With RecursiveFactorization loaded, SciML/LinearSolve.jl#1172 measured
+# TriangularSolve through panels of width 1792.  The no-extension fallback
+# stays conservative at 256.
+const PANEL_KERNEL_MAX_NP = 256
+const PANEL_BLAS_MIN_NP = 1792
+
+# `trsm!` needs a BLAS element type in a strided array; everything else stays on
+# the kernels, which are generic and beat the stdlib fallback for those types.
+@inline _panel_blas_eligible(::Type{Tv}) where {Tv} = Tv <: LinearAlgebra.BlasFloat
+
+@inline function _unit_lower_solve!(W::AbstractMatrix{Tv}, X::AbstractMatrix{Tv}, np::Int) where {Tv}
+    @inbounds for r in axes(X, 2)
+        _unit_lower_solve!(W, view(X, :, r), np)
+    end
+    return nothing
+end
+
+@inline function _upper_solve!(W::AbstractMatrix{Tv}, X::AbstractMatrix{Tv}, np::Int) where {Tv}
+    @inbounds for r in axes(X, 2)
+        _upper_solve!(W, view(X, :, r), np)
+    end
+    return nothing
+end
+
+# `trsm!` for the BLAS element types; anything else keeps the kernels.
+_panel_unit_lower_trsm!(Ws::AbstractMatrix{Tv}, Yb::AbstractMatrix{Tv}, np::Int) where {Tv} =
+    _unit_lower_solve!(Ws, Yb, np)
+function _panel_unit_lower_trsm!(
+        Ws::StridedMatrix{Tv}, Yb::StridedMatrix{Tv}, np::Int
+    ) where {Tv <: LinearAlgebra.BlasFloat}
+    BLAS.trsm!('L', 'L', 'N', 'U', one(Tv), view(Ws, 1:np, 1:np), Yb)
+    return nothing
+end
+
+_panel_upper_trsm!(Ws::AbstractMatrix{Tv}, Yb::AbstractMatrix{Tv}, np::Int) where {Tv} =
+    _upper_solve!(Ws, Yb, np)
+function _panel_upper_trsm!(
+        Ws::StridedMatrix{Tv}, Yb::StridedMatrix{Tv}, np::Int
+    ) where {Tv <: LinearAlgebra.BlasFloat}
+    BLAS.trsm!('L', 'U', 'N', 'N', one(Tv), view(Ws, 1:np, 1:np), Yb)
+    return nothing
+end
+
+"""
+    supernodal_panel_solve!(W, B, np; operation, algorithm = :auto)
+
+Apply a supernodal triangular-panel operation using the requested backend.
+`W` contains the factored diagonal block, `B` is the affected panel or
+right-hand side, and `np` is the panel width. `operation` is one of
+`:factor_right_upper`, `:factor_lower`, `:lower`, or `:upper`.
+"""
+function supernodal_panel_solve!(
+        W::AbstractMatrix, B::AbstractMatrix, np::Integer;
+        operation::Symbol, algorithm::Symbol = :auto
+    )
+    selected_algorithm =
+        algorithm === :auto ? _panel_algorithm(W, B, Int(np), operation) : algorithm
+    return supernodal_panel_solve_backend!(
+        Val(selected_algorithm), W, B, Int(np); operation
+    )
+end
+
+function _panel_algorithm(W::AbstractMatrix, B::AbstractMatrix, np::Int, operation::Symbol)
+    operation === :factor_right_upper && return :triangularsolve
+    operation === :factor_lower && return :triangularsolve
+    operation === :lower || operation === :upper ||
+        throw(ArgumentError("unknown supernodal panel operation: $operation"))
+    if np <= PANEL_KERNEL_MAX_NP || size(B, 2) == 1 || !_panel_blas_eligible(eltype(W))
+        return :kernel
+    end
+    return np > PANEL_BLAS_MIN_NP ? :blas : :triangularsolve
+end
+
+"""
+    supernodal_panel_solve_backend!(algorithm, W, B, np; operation)
+
+Backend extension hook used by [`supernodal_panel_solve!`](@ref). Extensions can
+specialize the `algorithm = Val(:triangularsolve)` method for supported panel types.
+"""
+function supernodal_panel_solve_backend!(
+        ::Val{:kernel}, W::AbstractMatrix, B::AbstractMatrix, np::Int; operation::Symbol
+    )
+    if operation === :lower
+        _unit_lower_solve!(W, B, np)
+    elseif operation === :upper
+        _upper_solve!(W, B, np)
+    else
+        return supernodal_panel_solve_backend!(Val(:triangularsolve), W, B, np; operation)
+    end
+    return B
+end
+
+function supernodal_panel_solve_backend!(
+        ::Val{:blas}, W::AbstractMatrix, B::AbstractMatrix, np::Int; operation::Symbol
+    )
+    if operation === :lower
+        _panel_unit_lower_trsm!(W, B, np)
+    elseif operation === :upper
+        _panel_upper_trsm!(W, B, np)
+    else
+        return supernodal_panel_solve_backend!(Val(:triangularsolve), W, B, np; operation)
+    end
+    return B
+end
+
+function supernodal_panel_solve_backend!(
+        ::Val{:triangularsolve}, W::AbstractMatrix, B::AbstractMatrix, np::Int; operation::Symbol
+    )
+    if operation === :factor_right_upper
+        rdiv!(B, UpperTriangular(view(W, 1:np, 1:np)))
+    elseif operation === :factor_lower
+        ldiv!(UnitLowerTriangular(view(W, 1:np, 1:np)), B)
+    elseif operation === :lower || operation === :upper
+        return supernodal_panel_solve_backend!(Val(:blas), W, B, np; operation)
+    else
+        throw(ArgumentError("unknown supernodal panel operation: $operation"))
+    end
+    return B
+end
+
+function _panel_solve_unit_lower!(
+        W::AbstractMatrix{Tv}, B::AbstractMatrix{Tv}, np::Int
+    ) where {Tv}
+    if np <= PANEL_KERNEL_MAX_NP || size(B, 2) == 1 || !_panel_blas_eligible(Tv)
+        _unit_lower_solve!(W, B, np)
+    elseif np > PANEL_BLAS_MIN_NP
+        _panel_unit_lower_trsm!(W, B, np)
+    else
+        supernodal_panel_solve_backend!(Val(:triangularsolve), W, B, np; operation = :lower)
+    end
+    return B
+end
+
+function _panel_solve_upper!(
+        W::AbstractMatrix{Tv}, B::AbstractMatrix{Tv}, np::Int
+    ) where {Tv}
+    if np <= PANEL_KERNEL_MAX_NP || size(B, 2) == 1 || !_panel_blas_eligible(Tv)
+        _upper_solve!(W, B, np)
+    elseif np > PANEL_BLAS_MIN_NP
+        _panel_upper_trsm!(W, B, np)
+    else
+        supernodal_panel_solve_backend!(Val(:triangularsolve), W, B, np; operation = :upper)
+    end
+    return B
+end
+
 # t := A * x for the L21 block W[np+1:np+nu, 1:np] (column-oriented gemv).
 @inline function _panel_gemv!(
         t::AbstractVector{Tv}, W::AbstractMatrix{Tv}, x::AbstractVector{Tv},
@@ -170,7 +328,7 @@ function _solve_panels!(Y::AbstractMatrix{Tv}, F::SupernodalLUFactor{Tv}) where 
         nu = length(Rf)
         Ws = F.W[s]
         Yb = view(Y, c1:c2, :)
-        ldiv!(UnitLowerTriangular(view(Ws, 1:np, 1:np)), Yb)
+        _panel_solve_unit_lower!(Ws, Yb, np)
         if nu > 0
             T = reshape(view(buf, 1:(nu * nrhs)), nu, nrhs)
             mul!(T, view(Ws, (np + 1):(np + nu), 1:np), Yb)
@@ -194,7 +352,7 @@ function _solve_panels!(Y::AbstractMatrix{Tv}, F::SupernodalLUFactor{Tv}) where 
             end
             mul!(Yb, F.Z[s], T, -one(Tv), one(Tv))
         end
-        ldiv!(UpperTriangular(view(Ws, 1:np, 1:np)), Yb)
+        _panel_solve_upper!(Ws, Yb, np)
     end
     return Y
 end
@@ -261,6 +419,16 @@ end
 # per solve for a residual change of ~1.5e-15 -> 7e-16.
 _auto_refine(F::SupernodalLUFactor) = F.nperturbed > 0 ? 3 : 0
 
+# Dispatch on the `refine` type rather than branching on its value: a value
+# branch leaves `Int(refine::Symbol)` reachable, which is both a runtime
+# dispatch and a MethodError instead of a usable message for a bad symbol.
+_refine_steps(::SupernodalLUFactor, refine::Integer) = Int(refine)
+function _refine_steps(F::SupernodalLUFactor, refine::Symbol)
+    refine === :auto ||
+        throw(ArgumentError("`refine` must be `:auto` or an integer number of steps"))
+    return _auto_refine(F)
+end
+
 """
     solve!(x, F::SupernodalLUFactor, b; refine=:auto) -> x
     solve(F::SupernodalLUFactor, b; refine=:auto) -> x
@@ -277,7 +445,7 @@ function solve!(
         x::AbstractVector{Tv}, F::SupernodalLUFactor{Tv}, b::AbstractVector;
         refine::Union{Symbol, Integer} = :auto
     ) where {Tv}
-    nref = refine === :auto ? _auto_refine(F) : Int(refine)
+    nref = _refine_steps(F, refine)
     _solve_once!(x, F, b)
     if nref > 0
         r = F.ir_r
@@ -301,7 +469,7 @@ function solve!(
         refine::Union{Symbol, Integer} = :auto
     ) where {Tv}
     size(X) == size(B) || throw(DimensionMismatch("X and B sizes differ"))
-    nref = refine === :auto ? _auto_refine(F) : Int(refine)
+    nref = _refine_steps(F, refine)
     if nref == 0
         return _solve_once!(X, F, B)
     end

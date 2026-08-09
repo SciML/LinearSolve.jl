@@ -765,8 +765,8 @@ restoration step like in the dense path's `_do_qr_fallback`.
 
 Unlike the dense path, we do not recurse through `solve!(cache, QRFactorization(...))`
 to compute the QR. We compute the rank-revealing column-pivoted sparse QR
-directly via `sparse_colpivqr_factorize(cache.A)` (implemented in the SparseArrays
-extension over SparseColumnPivotedQR.jl) and stash it in the dedicated
+directly via `sparse_colpivqr_factorize(cache.A)` (implemented in
+`src/sparsearrays.jl` over SparseColumnPivotedQR.jl) and stash it in the dedicated
 `:SparseColumnPivotedQRFactorization` slot ourselves with `setfield!`. That slot
 is pre-initialized to a `SparseColumnPivotedQRFactorization` of the matching element type for the
 `SparseMatrixCSC{<:Union{Float64, ComplexF64}, <:Integer}` cases that the sparse

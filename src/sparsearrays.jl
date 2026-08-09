@@ -1,13 +1,22 @@
-module LinearSolveSparseArraysExt
+# SparseArrays support for LinearSolve: the former `ext/LinearSolveSparseArraysExt.jl`,
+# moved here verbatim apart from its module header and import list.
+#
+# SparseArrays is an unconditional `[deps]` entry (`src/SupernodalLU` loads it at
+# package load time), so the extension always loaded -- but it loaded *after* the root
+# module precompiled, invalidating the default-path methods the root
+# `@compile_workload` had just cached. In `src/` the methods exist before the workload
+# runs.
+#
+# Kept as one self-contained unit so it can be excised again if SparseArrays ever
+# becomes genuinely optional. To turn it back into an extension: move this file to
+# `ext/`, wrap it in `module LinearSolveSparseArraysExt ... end` with a
+# `using LinearSolve: ...` import list, point its `include` back at
+# `../src/KLU/klu.jl`, restore the `getcolptr`/`rowvals`/`nonzeros` stubs and drop the
+# `include` in `src/LinearSolve.jl`, restore the `[extensions]` entry, and re-add
+# SparseArrays to the trigger lists of the fourteen extensions that co-trigger on it
+# (CUSOLVERRF, CliqueTrees, Enzyme, Ginkgo, HSL, MUMPS, PETSc, PETScMPI, ParU,
+# PureUMFPACK, Pardiso, SuperLUDIST, STRUMPACK, Sparspak).
 
-using LinearSolve: LinearSolve, BLASELTYPES, pattern_changed, ArrayInterface,
-    CHOLMODFactorization, GenericFactorization,
-    GenericLUFactorization,
-    KLUFactorization, PureKLUFactorization, LUFactorization,
-    NormalCholeskyFactorization,
-    OperatorAssumptions, LinearVerbosity,
-    QRFactorization, RFLUFactorization, UMFPACKFactorization,
-    SparseColumnPivotedQRFactorization, SupernodalLUFactorization, solve
 using SciMLOperators: AbstractSciMLOperator, has_concretization
 using ArrayInterface: ArrayInterface
 using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!
@@ -27,7 +36,7 @@ import StaticArraysCore: SVector
 # requiring the user does `using KLU`
 # But there's no reason to require it because SparseArrays will already
 # load SuiteSparse and thus all of the underlying KLU code
-include("../src/KLU/klu.jl")
+include("KLU/klu.jl")
 # PureKLU (pure-Julia, no SuiteSparse) is a hard dependency and the default
 # sparse LU; the SuiteSparse `KLUFactorization` above is unchanged.
 import PureKLU
@@ -1052,12 +1061,13 @@ end # @static if Base.USE_GPL_LIBS
 function LinearSolve.init_cacheval(
         alg::NormalCholeskyFactorization,
         A::Union{
-            AbstractSparseArray{T}, LinearSolve.GPUArraysCore.AnyGPUArray,
-            Symmetric{T, <:AbstractSparseArray{T}},
+            AbstractSparseArray{<:BLASELTYPES},
+            LinearSolve.GPUArraysCore.AnyGPUArray,
+            Symmetric{<:BLASELTYPES, <:AbstractSparseArray},
         }, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
-    ) where {T <: BLASELTYPES}
+    )
     return if LinearSolve.is_cusparse_csc(A)
         nothing
     elseif LinearSolve.is_cusparse_csr(A) && !LinearSolve.cudss_loaded(A)
@@ -1271,7 +1281,9 @@ function LinearSolve.init_cacheval(
 end
 
 LinearSolve.PrecompileTools.@compile_workload begin
-    A = sprand(4, 4, 0.3) + I
+    # `local` because `LinearSolve` already has a stray module-global `A`, which
+    # otherwise makes this soft-scope assignment ambiguous.
+    local A = sprand(4, 4, 0.3) + I
     b = rand(4)
     prob = LinearProblem(A, b)
     sol = solve(prob, PureKLUFactorization())
@@ -1489,6 +1501,4 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
         red.nrefactor += 1
     end
     return red.reduced
-end
-
 end

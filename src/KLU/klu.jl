@@ -7,6 +7,10 @@ export klu, klu!
 
 const libklu = :libklu
 const libsuitesparseconfig = :libsuitesparseconfig
+# Upstream KLU.jl never defines these two, leaving every AMD/BTF wrapper below an
+# `UndefVarError` waiting to happen.
+const libamd = :libamd
+const libbtf = :libbtf
 using Base: Ptr, Cvoid, Cint, Cdouble, Cchar, Csize_t
 include("wrappers.jl")
 

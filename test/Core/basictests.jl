@@ -188,7 +188,7 @@ end
     end
 
     @testset "KLU factor parts" begin
-        KLU = Base.get_extension(LinearSolve, :LinearSolveSparseArraysExt).KLU
+        KLU = LinearSolve.KLU
         # Block-triangular so the off-diagonal `F` part is non-empty
         Abt = sparse([rand(3, 3) + 3I rand(3, 3); zeros(3, 3) rand(3, 3) + 3I])
         for At in (sparse(A / 1), Abt)

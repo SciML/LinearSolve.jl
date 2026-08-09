@@ -165,7 +165,7 @@ function _direct_lu_factorize! end
 function _direct_lu_solve! end
 
 # Build a column-pivoted sparse QR factorization of `A` (the default sparse-LU
-# singular fallback). The method is provided by the SparseArrays extension over
+# singular fallback). The method is provided by `src/sparsearrays.jl` over
 # SparseColumnPivotedQR.jl; this generic declaration lets `src/default.jl` call it.
 function sparse_colpivqr_factorize end
 
@@ -173,7 +173,7 @@ function sparse_colpivqr_factorize end
 # pure-Julia "KLU-style" solver for less-structured problems (small, or medium and
 # very sparse) — `PureKLUFactorization` for LU and `SparseColumnPivotedQRFactorization`
 # for QR — while `false` selects the SuiteSparse solver for more structure (UMFPACK
-# for LU, SPQR for QR). The SparseArrays extension provides the real method for
+# for LU, SPQR for QR). `src/sparsearrays.jl` provides the real method for
 # sparse matrices; the generic fallback prefers the pure-Julia option.
 use_klulike_sparse_structure(A, b) = true
 

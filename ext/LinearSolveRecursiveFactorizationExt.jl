@@ -257,11 +257,9 @@ end
 
 # Solve-phase pivot-block trsms.  With TriangularSolve available it takes the
 # whole middle band: it is the library RecursiveFactorization already uses for
-# its own trsms, and it carries its own small-size cutoffs (`VECTOR_RHS_CUTOFF`
-# and the blocked-kernel thresholds), so there is no need to re-derive here
-# where it stops beating a naive sweep -- it falls back on its own.  Above
-# `PANEL_BLAS_MIN_NP` the blocked BLAS sweep is still expected to win, so the
-# large end stays on `trsm!`.
+# its own trsms.  A one-column matrix RHS retains the in-tree kernels: it
+# cannot amortize TriangularSolve's setup.  Wider panels use the BLAS path
+# above `PANEL_BLAS_MIN_NP`.
 #
 # Both wrappers need TriangularSolve >= 0.2.2, which is where the matrix
 # `ldiv!(::UpperTriangular{T,<:StridedMatrix{T}}, ::StridedMatrix{T}, ::Val)`
@@ -270,13 +268,12 @@ end
 # dispatch and the path that allocates on Julia 1.11.  The `[compat]` floor is
 # set accordingly.
 #
-# The band boundaries are inherited from the dense back-solve work (#1169,
-# #1164) rather than measured on supernode panels; SciML/LinearSolve.jl#1172
-# tracks measuring them here.
 function SNLU._panel_solve_unit_lower!(
         Ws::Matrix{Tv}, Yb::AbstractMatrix{Tv}, np::Int
     ) where {Tv <: SNLUTypes}
-    if np > SNLU.PANEL_BLAS_MIN_NP
+    if size(Yb, 2) == 1
+        SNLU._unit_lower_solve!(Ws, Yb, np)
+    elseif np > SNLU.PANEL_BLAS_MIN_NP
         SNLU._panel_unit_lower_trsm!(Ws, Yb, np)
     else
         TriangularSolve.ldiv!(UnitLowerTriangular(view(Ws, 1:np, 1:np)), Yb, Val(false))
@@ -287,7 +284,9 @@ end
 function SNLU._panel_solve_upper!(
         Ws::Matrix{Tv}, Yb::AbstractMatrix{Tv}, np::Int
     ) where {Tv <: SNLUTypes}
-    if np > SNLU.PANEL_BLAS_MIN_NP
+    if size(Yb, 2) == 1
+        SNLU._upper_solve!(Ws, Yb, np)
+    elseif np > SNLU.PANEL_BLAS_MIN_NP
         SNLU._panel_upper_trsm!(Ws, Yb, np)
     else
         TriangularSolve.ldiv!(UpperTriangular(view(Ws, 1:np, 1:np)), Yb, Val(false))

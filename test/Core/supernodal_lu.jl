@@ -316,3 +316,20 @@ end
     SNLU.solve!(X, F, B)
     @test norm(A * X - B) <= 1.0e-11 * norm(B)
 end
+
+@testset "multi-RHS panel solve tiers" begin
+    for np in (8, SNLU.PANEL_BLAS_MIN_NP, SNLU.PANEL_BLAS_MIN_NP + 256), nrhs in (1, 4)
+        W = Matrix{Float64}(I, np, np)
+        for j in 1:np, i in 1:np
+            i == j && continue
+            W[i, j] = randn() / sqrt(np)
+        end
+        Y0 = randn(np, nrhs)
+        Y = copy(Y0)
+        SNLU._panel_solve_unit_lower!(W, Y, np)
+        @test Y ≈ UnitLowerTriangular(W) \ Y0 rtol = 1.0e-12
+        copyto!(Y, Y0)
+        SNLU._panel_solve_upper!(W, Y, np)
+        @test Y ≈ UpperTriangular(W) \ Y0 rtol = 1.0e-12
+    end
+end

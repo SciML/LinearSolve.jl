@@ -59,30 +59,16 @@ end
 # side (not for a vector, and not on 1.10 or 1.12), which breaks the
 # allocation-free guarantee for every panel of every sweep.
 #
-#   np <= PANEL_KERNEL_MAX_NP   the in-tree column kernels.  Supernode panels
-#                               are small -- median width 6 for a 2D Poisson
-#                               factorization -- and at that size any library
-#                               call is dominated by its own overhead.
-#   above, up to PANEL_BLAS_MIN_NP
-#                               `TriangularSolve.ldiv!` when it is available,
-#                               i.e. when RecursiveFactorization is loaded; see
-#                               the hooks below.  It is the same library
-#                               RecursiveFactorization uses for its own trsms,
-#                               and it carries its own small-size cutoffs, so
-#                               the extension hands it the whole band rather
-#                               than re-deriving where it stops winning.
-#                               Without it this band falls back to BLAS.
-#   np > PANEL_BLAS_MIN_NP      `BLAS.trsm!`, whose blocked sweep is what wins
-#                               once the triangle no longer fits in cache.
+#   nrhs == 1                   the in-tree column kernels at every panel width.
+#   no TriangularSolve          kernels through `PANEL_KERNEL_MAX_NP`, then BLAS.
+#   TriangularSolve available   TriangularSolve through `PANEL_BLAS_MIN_NP`, then
+#                               BLAS (apart from the one-column case above).
 #
-# The boundaries follow the dense back-solve work rather than a fresh
-# measurement of this kernel: #1169 puts the in-tree-kernel/BLAS crossover at
-# 256, and #1164 confirms 256 for a `Matrix` orientation (512 wrapped) while
-# finding multi-RHS sweeps still ahead through N=1000.  Those were measured on
-# whole LU back-solves, not on supernode panels, so treat both numbers as
-# provisional -- SciML/LinearSolve.jl#1172 tracks measuring them here directly.
+# With RecursiveFactorization loaded, SciML/LinearSolve.jl#1172 measured
+# TriangularSolve through panels of width 1792.  The no-extension fallback
+# stays conservative at 256.
 const PANEL_KERNEL_MAX_NP = 256
-const PANEL_BLAS_MIN_NP = 1024
+const PANEL_BLAS_MIN_NP = 1792
 
 # `trsm!` needs a BLAS element type in a strided array; everything else stays on
 # the kernels, which are generic and beat the stdlib fallback for those types.
@@ -135,7 +121,7 @@ end
 function _panel_solve_unit_lower!(
         Ws::AbstractMatrix{Tv}, Yb::AbstractMatrix{Tv}, np::Int
     ) where {Tv}
-    if np <= PANEL_KERNEL_MAX_NP || !_panel_blas_eligible(Tv)
+    if np <= PANEL_KERNEL_MAX_NP || size(Yb, 2) == 1 || !_panel_blas_eligible(Tv)
         _unit_lower_solve!(Ws, Yb, np)
     else
         _panel_unit_lower_trsm!(Ws, Yb, np)
@@ -146,7 +132,7 @@ end
 function _panel_solve_upper!(
         Ws::AbstractMatrix{Tv}, Yb::AbstractMatrix{Tv}, np::Int
     ) where {Tv}
-    if np <= PANEL_KERNEL_MAX_NP || !_panel_blas_eligible(Tv)
+    if np <= PANEL_KERNEL_MAX_NP || size(Yb, 2) == 1 || !_panel_blas_eligible(Tv)
         _upper_solve!(Ws, Yb, np)
     else
         _panel_upper_trsm!(Ws, Yb, np)

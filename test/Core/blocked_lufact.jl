@@ -69,6 +69,51 @@ end
         end
     end
 
+    @testset "microkernel tiles and remainders ($T)" for T in (Float64, Float32)
+        # The register-blocked kernel takes the update at >= 64 trailing rows
+        # and >= 32 trailing columns, in tiles of 3W rows by 4 columns
+        # (W = 4 for Float64, 8 for Float32). This range straddles every row
+        # and column remainder of both tile shapes in both directions.
+        for n in 72:97
+            A = randn(T, n, n)
+            F = LinearSolve.generic_lufact!(copy(A), RowMaximum(), _ipiv(n); check = false)
+            @test F.info == 0
+            @test scaled_residual(A, F) < 20
+        end
+        # rowblock cuts landing mid-tile, and rows == 256 exactly, which is the
+        # padded-pack-stride branch
+        for n in (129, 257, 264, 272), nb in (8, 16, 17), rb in (13, 37, 384)
+            A = randn(T, n, n)
+            W = copy(A)
+            ipiv = _ipiv(n)
+            info = LinearSolve._blocked_lufact!(W, ipiv, n, n, n, nb, rb)
+            F = LU{T, Matrix{T}, Vector{BlasInt}}(W, ipiv, BlasInt(info))
+            @test scaled_residual(A, F) < 20
+        end
+        # unit row stride with a leading dimension wider than the matrix: the
+        # kernel addresses columns through `stride(A, 2)`, not `size(A, 1)`
+        for n in (80, 130)
+            P = randn(T, n + 9, n + 4)
+            V = @view P[1:n, 1:n]
+            A = copy(Matrix(V))
+            F = LinearSolve.generic_lufact!(V, RowMaximum(), _ipiv(n); check = false)
+            @test scaled_residual(A, F) < 20
+        end
+    end
+
+    @testset "eltypes outside the microkernel keep the scalar kernel" begin
+        # 80 x 80 puts the update past the >= 64 rows / >= 32 columns switch,
+        # so this is the packed scalar kernel, not the unpacked one
+        n = 80
+        A = big.(randn(n, n))
+        W = copy(A)
+        ipiv = _ipiv(n)
+        info = LinearSolve._blocked_lufact!(W, ipiv, n, n, n, 8, 384)
+        F = LU{BigFloat, Matrix{BigFloat}, Vector{BlasInt}}(W, ipiv, BlasInt(info))
+        @test info == 0
+        @test scaled_residual(A, F) < 20
+    end
+
     @testset "rectangular m x n" begin
         for (m, n) in (
                 (100, 3), (3, 100), (128, 40), (40, 128), (257, 130),

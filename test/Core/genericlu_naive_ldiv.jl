@@ -76,6 +76,70 @@ end
     @test sol.u ≈ A \ b rtol = 1.0e-12
 end
 
+@testset "GenericLU keeps the naive kernel at every size (no BLAS deferral)" begin
+    # Path discrimination is against the `ldiv!` reference, whose bits are
+    # stable across call contexts (LAPACK ccall / plain-op generic path): a
+    # size-based deferral would make `sol.u` bitwise-equal to it, while the
+    # naive kernel differs in the last ulps at these sizes. Comparing bitwise
+    # against the kernel itself is not portable — its `muladd`/`@simd` loops
+    # may contract differently standalone vs inlined (observed on Julia 1.11).
+    # N = 600 exceeds both cutoffs (256 `Matrix` / 512 wrapped) in
+    # `_naive_ldiv_cutoff`, which `_generic_lu_ldiv!` must never consult.
+    for (mk, n) in ((identity, 600), (adjoint, 600))
+        A = rand(n, n) + n * I
+        b = rand(n)
+        cache = init(LinearProblem(mk(copy(A)), copy(b)), GenericLUFactorization())
+        sol = solve!(cache)
+        F = first(cache.cacheval)
+        xldiv = copy(b)
+        ldiv!(F, xldiv)
+        @test sol.u != xldiv
+        @test sol.u ≈ Matrix(mk(A)) \ b rtol = 1.0e-10 * n
+
+        B = rand(n, 3)
+        solB = solve(LinearProblem(mk(copy(A)), copy(B)), GenericLUFactorization())
+        @test solB.u ≈ Matrix(mk(A)) \ B rtol = 1.0e-10 * n
+    end
+end
+
+@testset "LUFactorization back-solve is size-aware (naive below cutoff, getrs! above)" begin
+    # The branch is read off `_use_naive_lu_ldiv`, not inferred from
+    # `sol.u != ldiv!(...)`: the two agree to within an ulp and on a given draw
+    # can agree exactly (0.13% of draws at N = 64 on an EPYC 7502 / OpenBLAS
+    # 0.3.29 build), which is how the single-draw form of this check failed.
+    cutoff = LinearSolve._naive_ldiv_cutoff(zeros(0, 0))
+    for n in (cutoff ÷ 4, cutoff, cutoff + 1, 2 * cutoff)
+        naive_expected = n <= cutoff
+        A = rand(n, n) + n * I
+        b = rand(n)
+        cache = init(LinearProblem(copy(A), copy(b)), LUFactorization())
+        u = copy(solve!(cache).u)
+        F = cache.cacheval
+        @test LinearSolve._use_naive_lu_ldiv(u, F, b) == naive_expected
+        @test u ≈ A \ b rtol = 1.0e-10 * n
+        if naive_expected
+            # A fallback to `ldiv!` would reproduce its bits on *every* draw.
+            @test any(1:32) do _
+                bk = rand(n)
+                cache.b = bk
+                solve!(cache).u != ldiv!(similar(bk), F, copy(bk))
+            end
+        else
+            @test u == ldiv!(similar(b), F, copy(b))
+        end
+    end
+    # Matrix right-hand sides keep the BLAS-3 path at every size
+    n = 100
+    A = rand(n, n) + n * I
+    B = rand(n, 4)
+    cacheB = init(LinearProblem(copy(A), copy(B)), LUFactorization())
+    solB = solve!(cacheB)
+    FB = cacheB.cacheval
+    @test !LinearSolve._use_naive_lu_ldiv(solB.u, FB, B)
+    @test solB.u == ldiv!(similar(B), FB, copy(B))
+    @test solB.u ≈ A \ B rtol = 1.0e-8
+end
+
 @testset "GenericLU back-solve on Adjoint/Transpose operators" begin
     for T in (Float64, Float32, ComplexF64, ComplexF32, BigFloat),
             wrap in (adjoint, transpose)
@@ -133,4 +197,23 @@ end
             Tuple{Matrix{Float64}, ipivT, rhsT}
         )
     end
+end
+
+@testset "smart helper is specialized only for BLAS-eligible strided vector solves" begin
+    ipivT = Vector{LinearAlgebra.BlasInt}
+    for T in (Float64, ComplexF32)
+        luT = LU{T, Matrix{T}, ipivT}
+        @test which(
+            LinearSolve._smart_lu_ldiv!, Tuple{Vector{T}, luT, Vector{T}}
+        ) !== which(
+            LinearSolve._smart_lu_ldiv!, Tuple{Matrix{T}, luT, Matrix{T}}
+        )
+    end
+    # No measured BLAS crossover for BigFloat: it keeps `_ldiv!` unconditionally
+    luB = LU{BigFloat, Matrix{BigFloat}, Vector{Int}}
+    @test which(
+        LinearSolve._smart_lu_ldiv!, Tuple{Vector{BigFloat}, luB, Vector{BigFloat}}
+    ) === which(
+        LinearSolve._smart_lu_ldiv!, Tuple{Matrix{BigFloat}, luB, Matrix{BigFloat}}
+    )
 end

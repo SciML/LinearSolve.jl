@@ -15,6 +15,44 @@ end
 prob = LinearProblem(rand(50, 50), rand(50))
 solve(prob)
 
+# RF loaded: unconditional GenericLU ends at 10, RFLU (Accelerate on Apple) from 11
+@test LinearSolve.defaultalg(nothing, zeros(10)).alg ===
+    LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
+if LinearSolve.appleaccelerate_isavailable()
+    @test LinearSolve.defaultalg(nothing, zeros(11)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization
+else
+    @test LinearSolve.defaultalg(nothing, zeros(11)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.RFLUFactorization
+end
+
+# the raised GenericLU band is Float32/Float64-only; complex stays on BLAS
+let complex_alg = if LinearSolve.appleaccelerate_isavailable()
+        LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization
+    elseif LinearSolve.usemkl
+        LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization
+    else
+        LinearSolve.DefaultAlgorithmChoice.LUFactorization
+    end
+    for n in (32, 256)
+        @test LinearSolve.defaultalg(nothing, zeros(ComplexF64, n)).alg === complex_alg
+    end
+end
+
+# RF loaded: the GenericLU band stays shadowed by the RFLU band on every vendor
+let expected = LinearSolve.appleaccelerate_isavailable() ?
+        LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization :
+        LinearSolve.DefaultAlgorithmChoice.RFLUFactorization
+    for n in (16, 32, 100)
+        @test LinearSolve.defaultalg(nothing, zeros(n)).alg === expected
+    end
+    if LinearSolve.isopenblas()
+        for n in (128, 256, 500)
+            @test LinearSolve.defaultalg(nothing, zeros(n)).alg === expected
+        end
+    end
+end
+
 if LinearSolve.usemkl
     @test LinearSolve.defaultalg(nothing, zeros(600)).alg ===
         LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization
@@ -460,6 +498,22 @@ sol_glu_rs = solve(
     GenericLUFactorization(residualsafety = true)
 )
 @test sol_glu_rs.retcode === ReturnCode.APosterioriSafetyFailure
+
+# Callers with backend convergence metadata pass it through the failing check (#1166)
+cache_meta = init(LinearProblem(copy(A_nearsing), copy(b_nearsing)), LUFactorization())
+sol_meta = LinearSolve._check_residual_safety(
+    cache_meta, cache_meta.alg, A_nearsing, ones(n); iters = 7, resid = 1.25
+)
+@test sol_meta.retcode === ReturnCode.APosterioriSafetyFailure
+@test sol_meta.iters == 7
+@test sol_meta.resid == 1.25
+# Defaults keep the failure solution type-identical to the success path
+sol_default_meta = LinearSolve._check_residual_safety(
+    cache_meta, cache_meta.alg, A_nearsing, ones(n)
+)
+@test sol_default_meta.retcode === ReturnCode.APosterioriSafetyFailure
+@test sol_default_meta.iters == 0
+@test sol_default_meta.resid === nothing
 
 # Default LUFactorization() on near-singular matrix → ReturnCode.Success (no check)
 sol_lu_default = solve(

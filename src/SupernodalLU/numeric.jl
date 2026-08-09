@@ -287,25 +287,23 @@ function _cache_lu!(
     return true
 end
 
-# Panel triangular solves (L21 := L21·U11⁻¹ and U12 := L11⁻¹·U12).  These are
-# BLAS-3 trsms against the just-factored diagonal block, not linear solves in
-# the LinearSolve sense, so they are plain overridable hooks: the defaults
-# below use the stdlib triangular solves, and
-# LinearSolveRecursiveFactorizationExt routes them through TriangularSolve —
-# the same library RecursiveFactorization (and hence the RFLU dense default)
-# already uses internally for its own trsms.
+_lu_from_cacheval(cv::LinearAlgebra.LU) = cv
+_lu_from_cacheval(cv::Tuple) = _lu_from_cacheval(first(cv))
+
 function _panel_rdiv!(W::Matrix{Tv}, np::Int, len::Int) where {Tv}
-    rdiv!(view(W, (np + 1):len, 1:np), UpperTriangular(view(W, 1:np, 1:np)))
-    return nothing
+    len > np || return nothing
+    return supernodal_panel_solve_backend!(
+        Val(:triangularsolve), W, view(W, (np + 1):len, 1:np), np;
+        operation = :factor_right_upper
+    )
 end
 
 function _panel_ldiv!(W::Matrix{Tv}, np::Int, Z::Matrix{Tv}) where {Tv}
-    ldiv!(UnitLowerTriangular(view(W, 1:np, 1:np)), Z)
-    return nothing
+    isempty(Z) && return nothing
+    return supernodal_panel_solve_backend!(
+        Val(:triangularsolve), W, Z, np; operation = :factor_lower
+    )
 end
-
-_lu_from_cacheval(cv::LinearAlgebra.LU) = cv
-_lu_from_cacheval(cv::Tuple) = _lu_from_cacheval(first(cv))
 
 # The direct-BLAS backends (Apple Accelerate, BLIS, OpenBLAS) do not keep an
 # `LU` in their cacheval at all: each owns a mutable cache holding the factored

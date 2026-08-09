@@ -21,8 +21,4 @@ run_qa(
         # LinearCache is not declared public in LinearSolve.
         all_explicit_imports_are_public = (; ignore = (:LinearCache,)),
     ),
-    # `using LinearAlgebra, SparseArrays, PythonCall, CondaPkg` brings several names
-    # in implicitly; making them explicit is a source refactor tracked in
-    # https://github.com/SciML/LinearSolve.jl/issues/1058
-    ei_broken = (:no_implicit_imports,),
 )

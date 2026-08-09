@@ -316,3 +316,37 @@ end
     SNLU.solve!(X, F, B)
     @test norm(A * X - B) <= 1.0e-11 * norm(B)
 end
+
+@testset "multi-RHS panel solve tiers" begin
+    for np in (8, SNLU.PANEL_BLAS_MIN_NP, SNLU.PANEL_BLAS_MIN_NP + 256), nrhs in (1, 4)
+        W = Matrix{Float64}(I, np, np)
+        for j in 1:np, i in 1:np
+            i == j && continue
+            W[i, j] = randn() / sqrt(np)
+        end
+        Y0 = randn(np, nrhs)
+        Y = copy(Y0)
+        SNLU._panel_solve_unit_lower!(W, Y, np)
+        @test Y ≈ UnitLowerTriangular(W) \ Y0 rtol = 1.0e-12
+        copyto!(Y, Y0)
+        SNLU._panel_solve_upper!(W, Y, np)
+        @test Y ≈ UpperTriangular(W) \ Y0 rtol = 1.0e-12
+    end
+end
+
+@testset "public SupernodalLU panel benchmark hook" begin
+    W = Matrix{Float64}(I, 8, 8)
+    for j in 1:8, i in 1:8
+        i == j && continue
+        W[i, j] = randn() / sqrt(8)
+    end
+    Y0 = randn(8, 2)
+    for algorithm in (:kernel, :blas)
+        Y = copy(Y0)
+        supernodal_panel_solve!(W, Y, 8; algorithm, operation = :lower)
+        @test Y ≈ UnitLowerTriangular(W) \ Y0 rtol = 1.0e-12
+        copyto!(Y, Y0)
+        supernodal_panel_solve!(W, Y, 8; algorithm, operation = :upper)
+        @test Y ≈ UpperTriangular(W) \ Y0 rtol = 1.0e-12
+    end
+end

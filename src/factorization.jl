@@ -454,6 +454,22 @@ end
 _naive_ldiv_cutoff(::AbstractMatrix) = 256
 _naive_ldiv_cutoff(::_AdjTransStridedFactors) = 512
 
+# Branch predicate of `_smart_lu_ldiv!` below. Split out so the selection is
+# observable directly: the naive kernel and `getrs!` agree to within an ulp, so
+# comparing their outputs bitwise is not a reliable way to tell which one ran.
+_use_naive_lu_ldiv(x, F, b) = false
+
+function _use_naive_lu_ldiv(
+        x::StridedVector{T},
+        F::LU{T, <:Union{StridedMatrix{T}, _AdjTransStridedFactors}},
+        b::StridedVector{T}
+    ) where {T <: BLASELTYPES}
+    return !(
+        x isa GPUArraysCore.AnyGPUArray || b isa GPUArraysCore.AnyGPUArray ||
+            F.factors isa GPUArraysCore.AnyGPUArray
+    ) && length(x) <= _naive_ldiv_cutoff(F.factors)
+end
+
 # Size-aware back-solve for `ldiv!`-baseline algorithms (`LUFactorization` and
 # the defaults routed to it): single vectors at or below the crossover take the
 # naive kernel; everything else (larger vectors, multi-RHS, non-BLAS/GPU) keeps
@@ -465,11 +481,7 @@ function _smart_lu_ldiv!(
         F::LU{T, <:Union{StridedMatrix{T}, _AdjTransStridedFactors}},
         b::StridedVector{T}
     ) where {T <: BLASELTYPES}
-    if x isa GPUArraysCore.AnyGPUArray || b isa GPUArraysCore.AnyGPUArray ||
-            F.factors isa GPUArraysCore.AnyGPUArray ||
-            length(x) > _naive_ldiv_cutoff(F.factors)
-        return _ldiv!(x, F, b)
-    end
+    _use_naive_lu_ldiv(x, F, b) || return _ldiv!(x, F, b)
     x !== b && copyto!(x, b)
     return _naive_lu_ldiv!(F.factors, F.ipiv, x)
 end

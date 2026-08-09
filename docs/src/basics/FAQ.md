@@ -87,3 +87,36 @@ Pr = LA.Diagonal(weights)
 prob = LS.LinearProblem(A, b)
 sol = LS.solve(prob, LS.KrylovJL_GMRES(precs = Returns((Pl, Pr))))
 ```
+
+## Why does LinearSolve.jl depend on MKL_jll, and how do I stop it from loading?
+
+MKL is the fastest BLAS on most x86 hardware, often by a wide margin, so LinearSolve.jl
+ships it by default and lets the default algorithm choice pick `MKLLUFactorization`
+where it wins. Without it, most installations end up substantially slower.
+
+If you would rather not load it, for example because you only solve small static-array
+systems where it brings nothing, set the `LoadMKL_JLL` preference to `false`:
+
+```julia
+using Preferences, UUIDs
+
+Preferences.set_preferences!(
+    UUID("7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"),  # LinearSolve
+    "LoadMKL_JLL" => false; force = true
+)
+```
+
+The preference is read when LinearSolve.jl loads, so restart Julia afterwards and let
+the package recompile. From then on `LinearSolve.usemkl` is `false`, MKL_jll is never
+`using`'d, and the default algorithm falls back to the next best choice for your
+matrix, typically `LUFactorization` or `RFLUFactorization`. Nothing else about the
+interface changes and every algorithm you select explicitly keeps working.
+
+Two details worth knowing:
+
+  - The default is already architecture aware. MKL is only considered on `x86_64` and
+    `i686`, and it is off by default on AMD EPYC CPUs, where it does not win. On other
+    architectures such as Apple Silicon it is never loaded regardless of this setting.
+  - The preference controls whether LinearSolve.jl *loads and uses* MKL_jll, not
+    whether it is installed. MKL_jll stays a declared dependency, so it remains in the
+    dependency graph and Pkg still installs it.

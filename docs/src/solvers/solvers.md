@@ -249,8 +249,8 @@ FastQRFactorization
 
 ```@docs
 KLUFactorization
-LinearSolveSparseArraysExt.KLU.klu
-LinearSolveSparseArraysExt.KLU.klu!
+LinearSolve.KLU.klu
+LinearSolve.KLU.klu!
 PureKLUFactorization
 PureUMFPACKFactorization
 SupernodalLUFactorization

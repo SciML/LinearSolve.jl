@@ -324,11 +324,6 @@ issparsematrix(A) = false
 make_SparseMatrixCSC(A) = nothing
 makeempty_SparseMatrixCSC(A) = nothing
 
-# Stub functions for SparseArrays - overridden in extension
-getcolptr(A) = error("SparseArrays extension not loaded")
-rowvals(A) = error("SparseArrays extension not loaded")
-nonzeros(A) = error("SparseArrays extension not loaded")
-
 EnumX.@enumx DefaultAlgorithmChoice begin
     LUFactorization
     QRFactorization
@@ -632,6 +627,11 @@ appleaccelerate_isavailable() = HAS_APPLE_ACCELERATE[]
 useblis(x) = false
 usecuda(x) = false
 usemetal(x) = false
+
+# Formerly ext/LinearSolveSparseArraysExt.jl; kept as one excisable unit, see its
+# header. Order matters both ways: after the traits above, which its own workload
+# calls, and before the workload below, which it would otherwise invalidate.
+include("sparsearrays.jl")
 
 PrecompileTools.@compile_workload begin
     A = rand(4, 4)

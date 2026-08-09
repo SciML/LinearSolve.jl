@@ -1,5 +1,5 @@
 using SciMLTesting, LinearSolve, Test
-using SparseArrays  # materializes the KLU submodule via LinearSolveSparseArraysExt
+using SparseArrays
 
 # ExplicitImports only analyzes an extension module once it exists, and an extension
 # module only exists once every one of its triggers has been loaded. Loading the
@@ -42,7 +42,7 @@ loaded_extensions = (
     :LinearSolveJacobiDavidsonExt, :LinearSolveKernelAbstractionsExt,
     :LinearSolveKrylovKitExt, :LinearSolveMetalExt, :LinearSolveMooncakeExt,
     :LinearSolvePureUMFPACKExt,
-    :LinearSolveRecursiveFactorizationExt, :LinearSolveSparseArraysExt,
+    :LinearSolveRecursiveFactorizationExt,
     :LinearSolveSparspakExt, :LinearSolveSpecializingFactorizationsExt,
 )
 
@@ -55,19 +55,11 @@ loaded_extensions = (
     end
 end
 
-# Extension submodules ExplicitImports cannot analyze; allow them to be unanalyzable.
-klu_mod = try
-    Base.get_extension(LinearSolve, :LinearSolveSparseArraysExt).KLU
-catch
-    nothing
-end
+# Submodules ExplicitImports cannot analyze; allow them to be unanalyzable.
 unanalyzable_mods = (
     LinearSolve.OperatorCondition, LinearSolve.DefaultAlgorithmChoice,
-    LinearSolve.NonstructuralZeros, LinearSolve.WarmStart,
+    LinearSolve.NonstructuralZeros, LinearSolve.WarmStart, LinearSolve.KLU,
 )
-if klu_mod !== nothing
-    unanalyzable_mods = (unanalyzable_mods..., klu_mod)
-end
 
 # SciMLLogging names pulled in by the @verbosity_specifier macro expansion, plus
 # @set! reached by extensions via LinearSolve.@set! — both look stale to EI because
@@ -268,6 +260,4 @@ run_qa(
     ),
 )
 
-if klu_mod !== nothing
-    run_api_docs(klu_mod; rendered = true, docs_src)
-end
+run_api_docs(LinearSolve.KLU; rendered = true, docs_src)

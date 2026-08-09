@@ -174,7 +174,7 @@ const NONPERSISTENT_ZERO_FRACTION = 0.5
 # stored entries that have been numerically zero in every solve so far (the
 # complement of the running union of ever-nonzero positions), handing the inner
 # factorization a smaller, valid superset pattern. Sparse-matrix methods live in
-# the SparseArrays extension; these generic fallbacks make the non-sparse /
+# `src/sparsearrays.jl`; these generic fallbacks make the non-sparse /
 # reduction-off paths no-ops so callers can stay branch-light and type-stable.
 #
 # `init_sparse_reduction(A, assumptions)` returns either `nothing` (no reduction

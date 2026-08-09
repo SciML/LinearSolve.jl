@@ -109,16 +109,24 @@ function _copy_A_for_safety(cache::LinearCache)
 end
 
 """
-    _check_residual_safety(cache::LinearCache, alg, A_original, y)
+    _check_residual_safety(cache::LinearCache, alg, A_original, y; iters = 0, resid = nothing)
 
 Post-solve residual check for LU algorithms with `residualsafety=true`.
 Computes `‖A*y - b‖` and returns an `APosterioriSafetyFailure` solution if it
 exceeds `abstol + reltol * ‖b‖`. Returns `nothing` if the residual is acceptable.
 
+Iterative callers can pass their backend's convergence metadata through `iters`
+and `resid` so a failing check still reports it. The defaults keep the failure
+solution type-identical to the success path (`resid = nothing`): substituting the
+check's own `res_norm` here would put a `Float64`/`Nothing` union in `solve!`'s
+return type for every LU algorithm, breaking the concrete-return QA invariant.
+
 When inside `DefaultLinearSolver`, uses the pre-allocated `residual_buf` from
 `DefaultLinearSolverInit` (non-allocating). For standalone use, allocates a buffer.
 """
-function _check_residual_safety(cache::LinearCache, alg, A_original, y)
+function _check_residual_safety(
+        cache::LinearCache, alg, A_original, y; iters::Int = 0, resid = nothing
+    )
     b = cache.b
     if cache.alg isa DefaultLinearSolver
         buf = cache.cacheval.residual_buf
@@ -140,7 +148,8 @@ function _check_residual_safety(cache::LinearCache, alg, A_original, y)
             return "Residual safety check failed: ‖A*x - b‖ = $(res_norm), tol = $(tol) (abstol = $(cache.abstol), reltol = $(cache.reltol), ‖b‖ = $(b_norm), ratio = $(res_norm / tol))"
         end
         return SciMLBase.build_linear_solution(
-            alg, y, nothing, nothing; retcode = ReturnCode.APosterioriSafetyFailure
+            alg, y, resid, nothing;
+            retcode = ReturnCode.APosterioriSafetyFailure, iters
         )
     end
     return nothing

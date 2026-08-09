@@ -266,11 +266,13 @@ Supports arbitrary number types. Has low overhead and is good for small matrices
 
 For `StridedMatrix{Float64}`/`StridedMatrix{Float32}` with `RowMaximum` pivoting the
 factorization runs a blocked pure-Julia kernel (panel factorization + packed Schur
-update, the LAPACK `getrf` structure written with `@simd ivdep` loops) instead of the
-scalar textbook loop. That keeps the algorithm dependency-free while scaling far
-beyond the scalar kernel: on machines with a weak or unavailable BLAS it is
-competitive with (or faster than) OpenBLAS/MKL `getrf` up to a few hundred unknowns.
-Other element types and pivots keep the scalar generic path.
+update, the LAPACK `getrf` structure) instead of the scalar textbook loop. The Schur
+update is a register-blocked microkernel written on Base's `VecElement` tuples and
+LLVM's `fmuladd` intrinsic, so the algorithm stays dependency-free — no
+LoopVectorization, no SIMD.jl, no CPU feature detection — while scaling far beyond the
+scalar kernel: on machines with a weak or unavailable BLAS it is competitive with (or
+faster than) OpenBLAS/MKL `getrf` up to a few hundred unknowns. Other element types and
+pivots keep the scalar generic path.
 
 The back-solve is a pure-Julia column-oriented triangular solve (apply `ipiv`, unit-lower
 forward, upper backward) rather than `ldiv!(::LU, ·)` / OpenBLAS `getrs!`. That avoids the

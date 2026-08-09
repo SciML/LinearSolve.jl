@@ -638,6 +638,12 @@ PrecompileTools.@compile_workload begin
     sol = solve(prob)
     sol = solve(prob, LUFactorization())
     sol = solve(prob, KrylovJL_GMRES())
+    # 80 x 80 is past both `GenericLUFactorization` size switches: the blocked
+    # driver (panel, trsm, row swaps) and the register-blocked Schur kernel,
+    # neither of which the 4 x 4 problem above reaches.
+    Ablocked = rand(80, 80) + 80I
+    bblocked = rand(80)
+    sol = solve(LinearProblem(Ablocked, bblocked), GenericLUFactorization())
 end
 
 ALREADY_WARNED_CUDSS = Ref{Bool}(false)

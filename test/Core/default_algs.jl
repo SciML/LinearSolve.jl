@@ -27,15 +27,30 @@ else
 end
 
 # the raised GenericLU band is Float32/Float64-only; complex stays on BLAS
-if LinearSolve.appleaccelerate_isavailable()
-    @test LinearSolve.defaultalg(nothing, zeros(ComplexF64, 32)).alg ===
+let complex_alg = if LinearSolve.appleaccelerate_isavailable()
         LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization
-elseif LinearSolve.usemkl
-    @test LinearSolve.defaultalg(nothing, zeros(ComplexF64, 32)).alg ===
+    elseif LinearSolve.usemkl
         LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization
-else
-    @test LinearSolve.defaultalg(nothing, zeros(ComplexF64, 32)).alg ===
+    else
         LinearSolve.DefaultAlgorithmChoice.LUFactorization
+    end
+    for n in (32, 256)
+        @test LinearSolve.defaultalg(nothing, zeros(ComplexF64, n)).alg === complex_alg
+    end
+end
+
+# RF loaded: the GenericLU band stays shadowed by the RFLU band on every vendor
+let expected = LinearSolve.appleaccelerate_isavailable() ?
+        LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization :
+        LinearSolve.DefaultAlgorithmChoice.RFLUFactorization
+    for n in (16, 32, 100)
+        @test LinearSolve.defaultalg(nothing, zeros(n)).alg === expected
+    end
+    if LinearSolve.isopenblas()
+        for n in (128, 256, 500)
+            @test LinearSolve.defaultalg(nothing, zeros(n)).alg === expected
+        end
+    end
 end
 
 if LinearSolve.usemkl

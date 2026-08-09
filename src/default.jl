@@ -400,6 +400,18 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
                         DefaultAlgorithmChoice.RFLUFactorization
                         #elseif A === nothing || A isa Matrix
                         #    alg = FastLUFactorization()
+                        # Blocked generic_lufact! beats vendor getrf ≥ 2x through N = 32
+                        # everywhere, and through 128 vs OpenBLAS (badly tuned small-N
+                        # threading — same fact the RFLU 500 band above encodes).
+                    elseif (
+                            matrix_size <= 32 ||
+                                (isopenblas() && matrix_size <= 128)
+                        ) &&
+                            (
+                            A === nothing ? eltype(b) <: Union{Float32, Float64} :
+                                eltype(A) <: Union{Float32, Float64}
+                        )
+                        DefaultAlgorithmChoice.GenericLUFactorization
                     elseif usemkl &&
                             b isa DenseArray && !(b isa GPUArraysCore.AnyGPUArray) &&
                             eltype(b) <: Union{Float32, Float64, ComplexF32, ComplexF64}

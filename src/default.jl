@@ -401,11 +401,11 @@ function defaultalg(A, b, assump::OperatorAssumptions{Bool})
                         #elseif A === nothing || A isa Matrix
                         #    alg = FastLUFactorization()
                         # Blocked generic_lufact! beats vendor getrf ≥ 2x through N = 32
-                        # everywhere, and through 128 vs OpenBLAS (badly tuned small-N
+                        # everywhere, and through 256 vs OpenBLAS (badly tuned small-N
                         # threading — same fact the RFLU 500 band above encodes).
                     elseif (
                             matrix_size <= 32 ||
-                                (isopenblas() && matrix_size <= 128)
+                                (isopenblas() && matrix_size <= 256)
                         ) &&
                             (
                             A === nothing ? eltype(b) <: Union{Float32, Float64} :

@@ -41,7 +41,7 @@ else
     @test STRUMPACKFactorization() isa STRUMPACKFactorization
 end
 
-# no-RF dense band: blocked GenericLU owns N ≤ 32 everywhere, ≤ 128 under OpenBLAS
+# no-RF dense band: blocked GenericLU owns N ≤ 32 everywhere, ≤ 256 under OpenBLAS
 @test Base.get_extension(LinearSolve, :LinearSolveRecursiveFactorizationExt) === nothing
 if LinearSolve.appleaccelerate_isavailable()
     @test LinearSolve.defaultalg(nothing, zeros(32)).alg ===
@@ -55,7 +55,9 @@ else
     if LinearSolve.isopenblas()
         @test LinearSolve.defaultalg(nothing, zeros(128)).alg ===
             LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
-        @test LinearSolve.defaultalg(nothing, zeros(129)).alg === above_band
+        @test LinearSolve.defaultalg(nothing, zeros(256)).alg ===
+            LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
+        @test LinearSolve.defaultalg(nothing, zeros(257)).alg === above_band
     else
         @test LinearSolve.defaultalg(nothing, zeros(33)).alg === above_band
     end

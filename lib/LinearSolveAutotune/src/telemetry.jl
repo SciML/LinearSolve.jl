@@ -328,8 +328,11 @@ function format_categories_markdown(categories::Dict{String, String})
         return sorted_pairs
     end
 
-    # Format each element type
-    for (eltype, ranges) in sort(eltype_categories)
+    # Format each element type in sorted order. `sort` has no `Dict` method, so
+    # sort the keys; the old `sort(eltype_categories)` was a guaranteed
+    # MethodError on this path.
+    for eltype in sort!(collect(keys(eltype_categories)))
+        ranges = eltype_categories[eltype]
         push!(lines, "#### Recommendations for $eltype")
         push!(lines, "")
         push!(lines, "| Size Range | Best Algorithm |")
@@ -473,10 +476,12 @@ function upload_to_github(
 
     @info "📤 Preparing to upload benchmark results..."
 
-    return try
-        target_repo = "SciML/LinearSolve.jl"
-        issue_number = 725  # The existing issue for collecting autotune results
+    # Assigned outside the `try` so the `catch` block's messages can always
+    # reference them.
+    target_repo = "SciML/LinearSolve.jl"
+    issue_number = 725  # The existing issue for collecting autotune results
 
+    return try
         # Construct comment body - use cpu_model if available for more specific info
         cpu_display = get(system_info, "cpu_model", get(system_info, "cpu_name", "unknown"))
         os_name = get(system_info, "os", "unknown")
@@ -561,23 +566,24 @@ function upload_plots_to_gist(plot_files::Union{Nothing, Tuple, Dict}, auth, elt
         return nothing, Dict{String, String}()
     end
 
+    # Handle different plot_files formats. Computed outside the `try` so the
+    # `catch` block's fallback call always has `existing_files` defined.
+    files_to_upload = if isa(plot_files, Tuple)
+        # Legacy format: (png_file, pdf_file)
+        Dict("benchmark_plot.png" => plot_files[1], "benchmark_plot.pdf" => plot_files[2])
+    elseif isa(plot_files, Dict)
+        plot_files
+    else
+        return nothing, Dict{String, String}()
+    end
+
+    # Filter existing files
+    existing_files = Dict(k => v for (k, v) in files_to_upload if isfile(v))
+    if isempty(existing_files)
+        return nothing, Dict{String, String}()
+    end
+
     try
-        # Handle different plot_files formats
-        files_to_upload = if isa(plot_files, Tuple)
-            # Legacy format: (png_file, pdf_file)
-            Dict("benchmark_plot.png" => plot_files[1], "benchmark_plot.pdf" => plot_files[2])
-        elseif isa(plot_files, Dict)
-            plot_files
-        else
-            return nothing, Dict{String, String}()
-        end
-
-        # Filter existing files
-        existing_files = Dict(k => v for (k, v) in files_to_upload if isfile(v))
-        if isempty(existing_files)
-            return nothing, Dict{String, String}()
-        end
-
         # Create README content
         readme_content = """
         # LinearSolve.jl Benchmark Plots
@@ -615,9 +621,12 @@ function upload_plots_to_gist(plot_files::Union{Nothing, Tuple, Dict}, auth, elt
             "files" => gist_files
         )
 
-        # Create the gist
+        # Create the gist. GitHub.jl types `html_url` as a `Union` with
+        # `Nothing`, so guard before deriving the id and username from it.
         gist = GitHub.create_gist(; params = params, auth = auth)
-        gist_url = gist.html_url
+        html_url = gist.html_url
+        html_url === nothing && error("GitHub gist creation returned no html_url")
+        gist_url = string(html_url)
         gist_id = split(gist_url, "/")[end]
         username = split(gist_url, "/")[end - 1]
 

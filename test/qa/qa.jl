@@ -117,6 +117,75 @@ linearsolve_internal_imports = (
     :defaultalg, :do_factorization, :get_blas_operation_info, :init_cacheval,
 )
 
+# LinearSolve's own non-public names reached as `LinearSolve.x` (or
+# `LinearSolve.SupernodalLU.x`) from its extension modules. Same class as
+# `linearsolve_internal_imports` above: an extension is its own module root, so
+# ExplicitImports counts these as external accesses. Promoting them is a separate
+# public-API decision (https://github.com/SciML/LinearSolve.jl/issues/1058); this
+# inventory keeps the strict check on so any new non-public access is caught.
+linearsolve_internal_accesses = (
+    Symbol("@get_cacheval"), :ALREADY_WARNED_CUDSS, :AbstractFactorization,
+    :AbstractKrylovSubspaceMethod, :DefaultAlgorithmChoice, :DefaultLinearSolver,
+    :DefaultLinearSolverInit, :GPUArraysCore, :LinearCache,
+    :NONPERSISTENT_ZERO_FRACTION, :PERSISTENT_ZERO_FRACTION_THRESHOLD,
+    :PrecompileTools, :SciMLLinearSolveAlgorithm, :SupernodalLU,
+    :_SPARSE_LU_FALLBACK_ALGORITHMS, :_SPARSE_ONLY_ALGORITHMS,
+    :__is_extension_loaded, :__nonstructural_zeros, :_adjoint_factorization_solve,
+    :_adjoint_krylov_solve, :_can_reuse_cache_factorization,
+    :_custom_adjoint_factorization_solve, :_custom_cache_factorization,
+    :_custom_can_reuse_adjoint_factorization, Symbol("_direct_lu_factorize!"),
+    Symbol("_direct_lu_solve!"), Symbol("_fast_sym_givens!"), :_init_cacheval,
+    :_isidentity_struct, Symbol("_ldiv!"), :_select_eigenpairs, :_sym_givens,
+    :cudss_loaded, :default_alias_A, :default_num_eigenpairs, :default_tol,
+    :defaultalg, :defaultalg_adjoint_eval, :do_factorization, :error_no_cudss_lu,
+    :handle_sparsematrixcsc_lu, :init_cacheval, :init_sparse_reduction, :is_cusparse,
+    :is_cusparse_csc, :is_cusparse_csr, :is_underdetermined, :issparsematrix,
+    :issparsematrixcsc, :make_SparseMatrixCSC, :makeempty_SparseMatrixCSC,
+    :pattern_changed, Symbol("reduce_operand!"), :sparse_colpivqr_factorize,
+    Symbol("update_tolerances_internal!"), :use_klulike_sparse_structure, :useblis,
+    :usecuda, :usemetal, :userecursivefactorization,
+    # LinearSolve.SupernodalLU
+    :SupernodalLUFactor, :_costabs, Symbol("_panel_ldiv!"), Symbol("_panel_rdiv!"),
+    :nperturbed, :snlu, Symbol("snlu!"), Symbol("solve!"),
+)
+
+# Non-public names of stdlib / backend packages accessed with a qualified path,
+# where the owner exposes no public spelling for what the solver bindings need.
+# Grouped by owner; a name listed once is ignored for every owner (the check's
+# `ignore` is name-based).
+external_internal_accesses = (
+    # Base / Base.Experimental
+    Symbol("@_inline_meta"), :Experimental, :RefValue, :USE_BLAS64, :USE_GPL_LIBS,
+    :return_types, :structdiff, :typename, Symbol("@max_methods"),
+    # LinearAlgebra (+ .BLAS / .LAPACK)
+    :AdjointFactorization, :BlasFloat, :BlasInt, :PivotingStrategy, :QRCompactWY,
+    :QRIteration, :TransposeFactorization, :_check_lu_success, Symbol("_ipiv_rows!"),
+    :checknonsingular, :generic_lufact!, :lupivottype, :lutype, :get_config,
+    :get_num_threads, :set_num_threads, :chkfinite, :chklapackerror, :chktrans,
+    Symbol("geqp3!"), Symbol("geqrt!"), Symbol("getrf!"),
+    # SparseArrays (+ .SPQR)
+    :AbstractSparseMatrixCSC, :CHOLMOD, :SPQR, :UMFPACK, :getcolptr, :QRSparse,
+    # AMDGPU (+ .rocBLAS / .rocSOLVER)
+    :rocBLAS, :rocSOLVER, Symbol("trsv!"), Symbol("geqrf!"), Symbol("getrs!"),
+    Symbol("ormqr!"),
+    # CUDSS / cuSOLVER
+    :cuSPARSE, :CUDACore,
+    # EnzymeCore (+ .EnzymeRules)
+    :EnzymeRules, :augmented_primal, :forward, :inactive_type, :reverse,
+    # ForwardDiff
+    :Dual, :npartials, :partials, :valtype, :value,
+    # IterativeSolvers
+    :GMRESIterable, :IDRSIterable, :MINRESIterable, :Residual,
+    Symbol("gmres_iterable!"), Symbol("idrs_iterable!"), Symbol("init!"),
+    Symbol("init_residual!"), Symbol("minres_iterable!"),
+    # Krylov / Mooncake / EnumX / PureKLU / MKL_jll / OpenBLAS_jll
+    Symbol("warm_start!"), Symbol("increment_and_get_rdata!"), Symbol("rrule!!"),
+    :symbol_map, :KLU_OK, :is_available,
+    # RecursiveFactorization / TriangularSolve
+    Symbol("lu!"), Symbol("🦋mul!"), Symbol("🦋workspace"), Symbol("ldiv!"),
+    Symbol("rdiv!"),
+)
+
 docs_src = normpath(joinpath(@__DIR__, "..", "..", "docs", "src"))
 scimlbase_reexports = Tuple(names(LinearSolve.SciMLBase; all = false, imported = false))
 
@@ -183,12 +252,16 @@ run_qa(
                 backend_internal_imports..., linearsolve_internal_imports...,
             ),
         ),
+        # Inventory of today's non-public qualified accesses (see the two constants
+        # above). Replaces the blanket `ei_broken` marker from
+        # https://github.com/SciML/LinearSolve.jl/issues/1058: the strict check now
+        # runs, so a qualified access of any name not listed here fails QA.
+        all_qualified_accesses_are_public = (;
+            ignore = (
+                linearsolve_internal_accesses..., external_internal_accesses...,
+            ),
+        ),
     ),
-    # ~90 qualified accesses of non-public names (LinearSolve's own internals reached
-    # via LinearSolve.x from extensions, plus stdlib/SciMLBase/LinearAlgebra internals).
-    # Making them public is a large cross-package effort tracked in
-    # https://github.com/SciML/LinearSolve.jl/issues/1058
-    ei_broken = (:all_qualified_accesses_are_public,),
 )
 
 if klu_mod !== nothing

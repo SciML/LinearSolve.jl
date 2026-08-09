@@ -28,9 +28,7 @@ EnumX.@enumx WarmStart begin
     Default. Let the context decide. In standalone LinearSolve use this behaves
     as `WarmStart.None` (cold start), so it never changes behavior on its own. A
     higher-level caller that knows the surrounding algorithm may resolve it to a
-    concrete mode: OrdinaryDiffEq.jl, for instance, resolves `Auto` to
-    `WarmStart.Hegedus` for Newton-based integrators and leaves it as a cold
-    start for Rosenbrock/W-methods (see the warning above).
+    concrete mode.
     """
     Auto
     """
@@ -56,16 +54,18 @@ EnumX.@enumx WarmStart begin
     Start from the previous solution rescaled by the Hegedüs trick, `x₀ = ξ u`
     with `ξ = ⟨Au, b⟩ / ‖Au‖²`, which minimizes the initial residual along the
     direction of the previous solution and hence guarantees `‖b - A x₀‖ ≤ ‖b‖`
-    (never worse than a cold start). Costs two extra operator applications per
-    solve, plus one preconditioner application when a left preconditioner is set.
+    (never worse than a cold start). The guess is used only when it reduces the
+    residual by at least a factor of two; otherwise the solve starts cold. This
+    rejects nearly orthogonal previous directions whose rescaling would amplify
+    round-off without materially improving the initial residual. Costs two extra
+    operator applications per solve, plus one preconditioner application when a
+    left preconditioner is set.
 
-    Recommended when warm starting is wanted. Benchmarks on stiff PDE
-    Newton-Krylov solves (Brusselator, Allen-Cahn, Burgers, advection-diffusion
-    with KenCarp47/TRBDF2/FBDF + ILU) show it reliably reduces GMRES iteration
-    counts (median ≈ -17%), but wall time only improves when each solve performs
-    substantial Krylov work (≳5 iterations per solve); with a preconditioner
-    strong enough that solves take ≲3 iterations the fixed per-solve overhead
-    dominates the savings.
+    Prefer this to `WarmStart.Previous` when warm starting is explicitly wanted,
+    but benchmark against a cold start. The projection can reduce Krylov work
+    when successive systems are predictive, while on other residual spectra it
+    can increase the iteration count. The fixed per-solve overhead can also
+    dominate when the cold solve takes only a few iterations.
     """
     Hegedus
 end
@@ -400,6 +400,9 @@ end
 # solution is meaningful.
 const _WARM_STARTABLE_WORKSPACES = Union{Krylov.GmresWorkspace, Krylov.FgmresWorkspace}
 
+const _HEGEDUS_MAX_RESIDUAL_RATIO = 0.5
+const _HEGEDUS_MIN_COSINE = sqrt(1 - _HEGEDUS_MAX_RESIDUAL_RATIO^2)
+
 """
     _krylov_warm_start!(workspace, cache, mode, M, atol, rtol) -> (atol, rtol)
 
@@ -421,11 +424,17 @@ function _krylov_warm_start!(workspace, cache, mode::WarmStart.T, M, atol, rtol)
         Au = mul!(similar(cache.b), cache.A, u)
         d = real(dot(Au, Au))
         (iszero(d) || !isfinite(d)) && return atol, rtol
-        Krylov.warm_start!(workspace, (dot(Au, cache.b) / d) .* u)
+        Aub = dot(Au, cache.b)
+        isfinite(Aub) || return atol, rtol
+        bnorm = norm(cache.b)
+        (iszero(bnorm) || !isfinite(bnorm)) && return atol, rtol
+        abs(Aub) < _HEGEDUS_MIN_COSINE * sqrt(d) * bnorm && return atol, rtol
+        Krylov.warm_start!(workspace, (Aub / d) .* u)
+        bnorm = M === I ? bnorm : norm(ldiv!(similar(cache.b), M, cache.b))
     else
         Krylov.warm_start!(workspace, u)
+        bnorm = M === I ? norm(cache.b) : norm(ldiv!(similar(cache.b), M, cache.b))
     end
-    bnorm = M === I ? norm(cache.b) : norm(ldiv!(similar(cache.b), M, cache.b))
     return atol + rtol * bnorm, zero(rtol)
 end
 

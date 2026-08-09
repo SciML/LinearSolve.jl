@@ -372,36 +372,35 @@ function format_detailed_results_markdown(df::DataFrame)
             continue
         end
 
-        # Create a summary table with average performance per algorithm for this element type
-        # Include statistics that account for NaN values
+        # Create a summary table with average performance per algorithm and workload.
         summary = combine(
-            groupby(eltype_df, :algorithm),
+            groupby(eltype_df, [:workload, :algorithm]),
             :gflops => (
                 x -> begin
                     valid_vals = filter(!isnan, x)
                     length(valid_vals) > 0 ? mean(valid_vals) : NaN
                 end
             ) => :avg_gflops,
-            :gflops => (
+            :time_ns => (
                 x -> begin
                     valid_vals = filter(!isnan, x)
-                    length(valid_vals) > 1 ? std(valid_vals) : NaN
+                    length(valid_vals) > 0 ? mean(valid_vals) : NaN
                 end
-            ) => :std_gflops,
-            :gflops => (x -> count(!isnan, x)) => :successful_tests,
+            ) => :avg_time_ns,
+            :success => sum => :successful_tests,
             nrow => :total_tests
         )
-        sort!(summary, :avg_gflops, rev = true)
+        sort!(summary, [:workload, :avg_gflops], rev = [false, true])
 
         push!(lines, "##### Summary Statistics")
         push!(lines, "")
-        push!(lines, "| Algorithm | Avg GFLOPs | Std Dev | Success/Total |")
-        push!(lines, "|-----------|------------|---------|---------------|")
+        push!(lines, "| Workload | Algorithm | Avg GFLOPs | Avg Time (ns) | Success/Total |")
+        push!(lines, "|----------|-----------|------------|---------------|---------------|")
 
         for row in eachrow(summary)
             avg_str = isnan(row.avg_gflops) ? "NaN" : @sprintf("%.2f", row.avg_gflops)
-            std_str = isnan(row.std_gflops) ? "NaN" : @sprintf("%.2f", row.std_gflops)
-            push!(lines, "| $(row.algorithm) | $avg_str | $std_str | $(row.successful_tests)/$(row.total_tests) |")
+            time_str = isnan(row.avg_time_ns) ? "NaN" : @sprintf("%.0f", row.avg_time_ns)
+            push!(lines, "| $(row.workload) | $(row.algorithm) | $avg_str | $time_str | $(row.successful_tests)/$(row.total_tests) |")
         end
 
         push!(lines, "")
@@ -411,35 +410,44 @@ function format_detailed_results_markdown(df::DataFrame)
         push!(lines, "<summary>Raw Performance Data</summary>")
         push!(lines, "")
 
-        # Get unique algorithms for this element type
-        algorithms = unique(eltype_df.algorithm)
+        workloads = unique(eltype_df.workload)
 
-        for algorithm in sort(algorithms)
-            # Filter data for this algorithm
-            algo_df = filter(row -> row.algorithm == algorithm, eltype_df)
+        for workload in sort(workloads)
+            workload_df = filter(row -> row.workload == workload, eltype_df)
+            algorithms = unique(workload_df.algorithm)
 
-            # Sort by size for better readability
-            sort!(algo_df, :size)
+            for algorithm in sort(algorithms)
+                algo_df = filter(row -> row.algorithm == algorithm, workload_df)
+                sort!(algo_df, [:size, :nrhs, :orientation])
 
-
-            push!(lines, "##### $algorithm")
-            push!(lines, "")
-            push!(lines, "| Matrix Size | GFLOPs | Status |")
-            push!(lines, "|-------------|--------|--------|")
-
-            for row in eachrow(algo_df)
-                gflops_str = if row.success
-                    @sprintf("%.3f", row.gflops)
-                elseif isnan(row.gflops)
-                    "NaN"
+                push!(lines, "##### $workload: $algorithm")
+                push!(lines, "")
+                has_runtime_metadata =
+                    :blas_threads in propertynames(algo_df) &&
+                    any(!ismissing, algo_df.blas_threads)
+                if has_runtime_metadata
+                    push!(lines, "| Matrix Size | RHS Columns | Orientation | Time (ns) | BLAS Threads | Load 1m | GFLOPs | Status |")
+                    push!(lines, "|-------------|-------------|-------------|-----------|--------------|---------|---------|--------|")
                 else
-                    string(row.gflops)
+                    push!(lines, "| Matrix Size | RHS Columns | Orientation | Time (ns) | GFLOPs | Status |")
+                    push!(lines, "|-------------|-------------|-------------|-----------|---------|--------|")
                 end
-                status = row.success ? "✅ Success" : "❌ Failed"
-                push!(lines, "| $(row.size) | $gflops_str | $status |")
-            end
 
-            push!(lines, "")
+                for row in eachrow(algo_df)
+                    gflops_str = isnan(row.gflops) ? "NaN" : @sprintf("%.3f", row.gflops)
+                    time_str = isnan(row.time_ns) ? "NaN" : @sprintf("%.0f", row.time_ns)
+                    status = row.success ? "✅ Success" : "❌ Failed"
+                    if has_runtime_metadata
+                        blas_threads_str = ismissing(row.blas_threads) ? "" : string(row.blas_threads)
+                        load_str = ismissing(row.load_average_1m) || isnan(row.load_average_1m) ? "" : @sprintf("%.2f", row.load_average_1m)
+                        push!(lines, "| $(row.size) | $(row.nrhs) | $(row.orientation) | $time_str | $blas_threads_str | $load_str | $gflops_str | $status |")
+                    else
+                        push!(lines, "| $(row.size) | $(row.nrhs) | $(row.orientation) | $time_str | $gflops_str | $status |")
+                    end
+                end
+
+                push!(lines, "")
+            end
         end
 
         push!(lines, "</details>")

@@ -107,37 +107,107 @@ function _panel_upper_trsm!(
     return nothing
 end
 
-# Overridable hooks for the solve-phase pivot-block trsms, the same arrangement
-# the factorization phase uses for `_panel_rdiv!`/`_panel_ldiv!` in numeric.jl.
-# They exist because nothing else can reach these calls: `TriangularSolve.ldiv!`
-# is a distinct function from `LinearAlgebra.ldiv!` rather than an extension of
-# it, so a bare `ldiv!` here can never dispatch to it however the environment is
-# set up; and `defaultalg` selects algorithms for a `LinearProblem`, which a
-# dense triangular sub-solve inside a sweep is not.  Routing has to be explicit.
-#
-# These defaults cover the no-TriangularSolve case: kernels, then BLAS.
-# LinearSolveRecursiveFactorizationExt overrides both to slot TriangularSolve
-# into the middle band.
-function _panel_solve_unit_lower!(
-        Ws::AbstractMatrix{Tv}, Yb::AbstractMatrix{Tv}, np::Int
-    ) where {Tv}
-    if np <= PANEL_KERNEL_MAX_NP || size(Yb, 2) == 1 || !_panel_blas_eligible(Tv)
-        _unit_lower_solve!(Ws, Yb, np)
-    else
-        _panel_unit_lower_trsm!(Ws, Yb, np)
+"""
+    supernodal_panel_solve!(W, B, np; operation, algorithm = :auto)
+
+Apply a supernodal triangular-panel operation using the requested backend.
+`W` contains the factored diagonal block, `B` is the affected panel or
+right-hand side, and `np` is the panel width. `operation` is one of
+`:factor_right_upper`, `:factor_lower`, `:lower`, or `:upper`.
+"""
+function supernodal_panel_solve!(
+        W::AbstractMatrix, B::AbstractMatrix, np::Integer;
+        operation::Symbol, algorithm::Symbol = :auto
+    )
+    selected_algorithm =
+        algorithm === :auto ? _panel_algorithm(W, B, Int(np), operation) : algorithm
+    return supernodal_panel_solve_backend!(
+        Val(selected_algorithm), W, B, Int(np); operation
+    )
+end
+
+function _panel_algorithm(W::AbstractMatrix, B::AbstractMatrix, np::Int, operation::Symbol)
+    operation === :factor_right_upper && return :triangularsolve
+    operation === :factor_lower && return :triangularsolve
+    operation === :lower || operation === :upper ||
+        throw(ArgumentError("unknown supernodal panel operation: $operation"))
+    if np <= PANEL_KERNEL_MAX_NP || size(B, 2) == 1 || !_panel_blas_eligible(eltype(W))
+        return :kernel
     end
-    return nothing
+    return np > PANEL_BLAS_MIN_NP ? :blas : :triangularsolve
+end
+
+"""
+    supernodal_panel_solve_backend!(algorithm, W, B, np; operation)
+
+Backend extension hook used by [`supernodal_panel_solve!`](@ref). Extensions can
+specialize the `algorithm = Val(:triangularsolve)` method for supported panel types.
+"""
+function supernodal_panel_solve_backend!(
+        ::Val{:kernel}, W::AbstractMatrix, B::AbstractMatrix, np::Int; operation::Symbol
+    )
+    if operation === :lower
+        _unit_lower_solve!(W, B, np)
+    elseif operation === :upper
+        _upper_solve!(W, B, np)
+    else
+        return supernodal_panel_solve_backend!(Val(:triangularsolve), W, B, np; operation)
+    end
+    return B
+end
+
+function supernodal_panel_solve_backend!(
+        ::Val{:blas}, W::AbstractMatrix, B::AbstractMatrix, np::Int; operation::Symbol
+    )
+    if operation === :lower
+        _panel_unit_lower_trsm!(W, B, np)
+    elseif operation === :upper
+        _panel_upper_trsm!(W, B, np)
+    else
+        return supernodal_panel_solve_backend!(Val(:triangularsolve), W, B, np; operation)
+    end
+    return B
+end
+
+function supernodal_panel_solve_backend!(
+        ::Val{:triangularsolve}, W::AbstractMatrix, B::AbstractMatrix, np::Int; operation::Symbol
+    )
+    if operation === :factor_right_upper
+        rdiv!(B, UpperTriangular(view(W, 1:np, 1:np)))
+    elseif operation === :factor_lower
+        ldiv!(UnitLowerTriangular(view(W, 1:np, 1:np)), B)
+    elseif operation === :lower || operation === :upper
+        return supernodal_panel_solve_backend!(Val(:blas), W, B, np; operation)
+    else
+        throw(ArgumentError("unknown supernodal panel operation: $operation"))
+    end
+    return B
+end
+
+function _panel_solve_unit_lower!(
+        W::AbstractMatrix{Tv}, B::AbstractMatrix{Tv}, np::Int
+    ) where {Tv}
+    if np <= PANEL_KERNEL_MAX_NP || size(B, 2) == 1 || !_panel_blas_eligible(Tv)
+        _unit_lower_solve!(W, B, np)
+    elseif np > PANEL_BLAS_MIN_NP
+        _panel_unit_lower_trsm!(W, B, np)
+    else
+        supernodal_panel_solve_backend!(Val(:triangularsolve), W, B, np; operation = :lower)
+    end
+    return B
 end
 
 function _panel_solve_upper!(
-        Ws::AbstractMatrix{Tv}, Yb::AbstractMatrix{Tv}, np::Int
+        W::AbstractMatrix{Tv}, B::AbstractMatrix{Tv}, np::Int
     ) where {Tv}
-    if np <= PANEL_KERNEL_MAX_NP || size(Yb, 2) == 1 || !_panel_blas_eligible(Tv)
-        _upper_solve!(Ws, Yb, np)
+    if np <= PANEL_KERNEL_MAX_NP || size(B, 2) == 1 || !_panel_blas_eligible(Tv)
+        _upper_solve!(W, B, np)
+    elseif np > PANEL_BLAS_MIN_NP
+        _panel_upper_trsm!(W, B, np)
     else
-        _panel_upper_trsm!(Ws, Yb, np)
+        supernodal_panel_solve_backend!(Val(:triangularsolve), W, B, np; operation = :upper)
     end
-    return nothing
+    return B
 end
 
 # t := A * x for the L21 block W[np+1:np+nu, 1:np] (column-oriented gemv).

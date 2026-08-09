@@ -22,13 +22,14 @@ using LinearSolve: LinearSolve, AppleAccelerateLUFactorization,
     CudaOffloadLUFactorization, FastLUFactorization, GenericLUFactorization,
     LUFactorization, LinearAliasSpecifier, LinearProblem, MKLLUFactorization,
     MetalLUFactorization, OpenBLASLUFactorization, RFLUFactorization,
-    SimpleLUFactorization, solve
+    SimpleLUFactorization, solve, solve!
 using BenchmarkTools: BenchmarkTools, @benchmarkable
 using DataFrames: DataFrames, DataFrame, combine, groupby, nrow
 using PrettyTables: PrettyTables, pretty_table
-using Statistics: Statistics, std
+using Statistics: Statistics
 using Random: Random, MersenneTwister
-using LinearAlgebra: LinearAlgebra, norm
+using LinearAlgebra: I, LinearAlgebra, norm
+using SciMLBase: init
 using Printf: Printf, @sprintf
 using Dates: Dates
 using Base64: Base64, base64encode
@@ -49,7 +50,8 @@ using GitHub: GitHub
 using gh_cli_jll: gh_cli_jll
 using Plots: Plots, plot, plot!, savefig
 
-export autotune_setup, share_results, AutotuneResults, plot
+export autotune_setup, benchmark_solve_paths, benchmark_supernodal_panels, share_results,
+    AutotuneResults, plot
 
 include("algorithms.jl")
 include("gpu_detection.jl")
@@ -144,7 +146,7 @@ function Base.show(io::IO, results::AutotuneResults)
     println(io, "\n" * "="^60)
     println(io, "🚀 For comprehensive results, consider running:")
     println(io, "   results_full = autotune_setup(")
-    println(io, "       sizes = [:tiny, :small, :medium, :large, :big],")
+    println(io, "       sizes = [:cutoff, :tiny, :small, :medium, :large, :big],")
     println(io, "       eltypes = (Float32, Float64, ComplexF32, ComplexF64)")
     println(io, "   )")
     println(io, "\n📈 See community results at:")
@@ -197,13 +199,15 @@ end
 
 """
     autotune_setup(; 
-        sizes = [:small, :medium, :large],
+        sizes = [:cutoff, :tiny, :small, :medium, :large],
         set_preferences::Bool = true,
         samples::Int = 5,
         seconds::Float64 = 0.5,
         eltypes = (Float32, Float64, ComplexF32, ComplexF64),
         skip_missing_algs::Bool = false,
         include_fastlapack::Bool = false,
+        collect_solve_path_data::Bool = true,
+        collect_supernodal_panel_data::Bool = true,
         maxtime::Float64 = 100.0)
 
 Run a comprehensive benchmark of all available LU factorization methods and optionally:
@@ -221,13 +225,15 @@ Run a comprehensive benchmark of all available LU factorization methods and opti
 
 # Arguments
 
-  - `sizes = [:small, :medium, :large]`: Size categories to test. Options: :tiny (5-20), :small (20-100), :medium (100-300), :large (300-1000), :big (1000-15000)
+  - `sizes = [:cutoff, :tiny, :small, :medium, :large]`: Size categories to test. Options: :cutoff (dense LU crossover sizes), :tiny (5-20), :small (20-100), :medium (100-300), :large (300-1000), :big (1000-15000)
   - `set_preferences::Bool = true`: Update LinearSolve preferences with optimal algorithms
   - `samples::Int = 5`: Number of benchmark samples per algorithm/size
   - `seconds::Float64 = 0.5`: Maximum time per benchmark
   - `eltypes = (Float32, Float64, ComplexF32, ComplexF64)`: Element types to benchmark
   - `skip_missing_algs::Bool = false`: If false, error when expected algorithms are missing; if true, warn instead
   - `include_fastlapack::Bool = false`: If true, includes FastLUFactorization in benchmarks
+  - `collect_solve_path_data::Bool = true`: Measure cached vector/multi-RHS solves for normal and adjoint factors
+  - `collect_supernodal_panel_data::Bool = true`: Measure SupernodalLU panel kernels, TriangularSolve, and BLAS
   - `maxtime::Float64 = 100.0`: Maximum time in seconds for each algorithm test (including accuracy check). 
     If exceeded, the run is skipped and recorded as NaN
 
@@ -258,13 +264,15 @@ share_results(results)
 ```
 """
 function autotune_setup(;
-        sizes = [:tiny, :small, :medium, :large],
+        sizes = [:cutoff, :tiny, :small, :medium, :large],
         set_preferences::Bool = true,
         samples::Int = 5,
         seconds::Float64 = 0.5,
         eltypes = (Float64,),
         skip_missing_algs::Bool = false,
         include_fastlapack::Bool = false,
+        collect_solve_path_data::Bool = true,
+        collect_supernodal_panel_data::Bool = true,
         maxtime::Float64 = 100.0
     )
     @info "Starting LinearSolve.jl autotune setup..."
@@ -304,6 +312,18 @@ function autotune_setup(;
         matrix_sizes, all_algs, all_names, eltypes;
         samples = samples, seconds = seconds, sizes = sizes, maxtime = maxtime
     )
+    if collect_solve_path_data
+        solve_path_sizes = (8, 16, 32, 64, 128, 256, 257, 512, 513, 600, 1000)
+        solve_path_results = benchmark_solve_paths(
+            solve_path_sizes, cpu_algs, cpu_names, eltypes;
+            samples = samples, seconds = seconds
+        )
+        results_df = vcat(results_df, solve_path_results; cols = :union)
+    end
+    if collect_supernodal_panel_data
+        panel_results = benchmark_supernodal_panels(; samples = samples, seconds = seconds)
+        results_df = vcat(results_df, panel_results; cols = :union)
+    end
 
     # Display results table - show all results including NaN values to indicate what was tested
     all_results = results_df

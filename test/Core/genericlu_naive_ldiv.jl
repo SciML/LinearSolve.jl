@@ -103,25 +103,30 @@ end
 end
 
 @testset "LUFactorization back-solve is size-aware (naive below cutoff, getrs! above)" begin
-    for n in (64, 256)
+    # The branch is read off `_use_naive_lu_ldiv`, not inferred from
+    # `sol.u != ldiv!(...)`: the two agree to within an ulp and on a given draw
+    # can agree exactly (0.13% of draws at N = 64 on an EPYC 7502 / OpenBLAS
+    # 0.3.29 build), which is how the single-draw form of this check failed.
+    cutoff = LinearSolve._naive_ldiv_cutoff(zeros(0, 0))
+    for n in (cutoff ÷ 4, cutoff, cutoff + 1, 2 * cutoff)
+        naive_expected = n <= cutoff
         A = rand(n, n) + n * I
         b = rand(n)
         cache = init(LinearProblem(copy(A), copy(b)), LUFactorization())
-        sol = solve!(cache)
+        u = copy(solve!(cache).u)
         F = cache.cacheval
-        xldiv = ldiv!(similar(b), F, copy(b))
-        @test sol.u != xldiv
-        @test sol.u ≈ A \ b rtol = 1.0e-10 * n
-    end
-    for n in (257, 600)
-        A = rand(n, n) + n * I
-        b = rand(n)
-        cache = init(LinearProblem(copy(A), copy(b)), LUFactorization())
-        sol = solve!(cache)
-        F = cache.cacheval
-        xldiv = ldiv!(similar(b), F, copy(b))
-        @test sol.u == xldiv
-        @test sol.u ≈ A \ b rtol = 1.0e-10 * n
+        @test LinearSolve._use_naive_lu_ldiv(u, F, b) == naive_expected
+        @test u ≈ A \ b rtol = 1.0e-10 * n
+        if naive_expected
+            # A fallback to `ldiv!` would reproduce its bits on *every* draw.
+            @test any(1:32) do _
+                bk = rand(n)
+                cache.b = bk
+                solve!(cache).u != ldiv!(similar(bk), F, copy(bk))
+            end
+        else
+            @test u == ldiv!(similar(b), F, copy(b))
+        end
     end
     # Matrix right-hand sides keep the BLAS-3 path at every size
     n = 100
@@ -130,8 +135,8 @@ end
     cacheB = init(LinearProblem(copy(A), copy(B)), LUFactorization())
     solB = solve!(cacheB)
     FB = cacheB.cacheval
-    Xldiv = ldiv!(similar(B), FB, copy(B))
-    @test solB.u == Xldiv
+    @test !LinearSolve._use_naive_lu_ldiv(solB.u, FB, B)
+    @test solB.u == ldiv!(similar(B), FB, copy(B))
     @test solB.u ≈ A \ B rtol = 1.0e-8
 end
 

@@ -631,21 +631,6 @@ useblis(x) = false
 usecuda(x) = false
 usemetal(x) = false
 
-PrecompileTools.@compile_workload begin
-    A = rand(4, 4)
-    b = rand(4)
-    prob = LinearProblem(A, b)
-    sol = solve(prob)
-    sol = solve(prob, LUFactorization())
-    sol = solve(prob, KrylovJL_GMRES())
-    # 80 x 80 is past both `GenericLUFactorization` size switches: the blocked
-    # driver (panel, trsm, row swaps) and the register-blocked Schur kernel,
-    # neither of which the 4 x 4 problem above reaches.
-    Ablocked = rand(80, 80) + 80I
-    bblocked = rand(80)
-    sol = solve(LinearProblem(Ablocked, bblocked), GenericLUFactorization())
-end
-
 ALREADY_WARNED_CUDSS = Ref{Bool}(false)
 error_no_cudss_lu(A) = nothing
 cudss_loaded(A) = false
@@ -714,5 +699,21 @@ export LinearVerbosity
 export AbstractEigenvalueAlgorithm,
     DenseEigen, ArpackJL, ArnoldiMethod, ArnoldiMethodJL,
     KrylovKitEigen, JacobiDavidsonJL
+
+PrecompileTools.@compile_workload begin
+    # Element type is a coverage axis, size is not: inference is whole-body, so the
+    # blocked `GenericLUFactorization` kernels are cached from these 4 x 4 calls.
+    for T in (Float64, Float32)
+        A = rand(T, 4, 4)
+        b = rand(T, 4)
+        prob = LinearProblem(A, b)
+        sol = solve(prob, LUFactorization())
+        sol = solve(prob, GenericLUFactorization())
+        sol = solve(prob, KrylovJL_GMRES())
+    end
+    # Per-element-type default coverage lives in the extension workloads instead:
+    # they invalidate whatever the default path caches here.
+    sol = solve(LinearProblem(rand(4, 4), rand(4)))
+end
 
 end

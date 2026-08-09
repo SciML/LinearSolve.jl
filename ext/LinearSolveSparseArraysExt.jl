@@ -1271,6 +1271,13 @@ function LinearSolve.init_cacheval(
 end
 
 LinearSolve.PrecompileTools.@compile_workload begin
+    # Krylov, a hard LinearSolve dependency, pulls in SparseArrays, so this
+    # extension always loads and always invalidates the dense default path.
+    for T in (Float64, Float32)
+        denseprob = LinearProblem(rand(T, 4, 4), rand(T, 4))
+        sol = solve(denseprob)
+    end
+
     A = sprand(4, 4, 0.3) + I
     b = rand(4)
     prob = LinearProblem(A, b)

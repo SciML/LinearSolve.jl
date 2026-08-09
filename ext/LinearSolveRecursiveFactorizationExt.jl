@@ -6,7 +6,7 @@ using ArrayInterface: ArrayInterface
 using LinearAlgebra: LinearAlgebra, UnitLowerTriangular, UpperTriangular, ldiv!, mul!
 using RecursiveFactorization: RecursiveFactorization
 using TriangularSolve: TriangularSolve
-using SciMLBase: SciMLBase, ReturnCode
+using SciMLBase: SciMLBase, LinearProblem, ReturnCode, solve
 using SciMLLogging: @SciMLMessage
 
 LinearSolve.userecursivefactorization(A::Union{Nothing, AbstractMatrix}) = true
@@ -327,6 +327,17 @@ function SNLU._panel_solve_upper!(
         TriangularSolve.ldiv!(UpperTriangular(view(Ws, 1:np, 1:np)), Yb, Val(false))
     end
     return nothing
+end
+
+# The `@generated` `solve!(::LinearCache, ::DefaultLinearSolver)` body reaches both
+# `userecursivefactorization` and the `RFLUFactorization` `solve!` above, so loading
+# this extension invalidates every default-path specialization LinearSolve cached.
+LinearSolve.PrecompileTools.@compile_workload begin
+    A = rand(4, 4)
+    b = rand(4)
+    prob = LinearProblem(A, b)
+    sol = solve(prob)
+    sol = solve(prob, RFLUFactorization())
 end
 
 end

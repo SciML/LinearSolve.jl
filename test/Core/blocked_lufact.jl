@@ -80,8 +80,10 @@ end
             @test F.info == 0
             @test scaled_residual(A, F) < 20
         end
-        # rowblock cuts landing mid-tile, and rows == 256 exactly, which is the
-        # padded-pack-stride branch
+        # rowblock cuts landing mid-tile. `n = 264`/`nb = 8` and `n = 272`/
+        # `nb = 16` also enter the `rows == 256` padded pack-stride branch,
+        # though no residual can distinguish the padding: the pad cells are
+        # never read.
         for n in (129, 257, 264, 272), nb in (8, 16, 17), rb in (13, 37, 384)
             A = randn(T, n, n)
             W = copy(A)
@@ -127,9 +129,11 @@ end
         end
     end
 
-    @testset "strided views (contiguous and non-unit row stride)" begin
+    # The non-unit row stride case is the only coverage of the scalar packed
+    # kernel for a float eltype, so it runs for both of them.
+    @testset "strided views, contiguous and non-unit row stride ($T)" for T in (Float64, Float32)
         for n in (17, 80)
-            P = randn(2n + 3, n + 2)
+            P = randn(T, 2n + 3, n + 2)
             V1 = @view P[2:(n + 1), 2:(n + 1)]
             A1 = copy(Matrix(V1))
             F1 = LinearSolve.generic_lufact!(V1, RowMaximum(), _ipiv(n); check = false)

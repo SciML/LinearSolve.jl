@@ -585,6 +585,8 @@ function _blocked_lu_schur_micro!(
     length(pack) < ldp * jb && resize!(pack, ldp * jb)
     _blocked_lu_pack_panel!(pack, A, i0, m, j0, j1, ldp)
     V = _blocked_lu_vectype(T)
+    # Must equal the tile's row step; a mismatch silently double-applies or
+    # skips rows rather than erroring.
     mr = 3 * (_BLOCKED_LU_VEC_BYTES ÷ sizeof(T))
     ld = stride(A, 2)
     GC.@preserve A pack begin

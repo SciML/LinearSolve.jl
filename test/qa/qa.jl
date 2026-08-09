@@ -145,8 +145,11 @@ linearsolve_internal_accesses = (
     Symbol("update_tolerances_internal!"), :use_klulike_sparse_structure, :useblis,
     :usecuda, :usemetal, :userecursivefactorization,
     # LinearSolve.SupernodalLU
-    :SupernodalLUFactor, :_costabs, Symbol("_panel_ldiv!"), Symbol("_panel_rdiv!"),
-    :nperturbed, :snlu, Symbol("snlu!"), Symbol("solve!"),
+    :PANEL_BLAS_MIN_NP, :SupernodalLUFactor, :_costabs, Symbol("_panel_ldiv!"),
+    Symbol("_panel_rdiv!"), Symbol("_panel_solve_unit_lower!"),
+    Symbol("_panel_solve_upper!"), Symbol("_panel_unit_lower_trsm!"),
+    Symbol("_panel_upper_trsm!"), Symbol("_unit_lower_solve!"),
+    Symbol("_upper_solve!"), :nperturbed, :snlu, Symbol("snlu!"), Symbol("solve!"),
 )
 
 # Non-public names of stdlib / backend packages accessed with a qualified path,

@@ -422,14 +422,28 @@ function format_detailed_results_markdown(df::DataFrame)
 
                 push!(lines, "##### $workload: $algorithm")
                 push!(lines, "")
-                push!(lines, "| Matrix Size | RHS Columns | Orientation | Time (ns) | GFLOPs | Status |")
-                push!(lines, "|-------------|-------------|-------------|-----------|---------|--------|")
+                has_runtime_metadata =
+                    :blas_threads in propertynames(algo_df) &&
+                    any(!ismissing, algo_df.blas_threads)
+                if has_runtime_metadata
+                    push!(lines, "| Matrix Size | RHS Columns | Orientation | Time (ns) | BLAS Threads | Load 1m | GFLOPs | Status |")
+                    push!(lines, "|-------------|-------------|-------------|-----------|--------------|---------|---------|--------|")
+                else
+                    push!(lines, "| Matrix Size | RHS Columns | Orientation | Time (ns) | GFLOPs | Status |")
+                    push!(lines, "|-------------|-------------|-------------|-----------|---------|--------|")
+                end
 
                 for row in eachrow(algo_df)
                     gflops_str = isnan(row.gflops) ? "NaN" : @sprintf("%.3f", row.gflops)
                     time_str = isnan(row.time_ns) ? "NaN" : @sprintf("%.0f", row.time_ns)
                     status = row.success ? "✅ Success" : "❌ Failed"
-                    push!(lines, "| $(row.size) | $(row.nrhs) | $(row.orientation) | $time_str | $gflops_str | $status |")
+                    if has_runtime_metadata
+                        blas_threads_str = ismissing(row.blas_threads) ? "" : string(row.blas_threads)
+                        load_str = ismissing(row.load_average_1m) || isnan(row.load_average_1m) ? "" : @sprintf("%.2f", row.load_average_1m)
+                        push!(lines, "| $(row.size) | $(row.nrhs) | $(row.orientation) | $time_str | $blas_threads_str | $load_str | $gflops_str | $status |")
+                    else
+                        push!(lines, "| $(row.size) | $(row.nrhs) | $(row.orientation) | $time_str | $gflops_str | $status |")
+                    end
                 end
 
                 push!(lines, "")

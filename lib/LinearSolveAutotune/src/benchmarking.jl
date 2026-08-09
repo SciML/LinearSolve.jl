@@ -435,7 +435,7 @@ end
 
 Measure the in-tree, TriangularSolve, and BLAS implementations of SupernodalLU's lower and
 upper panel solves. RHS data is copied before every sample so every implementation performs
-the same solve.
+the same solve. Measurements run with one BLAS thread and record the one-minute load average.
 """
 function benchmark_supernodal_panels(
         ; nps = (256, 257, 512, 1024, 1280, 1536, 1792, 1793, 2048),
@@ -444,40 +444,48 @@ function benchmark_supernodal_panels(
     parameters = BenchmarkTools.Parameters(; seconds = seconds, samples = samples)
     results_data = []
     rng = MersenneTwister(1178)
+    previous_blas_threads = LinearAlgebra.BLAS.get_num_threads()
+    LinearAlgebra.BLAS.set_num_threads(1)
 
-    for np in nps, nrhs in nrhss
-        W = _supernodal_panel_matrix(np, rng)
-        Y0 = randn(rng, np, nrhs)
-        lower = (
-            ("SupernodalLUKernel", @benchmarkable LinearSolve.supernodal_panel_solve!($W, Y, $np; algorithm = :kernel, sweep = :lower) setup = (Y = copy($Y0))),
-            ("TriangularSolve", @benchmarkable LinearSolve.supernodal_panel_solve!($W, Y, $np; algorithm = :triangularsolve, sweep = :lower) setup = (Y = copy($Y0))),
-            ("BLAS.trsm!", @benchmarkable LinearSolve.supernodal_panel_solve!($W, Y, $np; algorithm = :blas, sweep = :lower) setup = (Y = copy($Y0))),
-        )
-        upper = (
-            ("SupernodalLUKernel", @benchmarkable LinearSolve.supernodal_panel_solve!($W, Y, $np; algorithm = :kernel, sweep = :upper) setup = (Y = copy($Y0))),
-            ("TriangularSolve", @benchmarkable LinearSolve.supernodal_panel_solve!($W, Y, $np; algorithm = :triangularsolve, sweep = :upper) setup = (Y = copy($Y0))),
-            ("BLAS.trsm!", @benchmarkable LinearSolve.supernodal_panel_solve!($W, Y, $np; algorithm = :blas, sweep = :upper) setup = (Y = copy($Y0))),
-        )
+    try
+        for np in nps, nrhs in nrhss
+            W = _supernodal_panel_matrix(np, rng)
+            Y0 = randn(rng, np, nrhs)
+            lower = (
+                ("SupernodalLUKernel", @benchmarkable LinearSolve.supernodal_panel_solve!($W, Y, $np; algorithm = :kernel, operation = :lower) setup = (Y = copy($Y0))),
+                ("TriangularSolve", @benchmarkable LinearSolve.supernodal_panel_solve!($W, Y, $np; algorithm = :triangularsolve, operation = :lower) setup = (Y = copy($Y0))),
+                ("BLAS.trsm!", @benchmarkable LinearSolve.supernodal_panel_solve!($W, Y, $np; algorithm = :blas, operation = :lower) setup = (Y = copy($Y0))),
+            )
+            upper = (
+                ("SupernodalLUKernel", @benchmarkable LinearSolve.supernodal_panel_solve!($W, Y, $np; algorithm = :kernel, operation = :upper) setup = (Y = copy($Y0))),
+                ("TriangularSolve", @benchmarkable LinearSolve.supernodal_panel_solve!($W, Y, $np; algorithm = :triangularsolve, operation = :upper) setup = (Y = copy($Y0))),
+                ("BLAS.trsm!", @benchmarkable LinearSolve.supernodal_panel_solve!($W, Y, $np; algorithm = :blas, operation = :upper) setup = (Y = copy($Y0))),
+            )
 
-        for (orientation, benchmarks) in (("lower", lower), ("upper", upper))
-            for (algorithm, benchmark) in benchmarks
-                push!(
-                    results_data,
-                    (
-                        size = np,
-                        algorithm = algorithm,
-                        eltype = "Float64",
-                        workload = "supernodal_panel",
-                        nrhs = nrhs,
-                        orientation = orientation,
-                        time_ns = minimum(BenchmarkTools.run(benchmark, parameters).times),
-                        gflops = NaN,
-                        success = true,
-                        error = "",
+            for (orientation, benchmarks) in (("lower", lower), ("upper", upper))
+                for (algorithm, benchmark) in benchmarks
+                    push!(
+                        results_data,
+                        (
+                            size = np,
+                            algorithm = algorithm,
+                            eltype = "Float64",
+                            workload = "supernodal_panel",
+                            nrhs = nrhs,
+                            orientation = orientation,
+                            time_ns = minimum(BenchmarkTools.run(benchmark, parameters).times),
+                            gflops = NaN,
+                            blas_threads = LinearAlgebra.BLAS.get_num_threads(),
+                            load_average_1m = Sys.iswindows() ? NaN : first(Sys.loadavg()),
+                            success = true,
+                            error = "",
+                        )
                     )
-                )
+                end
             end
         end
+    finally
+        LinearAlgebra.BLAS.set_num_threads(previous_blas_threads)
     end
 
     return DataFrame(results_data)

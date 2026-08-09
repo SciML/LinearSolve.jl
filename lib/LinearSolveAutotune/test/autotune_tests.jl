@@ -1,5 +1,6 @@
 using Test
 using LinearSolve
+using LinearAlgebra: BLAS
 
 if isempty(VERSION.prerelease)
     using LinearSolveAutotune
@@ -157,6 +158,7 @@ if isempty(VERSION.prerelease)
         end
 
         @testset "Supernodal panel benchmarking" begin
+            previous_blas_threads = BLAS.get_num_threads()
             results_df = LinearSolveAutotune.benchmark_supernodal_panels(
                 ; nps = (8,), nrhss = (1, 2), samples = 1, seconds = 0.01
             )
@@ -166,8 +168,13 @@ if isempty(VERSION.prerelease)
             @test Set(results_df.algorithm) ==
                 Set(("SupernodalLUKernel", "TriangularSolve", "BLAS.trsm!"))
             @test Set(results_df.orientation) == Set(("lower", "upper"))
+            @test all(results_df.blas_threads .== 1)
+            @test BLAS.get_num_threads() == previous_blas_threads
             @test all(results_df.success)
             @test all(>(0), results_df.time_ns)
+            markdown = LinearSolveAutotune.format_detailed_results_markdown(results_df)
+            @test occursin("BLAS Threads", markdown)
+            @test occursin("Load 1m", markdown)
         end
 
         @testset "Result Categorization" begin
@@ -431,7 +438,9 @@ if isempty(VERSION.prerelease)
                 set_preferences = true,  # KEY: Must be true to test preference setting
                 samples = 1,
                 seconds = 0.1,
-                eltypes = (Float64,)
+                eltypes = (Float64,),
+                collect_solve_path_data = false,
+                collect_supernodal_panel_data = false
             )
 
             @test isa(result, AutotuneResults)
@@ -502,7 +511,9 @@ if isempty(VERSION.prerelease)
                 set_preferences = false,
                 samples = 1,
                 seconds = 0.1,
-                eltypes = (Float64,)  # Single element type for speed
+                eltypes = (Float64,),  # Single element type for speed
+                collect_solve_path_data = false,
+                collect_supernodal_panel_data = false
             )
 
             @test isa(result, AutotuneResults)
@@ -521,7 +532,9 @@ if isempty(VERSION.prerelease)
                 set_preferences = false,
                 samples = 1,
                 seconds = 0.1,
-                eltypes = (Float64, Float32)
+                eltypes = (Float64, Float32),
+                collect_solve_path_data = false,
+                collect_supernodal_panel_data = false
             )
 
             @test isa(result_multi, AutotuneResults)

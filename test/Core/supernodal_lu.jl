@@ -343,10 +343,10 @@ end
     Y0 = randn(8, 2)
     for algorithm in (:kernel, :blas)
         Y = copy(Y0)
-        supernodal_panel_solve!(W, Y, 8; algorithm, sweep = :lower)
+        supernodal_panel_solve!(W, Y, 8; algorithm, operation = :lower)
         @test Y ≈ UnitLowerTriangular(W) \ Y0 rtol = 1.0e-12
         copyto!(Y, Y0)
-        supernodal_panel_solve!(W, Y, 8; algorithm, sweep = :upper)
+        supernodal_panel_solve!(W, Y, 8; algorithm, operation = :upper)
         @test Y ≈ UpperTriangular(W) \ Y0 rtol = 1.0e-12
     end
 end

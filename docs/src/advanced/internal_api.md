@@ -59,6 +59,7 @@ The system categorizes matrix sizes to match LinearSolveAutotune benchmarking:
 
 ```@docs
 LinearSolve.supernodal_panel_solve!
+LinearSolve.supernodal_panel_solve_backend!
 ```
 
 #### **Dual Preference Structure**

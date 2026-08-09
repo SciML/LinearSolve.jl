@@ -2,6 +2,7 @@ module LinearSolveRecursiveFactorizationExt
 
 using LinearSolve: LinearSolve, RFLUFactorization, ButterflyFactorization,
     RF32MixedLUFactorization, LinearVerbosity
+import LinearSolve: supernodal_panel_solve_backend!
 using ArrayInterface: ArrayInterface
 using LinearAlgebra: LinearAlgebra, UnitLowerTriangular, UpperTriangular, ldiv!, mul!
 using RecursiveFactorization: RecursiveFactorization
@@ -263,84 +264,20 @@ function LinearSolve._custom_adjoint_factorization_solve(
     return solution[1:n]
 end
 
-# ---- SupernodalLU panel triangular solves ---------------------------------
-# The vendored supernodal sparse LU (src/SupernodalLU) applies two BLAS-3
-# trsms per supernode against its just-factored diagonal block: the L21 panel
-# on the right by U11, and the U12 panel on the left by unit-L11.  Route them
-# through TriangularSolve, which RecursiveFactorization already depends on
-# and uses for its own trsms — so when RFLU is the dense default, the sparse
-# solver's panel work runs on the same kernels.  Measured: recovers the
-# 2D-mesh refactorization gap left by the stdlib trsms.
-const SNLU = LinearSolve.SupernodalLU
-const SNLUTypes = Union{Float32, Float64}
-
-function SNLU._panel_rdiv!(W::Matrix{Tv}, np::Int, len::Int) where {Tv <: SNLUTypes}
-    len > np || return nothing
-    TriangularSolve.rdiv!(
-        view(W, (np + 1):len, 1:np), UpperTriangular(view(W, 1:np, 1:np)), Val(false)
-    )
-    return nothing
-end
-
-function SNLU._panel_ldiv!(W::Matrix{Tv}, np::Int, Z::Matrix{Tv}) where {Tv <: SNLUTypes}
-    isempty(Z) && return nothing
-    TriangularSolve.ldiv!(
-        UnitLowerTriangular(view(W, 1:np, 1:np)), Z, Val(false)
-    )
-    return nothing
-end
-
-# Solve-phase pivot-block trsms.  With TriangularSolve available it takes the
-# whole middle band: it is the library RecursiveFactorization already uses for
-# its own trsms.  A one-column matrix RHS retains the in-tree kernels: it
-# cannot amortize TriangularSolve's setup.  Wider panels use the BLAS path
-# above `PANEL_BLAS_MIN_NP`.
-#
-# Both wrappers need TriangularSolve >= 0.2.2, which is where the matrix
-# `ldiv!(::UpperTriangular{T,<:StridedMatrix{T}}, ::StridedMatrix{T}, ::Val)`
-# family landed; on 0.2.1 the upper call silently forwards to
-# `LinearAlgebra.ldiv!` through an untyped catch-all, which is both a runtime
-# dispatch and the path that allocates on Julia 1.11.  The `[compat]` floor is
-# set accordingly.
-#
-function SNLU._panel_solve_unit_lower!(
-        Ws::Matrix{Tv}, Yb::AbstractMatrix{Tv}, np::Int
-    ) where {Tv <: SNLUTypes}
-    if size(Yb, 2) == 1
-        SNLU._unit_lower_solve!(Ws, Yb, np)
-    elseif np > SNLU.PANEL_BLAS_MIN_NP
-        SNLU._panel_unit_lower_trsm!(Ws, Yb, np)
+function supernodal_panel_solve_backend!(
+        ::Val{:triangularsolve}, W::StridedMatrix{Tv}, B::StridedMatrix{Tv}, np::Int;
+        operation::Symbol
+    ) where {Tv <: Union{Float32, Float64}}
+    if operation === :factor_right_upper
+        TriangularSolve.rdiv!(B, UpperTriangular(view(W, 1:np, 1:np)), Val(false))
+    elseif operation === :factor_lower || operation === :lower
+        TriangularSolve.ldiv!(UnitLowerTriangular(view(W, 1:np, 1:np)), B, Val(false))
+    elseif operation === :upper
+        TriangularSolve.ldiv!(UpperTriangular(view(W, 1:np, 1:np)), B, Val(false))
     else
-        TriangularSolve.ldiv!(UnitLowerTriangular(view(Ws, 1:np, 1:np)), Yb, Val(false))
+        throw(ArgumentError("unknown supernodal panel operation: $operation"))
     end
-    return nothing
-end
-
-function SNLU._panel_solve_upper!(
-        Ws::Matrix{Tv}, Yb::AbstractMatrix{Tv}, np::Int
-    ) where {Tv <: SNLUTypes}
-    if size(Yb, 2) == 1
-        SNLU._upper_solve!(Ws, Yb, np)
-    elseif np > SNLU.PANEL_BLAS_MIN_NP
-        SNLU._panel_upper_trsm!(Ws, Yb, np)
-    else
-        TriangularSolve.ldiv!(UpperTriangular(view(Ws, 1:np, 1:np)), Yb, Val(false))
-    end
-    return nothing
-end
-
-function SNLU._supernodal_panel_solve!(
-        Ws::Matrix{Tv}, Yb::AbstractMatrix{Tv}, np::Int,
-        ::Val{:triangularsolve}, ::Val{:lower}
-    ) where {Tv <: SNLUTypes}
-    return TriangularSolve.ldiv!(UnitLowerTriangular(view(Ws, 1:np, 1:np)), Yb, Val(false))
-end
-
-function SNLU._supernodal_panel_solve!(
-        Ws::Matrix{Tv}, Yb::AbstractMatrix{Tv}, np::Int,
-        ::Val{:triangularsolve}, ::Val{:upper}
-    ) where {Tv <: SNLUTypes}
-    return TriangularSolve.ldiv!(UpperTriangular(view(Ws, 1:np, 1:np)), Yb, Val(false))
+    return B
 end
 
 end

@@ -22,13 +22,14 @@ using LinearSolve: LinearSolve, AppleAccelerateLUFactorization,
     CudaOffloadLUFactorization, FastLUFactorization, GenericLUFactorization,
     LUFactorization, LinearAliasSpecifier, LinearProblem, MKLLUFactorization,
     MetalLUFactorization, OpenBLASLUFactorization, RFLUFactorization,
-    SimpleLUFactorization, solve
+    SimpleLUFactorization, solve, solve!
 using BenchmarkTools: BenchmarkTools, @benchmarkable
 using DataFrames: DataFrames, DataFrame, combine, groupby, nrow
 using PrettyTables: PrettyTables, pretty_table
-using Statistics: Statistics, std
+using Statistics: Statistics
 using Random: Random, MersenneTwister
-using LinearAlgebra: LinearAlgebra, norm
+using LinearAlgebra: I, LinearAlgebra, norm
+using SciMLBase: init
 using Printf: Printf, @sprintf
 using Dates: Dates
 using Base64: Base64, base64encode

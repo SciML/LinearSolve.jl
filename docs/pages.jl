@@ -10,6 +10,7 @@ pages = [
         "tutorials/petsc_mpi.md",
         "tutorials/accelerating_choices.md",
         "tutorials/static_arrays.md",
+        "tutorials/block_diagonal.md",
         "tutorials/gpu.md",
         "tutorials/autotune.md",
         "tutorials/eigenvalue.md",

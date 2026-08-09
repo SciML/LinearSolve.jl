@@ -1003,6 +1003,58 @@ using BlockDiagonals
     @test solve(prob1, SimpleGMRES(; blocksize = 2)).u ≈ solve(prob2, SimpleGMRES()).u
 end
 
+@testset "BlockDiagonal factorizations (#203)" begin
+    # `qr!` of a BlockDiagonal stays block diagonal and returns a `QR` wrapping
+    # the BlockDiagonal, while the generic `init_cacheval` predicted a dense
+    # `QRCompactWY`; the mismatch threw a TypeError on every solve.
+    for blocksizes in ([3, 3, 3, 3], [2, 3, 4])
+        A = BlockDiagonal([rand(n, n) + n * I for n in blocksizes])
+        b = rand(size(A, 1))
+        xref = Matrix(A) \ b
+
+        sol = solve(LinearProblem(A, copy(b)), QRFactorization(LinearAlgebra.NoPivot()))
+        @test SciMLBase.successful_retcode(sol)
+        @test sol.u ≈ xref
+
+        # The cached factorization keeps the block structure rather than densifying.
+        cache = init(LinearProblem(A, copy(b)), QRFactorization(LinearAlgebra.NoPivot()))
+        @test cache.cacheval isa LinearAlgebra.QR
+        sol1 = solve!(cache)
+        @test sol1.u ≈ xref
+        @test cache.cacheval.factors isa BlockDiagonal
+
+        # Re-solving with a new b reuses the factorization.
+        b2 = rand(size(A, 1))
+        cache.b = b2
+        @test solve!(cache).u ≈ Matrix(A) \ b2
+
+        # The other algorithms that accept a BlockDiagonal keep working.
+        for alg in (
+                nothing, LUFactorization(), GenericFactorization(),
+                SimpleGMRES(), KrylovJL_GMRES(),
+            )
+            s = alg === nothing ? solve(LinearProblem(A, copy(b))) :
+                solve(LinearProblem(A, copy(b)), alg)
+            @test s.u ≈ xref rtol = 1.0e-6
+        end
+    end
+
+    # Float32 blocks go through the same path.
+    A32 = BlockDiagonal([rand(Float32, 3, 3) + 3I for _ in 1:3])
+    b32 = rand(Float32, size(A32, 1))
+    sol32 = solve(LinearProblem(A32, copy(b32)), QRFactorization(LinearAlgebra.NoPivot()))
+    @test eltype(sol32.u) === Float32
+    @test sol32.u ≈ Matrix(A32) \ b32 rtol = 1.0f-3
+
+    # Column pivoting has to move entries between blocks, which BlockDiagonal
+    # cannot represent, so it stays an error rather than silently densifying.
+    Apiv = BlockDiagonal([rand(3, 3) + 3I for _ in 1:2])
+    bpiv = rand(size(Apiv, 1))
+    @test_throws Exception solve(
+        LinearProblem(Apiv, copy(bpiv)), QRFactorization(LinearAlgebra.ColumnNorm())
+    )
+end
+
 @testset "AbstractSparseMatrixCSC" begin
     struct MySparseMatrixCSC{Tv, Ti} <: SparseArrays.AbstractSparseMatrixCSC{Tv, Ti}
         csc::SparseMatrixCSC{Tv, Ti}

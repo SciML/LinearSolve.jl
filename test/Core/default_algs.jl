@@ -15,6 +15,29 @@ end
 prob = LinearProblem(rand(50, 50), rand(50))
 solve(prob)
 
+# RF loaded: unconditional GenericLU ends at 10, RFLU (Accelerate on Apple) from 11
+@test LinearSolve.defaultalg(nothing, zeros(10)).alg ===
+    LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
+if LinearSolve.appleaccelerate_isavailable()
+    @test LinearSolve.defaultalg(nothing, zeros(11)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization
+else
+    @test LinearSolve.defaultalg(nothing, zeros(11)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.RFLUFactorization
+end
+
+# the raised GenericLU band is Float32/Float64-only; complex stays on BLAS
+if LinearSolve.appleaccelerate_isavailable()
+    @test LinearSolve.defaultalg(nothing, zeros(ComplexF64, 32)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization
+elseif LinearSolve.usemkl
+    @test LinearSolve.defaultalg(nothing, zeros(ComplexF64, 32)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization
+else
+    @test LinearSolve.defaultalg(nothing, zeros(ComplexF64, 32)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.LUFactorization
+end
+
 if LinearSolve.usemkl
     @test LinearSolve.defaultalg(nothing, zeros(600)).alg ===
         LinearSolve.DefaultAlgorithmChoice.MKLLUFactorization

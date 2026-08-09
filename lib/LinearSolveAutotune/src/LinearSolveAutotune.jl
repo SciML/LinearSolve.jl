@@ -1,9 +1,9 @@
 module LinearSolveAutotune
 
 # Ensure MKL is available for benchmarking by setting the preference before loading LinearSolve
-using Preferences
-using MKL_jll
-using OpenBLAS_jll
+using Preferences: Preferences
+using MKL_jll: MKL_jll
+using OpenBLAS_jll: OpenBLAS_jll
 
 # Set MKL preference to true for benchmarking if MKL is available
 # We need to use UUID instead of the module since LinearSolve isn't loaded yet
@@ -18,32 +18,36 @@ if MKL_jll.is_available()
     end
 end
 
-using LinearSolve
-using BenchmarkTools
-using DataFrames
-using PrettyTables
-using Statistics
-using Random
-using LinearAlgebra
-using Printf
-using Dates
-using Base64
-using ProgressMeter
-using CPUSummary
+using LinearSolve: LinearSolve, AppleAccelerateLUFactorization,
+    CudaOffloadLUFactorization, FastLUFactorization, GenericLUFactorization,
+    LUFactorization, LinearAliasSpecifier, LinearProblem, MKLLUFactorization,
+    MetalLUFactorization, OpenBLASLUFactorization, RFLUFactorization,
+    SimpleLUFactorization, solve
+using BenchmarkTools: BenchmarkTools, @benchmarkable
+using DataFrames: DataFrames, DataFrame, combine, groupby, nrow
+using PrettyTables: PrettyTables, pretty_table
+using Statistics: Statistics, std
+using Random: Random, MersenneTwister
+using LinearAlgebra: LinearAlgebra, norm
+using Printf: Printf, @sprintf
+using Dates: Dates
+using Base64: Base64, base64encode
+using ProgressMeter: ProgressMeter, Progress
+using CPUSummary: CPUSummary
+using Pkg: Pkg
 
 # Hard dependency to ensure RFLUFactorization others solvers are available
-using RecursiveFactorization
-using blis_jll
-using LAPACK_jll
-using cuSOLVER
-using Metal
-using FastLapackInterface
-
+using RecursiveFactorization: RecursiveFactorization
+using blis_jll: blis_jll
+using LAPACK_jll: LAPACK_jll
+using cuSOLVER: cuSOLVER
+using Metal: Metal
+using FastLapackInterface: FastLapackInterface
 
 # Optional dependencies for telemetry and plotting
-using GitHub
-using gh_cli_jll
-using Plots
+using GitHub: GitHub
+using gh_cli_jll: gh_cli_jll
+using Plots: Plots, plot, plot!, savefig
 
 export autotune_setup, share_results, AutotuneResults, plot
 

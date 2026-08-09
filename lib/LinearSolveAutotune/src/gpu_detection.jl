@@ -644,20 +644,21 @@ function get_detailed_system_info()
         system_data["libm"] = "unknown"
     end
 
-    # libdl_name may not exist in all Julia versions
-    try
-        system_data["libdl"] = Base.libdl_name
-    catch
-        system_data["libdl"] = "unknown"
-    end
+    # libdl_name may not exist in all Julia versions; look it up dynamically so
+    # the reference stays valid (and JET-clean) on versions without the binding.
+    system_data["libdl"] = isdefined(Base, :libdl_name) ?
+        string(getglobal(Base, :libdl_name)) : "unknown"
 
     # Memory information (if available)
     try
         if Sys.islinux()
             meminfo = read(`cat /proc/meminfo`, String)
             mem_match = match(r"MemTotal:\s*(\d+)\s*kB", meminfo)
-            if mem_match !== nothing
-                system_data["total_memory_gb"] = round(parse(Int, mem_match.captures[1]) / 1024 / 1024, digits = 2)
+            # The capture is typed `Union{Nothing, SubString}`; bind it to a
+            # local so the guard narrows it.
+            mem_kb = mem_match === nothing ? nothing : mem_match.captures[1]
+            if mem_kb !== nothing
+                system_data["total_memory_gb"] = round(parse(Int, mem_kb) / 1024 / 1024, digits = 2)
             else
                 system_data["total_memory_gb"] = "unknown"
             end

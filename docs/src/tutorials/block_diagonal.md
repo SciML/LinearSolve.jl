@@ -79,16 +79,6 @@ LS.solve!(cache_lu)
     block_factorization = nameof(typeof(first(cache_lu.cacheval.facts))))
 ```
 
-Measured on 20x20 blocks, going through `LUFactorization`, this is worth two to
-three orders of magnitude against the previous behaviour of handing the whole
-`BlockDiagonal` to the generic `lu!`:
-
-| blocks | block size | N | before | now |
-|:---|:---|:---|:---|:---|
-| 10 | 20 | 200 | 7.8 ms | 0.05 ms |
-| 20 | 20 | 400 | 67 ms | 0.10 ms |
-| 40 | 20 | 800 | 255 ms | 0.21 ms |
-
 Two cases deliberately keep the generic dense path, because they are not a batch
 of independent square systems or need machinery the blockwise path does not
 carry:

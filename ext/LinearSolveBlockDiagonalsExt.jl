@@ -3,7 +3,7 @@ module LinearSolveBlockDiagonalsExt
 using LinearSolve: LinearSolve, LinearVerbosity, LUFactorization, OperatorAssumptions,
     QRFactorization, SimpleGMRES
 using BlockDiagonals: BlockDiagonals, BlockDiagonal, blocks, blocksizes
-using LinearAlgebra: LinearAlgebra, NoPivot
+using LinearAlgebra: LinearAlgebra
 using SciMLBase: SciMLBase, ReturnCode
 
 function LinearSolve.init_cacheval(
@@ -95,12 +95,13 @@ function _bd_instance(alg, A::BlockDiagonal)
     return BlockDiagonalFactorization([fact], [0, 0], true)
 end
 
-# Whether the blockwise representation applies. `residualsafety` needs the
-# a-posteriori machinery of the stock `LUFactorization` solve, so those caches
-# keep the generic dense representation and the generic solve path with it.
-_bd_blockwise(alg::LUFactorization, A::BlockDiagonal) =
-    !alg.residualsafety && _bd_all_square(A)
-_bd_blockwise(alg::QRFactorization, A::BlockDiagonal) = _bd_all_square(A)
+# Whether the blockwise representation applies. This depends only on the matrix,
+# never on the algorithm's options: the default solver builds its cacheval slot
+# from a bare `LUFactorization()` (see `algchoice_to_alg`) while solving with
+# `LUFactorization(residualsafety = alg.residualsafety)`, so a predicate that
+# looked at `residualsafety` would disagree with the slot it just typed.
+_bd_blockwise(::Union{LUFactorization, QRFactorization}, A::BlockDiagonal) =
+    _bd_all_square(A)
 
 for ALG in (:LUFactorization, :QRFactorization)
     @eval function LinearSolve.init_cacheval(
@@ -126,19 +127,26 @@ end
 
 # `LUFactorization` has its own `solve!` that calls `lu!`/`lu` directly rather
 # than going through `do_factorization`, so the blockwise path needs its own
-# method. Dispatching on the cacheval type rather than on `A` keys this to
-# exactly the caches that `init_cacheval` above chose the blockwise
-# representation for, leaving `residualsafety` and rectangular-block caches on
-# the stock path.
-const BlockDiagonalLUCache = LinearSolve.LinearCache{
-    <:Any, <:Any, <:Any, <:Any, <:Any, <:BlockDiagonalFactorization,
-}
-
+# method. It dispatches on `A` rather than on the cacheval so that it also covers
+# the default solver, whose cacheval is a `DefaultLinearSolverInit` holding the
+# blockwise factorization in its `LUFactorization` slot; `@get_cacheval` reads
+# the slot in both cases.
 function SciMLBase.solve!(
-        cache::BlockDiagonalLUCache, alg::LUFactorization; kwargs...
+        cache::LinearSolve.LinearCache{<:BlockDiagonal}, alg::LUFactorization;
+        kwargs...
     )
+    _bd_blockwise(alg, cache.A) || return invoke(
+        SciMLBase.solve!,
+        Tuple{LinearSolve.LinearCache, LUFactorization}, cache, alg; kwargs...
+    )
+
     if cache.isfresh
-        fact = LinearSolve.do_factorization(alg, cache.A, cache.b, cache.u)
+        # `lu!` overwrites the blocks it factorizes. The residual check needs the
+        # unfactored operator, so in that case work from a copy and leave
+        # `cache.A` intact; otherwise factorize in place as the stock solve does.
+        A_work = alg.residualsafety ?
+            BlockDiagonal([copy(B) for B in blocks(cache.A)]) : cache.A
+        fact = LinearSolve.do_factorization(alg, A_work, cache.b, cache.u)
         cache.cacheval = fact
         if !LinearAlgebra.issuccess(fact)
             return SciMLBase.build_linear_solution(
@@ -147,7 +155,16 @@ function SciMLBase.solve!(
         end
         cache.isfresh = false
     end
-    y = LinearSolve._ldiv!(cache.u, cache.cacheval, cache.b)
+
+    y = LinearSolve._ldiv!(
+        cache.u, LinearSolve.@get_cacheval(cache, :LUFactorization), cache.b
+    )
+
+    if alg.residualsafety
+        failed = LinearSolve._check_residual_safety(cache, alg, cache.A, y)
+        failed !== nothing && return failed
+    end
+
     return SciMLBase.build_linear_solution(
         alg, y, nothing, nothing; retcode = ReturnCode.Success
     )
@@ -173,6 +190,28 @@ function LinearSolve._ldiv!(
         LinearAlgebra.ldiv!(F.facts[i], view(X, (offsets[i] + 1):offsets[i + 1], :))
     end
     return X
+end
+
+# Without this, `BlockDiagonal` reaches the "not a factorizable operator" arm of
+# `defaultalg` and the default becomes `KrylovJL_GMRES`, which is by far the
+# worst option available here: it is matrix free, so it pays a full multiply per
+# iteration over a matrix whose structure it never exploits, and it stops at the
+# Krylov tolerance rather than machine precision. Now that the blockwise
+# factorization exists, the direct solve is the right default.
+#
+# Blocks that are not square do not decompose into independent subsystems, so
+# those keep the generic operator handling.
+function LinearSolve.defaultalg(
+        A::BlockDiagonal, b, assump::LinearSolve.OperatorAssumptions{Bool}
+    )
+    if assump.issq && _bd_all_square(A)
+        return LinearSolve.DefaultLinearSolver(
+            LinearSolve.DefaultAlgorithmChoice.LUFactorization
+        )
+    end
+    return LinearSolve.DefaultLinearSolver(
+        LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
+    )
 end
 
 end

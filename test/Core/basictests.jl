@@ -1149,13 +1149,32 @@ end
     cache_rect = init(LinearProblem(Arect, rand(5)), LUFactorization())
     @test !(cache_rect.cacheval isa BDFact)
 
-    # residualsafety needs the a-posteriori machinery of the stock LU solve, so
-    # those caches stay on the generic representation too.
+    # residualsafety stays on the blockwise representation. The blocks are
+    # factorized from a copy so the residual check still sees an unfactored A.
     Asafe = BlockDiagonal([rand(3, 3) + 3I for _ in 1:3])
     bsafe = rand(size(Asafe, 1))
+    Asafe_before = Matrix(Asafe)
     cache_safe = init(LinearProblem(Asafe, copy(bsafe)), LUFactorization(residualsafety = true))
-    @test !(cache_safe.cacheval isa BDFact)
-    @test solve!(cache_safe).u ≈ Matrix(Asafe) \ bsafe
+    @test cache_safe.cacheval isa BDFact
+    sol_safe = solve!(cache_safe)
+    @test SciMLBase.successful_retcode(sol_safe)
+    @test sol_safe.u ≈ Matrix(Asafe) \ bsafe
+    @test Matrix(cache_safe.A) ≈ Asafe_before
+
+    # The default algorithm picks the direct blockwise solve rather than falling
+    # through to the matrix-free KrylovJL_GMRES arm.
+    Adef = BlockDiagonal([rand(4, 4) + 4I for _ in 1:5])
+    bdef = rand(size(Adef, 1))
+    @test LinearSolve.defaultalg(Adef, bdef).alg ===
+        LinearSolve.DefaultAlgorithmChoice.LUFactorization
+    sol_def = solve(LinearProblem(Adef, copy(bdef)))
+    @test SciMLBase.successful_retcode(sol_def)
+    @test sol_def.u ≈ Matrix(Adef) \ bdef
+
+    # Rectangular blocks are not independent subsystems, so the default there
+    # stays on the generic operator handling.
+    @test LinearSolve.defaultalg(BlockDiagonal([rand(2, 3), rand(3, 2)]), rand(5)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
 end
 
 @testset "AbstractSparseMatrixCSC" begin

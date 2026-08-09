@@ -7,7 +7,7 @@ using ArrayInterface: ArrayInterface
 using LinearAlgebra: LinearAlgebra, UnitLowerTriangular, UpperTriangular, ldiv!, mul!
 using RecursiveFactorization: RecursiveFactorization
 using TriangularSolve: TriangularSolve
-using SciMLBase: SciMLBase, ReturnCode
+using SciMLBase: SciMLBase, LinearProblem, ReturnCode, solve
 using SciMLLogging: @SciMLMessage
 
 LinearSolve.userecursivefactorization(A::Union{Nothing, AbstractMatrix}) = true
@@ -278,6 +278,16 @@ function supernodal_panel_solve_backend!(
         throw(ArgumentError("unknown supernodal panel operation: $operation"))
     end
     return B
+end
+
+# Re-caches the default solve path, which this extension invalidates via
+# `userecursivefactorization`. Size is not a coverage axis: inference is whole-body.
+LinearSolve.PrecompileTools.@compile_workload begin
+    A = rand(4, 4)
+    b = rand(4)
+    prob = LinearProblem(A, b)
+    sol = solve(prob)
+    sol = solve(prob, RFLUFactorization())
 end
 
 end

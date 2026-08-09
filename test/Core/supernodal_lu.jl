@@ -333,3 +333,20 @@ end
         @test Y ≈ UpperTriangular(W) \ Y0 rtol = 1.0e-12
     end
 end
+
+@testset "public SupernodalLU panel benchmark hook" begin
+    W = Matrix{Float64}(I, 8, 8)
+    for j in 1:8, i in 1:8
+        i == j && continue
+        W[i, j] = randn() / sqrt(8)
+    end
+    Y0 = randn(8, 2)
+    for algorithm in (:kernel, :blas)
+        Y = copy(Y0)
+        supernodal_panel_solve!(W, Y, 8; algorithm, sweep = :lower)
+        @test Y ≈ UnitLowerTriangular(W) \ Y0 rtol = 1.0e-12
+        copyto!(Y, Y0)
+        supernodal_panel_solve!(W, Y, 8; algorithm, sweep = :upper)
+        @test Y ≈ UpperTriangular(W) \ Y0 rtol = 1.0e-12
+    end
+end

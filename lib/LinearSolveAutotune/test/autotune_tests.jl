@@ -88,6 +88,9 @@ if isempty(VERSION.prerelease)
             @test minimum(large_sizes) == 300
             @test maximum(large_sizes) == 1000
 
+            cutoff_sizes = LinearSolveAutotune.get_benchmark_sizes([:cutoff])
+            @test all(in(cutoff_sizes), (32, 33, 128, 129))
+
             # Test combination
             combined_sizes = LinearSolveAutotune.get_benchmark_sizes([:tiny, :small])
             @test length(combined_sizes) == length(unique(combined_sizes))
@@ -115,6 +118,10 @@ if isempty(VERSION.prerelease)
             @test hasproperty(results_df, :size)
             @test hasproperty(results_df, :algorithm)
             @test hasproperty(results_df, :eltype)
+            @test hasproperty(results_df, :workload)
+            @test hasproperty(results_df, :nrhs)
+            @test hasproperty(results_df, :orientation)
+            @test hasproperty(results_df, :time_ns)
             @test hasproperty(results_df, :gflops)
             @test hasproperty(results_df, :success)
             @test hasproperty(results_df, :error)
@@ -128,6 +135,39 @@ if isempty(VERSION.prerelease)
             if nrow(successful_results) > 0
                 @test all(gflops -> gflops > 0, successful_results.gflops)
             end
+        end
+
+        @testset "Solve-path benchmarking" begin
+            algorithms = [LUFactorization(), GenericLUFactorization()]
+            names = ["LUFactorization", "GenericLUFactorization"]
+            results_df = LinearSolveAutotune.benchmark_solve_paths(
+                [4], algorithms, names, (Float64,);
+                nrhss = (1, 2), orientations = (:normal, :adjoint), samples = 1, seconds = 0.01
+            )
+
+            @test nrow(results_df) == 8
+            @test all(results_df.workload .== "cached_solve")
+            @test Set(results_df.nrhs) == Set((1, 2))
+            @test Set(results_df.orientation) == Set(("normal", "adjoint"))
+            @test all(results_df.success)
+            @test all(>(0), results_df.time_ns)
+            markdown = LinearSolveAutotune.format_detailed_results_markdown(results_df)
+            @test occursin("cached_solve: LUFactorization", markdown)
+            @test occursin("| Matrix Size | RHS Columns | Orientation | Time (ns) |", markdown)
+        end
+
+        @testset "Supernodal panel benchmarking" begin
+            results_df = LinearSolveAutotune.benchmark_supernodal_panels(
+                ; nps = (8,), nrhss = (1, 2), samples = 1, seconds = 0.01
+            )
+
+            @test nrow(results_df) == 12
+            @test all(results_df.workload .== "supernodal_panel")
+            @test Set(results_df.algorithm) ==
+                Set(("SupernodalLUKernel", "TriangularSolve", "BLAS.trsm!"))
+            @test Set(results_df.orientation) == Set(("lower", "upper"))
+            @test all(results_df.success)
+            @test all(>(0), results_df.time_ns)
         end
 
         @testset "Result Categorization" begin

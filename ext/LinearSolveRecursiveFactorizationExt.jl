@@ -329,4 +329,18 @@ function SNLU._panel_solve_upper!(
     return nothing
 end
 
+function SNLU._supernodal_panel_solve!(
+        Ws::Matrix{Tv}, Yb::AbstractMatrix{Tv}, np::Int,
+        ::Val{:triangularsolve}, ::Val{:lower}
+    ) where {Tv <: SNLUTypes}
+    return TriangularSolve.ldiv!(UnitLowerTriangular(view(Ws, 1:np, 1:np)), Yb, Val(false))
+end
+
+function SNLU._supernodal_panel_solve!(
+        Ws::Matrix{Tv}, Yb::AbstractMatrix{Tv}, np::Int,
+        ::Val{:triangularsolve}, ::Val{:upper}
+    ) where {Tv <: SNLUTypes}
+    return TriangularSolve.ldiv!(UpperTriangular(view(Ws, 1:np, 1:np)), Yb, Val(false))
+end
+
 end

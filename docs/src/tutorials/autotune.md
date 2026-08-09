@@ -1,6 +1,6 @@
 # Automatic Algorithm Selection with LinearSolveAutotune
 
-LinearSolve.jl includes an automatic tuning system that benchmarks all available linear algebra algorithms on your specific hardware and automatically selects optimal algorithms for different problem sizes and data types. This tutorial will show you how to use the `LinearSolveAutotune` sublibrary to optimize your linear solve performance.
+LinearSolve.jl includes an automatic tuning system that benchmarks all available linear algebra algorithms on your specific hardware and automatically selects optimal algorithms for different problem sizes and data types. It measures fresh factorization-plus-solve workloads, cached vector and multi-RHS solves in normal and adjoint orientations, and the SupernodalLU panel kernels. This tutorial will show you how to use the `LinearSolveAutotune` sublibrary to optimize your linear solve performance.
 
 The autotuning system provides comprehensive benchmarking and automatic algorithm selection optimization for your specific hardware.
 
@@ -30,6 +30,8 @@ share_results(results)
 ```@docs
 LinearSolveAutotune.AutotuneResults
 LinearSolveAutotune.autotune_setup
+LinearSolveAutotune.benchmark_solve_paths
+LinearSolveAutotune.benchmark_supernodal_panels
 LinearSolveAutotune.share_results
 LinearSolveAutotune.plot(::LinearSolveAutotune.AutotuneResults)
 ```
@@ -77,14 +79,15 @@ Control which matrix size ranges to test:
 
 ```julia
 # Available size categories:
+# :cutoff - Dense LU policy cutovers (including the immediately larger sizes)
 # :tiny   - 5×5 to 20×20 (very small problems)
 # :small  - 20×20 to 100×100 (small problems)  
 # :medium - 100×100 to 300×300 (typical problems)
 # :large  - 300×300 to 1000×1000 (larger problems)
 # :big    - 1000×1000 to 15000×15000 (GPU/HPC scale, capped at 15000 for stability)
 
-# Default: test tiny through large
-results = autotune_setup()  # uses [:tiny, :small, :medium, :large]
+# Default: test dense-LU cutovers plus tiny through large
+results = autotune_setup()  # uses [:cutoff, :tiny, :small, :medium, :large]
 
 # Test only medium and large sizes
 results = autotune_setup(sizes = [:medium, :large])

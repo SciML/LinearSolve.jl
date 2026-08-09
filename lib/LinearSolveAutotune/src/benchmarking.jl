@@ -217,6 +217,10 @@ function benchmark_algorithms(
                                 size = n,
                                 algorithm = name,
                                 eltype = string(eltype),
+                                workload = "factor_solve",
+                                nrhs = 1,
+                                orientation = "normal",
+                                time_ns = NaN,
                                 gflops = NaN,
                                 success = false,
                                 error = "Skipped: exceeded maxtime on size $max_allowed_size matrix",
@@ -233,6 +237,7 @@ function benchmark_algorithms(
                 )
 
                 gflops = NaN  # Use NaN for failed/timed out runs
+                time_ns = NaN
                 success = true
                 error_msg = ""
                 passed_correctness = true
@@ -311,6 +316,7 @@ function benchmark_algorithms(
 
                                 # Calculate GFLOPs
                                 min_time_sec = minimum(bench.times) / 1.0e9
+                                time_ns = minimum(bench.times)
                                 flops = luflop(n, n)
                                 gflops = flops / min_time_sec / 1.0e9
                             end
@@ -331,6 +337,10 @@ function benchmark_algorithms(
                         size = n,
                         algorithm = name,
                         eltype = string(eltype),
+                        workload = "factor_solve",
+                        nrhs = 1,
+                        orientation = "normal",
+                        time_ns = time_ns,
                         gflops = gflops,
                         success = success,
                         error = error_msg,
@@ -339,6 +349,133 @@ function benchmark_algorithms(
 
                 # Update progress
                 ProgressMeter.next!(progress)
+            end
+        end
+    end
+
+    return DataFrame(results_data)
+end
+
+"""
+    benchmark_solve_paths(matrix_sizes, algorithms, alg_names, eltypes;
+        nrhss = (1, 4), orientations = (:normal, :adjoint), samples = 5, seconds = 0.5)
+
+Measure cached dense LU solves independently of factorization. The returned rows record RHS
+width, factor orientation, and minimum solve time, which exposes the vector and multi-RHS
+backsolve crossovers used by the LU selection policy.
+"""
+function benchmark_solve_paths(
+        matrix_sizes, algorithms, alg_names, eltypes;
+        nrhss = (1, 4), orientations = (:normal, :adjoint), samples = 5, seconds = 0.5
+    )
+    results_data = []
+    parameters = BenchmarkTools.Parameters(; seconds = seconds, samples = samples)
+
+    for eltype in eltypes
+        compatible_algs,
+            compatible_names = filter_compatible_algorithms(algorithms, alg_names, eltype)
+        for n in matrix_sizes, nrhs in nrhss, orientation in orientations
+            rng = MersenneTwister(1177 + n + nrhs)
+            A = rand(rng, eltype, n, n)
+            b = nrhs == 1 ? rand(rng, eltype, n) : rand(rng, eltype, n, nrhs)
+            u0 = similar(b)
+
+            for (alg, name) in zip(compatible_algs, compatible_names)
+                time_ns = NaN
+                success = true
+                error_msg = ""
+                try
+                    factor_A = orientation === :normal ? copy(A) : adjoint(copy(A))
+                    cache = init(
+                        LinearProblem(factor_A, copy(b); u0 = copy(u0)), alg
+                    )
+                    solve!(cache)
+                    benchmark = @benchmarkable solve!($cache) setup = (copyto!($cache.b, $b))
+                    time_ns = minimum(BenchmarkTools.run(benchmark, parameters).times)
+                catch err
+                    success = false
+                    error_msg = string(err)
+                end
+
+                push!(
+                    results_data,
+                    (
+                        size = n,
+                        algorithm = name,
+                        eltype = string(eltype),
+                        workload = "cached_solve",
+                        nrhs = nrhs,
+                        orientation = string(orientation),
+                        time_ns = time_ns,
+                        gflops = NaN,
+                        success = success,
+                        error = error_msg,
+                    )
+                )
+            end
+        end
+    end
+
+    return DataFrame(results_data)
+end
+
+function _supernodal_panel_matrix(np, rng)
+    W = Matrix{Float64}(I, np, np)
+    scale = inv(sqrt(np))
+    for j in 1:np, i in 1:np
+        i == j && continue
+        W[i, j] = scale * randn(rng)
+    end
+    return W
+end
+
+"""
+    benchmark_supernodal_panels(; nps = (256, 257, 512, 1024, 1280, 1536, 1792, 1793, 2048),
+        nrhss = (1, 2, 4, 8, 16, 32), samples = 5, seconds = 0.5)
+
+Measure the in-tree, TriangularSolve, and BLAS implementations of SupernodalLU's lower and
+upper panel solves. RHS data is copied before every sample so every implementation performs
+the same solve.
+"""
+function benchmark_supernodal_panels(
+        ; nps = (256, 257, 512, 1024, 1280, 1536, 1792, 1793, 2048),
+        nrhss = (1, 2, 4, 8, 16, 32), samples = 5, seconds = 0.5
+    )
+    parameters = BenchmarkTools.Parameters(; seconds = seconds, samples = samples)
+    results_data = []
+    rng = MersenneTwister(1178)
+
+    for np in nps, nrhs in nrhss
+        W = _supernodal_panel_matrix(np, rng)
+        Y0 = randn(rng, np, nrhs)
+        lower = (
+            ("SupernodalLUKernel", @benchmarkable LinearSolve.supernodal_panel_solve!($W, Y, $np; algorithm = :kernel, sweep = :lower) setup = (Y = copy($Y0))),
+            ("TriangularSolve", @benchmarkable LinearSolve.supernodal_panel_solve!($W, Y, $np; algorithm = :triangularsolve, sweep = :lower) setup = (Y = copy($Y0))),
+            ("BLAS.trsm!", @benchmarkable LinearSolve.supernodal_panel_solve!($W, Y, $np; algorithm = :blas, sweep = :lower) setup = (Y = copy($Y0))),
+        )
+        upper = (
+            ("SupernodalLUKernel", @benchmarkable LinearSolve.supernodal_panel_solve!($W, Y, $np; algorithm = :kernel, sweep = :upper) setup = (Y = copy($Y0))),
+            ("TriangularSolve", @benchmarkable LinearSolve.supernodal_panel_solve!($W, Y, $np; algorithm = :triangularsolve, sweep = :upper) setup = (Y = copy($Y0))),
+            ("BLAS.trsm!", @benchmarkable LinearSolve.supernodal_panel_solve!($W, Y, $np; algorithm = :blas, sweep = :upper) setup = (Y = copy($Y0))),
+        )
+
+        for (orientation, benchmarks) in (("lower", lower), ("upper", upper))
+            for (algorithm, benchmark) in benchmarks
+                push!(
+                    results_data,
+                    (
+                        size = np,
+                        algorithm = algorithm,
+                        eltype = "Float64",
+                        workload = "supernodal_panel",
+                        nrhs = nrhs,
+                        orientation = orientation,
+                        time_ns = minimum(BenchmarkTools.run(benchmark, parameters).times),
+                        gflops = NaN,
+                        success = true,
+                        error = "",
+                    )
+                )
             end
         end
     end
@@ -358,6 +495,7 @@ Size categories:
   - `:medium` - 100:50:300 (for typical problems)
   - `:large` - 300:100:1000 (for larger problems)
   - `:big` - vcat(1000:2000:10000, 10000:5000:15000) (for very large/GPU problems, capped at 15000)
+  - `:cutoff` - sizes at and immediately above the dense LU selection crossovers
 """
 function get_benchmark_sizes(size_categories::Vector{Symbol})
     sizes = Int[]
@@ -373,6 +511,8 @@ function get_benchmark_sizes(size_categories::Vector{Symbol})
             append!(sizes, 300:100:1000)
         elseif category == :big
             append!(sizes, vcat(1000:2000:10000, 10000:5000:15000))  # Capped at 15000
+        elseif category == :cutoff
+            append!(sizes, (8, 16, 24, 32, 33, 48, 64, 96, 128, 129, 192, 256, 384, 512))
         else
             @warn "Unknown size category: $category. Skipping."
         end

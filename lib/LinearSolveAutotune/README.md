@@ -40,6 +40,7 @@ share_results(results)
 
 The package now uses flexible size categories:
 
+- `:cutoff` - Dense LU policy cutovers and immediately larger sizes
 - `:tiny` - Matrices from 5×5 to 20×20 (very small problems)
 - `:small` - Matrices from 20×20 to 100×100 (small problems)
 - `:medium` - Matrices from 100×100 to 300×300 (typical problems)
@@ -51,7 +52,7 @@ The package now uses flexible size categories:
 ### Basic Benchmarking
 
 ```julia
-# Default: small, medium, and large sizes
+# Default: dense-LU cutovers plus tiny through large sizes
 results = autotune_setup()
 
 # Test all size ranges
@@ -142,12 +143,14 @@ If you prefer using a token:
 
 ```julia
 autotune_setup(;
-    sizes = [:small, :medium, :large],
+    sizes = [:cutoff, :tiny, :small, :medium, :large],
     set_preferences = true,
     samples = 5,
     seconds = 0.5,
     eltypes = (Float32, Float64, ComplexF32, ComplexF64),
-    skip_missing_algs = false
+    skip_missing_algs = false,
+    collect_solve_path_data = true,
+    collect_supernodal_panel_data = true
 )
 ```
 
@@ -158,6 +161,8 @@ autotune_setup(;
 - `seconds`: Maximum time per benchmark
 - `eltypes`: Element types to benchmark
 - `skip_missing_algs`: Continue if algorithms are missing
+- `collect_solve_path_data`: Measure cached vector and multi-RHS solve paths
+- `collect_supernodal_panel_data`: Measure SupernodalLU panel kernels and library paths
 
 **Returns:**
 - `results`: AutotuneResults object containing benchmark data and system info

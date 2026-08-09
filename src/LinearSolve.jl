@@ -456,6 +456,7 @@ include("default.jl")
 # after default.jl: the vendored solver caches its dense diagonal blocks
 # with LinearSolve's own default solver, so it needs DefaultLinearSolver{,Init}
 include("SupernodalLU/SupernodalLU.jl")
+using .SupernodalLU: supernodal_panel_solve!
 include("init.jl")
 include("adjoint.jl") # LinearSolveAdjoint struct definition only; rrules are in ChainRulesCore ext
 
@@ -659,6 +660,7 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
     NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
     UMFPACKFactorization, KLUFactorization, PureKLUFactorization,
     SupernodalLUFactorization,
+    supernodal_panel_solve!,
     PureUMFPACKFactorization, SparseColumnPivotedQRFactorization, FastLUFactorization,
     FastQRFactorization,
     SparspakFactorization, DiagonalFactorization, CholeskyFactorization,

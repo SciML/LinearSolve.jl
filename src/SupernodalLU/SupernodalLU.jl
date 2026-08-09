@@ -39,6 +39,7 @@ include("symbolic.jl")
 include("matching.jl")
 include("numeric.jl")
 include("solve.jl")
+include("benchmarking.jl")
 include("interface.jl")
 
 end # module

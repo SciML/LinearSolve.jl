@@ -48,11 +48,18 @@ The dual preference system provides intelligent algorithm selection with compreh
 
 #### **Size Categorization**
 The system categorizes matrix sizes to match LinearSolveAutotune benchmarking:
+
 - **tiny**: ≤20 elements (matrices ≤10 always override to GenericLU)
 - **small**: 21-100 elements  
 - **medium**: 101-300 elements
 - **large**: 301-1000 elements
 - **big**: >1000 elements
+
+#### **SupernodalLU Panel Benchmarking**
+
+```@docs
+LinearSolve.supernodal_panel_solve!
+```
 
 #### **Dual Preference Structure**
 For each category and element type (Float32, Float64, ComplexF32, ComplexF64):

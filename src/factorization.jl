@@ -228,6 +228,12 @@ Julia's built in `lu`. Equivalent to calling `lu!(A)`
   - On CuMatrix, it will use a CUDA-accelerated LU from CuSolver.
   - On BandedMatrix and BlockBandedMatrix, it will use a banded LU.
 
+The back-solve is size-aware for LAPACK-eligible dense factors: single-vector solves at
+or below a measured crossover (`N = 256` for `Matrix` factors) use the same pure-Julia
+triangular sweeps as `GenericLUFactorization`, which beat `getrs!`'s call and blocking
+overhead at those sizes; larger vectors and matrix right-hand sides use `ldiv!`
+(LAPACK `getrs!`).
+
 ## Positional Arguments
 
   - pivot: The choice of pivoting. Defaults to `LinearAlgebra.RowMaximum()`. The other choice is
@@ -263,6 +269,12 @@ forward, upper backward) rather than `ldiv!(::LU, ·)` / OpenBLAS `getrs!`. That
 is the default (see SciML/LinearSolve.jl#1145). `Adjoint`/`Transpose` operators, whose
 factors are stored through the lazy wrapper, get an orientation-specialized kernel that
 traverses the underlying parent column-contiguously (see SciML/LinearSolve.jl#1159).
+
+The generic back-solve is used at every size, with no BLAS deferral: explicitly selecting
+this algorithm selects the pure-Julia path for both the factorization and the solve. Note
+that above `N ≈ 400` a single-vector generic sweep is slower than `getrs!`; if BLAS is
+acceptable at large sizes, use `LUFactorization` (whose back-solve is size-aware) or the
+default algorithm instead.
 
 ## Positional Arguments
 
@@ -416,10 +428,38 @@ end
 end
 
 # 3-arg form matching `ldiv!(x, F, b)`: copy when `x !== b`, then in-place solve.
+# No size cutoff here, ever: choosing `GenericLUFactorization` is choosing the
+# generic back-solve; the size-aware path is `_smart_lu_ldiv!` below.
 function _generic_lu_ldiv!(x, F::LU, b)
     if x !== b
         copyto!(x, b)
     end
+    return _naive_lu_ldiv!(F.factors, F.ipiv, x)
+end
+
+# Measured single-vector crossover vs `ldiv!` (min-times, 1 BLAS thread, EPYC
+# 7502): naive wins to ≈ N 400 on `Matrix` factors and ≈ 900 on the wrapped
+# orientations, then loses 1.14x/1.24x/1.35x at N = 512/1000/2000 (`Matrix`).
+_naive_ldiv_cutoff(::AbstractMatrix) = 256
+_naive_ldiv_cutoff(::_AdjTransStridedFactors) = 512
+
+# Size-aware back-solve for `ldiv!`-baseline algorithms (`LUFactorization` and
+# the defaults routed to it): single vectors at or below the crossover take the
+# naive kernel; everything else (larger vectors, multi-RHS, non-BLAS/GPU) keeps
+# `ldiv!`. Explicit generic selections never consult this cutoff.
+_smart_lu_ldiv!(x, F, b) = _ldiv!(x, F, b)
+
+function _smart_lu_ldiv!(
+        x::StridedVector{T},
+        F::LU{T, <:Union{StridedMatrix{T}, _AdjTransStridedFactors}},
+        b::StridedVector{T}
+    ) where {T <: BLASELTYPES}
+    if x isa GPUArraysCore.AnyGPUArray || b isa GPUArraysCore.AnyGPUArray ||
+            F.factors isa GPUArraysCore.AnyGPUArray ||
+            length(x) > _naive_ldiv_cutoff(F.factors)
+        return _ldiv!(x, F, b)
+    end
+    x !== b && copyto!(x, b)
     return _naive_lu_ldiv!(F.factors, F.ipiv, x)
 end
 
@@ -537,7 +577,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
     end
 
     F = @get_cacheval(cache, :LUFactorization)
-    y = _ldiv!(cache.u, F, cache.b)
+    y = _smart_lu_ldiv!(cache.u, F, cache.b)
 
     if check_safety
         failed = _check_residual_safety(cache, alg, A_original, y)

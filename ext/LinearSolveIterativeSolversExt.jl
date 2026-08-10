@@ -59,6 +59,18 @@ end
 
 LinearSolve._isidentity_struct(::IterativeSolvers.Identity) = true
 
+# Accept LinearSolve's `maxiters` spelling on the algorithm and hand
+# IterativeSolvers the `maxiter` it expects. An explicit `maxiter` wins if both
+# are given, and the NamedTuple is rebuilt rather than mutated so the result
+# stays inferrable.
+function _rename_maxiters(kwargs)
+    haskey(kwargs, :maxiters) || return NamedTuple(kwargs)
+    nt = NamedTuple(kwargs)
+    maxiters = nt.maxiters
+    rest = Base.structdiff(nt, NamedTuple{(:maxiters,)})
+    return haskey(rest, :maxiter) ? rest : merge(rest, (; maxiter = maxiters))
+end
+
 function LinearSolve.init_cacheval(
         alg::IterativeSolversJL, A, b, u, Pl, Pr, maxiters::Int,
         abstol,
@@ -77,9 +89,18 @@ function LinearSolve.init_cacheval(
     restart = (alg.gmres_restart == 0) ? min(20, size(A, 1)) : alg.gmres_restart
     s = get(alg.kwargs, :idrs_s, 4) # shadow space
 
+    # LinearSolve spells the iteration cap `maxiters`, IterativeSolvers spells it
+    # `maxiter`. Passing the LinearSolve spelling on the algorithm, as in
+    # `IterativeSolversJL_CG(maxiters = 100)`, used to forward an unknown keyword
+    # and fail with a MethodError (SciML/LinearSolve.jl#175), so accept it as an
+    # alias here. Everything below reads the cap from `maxiters_eff` so the
+    # algorithm-level value also reaches the solvers that take it positionally.
+    alg_kwargs = _rename_maxiters(alg.kwargs)
+    maxiters_eff = get(alg_kwargs, :maxiter, maxiters)
+
     kwargs = (
-        abstol = abstol, reltol = reltol, maxiter = maxiters,
-        alg.kwargs...,
+        abstol = abstol, reltol = reltol, maxiter = maxiters_eff,
+        alg_kwargs...,
     )
 
     iterable = if alg.generate_iterator === IterativeSolvers.cg_iterator!
@@ -119,8 +140,8 @@ function LinearSolve.init_cacheval(
             return kwargs
         end
         IterativeSolvers.idrs_iterable!(
-            history, u, A, b, s, Pl, abstol, reltol, maxiters;
-            filter_kwargs(; alg.kwargs...)...
+            history, u, A, b, s, Pl, abstol, reltol, maxiters_eff;
+            filter_kwargs(; alg_kwargs...)...
         )
     elseif alg.generate_iterator === IterativeSolvers.bicgstabl_iterator!
         !!LinearSolve._isidentity_struct(Pr) &&
@@ -128,17 +149,20 @@ function LinearSolve.init_cacheval(
             "$(alg.generate_iterator) doesn't support right preconditioning",
             verbosity, :no_right_preconditioning
         )
+        # `bicgstabl_iterator!` caps work through `max_mv_products`, set just
+        # above, and has no `maxiter` keyword at all, so the normalized cap has
+        # to come out again here.
         alg.generate_iterator(
             u, A, b, alg.args...; Pl = Pl,
             abstol = abstol, reltol = reltol,
-            max_mv_products = maxiters * 2,
-            alg.kwargs...
+            max_mv_products = maxiters_eff * 2,
+            Base.structdiff(alg_kwargs, NamedTuple{(:maxiter,)})...
         )
     else # minres, qmr
         alg.generate_iterator(
             u, A, b, alg.args...;
-            abstol = abstol, reltol = reltol, maxiter = maxiters,
-            alg.kwargs...
+            abstol = abstol, reltol = reltol, maxiter = maxiters_eff,
+            alg_kwargs...
         )
     end
     return iterable

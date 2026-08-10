@@ -63,6 +63,7 @@ else
         core = function ()
             @time @safetestset "Basic Tests" include("Core/basictests.jl")
             @time @safetestset "EigenvalueProblem" include("Core/eigenvalue.jl")
+            @time @safetestset "Unitful" include("Core/unitful.jl")
             @time @safetestset "Batched RHS" include("Core/batch.jl")
             @time @safetestset "GenericLU naive back-solve" include("Core/genericlu_naive_ldiv.jl")
             @time @safetestset "Blocked generic_lufact! kernel" include("Core/blocked_lufact.jl")

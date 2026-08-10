@@ -732,13 +732,38 @@ end
                     ("GMRES", IterativeSolversJL_GMRES(; kwargs...)),
                     ("IDRS", IterativeSolversJL_IDRS(; kwargs...)),
                     ("IDRS(2)", IterativeSolversJL_IDRS(; idrs_s = 2, kwargs...)),
+                    ("MINRES", IterativeSolversJL_MINRES(; kwargs...)),
+                    # BICGSTAB stays out: IterativeSolvers' own bicgstabl breaks
+                    # down on the identity `prob1` here and throws
+                    # "matrix contains Infs or NaNs" out of LAPACK, which is an
+                    # upstream numerical issue rather than a wiring problem on
+                    # this side.
                     # ("BICGSTAB",IterativeSolversJL_BICGSTAB(; kwargs...)),
-                    # ("MINRES",IterativeSolversJL_MINRES(; kwargs...)),
                 )
                 @testset "$(alg[1])" begin
                     test_interface(alg[2], prob1, prob2)
                     test_interface(alg[2], prob3, prob4)
                     test_tolerance_update(alg[2], prob5, u5)
+                end
+            end
+
+            @testset "tolerances as algorithm kwargs (#24)" begin
+                # `idrs_iterable!` takes abstol/reltol/maxiter positionally and
+                # accepts only `smoothing`/`verbose` as keywords, so forwarding
+                # them from `alg.kwargs` used to raise a MethodError. MINRES read
+                # `.residual`, which its iterable calls `resnorm`, and threw a
+                # FieldError on every solve.
+                # Note these solves report `ReturnCode.Default` rather than
+                # `Success`: this extension never passes a retcode to
+                # `build_linear_solution`. That is pre-existing and separate from
+                # what is tested here, so assert on the solution itself.
+                for alg in (
+                        IterativeSolversJL_IDRS(abstol = 1.0e-10, reltol = 1.0e-10),
+                        IterativeSolversJL_MINRES(abstol = 1.0e-10, reltol = 1.0e-10),
+                        IterativeSolversJL_CG(abstol = 1.0e-10, reltol = 1.0e-10),
+                    )
+                    sol = solve(LinearProblem(A5, b5), alg)
+                    @test sol.u ≈ u5 rtol = 1.0e-6
                 end
             end
         end

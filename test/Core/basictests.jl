@@ -766,6 +766,27 @@ end
                     @test sol.u ≈ u5 rtol = 1.0e-6
                 end
             end
+
+            @testset "maxiters on the algorithm (#175)" begin
+                # LinearSolve spells it `maxiters`, IterativeSolvers `maxiter`.
+                # Passing the LinearSolve spelling on the algorithm used to
+                # forward an unknown keyword and raise a MethodError.
+                for f in (
+                        IterativeSolversJL_CG, IterativeSolversJL_GMRES,
+                        IterativeSolversJL_IDRS, IterativeSolversJL_MINRES,
+                        IterativeSolversJL_BICGSTAB,
+                    )
+                    @test solve(LinearProblem(A5, b5), f(maxiters = 200)).u ≈ u5 rtol = 1.0e-6
+                end
+
+                # The algorithm-level value caps the iteration count, and an
+                # explicit `maxiter` still wins if both are given.
+                slow = LinearProblem(Symmetric(Matrix(A5) + 0.5I), b5)
+                for m in (2, 5)
+                    @test solve(slow, IterativeSolversJL_CG(maxiters = m)).iters <= m
+                end
+                @test solve(slow, IterativeSolversJL_CG(maxiter = 3, maxiters = 50)).iters == 3
+            end
         end
     end
 

@@ -294,6 +294,7 @@ end
                 cache.cacheval.a_backup_synced = false
             end
         end
+        update_cacheval!(cache, :A, x)
     elseif name === :p
         setfield!(cache, :precsisfresh, true)
     elseif name === :b

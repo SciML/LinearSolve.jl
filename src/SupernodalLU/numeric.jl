@@ -315,6 +315,9 @@ end
 # or above `dense_threshold` is a `MethodError`.  `hasfield` on a concrete type
 # folds at compile time, so the check costs nothing at runtime.
 function _lu_from_cacheval(cv)
+    if cv isa LinearSolve._GenericLUFactorizationCache
+        return cv.fact
+    end
     if hasfield(typeof(cv), :factors) && hasfield(typeof(cv), :ipiv)
         return cv
     end

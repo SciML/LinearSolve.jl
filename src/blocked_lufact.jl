@@ -14,6 +14,22 @@ const _BLOCKED_LU_ROWBLOCK = 384
 # amortize panel/trsm overhead once the Schur update dominates.
 _blocked_lu_default_panel(minmn::Int) = minmn <= 160 ? 8 : 16
 
+function _blocked_lu_pack_size(m::Int, n::Int, minmn::Int, nb::Int)
+    len = 0
+    j0 = 1
+    while j0 <= minmn
+        jb = min(nb, minmn - j0 + 1)
+        j1 = j0 + jb - 1
+        rows = m - j1
+        if rows >= 64 && n - j1 >= 32
+            ldp = rows % 256 == 0 ? rows + 4 : rows
+            len = max(len, ldp * jb)
+        end
+        j0 += jb
+    end
+    return len
+end
+
 # Row-maximum pivot search in two passes: a `>`-select max reduction that
 # vectorizes (NaN compares false, so NaNs are ignored exactly like the
 # scalar stdlib/LAPACK search), then first-index-of-max, matching the
@@ -305,7 +321,6 @@ function _blocked_lu_schur_packed!(
     rows = m - i0 + 1
     jb = j1 - j0 + 1
     ldp = rows % 256 == 0 ? rows + 4 : rows
-    length(pack) < ldp * jb && resize!(pack, ldp * jb)
     _blocked_lu_pack_panel!(pack, A, i0, m, j0, j1, ldp)
     @inbounds begin
         ib = i0
@@ -582,7 +597,6 @@ function _blocked_lu_schur_micro!(
     rows = m - i0 + 1
     jb = j1 - j0 + 1
     ldp = rows % 256 == 0 ? rows + 4 : rows
-    length(pack) < ldp * jb && resize!(pack, ldp * jb)
     _blocked_lu_pack_panel!(pack, A, i0, m, j0, j1, ldp)
     V = _blocked_lu_vectype(T)
     # Must equal the tile's row step; a mismatch silently double-applies or
@@ -643,9 +657,8 @@ end
 
 function _blocked_lufact!(
         A::AbstractMatrix{T}, ipiv, m::Int, n::Int, minmn::Int,
-        nb::Int, rowblock::Int
+        nb::Int, rowblock::Int, pack::Vector{T}
     ) where {T}
-    pack = T[]
     info = 0
     j0 = 1
     while j0 <= minmn
@@ -665,6 +678,14 @@ function _blocked_lufact!(
     return info
 end
 
+function _blocked_lufact!(
+        A::AbstractMatrix{T}, ipiv, m::Int, n::Int, minmn::Int,
+        nb::Int, rowblock::Int
+    ) where {T}
+    pack = Vector{T}(undef, _blocked_lu_pack_size(m, n, minmn, nb))
+    return _blocked_lufact!(A, ipiv, m, n, minmn, nb, rowblock, pack)
+end
+
 # The `GenericLUFactorization` fast path: real strided float matrices with
 # `RowMaximum` pivoting take the blocked kernel; everything else falls through
 # to the scalar method. Semantics match `generic_lufact!` with a provided
@@ -674,6 +695,26 @@ end
 function generic_lufact!(
         A::StridedMatrix{T}, pivot::RowMaximum,
         ipiv::AbstractVector{<:Integer};
+        check::Bool = true, allowsingular::Bool = false
+    ) where {T <: Union{Float32, Float64}}
+    return _blocked_generic_lufact!(
+        A, pivot, ipiv, nothing; check = check, allowsingular = allowsingular
+    )
+end
+
+function generic_lufact!(
+        A::StridedMatrix{T}, pivot::RowMaximum,
+        ipiv::AbstractVector{<:Integer}, pack::Vector{T};
+        check::Bool = true, allowsingular::Bool = false
+    ) where {T <: Union{Float32, Float64}}
+    return _blocked_generic_lufact!(
+        A, pivot, ipiv, pack; check = check, allowsingular = allowsingular
+    )
+end
+
+function _blocked_generic_lufact!(
+        A::StridedMatrix{T}, pivot::RowMaximum,
+        ipiv::AbstractVector{<:Integer}, pack::Union{Nothing, Vector{T}};
         check::Bool = true, allowsingular::Bool = false
     ) where {T <: Union{Float32, Float64}}
     Base.require_one_based_indexing(A, ipiv)
@@ -687,9 +728,11 @@ function generic_lufact!(
     info = if minmn <= _BLOCKED_LU_UNBLOCKED_CUTOFF
         _blocked_lu_unblocked!(A, ipiv, m, n)
     else
+        nb = _blocked_lu_default_panel(minmn)
+        pack === nothing &&
+            (pack = Vector{T}(undef, _blocked_lu_pack_size(m, n, minmn, nb)))
         _blocked_lufact!(
-            A, ipiv, m, n, minmn, _blocked_lu_default_panel(minmn),
-            _BLOCKED_LU_ROWBLOCK
+            A, ipiv, m, n, minmn, nb, _BLOCKED_LU_ROWBLOCK, pack
         )
     end
     check && !allowsingular && info > 0 &&

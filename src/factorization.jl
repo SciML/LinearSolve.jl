@@ -299,6 +299,69 @@ end
 
 GenericLUFactorization(pivot = RowMaximum(); residualsafety::Bool = false) = GenericLUFactorization(pivot, residualsafety)
 
+mutable struct _GenericLUFactorizationCache{F, I, W}
+    fact::F
+    ipiv::I
+    workspace::W
+end
+
+_generic_lu_workspace(A, pivot) = nothing
+
+function _generic_lu_workspace(A::StridedMatrix{T}, ::RowMaximum) where {T <: Union{Float32, Float64}}
+    m, n = size(A)
+    minmn = min(m, n)
+    nb = _blocked_lu_default_panel(minmn)
+    return Vector{T}(undef, _blocked_lu_pack_size(m, n, minmn, nb))
+end
+
+function _generic_lufact!(A, pivot, ipiv, ::Nothing; kwargs...)
+    return generic_lufact!(A, pivot, ipiv; kwargs...)
+end
+
+function _generic_lufact!(A, pivot, ipiv, workspace::Vector; kwargs...)
+    return generic_lufact!(A, pivot, ipiv, workspace; kwargs...)
+end
+
+function _generic_lu_solve!(cacheval, A, u, b, pivot, isfresh::Bool)
+    if isfresh
+        fact = _generic_lufact!(
+            A, pivot, cacheval.ipiv, cacheval.workspace; check = false
+        )
+        cacheval.fact = fact
+        LinearAlgebra.issuccess(fact) || return false
+    end
+    fact = cacheval.fact
+    if fact isa LinearAlgebra.LU
+        _generic_lu_ldiv!(u, fact, b)
+    else
+        ldiv!(u, fact, b)
+    end
+    return true
+end
+
+_resize_generic_lu_workspace!(::Nothing, m::Int, n::Int) = nothing
+
+function _resize_generic_lu_workspace!(workspace::Vector, m::Int, n::Int)
+    minmn = min(m, n)
+    nb = _blocked_lu_default_panel(minmn)
+    resize!(workspace, _blocked_lu_pack_size(m, n, minmn, nb))
+    return nothing
+end
+
+function _resize_generic_lu_cache!(cacheval::_GenericLUFactorizationCache, m::Int, n::Int)
+    resize!(cacheval.ipiv, min(m, n))
+    _resize_generic_lu_workspace!(cacheval.workspace, m, n)
+    return nothing
+end
+
+resize_cacheval!(cache, cacheval::_GenericLUFactorizationCache, i) =
+    _resize_generic_lu_cache!(cacheval, i, i)
+
+function update_cacheval!(cache, cacheval::_GenericLUFactorizationCache, name::Symbol, A)
+    name === :A && _resize_generic_lu_cache!(cacheval, size(A, 1), size(A, 2))
+    return cacheval
+end
+
 # Pure-Julia LU back-solve used by GenericLUFactorization. A pivoted LU vector
 # solve at small N is a handful of flops but ~290 ns through OpenBLAS/MKL
 # getrs! (call overhead); the same algorithm written out as scalar loops is
@@ -630,18 +693,19 @@ function init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
+    A = convert(AbstractMatrix, A)
     ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
-    # `solve!` stores `(generic_lufact!(A, ...), ipiv)`, a `LinearAlgebra.LU` whose
-    # `factors` is `convert(AbstractMatrix, A)` and whose pivot is this
-    # `Vector{BlasInt}`. `lu_instance` would type the pivot after `A`'s container
-    # (e.g. a `FixedSizeVector` for a `FixedSizeArray`), so rebuild the instance
-    # with the `Vector` pivot to keep the cacheval slot type matching.
-    luinst = ArrayInterface.lu_instance(convert(AbstractMatrix, A))
+    # `lu_instance` may type its pivot after `A`'s container, so rebuild stdlib
+    # `LU` instances with the cache-owned `Vector{BlasInt}` pivot.
+    luinst = ArrayInterface.lu_instance(A)
     # `lu_instance` may return a non-`LinearAlgebra.LU` (e.g. `StaticArrays.LU`
     # for a `SizedMatrix`, with fields `L`/`U`/`p` rather than `factors`/`info`);
     # those already carry a `Vector` pivot, so use them as-is.
-    luinst isa LinearAlgebra.LU || return luinst, ipiv
-    return LinearAlgebra.LU(luinst.factors, ipiv, luinst.info), ipiv
+    workspace = _generic_lu_workspace(A, alg.pivot)
+    luinst isa LinearAlgebra.LU ||
+        return _GenericLUFactorizationCache(luinst, ipiv, workspace)
+    fact = LinearAlgebra.LU(luinst.factors, ipiv, luinst.info)
+    return _GenericLUFactorizationCache(fact, ipiv, workspace)
 end
 
 function init_cacheval(
@@ -649,7 +713,9 @@ function init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    return PREALLOCATED_LU, PREALLOCATED_IPIV
+    ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
+    workspace = _generic_lu_workspace(A, alg.pivot)
+    return _GenericLUFactorizationCache(PREALLOCATED_LU, ipiv, workspace)
 end
 
 function SciMLBase.solve!(
@@ -662,31 +728,15 @@ function SciMLBase.solve!(
     needs_backup = check_safety ||
         (cache.alg isa DefaultLinearSolver && cache.alg.safetyfallback && cache.isfresh)
     A_original = needs_backup ? _copy_A_for_safety(cache) : A
-    fact, ipiv = LinearSolve.@get_cacheval(cache, :GenericLUFactorization)
+    cacheval = LinearSolve.@get_cacheval(cache, :GenericLUFactorization)
 
-    if cache.isfresh
-        if length(ipiv) != min(size(A)...)
-            ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
-        end
-        fact = generic_lufact!(A, alg.pivot, ipiv; check = false)
-        cache.cacheval = (fact, ipiv)
-
-        if !LinearAlgebra.issuccess(fact)
-            return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
-            )
-        end
-
-        cache.isfresh = false
+    if !_generic_lu_solve!(cacheval, A, cache.u, cache.b, alg.pivot, cache.isfresh)
+        return SciMLBase.build_linear_solution(
+            alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
+        )
     end
-    F = LinearSolve.@get_cacheval(cache, :GenericLUFactorization)[1]
-    # Prefer the pure-Julia back-solve for `LinearAlgebra.LU` (the common
-    # cacheval). Non-stdlib LU types (e.g. StaticArrays) keep their own `ldiv!`.
-    y = if F isa LinearAlgebra.LU
-        _generic_lu_ldiv!(cache.u, F, cache.b)
-    else
-        ldiv!(cache.u, F, cache.b)
-    end
+    cache.isfresh = false
+    y = cache.u
 
     if check_safety
         failed = _check_residual_safety(cache, alg, A_original, y)
@@ -720,8 +770,9 @@ function init_cacheval(
     )
     error_no_cudss_lu(A)
     A isa GPUArraysCore.AnyGPUArray && return nothing
-    ipiv = Vector{LinearAlgebra.BlasInt}(undef, 0)
-    return LinearAlgebra.generic_lufact!(_typed_copy(A), alg.pivot; check = false), ipiv
+    ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
+    fact = LinearAlgebra.generic_lufact!(_typed_copy(A), alg.pivot; check = false)
+    return _GenericLUFactorizationCache(fact, ipiv, nothing)
 end
 
 const PREALLOCATED_LU = ArrayInterface.lu_instance(rand(1, 1))

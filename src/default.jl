@@ -47,12 +47,18 @@ mutable struct DefaultLinearSolverInit{
 end
 
 function resize_cacheval!(cache, cacheval::DefaultLinearSolverInit, i)
+    resize_cacheval!(cache, cacheval.GenericLUFactorization, i)
     A_backup = cacheval.A_backup
     return if A_backup isa AbstractMatrix
         setfield!(cacheval, :A_backup, similar(A_backup, i, i))
         cacheval.a_backup_allocated = true
         cacheval.a_backup_synced = false
     end
+end
+
+function update_cacheval!(cache, cacheval::DefaultLinearSolverInit, name::Symbol, A)
+    name === :A && update_cacheval!(cache, cacheval.GenericLUFactorization, name, A)
+    return cacheval
 end
 
 @generated function __setfield!(cache::DefaultLinearSolverInit, alg::DefaultLinearSolver, v)
@@ -1192,14 +1198,13 @@ end
 @generated function defaultalg_adjoint_eval(cache::LinearCache, dy)
     ex = :()
     for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))
-        newex = if alg in Symbol.(
-                (
-                    DefaultAlgorithmChoice.RFLUFactorization,
-                    DefaultAlgorithmChoice.GenericLUFactorization,
-                )
-            )
+        newex = if alg == Symbol(DefaultAlgorithmChoice.RFLUFactorization)
             quote
                 getproperty(cache.cacheval, $(Meta.quot(alg)))[1]' \ dy
+            end
+        elseif alg == Symbol(DefaultAlgorithmChoice.GenericLUFactorization)
+            quote
+                getproperty(cache.cacheval, $(Meta.quot(alg))).fact' \ dy
             end
         elseif alg == Symbol(DefaultAlgorithmChoice.MKLLUFactorization)
             quote

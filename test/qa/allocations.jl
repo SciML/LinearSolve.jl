@@ -16,6 +16,43 @@ end
     return info
 end
 
+@check_allocs function allocation_checked_generic_lu_solve!(cache)
+    success = LinearSolve._generic_lu_solve!(
+        cache.cacheval, cache.A, cache.u, cache.b, cache.alg.pivot, cache.isfresh
+    )
+    cache.isfresh = !success
+    return success
+end
+
+function generic_lu_solve_allocations(cache, Awork, A)
+    copyto!(Awork, A)
+    cache.A = Awork
+    solve!(cache)
+    copyto!(Awork, A)
+    cache.A = Awork
+    return @allocated solve!(cache)
+end
+
+@testset "GenericLUFactorization solve! is allocation-free" begin
+    n = 100
+    A = rand(n, n) + n * I
+    b = rand(n)
+    cache = init(LinearProblem(copy(A), b), GenericLUFactorization())
+
+    A2 = rand(n, n) + n * I
+    if VERSION >= v"1.12"
+        @test generic_lu_solve_allocations(cache, cache.A, A2) == 0
+    else
+        generic_lu_solve_allocations(cache, cache.A, A2)
+    end
+    @test cache.u ≈ A2 \ b
+
+    copyto!(cache.A, A2)
+    cache.A = cache.A
+    @test allocation_checked_generic_lu_solve!(cache)
+    @test cache.u ≈ A2 \ b
+end
+
 function test_allocation_free_refactorization(alg, ::Type{T}) where {T}
     A1 = T[4 1; 2 3]
     A2 = T[3 -1; 1 2]

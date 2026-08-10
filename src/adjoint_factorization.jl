@@ -98,6 +98,8 @@ end
 function _standard_cache_factorization(cacheval)
     if cacheval isa Factorization
         return cacheval
+    elseif cacheval isa _GenericLUFactorizationCache
+        return cacheval.fact
     elseif cacheval isa Tuple && !isempty(cacheval) && first(cacheval) isa Factorization
         return first(cacheval)
     else

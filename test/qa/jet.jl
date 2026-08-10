@@ -133,7 +133,16 @@ end
     JET.@test_opt solve(prob_sparse, UMFPACKFactorization()) broken = true
     # Passes since the 5.0 lightweight solution: with the cache no longer
     # captured in the returned LinearSolution, the KLU solve is dispatch-clean.
-    JET.@test_opt solve(prob_sparse, KLUFactorization())
+    #
+    # Except on the LTS. `@SciMLMessage` in the failure branches expands to
+    # `Logging.@logmsg`, and on 1.10 the `Base.CoreLogging` path it enters
+    # reaches `Base.typejoin`, which is itself a runtime dispatch there. That
+    # makes *any* solve able to emit a log fail `@test_opt` on 1.10, regardless
+    # of anything LinearSolve does; 1.11 carries the Base fix. Measured on this
+    # assertion: 2 reports on 1.10.11, 0 on 1.12.6, and the 1.10 reports name
+    # only `typejoin`/`CoreLogging`/`_emit_log`, none of the KLU internals that
+    # #1148 and #1163 dealt with. See SciML/LinearSolve.jl#1190.
+    JET.@test_opt solve(prob_sparse, KLUFactorization()) broken = VERSION < v"1.11"
     JET.@test_opt solve(prob_sparse_spd, CHOLMODFactorization()) broken = true
 
     # SparspakFactorization requires Sparspak to be loaded

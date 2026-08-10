@@ -47,6 +47,17 @@ sol_arnoldi = solve(
 )
 @test sol_arnoldi.u ≈ [8.0, 7.0]
 
+# `using ArnoldiMethod` is what makes this backend available, and it binds
+# `ArnoldiMethod` to the module, so the unqualified constructor name is shadowed
+# here. `ArnoldiMethodJL` is the spelling that survives that, and every other
+# assertion in this file goes through the qualified form, which is why the
+# missing keyword constructor was never caught.
+@test ArnoldiMethodJL(; tol = 1.0e-12) == LinearSolve.ArnoldiMethod(; tol = 1.0e-12)
+sol_arnoldi_jl = solve(
+    EigenvalueProblem(A_backend; num_eigenpairs = 2), ArnoldiMethodJL()
+)
+@test sol_arnoldi_jl.u ≈ [8.0, 7.0]
+
 sol_arnoldi_default = solve(EigenvalueProblem(A_backend), LinearSolve.ArnoldiMethod())
 @test length(sol_arnoldi_default.u) == 6
 

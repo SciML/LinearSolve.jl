@@ -41,13 +41,22 @@ end
 ArpackJL(; kwargs...) = ArpackJL((; kwargs...))
 
 """
-    ArnoldiMethodJL
+    ArnoldiMethodJL(; kwargs...)
 
-Algorithm type constructed by [`ArnoldiMethod`](@ref); see its docstring for details.
+Same solver as [`ArnoldiMethod`](@ref); see its docstring for details.
+
+Prefer this spelling when the ArnoldiMethod.jl package is in scope. Loading that
+package is what makes this solver available, and it binds the name
+`ArnoldiMethod` to the module, so after `using LinearSolve, ArnoldiMethod` a bare
+`ArnoldiMethod(; kwargs...)` reaches the module rather than the constructor and
+fails with "objects of type Module are not callable". `ArnoldiMethodJL` does not
+collide, and matches how the other backends are named.
 """
 struct ArnoldiMethodJL{K <: NamedTuple} <: AbstractEigenvalueAlgorithm
     kwargs::K
 end
+
+ArnoldiMethodJL(; kwargs...) = ArnoldiMethodJL((; kwargs...))
 
 """
     ArnoldiMethod(; kwargs...)

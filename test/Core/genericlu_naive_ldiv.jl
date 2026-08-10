@@ -90,7 +90,7 @@ end
         b = rand(n)
         cache = init(LinearProblem(mk(copy(A)), copy(b)), GenericLUFactorization())
         sol = solve!(cache)
-        F = first(cache.cacheval)
+        F = cache.cacheval.fact
         xldiv = copy(b)
         ldiv!(F, xldiv)
         @test sol.u != xldiv
@@ -162,7 +162,7 @@ end
                 @test SciMLBase.successful_retcode(sol)
                 @test sol.u ≈ xref rtol = rtol * n
 
-                F = first(cache.cacheval)
+                F = cache.cacheval.fact
                 @test F.factors isa (wrap === adjoint ? Adjoint : Transpose)
 
                 x1 = copy(b)

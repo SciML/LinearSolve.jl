@@ -106,7 +106,18 @@ function LinearSolve.init_cacheval(
         history = IterativeSolvers.ConvergenceHistory(partial = true)
         history[:abstol] = abstol
         history[:reltol] = reltol
-        filter_kwargs(; idrs_s = 0, kwargs...) = kwargs
+        # `idrs_iterable!` takes the tolerances and the iteration cap
+        # positionally and accepts only `smoothing`/`verbose` as keywords, so
+        # every name passed positionally below has to be dropped here. Filtering
+        # `idrs_s` alone meant `IterativeSolversJL_IDRS(abstol = ...)` forwarded
+        # `abstol` as a keyword too and failed with a `MethodError`
+        # (SciML/LinearSolve.jl#24).
+        function filter_kwargs(;
+                idrs_s = 0, abstol = nothing, reltol = nothing,
+                maxiter = nothing, kwargs...
+            )
+            return kwargs
+        end
         IterativeSolvers.idrs_iterable!(
             history, u, A, b, s, Pl, abstol, reltol, maxiters;
             filter_kwargs(; alg.kwargs...)...
@@ -167,14 +178,21 @@ function SciMLBase.solve!(cache::LinearCache, alg::IterativeSolversJL; kwargs...
         # TODO inject callbacks KSP into solve! cb!(cache.cacheval)
     end
 
-    resid = cache.cacheval isa IterativeSolvers.IDRSIterable ? cache.cacheval.R :
-        cache.cacheval.residual
+    resid = _iterable_residual(cache.cacheval)
     if resid isa IterativeSolvers.Residual
         resid = resid.current
     end
 
     return SciMLBase.build_linear_solution(alg, cache.u, resid, nothing; iters = i)
 end
+
+# IterativeSolvers does not name this field consistently across its iterables.
+# Reading `.residual` unconditionally made `IterativeSolversJL_MINRES` throw a
+# `FieldError` on every solve, because `MINRESIterable` calls it `resnorm`
+# (SciML/LinearSolve.jl#24).
+_iterable_residual(iterable) = iterable.residual
+_iterable_residual(iterable::IterativeSolvers.IDRSIterable) = iterable.R
+_iterable_residual(iterable::IterativeSolvers.MINRESIterable) = iterable.resnorm
 
 purge_history!(iter, x, b) = nothing
 function purge_history!(iter::IterativeSolvers.GMRESIterable, x, b)

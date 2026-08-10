@@ -1087,6 +1087,96 @@ using BlockDiagonals
     @test solve(prob1, SimpleGMRES(; blocksize = 2)).u ≈ solve(prob2, SimpleGMRES()).u
 end
 
+@testset "BlockDiagonal blockwise factorizations (#203)" begin
+    BDExt = Base.get_extension(LinearSolve, :LinearSolveBlockDiagonalsExt)
+    BDFact = BDExt.BlockDiagonalFactorization
+
+    for bsizes in ([3, 3, 3, 3], [2, 3, 4])
+        A = BlockDiagonal([rand(n, n) + n * I for n in bsizes])
+        b = rand(size(A, 1))
+        xref = Matrix(A) \ b
+
+        # LU and QR factorize block by block instead of handing the whole
+        # BlockDiagonal to the generic scalar LinearAlgebra path.
+        for alg in (
+                LUFactorization(), LUFactorization(LinearAlgebra.NoPivot()),
+                QRFactorization(LinearAlgebra.NoPivot()),
+                QRFactorization(LinearAlgebra.ColumnNorm()),
+            )
+            cache = init(LinearProblem(A, copy(b)), alg)
+            @test cache.cacheval isa BDFact
+            sol = solve!(cache)
+            @test SciMLBase.successful_retcode(sol)
+            @test sol.u ≈ xref
+
+            # Re-solving with a new b reuses the stored per-block factorizations.
+            b2 = rand(size(A, 1))
+            cache.b = b2
+            @test solve!(cache).u ≈ Matrix(A) \ b2
+        end
+
+        # The algorithms that do not specialize keep working unchanged.
+        for alg in (nothing, GenericFactorization(), SimpleGMRES(), KrylovJL_GMRES())
+            s = alg === nothing ? solve(LinearProblem(A, copy(b))) :
+                solve(LinearProblem(A, copy(b)), alg)
+            @test s.u ≈ xref rtol = 1.0e-6
+        end
+
+        # Batched right hand sides go through the same per-block solves.
+        B = rand(size(A, 1), 3)
+        @test solve(LinearProblem(A, copy(B)), LUFactorization()).u ≈ Matrix(A) \ B
+    end
+
+    # Element types other than Float64 take the same path.
+    A32 = BlockDiagonal([rand(Float32, 3, 3) + 3I for _ in 1:3])
+    b32 = rand(Float32, size(A32, 1))
+    sol32 = solve(LinearProblem(A32, copy(b32)), LUFactorization())
+    @test eltype(sol32.u) === Float32
+    @test sol32.u ≈ Matrix(A32) \ b32 rtol = 1.0f-3
+
+    Ac = BlockDiagonal([rand(ComplexF64, 3, 3) + 3I for _ in 1:3])
+    bc = rand(ComplexF64, size(Ac, 1))
+    @test solve(LinearProblem(Ac, copy(bc)), LUFactorization()).u ≈ Matrix(Ac) \ bc
+
+    # A singular block reports failure rather than crashing.
+    Asing = BlockDiagonal([zeros(3, 3), rand(3, 3) + 3I])
+    sol_sing = solve(LinearProblem(Asing, rand(6)), LUFactorization())
+    @test sol_sing.retcode === ReturnCode.Failure
+
+    # Rectangular blocks do not decompose into independent square subsystems,
+    # so they keep the generic dense representation.
+    Arect = BlockDiagonal([rand(2, 3), rand(3, 2)])
+    cache_rect = init(LinearProblem(Arect, rand(5)), LUFactorization())
+    @test !(cache_rect.cacheval isa BDFact)
+
+    # residualsafety stays on the blockwise representation. The blocks are
+    # factorized from a copy so the residual check still sees an unfactored A.
+    Asafe = BlockDiagonal([rand(3, 3) + 3I for _ in 1:3])
+    bsafe = rand(size(Asafe, 1))
+    Asafe_before = Matrix(Asafe)
+    cache_safe = init(LinearProblem(Asafe, copy(bsafe)), LUFactorization(residualsafety = true))
+    @test cache_safe.cacheval isa BDFact
+    sol_safe = solve!(cache_safe)
+    @test SciMLBase.successful_retcode(sol_safe)
+    @test sol_safe.u ≈ Matrix(Asafe) \ bsafe
+    @test Matrix(cache_safe.A) ≈ Asafe_before
+
+    # The default algorithm picks the direct blockwise solve rather than falling
+    # through to the matrix-free KrylovJL_GMRES arm.
+    Adef = BlockDiagonal([rand(4, 4) + 4I for _ in 1:5])
+    bdef = rand(size(Adef, 1))
+    @test LinearSolve.defaultalg(Adef, bdef).alg ===
+        LinearSolve.DefaultAlgorithmChoice.LUFactorization
+    sol_def = solve(LinearProblem(Adef, copy(bdef)))
+    @test SciMLBase.successful_retcode(sol_def)
+    @test sol_def.u ≈ Matrix(Adef) \ bdef
+
+    # Rectangular blocks are not independent subsystems, so the default there
+    # stays on the generic operator handling.
+    @test LinearSolve.defaultalg(BlockDiagonal([rand(2, 3), rand(3, 2)]), rand(5)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
+end
+
 @testset "AbstractSparseMatrixCSC" begin
     struct MySparseMatrixCSC{Tv, Ti} <: SparseArrays.AbstractSparseMatrixCSC{Tv, Ti}
         csc::SparseMatrixCSC{Tv, Ti}

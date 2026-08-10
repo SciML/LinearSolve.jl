@@ -532,18 +532,18 @@ corresponds to a column of `b`.
 """
 function __init_u0_from_Ab(A, b)
     u0 = similar(b, size(A, 2))
-    fill!(u0, false)
+    fill!(u0, zero(eltype(u0)))
     return u0
 end
 function __init_u0_from_Ab(A, b::AbstractMatrix)
     u0 = similar(b, size(A, 2), size(b, 2))
-    fill!(u0, false)
+    fill!(u0, zero(eltype(u0)))
     return u0
 end
 __init_u0_from_Ab(::SMatrix{S1, S2}, b) where {S1, S2} = zeros(SVector{S2, eltype(b)})
 function __init_u0_from_Ab(::SMatrix{S1, S2}, b::AbstractMatrix) where {S1, S2}
     u0 = similar(b, S2, size(b, 2))
-    fill!(u0, false)
+    fill!(u0, zero(eltype(u0)))
     return u0
 end
 function __init_u0_from_Ab(

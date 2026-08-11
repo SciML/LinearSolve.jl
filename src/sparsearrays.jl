@@ -26,7 +26,13 @@ using SparseArrays: SparseArrays, AbstractSparseArray, AbstractSparseMatrixCSC,
 using SciMLLogging: @SciMLMessage
 
 @static if Base.USE_GPL_LIBS
-    using SparseArrays.UMFPACK: UMFPACK_OK
+    using SparseArrays.UMFPACK: UMFPACK_OK, get_umfpack_control,
+        JL_UMFPACK_PRL, JL_UMFPACK_DENSE_ROW, JL_UMFPACK_DENSE_COL,
+        JL_UMFPACK_BLOCK_SIZE, JL_UMFPACK_ORDERING,
+        JL_UMFPACK_FIXQ, JL_UMFPACK_AMD_DENSE, JL_UMFPACK_AGGRESSIVE,
+        JL_UMFPACK_SINGLETONS, JL_UMFPACK_ALLOC_INIT,
+        JL_UMFPACK_SYM_PIVOT_TOLERANCE, JL_UMFPACK_SCALE,
+        JL_UMFPACK_FRONT_ALLOC_INIT, JL_UMFPACK_DROPTOL, JL_UMFPACK_IRSTEP
 end
 using Base: /, \, convert
 using SciMLBase: SciMLBase, LinearProblem, ReturnCode
@@ -329,6 +335,61 @@ end
         )
     end
 
+    # `UMFPACK_CONTROL_KEYS` mapped to their index in UMFPACK's control vector.
+    # Keyed by name rather than exposing the raw vector so a caller never has to
+    # know the layout, and so an unknown setting is an error at construction
+    # instead of a silently ignored index.
+    const _UMFPACK_CONTROL_INDEX = (
+        prl = JL_UMFPACK_PRL,
+        dense_row = JL_UMFPACK_DENSE_ROW,
+        dense_col = JL_UMFPACK_DENSE_COL,
+        block_size = JL_UMFPACK_BLOCK_SIZE,
+        ordering = JL_UMFPACK_ORDERING,
+        fixq = JL_UMFPACK_FIXQ,
+        amd_dense = JL_UMFPACK_AMD_DENSE,
+        aggressive = JL_UMFPACK_AGGRESSIVE,
+        singletons = JL_UMFPACK_SINGLETONS,
+        alloc_init = JL_UMFPACK_ALLOC_INIT,
+        sym_pivot_tolerance = JL_UMFPACK_SYM_PIVOT_TOLERANCE,
+        scale = JL_UMFPACK_SCALE,
+        front_alloc_init = JL_UMFPACK_FRONT_ALLOC_INIT,
+        droptol = JL_UMFPACK_DROPTOL,
+        irstep = JL_UMFPACK_IRSTEP,
+    )
+
+    # UMFPACK's control vector for `alg`, or `nothing` when it asks for no
+    # overrides and SparseArrays' own defaults should stand.
+    #
+    # The vector is built fresh from `get_umfpack_control` rather than by editing
+    # a factorization's own `control` in place: the `Float64`/`Int` cacheval is
+    # the shared `PREALLOCATED_UMFPACK` const, and mutating it would leak the
+    # settings into every other cache. Starting from `get_umfpack_control` also
+    # keeps the entries the caller did not name, which a hand-built vector would
+    # drop (notably SparseArrays disabling iterative refinement).
+    function _umfpack_control(
+            alg::UMFPACKFactorization, ::Type{Tv}, ::Type{Ti}
+        ) where {Tv, Ti}
+        isempty(alg.control) && return nothing
+        control = get_umfpack_control(Tv, Ti)
+        for (setting, value) in pairs(alg.control)
+            control[_UMFPACK_CONTROL_INDEX[setting]] = value
+        end
+        return control
+    end
+
+    # `lu!` takes no `control`, so these settings can only ride in on a fresh
+    # `lu`. That is the path every first solve takes (the preallocated cacheval
+    # holds no stored entries, so the length check below always sends it here),
+    # and the reuse branch then inherits the control from the factorization this
+    # produced.
+    function _umfpack_lu(
+            alg::UMFPACKFactorization, S::SparseMatrixCSC{Tv, Ti}
+        ) where {Tv, Ti}
+        control = _umfpack_control(alg, Tv, Ti)
+        return control === nothing ? lu(S; check = false) :
+            lu(S; check = false, control = control)
+    end
+
     function SciMLBase.solve!(
             cache::LinearSolve.LinearCache, alg::UMFPACKFactorization; kwargs...
         )
@@ -340,12 +401,12 @@ end
             if alg.reuse_symbolic
                 # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
                 if length(cacheval.nzval) != length(nonzeros(A)) || alg.check_pattern && pattern_changed(cacheval, A)
-                    fact = lu(
+                    fact = _umfpack_lu(
+                        alg,
                         SparseMatrixCSC(
                             size(A)..., getcolptr(A), rowvals(A),
                             nonzeros(A)
-                        ),
-                        check = false
+                        )
                     )
                 else
                     fact = lu!(
@@ -357,9 +418,9 @@ end
                     )
                 end
             else
-                fact = lu(
-                    SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
-                    check = false
+                fact = _umfpack_lu(
+                    alg,
+                    SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A))
                 )
             end
             cache.cacheval = fact

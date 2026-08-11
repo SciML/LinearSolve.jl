@@ -1642,8 +1642,22 @@ end
 
 ################################## Factorizations which require solve! overloads
 
+# Entries of UMFPACK's control vector, in the spelling `UMFPACKFactorization`
+# accepts, mapped to their index by `_UMFPACK_CONTROL_INDEX` in `src/sparsearrays.jl`.
+# Names follow SuiteSparse's own (`UMFPACK_IRSTEP` -> `irstep`), so the UMFPACK
+# User Guide reads across directly.
+# `pivot_tolerance` is deliberately absent: SparseArrays only grew
+# `JL_UMFPACK_PIVOT_TOLERANCE` after the version the Julia LTS ships, so
+# accepting it would give an API that exists on release and not on LTS. It can
+# be added once the LTS carries it.
+const UMFPACK_CONTROL_KEYS = (
+    :prl, :dense_row, :dense_col, :block_size, :ordering,
+    :fixq, :amd_dense, :aggressive, :singletons, :alloc_init,
+    :sym_pivot_tolerance, :scale, :front_alloc_init, :droptol, :irstep,
+)
+
 """
-`UMFPACKFactorization(;reuse_symbolic=true, check_pattern=true)`
+`UMFPACKFactorization(; reuse_symbolic = true, check_pattern = true, control = (;))`
 
 A fast sparse multithreaded LU-factorization which specializes on sparsity
 patterns with “more structure”.
@@ -1656,10 +1670,64 @@ patterns with “more structure”.
     unnecessary recomputation. To further reduce computational overhead, you can disable
     pattern checks entirely by setting `check_pattern = false`. Note that this may error
     if the sparsity pattern does change unexpectedly.
+
+## UMFPACK control settings
+
+`control` overrides entries of UMFPACK's control vector, given as a `NamedTuple`
+of any of $(length(UMFPACK_CONTROL_KEYS)) settings:
+
+$(join(map(k -> "`" * String(k) * "`", UMFPACK_CONTROL_KEYS), ", ")).
+
+The names are SuiteSparse's own, lowercased (`UMFPACK_IRSTEP` becomes `irstep`),
+so the [UMFPACK User
+Guide](https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/UMFPACK/Doc/UMFPACK_UserGuide.pdf)
+documents them directly. Anything not named keeps the value SparseArrays
+defaults it to, so `control = (;)` (the default) leaves behaviour unchanged.
+
+Iterative refinement is the common case. SuiteSparse defaults `irstep` to `2`,
+but Julia's SparseArrays disables it (JuliaLang/julia#122), so it has to be
+asked for:
+
+```julia
+solve(prob, UMFPACKFactorization(control = (; irstep = 2)))
+```
+
+Refinement needs the original matrix, so it only applies while the factorization
+is used with the matrix it was computed from. Other settings tune the
+factorization itself, for instance a looser pivot threshold:
+
+```julia
+solve(prob, UMFPACKFactorization(control = (; sym_pivot_tolerance = 0.01)))
+```
 """
-Base.@kwdef struct UMFPACKFactorization <: AbstractSparseFactorization
-    reuse_symbolic::Bool = true
-    check_pattern::Bool = true # Check factorization re-use
+struct UMFPACKFactorization{C <: NamedTuple} <: AbstractSparseFactorization
+    reuse_symbolic::Bool
+    check_pattern::Bool # Check factorization re-use
+    control::C
+
+    function UMFPACKFactorization(
+            reuse_symbolic::Bool, check_pattern::Bool, control::C
+        ) where {C <: NamedTuple}
+        unknown = filter(!in(UMFPACK_CONTROL_KEYS), keys(control))
+        if !isempty(unknown)
+            throw(
+                ArgumentError(
+                    "unknown UMFPACK control setting(s) " *
+                        join(map(k -> "`" * String(k) * "`", unknown), ", ") *
+                        ". Valid settings are " *
+                        join(map(k -> "`" * String(k) * "`", UMFPACK_CONTROL_KEYS), ", ")
+                )
+            )
+        end
+        return new{C}(reuse_symbolic, check_pattern, control)
+    end
+end
+
+function UMFPACKFactorization(;
+        reuse_symbolic::Bool = true, check_pattern::Bool = true,
+        control::NamedTuple = (;)
+    )
+    return UMFPACKFactorization(reuse_symbolic, check_pattern, control)
 end
 
 function init_cacheval(

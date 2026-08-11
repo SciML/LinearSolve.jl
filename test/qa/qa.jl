@@ -98,6 +98,20 @@ backend_internal_imports = (
     :sparspaklu, Symbol("sparspaklu!"),
 )
 
+# The names of UMFPACK's control-vector entries, plus the constructor for a
+# control vector carrying SparseArrays' defaults. `UMFPACKFactorization`'s
+# `control` keyword is defined in terms of these, and SparseArrays.UMFPACK
+# marks none of them public.
+umfpack_control_imports = (
+    :get_umfpack_control,
+    :JL_UMFPACK_PRL, :JL_UMFPACK_DENSE_ROW, :JL_UMFPACK_DENSE_COL,
+    :JL_UMFPACK_BLOCK_SIZE, :JL_UMFPACK_ORDERING,
+    :JL_UMFPACK_FIXQ, :JL_UMFPACK_AMD_DENSE, :JL_UMFPACK_AGGRESSIVE,
+    :JL_UMFPACK_SINGLETONS, :JL_UMFPACK_ALLOC_INIT,
+    :JL_UMFPACK_SYM_PIVOT_TOLERANCE, :JL_UMFPACK_SCALE,
+    :JL_UMFPACK_FRONT_ALLOC_INIT, :JL_UMFPACK_DROPTOL, :JL_UMFPACK_IRSTEP,
+)
+
 # LinearSolve's own non-public names, imported from LinearSolve by its extensions.
 # Same class as the qualified accesses tracked in
 # https://github.com/SciML/LinearSolve.jl/issues/1058; promoting them is a separate
@@ -243,9 +257,12 @@ run_qa(
         all_explicit_imports_are_public = (;
             ignore = (
                 Symbol("@blasfunc"), :AbstractSciMLOperator, :AbstractSparseMatrixCSC,
-                :ArrayInterface, :BLASELTYPES, :BlasInt, :StaticArray, :UMFPACK_OK,
+                :ArrayInterface, :BLASELTYPES, :BlasInt,
+                :StaticArray, :UMFPACK_OK,
                 :build_eigenvalue_solution, :chkargsok, :chkfinite, :chkstride1,
-                :getcolptr, :inv, :pattern_changed, :require_one_based_indexing,
+                :getcolptr, :inv, :pattern_changed,
+                :require_one_based_indexing,
+                umfpack_control_imports...,
                 backend_internal_imports..., linearsolve_internal_imports...,
             ),
         ),

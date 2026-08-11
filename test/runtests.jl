@@ -77,6 +77,7 @@ else
             @time @safetestset "Zero Initialization Tests" include("Core/zeroinittests.jl")
             @time @safetestset "Non-Square Tests" include("Core/nonsquare.jl")
             @time @safetestset "SparseVector b Tests" include("Core/sparse_vector.jl")
+            @time @safetestset "UMFPACK control" include("Core/umfpack_control.jl")
             @time @safetestset "Nonstructural Zeros" include("Core/nonstructural_zeros.jl")
             @time @safetestset "Default Alg Tests" include("Core/default_algs.jl")
             @time @safetestset "FixedSizeArrays" include("Core/fixedsizearrays.jl")

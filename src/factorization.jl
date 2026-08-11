@@ -1646,8 +1646,12 @@ end
 # accepts, mapped to their index by `_UMFPACK_CONTROL_INDEX` in `src/sparsearrays.jl`.
 # Names follow SuiteSparse's own (`UMFPACK_IRSTEP` -> `irstep`), so the UMFPACK
 # User Guide reads across directly.
+# `pivot_tolerance` is deliberately absent: SparseArrays only grew
+# `JL_UMFPACK_PIVOT_TOLERANCE` after the version the Julia LTS ships, so
+# accepting it would give an API that exists on release and not on LTS. It can
+# be added once the LTS carries it.
 const UMFPACK_CONTROL_KEYS = (
-    :prl, :dense_row, :dense_col, :pivot_tolerance, :block_size, :ordering,
+    :prl, :dense_row, :dense_col, :block_size, :ordering,
     :fixq, :amd_dense, :aggressive, :singletons, :alloc_init,
     :sym_pivot_tolerance, :scale, :front_alloc_init, :droptol, :irstep,
 )
@@ -1693,7 +1697,7 @@ is used with the matrix it was computed from. Other settings tune the
 factorization itself, for instance a looser pivot threshold:
 
 ```julia
-solve(prob, UMFPACKFactorization(control = (; pivot_tolerance = 0.01)))
+solve(prob, UMFPACKFactorization(control = (; sym_pivot_tolerance = 0.01)))
 ```
 """
 struct UMFPACKFactorization{C <: NamedTuple} <: AbstractSparseFactorization

@@ -5,7 +5,7 @@ using LinearSolve, SparseArrays, LinearAlgebra, Test, Random
 # which notably means iterative refinement stays off (JuliaLang/julia#122) unless
 # `irstep` is asked for. See SciML/LinearSolve.jl#383.
 @static if Base.USE_GPL_LIBS
-    using SparseArrays.UMFPACK: JL_UMFPACK_IRSTEP, JL_UMFPACK_PIVOT_TOLERANCE,
+    using SparseArrays.UMFPACK: JL_UMFPACK_IRSTEP, JL_UMFPACK_SYM_PIVOT_TOLERANCE,
         JL_UMFPACK_PRL, get_umfpack_control
 
     # The control vector actually handed to UMFPACK for this cache.
@@ -87,14 +87,14 @@ using LinearSolve, SparseArrays, LinearAlgebra, Test, Random
             cache = init(
                 LinearProblem(copy(A), copy(b)),
                 UMFPACKFactorization(
-                    control = (; irstep = 2, pivot_tolerance = 0.5, prl = 1)
+                    control = (; irstep = 2, sym_pivot_tolerance = 0.5, prl = 1)
                 )
             )
             sol = solve!(cache)
             @test SciMLBase.successful_retcode(sol)
             control = cache_control(cache)
             @test control[JL_UMFPACK_IRSTEP] == 2
-            @test control[JL_UMFPACK_PIVOT_TOLERANCE] == 0.5
+            @test control[JL_UMFPACK_SYM_PIVOT_TOLERANCE] == 0.5
             @test control[JL_UMFPACK_PRL] == 1
         end
 

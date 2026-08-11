@@ -85,6 +85,44 @@ end
     end
 end
 
+# The R of a banded QR has upper bandwidth `l + u`, so factoring in place into
+# `A`'s own `(l, u)` storage drops the fill. That used to return a wrong answer
+# for square systems and a non-least-squares one for overdetermined ones, with no
+# error or warning. See #1202.
+@testset "Banded QR keeps the l+u fill (#1202)" begin
+    for (m, k, l, u) in (
+            (10, 6, 2, 1), (20, 8, 3, 2), (30, 11, 4, 3),
+            (10, 6, 2, 0), (10, 6, 0, 2),
+        )
+        Aod = BandedMatrix(brand(m, k, l, u))
+        bod = rand(m)
+        reference = Matrix(Aod) \ bod
+        sol = solve(LinearProblem(Aod, bod), QRFactorization())
+        @test sol.retcode == LinearSolve.ReturnCode.Success
+        @test sol.u ≈ reference
+        # The least-squares optimum, not merely some solution.
+        @test norm(Aod * sol.u - bod) <= norm(Aod * reference - bod) + 1.0e-10
+    end
+
+    # Square banded reaches QR only when asked for explicitly, and was wrong
+    # outright there rather than just suboptimal.
+    for (k, l, u) in ((8, 2, 1), (15, 3, 2))
+        Asq = BandedMatrix(brand(k, k, l, u))
+        Asq[band(0)] .+= k
+        bsq = rand(k)
+        sol = solve(LinearProblem(Asq, bsq), QRFactorization())
+        @test sol.retcode == LinearSolve.ReturnCode.Success
+        @test sol.u ≈ Matrix(Asq) \ bsq
+        @test norm(Asq * sol.u - bsq) < 1.0e-10
+    end
+
+    # `inplace = true` is the default and must agree with the explicit opt-out.
+    Aip = BandedMatrix(brand(12, 7, 2, 2))
+    bip = rand(12)
+    @test solve(LinearProblem(Aip, bip), QRFactorization()).u ≈
+        solve(LinearProblem(Aip, bip), QRFactorization(NoPivot(), false)).u
+end
+
 # Overdetermined
 A = BandedMatrix(ones(10, 8), (2, 0))
 b = rand(10)

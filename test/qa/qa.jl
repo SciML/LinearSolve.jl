@@ -243,9 +243,11 @@ run_qa(
         all_explicit_imports_are_public = (;
             ignore = (
                 Symbol("@blasfunc"), :AbstractSciMLOperator, :AbstractSparseMatrixCSC,
-                :ArrayInterface, :BLASELTYPES, :BlasInt, :StaticArray, :UMFPACK_OK,
+                :ArrayInterface, :BLASELTYPES, :BlasInt, :JL_UMFPACK_IRSTEP,
+                :StaticArray, :UMFPACK_OK,
                 :build_eigenvalue_solution, :chkargsok, :chkfinite, :chkstride1,
-                :getcolptr, :inv, :pattern_changed, :require_one_based_indexing,
+                :get_umfpack_control, :getcolptr, :inv, :pattern_changed,
+                :require_one_based_indexing,
                 backend_internal_imports..., linearsolve_internal_imports...,
             ),
         ),

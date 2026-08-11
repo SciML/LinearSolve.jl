@@ -26,7 +26,7 @@ using SparseArrays: SparseArrays, AbstractSparseArray, AbstractSparseMatrixCSC,
 using SciMLLogging: @SciMLMessage
 
 @static if Base.USE_GPL_LIBS
-    using SparseArrays.UMFPACK: UMFPACK_OK
+    using SparseArrays.UMFPACK: UMFPACK_OK, JL_UMFPACK_IRSTEP, get_umfpack_control
 end
 using Base: /, \, convert
 using SciMLBase: SciMLBase, LinearProblem, ReturnCode
@@ -329,6 +329,39 @@ end
         )
     end
 
+    # UMFPACK's control vector for `alg`, or `nothing` to leave whatever
+    # SparseArrays defaults to in place. Julia disables iterative refinement
+    # (JuliaLang/julia#122) while SuiteSparse defaults it to 2, so
+    # `max_iterative_refinement_steps` is the one entry this exposes.
+    #
+    # The vector is built fresh from `get_umfpack_control` rather than by editing
+    # a factorization's own `control` in place: the `Float64`/`Int` cacheval is
+    # the shared `PREALLOCATED_UMFPACK` const, and mutating it would leak the
+    # setting into every other cache. Starting from `get_umfpack_control` also
+    # keeps SparseArrays' remaining defaults, which a hand-built vector would drop.
+    function _umfpack_control(
+            alg::UMFPACKFactorization, ::Type{Tv}, ::Type{Ti}
+        ) where {Tv, Ti}
+        steps = alg.max_iterative_refinement_steps
+        steps === nothing && return nothing
+        control = get_umfpack_control(Tv, Ti)
+        control[JL_UMFPACK_IRSTEP] = steps
+        return control
+    end
+
+    # `lu!` takes no `control`, so a refinement setting can only ride in on a
+    # fresh `lu`. That is the path every first solve takes (the preallocated
+    # cacheval holds no stored entries, so the length check below always sends it
+    # here), and the reuse branch then inherits the control from the factorization
+    # this produced.
+    function _umfpack_lu(
+            alg::UMFPACKFactorization, S::SparseMatrixCSC{Tv, Ti}
+        ) where {Tv, Ti}
+        control = _umfpack_control(alg, Tv, Ti)
+        return control === nothing ? lu(S; check = false) :
+            lu(S; check = false, control = control)
+    end
+
     function SciMLBase.solve!(
             cache::LinearSolve.LinearCache, alg::UMFPACKFactorization; kwargs...
         )
@@ -340,12 +373,12 @@ end
             if alg.reuse_symbolic
                 # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
                 if length(cacheval.nzval) != length(nonzeros(A)) || alg.check_pattern && pattern_changed(cacheval, A)
-                    fact = lu(
+                    fact = _umfpack_lu(
+                        alg,
                         SparseMatrixCSC(
                             size(A)..., getcolptr(A), rowvals(A),
                             nonzeros(A)
-                        ),
-                        check = false
+                        )
                     )
                 else
                     fact = lu!(
@@ -357,9 +390,9 @@ end
                     )
                 end
             else
-                fact = lu(
-                    SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
-                    check = false
+                fact = _umfpack_lu(
+                    alg,
+                    SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A))
                 )
             end
             cache.cacheval = fact

@@ -1643,7 +1643,8 @@ end
 ################################## Factorizations which require solve! overloads
 
 """
-`UMFPACKFactorization(;reuse_symbolic=true, check_pattern=true)`
+`UMFPACKFactorization(; reuse_symbolic = true, check_pattern = true,
+                       max_iterative_refinement_steps = nothing)`
 
 A fast sparse multithreaded LU-factorization which specializes on sparsity
 patterns with “more structure”.
@@ -1656,10 +1657,46 @@ patterns with “more structure”.
     unnecessary recomputation. To further reduce computational overhead, you can disable
     pattern checks entirely by setting `check_pattern = false`. Note that this may error
     if the sparsity pattern does change unexpectedly.
+
+## Iterative refinement
+
+`max_iterative_refinement_steps` sets the maximum number of steps of iterative
+refinement UMFPACK performs on each solve, trading time for accuracy on
+ill-conditioned systems.
+
+SuiteSparse defaults this to `2`, but Julia's SparseArrays turns it off
+(JuliaLang/julia#122), and `nothing` (the default here) keeps whatever
+SparseArrays itself defaults to rather than pinning a value. Pass a nonnegative
+integer to choose explicitly: `2` restores SuiteSparse's default, `0` disables
+refinement.
+
+```julia
+solve(prob, UMFPACKFactorization(max_iterative_refinement_steps = 2))
+```
+
+Refinement needs the original matrix, so it only applies while the factorization
+is used with the matrix it was computed from.
 """
 Base.@kwdef struct UMFPACKFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool = true
     check_pattern::Bool = true # Check factorization re-use
+    max_iterative_refinement_steps::Union{Nothing, Int} = nothing
+
+    function UMFPACKFactorization(
+            reuse_symbolic::Bool, check_pattern::Bool,
+            max_iterative_refinement_steps::Union{Nothing, Int}
+        )
+        if max_iterative_refinement_steps !== nothing &&
+                max_iterative_refinement_steps < 0
+            throw(
+                ArgumentError(
+                    "`max_iterative_refinement_steps` must be nonnegative, got " *
+                        "$max_iterative_refinement_steps"
+                )
+            )
+        end
+        return new(reuse_symbolic, check_pattern, max_iterative_refinement_steps)
+    end
 end
 
 function init_cacheval(

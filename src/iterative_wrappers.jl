@@ -352,12 +352,33 @@ function init_cacheval(
     return solver
 end
 
-# Krylov.jl tries to init with `ArrayPartition(undef, ...)`. Avoid hitting that!
+# Krylov.jl allocates its workspace as `S(undef, n)` with `S = typeof(b)`, and
+# `ArrayPartition(undef, n)` is defined only for a single partition, since there is
+# no way to know how to split `n` across several. Krylov also requires `ktypeof(b)`
+# to match the workspace storage, so handing it plain `Vector` storage alongside a
+# partitioned right-hand side is rejected as well.
+#
+# So the Krylov solve runs on flat copies and the result is written back into the
+# partitioned `u`. `A` is passed through untouched: an `ArrayPartition` and the flat
+# vector it flattens to have the same length, so a matrix or an operator sized for
+# one multiplies the other unchanged. See SciML/LinearSolve.jl#384.
+#
+# The previous method here returned `nothing` to dodge the workspace allocation, but
+# it declared no `zeroinit`, so the `solve!` path below (which always passes
+# `zeroinit = false`) never reached it and hit the error anyway.
+_krylov_flat(x::RecursiveArrayTools.ArrayPartition) = copyto!(
+    similar(first(x.x), length(x)), x
+)
+
+# The cacheval is the flat cache the solve actually runs on, built once here and
+# reused so repeated solves keep the same Krylov workspace.
 function init_cacheval(
         alg::LinearSolve.KrylovJL, A, b::RecursiveArrayTools.ArrayPartition, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, ::LinearSolve.OperatorAssumptions
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::LinearSolve.OperatorAssumptions; zeroinit = true
     )
-    return nothing
+    flat = LinearProblem(A, _krylov_flat(b); u0 = _krylov_flat(u))
+    return init(flat, alg; abstol, reltol, maxiters, verbose, Pl, Pr, assumptions)
 end
 
 # Batched (matrix) right-hand sides: Krylov.jl provides block methods for GMRES
@@ -436,6 +457,32 @@ function _krylov_warm_start!(workspace, cache, mode::WarmStart.T, M, atol, rtol)
         bnorm = M === I ? norm(cache.b) : norm(ldiv!(similar(cache.b), M, cache.b))
     end
     return atol + rtol * bnorm, zero(rtol)
+end
+
+# The partitioned problem is solved on the flat cache built by `init_cacheval`
+# above: `b` and `A` are refreshed from the outer cache each time so matrix and
+# right-hand side updates carry over, and the answer is copied back into the
+# partitioned `u` the caller owns. See SciML/LinearSolve.jl#384.
+function SciMLBase.solve!(
+        cache::LinearCache{<:Any, <:RecursiveArrayTools.ArrayPartition},
+        alg::KrylovJL; kwargs...
+    )
+    flat = cache.cacheval
+    copyto!(flat.b, cache.b)
+    copyto!(flat.u, cache.u)
+    if cache.isfresh
+        flat.A = cache.A
+        cache.isfresh = false
+    end
+    flat.Pl, flat.Pr = cache.Pl, cache.Pr
+    flat.abstol, flat.reltol, flat.maxiters = cache.abstol, cache.reltol, cache.maxiters
+
+    sol = SciMLBase.solve!(flat, alg; kwargs...)
+    copyto!(cache.u, sol.u)
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, sol.resid, cache; retcode = sol.retcode,
+        iters = sol.iters, stats = sol.stats
+    )
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)

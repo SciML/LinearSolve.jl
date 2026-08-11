@@ -1,5 +1,6 @@
 module LinearSolveBandedMatricesExt
 
+using ArrayInterface: ArrayInterface
 using BandedMatrices: BandedMatrices, BandedMatrix
 using LinearAlgebra: LinearAlgebra, ColumnNorm, NoPivot, Symmetric, lu, lu!, qr, qr!
 # The `@eval` loops below generate `init_cacheval` methods for every algorithm type,
@@ -18,11 +19,10 @@ import LinearSolve: defaultalg,
 function defaultalg(A::BandedMatrix, b, oa::OperatorAssumptions{Bool})
     if oa.issq
         return DefaultLinearSolver(DefaultAlgorithmChoice.LUFactorization)
-    elseif LinearSolve.is_underdetermined(A)
-        error("No solver for underdetermined `A::BandedMatrix` is currently implemented!")
-    else
-        return DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
     end
+    # Both non-square cases go to QR. The underdetermined one is solved through
+    # the QR of `Aᵀ`; see `BandedUnderdeterminedQR`.
+    return DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
 end
 
 function defaultalg(
@@ -35,13 +35,55 @@ function defaultalg(A::Symmetric{<:Number, <:BandedMatrix}, b, ::OperatorAssumpt
     return DefaultLinearSolver(DefaultAlgorithmChoice.CholeskyFactorization)
 end
 
+raw"""
+    BandedUnderdeterminedQR(qr_of_transpose)
+
+The QR factorization of `transpose(A)` for an underdetermined (wide)
+`A::BandedMatrix`.
+
+BandedMatrices can factor a wide banded matrix but cannot solve with the result:
+`A \ b` throws `"Not implemented"`. The minimum-norm solution comes from the QR
+of `Aᵀ`, which is banded as well (the bandwidths simply swap), so the banded
+factorization still does the work rather than falling back to a dense one:
+
+```
+Aᵀ = Q R   ⟹   A = Rᵀ Qᵀ   ⟹   x = Q [Rᵀ \ b; 0]
+```
+
+That is the same minimum-norm solution LAPACK's dense `\` returns for an
+underdetermined system. See SciML/LinearSolve.jl#419.
+"""
+struct BandedUnderdeterminedQR{F}
+    qr_of_transpose::F
+end
+
+function LinearSolve._ldiv!(x, F::BandedUnderdeterminedQR, b)
+    nrows = length(b)
+    # `R` is upper triangular and square in its leading `nrows` block; the rows
+    # below it are structurally zero and contribute nothing to the solve.
+    R = view(F.qr_of_transpose.R, 1:nrows, 1:nrows)
+    y = LinearAlgebra.ldiv!(
+        LinearAlgebra.adjoint(LinearAlgebra.UpperTriangular(R)),
+        copyto!(similar(x, nrows), b)
+    )
+    # Pad with the zeros that make `x` the minimum-norm solution, then apply `Q`.
+    fill!(x, zero(eltype(x)))
+    copyto!(view(x, 1:nrows), y)
+    LinearAlgebra.lmul!(F.qr_of_transpose.Q, x)
+    return x
+end
+
 # BandedMatrices `qr` doesn't support column pivoting, so convert to dense when
 # pivoting is requested (e.g. ColumnNorm fallback from singular LU).
 function do_factorization(alg::QRFactorization, A::BandedMatrix, b, u)
-    if alg.pivot isa NoPivot
-        return alg.inplace ? qr!(A) : qr(A)
-    else
+    if !(alg.pivot isa NoPivot)
         return qr!(Matrix(A), alg.pivot)
+    elseif LinearSolve.is_underdetermined(A)
+        # `qr!` would factor `A` itself, which cannot then be solved with, so the
+        # transpose is always built fresh here regardless of `alg.inplace`.
+        return BandedUnderdeterminedQR(qr(BandedMatrix(transpose(A))))
+    else
+        return alg.inplace ? qr!(A) : qr(A)
     end
 end
 
@@ -75,6 +117,19 @@ function init_cacheval(
     ) where {T}
     (T <: BigFloat) && return qr(similar(A, 0, 0))
     return lu(similar(A, 0, 0))
+end
+
+# `cache.cacheval` is typed from this, and the underdetermined path stores a
+# `BandedUnderdeterminedQR` rather than a plain `QR`, so the placeholder has to be
+# that same wrapper. Square and overdetermined `A` keep the generic instance.
+function init_cacheval(
+        alg::QRFactorization{NoPivot}, A::BandedMatrix, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions
+    )
+    LinearSolve.is_underdetermined(A) ||
+        return ArrayInterface.qr_instance(A, alg.pivot)
+    return BandedUnderdeterminedQR(qr(BandedMatrix(transpose(similar(A, 0, 0)))))
 end
 
 # Column-pivoted QR on BandedMatrix converts to dense, so cache a dense QRPivoted

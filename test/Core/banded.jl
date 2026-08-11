@@ -31,11 +31,36 @@ sol1s = solve(LinearProblem(A1s, b1; u0 = x1))
 sol2s = solve(LinearProblem(A2s, b2; u0 = x2))
 @test sol2s.u ≈ A2s \ b2
 
-# Underdetermined
-A = BandedMatrix(rand(8, 10), (2, 2))
-b = rand(8)
+# Underdetermined. BandedMatrices can factor a wide matrix but `\` on the result
+# throws "Not implemented", so LinearSolve solves through the QR of `Aᵀ`, which is
+# banded too. The answer is the minimum-norm one, matching dense LAPACK. See #419.
+@testset "Underdetermined BandedMatrix (#419)" begin
+    for (m, n, l, u) in ((8, 10, 2, 2), (6, 10, 2, 1), (3, 12, 0, 2), (9, 10, 3, 2))
+        Aud = BandedMatrix(rand(m, n), (l, u))
+        bud = rand(m)
+        reference = Matrix(Aud) \ bud
 
-@test_throws ErrorException solve(LinearProblem(A, b)).u
+        for alg in (nothing, QRFactorization())
+            sol = alg === nothing ? solve(LinearProblem(Aud, bud)) :
+                solve(LinearProblem(Aud, bud), alg)
+            @test sol.retcode == LinearSolve.ReturnCode.Success
+            @test length(sol.u) == n
+            @test Aud * sol.u ≈ bud
+            # Of the infinitely many solutions, the minimum-norm one.
+            @test sol.u ≈ reference
+            @test norm(sol.u) <= norm(reference) + 1.0e-8
+        end
+    end
+
+    # The cached path factors once and reuses it, so check a re-solve too.
+    Aud = BandedMatrix(rand(6, 10), (2, 1))
+    bud1 = rand(6)
+    cache = init(LinearProblem(Aud, bud1), QRFactorization())
+    @test solve!(cache).u ≈ Matrix(Aud) \ bud1
+    bud2 = rand(6)
+    cache.b = bud2
+    @test solve!(cache).u ≈ Matrix(Aud) \ bud2
+end
 
 A = AlmostBandedMatrix(BandedMatrix(fill(2.0, n - 2, n), (1, 1)), fill(3.0, 2, n))
 A[band(0)] .+= 1:(n - 2)

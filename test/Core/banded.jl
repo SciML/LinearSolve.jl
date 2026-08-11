@@ -62,10 +62,28 @@ sol2s = solve(LinearProblem(A2s, b2; u0 = x2))
     @test solve!(cache).u ≈ Matrix(Aud) \ bud2
 end
 
-A = AlmostBandedMatrix(BandedMatrix(fill(2.0, n - 2, n), (1, 1)), fill(3.0, 2, n))
-A[band(0)] .+= 1:(n - 2)
+# `AlmostBandedMatrix` hits the same wall, and is solved the same way, except its
+# transpose cannot stay structured: banded plus dense fill rows transposes to
+# dense fill columns, so the QR of the transpose densifies. The answer is still
+# the minimum-norm one, so it agrees with the `BandedMatrix` path above.
+@testset "Underdetermined AlmostBandedMatrix (#419)" begin
+    for (m, k, l, u, nfill) in ((n - 2, n, 1, 1, 2), (5, 10, 2, 1, 3), (4, 9, 1, 2, 2))
+        Aud = AlmostBandedMatrix(BandedMatrix(fill(2.0, m, k), (l, u)), rand(nfill, k))
+        Aud[band(0)] .+= 1:m
+        bud = rand(m)
+        reference = Matrix(Aud) \ bud
 
-@test_throws ErrorException solve(LinearProblem(A, b)).u
+        for alg in (nothing, QRFactorization())
+            sol = alg === nothing ? solve(LinearProblem(Aud, bud)) :
+                solve(LinearProblem(Aud, bud), alg)
+            @test sol.retcode == LinearSolve.ReturnCode.Success
+            @test length(sol.u) == k
+            @test Matrix(Aud) * sol.u ≈ bud
+            @test sol.u ≈ reference
+            @test norm(sol.u) <= norm(reference) + 1.0e-8
+        end
+    end
+end
 
 # Overdetermined
 A = BandedMatrix(ones(10, 8), (2, 0))

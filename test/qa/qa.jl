@@ -132,7 +132,7 @@ linearsolve_internal_imports = (
 linearsolve_internal_accesses = (
     Symbol("@get_cacheval"), :ALREADY_WARNED_CUDSS, :AbstractFactorization,
     :AbstractKrylovSubspaceMethod, :DefaultAlgorithmChoice, :DefaultLinearSolver,
-    :DefaultLinearSolverInit, :GPUArraysCore, :LinearCache,
+    :DefaultLinearSolverInit, :GPUArraysCore, :LinearCache, :MinNormQR,
     :NONPERSISTENT_ZERO_FRACTION, :PERSISTENT_ZERO_FRACTION_THRESHOLD,
     :PrecompileTools, :SciMLLinearSolveAlgorithm, :SupernodalLU,
     :_SPARSE_LU_FALLBACK_ALGORITHMS, :_SPARSE_ONLY_ALGORITHMS,

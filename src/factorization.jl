@@ -157,6 +157,47 @@ end
 
 _ldiv!(x, A, b) = ldiv!(x, A, b)
 
+raw"""
+    MinNormQR(qr_of_transpose)
+
+The QR factorization of `transpose(A)` for an underdetermined (wide) `A`, used to
+produce the minimum-norm solution of `A x = b`.
+
+Structured matrix types can often factor a wide matrix but not solve with the
+result. Going through `Aᵀ` turns the underdetermined solve back into a
+triangular one:
+
+```
+Aᵀ = Q R   ⟹   A = Rᵀ Qᵀ   ⟹   x = Q [Rᵀ \ b; 0]
+```
+
+Padding with zeros before applying `Q` is what makes `x` the minimum-norm
+solution, the same one LAPACK's dense `\` returns for an underdetermined system.
+Which factorization to wrap is left to the caller, so each matrix type can pick
+the cheapest `Aᵀ` it can build. See SciML/LinearSolve.jl#419.
+"""
+struct MinNormQR{F}
+    qr_of_transpose::F
+end
+
+# Defined as `ldiv!` on our own type rather than as another `_ldiv!` method: the
+# generic `_ldiv!(x, A, b)` above forwards here, while adding a third `_ldiv!`
+# would be ambiguous with the `SVector` methods that follow it.
+function LinearAlgebra.ldiv!(x::AbstractVector, F::MinNormQR, b::AbstractVector)
+    nrows = length(b)
+    # `R` is upper triangular and square in its leading `nrows` block; the rows
+    # below it are structurally zero and contribute nothing to the solve.
+    R = view(F.qr_of_transpose.R, 1:nrows, 1:nrows)
+    y = ldiv!(
+        LinearAlgebra.adjoint(LinearAlgebra.UpperTriangular(R)),
+        copyto!(similar(x, nrows), b)
+    )
+    fill!(x, zero(eltype(x)))
+    copyto!(view(x, 1:nrows), y)
+    LinearAlgebra.lmul!(F.qr_of_transpose.Q, x)
+    return x
+end
+
 _ldiv!(x, A, b::SVector) = (x .= A \ b)
 _ldiv!(::SVector, A, b::SVector) = (A \ b)
 _ldiv!(::SVector, A, b) = (A \ b)

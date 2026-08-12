@@ -5,6 +5,7 @@ using SparseArrays
 # module only exists once every one of its triggers has been loaded. Loading the
 # cheaply-resolvable weakdeps here is what puts LinearSolve's extensions under QA.
 using AlgebraicMultigrid, ArnoldiMethod, Arpack, BandedMatrices, BlockDiagonals
+using ConjugateGradients
 using ChainRulesCore, CliqueTrees, EnzymeCore, FastAlmostBandedMatrices
 using FastLapackInterface, ForwardDiff, IterativeSolvers, JacobiDavidson
 using KernelAbstractions, KrylovKit, Mooncake, PureUMFPACK, RecursiveFactorization
@@ -35,6 +36,7 @@ loaded_extensions = (
     :LinearSolveAMDGPUExt, :LinearSolveAlgebraicMultigridExt,
     :LinearSolveArnoldiMethodExt, :LinearSolveArpackExt, :LinearSolveBLISExt,
     :LinearSolveBandedMatricesExt, :LinearSolveBlockDiagonalsExt,
+    :LinearSolveConjugateGradientsExt,
     :LinearSolveCUDAExt, :LinearSolveCUDSSExt, :LinearSolveChainRulesCoreExt,
     :LinearSolveCliqueTreesExt, :LinearSolveEnzymeExt,
     :LinearSolveFastAlmostBandedMatricesExt, :LinearSolveFastLapackInterfaceExt,

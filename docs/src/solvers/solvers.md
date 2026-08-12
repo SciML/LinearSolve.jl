@@ -503,6 +503,21 @@ CUSOLVERRFFactorization
 AlgebraicMultigridJL
 ```
 
+### ConjugateGradients.jl
+
+!!! note
+    
+    Using these solvers requires adding the package ConjugateGradients.jl, i.e. `using ConjugateGradients`
+
+ConjugateGradients.jl solves for real element types in a plain `Vector` only. Use
+the Krylov.jl or IterativeSolvers.jl wrappers for complex or other array types.
+
+```@docs
+ConjugateGradientsJL_CG
+ConjugateGradientsJL_BICGSTAB
+ConjugateGradientsJL
+```
+
 ### IterativeSolvers.jl
 
 !!! note

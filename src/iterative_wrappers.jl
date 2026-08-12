@@ -478,7 +478,9 @@ function SciMLBase.solve!(
     flat.abstol, flat.reltol, flat.maxiters = cache.abstol, cache.reltol, cache.maxiters
 
     sol = SciMLBase.solve!(flat, alg; kwargs...)
-    copyto!(cache.u, sol.u)
+    # `restructure` rather than `copyto!`: it rebuilds the partitioned shape from
+    # the flat solution without assuming `u` is writable or laid out to receive it.
+    cache.u = ArrayInterface.restructure(cache.u, sol.u)
     return SciMLBase.build_linear_solution(
         alg, cache.u, sol.resid, cache; retcode = sol.retcode,
         iters = sol.iters, stats = sol.stats

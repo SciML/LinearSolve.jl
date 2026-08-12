@@ -826,6 +826,62 @@ function KrylovKitJL_GMRES end
 
 """
 ```julia
+ConjugateGradientsJL(; solver = :cg, precs = nothing, kwargs...)
+```
+
+A wrapper over [ConjugateGradients.jl](https://github.com/mcovalt/ConjugateGradients.jl),
+which provides CG and BiCGStab.
+
+`solver` selects `:cg` or `:bicgstab`; the convenience constructors
+[`ConjugateGradientsJL_CG`](@ref) and [`ConjugateGradientsJL_BICGSTAB`](@ref) set it
+for you. Remaining keywords are forwarded to the underlying solver, so
+`bicgstab`'s `tolRho` can be passed through.
+
+ConjugateGradients.jl solves for real element types in a plain `Vector` only, so a
+complex or otherwise-typed problem is rejected at `init` rather than partway
+through a solve.
+
+!!! note
+
+    Using this solver requires adding the package ConjugateGradients.jl, i.e.
+    `using ConjugateGradients`
+"""
+struct ConjugateGradientsJL{P, K} <: LinearSolve.AbstractKrylovSubspaceMethod
+    solver::Symbol
+    precs::P
+    kwargs::K
+end
+
+"""
+```julia
+ConjugateGradientsJL_CG(; precs = nothing, kwargs...)
+```
+
+A wrapper over the ConjugateGradients.jl CG. See [`ConjugateGradientsJL`](@ref).
+
+!!! note
+
+    Using this solver requires adding the package ConjugateGradients.jl, i.e.
+    `using ConjugateGradients`
+"""
+function ConjugateGradientsJL_CG end
+
+"""
+```julia
+ConjugateGradientsJL_BICGSTAB(; precs = nothing, kwargs...)
+```
+
+A wrapper over the ConjugateGradients.jl BiCGStab. See [`ConjugateGradientsJL`](@ref).
+
+!!! note
+
+    Using this solver requires adding the package ConjugateGradients.jl, i.e.
+    `using ConjugateGradients`
+"""
+function ConjugateGradientsJL_BICGSTAB end
+
+"""
+```julia
 IterativeSolversJL(args...;
     generate_iterator = IterativeSolvers.gmres_iterable!,
     Pl = nothing, Pr = nothing,

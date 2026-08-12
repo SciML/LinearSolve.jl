@@ -45,9 +45,15 @@ function do_factorization(alg::QRFactorization, A::BandedMatrix, b, u)
         # solve goes through `Aᵀ`, which is banded too since the bandwidths swap.
         # `alg.inplace` does not apply: `A` itself is not what gets factored.
         return LinearSolve.MinNormQR(qr(BandedMatrix(transpose(A))))
-    else
-        return alg.inplace ? qr!(A) : qr(A)
     end
+    # `alg.inplace` is deliberately not honoured here. The R of a banded QR has
+    # upper bandwidth `l + u`, so factoring into `A`'s own `(l, u)` storage has
+    # nowhere to put the fill and drops it, silently returning a wrong answer for
+    # square systems and a non-least-squares one for overdetermined ones. `qr`
+    # allocates storage of the right bandwidth, so the copy is what makes the
+    # result correct rather than an avoidable overhead. See
+    # SciML/LinearSolve.jl#1202.
+    return qr(A)
 end
 
 function do_factorization(alg::LUFactorization, A::BandedMatrix, b, u)

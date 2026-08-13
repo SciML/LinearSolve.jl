@@ -88,6 +88,29 @@ prob = LS.LinearProblem(A, b)
 sol = LS.solve(prob, LS.KrylovJL_GMRES(precs = Returns((Pl, Pr))))
 ```
 
+## Can I use a Krylov solver with a custom array type?
+
+Yes, if the type implements the
+[SciMLStructures.jl](https://github.com/SciML/SciMLStructures.jl) interface.
+
+Krylov.jl allocates its workspace as `S(undef, n)` with `S = typeof(b)`, so a
+right-hand side whose type cannot be built that way never reaches an iteration.
+`RecursiveArrayTools.ArrayPartition` is the common example: it is stored as several
+separate arrays, so there is no way to know how to split `n` across them.
+
+For these, LinearSolve runs the Krylov solve on a flat buffer and rebuilds the
+original container afterwards, using `SciMLStructures.canonicalize` to obtain the
+buffer and the `repack` that inverts it. A type therefore needs:
+
+  - `SciMLStructures.isscimlstructure` returning `true`
+  - `SciMLStructures.canonicalize(SciMLStructures.Tunable(), x)` returning a flat
+    buffer, a `repack`, and whether the buffer aliases `x`
+  - `SciMLStructures.replace` (and `replace!` when the type supports it)
+
+`ArrayPartition` implements this in RecursiveArrayTools.jl and works out of the box.
+Note that the interface is only consulted for right-hand side types Krylov cannot
+allocate for; a plain `Vector` or `Matrix` takes the direct path.
+
 ## Why does LinearSolve.jl depend on MKL_jll, and how do I stop it from loading?
 
 MKL is the fastest BLAS on most x86 hardware, often by a wide margin, so LinearSolve.jl

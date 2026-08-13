@@ -352,33 +352,66 @@ function init_cacheval(
     return solver
 end
 
-# Krylov.jl allocates its workspace as `S(undef, n)` with `S = typeof(b)`, and
-# `ArrayPartition(undef, n)` is defined only for a single partition, since there is
-# no way to know how to split `n` across several. Krylov also requires `ktypeof(b)`
-# to match the workspace storage, so handing it plain `Vector` storage alongside a
-# partitioned right-hand side is rejected as well.
+# Krylov.jl allocates its workspace as `S(undef, n)` with `S = typeof(b)`, so a
+# right-hand side whose type cannot be built that way never reaches an iteration.
+# `ArrayPartition(undef, n)` is the motivating case: it is defined only for a single
+# partition, since there is no way to know how to split `n` across several. Krylov
+# also requires `ktypeof(b)` to match the workspace storage, so handing it plain
+# `Vector` storage alongside such a right-hand side is rejected too.
 #
-# So the Krylov solve runs on flat copies and the result is written back into the
-# partitioned `u`. `A` is passed through untouched: an `ArrayPartition` and the flat
-# vector it flattens to have the same length, so a matrix or an operator sized for
-# one multiplies the other unchanged. See SciML/LinearSolve.jl#384.
+# The way through is SciMLStructures: `canonicalize` gives a flat buffer of the
+# tunable values and a `repack` that rebuilds the original container, so the Krylov
+# solve runs flat and the answer is repacked into the `u` the caller owns. A type
+# that wants to work here needs only the SciMLStructures interface plus the two
+# forwarding methods below. See SciML/LinearSolve.jl#384.
 #
+# `A` is passed through untouched: the container and the flat buffer it canonicalizes
+# to have the same length, so a matrix or an operator sized for one multiplies the
+# other unchanged.
+_krylov_flat(x) = first(SciMLStructures.canonicalize(SciMLStructures.Tunable(), x))
+
+# Builds the flat cache the solve runs on. Kept separate from the dispatch below so
+# another conforming right-hand side type can forward to it unchanged.
+function _init_flat_krylov_cacheval(
+        alg, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol, verbose, assumptions
+    )
+    flat = LinearProblem(A, _krylov_flat(b); u0 = _krylov_flat(u))
+    return init(flat, alg; abstol, reltol, maxiters, verbose, Pl, Pr, assumptions)
+end
+
+# `b` and `A` are refreshed from the outer cache each time so matrix and right-hand
+# side updates carry over, and the answer is repacked into the caller's `u`.
+function _solve_flat_krylov!(cache::LinearCache, alg; kwargs...)
+    flat = cache.cacheval
+    copyto!(flat.b, cache.b)
+    copyto!(flat.u, cache.u)
+    if cache.isfresh
+        flat.A = cache.A
+        cache.isfresh = false
+    end
+    flat.Pl, flat.Pr = cache.Pl, cache.Pr
+    flat.abstol, flat.reltol, flat.maxiters = cache.abstol, cache.reltol, cache.maxiters
+
+    sol = SciMLBase.solve!(flat, alg; kwargs...)
+    _, repack, _ = SciMLStructures.canonicalize(SciMLStructures.Tunable(), cache.u)
+    cache.u = repack(sol.u)
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, sol.resid, cache; retcode = sol.retcode,
+        iters = sol.iters, stats = sol.stats
+    )
+end
+
 # The previous method here returned `nothing` to dodge the workspace allocation, but
 # it declared no `zeroinit`, so the `solve!` path below (which always passes
 # `zeroinit = false`) never reached it and hit the error anyway.
-_krylov_flat(x::RecursiveArrayTools.ArrayPartition) = copyto!(
-    similar(first(x.x), length(x)), x
-)
-
-# The cacheval is the flat cache the solve actually runs on, built once here and
-# reused so repeated solves keep the same Krylov workspace.
 function init_cacheval(
         alg::LinearSolve.KrylovJL, A, b::RecursiveArrayTools.ArrayPartition, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::LinearSolve.OperatorAssumptions; zeroinit = true
     )
-    flat = LinearProblem(A, _krylov_flat(b); u0 = _krylov_flat(u))
-    return init(flat, alg; abstol, reltol, maxiters, verbose, Pl, Pr, assumptions)
+    return _init_flat_krylov_cacheval(
+        alg, A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose, assumptions
+    )
 end
 
 # Batched (matrix) right-hand sides: Krylov.jl provides block methods for GMRES
@@ -467,24 +500,7 @@ function SciMLBase.solve!(
         cache::LinearCache{<:Any, <:RecursiveArrayTools.ArrayPartition},
         alg::KrylovJL; kwargs...
     )
-    flat = cache.cacheval
-    copyto!(flat.b, cache.b)
-    copyto!(flat.u, cache.u)
-    if cache.isfresh
-        flat.A = cache.A
-        cache.isfresh = false
-    end
-    flat.Pl, flat.Pr = cache.Pl, cache.Pr
-    flat.abstol, flat.reltol, flat.maxiters = cache.abstol, cache.reltol, cache.maxiters
-
-    sol = SciMLBase.solve!(flat, alg; kwargs...)
-    # `restructure` rather than `copyto!`: it rebuilds the partitioned shape from
-    # the flat solution without assuming `u` is writable or laid out to receive it.
-    cache.u = ArrayInterface.restructure(cache.u, sol.u)
-    return SciMLBase.build_linear_solution(
-        alg, cache.u, sol.resid, cache; retcode = sol.retcode,
-        iters = sol.iters, stats = sol.stats
-    )
+    return _solve_flat_krylov!(cache, alg; kwargs...)
 end
 
 function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)

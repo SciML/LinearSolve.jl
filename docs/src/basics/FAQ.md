@@ -90,26 +90,22 @@ sol = LS.solve(prob, LS.KrylovJL_GMRES(precs = Returns((Pl, Pr))))
 
 ## Can I use a Krylov solver with a custom array type?
 
-Yes, if the type implements the
-[SciMLStructures.jl](https://github.com/SciML/SciMLStructures.jl) interface.
+Yes, if `similar` works for it.
 
-Krylov.jl allocates its workspace as `S(undef, n)` with `S = typeof(b)`, so a
-right-hand side whose type cannot be built that way never reaches an iteration.
+Krylov.jl allocates its workspace as `S(undef, n)` with `S = typeof(b)`, so a type
+that cannot be built that way never reaches an iteration.
 `RecursiveArrayTools.ArrayPartition` is the common example: it is stored as several
 separate arrays, so there is no way to know how to split `n` across them.
 
-For these, LinearSolve runs the Krylov solve on a flat buffer and rebuilds the
-original container afterwards, using `SciMLStructures.canonicalize` to obtain the
-buffer and the `repack` that inverts it. A type therefore needs:
+For these, LinearSolve builds the workspace with
+[`Krylov.KrylovConstructor`](https://jso.dev/Krylov.jl/dev/inplace/#Krylov.KrylovConstructor),
+which uses `similar` on the vectors it is given rather than the `undef` constructor.
+The solve then runs on the caller's own array type, with no flattening and no
+copying, and `u` comes back in the same type it went in as.
 
-  - `SciMLStructures.isscimlstructure` returning `true`
-  - `SciMLStructures.canonicalize(SciMLStructures.Tunable(), x)` returning a flat
-    buffer, a `repack`, and whether the buffer aliases `x`
-  - `SciMLStructures.replace` (and `replace!` when the type supports it)
-
-`ArrayPartition` implements this in RecursiveArrayTools.jl and works out of the box.
-Note that the interface is only consulted for right-hand side types Krylov cannot
-allocate for; a plain `Vector` or `Matrix` takes the direct path.
+`ArrayPartition` works out of the box. Another type needs `similar` and the usual
+array operations Krylov uses, plus an `init_cacheval` method forwarding to
+`Krylov.KrylovConstructor` the way the `ArrayPartition` one does.
 
 ## Why does LinearSolve.jl depend on MKL_jll, and how do I stop it from loading?
 

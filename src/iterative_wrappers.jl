@@ -356,8 +356,13 @@ end
 # `ArrayPartition` cannot provide: it is stored as several separate arrays, so there
 # is no way to know how to split `n` across them, and its constructor says so rather
 # than guessing. `Krylov.KrylovConstructor` builds the workspace with `similar`
-# instead, which such a type does support, so the solve runs on the partitioned
-# vectors directly with no flattening and no copying.
+# instead, which an `ArrayPartition` does support, so the solve runs on the
+# partitioned vectors directly with no flattening and no copying.
+#
+# This covers array types only. A right-hand side that is not an array at all, such
+# as a parameter object implementing the SciMLStructures interface, supports neither
+# `S(undef, n)` nor `similar`, and needs canonicalizing to a flat buffer instead.
+# That case is not handled here.
 #
 # The previous method here returned `nothing` to dodge the workspace allocation, but
 # it declared no `zeroinit`, so the `solve!` path (which always passes

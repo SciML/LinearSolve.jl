@@ -336,3 +336,109 @@ end
         sum(solve(prob2).u)
     end
 end
+
+@testset "Preconditioners carry over to the adjoint solve (#476)" begin
+    # An adjoint solve that drops the forward preconditioner runs unpreconditioned, so on
+    # a system that needs preconditioning it stops at `maxiters` and the gradient is
+    # silently wrong rather than merely slow.
+    Random.seed!(476)
+    alg = KrylovJL_GMRES()
+
+    for m in (64, 256)
+        A = Diagonal(10.0 .^ range(-8, 8, m)) * (rand(m, m) + m * I)
+        bvec = rand(m)
+        Pl = Diagonal(diag(A))
+
+        uex = A \ bvec
+        λ = adjoint(A) \ (2 .* uex)
+        gA_ex = -(λ .* adjoint(uex))
+
+        gA, gb = Zygote.gradient(
+            (A, bvec) -> sum(abs2, solve(LinearProblem(A, bvec), alg; Pl = Pl).u),
+            A, bvec
+        )
+
+        @test norm(gb - λ) / norm(λ) < 1.0e-5
+        @test norm(gA - gA_ex) / norm(gA_ex) < 1.0e-5
+    end
+
+    # `Pl`/`Pr` on the sensealg override the derived pair, which is what a preconditioner
+    # with no usable `adjoint` needs.
+    m = 128
+    A = Diagonal(10.0 .^ range(-8, 8, m)) * (rand(m, m) + m * I)
+    bvec = rand(m)
+    Pl = Diagonal(diag(A))
+    λ = adjoint(A) \ (2 .* (A \ bvec))
+
+    gb = Zygote.gradient(
+        bvec -> sum(
+            abs2,
+            solve(
+                LinearProblem(A, bvec), alg;
+                Pl = Pl, sensealg = LinearSolveAdjoint(; Pr = adjoint(Pl))
+            ).u
+        ),
+        bvec
+    )[1]
+    @test norm(gb - λ) / norm(λ) < 1.0e-5
+
+    # A symmetric system solved by a method with no right slot keeps the preconditioner on
+    # the left instead of swapping it into a slot that would discard it.
+    S = rand(m, m)
+    S = S'S + m * I
+    bvec = rand(m)
+    Pl = Diagonal(diag(S))
+    λ = adjoint(S) \ (2 .* (S \ bvec))
+    gb = Zygote.gradient(
+        bvec -> sum(abs2, solve(LinearProblem(S, bvec), KrylovJL_CG(); Pl = Pl).u), bvec
+    )[1]
+    @test norm(gb - λ) / norm(λ) < 1.0e-5
+end
+
+@testset "An algorithm with its own precs is left alone (#476)" begin
+    # `precs` rebuilds the pair against `A'` when the adjoint problem is initialized, so
+    # deriving a second pair here would apply two preconditioners.
+    Random.seed!(4760)
+    m = 128
+    A = Diagonal(10.0 .^ range(-8, 8, m)) * (rand(m, m) + m * I)
+    bvec = rand(m)
+    λ = adjoint(A) \ (2 .* (A \ bvec))
+
+    alg = KrylovJL_GMRES(precs = (A, p) -> (Diagonal(diag(A)), I))
+    gb = Zygote.gradient(bvec -> sum(abs2, solve(LinearProblem(A, bvec), alg).u), bvec)[1]
+    @test norm(gb - λ) / norm(λ) < 1.0e-5
+end
+
+@testset "Adjoint preconditioner pairing (#476)" begin
+    m = 8
+    Pl = Diagonal(rand(m) .+ 1)
+    Pr = Diagonal(rand(m) .+ 1)
+    sensealg = LinearSolveAdjoint()
+
+    # Left preconditioning the forward system gives `Pl \ A`, whose adjoint is right
+    # preconditioned by `Pl'`, so the two sides swap.
+    aPl, aPr = LinearSolve._adjoint_precs(KrylovJL_GMRES(), sensealg, Pl, Pr)
+    @test aPl == adjoint(Pr)
+    @test aPr == adjoint(Pl)
+
+    # An identity side is dropped rather than passed along.
+    idPl, idPr = LinearSolve._adjoint_precs(
+        KrylovJL_GMRES(), sensealg, Pl, LinearSolve.IdentityOperator(m)
+    )
+    @test idPl === nothing
+    @test idPr == adjoint(Pl)
+
+    # Methods restricted to centered preconditioning keep the left preconditioner.
+    cgPl, cgPr = LinearSolve._adjoint_precs(
+        KrylovJL_CG(), sensealg, Pl, LinearSolve.IdentityOperator(m)
+    )
+    @test cgPl == adjoint(Pl)
+    @test cgPr === nothing
+
+    # Explicit overrides win over the derived pair.
+    ovPl, ovPr = LinearSolve._adjoint_precs(
+        KrylovJL_GMRES(), LinearSolveAdjoint(; Pl = Pl, Pr = Pr), Pl, Pr
+    )
+    @test ovPl === Pl
+    @test ovPr === Pr
+end

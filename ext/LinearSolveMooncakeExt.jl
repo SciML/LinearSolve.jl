@@ -94,6 +94,8 @@ function Mooncake.rrule!!(
         cachenew = init(LinearProblem(cache.A, cache.b), alg, _args...; kwargs...)
         new_sol = solve!(cachenew)
         ∂u = sol.dx.data.u
+        adj_alg = sensealg.linsolve === missing ? alg : sensealg.linsolve
+        adj_Pl, adj_Pr = LinearSolve._adjoint_precs(adj_alg, sensealg, cache.Pl, cache.Pr)
 
         if sensealg.linsolve === missing
             cached_adjoint_solution = LinearSolve._adjoint_factorization_solve(
@@ -103,18 +105,23 @@ function Mooncake.rrule!!(
                 cached_adjoint_solution
             elseif alg isa AbstractKrylovSubspaceMethod
                 LinearSolve._adjoint_krylov_solve(
-                    alg, cache.A, ∂u; cache.abstol, cache.reltol, cache.verbose
+                    alg, cache.A, ∂u; cache.abstol, cache.reltol, cache.verbose,
+                    Pl = adj_Pl, Pr = adj_Pr
                 )
             elseif alg isa DefaultLinearSolver
                 LinearSolve.defaultalg_adjoint_eval(cache, ∂u)
             else
                 invprob = LinearProblem(adjoint(A_), ∂u) # We cached `A`
-                solve(invprob, alg; cache.abstol, cache.reltol, cache.verbose).u
+                solve(
+                    invprob, alg; cache.abstol, cache.reltol, cache.verbose,
+                    Pl = adj_Pl, Pr = adj_Pr
+                ).u
             end
         else
             invprob = LinearProblem(adjoint(A_), ∂u) # We cached `A`
             λ = solve(
-                invprob, sensealg.linsolve; cache.abstol, cache.reltol, cache.verbose
+                invprob, sensealg.linsolve; cache.abstol, cache.reltol, cache.verbose,
+                Pl = adj_Pl, Pr = adj_Pr
             ).u
         end
 

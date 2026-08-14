@@ -187,10 +187,11 @@ _adjoint_factorization_solve(::_AdjointFactorizationReuse, alg, cacheval, A, b) 
     nothing
 
 function _adjoint_krylov_solve(
-        alg::AbstractKrylovSubspaceMethod, A, b; abstol, reltol, verbose
+        alg::AbstractKrylovSubspaceMethod, A, b; abstol, reltol, verbose,
+        Pl = nothing, Pr = nothing
     )
     invprob = LinearProblem(adjoint(A), b)
-    return solve(invprob, alg; abstol, reltol, verbose).u
+    return solve(invprob, alg; abstol, reltol, verbose, Pl, Pr).u
 end
 
 _custom_can_reuse_adjoint_factorization(::SimpleLUFactorization, ::LUSolver) = true

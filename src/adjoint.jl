@@ -54,6 +54,11 @@ function _adjoint_precs(alg, sensealg, Pl, Pr)
     userPl = sensealg isa LinearSolveAdjoint ? sensealg.Pl : missing
     userPr = sensealg isa LinearSolveAdjoint ? sensealg.Pr : missing
     _side(user, derived) = user === missing ? _drop_identity(derived) : user
+    # An algorithm carrying its own `precs` rebuilds the pair against `A'` when the adjoint
+    # problem is initialized, so deriving one here would apply two preconditioners.
+    if _has_own_precs(alg)
+        return _side(userPl, nothing), _side(userPr, nothing)
+    end
     if _supports_right_preconditioning(alg)
         return _side(userPl, adjoint(Pr)), _side(userPr, adjoint(Pl))
     end
@@ -62,6 +67,8 @@ function _adjoint_precs(alg, sensealg, Pl, Pr)
 end
 
 _drop_identity(P) = (P === nothing || _isidentity_struct(P)) ? nothing : P
+
+_has_own_precs(alg) = hasproperty(alg, :precs) && alg.precs !== nothing
 
 # Mirrors the preconditioner dispatch in the `KrylovJL` `solve!`, where the methods for
 # symmetric systems warn on and discard a right preconditioner.

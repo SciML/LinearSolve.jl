@@ -395,6 +395,20 @@ end
     @test norm(gb - λ) / norm(λ) < 1.0e-5
 end
 
+@testset "An algorithm with its own precs is left alone (#476)" begin
+    # `precs` rebuilds the pair against `A'` when the adjoint problem is initialized, so
+    # deriving a second pair here would apply two preconditioners.
+    Random.seed!(4760)
+    m = 128
+    A = Diagonal(10.0 .^ range(-8, 8, m)) * (rand(m, m) + m * I)
+    bvec = rand(m)
+    λ = adjoint(A) \ (2 .* (A \ bvec))
+
+    alg = KrylovJL_GMRES(precs = (A, p) -> (Diagonal(diag(A)), I))
+    gb = Zygote.gradient(bvec -> sum(abs2, solve(LinearProblem(A, bvec), alg).u), bvec)[1]
+    @test norm(gb - λ) / norm(λ) < 1.0e-5
+end
+
 @testset "Adjoint preconditioner pairing (#476)" begin
     m = 8
     Pl = Diagonal(rand(m) .+ 1)

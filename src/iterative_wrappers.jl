@@ -492,6 +492,16 @@ function _krylov_warm_start!(workspace, cache, mode::WarmStart.T, M, atol, rtol)
     return atol + rtol * bnorm, zero(rtol)
 end
 
+# The methods for symmetric systems below take centered preconditioning only, and warn on
+# and discard a right preconditioner. Keep this in step with the dispatch in `solve!`.
+function _supports_right_preconditioning(alg::KrylovJL)
+    return !(
+        alg.KrylovAlg === Krylov.cg! || alg.KrylovAlg === Krylov.minres! ||
+            alg.KrylovAlg === Krylov.block_minres! || alg.KrylovAlg === Krylov.cgls! ||
+            alg.KrylovAlg === Krylov.crls!
+    )
+end
+
 function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     if cache.precsisfresh && !isnothing(alg.precs)
         Pl, Pr = alg.precs(cache.A, cache.p)

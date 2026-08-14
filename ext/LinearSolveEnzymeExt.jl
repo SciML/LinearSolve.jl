@@ -720,11 +720,15 @@ function EnzymeRules.reverse(
             cached_adjoint_solution
         elseif _linsolve.alg isa LinearSolve.AbstractKrylovSubspaceMethod
             # Doesn't modify `A`, so it's safe to just reuse it
+            adj_Pl, adj_Pr = LinearSolve._adjoint_precs(
+                _linsolve.alg, _linsolve.sensealg, _linsolve.Pl, _linsolve.Pr
+            )
             LinearSolve._adjoint_krylov_solve(
                 _linsolve.alg, _linsolve.A, dy;
                 abstol = _linsolve.abstol,
                 reltol = _linsolve.reltol,
-                verbose = _linsolve.verbose
+                verbose = _linsolve.verbose,
+                Pl = adj_Pl, Pr = adj_Pr
             )
         elseif _linsolve.alg isa LinearSolve.DefaultLinearSolver
             LinearSolve.defaultalg_adjoint_eval(_linsolve, dy)

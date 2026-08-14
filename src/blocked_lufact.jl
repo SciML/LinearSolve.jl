@@ -53,9 +53,7 @@ end
     return kp, amax
 end
 
-# Unblocked factorization for the whole matrix at small sizes. Identical
-# control flow to the scalar `generic_lufact!` RowMaximum path, with hoisted
-# multipliers, `muladd`, and `@simd ivdep` on the column updates.
+# Keep small factorizations identical to the scalar `generic_lufact!` RowMaximum path.
 function _blocked_lu_unblocked!(A::AbstractMatrix{T}, ipiv, m::Int, n::Int) where {T}
     minmn = min(m, n)
     info = 0
@@ -79,8 +77,8 @@ function _blocked_lu_unblocked!(A::AbstractMatrix{T}, ipiv, m::Int, n::Int) wher
         end
         for j in (k + 1):n
             Akj = A[k, j]
-            @simd ivdep for i in (k + 1):m
-                A[i, j] = muladd(-A[i, k], Akj, A[i, j])
+            for i in (k + 1):m
+                A[i, j] -= A[i, k] * Akj
             end
         end
     end

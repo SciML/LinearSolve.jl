@@ -41,6 +41,17 @@ end
         @test !endswith(String(m_generic.file), "blocked_lufact.jl")
     end
 
+    @testset "small path matches scalar arithmetic" begin
+        A = randn(MersenneTwister(1234), 4, 4)
+        F = LinearSolve.generic_lufact!(copy(A), RowMaximum(), _ipiv(4); check = false)
+        A_scalar_dispatch = @view copy(A)[:, [1, 2, 3, 4]]
+        F_scalar = LinearSolve.generic_lufact!(
+            A_scalar_dispatch, RowMaximum(), _ipiv(4); check = false
+        )
+        @test F.factors == F_scalar.factors
+        @test F.ipiv == F_scalar.ipiv
+    end
+
     @testset "residual, square, default params ($T)" for T in (Float64, Float32)
         for n in (
                 1, 2, 3, 5, 7, 8, 9, 13, 16, 17, 31, 32, 33, 40, 41, 63, 64, 65,

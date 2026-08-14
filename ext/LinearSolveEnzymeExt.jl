@@ -621,6 +621,16 @@ function EnzymeRules.reverse(
     return (nothing, nothing)
 end
 
+"""
+    _shadow_of_constant(x)
+
+Shadow value to store alongside a constant assigned into a cache. A constant carries no
+derivative, so an array shadow is zeroed; anything else is a field the shadow cache holds
+verbatim (the staleness flags, the algorithm, a cacheval), and is passed through.
+"""
+_shadow_of_constant(x::AbstractArray) = zero(x)
+_shadow_of_constant(x) = x
+
 # `setproperty!` is the public way to change a `LinearCache` between solves, so it is the
 # one place that has to copy. Reverse restores what the assignment overwrote, which walks
 # the cache backwards into the state each earlier `solve!` ran against, and that is what
@@ -644,7 +654,7 @@ function EnzymeRules.augmented_primal(
     if !(cache isa Const)
         dcaches = EnzymeRules.width(config) == 1 ? (cache.dval,) : cache.dval
         dxs = if x isa Const
-            ntuple(_ -> EnzymeCore.make_zero(x.val), Val(EnzymeRules.width(config)))
+            ntuple(_ -> _shadow_of_constant(x.val), Val(EnzymeRules.width(config)))
         elseif EnzymeRules.width(config) == 1
             (x.dval,)
         else

@@ -78,6 +78,7 @@ else
             @time @safetestset "Non-Square Tests" include("Core/nonsquare.jl")
             @time @safetestset "SparseVector b Tests" include("Core/sparse_vector.jl")
             @time @safetestset "ArrayPartition" include("Core/arraypartition.jl")
+            @time @safetestset "SciMLStructures RHS" include("Core/scimlstructures_rhs.jl")
             @time @safetestset "UMFPACK control" include("Core/umfpack_control.jl")
             @time @safetestset "ConjugateGradients" include("Core/conjugategradients.jl")
             @time @safetestset "Nonstructural Zeros" include("Core/nonstructural_zeros.jl")

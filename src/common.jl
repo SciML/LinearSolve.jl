@@ -619,9 +619,90 @@ function _check_square_A_support(alg::SciMLLinearSolveAlgorithm, A)
     return nothing
 end
 
+# A right-hand side that implements the SciMLStructures interface but is not an
+# array cannot go through `__init` at all: it has no `eltype`, `length` or `similar`,
+# so the `abstol`/`reltol`/`maxiters` defaults below have nothing to work from, and it
+# fails at `real(eltype(prob.b))` before any algorithm is reached.
+#
+# `canonicalize` gives a flat buffer of the tunable values that every algorithm can
+# handle, plus the `repack` that rebuilds the container. The buffer is built once
+# here, and the solve writes back with `replace!` so repeated solves do not allocate
+# a new container each time. See SciML/LinearSolve.jl#1208.
+_is_structure_rhs(b) = !(b isa AbstractArray) && SciMLStructures.isscimlstructure(b)
+
+"""
+    StructureLinearCache(cache, b, repack)
+
+Wraps the flat `LinearCache` a structured right-hand side is actually solved on,
+keeping the caller's container and the `repack` that rebuilds it. See
+[`_is_structure_rhs`](@ref).
+"""
+mutable struct StructureLinearCache{C, B, U, R}
+    cache::C
+    b::B
+    # The container the answer is written into, built once so a repeated solve can
+    # `replace!` into it. Kept separate from `b`, which must not be overwritten.
+    u::U
+    repack::R
+end
+
 function SciMLBase.init(prob::LinearProblem, alg::SciMLLinearSolveAlgorithm, args...; kwargs...)
+    if _is_structure_rhs(prob.b)
+        buffer, repack, _ = SciMLStructures.canonicalize(
+            SciMLStructures.Tunable(), prob.b
+        )
+        flat = LinearProblem(prob.A, buffer; u0 = zero(buffer), p = prob.p)
+        return StructureLinearCache(
+            __init(flat, alg, args...; kwargs...), prob.b,
+            repack(zero(buffer)), repack
+        )
+    end
     return __init(prob, alg, args...; kwargs...)
 end
+
+# `b` is re-canonicalized when the caller assigns a new container, so an updated
+# right-hand side reaches the flat cache the solve runs on.
+function Base.setproperty!(cache::StructureLinearCache, sym::Symbol, v)
+    if sym === :b
+        buffer, repack, _ = SciMLStructures.canonicalize(SciMLStructures.Tunable(), v)
+        cache.cache.b = buffer
+        setfield!(cache, :repack, repack)
+        return setfield!(cache, :b, v)
+    elseif sym in (:A, :Pl, :Pr, :abstol, :reltol, :maxiters)
+        return setproperty!(cache.cache, sym, v)
+    end
+    return setfield!(cache, sym, v)
+end
+
+function Base.getproperty(cache::StructureLinearCache, sym::Symbol)
+    sym in (:cache, :b, :u, :repack) && return getfield(cache, sym)
+    return getproperty(getfield(cache, :cache), sym)
+end
+
+function SciMLBase.solve!(cache::StructureLinearCache, args...; kwargs...)
+    sol = SciMLBase.solve!(getfield(cache, :cache), args...; kwargs...)
+    # `replace!` into the solution container where the type allows it, so a repeated
+    # solve does not allocate a new one. `b` is never written to.
+    u = getfield(cache, :u)
+    if SciMLStructures.ismutablescimlstructure(u)
+        SciMLStructures.replace!(SciMLStructures.Tunable(), u, sol.u)
+    else
+        u = getfield(cache, :repack)(sol.u)
+        setfield!(cache, :u, u)
+    end
+    # `build_linear_solution` derives the solution's `N` from `size(u)`, which a
+    # container that is not an array does not answer, so the solution is built here
+    # with the element type of the canonical buffer and `N = 1`: the tunable portion
+    # is a flat vector by the interface's own contract.
+    return SciMLBase.LinearSolution{
+        eltype(sol.u), 1, typeof(u), typeof(sol.resid), typeof(sol.alg),
+        typeof(getfield(cache, :cache)), typeof(sol.stats),
+    }(
+        u, sol.resid, sol.alg, sol.retcode, sol.iters,
+        getfield(cache, :cache), sol.stats
+    )
+end
+
 
 function __init(
         prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
@@ -838,6 +919,14 @@ function SciMLBase.solve(
         prob::LinearProblem, ::Nothing, args...;
         assump = OperatorAssumptions(issquare(prob.A)), kwargs...
     )
+    # A structured right-hand side has no size or eltype for `defaultalg` to read,
+    # so the algorithm is chosen from the canonical buffer it will actually be
+    # solved on. `init` canonicalizes again and owns the repack; see
+    # `_is_structure_rhs`.
+    if _is_structure_rhs(prob.b)
+        buffer, = SciMLStructures.canonicalize(SciMLStructures.Tunable(), prob.b)
+        return solve(prob, defaultalg(prob.A, buffer, assump), args...; kwargs...)
+    end
     # Promote integer-eltype problems before choosing the algorithm, so the choice
     # and the cache agree on the types; see `__promote_int_problem`.
     prob = __promote_int_problem(prob, nothing)

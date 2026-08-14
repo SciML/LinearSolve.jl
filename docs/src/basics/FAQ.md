@@ -88,6 +88,32 @@ prob = LS.LinearProblem(A, b)
 sol = LS.solve(prob, LS.KrylovJL_GMRES(precs = Returns((Pl, Pr))))
 ```
 
+## Can I use a Krylov solver with a custom array type?
+
+Yes, if `similar` works for it.
+
+Krylov.jl allocates its workspace as `S(undef, n)` with `S = typeof(b)`, so a type
+that cannot be built that way never reaches an iteration.
+`RecursiveArrayTools.ArrayPartition` is the common example: it is stored as several
+separate arrays, so there is no way to know how to split `n` across them.
+
+For these, LinearSolve builds the workspace with
+[`Krylov.KrylovConstructor`](https://jso.dev/Krylov.jl/dev/inplace/#Krylov.KrylovConstructor),
+which uses `similar` on the vectors it is given rather than the `undef` constructor.
+The solve then runs on the caller's own array type, with no flattening and no
+copying, and `u` comes back in the same type it went in as.
+
+`ArrayPartition` works out of the box. Another array type needs `similar` and the
+usual array operations Krylov uses.
+
+A right-hand side that is not an array at all, such as a parameter object, is not
+supported yet: it has neither the `undef` constructor nor `similar`. The intended
+general answer there is the
+[SciMLStructures.jl](https://github.com/SciML/SciMLStructures.jl) interface, since a
+type implementing it can be canonicalized to a flat buffer and repacked afterwards,
+which works for containers that are not arrays. Tracked in
+[#1208](https://github.com/SciML/LinearSolve.jl/issues/1208).
+
 ## Why does LinearSolve.jl depend on MKL_jll, and how do I stop it from loading?
 
 MKL is the fastest BLAS on most x86 hardware, often by a wide margin, so LinearSolve.jl

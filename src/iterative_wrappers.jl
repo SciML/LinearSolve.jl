@@ -352,12 +352,66 @@ function init_cacheval(
     return solver
 end
 
-# Krylov.jl tries to init with `ArrayPartition(undef, ...)`. Avoid hitting that!
+# Krylov.jl allocates its workspace as `S(undef, n)` with `S = typeof(b)`, which an
+# `ArrayPartition` cannot provide: it is stored as several separate arrays, so there
+# is no way to know how to split `n` across them, and its constructor says so rather
+# than guessing. `Krylov.KrylovConstructor` builds the workspace with `similar`
+# instead, which an `ArrayPartition` does support, so the solve runs on the
+# partitioned vectors directly with no flattening and no copying.
+#
+# This covers array types only. A right-hand side that is not an array at all, such
+# as a parameter object implementing the SciMLStructures interface, supports neither
+# `S(undef, n)` nor `similar`, and needs canonicalizing to a flat buffer instead.
+# That case is not handled here.
+#
+# The previous method here returned `nothing` to dodge the workspace allocation, but
+# it declared no `zeroinit`, so the `solve!` path (which always passes
+# `zeroinit = false`) never reached it and hit the error anyway.
+#
+# `solve!` needs no specialization: the workspace holds the caller's array type
+# throughout, so the generic path writes the answer straight into it.
+# See SciML/LinearSolve.jl#384.
 function init_cacheval(
         alg::LinearSolve.KrylovJL, A, b::RecursiveArrayTools.ArrayPartition, u, Pl, Pr,
-        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, ::LinearSolve.OperatorAssumptions
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::LinearSolve.OperatorAssumptions; zeroinit = true
     )
-    return nothing
+    KS = get_KrylovJL_solver(alg.KrylovAlg)
+    kwargs_nt = NamedTuple(alg.kwargs)
+    # `b` sizes the range vectors and `u` the domain ones, so a rectangular operator
+    # gets the right shape on each side.
+    constructor = Krylov.KrylovConstructor(b, u)
+
+    solver = if (
+            alg.KrylovAlg === Krylov.dqgmres! ||
+                alg.KrylovAlg === Krylov.diom! ||
+                alg.KrylovAlg === Krylov.gmres! ||
+                alg.KrylovAlg === Krylov.fgmres! ||
+                alg.KrylovAlg === Krylov.gpmr! ||
+                alg.KrylovAlg === Krylov.fom!
+        )
+        memory = if haskey(kwargs_nt, :memory)
+            kwargs_nt[:memory]
+        elseif alg.gmres_restart == 0
+            min(20, size(A, 1))
+        else
+            alg.gmres_restart
+        end
+        KS(constructor; memory)
+    elseif (
+            alg.KrylovAlg === Krylov.minres! ||
+                alg.KrylovAlg === Krylov.symmlq! ||
+                alg.KrylovAlg === Krylov.lslq! ||
+                alg.KrylovAlg === Krylov.lsqr! ||
+                alg.KrylovAlg === Krylov.lsmr!
+        )
+        (alg.window != 0) ? KS(constructor; window = alg.window) : KS(constructor)
+    else
+        KS(constructor)
+    end
+
+    solver.x = u
+    return solver
 end
 
 # Batched (matrix) right-hand sides: Krylov.jl provides block methods for GMRES

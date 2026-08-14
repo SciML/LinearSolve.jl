@@ -20,6 +20,7 @@ using SciMLBase: SciMLBase, LinearAliasSpecifier,
 using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator,
     MatrixOperator,
     has_ldiv!, issquare
+using SciMLStructures: SciMLStructures
 using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_int,
     AbstractVerbositySpecifier, AbstractVerbosityPreset,
     Silent, InfoLevel, WarnLevel, MessageLevel, None, Minimal, Standard, Detailed, All

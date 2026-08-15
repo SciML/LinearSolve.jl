@@ -642,6 +642,7 @@ end
 
 function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
     A = cache.A
+    _check_woperator_convertible(alg, A)
     A = convert(AbstractMatrix, A)
     check_safety = alg.residualsafety && cache.isfresh
     needs_backup = check_safety ||
@@ -852,6 +853,50 @@ function init_cacheval(
         A::AbstractSciMLOperator, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
+# An out-of-place `WOperator`, or one over an operator Jacobian, rebuilds its concrete form
+# on `convert` and so can be factorized like any matrix; the operator fallback above would
+# leave the cacheval `nothing` and `solve!` would fail on the first assignment into it.
+function init_cacheval(
+        alg::LUFactorization,
+        A::WOperator, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions
+    )
+    (SciMLOperators.isconvertible(A) && _woperator_convert_rebuilds(A)) || return nothing
+    return ArrayInterface.lu_instance(convert(AbstractMatrix, A))
+end
+
+"""
+    _woperator_convert_rebuilds(W) -> Bool
+
+Whether `convert(AbstractMatrix, W)` rebuilds the concrete form from the current `gamma`
+and `J`, rather than handing back a buffer someone else maintains.
+
+For an in-place `WOperator` over a plain-matrix Jacobian it does not: `_concrete_form` is
+written by the operator's owner (OrdinaryDiffEq's `jacobian2W!`), so it is stale the moment
+`gamma` moves or `J` is written in place, and factorizing it gives a confidently wrong
+answer. Every other shape rebuilds and is safe.
+"""
+_woperator_convert_rebuilds(W::WOperator{true}) = W.J isa AbstractSciMLOperator
+_woperator_convert_rebuilds(::WOperator) = true
+
+"""
+    _check_woperator_convertible(alg, A)
+
+Guard a concrete factorization against a `WOperator` whose conversion is not current.
+
+Checked at `solve!` rather than `init_cacheval` on purpose: the default algorithm builds a
+cacheval for every slot up front, so refusing there would break problems that never reach
+this factorization at all.
+"""
+_check_woperator_convertible(alg, A) = nothing
+@noinline function _check_woperator_convertible(alg, W::WOperator)
+    _woperator_convert_rebuilds(W) || throw(
+        ArgumentError("$(nameof(typeof(alg))) cannot safely factorize an in-place WOperator over a plain-matrix Jacobian: its concrete form is maintained by the operator's owner, not rebuilt on conversion, so it is stale after any change of `gamma` or in-place write to `J`. Use `LHLFactorization`, which consumes the split form directly, or assemble the matrix yourself.")
     )
     return nothing
 end

@@ -39,7 +39,7 @@ end
     W = wop(J, 0.1)
     cache = init(LinearProblem(W, b), LHLFactorization(; refine = 0))
     solve!(cache)
-    ws = cache.cacheval
+    ws = cache.cacheval.ws
     @test ws.reduced
     # The solve claimed the operator by clearing the flag it was constructed with.
     @test !jacobian_stale(W)
@@ -69,6 +69,30 @@ end
     γ = 0.2 + 0.3im
     @test solve(LinearProblem(wop(J, γ; u = zeros(ComplexF64, n)), b), LHLFactorization()).u ≈
         dense(J, γ) \ b rtol = 1.0e-9
+end
+
+@testset "complex shift on a real Jacobian" begin
+    # RadauIIA's shape: `J` stays real and only the shift goes complex, so the expensive
+    # reduction is real and one of them can serve a complex γ.
+    n = 40
+    J = randn(MersenneTwister(31), n, n)
+    b = randn(MersenneTwister(32), ComplexF64, n)
+    γc = 0.03 + 0.02im
+    W = WOperator{true}(I, γc, J, zeros(ComplexF64, n))
+    for refine in (0, 1)
+        u = solve(LinearProblem(W, b), LHLFactorization(; refine)).u
+        @test u ≈ dense(J, γc) \ b rtol = 1.0e-9
+    end
+
+    cache = init(LinearProblem(W, b), LHLFactorization())
+    solve!(cache)
+    ws = cache.cacheval.ws
+    @test eltype(ws.factors) === Float64        # the reduction stays real
+    @test typeof(ws.σ) === ComplexF64           # only the shift is complex
+    for γ in (0.05 - 0.01im, 0.2 + 0.4im)
+        update_gamma!(cache, γ)
+        @test copy(solve!(cache).u) ≈ dense(J, γ) \ b rtol = 1.0e-9
+    end
 end
 
 @testset "singular shift reports failure" begin
@@ -101,19 +125,74 @@ end
 
     # Too small to pay for the reduction, or a general mass matrix: both keep whatever
     # the pre-existing operator path chose, rather than being intercepted.
-    b20 = randn(MersenneTwister(4), 20)
-    J20 = randn(MersenneTwister(3), 20, 20)
+    nsmall = LinearSolve.LHL_DEFAULT_MIN_SIZE - 1
+    b20 = randn(MersenneTwister(4), nsmall)
+    J20 = randn(MersenneTwister(3), nsmall, nsmall)
     small = LinearSolve.defaultalg(wop(J20, 0.1), b20, LinearSolve.OperatorAssumptions(true))
     @test !(small isa LHLFactorization)
     @test small == @invoke LinearSolve.defaultalg(
         wop(J20, 0.1)::SciMLOperators.AbstractSciMLOperator, b20,
         LinearSolve.OperatorAssumptions(true)
     )
+    # and one element above the cutoff it is selected
+    nbig = LinearSolve.LHL_DEFAULT_MIN_SIZE
+    @test LinearSolve.defaultalg(
+        wop(randn(MersenneTwister(7), nbig, nbig), 0.1), randn(MersenneTwister(8), nbig),
+        LinearSolve.OperatorAssumptions(true)
+    ) isa LHLFactorization
     Wmm = WOperator{true}(Diagonal(collect(1.0:200)), 0.1, J200, zeros(200))
     @test !(
         LinearSolve.defaultalg(Wmm, b200, LinearSolve.OperatorAssumptions(true)) isa
             LHLFactorization
     )
+end
+
+@testset "a different Jacobian is never served a stale reduction" begin
+    # Regression: keyed on the staleness flag alone, swapping in a *different* WOperator
+    # whose flag some other consumer had already cleared reused the old reduction and
+    # returned a confidently wrong answer (rel. error 0.89).
+    n = 60
+    J1 = randn(MersenneTwister(1), n, n)
+    J2 = randn(MersenneTwister(2), n, n)
+    b = randn(MersenneTwister(3), n)
+    W1, W2 = wop(J1, 0.1), wop(J2, 0.1)
+    cache = init(LinearProblem(W1, b), LHLFactorization(; refine = 0))
+    @test copy(solve!(cache).u) ≈ dense(J1, 0.1) \ b rtol = 1.0e-9
+
+    SciMLOperators.mark_jacobian_current!(W2)      # someone else already claimed it
+    @test !jacobian_stale(W2)
+    LinearSolve.reinit!(cache; A = W2)
+    @test copy(solve!(cache).u) ≈ dense(J2, 0.1) \ b rtol = 1.0e-9
+
+    # Same object, contents rewritten, flag raised: still reduces.
+    J2 .= randn(MersenneTwister(4), n, n)
+    mark_jacobian_updated!(W2)
+    @test copy(solve!(cache).u) ≈ dense(J2, 0.1) \ b rtol = 1.0e-9
+
+    # A bare matrix has no flag, so `isfresh` is the only signal and must be honoured.
+    A1 = randn(MersenneTwister(5), n, n)
+    A2 = randn(MersenneTwister(6), n, n)
+    c2 = init(LinearProblem(A1, b), LHLFactorization(; refine = 0))
+    @test copy(solve!(c2).u) ≈ A1 \ b rtol = 1.0e-9
+    LinearSolve.reinit!(c2; A = A2)
+    @test copy(solve!(c2).u) ≈ A2 \ b rtol = 1.0e-9
+end
+
+@testset "concrete factorizations refuse an externally-maintained WOperator" begin
+    # `convert(AbstractMatrix, ·)` hands back the owner-maintained `_concrete_form` for an
+    # in-place WOperator over a plain matrix, so it is stale after any gamma change. Better
+    # a loud error than a factorization of the wrong matrix.
+    n = 40
+    J = randn(MersenneTwister(15), n, n)
+    b = randn(MersenneTwister(16), n)
+    @test_throws ArgumentError solve(LinearProblem(wop(J, 0.1), b), LUFactorization())
+    # The guard sits on the factorization, not on cache construction: the default
+    # algorithm builds a cacheval for every slot, so throwing at init would break
+    # problems that never reach an LU.
+    @test init(LinearProblem(wop(J, 0.1), b), LUFactorization()) isa LinearSolve.LinearCache
+    # An operator-backed Jacobian does rebuild on conversion, so it is fine.
+    Wop = WOperator{true}(I, 0.1, SciMLOperators.MatrixOperator(J), zeros(n))
+    @test solve(LinearProblem(Wop, b), LUFactorization()).u ≈ dense(J, 0.1) \ b rtol = 1.0e-9
 end
 
 @testset "update_gamma! works for algorithms that are not LHL" begin

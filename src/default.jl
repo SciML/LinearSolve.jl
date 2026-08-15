@@ -210,10 +210,15 @@ end
     LinearSolve.LHL_DEFAULT_MIN_SIZE
 
 Smallest `n` at which `defaultalg` prefers `LHLFactorization` for a split `WOperator`.
-Measured, not derived: below it a fresh LU is cheap enough that the LHL solve — ~2× an
-LU's, and charged once per right-hand side — outweighs the saving on the shift.
+
+Measured, not derived. Costing one γ-cycle — a re-shift plus the ~14 solves it serves, with
+the reduction amortized over the ~55 γ a Jacobian serves, both ratios taken from
+instrumented BDF runs — against a fresh LU plus its solves, the default `refine = 1`
+crosses at `n ≈ 16` and reaches a 1.4× margin by `n = 32`; `refine = 0` wins from `n = 4`.
+The cutoff sits at the first size where the margin clears run-to-run noise rather than at
+the crossover itself.
 """
-const LHL_DEFAULT_MIN_SIZE = 100
+const LHL_DEFAULT_MIN_SIZE = 32
 
 # A `WOperator` holds `J` and `gamma` apart, which is the statement that the shift will
 # move while `J` stays put. When its Jacobian is a dense matrix, the algorithm that

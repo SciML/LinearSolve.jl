@@ -100,7 +100,7 @@ If LinearSolve.jl is part of your research, please cite it using
 
 ```bib
 @software{LinearSolve.jl,
-  author = {Will Kimmerer and Vedant Puri and Chris Rackauckas},
+  author = {Will Kimmerer and Vedant Puri and Jash Ambaliya and Chris Rackauckas},
   title = {LinearSolve.jl},
   url = {https://github.com/SciML/LinearSolve.jl}
 }

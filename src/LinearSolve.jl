@@ -12,7 +12,7 @@ using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, Bunc
     RowMaximum, RowNonZero, SymTridiagonal, Symmetric, Transpose,
     Tridiagonal, UniformScaling, axpby!, axpy!, bunchkaufman,
     bunchkaufman!,
-    cholesky, cholesky!, diagind, dot, inv, ldiv!, ldlt!, lu, lu!, mul!,
+    cholesky, cholesky!, diagind, dot, inv, issuccess, ldiv!, ldlt!, lu, lu!, mul!,
     norm,
     qr, qr!, svd, svd!
 using SciMLBase: SciMLBase, LinearAliasSpecifier,

@@ -216,6 +216,7 @@ LinearSolve.jl contains some linear solvers built in for specialized cases.
 ```@docs
 SimpleLUFactorization
 DiagonalFactorization
+LowRankUpdatedFactorization
 SimpleGMRES
 DirectLdiv!
 LinearSolveFunction

@@ -2,21 +2,26 @@
     LHLFactorization(; balance = true, refine = 1)
 
 Reduce the Jacobian once to upper Hessenberg form by Gaussian similarity transformations
-with partial pivoting — the *LHL factorization*, see [LHL.jl](https://github.com/SciML/LHL.jl) —
+with partial pivoting — the *LHL factorization*, see
+[LHLFactorization.jl](https://github.com/SciML/LHLFactorization.jl) —
 
     J = Z H Z⁻¹,   Z = D·P·L
 
 with `L` unit lower triangular (multipliers bounded by 1), `P` a permutation and `D` the
 balancing diagonal, and then solve
 
-    (I - γJ) x = b   as   x = Z (I - γH)⁻¹ Z⁻¹ b.
+    (J - M/γ) x = b   as   x = Z (H - M/γ)⁻¹ Z⁻¹ b.
 
 The shift is invisible to `Z`, so a **new `γ` costs `O(n²)`** (rebuild and re-factorize the
-Hessenberg `I - γH`) instead of the `O(n³)` of a fresh LU.  That is the point of the
+shifted Hessenberg) instead of the `O(n³)` of a fresh LU.  That is the point of the
 algorithm: adaptive implicit ODE solvers change `γ = c·dt` every step while holding `J`
-fixed for many steps.  Give it a [`ShiftedJacobian`](@ref) as the system matrix and change
-`γ` with [`update_gamma!`](@ref); this is also what `defaultalg` selects for a
-`ShiftedJacobian` large enough to pay for the reduction.
+fixed for many steps.
+
+Give it the system matrix unassembled, as a `SciMLOperators.WOperator` — the split
+`J - M/γ` an implicit solver already builds — and move the shift with
+[`update_gamma!`](@ref).  A `WOperator` whose Jacobian is a dense matrix is also what
+`defaultalg` selects this algorithm for, at sizes where the reduction pays.  The mass
+matrix must be a multiple of `I`.
 
 Handed an ordinary matrix `A`, it solves `Ax = b` as `Z H⁻¹ Z⁻¹ b`; that works, but it is
 strictly worse than an LU and the algorithm has no reason to be chosen.
@@ -68,24 +73,50 @@ function init_cacheval(
         alg::LHLFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
-    A isa AbstractMatrix || return LHLWorkspace{eltype(u)}(0)
+    (A isa AbstractMatrix || A isa WOperator) || return LHLWorkspace{eltype(u)}(0)
     return LHLWorkspace{eltype(A)}(size(A, 1))
 end
 
-_lhl_jacobian(W::ShiftedJacobian) = W.J
+"""
+    _lhl_jacobian(A)
+
+The matrix the reduction is taken of. For a split `W = -M/γ + J` that is `J`; for a bare
+matrix it is the matrix itself.
+"""
+_lhl_jacobian(W::WOperator) = _lhl_unwrap(W.J)
 _lhl_jacobian(A::AbstractMatrix) = A
-_lhl_shift_pair(W::ShiftedJacobian) = (W.β, W.α)
+_lhl_unwrap(J::AbstractMatrix) = J
+_lhl_unwrap(J::MatrixOperator) = convert(AbstractMatrix, J)
+
+"""
+    _lhl_shift_pair(A) -> (σ, τ)
+
+The system matrix as `σI + τJ`. `WOperator` holds `-M/γ + J` with `M = λI`, so
+`(σ, τ) = (-λ/γ, 1)`; a bare matrix is `(0, 1)`.
+"""
+function _lhl_shift_pair(W::WOperator)
+    λ = _lhl_massmatrix_λ(W.mass_matrix)
+    return (-λ / W.gamma, one(eltype(W)))
+end
 _lhl_shift_pair(A::AbstractMatrix) = (zero(eltype(A)), one(eltype(A)))
 
-# A `ShiftedJacobian` says exactly when `J` moved, so `isfresh` — which is also raised for
-# a mere change of shift — must not be allowed to force a reduction.  A bare matrix has no
-# such signal, so there `isfresh` is all there is.
-_lhl_needs_reduce(ws::LHLWorkspace, W::ShiftedJacobian, isfresh::Bool) =
-    ws.jac_version != W.jac_version || ws.n != size(W, 1)
+_lhl_massmatrix_λ(mm::UniformScaling) = mm.λ
+_lhl_massmatrix_λ(mm::Number) = mm
+function _lhl_massmatrix_λ(mm)
+    throw(
+        ArgumentError("LHLFactorization needs a mass matrix that is a multiple of I; got $(typeof(mm)). Reducing a general pencil to Hessenberg–triangular form is not implemented.")
+    )
+end
+
+# A `WOperator` says exactly when `J` moved, so `isfresh` — which is also raised for a mere
+# change of `gamma` — must not be allowed to force a reduction. A bare matrix has no such
+# signal, so there `isfresh` is all there is.
+_lhl_needs_reduce(ws::LHLWorkspace, W::WOperator, isfresh::Bool) =
+    ws.jac_version != jacobian_version(W) || ws.n != size(W, 1)
 _lhl_needs_reduce(ws::LHLWorkspace, A::AbstractMatrix, isfresh::Bool) =
     isfresh || ws.jac_version < 0 || ws.n != size(A, 1)
 
-_lhl_stamp!(ws::LHLWorkspace, W::ShiftedJacobian) = (ws.jac_version = W.jac_version)
+_lhl_stamp!(ws::LHLWorkspace, W::WOperator) = (ws.jac_version = jacobian_version(W))
 _lhl_stamp!(ws::LHLWorkspace, ::AbstractMatrix) = (ws.jac_version = 0)
 
 function _lhl_sync!(ws::LHLWorkspace, A, alg::LHLFactorization, isfresh::Bool)
@@ -104,8 +135,8 @@ end
 
 function SciMLBase.solve!(cache::LinearCache, alg::LHLFactorization; kwargs...)
     A = cache.A
-    A isa AbstractMatrix || throw(
-        ArgumentError("LHLFactorization requires a matrix or a ShiftedJacobian, got $(typeof(A))")
+    (A isa AbstractMatrix || A isa WOperator) || throw(
+        ArgumentError("LHLFactorization requires a matrix or a WOperator, got $(typeof(A))")
     )
     ws = LinearSolve.@get_cacheval(cache, :LHLFactorization)
     # Sync unconditionally rather than only on `isfresh`: an integer and a scalar compare
@@ -128,45 +159,38 @@ end
 """
     update_gamma!(cache::LinearCache, γ) -> cache
 
-Set the shift of the cache's [`ShiftedJacobian`](@ref) to `γ` and make the cached
-factorization current for it again.
+Set the `gamma` of the cache's `WOperator` — making its system matrix `J - M/γ` — and make
+the cached factorization current for it again.
 
 With [`LHLFactorization`](@ref) this is the cheap path the algorithm exists for: `O(n²)`,
-re-using the reduction of `J`.  With any other algorithm it simply invalidates the
-factorization, so the next `solve!` refactorizes `I - γJ` from scratch — correct, just not
-cheap.  Callers may therefore use it unconditionally.
+re-using the reduction of `J`.  With any other algorithm that can consume a `WOperator` it
+simply invalidates the factorization, so the next `solve!` rebuilds from scratch — correct,
+just not cheap.  Callers may therefore use it without checking which algorithm is in play.
 
 Changing the *contents* of `J` is a separate event; announce it with
-[`mark_jacobian_updated!`](@ref).
+`SciMLOperators.mark_jacobian_updated!`.
 """
-update_gamma!(cache::LinearCache, γ) = update_shift!(cache, -γ, oneunit(γ))
-
-"""
-    update_shift!(cache::LinearCache, α, β) -> cache
-
-The general form of [`update_gamma!`](@ref): make the cache's system matrix `α*J + β*I`.
-
-`update_gamma!(cache, γ)` is `update_shift!(cache, -γ, 1)`; an implicit ODE solver using
-the W-transform `W = J - M/(dt·γ)` wants `update_shift!(cache, 1, -inv(dt*γ))`.
-"""
-function update_shift!(cache::LinearCache, α, β)
+function update_gamma!(cache::LinearCache, γ)
     A = cache.A
-    A isa ShiftedJacobian || throw(
-        ArgumentError("update_gamma!/update_shift! need the cache's `A` to be a `ShiftedJacobian`, got $(typeof(A))")
+    A isa WOperator || throw(
+        ArgumentError("update_gamma! needs the cache's `A` to be a `WOperator`, got $(typeof(A))")
     )
-    set_shift!(A, α, β)
-    _update_shift!(cache, LinearSolve.@get_cacheval(cache, :LHLFactorization), A)
+    SciMLOperators.update_coefficients!(A; gamma = γ)
+    # `cache.cacheval` directly, not `@get_cacheval`: the algorithm in play may be the
+    # default solver, whose cacheval struct has no `LHLFactorization` slot.
+    _update_gamma!(cache, cache.cacheval, A)
     return cache
 end
 
-_update_shift!(cache::LinearCache, ::Any, ::ShiftedJacobian) = (cache.isfresh = true)
+_update_gamma!(cache::LinearCache, ::Any, ::WOperator) = (cache.isfresh = true)
 
-function _update_shift!(cache::LinearCache, ws::LHLWorkspace, A::ShiftedJacobian)
+function _update_gamma!(cache::LinearCache, ws::LHLWorkspace, A::WOperator)
     if cache.isfresh || _lhl_needs_reduce(ws, A, cache.isfresh)
         cache.isfresh = true
         return cache
     end
-    lhl_shift!(ws, A.β, A.α)
-    ws.σ, ws.τ = A.β, A.α
+    σ, τ = _lhl_shift_pair(A)
+    lhl_shift!(ws, σ, τ)
+    ws.σ, ws.τ = σ, τ
     return cache
 end

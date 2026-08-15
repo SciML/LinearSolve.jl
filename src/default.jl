@@ -209,26 +209,31 @@ end
 """
     LinearSolve.LHL_DEFAULT_MIN_SIZE
 
-Smallest `n` at which `defaultalg` prefers `LHLFactorization` for a `ShiftedJacobian`.
+Smallest `n` at which `defaultalg` prefers `LHLFactorization` for a split `WOperator`.
 Measured, not derived: below it a fresh LU is cheap enough that the LHL solve — ~2× an
 LU's, and charged once per right-hand side — outweighs the saving on the shift.
 """
 const LHL_DEFAULT_MIN_SIZE = 100
 
-# Wrapping a system matrix as a `ShiftedJacobian` is itself the statement that the shift
-# will move while `J` stays put; nothing else constructs one. So the default for it is the
-# algorithm that exploits exactly that.
-
-function defaultalg(A::ShiftedJacobian, b, assump::OperatorAssumptions{Bool})
-    if assump.issq && A.J isa DenseMatrix && size(A, 1) >= LHL_DEFAULT_MIN_SIZE
+# A `WOperator` holds `J` and `gamma` apart, which is the statement that the shift will
+# move while `J` stays put. When its Jacobian is a dense matrix, the algorithm that
+# exploits that split is the right default; a matrix-free `J` still wants Krylov.
+function defaultalg(A::WOperator, b, assump::OperatorAssumptions{Bool})
+    J = A.J isa MatrixOperator ? convert(AbstractMatrix, A.J) : A.J
+    if assump.issq && J isa DenseMatrix && size(A, 1) >= LHL_DEFAULT_MIN_SIZE &&
+            _lhl_scalar_massmatrix(A.mass_matrix)
         # Refinement is the right default for a bare linear solve; a caller running an
         # outer correction loop should ask for `LHLFactorization(refine = 0)`.
         return LHLFactorization()
     end
-    # Anything else materializes: a `ShiftedJacobian` is lazy and cannot be factorized in
-    # place, so the fallback has to be an algorithm with an allocating path.
-    return LUFactorization()
+    # Everything else — a matrix-free Jacobian, a general mass matrix, or a problem too
+    # small to pay for the reduction — keeps whatever the operator path already chose.
+    return @invoke defaultalg(A::SciMLOperators.AbstractSciMLOperator, b, assump)
 end
+
+_lhl_scalar_massmatrix(::UniformScaling) = true
+_lhl_scalar_massmatrix(::Number) = true
+_lhl_scalar_massmatrix(::Any) = false
 
 function defaultalg(A::Symmetric{<:Number, <:Array}, b, ::OperatorAssumptions{Bool})
     return DefaultLinearSolver(DefaultAlgorithmChoice.BunchKaufmanFactorization)

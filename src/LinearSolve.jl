@@ -6,8 +6,9 @@ end
 
 import PrecompileTools
 using ArrayInterface: ArrayInterface
-using LHL: LHL, LHLWorkspace, ShiftedJacobian, lhl_reduce!, lhl_shift!, lhl_ldiv!,
-    lhl_refine!, mark_jacobian_updated!, set_shift!
+# Explicit names, not the module: LinearSolve defines its own `LHLFactorization` (the
+# algorithm object) and `using LHLFactorization` would shadow it.
+using LHLFactorization: LHLWorkspace, lhl_reduce!, lhl_shift!, lhl_ldiv!, lhl_refine!
 using Base: Bool, convert, copyto!, adjoint, transpose, /, \, require_one_based_indexing
 using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, BunchKaufman,
     ColumnNorm, cond, Diagonal, Factorization, Hermitian, I, LAPACK, NoPivot,
@@ -20,7 +21,7 @@ using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, Bunc
 using SciMLBase: SciMLBase, LinearAliasSpecifier,
     init, solve!, reinit!, solve, ReturnCode, LinearProblem
 using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator,
-    MatrixOperator,
+    MatrixOperator, WOperator, jacobian_version, mark_jacobian_updated!,
     has_ldiv!, issquare
 using SciMLStructures: SciMLStructures
 using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_int,
@@ -780,9 +781,9 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
     SpecializedLUFactorization, SpecializedQRFactorization,
     HSLMA57Factorization, HSLMA97Factorization
 
-export LHLFactorization, update_gamma!, update_shift!
-# Re-exported from LHL.jl, which owns the split-W representation itself.
-export ShiftedJacobian, mark_jacobian_updated!, set_shift!
+export LHLFactorization, update_gamma!
+# Re-exported from SciMLOperators: announcing a new Jacobian is part of using the split form.
+export mark_jacobian_updated!
 
 export LinearSolveFunction, DirectLdiv!, show_algorithm_choices
 

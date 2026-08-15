@@ -228,24 +228,25 @@ An implicit ODE/DAE solver factorizes `W = I - γJ` (or `J - M/(dt·γ)`) at eve
 `γ` changes with the step size far more often than `J` does. `LHLFactorization` reduces `J`
 to Hessenberg form once and absorbs each new `γ` in `O(n²)`.
 
-Hand it the system matrix in split form as a `ShiftedJacobian` — a lazy `AbstractMatrix`
-equal to `I - γJ`, re-exported from [LHL.jl](https://github.com/SciML/LHL.jl), which owns
-the factorization itself — and move the shift with `update_gamma!`. Constructing a
-`ShiftedJacobian` is enough to make this the default algorithm at sizes where it pays.
+Hand it the system matrix unassembled, as the `SciMLOperators.WOperator` that holds `J`
+and `γ` apart, and move the shift with `update_gamma!`. The factorization itself lives in
+[LHLFactorization.jl](https://github.com/SciML/LHLFactorization.jl). A `WOperator` with a
+dense Jacobian is also what `defaultalg` selects this algorithm for, at sizes where the
+reduction pays.
 
 ```julia
-A = ShiftedJacobian(J, 0.01)          # lazily == I - 0.01J
-cache = init(LinearProblem(A, b), LHLFactorization())
+using SciMLOperators
+W = WOperator{true}(I, 0.01, J, similar(b))   # == J - I/0.01
+cache = init(LinearProblem(W, b), LHLFactorization())
 u1 = solve!(cache).u
 update_gamma!(cache, 0.013)           # O(n²): reuses the reduction of J
 u2 = solve!(cache).u
-J .= newJ; mark_jacobian_updated!(A)  # next solve redoes the O(n³) reduction
+J .= newJ; mark_jacobian_updated!(W)  # next solve redoes the O(n³) reduction
 ```
 
 ```@docs
 LHLFactorization
 update_gamma!
-update_shift!
 ```
 
 ### FastLapackInterface.jl

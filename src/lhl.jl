@@ -112,19 +112,21 @@ end
 # change of `gamma` — must not be allowed to force a reduction. A bare matrix has no such
 # signal, so there `isfresh` is all there is.
 _lhl_needs_reduce(ws::LHLWorkspace, W::WOperator, isfresh::Bool) =
-    ws.jac_version != jacobian_version(W) || ws.n != size(W, 1)
+    jacobian_stale(W) || !ws.reduced || ws.n != size(W, 1)
 _lhl_needs_reduce(ws::LHLWorkspace, A::AbstractMatrix, isfresh::Bool) =
-    isfresh || ws.jac_version < 0 || ws.n != size(A, 1)
+    isfresh || !ws.reduced || ws.n != size(A, 1)
 
-_lhl_stamp!(ws::LHLWorkspace, W::WOperator) = (ws.jac_version = jacobian_version(W))
-_lhl_stamp!(ws::LHLWorkspace, ::AbstractMatrix) = (ws.jac_version = 0)
+# Clearing the flag claims the operator: a second cache sharing this `WOperator` would
+# never see the update. `SciMLOperators.mark_jacobian_current!` documents the constraint.
+_lhl_claim!(W::WOperator) = mark_jacobian_current!(W)
+_lhl_claim!(::AbstractMatrix) = nothing
 
 function _lhl_sync!(ws::LHLWorkspace, A, alg::LHLFactorization, isfresh::Bool)
     σ, τ = _lhl_shift_pair(A)
     fresh_reduction = _lhl_needs_reduce(ws, A, isfresh)
     if fresh_reduction
         lhl_reduce!(ws, _lhl_jacobian(A), alg.balance)
-        _lhl_stamp!(ws, A)
+        _lhl_claim!(A)
     end
     if fresh_reduction || ws.σ != σ || ws.τ != τ
         lhl_shift!(ws, σ, τ)

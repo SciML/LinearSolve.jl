@@ -21,7 +21,8 @@ using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, Bunc
 using SciMLBase: SciMLBase, LinearAliasSpecifier,
     init, solve!, reinit!, solve, ReturnCode, LinearProblem
 using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator,
-    MatrixOperator, WOperator, jacobian_version, mark_jacobian_updated!,
+    MatrixOperator, WOperator, jacobian_stale, mark_jacobian_updated!,
+    mark_jacobian_current!,
     has_ldiv!, issquare
 using SciMLStructures: SciMLStructures
 using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_int,

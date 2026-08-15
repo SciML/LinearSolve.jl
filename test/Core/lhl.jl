@@ -1,5 +1,5 @@
 using LinearSolve, LinearAlgebra, Random, SciMLOperators, Test
-using SciMLOperators: WOperator, jacobian_version
+using SciMLOperators: WOperator, jacobian_stale
 
 # `LHLFactorization` takes its system matrix unassembled, as the split `J - M/γ` a
 # `WOperator` holds, so that a new γ never touches the reduction of J.
@@ -40,16 +40,19 @@ end
     cache = init(LinearProblem(W, b), LHLFactorization(; refine = 0))
     solve!(cache)
     ws = cache.cacheval
-    @test ws.jac_version == jacobian_version(W)
+    @test ws.reduced
+    # The solve claimed the operator by clearing the flag it was constructed with.
+    @test !jacobian_stale(W)
 
     # Without the announcement an in-place write to J is invisible and the stale
-    # reduction is reused; with it, the next solve reduces again.
+    # reduction is reused; with it, the next solve reduces again and re-clears.
     J .= randn(MersenneTwister(9), n, n)
     stale = copy(solve!(cache).u)
     @test !isapprox(stale, dense(J, 0.1) \ b, rtol = 1.0e-6)
     mark_jacobian_updated!(W)
+    @test jacobian_stale(W)
     @test copy(solve!(cache).u) ≈ dense(J, 0.1) \ b rtol = 1.0e-9
-    @test ws.jac_version == jacobian_version(W)
+    @test !jacobian_stale(W)
 end
 
 @testset "plain matrix" begin

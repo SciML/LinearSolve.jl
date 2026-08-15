@@ -940,8 +940,38 @@ function SciMLBase.solve(
     return solve!(init(prob, alg, args...; kwargs...))
 end
 
-function SciMLBase.solve!(cache::LinearCache, args...; kwargs...)
+"""
+    solve!(cache::LinearCache, args...; adjoint = false, kwargs...)
+
+`adjoint = true` solves `adjoint(A) x = b` instead of `A x = b`, reusing the
+factorization the cache already holds rather than factorizing the adjoint afresh:
+
+```julia
+cache = init(LinearProblem(A, b))
+x = solve!(cache).u
+cache.b = c
+lambda = solve!(cache; adjoint = true).u   # adjoint(A) lambda = c, same factorization
+```
+
+Algorithms that have not opted into reusing their factorization for an adjoint solve
+fall back to factorizing `adjoint(A)`, so the keyword is always answerable. The
+solution is written into `cache.u` as usual.
+"""
+@inline function SciMLBase.solve!(
+        cache::LinearCache, args...; adjoint::Bool = false, kwargs...
+    )
+    adjoint && return _solve_adjoint!(cache, args...; kwargs...)
     return solve!(cache, cache.alg, args...; kwargs...)
+end
+
+function _solve_adjoint!(cache::LinearCache, args...; kwargs...)
+    # The reuse is only possible once a factorization exists, and a fresh `A` has not
+    # been factorized yet.
+    cache.isfresh && solve!(cache, cache.alg, args...; kwargs...)
+    copyto!(cache.u, _adjoint_solve(cache, cache.b))
+    return SciMLBase.build_linear_solution(
+        cache.alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+    )
 end
 
 # Special Case for StaticArrays

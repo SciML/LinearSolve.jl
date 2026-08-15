@@ -226,3 +226,34 @@ function _custom_adjoint_factorization_solve(
     end
     return x
 end
+
+"""
+    _adjoint_solve(cache::LinearCache, b)
+
+Solve `adjoint(A) x = b` for the cache's current `A`, reusing the factorization the
+cache already holds when the algorithm has opted into that, and falling back to the
+Krylov, default-solver and generic routes otherwise.
+
+This is the one place that decides how an adjoint solve is carried out, so the public
+`solve!(cache; adjoint = true)` and the reverse-mode rules take the same path.
+"""
+function _adjoint_solve(cache::LinearCache, b, A = cache.A)
+    alg = cache.alg
+    cached = _adjoint_factorization_solve(alg, cache.cacheval, A, b)
+    cached === nothing || return cached
+
+    if alg isa AbstractKrylovSubspaceMethod
+        Pl, Pr = _adjoint_precs(alg, cache.sensealg, cache.Pl, cache.Pr)
+        return _adjoint_krylov_solve(
+            alg, A, b; cache.abstol, cache.reltol, cache.verbose, Pl, Pr
+        )
+    elseif alg isa DefaultLinearSolver
+        return defaultalg_adjoint_eval(cache, b)
+    end
+
+    # No cached factorization to reuse, so factorize the adjoint directly. `A` is a
+    # parameter because a factorization may have overwritten `cache.A`, and the reverse
+    # rules keep the copy that was preserved before that happened.
+    invprob = LinearProblem(adjoint(A), b)
+    return solve(invprob, alg; cache.abstol, cache.reltol, cache.verbose).u
+end

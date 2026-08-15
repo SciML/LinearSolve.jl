@@ -222,6 +222,32 @@ LinearSolveFunction
 LinearSolveAdjoint
 ```
 
+#### Repeated solves of `I - γJ` for varying `γ`
+
+An implicit ODE/DAE solver factorizes `W = I - γJ` (or `J - M/(dt·γ)`) at every step, but
+`γ` changes with the step size far more often than `J` does. `LHLFactorization` reduces `J`
+to Hessenberg form once and absorbs each new `γ` in `O(n²)`.
+
+Hand it the system matrix in split form as a `ShiftedJacobian` — a lazy `AbstractMatrix`
+equal to `I - γJ`, re-exported from [LHL.jl](https://github.com/SciML/LHL.jl), which owns
+the factorization itself — and move the shift with `update_gamma!`. Constructing a
+`ShiftedJacobian` is enough to make this the default algorithm at sizes where it pays.
+
+```julia
+A = ShiftedJacobian(J, 0.01)          # lazily == I - 0.01J
+cache = init(LinearProblem(A, b), LHLFactorization())
+u1 = solve!(cache).u
+update_gamma!(cache, 0.013)           # O(n²): reuses the reduction of J
+u2 = solve!(cache).u
+J .= newJ; mark_jacobian_updated!(A)  # next solve redoes the O(n³) reduction
+```
+
+```@docs
+LHLFactorization
+update_gamma!
+update_shift!
+```
+
 ### FastLapackInterface.jl
 
 FastLapackInterface.jl is a package that allows for a lower-level interface to the LAPACK

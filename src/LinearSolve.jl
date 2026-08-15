@@ -6,6 +6,8 @@ end
 
 import PrecompileTools
 using ArrayInterface: ArrayInterface
+using LHL: LHL, LHLWorkspace, ShiftedJacobian, lhl_reduce!, lhl_shift!, lhl_ldiv!,
+    lhl_refine!, mark_jacobian_updated!, set_shift!
 using Base: Bool, convert, copyto!, adjoint, transpose, /, \, require_one_based_indexing
 using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, BunchKaufman,
     ColumnNorm, cond, Diagonal, Factorization, Hermitian, I, LAPACK, NoPivot,
@@ -448,6 +450,7 @@ include("appleaccelerate.jl")
 include("mkl.jl")
 include("openblas.jl")
 include("simplelu.jl")
+include("lhl.jl")
 include("adjoint_factorization.jl")
 include("simplegmres.jl")
 include("iterative_wrappers.jl")
@@ -776,6 +779,10 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
     STRUMPACKFactorization, MUMPSFactorization, SuperLUDISTFactorization,
     SpecializedLUFactorization, SpecializedQRFactorization,
     HSLMA57Factorization, HSLMA97Factorization
+
+export LHLFactorization, update_gamma!, update_shift!
+# Re-exported from LHL.jl, which owns the split-W representation itself.
+export ShiftedJacobian, mark_jacobian_updated!, set_shift!
 
 export LinearSolveFunction, DirectLdiv!, show_algorithm_choices
 

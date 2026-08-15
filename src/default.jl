@@ -206,6 +206,30 @@ function defaultalg(A::Hermitian, b, ::OperatorAssumptions{Bool})
     return DefaultLinearSolver(DefaultAlgorithmChoice.CholeskyFactorization)
 end
 
+"""
+    LinearSolve.LHL_DEFAULT_MIN_SIZE
+
+Smallest `n` at which `defaultalg` prefers `LHLFactorization` for a `ShiftedJacobian`.
+Measured, not derived: below it a fresh LU is cheap enough that the LHL solve — ~2× an
+LU's, and charged once per right-hand side — outweighs the saving on the shift.
+"""
+const LHL_DEFAULT_MIN_SIZE = 100
+
+# Wrapping a system matrix as a `ShiftedJacobian` is itself the statement that the shift
+# will move while `J` stays put; nothing else constructs one. So the default for it is the
+# algorithm that exploits exactly that.
+
+function defaultalg(A::ShiftedJacobian, b, assump::OperatorAssumptions{Bool})
+    if assump.issq && A.J isa DenseMatrix && size(A, 1) >= LHL_DEFAULT_MIN_SIZE
+        # Refinement is the right default for a bare linear solve; a caller running an
+        # outer correction loop should ask for `LHLFactorization(refine = 0)`.
+        return LHLFactorization()
+    end
+    # Anything else materializes: a `ShiftedJacobian` is lazy and cannot be factorized in
+    # place, so the fallback has to be an algorithm with an allocating path.
+    return LUFactorization()
+end
+
 function defaultalg(A::Symmetric{<:Number, <:Array}, b, ::OperatorAssumptions{Bool})
     return DefaultLinearSolver(DefaultAlgorithmChoice.BunchKaufmanFactorization)
 end

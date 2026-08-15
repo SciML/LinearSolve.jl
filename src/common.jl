@@ -186,46 +186,49 @@ reduce_operand!(::Nothing, A) = A
 """
     LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, issq, S}
 
-The core cache structure used by LinearSolve for storing and managing the state of linear
-solver computations. This mutable struct acts as the primary interface for iterative 
-solving and caching of factorizations and intermediate results.
+The mutable state passed to a linear solver algorithm by `init` and reused by
+`solve!`. Construct it with `SciMLBase.init(::LinearProblem, alg)` rather than
+calling the constructor directly.
 
-## Fields
+# Fields
 
-- `A::TA`: The matrix operator of the linear system.
-- `b::Tb`: The right-hand side vector of the linear system.
-- `u::Tu`: The solution vector (preallocated storage for the result).
-- `p::Tp`: Parameters passed to the linear solver algorithm.
-- `alg::Talg`: The linear solver algorithm instance.
-- `cacheval::Tc`: Algorithm-specific cache storage for factorizations and intermediate computations.
-- `isfresh::Bool`: Cache validity flag for the matrix `A`. `false` means `cacheval` is up-to-date 
-  with respect to `A`, `true` means `cacheval` needs to be updated.
-- `precsisfresh::Bool`: Cache validity flag for preconditioners. `false` means `Pl` and `Pr` 
-  are up-to-date with respect to `A`, `true` means they need to be updated.
-- `Pl::Tl`: Left preconditioner operator.
-- `Pr::Tr`: Right preconditioner operator.
-- `abstol::Ttol`: Absolute tolerance for iterative solvers.
-- `reltol::Ttol`: Relative tolerance for iterative solvers.
-- `maxiters::Int`: Maximum number of iterations for iterative solvers.
-- `verbose::LinearVerbosity`: Whether to print verbose output during solving.
-- `assumptions::OperatorAssumptions{issq}`: Assumptions about the operator properties.
-- `sensealg::S`: Sensitivity analysis algorithm for automatic differentiation.
-- `alias_A::Bool`: The resolved `LinearAliasSpecifier.alias_A` from `init`. When `true`,
-  the user has permitted LinearSolve to overwrite `A`; dense factorizations may then
-  refactorize in place (e.g. `lu!(cache.A)`) after `cache.A` is replaced, skipping the
-  O(n²) copy.
+  - `A::TA`: Operator or matrix for the system.
+  - `b::Tb`: Right-hand side. It may be a vector or a matrix of right-hand sides.
+  - `u::Tu`: Preallocated solution storage written by `solve!`.
+  - `p::Tp`: Problem parameters forwarded to the algorithm.
+  - `alg::Talg`: Algorithm instance used by this cache.
+  - `cacheval::Tc`: Algorithm-owned factorization, workspace, or solver object.
+  - `isfresh::Bool`: Whether `cacheval` must be rebuilt because `A` changed.
+  - `precsisfresh::Bool`: Whether the preconditioners must be refreshed.
+  - `Pl::Tl`: Left preconditioner, or `nothing`.
+  - `Pr::Tr`: Right preconditioner, or `nothing`.
+  - `abstol::Ttol`: Absolute convergence tolerance.
+  - `reltol::Ttol`: Relative convergence tolerance.
+  - `maxiters::Int`: Maximum iteration count for iterative algorithms.
+  - `verbose::Tlv`: Verbosity specification.
+  - `assumptions::OperatorAssumptions{issq}`: Properties promised about `A`.
+  - `sensealg::S`: Sensitivity algorithm associated with the solve.
+  - `sparse_reduction::Tred`: State for persistent sparse-pattern reduction, or `nothing`.
+  - `alias_A::Bool`: Whether the caller permits replacing or mutating `A`.
 
-## Usage
+# Interface rules
 
-The `LinearCache` is typically created via `init(::LinearProblem, ::SciMLLinearSolveAlgorithm)` 
-and then used with `solve!(cache)` for efficient repeated solves with the same matrix structure
-but potentially different right-hand sides or parameter values.
+An algorithm's `solve!` method may update `u`, `cacheval`, and the freshness
+flags, but must preserve the meaning of the other fields. When `isfresh` is
+`true`, rebuild any factorization or backend object that depends on `A`; after
+doing so, set it to `false`. Algorithms that read tolerances at solve time use
+`abstol`, `reltol`, and `maxiters` directly. Algorithms that copy tolerances into
+`cacheval` must implement `update_tolerances_internal!`.
 
-## Cache Management
+# Examples
 
-The cache automatically tracks when matrix `A` or parameters `p` change by setting the 
-appropriate freshness flags. When `solve!` is called, stale cache entries are automatically
-recomputed as needed.
+```julia
+prob = LinearProblem(A, b)
+cache = init(prob, LUFactorization())
+sol = solve!(cache)
+cache.b = b2
+sol2 = solve!(cache)
+```
 """
 mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, Tlv <: LinearVerbosity, issq, S, Tred}
     A::TA

@@ -88,70 +88,53 @@ function __setfield!(
     return setfield!(cache, :QRFactorizationPivoted, v)
 end
 
-"""
-    defaultalg(A, b, assumptions::OperatorAssumptions)
-
-Select the most appropriate linear solver algorithm based on the matrix `A`, 
-right-hand side `b`, and operator assumptions. This is the core algorithm 
-selection logic used by LinearSolve.jl's automatic algorithm choice.
-
-## Arguments
-- `A`: The matrix operator (can be a matrix, factorization, or abstract operator)
-- `b`: The right-hand side vector
-- `assumptions`: Operator assumptions including square matrix flag and conditioning
-
-## Returns
-A `DefaultLinearSolver` instance configured with the most appropriate algorithm choice,
-or a specific algorithm instance for certain special cases.
-
-## Algorithm Selection Logic
-
-The function uses a hierarchy of dispatch rules based on:
-
-1. **Matrix Type**: Special handling for structured matrices (Diagonal, Tridiagonal, etc.)
-2. **Matrix Properties**: Square vs. rectangular, sparse vs. dense
-3. **Hardware**: GPU vs. CPU arrays
-4. **Conditioning**: Well-conditioned vs. ill-conditioned systems
-5. **Size**: Small vs. large matrices for performance optimization
-
-## Common Algorithm Choices
-
-- **Diagonal matrices**: `DiagonalFactorization` for optimal O(n) performance
-- **Tridiagonal/Bidiagonal**: Direct methods or specialized factorizations
-- **Dense matrices**: LU, QR, or Cholesky based on structure and conditioning
-- **Sparse matrices**: Specialized sparse factorizations (UMFPACK, KLU, etc.)
-- **GPU arrays**: QR or LU factorizations optimized for GPU computation
-- **Abstract operators**: Krylov methods (GMRES, CRAIGMR, LSMR)
-- **Symmetric positive definite**: Cholesky factorization
-- **Symmetric indefinite**: Bunch-Kaufman factorization
-
-## Examples
-
-```julia
-# Dense square matrix - typically chooses LU
-A = rand(100, 100)
-b = rand(100)
-alg = defaultalg(A, b, OperatorAssumptions(true))
-
-# Overdetermined system - typically chooses QR  
-A = rand(100, 50)
-b = rand(100)
-alg = defaultalg(A, b, OperatorAssumptions(false))
-
-# Diagonal matrix - chooses diagonal factorization
-A = Diagonal(rand(100))
-alg = defaultalg(A, b, OperatorAssumptions(true))
-```
-
-## Notes
-This function is primarily used internally by `solve(::LinearProblem)` when no
-explicit algorithm is provided. For manual algorithm selection, users can
-directly instantiate specific algorithm types.
-"""
 # Legacy fallback
 # For SciML algorithms already using `defaultalg`, all assume square matrix.
 defaultalg(A, b) = defaultalg(A, b, OperatorAssumptions(true))
 
+"""
+    defaultalg(A, b, assumptions::OperatorAssumptions)
+
+Select a default linear solver algorithm for the operator `A`, right-hand side
+`b`, and operator assumptions. This is the dispatch point used by
+`solve(::LinearProblem)` when no algorithm is supplied explicitly.
+
+# Arguments
+
+- `A`: Matrix, factorization, or abstract operator to solve with.
+- `b`: Right-hand side vector or matrix.
+- `assumptions`: [`OperatorAssumptions`](@ref) describing whether `A` is square,
+  its conditioning, and its structural-zero behavior.
+
+# Returns
+
+A concrete [`SciMLLinearSolveAlgorithm`](@ref), usually wrapped in a
+[`DefaultLinearSolver`](@ref), selected for the input representation and
+available extensions.
+
+# Examples
+
+```julia
+A = rand(100, 100)
+b = rand(100)
+alg = defaultalg(A, b, OperatorAssumptions(true))
+solve(LinearProblem(A, b), alg)
+```
+
+For an abstract matrix-free operator, the default is a Krylov algorithm when
+the operator does not provide a direct solve method:
+
+```julia
+A = SciMLOperators.MatrixOperator(rand(10, 10))
+b = rand(10)
+alg = defaultalg(A, b, OperatorAssumptions(true))
+```
+
+# Notes
+
+The two-argument form assumes a square system. Use an explicit algorithm when
+the application requires a particular factorization or iterative method.
+"""
 function defaultalg(
         A::MatrixOperator, b,
         assump::OperatorAssumptions{Bool}

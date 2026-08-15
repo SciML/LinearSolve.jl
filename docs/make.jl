@@ -22,7 +22,7 @@ makedocs(
         LinearSolvePyAMG,
         LinearSolve.KLU,
     ],
-    clean = true, doctest = false, linkcheck = true,
+    clean = true, doctest = true, linkcheck = true,
     warnonly = [:docs_block, :missing_docs],
     linkcheck_ignore = [
         "https://cli.github.com/manual/installation",

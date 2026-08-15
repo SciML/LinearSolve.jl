@@ -442,6 +442,7 @@ include("appleaccelerate.jl")
 include("mkl.jl")
 include("openblas.jl")
 include("simplelu.jl")
+include("lowrank.jl")
 include("adjoint_factorization.jl")
 include("simplegmres.jl")
 include("iterative_wrappers.jl")
@@ -657,6 +658,7 @@ is_cusparse_csr(A) = false
 is_cusparse_csc(A) = false
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
+    LowRankUpdatedFactorization,
     GenericLUFactorization, GESVFactorization, SimpleLUFactorization,
     RFLUFactorization, ButterflyFactorization,
     NormalCholeskyFactorization, NormalBunchKaufmanFactorization,

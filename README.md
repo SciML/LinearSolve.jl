@@ -92,3 +92,16 @@ sol3.u
  -0.4097250749016653
 =#
 ```
+
+## Citation
+
+If LinearSolve.jl is part of your research, please cite it using
+[`CITATION.bib`](CITATION.bib):
+
+```bib
+@software{LinearSolve.jl,
+  author = {Will Kimmerer and Vedant Puri and Chris Rackauckas},
+  title = {LinearSolve.jl},
+  url = {https://github.com/SciML/LinearSolve.jl}
+}
+```

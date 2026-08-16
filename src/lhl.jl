@@ -82,20 +82,27 @@ consumer has to track that itself. Two independent things can invalidate a reduc
 each needs its own signal: swapping in a *different* matrix (caught by `===` on the
 Jacobian) and writing into the *same* one (caught by `jacobian_stale`, since the object is
 unchanged). Keying on only one of them silently reuses a stale reduction.
+
+`jac` is typed rather than `Any`: the `LinearCache` is parameterized on `A`, so the
+Jacobian's type is fixed for the life of the cache and only the `nothing` of the
+not-yet-reduced state widens it.
 """
-mutable struct LHLCache{WS}
+mutable struct LHLCache{WS, JT}
     ws::WS
-    jac::Any
+    jac::Union{Nothing, JT}
 end
+
+LHLCache(ws, ::Type{JT}) where {JT} = LHLCache{typeof(ws), JT}(ws, nothing)
 
 function init_cacheval(
         alg::LHLFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
     (A isa AbstractMatrix || A isa WOperator) ||
-        return LHLCache(LHLWorkspace{eltype(u)}(0), nothing)
-    T = eltype(_lhl_jacobian(A))
-    return LHLCache(LHLWorkspace{T}(size(A, 1); shift = _lhl_shift_eltype(A, u)), nothing)
+        return LHLCache(LHLWorkspace{eltype(u)}(0), Nothing)
+    J = _lhl_jacobian(A)
+    ws = LHLWorkspace{eltype(J)}(size(A, 1); shift = _lhl_shift_eltype(A, u))
+    return LHLCache(ws, typeof(J))
 end
 
 """

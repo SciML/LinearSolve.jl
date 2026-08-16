@@ -7,7 +7,7 @@ update_tolerances_internal!(cache, ::DefaultLinearSolver, abstol, reltol) = noth
 
 mutable struct DefaultLinearSolverInit{
         T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12,
-        T13, T14, T15, T16, T17, T18, T19, T20, T21, T22, T23, T24, T25,
+        T13, T14, T15, T16, T17, T18, T19, T20, T21, T22, T23, T24, T25, T26,
         TA, Tb, TR,
     }
     LUFactorization::T1
@@ -35,6 +35,7 @@ mutable struct DefaultLinearSolverInit{
     CudaOffloadLUFactorization::T23
     MetalLUFactorization::T24
     SparseColumnPivotedQRFactorization::T25
+    LHLFactorization::T26
     A_backup::TA  # backup of cache.A for restoring after in-place LU and QR fallback
     residual_buf::Tb  # pre-allocated buffer for post-solve residual check (same size/type as b)
     a_backup_synced::Bool  # true if A_backup content matches cache.A (before LU modifies it)
@@ -229,7 +230,7 @@ function defaultalg(A::WOperator, b, assump::OperatorAssumptions{Bool})
             _lhl_scalar_massmatrix(A.mass_matrix)
         # Refinement is the right default for a bare linear solve; a caller running an
         # outer correction loop should ask for `LHLFactorization(refine = 0)`.
-        return LHLFactorization()
+        return DefaultLinearSolver(DefaultAlgorithmChoice.LHLFactorization)
     end
     # Everything else — a matrix-free Jacobian, a general mass matrix, or a problem too
     # small to pay for the reduction — keeps whatever the operator path already chose.
@@ -513,6 +514,8 @@ function algchoice_to_alg(alg::Symbol)
         PureKLUFactorization()
     elseif alg === :SupernodalLUFactorization
         SupernodalLUFactorization()
+    elseif alg === :LHLFactorization
+        LHLFactorization()
     elseif alg === :KrylovJL_GMRES
         KrylovJL_GMRES()
     elseif alg === :GenericLUFactorization
@@ -617,7 +620,20 @@ end
         A_original
     )
     caches = map(first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))) do alg
-        if alg === :KrylovJL_GMRES || alg === :KrylovJL_CRAIGMR || alg === :KrylovJL_LSMR
+        if alg === :LHLFactorization
+            # Three n×n buffers, wanted only by the split form. Every other `A` — which is
+            # nearly every `A` — would pay for them and never use the slot.
+            quote
+                if A isa WOperator
+                    init_cacheval(
+                        $(algchoice_to_alg(alg)), A, b, u, Pl, Pr, maxiters, abstol,
+                        reltol, verbose, assump
+                    )
+                else
+                    nothing
+                end
+            end
+        elseif alg === :KrylovJL_GMRES || alg === :KrylovJL_CRAIGMR || alg === :KrylovJL_LSMR
             quote
                 if A isa DenseMatrix || issparsematrixcsc(A)
                     nothing

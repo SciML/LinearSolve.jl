@@ -117,9 +117,10 @@ end
 @testset "defaultalg picks it from the split form" begin
     b200 = randn(MersenneTwister(2), 200)
     J200 = randn(MersenneTwister(1), 200, 200)
-    @test LinearSolve.defaultalg(
-        wop(J200, 0.1), b200, LinearSolve.OperatorAssumptions(true)
-    ) isa LHLFactorization
+    # Selected through the default polyalgorithm, so `defaultalg`'s return type does not
+    # depend on the runtime size/mass-matrix checks.
+    @test LinearSolve.defaultalg(wop(J200, 0.1), b200, LinearSolve.OperatorAssumptions(true)) ==
+        LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LHLFactorization)
     s = solve(LinearProblem(wop(J200, 0.1), b200))
     @test s.u ≈ dense(J200, 0.1) \ b200 rtol = 1.0e-9
 
@@ -129,7 +130,7 @@ end
     b20 = randn(MersenneTwister(4), nsmall)
     J20 = randn(MersenneTwister(3), nsmall, nsmall)
     small = LinearSolve.defaultalg(wop(J20, 0.1), b20, LinearSolve.OperatorAssumptions(true))
-    @test !(small isa LHLFactorization)
+    @test small != LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LHLFactorization)
     @test small == @invoke LinearSolve.defaultalg(
         wop(J20, 0.1)::SciMLOperators.AbstractSciMLOperator, b20,
         LinearSolve.OperatorAssumptions(true)
@@ -139,12 +140,14 @@ end
     @test LinearSolve.defaultalg(
         wop(randn(MersenneTwister(7), nbig, nbig), 0.1), randn(MersenneTwister(8), nbig),
         LinearSolve.OperatorAssumptions(true)
-    ) isa LHLFactorization
+    ) == LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LHLFactorization)
     Wmm = WOperator{true}(Diagonal(collect(1.0:200)), 0.1, J200, zeros(200))
-    @test !(
-        LinearSolve.defaultalg(Wmm, b200, LinearSolve.OperatorAssumptions(true)) isa
-            LHLFactorization
-    )
+    @test LinearSolve.defaultalg(Wmm, b200, LinearSolve.OperatorAssumptions(true)) !=
+        LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LHLFactorization)
+
+    # A plain matrix must not pay for the LHL workspace it will never use.
+    cm = init(LinearProblem(randn(MersenneTwister(9), 200, 200), b200))
+    @test cm.cacheval.LHLFactorization === nothing
 end
 
 @testset "a different Jacobian is never served a stale reduction" begin

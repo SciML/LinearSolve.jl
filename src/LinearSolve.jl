@@ -353,6 +353,7 @@ EnumX.@enumx DefaultAlgorithmChoice begin
     CudaOffloadLUFactorization
     MetalLUFactorization
     SparseColumnPivotedQRFactorization
+    LHLFactorization
 end
 
 # Autotune preference constants - loaded once at package import time
@@ -382,6 +383,8 @@ function is_algorithm_available(alg::DefaultAlgorithmChoice.T)
         return usemetal(nothing)  # Available if Metal extension is loaded
     elseif alg === DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization
         return true  # SparseColumnPivotedQR is a hard dependency, always available
+    elseif alg === DefaultAlgorithmChoice.LHLFactorization
+        return true  # LHLFactorization.jl is a hard dependency, always available
     else
         # For extension-dependent algorithms not explicitly handled above,
         # we cannot easily check availability without trying to use them.

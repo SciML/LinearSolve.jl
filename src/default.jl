@@ -216,8 +216,12 @@ Measured, not derived. Costing one γ-cycle — a re-shift plus the ~14 solves i
 the reduction amortized over the ~55 γ a Jacobian serves, both ratios taken from
 instrumented BDF runs — against a fresh LU plus its solves, the default `refine = 1`
 crosses at `n ≈ 16` and reaches a 1.4× margin by `n = 32`; `refine = 0` wins from `n = 4`.
-The cutoff sits at the first size where the margin clears run-to-run noise rather than at
-the crossover itself.
+
+That model is per-operation. End to end it is optimistic near the cutoff, because a real
+problem need not hit those two ratios: measured on stiff ODE runs, `refine = 1` is roughly
+break-even between `n = 32` and `n = 40` (0.98×–1.47×) and only pulls clear above
+`n ≈ 100`. The cutoff is therefore where the algorithm stops *losing*, not where it starts
+winning; the win grows with `n`, reaching 2–5× by `n = 800`.
 """
 const LHL_DEFAULT_MIN_SIZE = 32
 

@@ -22,5 +22,5 @@ jobs:
       owner: "${{ matrix.package.user }}"
       repo: "${{ matrix.package.repo }}"
       group: "${{ matrix.package.group }}"
-      julia-version: "lts"
+      julia-version: "1"
     secrets: "inherit"

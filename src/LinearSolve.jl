@@ -27,7 +27,7 @@ using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_int,
 using Setfield: Setfield, @set!
 using DocStringExtensions: DocStringExtensions
 using EnumX: EnumX
-using Markdown: Markdown, @doc_str
+using Markdown: Markdown
 using Reexport: Reexport, @reexport
 using Libdl: Libdl
 import InteractiveUtils

@@ -1,6 +1,7 @@
 using LinearSolve
 using LinearSolveAutotune
 using LinearSolvePyAMG
+using CommonSolve
 using SparseArrays
 using Documenter
 
@@ -17,16 +18,20 @@ makedocs(
     authors = "Chris Rackauckas",
     modules = [
         LinearSolve,
-        LinearSolve.SciMLBase,
         LinearSolveAutotune,
         LinearSolvePyAMG,
         LinearSolve.KLU,
     ],
-    clean = true, doctest = true, linkcheck = true,
-    warnonly = [:docs_block, :missing_docs],
+    clean = true, doctest = true, linkcheck = true, checkdocs = :exports,
     linkcheck_ignore = [
         "https://cli.github.com/manual/installation",
         "https://pyamg.readthedocs.io",
+        # These cross-package API links are user-facing, but the docs host
+        # rejects Documenter's automated linkcheck requests with HTTP 403.
+        "https://docs.sciml.ai/SciMLBase/stable/interfaces/LinearProblem/",
+        "https://docs.sciml.ai/SciMLBase/stable/interfaces/EigenvalueProblem/",
+        # GitHub rate-limits this stable SuiteSparse source link during CI.
+        "https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/UMFPACK/Doc/UMFPACK_UserGuide.pdf",
     ],
     format = Documenter.HTML(
         assets = ["assets/favicon.ico"],

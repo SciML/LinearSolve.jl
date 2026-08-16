@@ -228,8 +228,17 @@ An implicit ODE/DAE solver factorizes `W = I - γJ` (or `J - M/(dt·γ)`) at eve
 `γ` changes with the step size far more often than `J` does. [`LHLFactorization`](@ref)
 reduces `J` to Hessenberg form once and absorbs each new `γ` in `O(n²)`.
 
-See [Repeated Solves of a Shifted System](@ref) for how to set it up, when it is selected
-automatically, and what it costs.
+Hand it the system matrix unassembled, as the `SciMLOperators.WOperator` that holds `J` and
+`γ` apart, and move the shift with [`update_gamma!`](@ref). The factorization itself lives
+in [LHLFactorization.jl](https://github.com/SciML/LHLFactorization.jl).
+
+See the [Repeated Solves of a Shifted System](@ref) tutorial for a worked example, the
+accuracy tradeoff, complex shifts, and the limits.
+
+```@docs
+LHLFactorization
+update_gamma!
+```
 
 ### FastLapackInterface.jl
 

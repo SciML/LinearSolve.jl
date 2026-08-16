@@ -216,9 +216,7 @@ still wants a Krylov method.
     conversion, so it is stale after any change of `gamma`. LinearSolve raises rather than
     factorizing the wrong matrix.
 
-## API
+## Reference
 
-```@docs
-LHLFactorization
-update_gamma!
-```
+[`LHLFactorization`](@ref) and [`update_gamma!`](@ref) are documented with the other
+algorithms on the [Linear System Solvers](@ref linearsystemsolvers) page.

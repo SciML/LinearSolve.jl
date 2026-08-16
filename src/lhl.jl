@@ -58,17 +58,31 @@ Hence `refine = 1` by default.
 `balance = true` applies a Parlett–Reinsch diagonal similarity (exact powers of two)
 before the reduction.
 
+`thread = Val(true)` lets the reduction — the `O(n³)` part, and the only part big enough to
+be worth splitting — run on Polyester threads when Polyester is loaded and
+`Threads.nthreads() > 1`. It is deterministic: the result is bit-identical for any thread
+count. The per-γ shift and the solves stay serial, being `O(n²)`.
+
 ## Keyword Arguments
 
   - `balance`: balance the Jacobian before reducing it. Default `true`.
   - `refine`: steps of iterative refinement applied to each solve. Default `1`.
+  - `thread`: thread the reduction. Default `Val(true)`.
 """
-struct LHLFactorization <: AbstractDenseFactorization
+struct LHLFactorization{T} <: AbstractDenseFactorization
     balance::Bool
     refine::Int
 end
 
-LHLFactorization(; balance::Bool = true, refine::Int = 1) = LHLFactorization(balance, refine)
+function LHLFactorization(;
+        balance::Bool = true, refine::Int = 1, thread::Union{Bool, Val} = Val(true)
+    )
+    return LHLFactorization{_lhl_unwrap(thread)}(balance, refine)
+end
+
+_lhl_unwrap(::Val{T}) where {T} = T::Bool
+_lhl_unwrap(t::Bool) = t
+_lhl_thread(::LHLFactorization{T}) where {T} = Val(T)
 
 default_alias_A(::LHLFactorization, ::Any, ::Any) = true
 
@@ -191,7 +205,7 @@ function _lhl_sync!(c::LHLCache, A, alg::LHLFactorization, isfresh::Bool)
     fresh_reduction = _lhl_needs_reduce(c, A, isfresh)
     if fresh_reduction
         J = _lhl_jacobian(A)
-        lhl_reduce!(ws, J, alg.balance)
+        lhl_reduce!(ws, J, alg.balance, _lhl_thread(alg))
         c.jac = J
         _lhl_claim!(A)
     end

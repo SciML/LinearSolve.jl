@@ -55,6 +55,25 @@ end
     @test !jacobian_stale(W)
 end
 
+@testset "thread option" begin
+    # Threading the reduction is deterministic: bit-identical for any thread count, so the
+    # option can never change an answer.
+    n = 200
+    J = randn(MersenneTwister(41), n, n)
+    b = randn(MersenneTwister(42), n)
+    ref = dense(J, 0.1) \ b
+    us = [
+        solve(LinearProblem(wop(J, 0.1), b), LHLFactorization(; thread)).u
+            for thread in (Val(true), Val(false), true, false)
+    ]
+    for u in us
+        @test u ≈ ref rtol = 1.0e-9
+        @test u == us[1]
+    end
+    @test typeof(LHLFactorization()) === LHLFactorization{true}
+    @test typeof(LHLFactorization(thread = false)) === LHLFactorization{false}
+end
+
 @testset "plain matrix" begin
     n = 70
     A = randn(MersenneTwister(11), n, n)

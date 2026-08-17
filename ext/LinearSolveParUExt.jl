@@ -166,6 +166,43 @@ function SciMLBase.solve!(
         cache::LinearSolve.LinearCache, alg::LinearSolve.ParUFactorization;
         kwargs...
     )
+    # METIS allocates heavily inside ParU's symbolic analysis. SuiteSparse routes those
+    # allocations through Julia's counted allocator, which charges them to the GC
+    # heuristic even though the collector can never free them: they belong to METIS. Once
+    # enough of that memory is outstanding, every further allocation trips `maybe_collect`
+    # and the analysis stops making progress, turning a 0.5 s solve into hours.
+    #
+    # Handing SuiteSparse the plain libc allocator for the duration keeps that memory off
+    # Julia's books, which is what the accounting should have said in the first place. The
+    # collector stays on throughout. See SciML/LinearSolve.jl#1142.
+    return _with_uncounted_suitesparse_allocator() do
+        _paru_solve!(cache, alg; kwargs...)
+    end
+end
+
+function _with_uncounted_suitesparse_allocator(f)
+    prev_malloc = LinearSolve.KLU.SuiteSparse_config_malloc_func_get()
+    prev_calloc = LinearSolve.KLU.SuiteSparse_config_calloc_func_get()
+    prev_realloc = LinearSolve.KLU.SuiteSparse_config_realloc_func_get()
+    prev_free = LinearSolve.KLU.SuiteSparse_config_free_func_get()
+    LinearSolve.KLU.SuiteSparse_config_malloc_func_set(cglobal(:malloc))
+    LinearSolve.KLU.SuiteSparse_config_calloc_func_set(cglobal(:calloc))
+    LinearSolve.KLU.SuiteSparse_config_realloc_func_set(cglobal(:realloc))
+    LinearSolve.KLU.SuiteSparse_config_free_func_set(cglobal(:free))
+    return try
+        f()
+    finally
+        LinearSolve.KLU.SuiteSparse_config_malloc_func_set(prev_malloc)
+        LinearSolve.KLU.SuiteSparse_config_calloc_func_set(prev_calloc)
+        LinearSolve.KLU.SuiteSparse_config_realloc_func_set(prev_realloc)
+        LinearSolve.KLU.SuiteSparse_config_free_func_set(prev_free)
+    end
+end
+
+function _paru_solve!(
+        cache::LinearSolve.LinearCache, alg::LinearSolve.ParUFactorization;
+        kwargs...
+    )
     A = cache.A
     A = convert(AbstractMatrix, A)
 

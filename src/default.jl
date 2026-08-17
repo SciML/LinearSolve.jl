@@ -1226,13 +1226,16 @@ end
                 )
             )
             quote
-                invprob = LinearSolve.LinearProblem(transpose(cache.A), dy)
+                # `adjoint` rather than `transpose` to match the other branches, which
+                # differ for a complex eltype, and `.u` because the caller wants the
+                # solution vector the sibling branches return.
+                invprob = LinearSolve.LinearProblem(adjoint(cache.A), dy)
                 solve(
                     invprob, cache.alg;
-                    abstol = cache.val.abstol,
-                    reltol = cache.val.reltol,
-                    verbose = cache.val.verbose
-                )
+                    abstol = cache.abstol,
+                    reltol = cache.reltol,
+                    verbose = cache.verbose
+                ).u
             end
         else
             # Interpolate the algorithm name at generator time: inside `quote`, the

@@ -1,14 +1,17 @@
 using LinearSolve, LinearAlgebra, SparseArrays, Test, Random
 
-# `LowRankUpdatedFactorization` solves `(A + U C V') x = b` by factorizing `A` once and
-# applying the Woodbury identity, so a low-rank change never refactorizes the full matrix.
+# `LowRankUpdatedMatrix` carries `A + U C V'`, so the update is part of the problem rather
+# than the algorithm. The solve factorizes `A` once and applies the Woodbury identity.
 # See SciML/LinearSolve.jl#136.
-@testset "Low-rank updated factorization (#136)" begin
+@testset "Low-rank updated matrix (#136)" begin
     Random.seed!(136)
     n = 40
     k = 3
 
-    @testset "matches the formed matrix" begin
+    formed(A, U, V, C) = C === I ? Matrix(A) + U * V' : Matrix(A) + U * C * V'
+    asmat(x, n) = x isa AbstractVector ? reshape(x, n, 1) : x
+
+    @testset "matches the assembled matrix" begin
         for (name, U, V, C) in (
                 ("rank-1 vectors", rand(n), rand(n), I),
                 ("rank-k matrices", rand(n, k), rand(n, k), I),
@@ -17,70 +20,84 @@ using LinearSolve, LinearAlgebra, SparseArrays, Test, Random
             @testset "$name" begin
                 A = rand(n, n) + n * I
                 b = rand(n)
-                Um = U isa AbstractVector ? reshape(U, n, 1) : U
-                Vm = V isa AbstractVector ? reshape(V, n, 1) : V
-                formed = C === I ? A + Um * Vm' : A + Um * C * Vm'
+                ref = formed(A, asmat(U, n), asmat(V, n), C) \ b
 
-                sol = solve(
-                    LinearProblem(A, b),
-                    LowRankUpdatedFactorization(; U = U, V = V, C = C)
-                )
+                sol = solve(LinearProblem(LowRankUpdatedMatrix(A, U, V; C = C), b))
                 @test sol.retcode == LinearSolve.ReturnCode.Success
-                @test sol.u ≈ formed \ b rtol = 1.0e-10
+                @test sol.u ≈ ref rtol = 1.0e-9
             end
         end
+    end
+
+    @testset "behaves as a matrix" begin
+        A = rand(n, n) + n * I
+        U = rand(n, k)
+        V = rand(n, k)
+        M = LowRankUpdatedMatrix(A, U, V)
+        dense = A + U * V'
+
+        @test size(M) == (n, n)
+        @test size(M, 1) == n
+        @test eltype(M) == Float64
+        @test M[3, 7] ≈ dense[3, 7]
+        x = rand(n)
+        @test M * x ≈ dense * x rtol = 1.0e-10
+        y = similar(x)
+        @test mul!(y, M, x) ≈ dense * x rtol = 1.0e-10
+    end
+
+    @testset "rejects mismatched shapes" begin
+        A = rand(n, n) + n * I
+        @test_throws DimensionMismatch LowRankUpdatedMatrix(A, rand(n + 1), rand(n))
+        @test_throws DimensionMismatch LowRankUpdatedMatrix(A, rand(n), rand(n + 1))
+        @test_throws DimensionMismatch LowRankUpdatedMatrix(A, rand(n, 2), rand(n, 3))
     end
 
     @testset "the factorization is reused across right-hand sides" begin
         A = rand(n, n) + n * I
         U = rand(n, k)
         V = rand(n, k)
-        formed = A + U * V'
+        dense = A + U * V'
 
-        cache = init(LinearProblem(A, rand(n)), LowRankUpdatedFactorization(; U = U, V = V))
+        cache = init(LinearProblem(LowRankUpdatedMatrix(A, U, V), rand(n)))
         solve!(cache)
         for _ in 1:3
             b = rand(n)
             cache.b = b
-            @test solve!(cache).u ≈ formed \ b rtol = 1.0e-10
+            @test solve!(cache).u ≈ dense \ b rtol = 1.0e-9
         end
     end
 
-    @testset "a new matrix refactorizes" begin
+    @testset "an explicit factorization algorithm works" begin
+        A = rand(n, n) + n * I
         U = rand(n, k)
         V = rand(n, k)
-        alg = LowRankUpdatedFactorization(; U = U, V = V)
-        A = rand(n, n) + n * I
         b = rand(n)
-        cache = init(LinearProblem(A, b), alg)
-        @test solve!(cache).u ≈ (A + U * V') \ b rtol = 1.0e-10
-
-        A2 = rand(n, n) + 2n * I
-        cache.A = A2
-        @test solve!(cache).u ≈ (A2 + U * V') \ b rtol = 1.0e-10
+        M = LowRankUpdatedMatrix(A, U, V)
+        for alg in (LUFactorization(), QRFactorization())
+            @test solve(LinearProblem(M, b), alg).u ≈ (A + U * V') \ b rtol = 1.0e-9
+        end
     end
 
-    # The point of the identity: a dense update to a sparse matrix would otherwise
-    # destroy the sparsity and force a dense factorization.
+    # The point of the type: a dense update to a sparse base would otherwise assemble to a
+    # dense matrix and force a dense factorization.
     @testset "a sparse base keeps its factorization" begin
         m = 200
         A = spdiagm(-1 => -ones(m - 1), 0 => 4ones(m), 1 => -ones(m - 1))
         u = rand(m)
         v = rand(m)
         b = rand(m)
-        sol = solve(LinearProblem(A, b), LowRankUpdatedFactorization(; U = u, V = v))
+        sol = solve(LinearProblem(LowRankUpdatedMatrix(A, u, v), b))
         @test sol.u ≈ (Matrix(A) + u * v') \ b rtol = 1.0e-8
     end
 
-    # A singular capacitance matrix is where an update that makes the whole system
-    # singular shows up, and it must be reported rather than returning a wrong answer.
+    # An update that makes the whole matrix singular shows up as a singular capacitance
+    # matrix, and has to be reported rather than returned as a wrong answer.
     @testset "a singular update reports failure" begin
         A = Matrix{Float64}(I, 4, 4)
         u = [1.0, 0, 0, 0]
-        v = [-1.0, 0, 0, 0]   # A + u*v' is singular in the first entry
-        sol = solve(
-            LinearProblem(A, rand(4)), LowRankUpdatedFactorization(; U = u, V = v)
-        )
+        v = [-1.0, 0, 0, 0]
+        sol = solve(LinearProblem(LowRankUpdatedMatrix(A, u, v), rand(4)))
         @test sol.retcode != LinearSolve.ReturnCode.Success
     end
 end

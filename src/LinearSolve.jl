@@ -447,10 +447,48 @@ include("preconditioners.jl")
 include("preferences.jl")
 include("solve_function.jl")
 include("default.jl")
+"""
+    supernodal_panel_solve!(W, B, np; operation, algorithm = :auto)
+
+Apply a supernodal triangular-panel operation using the requested backend.
+
+# Arguments
+
+  - `W`: Matrix containing the factored diagonal block.
+  - `B`: Panel or right-hand side to update in place.
+  - `np`: Width of the diagonal block in `W`.
+
+# Keywords
+
+  - `operation`: One of `:factor_right_upper`, `:factor_lower`, `:lower`, or `:upper`.
+  - `algorithm`: Panel backend. `:auto` selects between `:kernel`, `:blas`, and
+    `:triangularsolve` from the operand types and dimensions.
+
+# Returns
+
+The updated `B`.
+"""
+function supernodal_panel_solve! end
+
+"""
+    supernodal_panel_solve_backend!(algorithm, W, B, np; operation)
+
+Backend extension hook for [`supernodal_panel_solve!`](@ref).
+
+# Interface rules
+
+An extension may specialize `algorithm::Val` for supported operand types. The method
+must apply `operation` to `B` in place, return `B`, and treat the factored diagonal
+block `W[1:np, 1:np]` as read-only. `B` may be a view into the remainder of `W`.
+Unsupported operations must throw `ArgumentError`.
+
+The built-in backends use `Val(:kernel)`, `Val(:blas)`, and
+`Val(:triangularsolve)`. Extensions should add methods only for backend and operand
+combinations they implement; the generic methods provide the fallback behavior.
+"""
+function supernodal_panel_solve_backend! end
 # after default.jl: the vendored solver caches its dense diagonal blocks
 # with LinearSolve's own default solver, so it needs DefaultLinearSolver{,Init}
-function supernodal_panel_solve! end
-function supernodal_panel_solve_backend! end
 include("SupernodalLU/SupernodalLU.jl")
 include("init.jl")
 include("adjoint.jl") # LinearSolveAdjoint struct definition only; rrules are in ChainRulesCore ext

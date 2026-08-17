@@ -107,14 +107,6 @@ function _panel_upper_trsm!(
     return nothing
 end
 
-"""
-    supernodal_panel_solve!(W, B, np; operation, algorithm = :auto)
-
-Apply a supernodal triangular-panel operation using the requested backend.
-`W` contains the factored diagonal block, `B` is the affected panel or
-right-hand side, and `np` is the panel width. `operation` is one of
-`:factor_right_upper`, `:factor_lower`, `:lower`, or `:upper`.
-"""
 function supernodal_panel_solve!(
         W::AbstractMatrix, B::AbstractMatrix, np::Integer;
         operation::Symbol, algorithm::Symbol = :auto
@@ -137,12 +129,6 @@ function _panel_algorithm(W::AbstractMatrix, B::AbstractMatrix, np::Int, operati
     return np > PANEL_BLAS_MIN_NP ? :blas : :triangularsolve
 end
 
-"""
-    supernodal_panel_solve_backend!(algorithm, W, B, np; operation)
-
-Backend extension hook used by [`supernodal_panel_solve!`](@ref). Extensions can
-specialize the `algorithm = Val(:triangularsolve)` method for supported panel types.
-"""
 function supernodal_panel_solve_backend!(
         ::Val{:kernel}, W::AbstractMatrix, B::AbstractMatrix, np::Int; operation::Symbol
     )

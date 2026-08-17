@@ -3,7 +3,7 @@ module LinearSolveMooncakeExt
 using Mooncake: Mooncake, @from_chainrules, MinimalCtx, ReverseMode, NoRData,
     @is_primitive, primal, zero_fcodual, CoDual, rdata, fdata
 using LinearSolve: LinearSolve, SciMLLinearSolveAlgorithm, init, solve!, LinearProblem,
-    LinearCache, AbstractKrylovSubspaceMethod, DefaultLinearSolver, LinearSolveAdjoint,
+    LinearCache, LinearSolveAdjoint,
     OperatorAssumptions, defaultalg, solve
 using SciMLBase: SciMLBase
 

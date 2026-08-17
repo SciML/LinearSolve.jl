@@ -143,6 +143,25 @@ function LinearSolve.init_cacheval(
     return qr(CUDACore.CuArray(A))
 end
 
+# `qr` on a `CuSparseMatrix` falls through to the generic sparse path and dies on scalar
+# indexing, so a sparse QR on the GPU was not reachable through `QRFactorization` at all.
+# cuSOLVER's `csrlsvqr!` does the whole thing on the device. It wants CSR with `Int32`
+# indices, which is also the layout cuSOLVER's other sparse entry points take.
+# See https://github.com/SciML/LinearSolve.jl/issues/410.
+function SciMLBase.solve!(
+        cache::LinearSolve.LinearCache{<:cuSPARSE.CuSparseMatrixCSR{T, Int32}},
+        alg::LinearSolve.QRFactorization; kwargs...
+    ) where {T}
+    A = cache.A
+    # `csrlsvqr!` factorizes and solves in one call, so there is nothing to cache between
+    # solves; `cache.isfresh` is cleared only to keep the flag honest.
+    cuSOLVER.csrlsvqr!(A, cache.b, cache.u, T(cache.reltol), Cint(1), 'O')
+    cache.isfresh = false
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache; retcode = LinearSolve.ReturnCode.Success
+    )
+end
+
 for AlgType in (SparspakFactorization, LinearSolve.QRFactorization)
     @eval function LinearSolve.init_cacheval(
             ::$AlgType, A::cuSPARSE.CuSparseMatrixCSR, b, u,

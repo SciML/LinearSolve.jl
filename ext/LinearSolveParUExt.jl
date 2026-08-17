@@ -166,17 +166,36 @@ function SciMLBase.solve!(
         cache::LinearSolve.LinearCache, alg::LinearSolve.ParUFactorization;
         kwargs...
     )
-    # METIS allocates heavily inside ParU's symbolic analysis, and each allocation goes
-    # through Julia's counted-malloc and its `maybe_collect` check. Those collections
-    # cannot free anything METIS holds, so once enough analysis state has accumulated in
-    # the process they fire repeatedly and the solve stops making progress: a 0.5 s solve
-    # has been seen to run for hours. Holding the collector off for the duration of the
-    # solve keeps it at 0.5 s. See SciML/LinearSolve.jl#1142.
-    gc_was_enabled = GC.enable(false)
-    try
-        return _paru_solve!(cache, alg; kwargs...)
+    # METIS allocates heavily inside ParU's symbolic analysis. SuiteSparse routes those
+    # allocations through Julia's counted allocator, which charges them to the GC
+    # heuristic even though the collector can never free them: they belong to METIS. Once
+    # enough of that memory is outstanding, every further allocation trips `maybe_collect`
+    # and the analysis stops making progress, turning a 0.5 s solve into hours.
+    #
+    # Handing SuiteSparse the plain libc allocator for the duration keeps that memory off
+    # Julia's books, which is what the accounting should have said in the first place. The
+    # collector stays on throughout. See SciML/LinearSolve.jl#1142.
+    return _with_uncounted_suitesparse_allocator() do
+        _paru_solve!(cache, alg; kwargs...)
+    end
+end
+
+function _with_uncounted_suitesparse_allocator(f)
+    prev_malloc = LinearSolve.KLU.SuiteSparse_config_malloc_func_get()
+    prev_calloc = LinearSolve.KLU.SuiteSparse_config_calloc_func_get()
+    prev_realloc = LinearSolve.KLU.SuiteSparse_config_realloc_func_get()
+    prev_free = LinearSolve.KLU.SuiteSparse_config_free_func_get()
+    LinearSolve.KLU.SuiteSparse_config_malloc_func_set(cglobal(:malloc))
+    LinearSolve.KLU.SuiteSparse_config_calloc_func_set(cglobal(:calloc))
+    LinearSolve.KLU.SuiteSparse_config_realloc_func_set(cglobal(:realloc))
+    LinearSolve.KLU.SuiteSparse_config_free_func_set(cglobal(:free))
+    return try
+        f()
     finally
-        GC.enable(gc_was_enabled)
+        LinearSolve.KLU.SuiteSparse_config_malloc_func_set(prev_malloc)
+        LinearSolve.KLU.SuiteSparse_config_calloc_func_set(prev_calloc)
+        LinearSolve.KLU.SuiteSparse_config_realloc_func_set(prev_realloc)
+        LinearSolve.KLU.SuiteSparse_config_free_func_set(prev_free)
     end
 end
 

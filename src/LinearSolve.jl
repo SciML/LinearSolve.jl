@@ -427,6 +427,14 @@ const BLASELTYPES = Union{Float32, Float64, ComplexF32, ComplexF64}
 
 function defaultalg_symbol end
 
+"""
+    _check_matrix_support(A)
+
+Reject a matrix format that would otherwise be solved incorrectly. Extensions add
+methods for their own formats; the fallback accepts everything.
+"""
+_check_matrix_support(A) = nothing
+
 include("verbosity.jl")
 include("blas_logging.jl")
 include("generic_lufact.jl")
@@ -751,6 +759,7 @@ error_no_cudss_lu(A) = nothing
 cudss_loaded(A) = false
 is_cusparse(A) = false
 is_cusparse_csr(A) = false
+
 is_cusparse_csc(A) = false
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,

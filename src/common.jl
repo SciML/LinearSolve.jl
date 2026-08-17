@@ -770,6 +770,7 @@ function __init(
         kwargs...
     )
     (; A, b, u0, p) = prob
+    _check_matrix_support(A)
 
     # Integer-eltype problems are solved as their float (or joint-promoted)
     # counterparts, matching `\`; see `__promote_int_arrays`. This happens before

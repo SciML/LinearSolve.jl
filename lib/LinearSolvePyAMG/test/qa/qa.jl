@@ -1,13 +1,9 @@
 using SciMLTesting, LinearSolvePyAMG, Test
 using JET
 
-docs_src = normpath(joinpath(pkgdir(LinearSolvePyAMG), "..", "..", "docs", "src"))
-
 run_qa(
     LinearSolvePyAMG;
     explicit_imports = true,
-    api_docs_kwargs = (; rendered = true, docs_src),
-    jet_kwargs = (; target_defined_modules = true),
     ei_kwargs = (;
         # Non-public names accessed qualified: SciMLBase / LinearSolve internals the
         # solver wrapper relies on (build_linear_solution, default_alias_A/b, ...).

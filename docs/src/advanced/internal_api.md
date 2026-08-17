@@ -60,6 +60,8 @@ The system categorizes matrix sizes to match LinearSolveAutotune benchmarking:
 ```@docs
 LinearSolve.supernodal_panel_solve!
 LinearSolve.supernodal_panel_solve_backend!
+LinearSolve.SupernodalLU.AMD
+LinearSolve.SupernodalLU.AMD.amd_order!
 ```
 
 #### **Dual Preference Structure**
@@ -132,11 +134,14 @@ LinearSolve.__init_u0_from_Ab
 
 ## Solve Functions
 
-For custom solving strategies:
+The user-facing solve-function algorithms are documented in the
+[solver reference](@ref linearsystemsolvers).
+
+The generic `CommonSolve.solve!` method is the developer entry point used by
+LinearSolve's cache-based algorithms:
 
 ```@docs
-LinearSolve.LinearSolveFunction
-LinearSolve.DirectLdiv!
+CommonSolve.solve!
 ```
 
 ## Preconditioner Infrastructure
@@ -150,12 +155,8 @@ LinearSolve.InvPreconditioner
 
 ## Internal Algorithm Types
 
-These are internal algorithm implementations:
-
-```@docs
-LinearSolve.SimpleLUFactorization
-LinearSolve.LUSolver
-```
+`LUSolver` is an internal implementation detail. The user-facing
+factorization algorithms are documented in the [solver reference](@ref linearsystemsolvers).
 
 ## Developer Notes
 

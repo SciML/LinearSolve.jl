@@ -96,25 +96,17 @@ function Mooncake.rrule!!(
         ∂u = sol.dx.data.u
 
         if sensealg.linsolve === missing
-            cached_adjoint_solution = LinearSolve._adjoint_factorization_solve(
-                alg, cache.cacheval, cache.A, ∂u
-            )
-            λ = if cached_adjoint_solution !== nothing
-                cached_adjoint_solution
-            elseif alg isa AbstractKrylovSubspaceMethod
-                LinearSolve._adjoint_krylov_solve(
-                    alg, cache.A, ∂u; cache.abstol, cache.reltol, cache.verbose
-                )
-            elseif alg isa DefaultLinearSolver
-                LinearSolve.defaultalg_adjoint_eval(cache, ∂u)
-            else
-                invprob = LinearProblem(adjoint(A_), ∂u) # We cached `A`
-                solve(invprob, alg; cache.abstol, cache.reltol, cache.verbose).u
-            end
+            # Same route as `solve!(cache; adjoint = true)`. `A_` is the copy preserved
+            # above when the factorization may have overwritten `cache.A`.
+            λ = LinearSolve._adjoint_solve(cache, ∂u, A_ === nothing ? cache.A : A_)
         else
+            adj_Pl, adj_Pr = LinearSolve._adjoint_precs(
+                sensealg.linsolve, sensealg, cache.Pl, cache.Pr
+            )
             invprob = LinearProblem(adjoint(A_), ∂u) # We cached `A`
             λ = solve(
-                invprob, sensealg.linsolve; cache.abstol, cache.reltol, cache.verbose
+                invprob, sensealg.linsolve; cache.abstol, cache.reltol, cache.verbose,
+                Pl = adj_Pl, Pr = adj_Pr
             ).u
         end
 

@@ -139,7 +139,7 @@ linearsolve_internal_accesses = (
     :PrecompileTools, :SciMLLinearSolveAlgorithm, :SupernodalLU,
     :_SPARSE_LU_FALLBACK_ALGORITHMS, :_SPARSE_ONLY_ALGORITHMS,
     :__is_extension_loaded, :__nonstructural_zeros, :_adjoint_factorization_solve,
-    :_adjoint_krylov_solve, :_can_reuse_cache_factorization,
+    :_adjoint_krylov_solve, :_adjoint_precs, :_can_reuse_cache_factorization,
     :_check_residual_safety,
     :_custom_adjoint_factorization_solve, :_custom_cache_factorization,
     :_custom_can_reuse_adjoint_factorization, Symbol("_direct_lu_factorize!"),
@@ -199,21 +199,17 @@ external_internal_accesses = (
     Symbol("rdiv!"),
 )
 
-docs_src = normpath(joinpath(@__DIR__, "..", "..", "docs", "src"))
+# `@reexport using SciMLBase` puts every SciMLBase export in LinearSolve's public API,
+# so the reexport audit needs them allowed; the list is computed so it tracks
+# SciMLBase. The API-docs checks need no matching ignore: SciMLTesting follows each
+# binding to SciMLBase's docstring, exempts the reexported module name, and only
+# requires a local `@docs` entry for names LinearSolve owns.
 scimlbase_reexports = Tuple(names(LinearSolve.SciMLBase; all = false, imported = false))
 
 run_qa(
     LinearSolve;
     explicit_imports = true,
     reexports_allow = scimlbase_reexports,
-    # `scimlbase_reexports` covers both checks: `names(SciMLBase)` includes the
-    # module's own name, so re-exporting it puts `:SciMLBase` in LinearSolve's public
-    # API, where the docstring check counts it as undocumented. It is SciMLBase's name
-    # to document, not LinearSolve's, hence the same ignore list as the rendered check.
-    api_docs_kwargs = (;
-        rendered = true, docs_src,
-        ignore = scimlbase_reexports, rendered_ignore = scimlbase_reexports,
-    ),
     aqua_kwargs = (;
         # `MKL_jll` is not stale: `src/LinearSolve.jl` and `src/mkl.jl` load it
         # (`using MKL_jll: MKL_jll` / `libmkl_rt`) behind a `@static if` gated on a
@@ -280,4 +276,4 @@ run_qa(
     ),
 )
 
-run_api_docs(LinearSolve.KLU; rendered = true, docs_src)
+run_api_docs(LinearSolve.KLU)

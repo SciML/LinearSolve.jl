@@ -25,7 +25,7 @@ decomposition.
 
 For large problems, computing every eigenpair is wasteful when only a handful are
 needed. `num_eigenpairs` controls how many eigenpairs are returned, and `eigentarget`
-(an [`EigenvalueTarget`](@ref)) controls which part of the spectrum they come from:
+(an [`EigenvalueTarget`](https://docs.sciml.ai/SciMLBase/stable/interfaces/EigenvalueProblem/)) controls which part of the spectrum they come from:
 
 ```@example eigsys1
 prob = LS.EigenvalueProblem(

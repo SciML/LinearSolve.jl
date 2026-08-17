@@ -116,6 +116,46 @@ directly would additionally need
 LinearSolve.needs_concrete_A(::MyLUFactorization) = true
 ```
 
+## Matrix-free implementation
+
+An iterative algorithm can promise that it only needs the generic `mul!`
+operation. The operator does not need to expose a factorization or a dense
+matrix representation; the algorithm still receives the standard
+`LinearCache` and returns the standard `LinearSolution`.
+
+```julia
+struct DocIdentityOperator{T} <: AbstractMatrix{T}
+    n::Int
+end
+
+Base.size(A::DocIdentityOperator) = (A.n, A.n)
+Base.getindex(A::DocIdentityOperator{T}, i::Int, j::Int) where {T} =
+    i == j ? one(T) : zero(T)
+
+function LinearAlgebra.mul!(y::AbstractVector, ::DocIdentityOperator, x::AbstractVector)
+    copyto!(y, x)
+    return y
+end
+
+struct DocMatVecAlg <: LinearSolve.AbstractKrylovSubspaceMethod end
+
+function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::DocMatVecAlg; kwargs...)
+    mul!(cache.u, cache.A, cache.b)
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache; retcode = SciMLBase.ReturnCode.Success
+    )
+end
+
+A = DocIdentityOperator{Float64}(3)
+b = [1.0, 2.0, 3.0]
+cache = init(LinearProblem(A, b), DocMatVecAlg())
+@assert solve!(cache).u == b
+```
+
+The example is intentionally limited to the generic contract: a real iterative
+algorithm must also define its convergence, stopping, and preconditioning rules
+and should exercise those rules with dedicated tests.
+
 ## Checking compliance
 
 ```julia

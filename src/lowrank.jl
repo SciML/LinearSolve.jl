@@ -1,3 +1,6 @@
+# Not an `AbstractDenseFactorization`: this wraps another algorithm and carries the
+# update, so it has no zero-argument form, while the factorization subtypes are swept
+# and constructed generically (`test/Core/resolve.jl`).
 @doc doc"""
     LowRankUpdatedFactorization(alg = LUFactorization(); U, V, C = I)
 
@@ -30,9 +33,6 @@ update.
     full matrix singular shows up as a singular capacitance matrix rather than as
     a failure of the outer solve.
 """
-# Not an `AbstractDenseFactorization`: this wraps another algorithm and carries the
-# update, so it has no zero-argument form, while the factorization subtypes are swept
-# and constructed generically (`test/Core/resolve.jl`).
 struct LowRankUpdatedFactorization{Alg, TU, TV, TC} <: SciMLLinearSolveAlgorithm
     alg::Alg
     U::TU

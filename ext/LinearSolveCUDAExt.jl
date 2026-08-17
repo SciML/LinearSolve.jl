@@ -25,6 +25,20 @@ end
 LinearSolve.is_cusparse_csr(::cuSPARSE.CuSparseMatrixCSR) = true
 LinearSolve.is_cusparse_csc(::cuSPARSE.CuSparseMatrixCSC) = true
 
+# CUSPARSE's COO routines require the entries sorted by row. A COO assembled by hand is
+# not necessarily sorted that way (`findnz` on a CSC yields column-major order), and the
+# mismatch is silent: the solve converges to a wrong answer rather than failing. The
+# conversions sort as part of the conversion, so they are the way in.
+# See https://github.com/SciML/LinearSolve.jl/issues/350.
+function LinearSolve._check_matrix_support(::cuSPARSE.CuSparseMatrixCOO)
+    return error(
+        "CuSparseMatrixCOO is not supported by LinearSolve.jl. CUSPARSE requires the " *
+            "entries sorted by row, which a hand-assembled COO need not be, and an " *
+            "unsorted one solves to a wrong answer without erroring. Convert first, " *
+            "with `CuSparseMatrixCSR(A)` or `CuSparseMatrixCSC(A)`."
+    )
+end
+
 function LinearSolve.defaultalg(
         A::cuSPARSE.CuSparseMatrixCSR{Tv, Ti}, b,
         assump::OperatorAssumptions{Bool}

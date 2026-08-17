@@ -1,21 +1,51 @@
 """
-`OperatorCondition`
+    EnumX.@enumx OperatorCondition
 
-Specifies the assumption of matrix conditioning for the default linear solver choices. Condition number
-is defined as the ratio of eigenvalues. The numerical stability of many linear solver algorithms
-can be dependent on the condition number of the matrix. The condition number can be computed as:
+Specifies the assumption of matrix conditioning for the default linear solver choices.
+The condition number is the ratio of the largest to the smallest singular value of `A`
+(for normal matrices this coincides with the ratio of the extreme eigenvalue magnitudes).
+The numerical stability of many linear solver algorithms can be dependent on the
+condition number of the matrix. The condition number can be computed as:
 
 ```julia
 using LinearAlgebra
 cond(rand(100, 100))
 ```
 
-However, in practice this computation is very expensive and thus not possible for most practical cases.
-Therefore, OperatorCondition lets one share to LinearSolve the expected conditioning. The higher the
-expected condition number, the safer the algorithm needs to be and thus there is a trade-off between
-numerical performance and stability. By default the method assumes the operator may be ill-conditioned
-for the standard linear solvers to converge (such as LU-factorization), though more extreme
-ill-conditioning or well-conditioning could be the case and specified through this assumption.
+However, in practice this computation is very expensive and thus not possible for most
+practical cases. Therefore, `OperatorCondition` lets one share to LinearSolve the
+expected conditioning. The higher the expected condition number, the safer the
+algorithm needs to be and thus there is a trade-off between numerical performance and
+stability. By default the method assumes the operator may be ill-conditioned for the
+standard linear solvers to converge (such as LU-factorization), though more extreme
+ill-conditioning or well-conditioning could be the case and specified through this
+assumption.
+
+The assumption is supplied through the `condition` keyword of `OperatorAssumptions`,
+which in turn is passed as the `assumptions` keyword of `init` (or the `assump`
+keyword of `solve` when no algorithm is given):
+
+```julia
+cache = init(prob; assumptions = OperatorAssumptions(true;
+    condition = OperatorCondition.WellConditioned))
+sol = solve!(cache)
+```
+
+It only affects the default algorithm (`solve(prob)` with no algorithm given). The
+members and their effect on the dense default choice are:
+
+  - `OperatorCondition.IllConditioned` (default): pivoted LU for square `A`
+    (`LUFactorization` or one of its size- and BLAS-dependent variants), QR
+    (column-pivoted when underdetermined) for non-square `A`.
+  - `OperatorCondition.WellConditioned`: LU for square `A` (as above),
+    `NormalCholeskyFactorization` for non-square `A`.
+  - `OperatorCondition.VeryIllConditioned`: `QRFactorization` (column-pivoted when
+    underdetermined).
+  - `OperatorCondition.SuperIllConditioned`: `SVDFactorization`.
+
+Sparse and structured `A` have their own default choices that do not consult this
+setting; on GPU arrays `IllConditioned` (or a non-square `A`) selects QR and the other
+members select LU.
 """
 EnumX.@enumx OperatorCondition begin
     """
@@ -98,40 +128,58 @@ end
 
 """
     OperatorAssumptions(issquare = nothing;
-                        condition::OperatorCondition.T = IllConditioned,
-                        nonstructural_zeros::NonstructuralZeros.T = Auto)
+                        condition::OperatorCondition.T = OperatorCondition.IllConditioned,
+                        nonstructural_zeros::NonstructuralZeros.T = NonstructuralZeros.Auto)
 
-Sets the operator `A` assumptions used as part of the default algorithm.
+Sets the operator `A` assumptions used as part of the default algorithm. The object is
+supplied through the `assumptions` keyword of `init` (or the `assump` keyword of
+`solve` when no algorithm is given), whose default is
+`OperatorAssumptions(issquare(prob.A))`:
 
-`issquare` asserts whether `A` is square (and thus whether a direct
-factorization vs. a least-squares solver is appropriate). `nothing` (default)
-defers the decision, letting `init`/`defaultalg` infer it from `A`.
+```julia
+cache = init(prob; assumptions = OperatorAssumptions(true;
+    condition = OperatorCondition.WellConditioned))
+sol = solve!(cache)
+```
 
-`condition` describes the conditioning of `A` and selects how aggressively the
-default algorithm trades speed for stability (see [`OperatorCondition`](@ref)):
+## Positional Arguments
 
-  - `OperatorCondition.IllConditioned` (default): assume `A` may be ill
-    conditioned; pick a stability-preserving algorithm (e.g. pivoted
-    factorizations).
-  - `OperatorCondition.WellConditioned`: assume contained conditioning and pick
-    the fastest algorithm, skipping safety work.
-  - `OperatorCondition.VeryIllConditioned` /
-    `OperatorCondition.SuperIllConditioned`: progressively more conservative,
-    favoring the most numerically robust paths.
+  - `issquare`: asserts whether `A` is square (and thus whether a direct
+    factorization vs. a least-squares solver is appropriate). `nothing` (default)
+    defers the decision, letting `init`/`defaultalg` infer it from `A`.
 
-`nonstructural_zeros` declares how `A`'s *nonstructural zeros* (stored entries
-that are numerically zero) behave across a sequence of solves, and hence whether
-and how a sparse factorization should drop them (see [`NonstructuralZeros`](@ref)):
+## Keyword Arguments
 
-  - `NonstructuralZeros.Auto` (default): detect from the starting matrix and
-    adapt (cached union, falling back to per-solve dropzeros if non-persistent).
-  - `NonstructuralZeros.None`: none worth dropping; never reduce (bit-identical).
-  - `NonstructuralZeros.Persistent`: present at stable positions; cached-union
-    reduction.
-  - `NonstructuralZeros.Present`: present but positions may vary; per-solve
-    dropzeros.
+  - `condition`: describes the conditioning of `A` and selects how aggressively the
+    default algorithm trades speed for stability (see `OperatorCondition`). Defaults
+    to `OperatorCondition.IllConditioned`.
 
-Has no effect on dense `A`.
+      + `OperatorCondition.IllConditioned` (default): assume `A` may be ill
+        conditioned; pick a stability-preserving algorithm (e.g. pivoted
+        factorizations).
+      + `OperatorCondition.WellConditioned`: assume contained conditioning and pick
+        the fastest algorithm, skipping safety work.
+      + `OperatorCondition.VeryIllConditioned` /
+        `OperatorCondition.SuperIllConditioned`: progressively more conservative,
+        favoring the most numerically robust paths.
+
+  - `nonstructural_zeros`: declares how `A`'s *nonstructural zeros* (stored entries
+    that are numerically zero) behave across a sequence of solves, and hence whether
+    and how a sparse factorization should drop them (see `NonstructuralZeros`).
+    Defaults to `NonstructuralZeros.Auto`.
+
+      + `NonstructuralZeros.Auto` (default): detect from the starting matrix and
+        adapt (cached union, falling back to per-solve dropzeros if non-persistent).
+      + `NonstructuralZeros.None`: none worth dropping; never reduce (bit-identical).
+      + `NonstructuralZeros.Persistent`: present at stable positions; cached-union
+        reduction.
+      + `NonstructuralZeros.Present`: present but positions may vary; per-solve
+        dropzeros.
+
+`issquare` and `condition` steer the dense default choice (LU vs. QR vs. SVD vs.
+`NormalCholeskyFactorization`); `nonstructural_zeros` only applies to sparse `A` and
+has no effect on dense `A`. Sparse and structured `A` consult at most `issquare` when
+picking their default.
 """
 struct OperatorAssumptions{T}
     issq::T

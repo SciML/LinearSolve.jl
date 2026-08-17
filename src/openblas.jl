@@ -1,11 +1,16 @@
 """
-```julia
-OpenBLASLUFactorization()
-```
+    OpenBLASLUFactorization(; residualsafety::Bool = false)
 
 A direct wrapper over OpenBLAS's LU factorization (`getrf!` and `getrs!`).
 This solver makes direct calls to OpenBLAS_jll without going through Julia's
 libblastrampoline, which can provide performance benefits in certain configurations.
+
+## Keyword Arguments
+
+  - `residualsafety`: If `true`, every solve that (re)factorizes `A` is followed by a
+    residual check against a copy of the original matrix. If `‖A*x - b‖` exceeds
+    `abstol + reltol * ‖b‖` (the tolerances of the solve), the returned solution has
+    `retcode = ReturnCode.APosterioriSafetyFailure`. Defaults to `false`.
 
 ## Performance Characteristics
 

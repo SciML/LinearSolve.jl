@@ -19,6 +19,13 @@ specialized dispatches.
 
       + If this is set `≤ 0` and during runtime we get a Block Diagonal Matrix, then we will
         check if the specialized dispatch can be used.
+  - `warm_start::Bool = false`: If `true`, the initial residual is formed as `b - A*Δx` from
+    the cache's internal `Δx` buffer instead of as `b`, and `Δx` is folded into the returned
+    solution (following the Krylov.jl `warm_start` convention). Note that in the current
+    implementation nothing copies the problem's `u0` into `Δx`: with `restart = true` the
+    buffer is uninitialized, and with `restart = false` it has length zero (so the first
+    `solve!` throws a `DimensionMismatch`). This option therefore does not seed the
+    iteration from `u0`. Leave it at the default `false`.
 
 !!! warning
 

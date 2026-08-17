@@ -222,8 +222,28 @@ end
 """
     show_algorithm_choices()
 
-Display what algorithm choices are actually made by the default solver for 
-representative matrix sizes. Shows current preferences and system information.
+Print a report of the dense default algorithm selection to `stdout` and return
+`nothing`. Takes no arguments. Use it to check whether autotune preferences are set and
+took effect, or to see which LU variant `solve(prob)` will pick on this machine.
+
+The report has three parts, followed by a short legend of the size categories:
+
+  - **Current Preferences**: the Preferences.jl entries `best_algorithm_<eltype>_<size>`
+    and `best_always_loaded_<eltype>_<size>` stored for LinearSolve (typically written to
+    `LocalPreferences.toml` by LinearSolveAutotune.jl) for the eltypes `Float32`,
+    `Float64`, `ComplexF32`, `ComplexF64` and the size categories `tiny` (n <= 20),
+    `small` (21-100), `medium` (101-300), `large` (301-1000), `big` (> 1000), or
+    "No autotune preferences currently set." if there are none.
+  - **Default Algorithm Choices**: a table of the algorithm `defaultalg` returns for a
+    dense random square matrix (with `OperatorAssumptions(true)`) of each eltype at one
+    representative size per category: 8, 50, 200, 500, and 1500. Sizes of 10 or less
+    always resolve to `GenericLUFactorization`.
+  - **System Information**: whether MKL and Apple Accelerate are available and whether
+    RecursiveFactorization.jl is enabled.
+
+Preferences are read into constants when LinearSolve is compiled, so a preference set
+in the current session shows up in the first section but only changes the second
+section (and actual solves) after Julia is restarted.
 """
 function show_algorithm_choices()
     println("="^60)

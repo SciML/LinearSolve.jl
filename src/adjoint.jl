@@ -1,7 +1,8 @@
 """
     LinearSolveAdjoint(; linsolve = missing, Pl = missing, Pr = missing)
 
-Given a Linear Problem ``A x = b`` computes the sensitivities for ``A`` and ``b`` as:
+Sensitivity algorithm for reverse-mode differentiation of a linear solve. Given a Linear
+Problem ``A x = b`` it computes the sensitivities for ``A`` and ``b`` as:
 
 ```math
 \\begin{align}
@@ -12,6 +13,31 @@ A' \\lambda &= \\partial x   \\\\
 ```
 
 For more details, check [these notes](https://math.mit.edu/~stevenj/18.336/adjoint.pdf).
+
+## Usage
+
+The object is passed as the `sensealg` keyword of `init`/`solve`, and
+`LinearSolveAdjoint()` is already the default value of that keyword, so nothing needs to
+be done to differentiate a solve; construct one explicitly only to override the adjoint
+linear solver or preconditioners:
+
+```julia
+sol = solve(prob, alg; sensealg = LinearSolveAdjoint(linsolve = KrylovJL_GMRES()))
+```
+
+The stored settings are consulted by the reverse-mode rules for `solve` and `solve!`:
+the ChainRulesCore `rrule` (used by Zygote and other ChainRules-based tools, loaded with
+`using ChainRulesCore` or `using Zygote`) and the Mooncake rule (`using Mooncake`).
+Those rules currently accept only a `LinearSolveAdjoint` as `sensealg`.
+
+## Keyword Arguments
+
+  - `linsolve`: the LinearSolve algorithm instance (e.g. `LUFactorization()`,
+    `KrylovJL_GMRES()`) used to solve the adjoint system ``A' \\lambda = \\partial x``.
+    Defaults to `missing`, meaning reuse the forward algorithm (and, where possible, its
+    cached factorization).
+  - `Pl`, `Pr`: left and right preconditioners for the adjoint solve. Default to
+    `missing`, meaning derive them from the forward preconditioners as described below.
 
 ## Choice of Linear Solver
 

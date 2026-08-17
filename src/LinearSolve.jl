@@ -460,13 +460,50 @@ Apply a supernodal triangular-panel operation using the requested backend.
 
 # Keywords
 
-  - `operation`: One of `:factor_right_upper`, `:factor_lower`, `:lower`, or `:upper`.
-  - `algorithm`: Panel backend. `:auto` selects between `:kernel`, `:blas`, and
-    `:triangularsolve` from the operand types and dimensions.
+  - `operation`: which triangular operation to apply. One of
+
+      + `:factor_right_upper`: `B := B / U11`, a right solve with the non-unit
+        upper triangle (used during numeric factorization to form `L21`).
+      + `:factor_lower`: `B := L11 \\ B`, a left solve with the unit-lower triangle
+        (used during numeric factorization to form `U12`).
+      + `:lower`: `B := L11 \\ B`, the unit-lower forward substitution of the solve
+        phase.
+      + `:upper`: `B := U11 \\ B`, the non-unit upper back substitution of the
+        solve phase.
+
+    Any other symbol throws an `ArgumentError`. `:factor_lower` and `:lower`
+    compute the same result; they differ only in which backend code path each
+    `algorithm` routes them to (see below).
+  - `algorithm`: backend to dispatch to through `supernodal_panel_solve_backend!`.
+    Defaults to `:auto`. Accepted values:
+
+      + `:kernel`: the in-tree column-oriented kernels (generic over the element
+        type, allocation-free) for `:lower`/`:upper`; the `:factor_*` operations
+        are forwarded to `:triangularsolve`.
+      + `:blas`: `BLAS.trsm!` for `:lower`/`:upper` when `W` and `B` are strided
+        `BlasFloat` matrices, the kernels for other element types; the `:factor_*`
+        operations are forwarded to `:triangularsolve`.
+      + `:triangularsolve`: `LinearAlgebra.ldiv!`/`rdiv!` on the triangular
+        wrappers, replaced by TriangularSolve.jl kernels for strided `Float32`
+        and `Float64` panels when RecursiveFactorization.jl and TriangularSolve.jl
+        are loaded.
+      + `:auto`: `:factor_right_upper` and `:factor_lower` always go to
+        `:triangularsolve`. `:lower` and `:upper` use `:kernel` when
+        `np <= PANEL_KERNEL_MAX_NP` (256), when `B` has a single column, or when
+        the element type is not a `BlasFloat`; otherwise `:blas` when
+        `np > PANEL_BLAS_MIN_NP` (1792) and `:triangularsolve` in between.
 
 # Returns
 
 The updated `B`.
+
+!!! note
+
+    The TriangularSolve.jl backend is only active when both RecursiveFactorization.jl
+    and TriangularSolve.jl are loaded; `using RecursiveFactorization` is enough,
+    since RecursiveFactorization.jl depends on TriangularSolve.jl. Without them
+    `:triangularsolve` routes `:lower`/`:upper` back to `:blas` and the
+    `:factor_*` operations to the stdlib triangular solves.
 """
 function supernodal_panel_solve! end
 
@@ -485,6 +522,30 @@ Unsupported operations must throw `ArgumentError`.
 The built-in backends use `Val(:kernel)`, `Val(:blas)`, and
 `Val(:triangularsolve)`. Extensions should add methods only for backend and operand
 combinations they implement; the generic methods provide the fallback behavior.
+
+# Built-in backends
+
+  - `Val(:kernel)`: runs `:lower`/`:upper` through the in-tree column-oriented
+    kernels; `:factor_right_upper`/`:factor_lower` are forwarded to
+    `Val(:triangularsolve)`.
+  - `Val(:blas)`: runs `:lower`/`:upper` through `BLAS.trsm!` when `W` and `B` are
+    strided `BlasFloat` matrices, and through the kernels otherwise;
+    `:factor_right_upper`/`:factor_lower` are forwarded to `Val(:triangularsolve)`.
+  - `Val(:triangularsolve)`: the in-tree method runs `:factor_right_upper` through
+    `LinearAlgebra.rdiv!` with `UpperTriangular` and `:factor_lower` through
+    `LinearAlgebra.ldiv!` with `UnitLowerTriangular`, and forwards
+    `:lower`/`:upper` to `Val(:blas)`.
+
+This is the extension hook: a package can add a more specific method for
+`Val(:triangularsolve)` and supported panel types. The
+`LinearSolveRecursiveFactorizationExt` extension defines
+
+    supernodal_panel_solve_backend!(::Val{:triangularsolve}, W::StridedMatrix{Tv},
+        B::StridedMatrix{Tv}, np::Int; operation::Symbol) where {Tv <: Union{Float32, Float64}}
+
+which runs all four operations through TriangularSolve.jl and is active once
+RecursiveFactorization.jl and TriangularSolve.jl are both loaded
+(`using RecursiveFactorization` is enough, since it depends on TriangularSolve.jl).
 """
 function supernodal_panel_solve_backend! end
 # after default.jl: the vendored solver caches its dense diagonal blocks

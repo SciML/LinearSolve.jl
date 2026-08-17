@@ -71,20 +71,73 @@ EnumX.@enumx WarmStart begin
 end
 
 """
-```julia
-KrylovJL(args...; KrylovAlg = Krylov.gmres!,
-    Pl = nothing, Pr = nothing,
-    gmres_restart = 0, window = 0,
-    warm_start = WarmStart.Auto,
-    kwargs...)
-```
+    KrylovJL(args...; KrylovAlg = Krylov.gmres!, gmres_restart = 0, window = 0,
+        warm_start = WarmStart.Auto, precs = nothing, kwargs...)
 
-A generic wrapper over the Krylov.jl krylov-subspace iterative solvers.
+A generic wrapper over the Krylov.jl Krylov-subspace iterative solvers. The chosen
+in-place solver is run through `Krylov.krylov_solve!` on a Krylov.jl workspace
+that `solve!` builds on the first solve, rebuilds whenever `A` has been replaced
+(`cache.A = newA` or `reinit!` with a new `A`), and otherwise reuses across
+solves of the same cache (for example when only `b` changes). Preconditioners,
+whether given as `Pl`/`Pr` to `init`/`solve` or built by `precs`, are handed to
+Krylov.jl as its `M` (left) and `N` (right) operators, for the methods that take
+them (see the last paragraph). The named constructors `KrylovJL_GMRES`,
+`KrylovJL_CG`, `KrylovJL_MINRES`, `KrylovJL_FGMRES`, `KrylovJL_BICGSTAB`,
+`KrylovJL_LSMR`, `KrylovJL_CRAIGMR`, and `KrylovJL_MINARES` fix `KrylovAlg` and
+forward everything else here.
 
-`warm_start` (a [`WarmStart`](@ref) value) selects the initial guess used when
-the same cache is solved repeatedly (GMRES and FGMRES only): `WarmStart.Auto`
-(default; cold start unless a caller resolves it), `WarmStart.None`,
-`WarmStart.Previous`, or the recommended `WarmStart.Hegedus`.
+## Positional Arguments
+
+  - `args...`: stored on the algorithm but not used by `solve!`.
+
+## Keyword Arguments
+
+  - `KrylovAlg`: the Krylov.jl in-place solver function to run. It must be one of
+    the `Krylov.<method>!` functions LinearSolve knows how to build a workspace
+    for: `cg!`, `cr!`, `cgs!`, `minres!`, `minres_qlp!`, `minares!`, `symmlq!`,
+    `cg_lanczos!`, `gmres!`, `fgmres!`, `dqgmres!`, `diom!`, `fom!`, `gpmr!`,
+    `bicgstab!`, `bilq!`, `bilqr!`, `qmr!`, `usymlq!`, `usymqr!`, `tricg!`,
+    `trimr!`, `trilqr!`, `cgls!`, `crls!`, `lsqr!`, `lslq!`, `lsmr!`, `cgne!`,
+    `crmr!`, `lnlq!`, `craig!`, or `craigmr!`. Any other value errors with
+    "Invalid Krylov method detected". Defaults to `Krylov.gmres!`.
+  - `gmres_restart`: Krylov subspace size for the GMRES-like methods (`gmres!`,
+    `fgmres!`, `dqgmres!`, `diom!`, `fom!`, `gpmr!`). `0` sizes the workspace with
+    `memory = min(20, size(A, 1))` and runs GMRES without restarting; a positive
+    value sets `memory = gmres_restart` and, for `gmres!` only, also passes
+    `restart = true` so that GMRES restarts every `gmres_restart` iterations. For
+    the other GMRES-like methods it only sizes the workspace (pass
+    `restart = true` in `kwargs` to make FGMRES restart). Ignored by every other
+    method. Defaults to `0`.
+  - `window`: the `window` argument of the Krylov.jl workspace constructor for
+    `minres!`, `symmlq!`, `lslq!`, `lsqr!`, and `lsmr!` (the number of iterations
+    used to estimate a lower bound on the error), forwarded when nonzero. Ignored
+    by every other method. Defaults to `0`.
+  - `warm_start`: a [`WarmStart`](@ref) value selecting the initial guess used when
+    the same cache is solved repeatedly (GMRES and FGMRES only): `WarmStart.Auto`
+    (cold start unless a caller resolves it), `WarmStart.None`,
+    `WarmStart.Previous`, or the recommended `WarmStart.Hegedus`. Defaults to
+    `WarmStart.Auto`.
+  - `precs`: a preconditioner builder, a function `(A, p) -> (Pl, Pr)`. It is
+    called at `init` (explicit `Pl`/`Pr` passed to `init`/`solve` take
+    precedence) and again in `solve!` whenever `A` or `p` has changed since the
+    preconditioners were last built (`reinit!` without `reuse_precs = true`), and
+    its result becomes `cache.Pl`/`cache.Pr`. `nothing` means no preconditioning
+    unless `Pl`/`Pr` are given to `init`/`solve`. Defaults to `nothing`.
+  - `kwargs...`: any remaining keywords are forwarded to `Krylov.krylov_solve!` on
+    every solve (for example `callback`, `reorthogonalization`, `timemax`, or
+    `restart`), on top of the `atol`/`rtol` tolerances, `itmax = maxiters`,
+    `verbose`, `ldiv = true`, and `history = true` that LinearSolve supplies. Two
+    exceptions are consumed at workspace construction instead of being
+    forwarded: `memory` overrides the subspace size derived from
+    `gmres_restart`, and `window` is dropped (use the `window` keyword above).
+
+Right preconditioning is only available for some methods. For `cg!`, `minres!`,
+`cgls!`, and `crls!` a non-identity `Pr` triggers the `no_right_preconditioning`
+verbosity message and is discarded, since Krylov.jl takes only a centered
+preconditioner `M` for them. `Pl` and `Pr` are passed through for the GMRES,
+FGMRES, BiCGSTAB, LSMR, LSQR, and LSLQ workspaces. For every other `KrylovAlg`
+(including `craigmr!` and `minares!`), `solve!` calls the Krylov solver without
+`M`/`N`, so any `Pl`/`Pr` are silently ignored.
 """
 struct KrylovJL{F, I, P, A, K} <: AbstractKrylovSubspaceMethod
     KrylovAlg::F
@@ -113,94 +166,161 @@ default_alias_A(::KrylovJL, ::Any, ::Any) = true
 default_alias_b(::KrylovJL, ::Any, ::Any) = true
 
 """
-```julia
-KrylovJL_CG(args...; kwargs...)
-```
+    KrylovJL_CG(args...; kwargs...)
 
-A generic CG implementation for Hermitian and positive definite linear systems
+Conjugate gradient for Hermitian positive definite linear systems, wrapping
+`Krylov.cg!` via `KrylovJL` (equivalent to
+`KrylovJL(args...; KrylovAlg = Krylov.cg!, kwargs...)`). All keyword arguments
+(`precs`, and any Krylov.jl solve keywords such as `callback`) are those of
+`KrylovJL`; `gmres_restart` and `window` have no effect here. Only left
+(centered) preconditioning is supported: a right preconditioner `Pr` triggers
+the `no_right_preconditioning` verbosity message and is discarded.
 """
 function KrylovJL_CG(args...; kwargs...)
     return KrylovJL(args...; KrylovAlg = Krylov.cg!, kwargs...)
 end
 
 """
-```julia
-KrylovJL_MINRES(args...; kwargs...)
-```
+    KrylovJL_MINRES(args...; window = 0, kwargs...)
 
-A generic MINRES implementation for Hermitian linear systems
+MINRES for Hermitian (possibly indefinite) linear systems, wrapping
+`Krylov.minres!` via `KrylovJL` (equivalent to
+`KrylovJL(args...; KrylovAlg = Krylov.minres!, kwargs...)`). Keyword arguments
+are those of `KrylovJL`. `window` sizes the error-estimation window of the
+MINRES workspace when nonzero (defaults to `0`, meaning Krylov.jl's default);
+`gmres_restart` has no effect here. Only left (centered) preconditioning is
+supported: a right preconditioner `Pr` triggers the `no_right_preconditioning`
+verbosity message and is discarded. Batched (matrix) right-hand sides are
+supported through Krylov.jl's block MINRES.
 """
 function KrylovJL_MINRES(args...; kwargs...)
     return KrylovJL(args...; KrylovAlg = Krylov.minres!, kwargs...)
 end
 
 """
-```julia
-KrylovJL_GMRES(args...; gmres_restart = 0, window = 0, warm_start = WarmStart.Auto, kwargs...)
-```
+    KrylovJL_GMRES(args...; gmres_restart = 0, warm_start = WarmStart.Auto,
+        precs = nothing, kwargs...)
 
-A generic GMRES implementation for square non-Hermitian linear systems
+GMRES for square non-Hermitian linear systems, wrapping `Krylov.gmres!` via
+`KrylovJL` (equivalent to `KrylovJL(args...; KrylovAlg = Krylov.gmres!, kwargs...)`).
+This is the general-purpose iterative choice, and the one the default
+polyalgorithm falls back to for operators without a matrix representation.
 
-`warm_start` (a [`WarmStart`](@ref) value) selects the initial guess used when
-the same cache is solved repeatedly; see [`KrylovJL`](@ref).
+## Keyword Arguments
+
+  - `gmres_restart`: `0` allocates a workspace with `memory = min(20, size(A, 1))`
+    and runs GMRES without restarting; a positive value sets the workspace memory
+    to `gmres_restart` and passes `restart = true`, so GMRES restarts every
+    `gmres_restart` iterations. Defaults to `0`.
+  - `warm_start`: a [`WarmStart`](@ref) value selecting the initial guess used
+    when the same cache is solved repeatedly; see `KrylovJL` and `WarmStart`.
+    Defaults to `WarmStart.Auto`.
+  - `precs`: a preconditioner builder `(A, p) -> (Pl, Pr)`; see `KrylovJL`.
+    Defaults to `nothing`.
+  - `kwargs...`: forwarded to `Krylov.krylov_solve!` as described for `KrylovJL`
+    (`memory` overrides the subspace size derived from `gmres_restart`).
+
+Both left and right preconditioners are supported. `window` is accepted but has
+no effect for GMRES. Batched (matrix) right-hand sides are supported through
+Krylov.jl's block GMRES.
 """
 function KrylovJL_GMRES(args...; kwargs...)
     return KrylovJL(args...; KrylovAlg = Krylov.gmres!, kwargs...)
 end
 
 """
-```julia
-KrylovJL_FGMRES(args...; gmres_restart = 0, window = 0, warm_start = WarmStart.Auto, kwargs...)
-```
+    KrylovJL_FGMRES(args...; gmres_restart = 0, warm_start = WarmStart.Auto,
+        precs = nothing, kwargs...)
 
-A generic FGMRES implementation for square non-Hermitian linear systems
+Flexible GMRES for square non-Hermitian linear systems, wrapping `Krylov.fgmres!`
+via `KrylovJL` (equivalent to
+`KrylovJL(args...; KrylovAlg = Krylov.fgmres!, kwargs...)`). Use it in place of
+`KrylovJL_GMRES` when the right preconditioner changes between iterations, for
+example when it is itself an iterative solve.
 
-`warm_start` (a [`WarmStart`](@ref) value) selects the initial guess used when
-the same cache is solved repeatedly; see [`KrylovJL`](@ref).
+## Keyword Arguments
+
+  - `gmres_restart`: `0` allocates a workspace with `memory = min(20, size(A, 1))`;
+    a positive value sets the workspace memory to `gmres_restart`. Unlike
+    `KrylovJL_GMRES`, no `restart` flag is passed for FGMRES, so this only sizes
+    the workspace; pass `restart = true` in `kwargs` to make FGMRES restart every
+    `gmres_restart` iterations. Defaults to `0`.
+  - `warm_start`: a [`WarmStart`](@ref) value selecting the initial guess used
+    when the same cache is solved repeatedly; see `KrylovJL` and `WarmStart`.
+    Defaults to `WarmStart.Auto`.
+  - `precs`: a preconditioner builder `(A, p) -> (Pl, Pr)`; see `KrylovJL`.
+    Defaults to `nothing`.
+  - `kwargs...`: forwarded to `Krylov.krylov_solve!` as described for `KrylovJL`
+    (`memory` overrides the subspace size derived from `gmres_restart`).
+
+Both left and right preconditioners are supported. `window` is accepted but has
+no effect for FGMRES.
 """
 function KrylovJL_FGMRES(args...; kwargs...)
     return KrylovJL(args...; KrylovAlg = Krylov.fgmres!, kwargs...)
 end
 
 """
-```julia
-KrylovJL_BICGSTAB(args...; kwargs...)
-```
+    KrylovJL_BICGSTAB(args...; kwargs...)
 
-A generic BICGSTAB implementation for square non-Hermitian linear systems
+BiCGSTAB for square non-Hermitian linear systems, wrapping `Krylov.bicgstab!` via
+`KrylovJL` (equivalent to
+`KrylovJL(args...; KrylovAlg = Krylov.bicgstab!, kwargs...)`). Its memory use
+does not grow with the iteration count, unlike unrestarted GMRES, at the cost of
+a less regular convergence history. All keyword arguments (`precs`, and any Krylov.jl solve
+keywords such as `callback`) are those of `KrylovJL`; `gmres_restart` and
+`window` have no effect here. Both left and right preconditioners are supported.
 """
 function KrylovJL_BICGSTAB(args...; kwargs...)
     return KrylovJL(args...; KrylovAlg = Krylov.bicgstab!, kwargs...)
 end
 
 """
-```julia
-KrylovJL_LSMR(args...; kwargs...)
-```
+    KrylovJL_LSMR(args...; window = 0, kwargs...)
 
-A generic LSMR implementation for least-squares problems
+LSMR for least-squares problems (rectangular or rank-deficient `A`, minimizing
+`‖b - A x‖`), wrapping `Krylov.lsmr!` via `KrylovJL` (equivalent to
+`KrylovJL(args...; KrylovAlg = Krylov.lsmr!, kwargs...)`). It is the default
+polyalgorithm's choice for tall systems whose `A` is an operator without a matrix
+representation. Keyword arguments are those of `KrylovJL`. `window` sizes the
+error-estimation window of the LSMR workspace when nonzero (defaults to `0`,
+meaning Krylov.jl's default); `gmres_restart` has no effect here. Both left and
+right preconditioners are passed through to Krylov.jl.
 """
 function KrylovJL_LSMR(args...; kwargs...)
     return KrylovJL(args...; KrylovAlg = Krylov.lsmr!, kwargs...)
 end
 
 """
-```julia
-KrylovJL_CRAIGMR(args...; kwargs...)
-```
+    KrylovJL_CRAIGMR(args...; kwargs...)
 
-A generic CRAIGMR implementation for least-norm problems
+CRAIGMR for least-norm problems (underdetermined `A`, returning the minimum-norm
+solution of `A x = b`), wrapping `Krylov.craigmr!` via `KrylovJL` (equivalent to
+`KrylovJL(args...; KrylovAlg = Krylov.craigmr!, kwargs...)`). It is the default
+polyalgorithm's choice for wide systems whose `A` is an operator without a matrix
+representation. Keyword arguments (`precs`, and any Krylov.jl solve keywords)
+are those of `KrylovJL`; `gmres_restart` and `window` have no effect here.
+Preconditioners are not passed through for this method:
+`solve!` calls `Krylov.craigmr!` without `M`/`N`, so any `Pl`/`Pr` supplied to
+`init`/`solve` or built by `precs` are silently ignored.
 """
 function KrylovJL_CRAIGMR(args...; kwargs...)
     return KrylovJL(args...; KrylovAlg = Krylov.craigmr!, kwargs...)
 end
 
 """
-```julia
-KrylovJL_MINARES(args...; kwargs...)
-```
+    KrylovJL_MINARES(args...; kwargs...)
 
-A generic MINARES implementation for Hermitian linear systems
+MINARES for Hermitian (possibly indefinite or singular) linear systems,
+wrapping `Krylov.minares!` via `KrylovJL` (equivalent to
+`KrylovJL(args...; KrylovAlg = Krylov.minares!, kwargs...)`). It minimizes the
+norm of `A r` rather than that of the residual `r`, and is an alternative to
+`KrylovJL_MINRES` for singular or nearly singular Hermitian systems. Keyword
+arguments (`precs`, and any Krylov.jl solve keywords) are those of `KrylovJL`;
+`gmres_restart` and `window` have no effect here. Preconditioners are not passed
+through for this method: `solve!` calls `Krylov.minares!` without `M`/`N`, so
+any `Pl`/`Pr` supplied to `init`/`solve` or built by `precs` are silently
+ignored.
 """
 function KrylovJL_MINARES(args...; kwargs...)
     return KrylovJL(args...; KrylovAlg = Krylov.minares!, kwargs...)

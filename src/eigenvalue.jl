@@ -4,8 +4,25 @@ using SciMLBase: EigenvalueProblem, EigenvalueSolution, EigenvalueTarget,
 """
     AbstractEigenvalueAlgorithm
 
-Base type for algorithms that solve a
-[`SciMLBase.EigenvalueProblem`](https://docs.sciml.ai/SciMLBase/stable/interfaces/EigenvalueProblem/).
+Base type for algorithms that solve an `EigenvalueProblem`. An instance is passed as
+the second argument of `solve(prob::EigenvalueProblem, alg)`; when no algorithm is
+given, `DenseEigen()` is used.
+
+The concrete algorithms are:
+
+  - `DenseEigen`: dense `LinearAlgebra.eigen`, the default; always available.
+  - `ArpackJL`: `Arpack.eigs` (requires `using Arpack`).
+  - `ArnoldiMethodJL` / `ArnoldiMethod`: `ArnoldiMethod.partialschur` (requires
+    `using ArnoldiMethod`).
+  - `KrylovKitEigen`: `KrylovKit.eigsolve` (requires `using KrylovKit`).
+  - `JacobiDavidsonJL`: `JacobiDavidson.jdqr` (requires `using JacobiDavidson`).
+
+A new backend subtypes this type and defines
+`SciMLBase.solve(prob::EigenvalueProblem, alg::MyAlg, args...; kwargs...)`, returning
+an `EigenvalueSolution` (see `SciMLBase.build_eigenvalue_solution`). The fallback
+method for the abstract type throws "The eigenvalue backend ... is not available",
+which is what a user sees when an extension-backed algorithm is used before its
+package has been loaded.
 """
 abstract type AbstractEigenvalueAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
 
@@ -44,14 +61,31 @@ ArpackJL(; kwargs...) = ArpackJL((; kwargs...))
 """
     ArnoldiMethodJL(; kwargs...)
 
-Same solver as [`ArnoldiMethod`](@ref); see its docstring for details.
+Solve the `EigenvalueProblem` with
+[ArnoldiMethod.jl](https://github.com/JuliaLinearAlgebra/ArnoldiMethod.jl)'s
+`partialschur`, a pure-Julia implicitly restarted Arnoldi method for computing a few
+eigenpairs of a large sparse or structured matrix. Extra `kwargs` are forwarded to
+`ArnoldiMethod.partialschur` (for example `tol`, `mindim`, `maxdim`, `restarts`).
 
-Prefer this spelling when the ArnoldiMethod.jl package is in scope. Loading that
-package is what makes this solver available, and it binds the name
+Restrictions of the backend:
+
+  - Standard problems only: a generalized problem (`B !== nothing`) raises an error.
+  - `eigentarget = EigenvalueTarget.SmallestMagnitude` is not supported directly
+    (ArnoldiMethod has no such target); supply `shift` for shift-and-invert, which
+    factorizes `A - shift*I` and finds the eigenvalues nearest `shift`, or use another
+    backend such as `KrylovKitEigen()` or `ArpackJL()`.
+
+`ArnoldiMethodJL(; kwargs...)` and `ArnoldiMethod(; kwargs...)` build the same
+algorithm object; this is the spelling to prefer once the ArnoldiMethod.jl package is
+loaded. Loading that package is what makes the solver available, and it binds the name
 `ArnoldiMethod` to the module, so after `using LinearSolve, ArnoldiMethod` a bare
-`ArnoldiMethod(; kwargs...)` reaches the module rather than the constructor and
-fails with "objects of type Module are not callable". `ArnoldiMethodJL` does not
-collide, and matches how the other backends are named.
+`ArnoldiMethod(; kwargs...)` reaches the module rather than the constructor and fails
+with "objects of type Module are not callable" (and `?ArnoldiMethod` shows the module's
+help). `ArnoldiMethodJL` does not collide, and matches how the other backends are named.
+
+!!! note
+
+    Using this solver requires loading ArnoldiMethod.jl, i.e. `using ArnoldiMethod`.
 """
 struct ArnoldiMethodJL{K <: NamedTuple} <: AbstractEigenvalueAlgorithm
     kwargs::K
@@ -65,9 +99,19 @@ ArnoldiMethodJL(; kwargs...) = ArnoldiMethodJL((; kwargs...))
 Solve the `EigenvalueProblem` with
 [ArnoldiMethod.jl](https://github.com/JuliaLinearAlgebra/ArnoldiMethod.jl)'s
 `partialschur`, a pure-Julia implicitly restarted Arnoldi method for large sparse or
-structured matrices. Does not support `eigentarget = EigenvalueTarget.SmallestMagnitude`
-directly; use `shift` for shift-and-invert instead, or another backend. Extra `kwargs`
-are forwarded to `ArnoldiMethod.partialschur`.
+structured matrices. Extra `kwargs` are forwarded to `ArnoldiMethod.partialschur`.
+
+Restrictions of the backend:
+
+  - Standard problems only: a generalized problem (`B !== nothing`) raises an error.
+  - `eigentarget = EigenvalueTarget.SmallestMagnitude` is not supported directly;
+    supply `shift` for shift-and-invert instead, or use another backend such as
+    `KrylovKitEigen()` or `ArpackJL()`.
+
+This constructor returns an `ArnoldiMethodJL`; the two names build the same algorithm.
+Once the ArnoldiMethod.jl package is loaded the bare name `ArnoldiMethod` refers to
+that module, so use `ArnoldiMethodJL(; kwargs...)` (or `LinearSolve.ArnoldiMethod`)
+in that case.
 
 !!! note
 
@@ -80,8 +124,23 @@ ArnoldiMethod(; kwargs...) = ArnoldiMethodJL((; kwargs...))
 
 Solve the `EigenvalueProblem` with
 [KrylovKit.jl](https://github.com/Jutho/KrylovKit.jl)'s `eigsolve`, a Krylov solver
-supporting both standard and generalized eigenvalue problems, extremal and interior
-(shifted) targets. Extra `kwargs` are forwarded to `KrylovKit.eigsolve`.
+for a few extremal or interior (shifted) eigenpairs of a large sparse or structured
+matrix. Extra `kwargs` are forwarded to the KrylovKit call (for example `tol`,
+`krylovdim`, `maxiter`, `issymmetric`, `ishermitian`, `isposdef`).
+
+Which KrylovKit routine runs depends on the problem:
+
+  - Standard problem, no `shift`: `KrylovKit.eigsolve(A, nev, which)` with `which`
+    derived from `eigentarget`; no symmetry or definiteness is required of `A`.
+  - Any problem with a `shift`: shift-and-invert. `A - shift*I` (or `A - shift*B` for a
+    generalized problem) is factorized and `KrylovKit.eigsolve` is run on the inverse
+    operator, so general (non-Hermitian) pencils are supported on this path.
+  - Generalized problem without a `shift`: `KrylovKit.geneigsolve((A, B), nev, which)`.
+    KrylovKit only implements the symmetric/Hermitian case with positive definite `B`
+    and throws an `ArgumentError` otherwise (it also rejects the imaginary-part
+    targets). For matrices these properties are detected automatically; for other
+    operator types pass `issymmetric = true`/`ishermitian = true` and `isposdef = true`
+    through `kwargs`. For a non-Hermitian pencil supply a `shift` instead.
 
 !!! note
 

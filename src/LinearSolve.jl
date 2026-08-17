@@ -27,7 +27,7 @@ using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_int,
 using Setfield: Setfield, @set!
 using DocStringExtensions: DocStringExtensions
 using EnumX: EnumX
-using Markdown: Markdown, @doc_str
+using Markdown: Markdown
 using Reexport: Reexport, @reexport
 using Libdl: Libdl
 import InteractiveUtils
@@ -105,25 +105,38 @@ This type integrates with the SciMLBase ecosystem, providing a consistent
 interface for linear algebra operations across the Julia scientific computing
 ecosystem.
 
-## Interface
+# Interface
 
-A concrete algorithm `MyAlg <: SciMLLinearSolveAlgorithm` must implement
+A concrete `MyAlg <: SciMLLinearSolveAlgorithm` must implement
+`SciMLBase.solve!(cache::LinearCache, alg::MyAlg; kwargs...)` and
+[`needs_concrete_A`](@ref)`(alg::MyAlg)::Bool`. It may implement
+[`init_cacheval`](@ref), [`default_alias_A`](@ref), [`default_alias_b`](@ref),
+[`needs_square_A`](@ref), and [`update_tolerances_internal!`](@ref); each of
+these has a documented default.
 
-  - `SciMLBase.solve!(cache::LinearCache, alg::MyAlg; kwargs...)`
-  - [`LinearSolve.needs_concrete_A`](@ref)`(alg::MyAlg)::Bool`
+Subtyping one of the categorized abstract types below supplies
+`needs_concrete_A` and the aliasing defaults. Direct subtypes must define
+`needs_concrete_A` themselves. The complete contract, including cache lifecycle
+rules and extension boundaries, is documented on the
+[Linear Solver Algorithm Interface](@ref) page.
 
-and may implement [`init_cacheval`](@ref), [`default_alias_A`](@ref),
-[`default_alias_b`](@ref), [`needs_square_A`](@ref) and
-[`update_tolerances_internal!`](@ref), each of which has a default. Subtyping
-one of the categorized abstract types below supplies `needs_concrete_A` and the
-aliasing defaults; subtyping `SciMLLinearSolveAlgorithm` directly does not, so
-such algorithms must define `needs_concrete_A` themselves. Traits belong next to
-the algorithm struct rather than in a package extension, since downstream
-solvers query them before the backend is loaded.
+# Extension rules
 
-[`LinearSolve.algorithm_interface_issues`](@ref) checks an algorithm against
-this interface. See the "Linear Solver Algorithm Interface" page of the
-documentation for the full contract.
+Define the four traits `needs_concrete_A`, `needs_square_A`, `default_alias_A`,
+and `default_alias_b` in the package that defines `MyAlg`, next to the algorithm
+type. Downstream solvers query them before an optional backend is loaded. Methods
+that actually call the backend, such as `solve!` and `init_cacheval`, may be
+defined in the package extension instead.
+
+# Examples
+
+```julia
+struct MyAlg <: LinearSolve.AbstractKrylovSubspaceMethod end
+LinearSolve.needs_square_A(::MyAlg) = true
+```
+
+Use [`algorithm_interface_issues`](@ref) to check a custom algorithm before
+passing it to `init` or `solve`.
 """
 abstract type SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
 
@@ -135,22 +148,18 @@ These algorithms typically decompose the matrix `A` into a product of simpler
 matrices (e.g., `A = LU`, `A = QR`, `A = LDL'`) and then solve the system
 using forward/backward substitution.
 
-## Characteristics
+# Interface
 
-  - Requires concrete matrix representation (`needs_concrete_A() = true`)
-  - Typically efficient for multiple solves with the same matrix
-  - Generally provides high accuracy for well-conditioned problems
-  - Memory requirements depend on the specific factorization type
+Factorization algorithms receive a concrete representation of `A`, normally
+factorize it when `cache.isfresh` is true, store the factorization in
+`cache.cacheval`, and return a `SciMLBase.build_linear_solution` from `solve!`.
+The concrete subtypes are [`AbstractDenseFactorization`](@ref) and
+[`AbstractSparseFactorization`](@ref).
 
-## Subtypes
+# Examples
 
-  - `AbstractDenseFactorization`: For dense matrix factorizations
-  - `AbstractSparseFactorization`: For sparse matrix factorizations
-
-## Examples of concrete subtypes
-
-  - `LUFactorization`, `QRFactorization`, `CholeskyFactorization`
-  - `UMFPACKFactorization`, `KLUFactorization`
+`LUFactorization`, `QRFactorization`, `CholeskyFactorization`, `UMFPACKFactorization`,
+and `KLUFactorization` are concrete subtypes.
 """
 abstract type AbstractFactorization <: SciMLLinearSolveAlgorithm end
 
@@ -161,20 +170,18 @@ Abstract type for factorization-based linear solvers optimized for sparse matric
 These algorithms take advantage of sparsity patterns to reduce memory usage and
 computational cost compared to dense factorizations.
 
-## Characteristics
+# Interface
 
-  - Optimized for matrices with many zero entries
-  - Often use specialized pivoting strategies to preserve sparsity
-  - May reorder rows/columns to minimize fill-in during factorization
-  - Typically more memory-efficient than dense methods for sparse problems
+Use this supertype when the algorithm can preserve and exploit sparse structure.
+The default `needs_concrete_A`, `default_alias_A`, and `default_alias_b` traits
+are appropriate for the usual non-mutating sparse factorization workflow. An
+algorithm that mutates its input must override the aliasing traits and document
+that requirement.
 
-## Examples of concrete subtypes
+# Examples
 
-  - `UMFPACKFactorization`: General sparse LU with partial pivoting
-  - `KLUFactorization`: Sparse LU optimized for circuit simulation
-  - `CHOLMODFactorization`: Sparse Cholesky for positive definite systems
-  - `SparspakFactorization`: Envelope/profile method for sparse systems
-  - `ParUFactorization`: Parallel sparse LU using OpenMP (requires `import ParU_jll`)
+`UMFPACKFactorization`, `KLUFactorization`, `CHOLMODFactorization`,
+`SparspakFactorization`, and `ParUFactorization` are concrete subtypes.
 """
 abstract type AbstractSparseFactorization <: AbstractFactorization end
 
@@ -185,19 +192,17 @@ Abstract type for factorization-based linear solvers optimized for dense matrice
 These algorithms assume the matrix has no particular sparsity structure and use
 dense linear algebra routines (typically from BLAS/LAPACK) for optimal performance.
 
-## Characteristics
+# Interface
 
-  - Optimized for matrices with few zeros or no sparsity structure
-  - Leverage highly optimized BLAS/LAPACK routines when available
-  - Generally provide excellent performance for moderately-sized dense problems
-  - Memory usage scales as O(n²) with matrix size
+Use this supertype when the algorithm needs the entries of a dense `A` to build
+a factorization. The default `needs_concrete_A` is `true` and the default
+aliasing traits are `false`, preserving the caller's matrix while a
+factorization is built.
 
-## Examples of concrete subtypes
+# Examples
 
-  - `LUFactorization`: Dense LU with partial pivoting (via LAPACK)
-  - `QRFactorization`: Dense QR factorization for overdetermined systems
-  - `CholeskyFactorization`: Dense Cholesky for symmetric positive definite matrices
-  - `BunchKaufmanFactorization`: For symmetric indefinite matrices
+`LUFactorization`, `QRFactorization`, `CholeskyFactorization`, and
+`BunchKaufmanFactorization` are concrete subtypes.
 """
 abstract type AbstractDenseFactorization <: AbstractFactorization end
 
@@ -208,27 +213,19 @@ Abstract type for iterative linear solvers based on Krylov subspace methods.
 These algorithms solve linear systems by iteratively building an approximation
 from a sequence of Krylov subspaces, without requiring explicit matrix factorization.
 
-## Characteristics
+# Interface
 
-  - Does not require concrete matrix representation (`needs_concrete_A() = false`)
-  - Only needs matrix-vector products `A*v` (can work with operators/functions)
-  - Memory usage typically O(n) or O(kn) where k << n
-  - Convergence depends on matrix properties (condition number, eigenvalue distribution)
-  - Often benefits significantly from preconditioning
+Use this supertype for algorithms that can solve from matrix-vector products
+without materializing `A`. `needs_concrete_A` defaults to `false`. The
+implementation reads the right-hand side and tolerances from `LinearCache`,
+uses `cache.Pl` and `cache.Pr` when it supports preconditioning, writes into
+`cache.u`, and returns a `SciMLBase.build_linear_solution`.
 
-## Advantages
+# Examples
 
-  - Low memory requirements for large sparse systems
-  - Can handle matrix-free operators (functions that compute `A*v`)
-  - Often the only feasible approach for very large systems
-  - Can exploit matrix structure through specialized operators
-
-## Examples of concrete subtypes
-
-  - `GMRESIteration`: Generalized Minimal Residual method
-  - `CGIteration`: Conjugate Gradient (for symmetric positive definite systems)
-  - `BiCGStabLIteration`: Bi-Conjugate Gradient Stabilized
-  - Wrapped external iterative solvers (KrylovKit.jl, IterativeSolvers.jl)
+Krylov wrappers such as `KrylovJL_GMRES`, `KrylovJL_CG`, and
+`IterativeSolversJL_GMRES` are concrete subtypes. A matrix-free implementation
+must support the `mul!` operations required by its algorithm.
 """
 abstract type AbstractKrylovSubspaceMethod <: SciMLLinearSolveAlgorithm end
 
@@ -239,17 +236,18 @@ Abstract type for linear solvers that wrap custom solving functions or
 provide direct interfaces to specific solve methods. These provide flexibility
 for integrating custom algorithms or simple solve strategies.
 
-## Characteristics
+# Interface
 
-  - Does not require concrete matrix representation (`needs_concrete_A() = false`)
-  - Provides maximum flexibility for custom solving strategies
-  - Can wrap external solver libraries or implement specialized algorithms
-  - Performance and stability depend entirely on the wrapped implementation
+Use this supertype for an algorithm that delegates solving to a callable or a
+specialized direct operation. `needs_concrete_A` defaults to `false`, but the
+wrapped implementation is responsible for accepting the operator types that
+the algorithm advertises. The callable must return a solution compatible with
+`cache.u`.
 
-## Examples of concrete subtypes
+# Examples
 
-  - `LinearSolveFunction`: Wraps arbitrary user-defined solve functions
-  - `DirectLdiv!`: Direct application of the `\\` operator
+`LinearSolveFunction` wraps a user callable, while `DirectLdiv!` delegates to
+Julia's `ldiv!` implementation.
 """
 abstract type AbstractSolveFunction <: SciMLLinearSolveAlgorithm end
 
@@ -449,10 +447,48 @@ include("preconditioners.jl")
 include("preferences.jl")
 include("solve_function.jl")
 include("default.jl")
+"""
+    supernodal_panel_solve!(W, B, np; operation, algorithm = :auto)
+
+Apply a supernodal triangular-panel operation using the requested backend.
+
+# Arguments
+
+  - `W`: Matrix containing the factored diagonal block.
+  - `B`: Panel or right-hand side to update in place.
+  - `np`: Width of the diagonal block in `W`.
+
+# Keywords
+
+  - `operation`: One of `:factor_right_upper`, `:factor_lower`, `:lower`, or `:upper`.
+  - `algorithm`: Panel backend. `:auto` selects between `:kernel`, `:blas`, and
+    `:triangularsolve` from the operand types and dimensions.
+
+# Returns
+
+The updated `B`.
+"""
+function supernodal_panel_solve! end
+
+"""
+    supernodal_panel_solve_backend!(algorithm, W, B, np; operation)
+
+Backend extension hook for [`supernodal_panel_solve!`](@ref).
+
+# Interface rules
+
+An extension may specialize `algorithm::Val` for supported operand types. The method
+must apply `operation` to `B` in place, return `B`, and treat the factored diagonal
+block `W[1:np, 1:np]` as read-only. `B` may be a view into the remainder of `W`.
+Unsupported operations must throw `ArgumentError`.
+
+The built-in backends use `Val(:kernel)`, `Val(:blas)`, and
+`Val(:triangularsolve)`. Extensions should add methods only for backend and operand
+combinations they implement; the generic methods provide the fallback behavior.
+"""
+function supernodal_panel_solve_backend! end
 # after default.jl: the vendored solver caches its dense diagonal blocks
 # with LinearSolve's own default solver, so it needs DefaultLinearSolver{,Init}
-function supernodal_panel_solve! end
-function supernodal_panel_solve_backend! end
 include("SupernodalLU/SupernodalLU.jl")
 include("init.jl")
 include("adjoint.jl") # LinearSolveAdjoint struct definition only; rrules are in ChainRulesCore ext

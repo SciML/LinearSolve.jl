@@ -1022,6 +1022,7 @@ solver. Convenience constructors `PyAMG_RugeStuben` and `PyAMG_SmoothedAggregati
 are also provided.
 
 ```@docs
+LinearSolvePyAMG.LinearSolvePyAMG
 LinearSolvePyAMG.PyAMG
 LinearSolvePyAMG.PyAMG_RugeStuben
 LinearSolvePyAMG.PyAMG_SmoothedAggregation

@@ -4,7 +4,8 @@ using SciMLBase: EigenvalueProblem, EigenvalueSolution, EigenvalueTarget,
 """
     AbstractEigenvalueAlgorithm
 
-Base type for algorithms that solve an [`EigenvalueProblem`](@ref).
+Base type for algorithms that solve a
+[`SciMLBase.EigenvalueProblem`](https://docs.sciml.ai/SciMLBase/stable/interfaces/EigenvalueProblem/).
 """
 abstract type AbstractEigenvalueAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
 

@@ -1,15 +1,12 @@
 using SciMLTesting, LinearSolveAutotune, Test
 using JET
 
-docs_src = normpath(joinpath(pkgdir(LinearSolveAutotune), "..", "..", "docs", "src"))
-
 run_qa(
     LinearSolveAutotune;
     explicit_imports = true,
     # `plot` is deliberately re-exported from Plots: the package extends it with
     # AutotuneResults methods and exports it as the plotting entry point.
     reexports_allow = (:plot,),
-    api_docs_kwargs = (; docs_src),
     ei_kwargs = (;
         # BlasFloat (LinearAlgebra.BLAS, reached via LinearAlgebra) and Base.run.
         all_qualified_accesses_via_owners = (; ignore = (:BlasFloat, :run)),

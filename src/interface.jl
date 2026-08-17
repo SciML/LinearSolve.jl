@@ -57,15 +57,29 @@ end
 """
     LinearSolve.update_tolerances_internal!(cache, alg, abstol, reltol)
 
-Algorithm hook of [`update_tolerances!`](@ref), called after `cache.abstol` and
-`cache.reltol` have been set to the new values. `abstol`/`reltol` are the
-requested values, either of which may be `nothing` when only the other was
-given.
+# Arguments
 
-Define it as `nothing` for an algorithm that reads `cache.abstol`/`cache.reltol`
-at solve time, and define it to write into `cache.cacheval` for an algorithm
-that snapshots the tolerances into its own solver object. The default throws:
-an algorithm that never defines it is taken to have no tolerances to update.
+  - `cache`: Existing [`LinearCache`](@ref) whose tolerance fields have already
+    been updated.
+  - `alg`: Algorithm associated with `cache`.
+  - `abstol`: New absolute tolerance, or `nothing` when it is unchanged.
+  - `reltol`: New relative tolerance, or `nothing` when it is unchanged.
+
+# Interface rules
+
+Define this hook as `nothing` for an algorithm that reads `cache.abstol` and
+`cache.reltol` at solve time. Define it to update `cache.cacheval` when the
+algorithm snapshots tolerances into its own solver object during `init`.
+
+# Returns
+
+`nothing`. The default method throws because an algorithm that has no hook is
+treated as not supporting tolerance updates.
+
+# Throws
+
+`ArgumentError` if the algorithm does not support changing tolerances after
+`init`.
 """
 function update_tolerances_internal!(
         cache, alg::SciMLLinearSolveAlgorithm, abstol, reltol
@@ -89,10 +103,23 @@ update_tolerances_internal!(cache, ::AbstractSolveFunction, abstol, reltol) = no
 """
     LinearSolve.concrete_algorithm_types(T = SciMLLinearSolveAlgorithm)
 
-Every loaded concrete subtype of `T`, including those reachable only through
-intermediate abstract types. Used to check the algorithm interface across all
-algorithms a session knows about, so the result depends on which package
-extensions are loaded.
+# Arguments
+
+  - `T`: Abstract algorithm type to inspect. Defaults to
+    `SciMLLinearSolveAlgorithm`.
+
+# Returns
+
+A newly allocated `Vector{Any}` containing every loaded concrete subtype of
+`T`, including types reachable through intermediate abstract types. The result
+depends on which package extensions have been loaded in the current session.
+
+# Examples
+
+```julia
+algorithms = LinearSolve.concrete_algorithm_types()
+@assert all(T -> T <: LinearSolve.SciMLLinearSolveAlgorithm, algorithms)
+```
 """
 function concrete_algorithm_types(::Type{T} = SciMLLinearSolveAlgorithm) where {T}
     return _collect_concrete_subtypes!(Any[], T)
@@ -143,7 +170,23 @@ Check `alg` -- an algorithm instance or an algorithm type -- against the
 `SciMLLinearSolveAlgorithm` interface and return one message per violation. An
 empty result means `alg` is interface compliant.
 
-## Required methods
+# Arguments
+
+  - `alg`: An algorithm instance or a subtype of
+    `SciMLLinearSolveAlgorithm`.
+
+# Keywords
+
+  - `check_solve::Bool`: Require a concrete `SciMLBase.solve!` method when
+    `true` (default). Set this to `false` only when the method is supplied by an
+    unloaded package extension; trait checks still run.
+
+# Returns
+
+A `Vector{String}` containing one diagnostic per violated interface rule. An
+empty vector means that the requested checks passed.
+
+# Required methods
 
   - `SciMLBase.solve!(cache::LinearCache, alg::MyAlg; kwargs...)` performs the solve and
     returns `SciMLBase.build_linear_solution(alg, u, resid, cache)`.
@@ -157,7 +200,7 @@ Subtyping `AbstractFactorization`, `AbstractSparseFactorization`,
 `AbstractKrylovSubspaceMethod` or `AbstractSolveFunction` supplies
 `needs_concrete_A`; subtyping `SciMLLinearSolveAlgorithm` directly does not.
 
-## Trait placement
+# Trait placement
 
 `needs_concrete_A`, `needs_square_A`, `default_alias_A` and `default_alias_b`
 must be defined in the module that defines the algorithm type, never in a
@@ -165,7 +208,7 @@ package extension. A trait defined in an extension is invisible until the
 backend loads, so callers silently get the inherited default instead — that is
 reported as a violation too.
 
-## Optional methods
+# Optional methods
 
 These have defaults, so they are never reported as issues; they are listed here
 because they complete the interface:
@@ -181,14 +224,7 @@ because they complete the interface:
 The four `Bool`-valued traits are additionally checked to be inferred as `Bool`,
 since `init` calls them while building the cache.
 
-## Keyword arguments
-
-  - `check_solve`: whether to require `SciMLBase.solve!`. Set it to `false` when the
-    algorithm's `solve!` lives in a package extension whose backend is not loaded. The
-    trait checks still apply in that case, because traits must resolve without the
-    backend.
-
-## Example
+# Examples
 
 ```julia
 struct MyLUFactorization <: LinearSolve.SciMLLinearSolveAlgorithm end

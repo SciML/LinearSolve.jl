@@ -1,14 +1,14 @@
-@doc doc"""
+"""
     LinearSolveAdjoint(; linsolve = missing, Pl = missing, Pr = missing)
 
 Given a Linear Problem ``A x = b`` computes the sensitivities for ``A`` and ``b`` as:
 
 ```math
-\begin{align}
-A' \lambda &= \partial x   \\
-\partial A  &= -\lambda x' \\
-\partial b  &= \lambda
-\end{align}
+\\begin{align}
+A' \\lambda &= \\partial x   \\\\
+\\partial A  &= -\\lambda x' \\\\
+\\partial b  &= \\lambda
+\\end{align}
 ```
 
 For more details, check [these notes](https://math.mit.edu/~stevenj/18.336/adjoint.pdf).

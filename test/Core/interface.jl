@@ -28,6 +28,27 @@ struct NoTraitAlg <: LinearSolve.SciMLLinearSolveAlgorithm end
 struct NoSolveAlg <: LinearSolve.SciMLLinearSolveAlgorithm end
 LinearSolve.needs_concrete_A(::NoSolveAlg) = true
 
+struct IdentityOperator{T} <: AbstractMatrix{T}
+    n::Int
+end
+
+Base.size(A::IdentityOperator) = (A.n, A.n)
+Base.getindex(A::IdentityOperator{T}, i::Int, j::Int) where {T} = i == j ? one(T) : zero(T)
+
+function LinearAlgebra.mul!(y::AbstractVector, ::IdentityOperator, x::AbstractVector)
+    copyto!(y, x)
+    return y
+end
+
+struct GenericMatVecAlg <: LinearSolve.AbstractKrylovSubspaceMethod end
+
+function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::GenericMatVecAlg; kwargs...)
+    LinearAlgebra.mul!(cache.u, cache.A, cache.b)
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache; retcode = SciMLBase.ReturnCode.Success
+    )
+end
+
 @testset "Every algorithm satisfies the SciMLLinearSolveAlgorithm interface" begin
     # The deliberately non-compliant fixtures above live in this module.
     algorithm_types = filter(
@@ -158,6 +179,19 @@ end
     # An algorithm with no tolerances to update says so rather than silently
     # ignoring the request.
     @test_throws ArgumentError LinearSolve.update_tolerances!(cache; abstol = 1.0e-10)
+end
+
+@testset "A custom matrix-vector algorithm uses only the generic interface" begin
+    A = IdentityOperator{Float64}(3)
+    b = [1.0, 2.0, 3.0]
+    alg = GenericMatVecAlg()
+
+    @test LinearSolve.needs_concrete_A(alg) === false
+    @test isempty(LinearSolve.algorithm_interface_issues(alg))
+
+    cache = SciMLBase.init(LinearProblem(A, b), alg)
+    solution = SciMLBase.solve!(cache)
+    @test solution.u == b
 end
 
 @testset "update_tolerances! reaches every in-tree algorithm class" begin

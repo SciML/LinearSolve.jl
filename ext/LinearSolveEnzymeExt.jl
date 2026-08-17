@@ -621,6 +621,70 @@ function EnzymeRules.reverse(
     return (nothing, nothing)
 end
 
+"""
+    _shadow_of_constant(x)
+
+Shadow value to store alongside a constant assigned into a cache. A constant carries no
+derivative, so an array shadow is zeroed; anything else is a field the shadow cache holds
+verbatim (the staleness flags, the algorithm, a cacheval), and is passed through.
+"""
+_shadow_of_constant(x::AbstractArray) = zero(x)
+_shadow_of_constant(x) = x
+
+# `setproperty!` is the public way to change a `LinearCache` between solves, so it is the
+# one place that has to copy. Reverse restores what the assignment overwrote, which walks
+# the cache backwards into the state each earlier `solve!` ran against, and that is what
+# lets the `solve!` rule hold the live cache instead of copying it defensively every time.
+# See https://github.com/SciML/LinearSolve.jl/issues/380.
+function EnzymeRules.augmented_primal(
+        config, func::Const{typeof(Base.setproperty!)}, ::Type{RT},
+        cache::EnzymeCore.Annotation{<:LinearSolve.LinearCache},
+        name::Const{Symbol}, x::EnzymeCore.Annotation
+    ) where {RT}
+    field = name.val
+    old = getfield(cache.val, field)
+    # Assigning any of these also flips the staleness flags, so they rewind together.
+    old_isfresh = getfield(cache.val, :isfresh)
+    old_precsisfresh = getfield(cache.val, :precsisfresh)
+    # A new `A` is what invalidates the factorization, and the next `solve!` builds the
+    # replacement over the same cacheval, so this is the assignment that has to copy.
+    old_cacheval = field === :A ? deepcopy(getfield(cache.val, :cacheval)) : nothing
+
+    func.val(cache.val, field, x.val)
+    if !(cache isa Const)
+        dcaches = EnzymeRules.width(config) == 1 ? (cache.dval,) : cache.dval
+        dxs = if x isa Const
+            ntuple(_ -> _shadow_of_constant(x.val), Val(EnzymeRules.width(config)))
+        elseif EnzymeRules.width(config) == 1
+            (x.dval,)
+        else
+            x.dval
+        end
+        for (dcache, dx) in zip(dcaches, dxs)
+            func.val(dcache, field, dx)
+        end
+    end
+
+    tape = (field, old, old_isfresh, old_precsisfresh, old_cacheval)
+    primal = EnzymeRules.needs_primal(config) ? x.val : nothing
+    return EnzymeRules.AugmentedReturn(primal, nothing, tape)
+end
+
+function EnzymeRules.reverse(
+        config, func::Const{typeof(Base.setproperty!)}, ::Type{RT}, tape,
+        cache::EnzymeCore.Annotation{<:LinearSolve.LinearCache},
+        name::Const{Symbol}, x::EnzymeCore.Annotation
+    ) where {RT}
+    field, old, old_isfresh, old_precsisfresh, old_cacheval = tape
+    # `setfield!` rather than `setproperty!`: this is a rewind, so it must not re-run the
+    # bookkeeping that the forward assignment already did.
+    setfield!(cache.val, field, old)
+    setfield!(cache.val, :isfresh, old_isfresh)
+    setfield!(cache.val, :precsisfresh, old_precsisfresh)
+    old_cacheval === nothing || setfield!(cache.val, :cacheval, old_cacheval)
+    return (nothing, nothing, nothing)
+end
+
 # y=inv(A) B
 #   dA −= z y^T
 #   dB += z, where  z = inv(A^T) dy
@@ -675,9 +739,9 @@ function EnzymeRules.augmented_primal(
         end
     end
 
-    cachesolve = deepcopy(linsolve.val)
-
-    cache = (copy(res.u), resvals, cachesolve, dAs, dbs)
+    # No copy: the `setproperty!` rules above rewind the cache as the tape unwinds, so by
+    # the time this solve's reverse runs the live cache is back to what this solve saw.
+    cache = (copy(res.u), resvals, linsolve.val, dAs, dbs)
 
     _res = EnzymeRules.needs_primal(config) ? res : nothing
     _dres = EnzymeRules.needs_shadow(config) ? dres : nothing

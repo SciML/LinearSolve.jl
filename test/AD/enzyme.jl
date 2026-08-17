@@ -565,3 +565,49 @@ end
     @test all(isfinite, db_en)
     @test !iszero(db_en)
 end
+
+@testset "Cache mutation between solves rewinds in reverse (#380)" begin
+    # The `solve!` rule keeps the live cache rather than a defensive `deepcopy`, so the
+    # `setproperty!` rules have to restore what each assignment overwrote. Replacing `A`
+    # is the case that matters: it invalidates the factorization that the next `solve!`
+    # builds over, so the earlier solve's reverse needs the factorization it ran against.
+    n = 12
+
+    single(A, b) = sum(abs2, solve!(init(LinearProblem(A, b), LUFactorization())).u)
+
+    function new_b(A, b)
+        cache = init(LinearProblem(A, b), LUFactorization())
+        s = sum(abs2, solve!(cache).u)
+        cache.b = 2 .* b
+        return s + sum(abs2, solve!(cache).u)
+    end
+
+    function new_A(A, b)
+        cache = init(LinearProblem(A, b), LUFactorization())
+        s = sum(abs2, solve!(cache).u)
+        cache.A = 2 .* A
+        return s + sum(abs2, solve!(cache).u)
+    end
+
+    function both(A, b)
+        cache = init(LinearProblem(A, b), LUFactorization())
+        s = sum(abs2, solve!(cache).u)
+        cache.b = 2 .* b
+        s += sum(abs2, solve!(cache).u)
+        cache.A = 3 .* A
+        return s + sum(abs2, solve!(cache).u)
+    end
+
+    for f in (single, new_b, new_A, both)
+        A = rand(n, n) + n * I
+        b = rand(n)
+        dA = zeros(n, n)
+        db = zeros(n)
+        Enzyme.autodiff(
+            Enzyme.set_runtime_activity(Enzyme.Reverse), f,
+            Duplicated(copy(A), dA), Duplicated(copy(b), db)
+        )
+        @test dA ≈ ForwardDiff.gradient(X -> f(X, b), copy(A)) rtol = 1.0e-8
+        @test db ≈ ForwardDiff.gradient(y -> f(A, y), copy(b)) rtol = 1.0e-8
+    end
+end

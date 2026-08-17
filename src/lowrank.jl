@@ -74,9 +74,6 @@ function LinearAlgebra.mul!(y::AbstractVector, M::LowRankUpdatedMatrix, x::Abstr
     return mul!(y, M.U, M.C === I ? Vx : M.C * Vx, true, true)
 end
 
-Base.:*(M::LowRankUpdatedMatrix, x::AbstractVector) =
-    mul!(similar(x, promote_type(eltype(M), eltype(x)), size(M, 1)), M, x)
-
 """
     LowRankUpdatedCache
 
@@ -91,25 +88,39 @@ end
 
 _lowrank_capacitance(C, VAiU) = lu((C === I ? VAiU + I : inv(C) + VAiU); check = false)
 
-function init_cacheval(
-        alg::AbstractFactorization, M::LowRankUpdatedMatrix, b, u, Pl, Pr, maxiters::Int,
-        abstol, reltol, verbose::Union{LinearVerbosity, Bool},
-        assumptions::OperatorAssumptions
-    )
-    # Instances rather than real work, so `cacheval` is typed as `solve!` will store it.
-    inner = init_cacheval(
-        alg, M.A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose, assumptions
-    )
-    T = eltype(u)
-    k = size(M.U, 2)
-    return LowRankUpdatedCache(
-        inner, similar(M.U, T, size(M.U, 1), k), lu(Matrix{T}(I, k, k); check = false)
-    )
+# Dispatching on the matrix with a general algorithm would be ambiguous against every
+# `solve!` that dispatches on a specific algorithm with a general matrix, so the supported
+# factorizations are enumerated instead. Each method is then strictly more specific.
+const _LOWRANK_ALGS = (
+    LUFactorization, GenericLUFactorization, QRFactorization, CholeskyFactorization,
+    SVDFactorization, BunchKaufmanFactorization, UMFPACKFactorization, KLUFactorization,
+)
+
+for Alg in _LOWRANK_ALGS
+    @eval function init_cacheval(
+            alg::$Alg, M::LowRankUpdatedMatrix, b, u, Pl, Pr, maxiters::Int,
+            abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+            assumptions::OperatorAssumptions
+        )
+        # Instances rather than real work, so `cacheval` is typed as `solve!` stores it.
+        inner = init_cacheval(
+            alg, M.A, b, u, Pl, Pr, maxiters, abstol, reltol, verbose, assumptions
+        )
+        T = eltype(u)
+        k = size(M.U, 2)
+        return LowRankUpdatedCache(
+            inner, similar(M.U, T, size(M.U, 1), k), lu(Matrix{T}(I, k, k); check = false)
+        )
+    end
+
+    @eval function SciMLBase.solve!(
+            cache::LinearCache{<:LowRankUpdatedMatrix}, alg::$Alg; kwargs...
+        )
+        return _lowrank_solve!(cache, alg)
+    end
 end
 
-function SciMLBase.solve!(
-        cache::LinearCache{<:LowRankUpdatedMatrix}, alg::AbstractFactorization; kwargs...
-    )
+function _lowrank_solve!(cache::LinearCache{<:LowRankUpdatedMatrix}, alg)
     M = cache.A
     if cache.isfresh
         # `do_factorization` may consume its argument, and the correction needs `A` only

@@ -442,3 +442,53 @@ end
     @test ovPl === Pl
     @test ovPr === Pr
 end
+
+@testset "solve! with adjoint = true reuses the factorization (#92)" begin
+    # `adjoint = true` solves `adjoint(A) x = b` from the factorization the cache already
+    # holds, which is what a hand-written rrule previously had no public way to reach.
+    Random.seed!(92)
+    m = 60
+
+    @testset "matches a fresh adjoint solve" begin
+        for alg in (
+                LUFactorization(), QRFactorization(), RFLUFactorization(),
+                KrylovJL_GMRES(), nothing,
+            )
+            A = rand(m, m) + m * I
+            bvec = rand(m)
+            cvec = rand(m)
+            cache = alg === nothing ? init(LinearProblem(A, bvec)) :
+                init(LinearProblem(A, bvec), alg)
+
+            @test solve!(cache).u ≈ A \ bvec rtol = 1.0e-6
+            cache.b = cvec
+            @test solve!(cache; adjoint = true).u ≈ adjoint(A) \ cvec rtol = 1.0e-6
+        end
+    end
+
+    @testset "the same cache answers both directions" begin
+        A = rand(m, m) + m * I
+        bvec = rand(m)
+        cache = init(LinearProblem(A, bvec), LUFactorization())
+        @test solve!(cache).u ≈ A \ bvec
+        @test solve!(cache; adjoint = true).u ≈ adjoint(A) \ bvec
+        # and back again, without the keyword
+        @test solve!(cache).u ≈ A \ bvec
+    end
+
+    @testset "a fresh cache factorizes first" begin
+        A = rand(m, m) + m * I
+        bvec = rand(m)
+        cache = init(LinearProblem(A, bvec), LUFactorization())
+        # no primal solve first, so the adjoint has to build the factorization
+        @test solve!(cache; adjoint = true).u ≈ adjoint(A) \ bvec
+    end
+
+    @testset "complex matrices take the conjugate transpose" begin
+        A = rand(ComplexF64, m, m) + m * I
+        bvec = rand(ComplexF64, m)
+        cache = init(LinearProblem(A, bvec), LUFactorization())
+        solve!(cache)
+        @test solve!(cache; adjoint = true).u ≈ adjoint(A) \ bvec
+    end
+end

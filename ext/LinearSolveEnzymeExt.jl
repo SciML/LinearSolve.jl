@@ -713,28 +713,9 @@ function EnzymeRules.reverse(
         # Add the contribution from direct `linsolve.u` modifications
         dy .+= dy2.u
 
-        cached_adjoint_solution = LinearSolve._adjoint_factorization_solve(
-            _linsolve.alg, _linsolve.cacheval, _linsolve.A, dy
-        )
-        z = if cached_adjoint_solution !== nothing
-            cached_adjoint_solution
-        elseif _linsolve.alg isa LinearSolve.AbstractKrylovSubspaceMethod
-            # Doesn't modify `A`, so it's safe to just reuse it
-            adj_Pl, adj_Pr = LinearSolve._adjoint_precs(
-                _linsolve.alg, _linsolve.sensealg, _linsolve.Pl, _linsolve.Pr
-            )
-            LinearSolve._adjoint_krylov_solve(
-                _linsolve.alg, _linsolve.A, dy;
-                abstol = _linsolve.abstol,
-                reltol = _linsolve.reltol,
-                verbose = _linsolve.verbose,
-                Pl = adj_Pl, Pr = adj_Pr
-            )
-        elseif _linsolve.alg isa LinearSolve.DefaultLinearSolver
-            LinearSolve.defaultalg_adjoint_eval(_linsolve, dy)
-        else
-            error("Algorithm $(_linsolve.alg) is currently not supported by Enzyme rules on LinearSolve.jl. Please open an issue on LinearSolve.jl detailing which algorithm is missing the adjoint handling")
-        end
+        # Same route as `solve!(cache; adjoint = true)`. The cache is the one this solve
+        # ran against, so `A` is read from it rather than passed separately.
+        z = LinearSolve._adjoint_solve(_linsolve, dy)
 
         # Use sparse-safe outer product subtraction to preserve sparsity pattern
         _sparse_outer_sub!(dA, z, y)

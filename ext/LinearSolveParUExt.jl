@@ -166,6 +166,24 @@ function SciMLBase.solve!(
         cache::LinearSolve.LinearCache, alg::LinearSolve.ParUFactorization;
         kwargs...
     )
+    # METIS allocates heavily inside ParU's symbolic analysis, and each allocation goes
+    # through Julia's counted-malloc and its `maybe_collect` check. Those collections
+    # cannot free anything METIS holds, so once enough analysis state has accumulated in
+    # the process they fire repeatedly and the solve stops making progress: a 0.5 s solve
+    # has been seen to run for hours. Holding the collector off for the duration of the
+    # solve keeps it at 0.5 s. See SciML/LinearSolve.jl#1142.
+    gc_was_enabled = GC.enable(false)
+    try
+        return _paru_solve!(cache, alg; kwargs...)
+    finally
+        GC.enable(gc_was_enabled)
+    end
+end
+
+function _paru_solve!(
+        cache::LinearSolve.LinearCache, alg::LinearSolve.ParUFactorization;
+        kwargs...
+    )
     A = cache.A
     A = convert(AbstractMatrix, A)
 

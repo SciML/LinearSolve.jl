@@ -1,10 +1,29 @@
 """
-```julia
-MKLLUFactorization()
-```
+    MKLLUFactorization(; residualsafety::Bool = false)
 
-A wrapper over Intel's Math Kernel Library (MKL). Direct calls to MKL in a way that pre-allocates workspace
-to avoid allocations and does not require libblastrampoline.
+A wrapper over Intel's Math Kernel Library (MKL). Direct calls to MKL's LU routines
+(`getrf!` and `getrs!`) in a way that pre-allocates workspace to avoid allocations and does
+not require libblastrampoline. Supports `Float32`, `Float64`, `ComplexF32`, and `ComplexF64`
+element types.
+
+Use this to guarantee MKL's LU is used regardless of the system BLAS configuration (no
+`using MKL` needed), or when benchmarking shows it beats `LUFactorization` on your hardware.
+Where MKL is loaded, the default algorithm choice already selects this method for larger
+dense BLAS-eltype matrices.
+
+## Keyword Arguments
+
+  - `residualsafety`: If `true`, every solve that (re)factorizes `A` is followed by a
+    residual check against a copy of the original matrix. If `‖A*x - b‖` exceeds
+    `abstol + reltol * ‖b‖` (the tolerances of the solve), the returned solution has
+    `retcode = ReturnCode.APosterioriSafetyFailure`. Defaults to `false`.
+
+!!! note
+
+    MKL is only loaded on x86_64/i686 hosts when the `LoadMKL_JLL` preference is `true`
+    (the default, except on AMD EPYC CPUs where it defaults to `false`) and MKL_jll is at
+    least version 2022.2. Otherwise `solve!` with this algorithm errors that the MKL binary
+    is missing.
 """
 struct MKLLUFactorization <: AbstractFactorization
     residualsafety::Bool

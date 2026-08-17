@@ -964,13 +964,15 @@ function _algchoice_to_alg_with_safety(alg::Symbol)
     end
 end
 
-"""
-if alg.alg === DefaultAlgorithmChoice.LUFactorization
-SciMLBase.solve!(cache, LUFactorization(), args...; kwargs...))
-else
-...
-end
-"""
+# Generated body has the shape
+#
+#     if alg.alg === DefaultAlgorithmChoice.LUFactorization
+#         SciMLBase.solve!(cache, LUFactorization(), args...; kwargs...)
+#     elseif ...
+#     end
+#
+# with one branch per DefaultAlgorithmChoice, so each branch calls solve! on a
+# concrete algorithm type instead of going through a Symbol-to-algorithm lookup.
 @generated function SciMLBase.solve!(
         cache::LinearCache, alg::DefaultLinearSolver,
         args...;

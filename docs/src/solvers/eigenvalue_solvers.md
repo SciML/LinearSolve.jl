@@ -1,6 +1,6 @@
 # [Eigenvalue Problem Solvers](@id eigenvaluesolvers)
 
-`LS.solve(prob, alg; kwargs)` for a [`SciMLBase.EigenvalueProblem`](https://docs.sciml.ai/SciMLBase/stable/interfaces/EigenvalueProblem/).
+`LS.solve(prob, alg; kwargs)` for an [`EigenvalueProblem`](@ref eigenvalue_problem).
 
 Solves for the eigenpairs $$(\lambda, v)$$ of $$Av = \lambda v$$ (or the generalized
 problem $$Av = \lambda Bv$$ when a second operator is supplied) defined by `prob` using

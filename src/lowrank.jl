@@ -1,7 +1,7 @@
 # Not an `AbstractDenseFactorization`: this wraps another algorithm and carries the
 # update, so it has no zero-argument form, while the factorization subtypes are swept
 # and constructed generically (`test/Core/resolve.jl`).
-@doc doc"""
+"""
     LowRankUpdatedFactorization(alg = LUFactorization(); U, V, C = I)
 
 Solve a system whose matrix is a low-rank update of one that is cheap to keep

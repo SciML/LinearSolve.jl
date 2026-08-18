@@ -786,8 +786,6 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
     HSLMA57Factorization, HSLMA97Factorization
 
 export LHLFactorization, update_gamma!
-# Re-exported from SciMLOperators: announcing a new Jacobian is part of using the split form.
-export mark_jacobian_updated!
 
 export LinearSolveFunction, DirectLdiv!, show_algorithm_choices
 

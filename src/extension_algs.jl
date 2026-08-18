@@ -1538,14 +1538,15 @@ to a classical AMG cycle used as a single-pass preconditioner. `A` must be a
 The AMGX resources are freed by a finalizer, so the preconditioner can be left to
 the garbage collector.
 """
-mutable struct AMGXPreconditioner
-    config::Any
-    resources::Any
-    matrix::Any
-    solver::Any
-    xvec::Any
-    bvec::Any
+mutable struct AMGXPreconditioner{C, R, M, S, V}
+    config::C
+    resources::R
+    matrix::M
+    solver::S
+    xvec::V
+    bvec::V
     n::Int
+    closed::Bool
 
     function AMGXPreconditioner(A; config = nothing)
         ext = Base.get_extension(@__MODULE__, :LinearSolveAMGXExt)
@@ -1556,9 +1557,13 @@ mutable struct AMGXPreconditioner
     end
 
     # The inner constructor above hides the default one, so the extension needs a way
-    # to build the struct once it holds the AMGX objects.
-    global _new_amgx_preconditioner(cfg, res, mat, solver, xv, bv, n) =
-        new(cfg, res, mat, solver, xv, bv, n)
+    # to build the struct once it holds the AMGX objects. The types are AMGX's, which
+    # only exist once the extension is loaded, hence the parameters.
+    global function _new_amgx_preconditioner(
+            cfg::C, res::R, mat::M, solver::S, xv::V, bv::V, n
+        ) where {C, R, M, S, V}
+        return new{C, R, M, S, V}(cfg, res, mat, solver, xv, bv, n, false)
+    end
 end
 
 """

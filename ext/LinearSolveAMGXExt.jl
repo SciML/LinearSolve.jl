@@ -35,16 +35,15 @@ default_amgx_config() = Dict(
 )
 
 function free_amgx_preconditioner!(P::AMGXPreconditioner)
-    for f in (:solver, :xvec, :bvec, :matrix, :resources, :config)
-        obj = getfield(P, f)
-        obj === nothing && continue
+    P.closed && return nothing
+    P.closed = true
+    for obj in (P.solver, P.xvec, P.bvec, P.matrix, P.resources, P.config)
         try
             AMGX.close(obj)
         catch
             # A finalizer must not throw, and there is nothing to do if AMGX has
             # already torn the object down.
         end
-        setfield!(P, f, nothing)
     end
     return nothing
 end

@@ -171,3 +171,27 @@ The following preconditioners match the interface of LinearSolve.jl.
       + Incomplete Cholesky decomposition `KrylovPreconditioners.kp_ic0(A)`
       + Incomplete LU decomposition `KrylovPreconditioners.kp_ilu0(A)`
       + Block Jacobi `KrylovPreconditioners.kp_block_jacobi(A)`
+
+## GPU algebraic multigrid
+
+[AMGX.jl](https://github.com/JuliaGPU/AMGX.jl) exposes NVIDIA's algebraic multigrid.
+It is a solver in its own right, but on a GPU sparse matrix it is most useful as the
+preconditioner of a Krylov method, which is what `precs` is for:
+
+```julia
+using LinearSolve, CUDA, AMGX
+A = CuSparseMatrixCSR(A_cpu)
+alg = KrylovJL_GMRES(precs = (A, p) -> (AMGXPreconditioner(A), I))
+sol = solve(LinearProblem(A, b_gpu), alg)
+```
+
+On a 400x400 tridiagonal system that takes GMRES from 14 iterations to 6. `A` has to
+be a `CuSparseMatrixCSR`. `config` takes a `Dict{String, String}` of AMGX
+configuration entries if the default single V-cycle is not what you want.
+
+AMGX.jl needs a system AMGX installation, and points at it with
+`AMGX.set_libAMGX_path`.
+
+```@docs
+AMGXPreconditioner
+```

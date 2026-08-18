@@ -303,7 +303,7 @@ Base.:\(P::CountingPrec, x) = (P.applied += 1; P.inner \ x)
         # `alg === nothing` means "go through the default", which is the interesting
         # path. The matrix-free case names Krylov instead: the default cannot build its
         # cachevals for a matrix-free `WOperator` at all, which predates this PR
-        # (SciML/LinearSolve.jl#1226) and is not what this testset is about.
+        # (SciML/LinearSolve.jl#1236) and is not what this testset is about.
         if alg === nothing
             @test init(LinearProblem(W, rhs)).cacheval.LHLFactorization === nothing
             @test solve(LinearProblem(W, rhs)).u ≈ dW \ rhs rtol = 1.0e-6

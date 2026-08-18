@@ -1,5 +1,5 @@
 using LinearSolve, LinearAlgebra, Random, SciMLOperators, Test
-using SciMLOperators: WOperator, jacobian_stale
+using SciMLOperators: WOperator, jacobian_stale, FunctionOperator
 
 # `LHLFactorization` takes its system matrix unassembled, as the split `J - M/γ` a
 # `WOperator` holds, so that a new γ never touches the reduction of J.
@@ -254,4 +254,80 @@ end
         LinearSolve._NoAdjointFactorizationReuse
     @test solve(LinearProblem(adjoint(dense(J, 0.4)), b), LHLFactorization()).u ≈
         adjoint(dense(J, 0.4)) \ b rtol = 1.0e-9
+end
+
+# Counts applications so a test can tell "the preconditioner was honoured" from
+# "the solve happened to converge without it".
+mutable struct CountingPrec{P}
+    inner::P
+    applied::Int
+end
+CountingPrec(inner) = CountingPrec(inner, 0)
+LinearAlgebra.ldiv!(y, P::CountingPrec, x) = (P.applied += 1; ldiv!(y, P.inner, x))
+LinearAlgebra.ldiv!(P::CountingPrec, x) = (P.applied += 1; ldiv!(P.inner, x))
+Base.:\(P::CountingPrec, x) = (P.applied += 1; P.inner \ x)
+
+@testset "branches that decline LHL still solve" begin
+    γ = 0.1
+    nbig = 40
+    J = randn(MersenneTwister(11), nbig, nbig)
+    bbig = randn(MersenneTwister(12), nbig)
+    fj(v, u, p, t) = J * v
+    fj(w, v, u, p, t) = mul!(w, J, v)
+    matfree = FunctionOperator(fj, zeros(nbig), zeros(nbig); islinear = true)
+    mass = Diagonal(collect(1.0:nbig))
+
+    nsmall = LinearSolve.LHL_DEFAULT_MIN_SIZE - 1
+    Jsmall = randn(MersenneTwister(13), nsmall, nsmall)
+    bsmall = randn(MersenneTwister(14), nsmall)
+
+    # Each is a reason `defaultalg` hands the WOperator back to the operator path. The
+    # selection assertions elsewhere only check which algorithm comes out; these check
+    # that the algorithm which comes out actually produces the right answer, and that the
+    # LHL slot is left unbuilt so the n² buffers are not allocated for a solve that will
+    # never touch them.
+    Wfree = WOperator{true}(I, γ, matfree, zeros(nbig))
+    cases = (
+        ("matrix-free J", Wfree, Matrix(J - I / γ), bbig, KrylovJL_GMRES()),
+        (
+            "general mass matrix", WOperator{true}(mass, γ, J, zeros(nbig)),
+            J - Matrix(mass) / γ, bbig, nothing,
+        ),
+        ("below the size cutoff", wop(Jsmall, γ), dense(Jsmall, γ), bsmall, nothing),
+    )
+    for (label, W, dW, rhs, alg) in cases
+        assump = LinearSolve.OperatorAssumptions(true)
+        @test !LinearSolve._lhl_defaultable(W, assump)
+        @test LinearSolve.defaultalg(W, rhs, assump) !=
+            LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LHLFactorization)
+        # `alg === nothing` means "go through the default", which is the interesting
+        # path. The matrix-free case names Krylov instead: the default cannot build its
+        # cachevals for a matrix-free `WOperator` at all, which predates this PR
+        # (SciML/LinearSolve.jl#1226) and is not what this testset is about.
+        if alg === nothing
+            @test init(LinearProblem(W, rhs)).cacheval.LHLFactorization === nothing
+            @test solve(LinearProblem(W, rhs)).u ≈ dW \ rhs rtol = 1.0e-6
+        else
+            @test solve(LinearProblem(W, rhs), alg).u ≈ dW \ rhs rtol = 1.0e-6
+        end
+    end
+end
+
+@testset "a split W keeps its preconditioners on an iterative solve" begin
+    γ = 0.1
+    n = 40
+    J = randn(MersenneTwister(15), n, n)
+    b = randn(MersenneTwister(16), n)
+    W = wop(J, γ)
+    dW = dense(J, γ)
+    # Diagonal of the assembled W: a real preconditioner, so a dropped one shows up as a
+    # changed iteration count rather than only as a changed answer.
+    D = Diagonal(diag(dW))
+
+    for (label, kw) in (("Pl", :Pl), ("Pr", :Pr))
+        P = CountingPrec(D)
+        sol = solve(LinearProblem(W, b), KrylovJL_GMRES(); (kw => P,)...)
+        @test P.applied > 0
+        @test sol.u ≈ dW \ b rtol = 1.0e-5
+    end
 end

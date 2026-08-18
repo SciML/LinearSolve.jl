@@ -228,10 +228,18 @@ const LHL_DEFAULT_MIN_SIZE = 32
 # A `WOperator` holds `J` and `gamma` apart, which is the statement that the shift will
 # move while `J` stays put. When its Jacobian is a dense matrix, the algorithm that
 # exploits that split is the right default; a matrix-free `J` still wants Krylov.
-function defaultalg(A::WOperator, b, assump::OperatorAssumptions{Bool})
+# `defaultalg` and the cacheval initializer must agree exactly: if the slot is selected
+# but left uninitialized the solve fails, and if it is initialized but never selected the
+# buffers are wasted. Both ask here.
+function _lhl_defaultable(A::WOperator, assump::OperatorAssumptions)
     J = A.J isa MatrixOperator ? convert(AbstractMatrix, A.J) : A.J
-    if assump.issq && J isa DenseMatrix && size(A, 1) >= LHL_DEFAULT_MIN_SIZE &&
-            _lhl_scalar_massmatrix(A.mass_matrix)
+    return assump.issq && J isa DenseMatrix && size(A, 1) >= LHL_DEFAULT_MIN_SIZE &&
+        _lhl_scalar_massmatrix(A.mass_matrix)
+end
+_lhl_defaultable(A, assump) = false
+
+function defaultalg(A::WOperator, b, assump::OperatorAssumptions{Bool})
+    if _lhl_defaultable(A, assump)
         # Refinement is the right default for a bare linear solve; a caller running an
         # outer correction loop should ask for `LHLFactorization(refine = 0)`.
         return DefaultLinearSolver(DefaultAlgorithmChoice.LHLFactorization)
@@ -628,7 +636,7 @@ end
             # Three n×n buffers, wanted only by the split form. Every other `A` — which is
             # nearly every `A` — would pay for them and never use the slot.
             quote
-                if A isa WOperator
+                if _lhl_defaultable(A, assump)
                     init_cacheval(
                         $(algchoice_to_alg(alg)), A, b, u, Pl, Pr, maxiters, abstol,
                         reltol, verbose, assump

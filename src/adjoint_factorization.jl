@@ -90,6 +90,11 @@ for Alg in (
         ElementalJL,
         SpecializedLUFactorization,
         SpecializedQRFactorization,
+        # The LHL workspace is a Hessenberg reduction of J plus an LU of the shifted
+        # Hessenberg, not a `Factorization` of the system matrix; `Wᴴ = Z⁻ᴴ(I-γH)ᴴZᴴ` is
+        # solvable from the same pieces but is not implemented, so the adjoint reduces
+        # `Aᴴ` from scratch.
+        LHLFactorization,
     )
     @eval _adjoint_factorization_reuse(::Type{<:$Alg}) =
         _NoAdjointFactorizationReuse()

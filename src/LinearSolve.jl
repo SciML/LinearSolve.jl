@@ -6,6 +6,9 @@ end
 
 import PrecompileTools
 using ArrayInterface: ArrayInterface
+# Explicit names, not the module: LinearSolve defines its own `LHLFactorization` (the
+# algorithm object) and `using LHLFactorization` would shadow it.
+using LHLFactorization: LHLWorkspace, lhl_reduce!, lhl_shift!, lhl_ldiv!, lhl_refine!
 using Base: Bool, convert, copyto!, adjoint, transpose, /, \, require_one_based_indexing
 using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, BunchKaufman,
     ColumnNorm, cond, Diagonal, Factorization, Hermitian, I, LAPACK, NoPivot,
@@ -18,7 +21,8 @@ using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, Bunc
 using SciMLBase: SciMLBase, LinearAliasSpecifier,
     init, solve!, reinit!, solve, ReturnCode, LinearProblem
 using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator,
-    MatrixOperator,
+    MatrixOperator, WOperator, jacobian_stale, mark_jacobian_updated!,
+    mark_jacobian_current!,
     has_ldiv!, issquare
 using SciMLStructures: SciMLStructures
 using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_int,
@@ -349,6 +353,7 @@ EnumX.@enumx DefaultAlgorithmChoice begin
     CudaOffloadLUFactorization
     MetalLUFactorization
     SparseColumnPivotedQRFactorization
+    LHLFactorization
 end
 
 # Autotune preference constants - loaded once at package import time
@@ -378,6 +383,8 @@ function is_algorithm_available(alg::DefaultAlgorithmChoice.T)
         return usemetal(nothing)  # Available if Metal extension is loaded
     elseif alg === DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization
         return true  # SparseColumnPivotedQR is a hard dependency, always available
+    elseif alg === DefaultAlgorithmChoice.LHLFactorization
+        return true  # LHLFactorization.jl is a hard dependency, always available
     else
         # For extension-dependent algorithms not explicitly handled above,
         # we cannot easily check availability without trying to use them.
@@ -448,6 +455,7 @@ include("appleaccelerate.jl")
 include("mkl.jl")
 include("openblas.jl")
 include("simplelu.jl")
+include("lhl.jl")
 include("adjoint_factorization.jl")
 include("simplegmres.jl")
 include("iterative_wrappers.jl")
@@ -776,6 +784,8 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
     STRUMPACKFactorization, MUMPSFactorization, SuperLUDISTFactorization,
     SpecializedLUFactorization, SpecializedQRFactorization,
     HSLMA57Factorization, HSLMA97Factorization
+
+export LHLFactorization, update_gamma!
 
 export LinearSolveFunction, DirectLdiv!, show_algorithm_choices
 

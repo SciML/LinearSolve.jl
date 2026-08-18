@@ -1517,6 +1517,51 @@ struct BLISLUFactorization <: AbstractFactorization
 end
 
 """
+    AMGXPreconditioner(A; config = nothing)
+
+An algebraic multigrid preconditioner for a GPU matrix, backed by
+[AMGX.jl](https://github.com/JuliaGPU/AMGX.jl). Requires `using AMGX`.
+
+AMGX is a solver in its own right, but it is most useful here as the preconditioner
+of a Krylov method, which is what the `precs` callback is for:
+
+```julia
+using LinearSolve, CUDA, AMGX
+alg = KrylovJL_GMRES(precs = (A, p) -> (AMGXPreconditioner(A), I))
+sol = solve(LinearProblem(A_gpu_csr, b_gpu), alg)
+```
+
+`config` takes a `Dict{String, String}` of AMGX configuration entries, and defaults
+to a classical AMG cycle used as a single-pass preconditioner. `A` must be a
+`CuSparseMatrixCSR`, which is the layout AMGX uploads from.
+
+The AMGX resources are freed by a finalizer, so the preconditioner can be left to
+the garbage collector.
+"""
+mutable struct AMGXPreconditioner
+    config::Any
+    resources::Any
+    matrix::Any
+    solver::Any
+    xvec::Any
+    bvec::Any
+    n::Int
+
+    function AMGXPreconditioner(A; config = nothing)
+        ext = Base.get_extension(@__MODULE__, :LinearSolveAMGXExt)
+        if ext === nothing
+            error("AMGXPreconditioner requires that AMGX is loaded, i.e. `using AMGX`")
+        end
+        return ext.build_amgx_preconditioner(A, config)
+    end
+
+    # The inner constructor above hides the default one, so the extension needs a way
+    # to build the struct once it holds the AMGX objects.
+    global _new_amgx_preconditioner(cfg, res, mat, solver, xv, bv, n) =
+        new(cfg, res, mat, solver, xv, bv, n)
+end
+
+"""
 `CUSOLVERRFFactorization(; symbolic = :RF, reuse_symbolic = true)`
 
 A GPU-accelerated sparse LU factorization using NVIDIA's cusolverRF library.

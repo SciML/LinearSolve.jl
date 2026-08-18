@@ -773,6 +773,7 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
     SparspakFactorization, DiagonalFactorization, CholeskyFactorization,
     BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization,
     CUSOLVERRFFactorization, CliqueTreesFactorization, ParUFactorization,
+    AMGXPreconditioner,
     STRUMPACKFactorization, MUMPSFactorization, SuperLUDISTFactorization,
     SpecializedLUFactorization, SpecializedQRFactorization,
     HSLMA57Factorization, HSLMA97Factorization

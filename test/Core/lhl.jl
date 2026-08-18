@@ -1,4 +1,4 @@
-using LinearSolve, LinearAlgebra, Random, SciMLOperators, Test
+using LinearSolve, LinearAlgebra, Random, SparseArrays, SciMLOperators, Test
 using SciMLOperators: WOperator, jacobian_stale, FunctionOperator
 
 # `LHLFactorization` takes its system matrix unassembled, as the split `J - M/γ` a
@@ -280,6 +280,7 @@ Base.:\(P::CountingPrec, x) = (P.applied += 1; P.inner \ x)
     nsmall = LinearSolve.LHL_DEFAULT_MIN_SIZE - 1
     Jsmall = randn(MersenneTwister(13), nsmall, nsmall)
     bsmall = randn(MersenneTwister(14), nsmall)
+    Jsparse = sprandn(MersenneTwister(17), nbig, nbig, 0.3) + 2I
 
     # Each is a reason `defaultalg` hands the WOperator back to the operator path. The
     # selection assertions elsewhere only check which algorithm comes out; these check
@@ -294,6 +295,7 @@ Base.:\(P::CountingPrec, x) = (P.applied += 1; P.inner \ x)
             J - Matrix(mass) / γ, bbig, nothing,
         ),
         ("below the size cutoff", wop(Jsmall, γ), dense(Jsmall, γ), bsmall, nothing),
+        ("sparse J", wop(Jsparse, γ), Matrix(Jsparse) - I / γ, bbig, nothing),
     )
     for (label, W, dW, rhs, alg) in cases
         assump = LinearSolve.OperatorAssumptions(true)

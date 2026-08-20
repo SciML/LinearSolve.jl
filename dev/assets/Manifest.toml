@@ -573,9 +573,9 @@ version = "3.4.1+1"
 
 [[deps.GPUArrays]]
 deps = ["Adapt", "GPUArraysCore", "KernelAbstractions", "LLVM", "LinearAlgebra", "Printf", "Random", "Reexport", "ScopedValues", "Serialization", "SparseArrays", "Statistics"]
-git-tree-sha1 = "83a1749542c76d71755cfa869f0e539adbae54ed"
+git-tree-sha1 = "4939facbe63151c92b622dad9f9bb2b639b5bbde"
 uuid = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7"
-version = "11.5.11"
+version = "11.5.12"
 
     [deps.GPUArrays.extensions]
     JLD2Ext = "JLD2"

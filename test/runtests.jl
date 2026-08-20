@@ -140,6 +140,13 @@ else
                 end
                 return nothing
             end,
+            "Reactant" => function ()
+                if isempty(VERSION.prerelease)
+                    activate_group_env(joinpath(@__DIR__, "Reactant"))
+                    @time @safetestset "Reactant JIT" include("Reactant/reactant.jl")
+                end
+                return nothing
+            end,
             # ParU_jll requires Julia >= 1.12 (SuiteSparse_jll in older stdlib is
             # incompatible)
             "LinearSolveParU" => function ()

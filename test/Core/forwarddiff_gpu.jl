@@ -2,6 +2,7 @@ using LinearSolve
 using ForwardDiff
 using JLArrays
 using LinearAlgebra
+using SciMLOperators: WOperator
 using Test
 
 # JLArray is a CPU-backed AbstractGPUArray, so it exercises the GPU contract
@@ -19,6 +20,12 @@ using Test
 # that genuinely honors the GPU contract here, which is what this file proves.
 
 const N_PARTIALS = 3
+
+@testset "WOperator with a GPU right-hand side" begin
+    W = WOperator{true}(I, 0.1, Matrix{Float64}(I, 2, 2), zeros(2))
+    alg = LinearSolve.defaultalg(W, JLArray(ones(2)), LinearSolve.OperatorAssumptions(true))
+    @test alg.alg === LinearSolve.DefaultAlgorithmChoice.KrylovJL_GMRES
+end
 
 function dual_problem(n, p)
     A = [

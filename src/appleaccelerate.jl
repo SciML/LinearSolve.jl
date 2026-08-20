@@ -4,12 +4,31 @@ using LinearAlgebra
 const global libacc = "/System/Library/Frameworks/Accelerate.framework/Accelerate"
 
 """
-```julia
-AppleAccelerateLUFactorization()
-```
+    AppleAccelerateLUFactorization(; residualsafety::Bool = false)
 
-A wrapper over Apple's Accelerate Library. Direct calls to Acceelrate in a way that pre-allocates workspace
-to avoid allocations and does not require libblastrampoline.
+A wrapper over Apple's Accelerate library. Direct calls to Accelerate's LU routines
+(`getrf!` and `getrs!`) in a way that pre-allocates workspace to avoid allocations and does
+not require libblastrampoline. Supports `Float32`, `Float64`, `ComplexF32`, and `ComplexF64`
+element types.
+
+Use this to guarantee Accelerate's LU is used regardless of the system BLAS configuration
+(no `using AppleAccelerate` needed), or when benchmarking shows it beats `LUFactorization`
+on your Mac. Where Accelerate is available, the default algorithm choice already selects
+this method for all but the smallest dense BLAS-eltype matrices.
+
+## Keyword Arguments
+
+  - `residualsafety`: If `true`, every solve that (re)factorizes `A` is followed by a
+    residual check against a copy of the original matrix. If `‖A*x - b‖` exceeds
+    `abstol + reltol * ‖b‖` (the tolerances of the solve), the returned solution has
+    `retcode = ReturnCode.APosterioriSafetyFailure`. Defaults to `false`.
+
+!!! note
+
+    This solver is macOS-only: it requires the system Accelerate framework to be loadable
+    (`/System/Library/Frameworks/Accelerate.framework/Accelerate` exporting `dgetrf_`).
+    On other platforms, or if the framework cannot be opened, `solve!` with this algorithm
+    errors that the AppleAccelerate binary is missing.
 """
 struct AppleAccelerateLUFactorization <: AbstractFactorization
     residualsafety::Bool

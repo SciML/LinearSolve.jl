@@ -252,31 +252,44 @@ end
 needs_concrete_A(::HYPREAlgorithm) = true
 
 """
-`PartitionedSolversAlgorithm(solver = nothing; kwargs...)`
+    PartitionedSolversAlgorithm(solver = nothing; kwargs...)
 
 [PartitionedSolvers](https://github.com/PartitionedArrays/PartitionedArrays.jl/tree/master/PartitionedSolvers)
 provides distributed linear solver building blocks for
 [PartitionedArrays.jl](https://github.com/PartitionedArrays/PartitionedArrays.jl).
 
-This algorithm is intended for `PSparseMatrix` / `PVector` inputs. The integration
-delegates actual solves to the local `PartitionedSolvers` solver constructors and caches
-the resulting solver object for repeated solves. The default dispatch for `PSparseMatrix`
-inputs chooses the CG-backed PartitionedSolvers path, but the integration is
-solver-agnostic: any PartitionedSolvers solver constructor (for example
-`PartitionedSolvers.cg`, `PartitionedSolvers.jacobi`, or `PartitionedSolvers.amg`) can be
-passed, and only the convergence keywords that the chosen solver actually accepts are
-forwarded automatically.
+This algorithm requires `PSparseMatrix` / `PVector` inputs: `init` throws an
+`ArgumentError` if `A` is not a `PSparseMatrix`, if `b` is not a `PVector`, or if a
+`u0` is given that is not a `PVector`. The integration delegates actual solves to the
+local `PartitionedSolvers` solver constructors and caches the resulting solver object
+for repeated solves. The default dispatch for `PSparseMatrix` inputs chooses the
+CG-backed PartitionedSolvers path, but the integration is solver-agnostic: any
+PartitionedSolvers solver constructor (for example `PartitionedSolvers.cg`,
+`PartitionedSolvers.jacobi`, or `PartitionedSolvers.amg`) can be passed, and only the
+convergence keywords that the chosen solver actually accepts (`iterations`, `abstol`,
+`reltol`, `verbose`, and `Pl` when a left preconditioner is set, otherwise
+`update_Pl = false`) are forwarded automatically.
+
+!!! note
+
+    Using this solver requires that both PartitionedArrays.jl and PartitionedSolvers.jl
+    are loaded, i.e. `using PartitionedArrays, PartitionedSolvers`. The constructor
+    errors otherwise.
 
 ## Positional Arguments
 
-  - `solver`: optional PartitionedSolvers solver object or constructor such as
-    `PartitionedSolvers.cg`. If omitted, the integration uses the local
-    `PartitionedSolvers` default solver.
+  - `solver`: optional PartitionedSolvers solver constructor such as
+    `PartitionedSolvers.cg`, or an already constructed `PartitionedSolvers.AbstractSolver`.
+    Defaults to `nothing`, in which case `PartitionedSolvers.default_solver(problem)` is
+    used.
 
 ## Keyword Arguments
 
-  - `kwargs...`: forwarded when constructing an explicit underlying PartitionedSolvers
-    solver. They take precedence over the auto-derived convergence keywords.
+  - `kwargs...`: forwarded when a solver constructor is called for the problem. They take
+    precedence over the auto-derived convergence keywords. They are not used when `solver`
+    is `nothing` (the default solver takes no options) or when `solver` is an already
+    constructed `AbstractSolver` (which is updated with the new problem via
+    `PartitionedSolvers.update` instead).
 
 ## Example
 
@@ -307,10 +320,22 @@ needs_concrete_A(::PartitionedSolversAlgorithm) = true
 
 # Debug: About to define CudaOffloadLUFactorization
 """
-`CudaOffloadLUFactorization()`
+    CudaOffloadLUFactorization(; throwerror = true, residualsafety = false)
 
 An offloading technique used to GPU-accelerate CPU-based computations using LU factorization.
+The dense CPU matrix `A` is copied to a `CuArray`, factored with cuSOLVER's `lu`, and each
+solve copies `b` to the GPU, back-solves there, and copies the result back to `cache.u`.
 Requires a sufficiently large `A` to overcome the data transfer costs.
+
+## Keyword Arguments
+
+  - `throwerror`: whether to throw an error at construction when the CUDA extension is not
+    loaded. Defaults to `true`. Passing `false` is what lets the default solver build the
+    algorithm speculatively.
+  - `residualsafety`: intended to enable the post-solve residual check described for
+    `LUFactorization`. Defaults to `false`. That check lives in the generic factorization
+    `solve!`, which the CUDA extension replaces with its own `solve!` for this algorithm,
+    so the flag currently has no effect here.
 
 !!! note
 
@@ -329,12 +354,17 @@ struct CudaOffloadLUFactorization <: AbstractFactorization
 end
 
 """
-`CUDAOffload32MixedLUFactorization()`
+    CUDAOffload32MixedLUFactorization(; throwerror = true)
 
 A mixed precision GPU-accelerated LU factorization that converts matrices to Float32
-before offloading to CUDA GPU for factorization, then converts back for the solve.
-This can provide speedups when the reduced precision is acceptable and memory
-bandwidth is a bottleneck.
+(ComplexF32 for complex inputs) before offloading to CUDA GPU for factorization, then
+converts back for the solve. This can provide speedups when the reduced precision is
+acceptable and memory bandwidth is a bottleneck.
+
+## Keyword Arguments
+
+  - `throwerror`: whether to throw an error at construction when the CUDA extension is not
+    loaded. Defaults to `true`.
 
 ## Performance Notes
 - Converts Float64 matrices to Float32 for GPU factorization
@@ -448,7 +478,9 @@ end
 ## RFLUFactorization
 
 """
-    RFLUFactorization{P, T}(; pivot = Val(true), thread = Val(true))
+    RFLUFactorization(; pivot = Val(true), thread = Val(true), throwerror = true,
+                      residualsafety = false)
+    RFLUFactorization(pivot::Val, thread::Val; throwerror = true, residualsafety = false)
 
 A fast pure Julia LU-factorization implementation using RecursiveFactorization.jl.
 This is by far the fastest LU-factorization implementation, usually outperforming
@@ -466,6 +498,10 @@ is in the works.
 - `thread = Val(true)`: Enable multi-threading. Set to `Val{false}` for single-threaded
   execution.
 - `throwerror = true`: Whether to throw an error if RecursiveFactorization.jl is not loaded.
+- `residualsafety = false`: intended to enable the post-solve residual check described
+  for `LUFactorization`. That check lives in the generic factorization `solve!`, which
+  the RecursiveFactorization extension replaces with its own `solve!` for this
+  algorithm, so the flag currently has no effect here.
 
 ## Performance Notes
 - Fastest for dense matrices with dimensions roughly < 500×500
@@ -501,11 +537,30 @@ function RFLUFactorization(; pivot = Val(true), thread = Val(true), throwerror =
 end
 
 """
-`ButterflyFactorization()`
+    ButterflyFactorization(; thread = Val(true), throwerror = true)
+    ButterflyFactorization(thread::Val; throwerror = true)
 
-A fast pure Julia LU-factorization implementation
-using RecursiveFactorization.jl. This method utilizes a butterfly
-factorization approach rather than pivoting.
+A fast pure Julia LU-factorization implementation using RecursiveFactorization.jl.
+Instead of pivoting, the matrix is first mixed with RecursiveFactorization.jl's random
+butterfly transform and then factored with the pivot-free `RecursiveFactorization.lu!`,
+and each solve applies the transform to the right-hand side around a `TriangularSolve`
+back-solve. This trades the row swaps of partial pivoting for two cheap dense
+multiplies, which can be faster than `RFLUFactorization` on dense square `Array` inputs
+while being less robust for matrices that need pivoting for stability. Only square
+matrices are supported (an assertion fires on the first factorization otherwise).
+
+## Keyword Arguments
+
+  - `thread`: threading choice as `Val{Bool}`, forwarded to
+    `RecursiveFactorization.lu!` and to the triangular back-solves. Defaults to
+    `Val(true)`.
+  - `throwerror`: whether to throw an error at construction when
+    RecursiveFactorization.jl is not loaded. Defaults to `true`.
+
+!!! note
+
+    Using this solver requires that RecursiveFactorization.jl is loaded, i.e.
+    `using RecursiveFactorization`.
 """
 struct ButterflyFactorization{T} <: AbstractDenseFactorization
     thread::Val{T}
@@ -562,22 +617,28 @@ sol = solve(prob, alg)
 struct FastLUFactorization <: AbstractDenseFactorization end
 
 """
-    FastQRFactorization{P}(; pivot = ColumnNorm(), blocksize = 36)
+    FastQRFactorization()
+    FastQRFactorization(pivot, blocksize)
 
 A high-performance QR factorization using the FastLapackInterface.jl package.
 This provides an optimized interface to LAPACK QR routines with reduced overhead
-compared to the standard LinearAlgebra LAPACK wrappers.
+compared to the standard LinearAlgebra LAPACK wrappers. The zero-argument constructor
+is `FastQRFactorization(NoPivot(), 36)`; there is no keyword constructor, so both
+fields are set positionally.
 
 ## Type Parameters
 - `P`: The type of pivoting strategy used
 
-## Fields
-- `pivot::P`: Pivoting strategy (e.g., `ColumnNorm()` for column pivoting, `nothing` for no pivoting)
-- `blocksize::Int`: Block size for the blocked QR algorithm (default: 36)
+## Positional Arguments
+- `pivot`: Pivoting strategy. `NoPivot()` (the default) uses the blocked
+  unpivoted `geqrt!` path; `ColumnNorm()` selects the column-pivoted `geqp3!` path.
+  These are the only two pivot types the extension implements.
+- `blocksize`: Block size for the blocked (unpivoted) QR algorithm, passed to
+  FastLapackInterface's `QRWYWs` workspace. Defaults to `36`. It is not used by the
+  column-pivoted path.
 
 ## Features
 - Reduced function call overhead compared to standard LAPACK wrappers
-- Supports various pivoting strategies for numerical stability
 - Configurable block size for optimal performance
 - Suitable for dense matrices, especially overdetermined systems
 
@@ -591,13 +652,13 @@ Using this solver requires that FastLapackInterface.jl is loaded: `using FastLap
 
 ## Example
 ```julia
-using FastLapackInterface
-# QR with column pivoting
+using FastLapackInterface, LinearAlgebra
+# QR without pivoting, block size 36
 alg1 = FastQRFactorization()
-# QR without pivoting for speed
-alg2 = FastQRFactorization(pivot=nothing)
+# QR with column pivoting
+alg2 = FastQRFactorization(ColumnNorm(), 36)
 # Custom block size
-alg3 = FastQRFactorization(blocksize=64)
+alg3 = FastQRFactorization(NoPivot(), 64)
 ```
 """
 struct FastQRFactorization{P} <: AbstractDenseFactorization
@@ -618,7 +679,13 @@ MKLPardisoFactorize(; nprocs::Union{Int, Nothing} = nothing,
     dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
 ```
 
-A sparse factorization method using MKL Pardiso.
+A sparse direct (LU) factorization method using MKL Pardiso, i.e.
+`PardisoJL(; vendor = :MKL, solver_type = 0, kwargs...)`. It solves square sparse
+systems (`SparseMatrixCSC`, real or complex element types) with a multithreaded
+supernodal LU and is a good choice for large sparse systems on Intel hardware where
+MKL is available. Use `MKLPardisoIterate` when the same sparsity pattern is factored
+repeatedly and the LU-preconditioned iteration is likely to converge without a
+refactorization.
 
 !!! note
 
@@ -626,14 +693,23 @@ A sparse factorization method using MKL Pardiso.
 
 ## Keyword Arguments
 
-Setting `cache_analysis = true` disables Pardiso's scaling and matching defaults
-and caches the result of the initial analysis phase for all further computations
-with this solver.
+  - `nprocs`: number of threads, passed to `Pardiso.set_nprocs!`. Defaults to `nothing`
+    (Pardiso's default).
+  - `matrix_type`: Pardiso matrix type (`Pardiso.MatrixType` or its integer code),
+    overriding the automatic choice of `Pardiso.REAL_NONSYM` for real and
+    `Pardiso.COMPLEX_NONSYM` for complex element types. Defaults to `nothing`.
+  - `cache_analysis`: when `true`, disables Pardiso's scaling and matching defaults
+    (`iparm[11] = iparm[13] = 0`), runs the analysis phase once at `init`, and reuses it
+    for all further factorizations with this solver. Defaults to `false`.
+  - `iparm`: vector of `(index, value)` tuples applied via `Pardiso.set_iparm!`.
+    Defaults to `nothing`.
+  - `dparm`: vector of `(index, value)` tuples applied via `Pardiso.set_dparm!`.
+    Defaults to `nothing`.
 
-For the definition of the other keyword arguments, see the Pardiso.jl documentation.
-All values default to `nothing` and the solver internally determines the values
-given the input types, and these keyword arguments are only for overriding the
-default handling process. This should not be required by most users.
+The defaults let the solver determine everything from the input types; these keywords
+are only for overriding that handling and should not be required by most users. See
+`PardisoJL` for the full description of each keyword and the Pardiso.jl documentation
+for the meaning of the individual `iparm`/`dparm` entries.
 """
 MKLPardisoFactorize(; kwargs...) = PardisoJL(; vendor = :MKL, solver_type = 0, kwargs...)
 
@@ -646,7 +722,16 @@ MKLPardisoIterate(; nprocs::Union{Int, Nothing} = nothing,
     dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
 ```
 
-A mixed factorization+iterative method using MKL Pardiso.
+A mixed factorization+iterative method using MKL Pardiso, i.e.
+`PardisoJL(; vendor = :MKL, solver_type = 1, kwargs...)`. Pardiso computes an LU
+factorization for the first system and then reuses those exact factors as the
+preconditioner of a Krylov (CGS) iteration for the following solves, falling back to a
+fresh numerical factorization when the iteration does not converge. `iparm[4]` is set
+from the `reltol` given to `init`/`solve` to control the iteration's stopping
+tolerance. This is worthwhile when the same sparsity pattern is solved many times with
+slowly changing values (for example inside a nonlinear or time-stepping loop) and each
+new factorization is expensive; use `MKLPardisoFactorize` for a plain direct solve.
+Square sparse systems (`SparseMatrixCSC`, real or complex) are supported.
 
 !!! note
 
@@ -654,14 +739,23 @@ A mixed factorization+iterative method using MKL Pardiso.
 
 ## Keyword Arguments
 
-Setting `cache_analysis = true` disables Pardiso's scaling and matching defaults
-and caches the result of the initial analysis phase for all further computations
-with this solver.
+  - `nprocs`: number of threads, passed to `Pardiso.set_nprocs!`. Defaults to `nothing`
+    (Pardiso's default).
+  - `matrix_type`: Pardiso matrix type (`Pardiso.MatrixType` or its integer code),
+    overriding the automatic choice of `Pardiso.REAL_NONSYM` for real and
+    `Pardiso.COMPLEX_NONSYM` for complex element types. Defaults to `nothing`.
+  - `cache_analysis`: when `true`, disables Pardiso's scaling and matching defaults
+    (`iparm[11] = iparm[13] = 0`), runs the analysis phase once at `init`, and reuses it
+    for all further factorizations with this solver. Defaults to `false`.
+  - `iparm`: vector of `(index, value)` tuples applied via `Pardiso.set_iparm!`.
+    Defaults to `nothing`.
+  - `dparm`: vector of `(index, value)` tuples applied via `Pardiso.set_dparm!`.
+    Defaults to `nothing`.
 
-For the definition of the other keyword arguments, see the Pardiso.jl documentation.
-All values default to `nothing` and the solver internally determines the values
-given the input types, and these keyword arguments are only for overriding the
-default handling process. This should not be required by most users.
+The defaults let the solver determine everything from the input types; these keywords
+are only for overriding that handling and should not be required by most users. See
+`PardisoJL` for the full description of each keyword and the Pardiso.jl documentation
+for the meaning of the individual `iparm`/`dparm` entries.
 """
 MKLPardisoIterate(; kwargs...) = PardisoJL(; vendor = :MKL, solver_type = 1, kwargs...)
 
@@ -674,7 +768,13 @@ PanuaPardisoFactorize(; nprocs::Union{Int, Nothing} = nothing,
     dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
 ```
 
-A sparse factorization method using Panua Pardiso.
+A sparse direct (LU) factorization method using Panua Pardiso (formerly
+pardiso-project.org), i.e. `PardisoJL(; vendor = :Panua, solver_type = 0, kwargs...)`.
+It solves square sparse systems (`SparseMatrixCSC`, real or complex element types) with
+a multithreaded supernodal LU and is the choice when a Panua Pardiso license is
+available, including on platforms where MKL Pardiso is not. Use `PanuaPardisoIterate` when
+the same sparsity pattern is factored repeatedly and the LU-preconditioned iteration is
+likely to converge without a refactorization.
 
 !!! note
 
@@ -682,14 +782,23 @@ A sparse factorization method using Panua Pardiso.
 
 ## Keyword Arguments
 
-Setting `cache_analysis = true` disables Pardiso's scaling and matching defaults
-and caches the result of the initial analysis phase for all further computations
-with this solver.
+  - `nprocs`: number of threads. Defaults to `nothing` (Pardiso's default). The
+    extension currently applies this only for the MKL vendor, so it has no effect here.
+  - `matrix_type`: Pardiso matrix type (`Pardiso.MatrixType` or its integer code),
+    overriding the automatic choice of `Pardiso.REAL_NONSYM` for real and
+    `Pardiso.COMPLEX_NONSYM` for complex element types. Defaults to `nothing`.
+  - `cache_analysis`: when `true`, disables Pardiso's scaling and matching defaults
+    (`iparm[11] = iparm[13] = 0`), runs the analysis phase once at `init`, and reuses it
+    for all further factorizations with this solver. Defaults to `false`.
+  - `iparm`: vector of `(index, value)` tuples applied via `Pardiso.set_iparm!`.
+    Defaults to `nothing`.
+  - `dparm`: vector of `(index, value)` tuples applied via `Pardiso.set_dparm!`.
+    Defaults to `nothing`.
 
-For the definition of the keyword arguments, see the Pardiso.jl documentation.
-All values default to `nothing` and the solver internally determines the values
-given the input types, and these keyword arguments are only for overriding the
-default handling process. This should not be required by most users.
+The defaults let the solver determine everything from the input types; these keywords
+are only for overriding that handling and should not be required by most users. See
+`PardisoJL` for the full description of each keyword and the Pardiso.jl documentation
+for the meaning of the individual `iparm`/`dparm` entries.
 """
 PanuaPardisoFactorize(; kwargs...) = PardisoJL(;
     vendor = :Panua, solver_type = 0, kwargs...
@@ -699,11 +808,21 @@ PanuaPardisoFactorize(; kwargs...) = PardisoJL(;
 ```julia
 PanuaPardisoIterate(; nprocs::Union{Int, Nothing} = nothing,
     matrix_type = nothing,
+    cache_analysis = false,
     iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
     dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing)
 ```
 
-A mixed factorization+iterative method using Panua Pardiso.
+A mixed factorization+iterative method using Panua Pardiso, i.e.
+`PardisoJL(; vendor = :Panua, solver_type = 1, kwargs...)`. `Pardiso.set_solver!` selects
+Panua's iterative solver: an LU factorization is computed for the first system and then
+reused as the preconditioner of a Krylov iteration for the following solves, with a
+fresh numerical factorization when the iteration does not converge. `iparm[4]` is set
+from the `reltol` given to `init`/`solve` to control the iteration's stopping tolerance.
+This is worthwhile when the same sparsity pattern is solved many times with slowly
+changing values and each new factorization is expensive; use `PanuaPardisoFactorize`
+for a plain direct solve. Square sparse systems (`SparseMatrixCSC`, real or complex)
+are supported.
 
 !!! note
 
@@ -711,10 +830,23 @@ A mixed factorization+iterative method using Panua Pardiso.
 
 ## Keyword Arguments
 
-For the definition of the keyword arguments, see the Pardiso.jl documentation.
-All values default to `nothing` and the solver internally determines the values
-given the input types, and these keyword arguments are only for overriding the
-default handling process. This should not be required by most users.
+  - `nprocs`: number of threads. Defaults to `nothing` (Pardiso's default). The
+    extension currently applies this only for the MKL vendor, so it has no effect here.
+  - `matrix_type`: Pardiso matrix type (`Pardiso.MatrixType` or its integer code),
+    overriding the automatic choice of `Pardiso.REAL_NONSYM` for real and
+    `Pardiso.COMPLEX_NONSYM` for complex element types. Defaults to `nothing`.
+  - `cache_analysis`: when `true`, disables Pardiso's scaling and matching defaults
+    (`iparm[11] = iparm[13] = 0`), runs the analysis phase once at `init`, and reuses it
+    for all further factorizations with this solver. Defaults to `false`.
+  - `iparm`: vector of `(index, value)` tuples applied via `Pardiso.set_iparm!`.
+    Defaults to `nothing`.
+  - `dparm`: vector of `(index, value)` tuples applied via `Pardiso.set_dparm!`.
+    Defaults to `nothing`.
+
+The defaults let the solver determine everything from the input types; these keywords
+are only for overriding that handling and should not be required by most users. See
+`PardisoJL` for the full description of each keyword and the Pardiso.jl documentation
+for the meaning of the individual `iparm`/`dparm` entries.
 """
 PanuaPardisoIterate(; kwargs...) = PardisoJL(; vendor = :Panua, solver_type = 1, kwargs...)
 
@@ -723,13 +855,20 @@ PanuaPardisoIterate(; kwargs...) = PardisoJL(; vendor = :Panua, solver_type = 1,
 PardisoJL(; nprocs::Union{Int, Nothing} = nothing,
     solver_type = nothing,
     matrix_type = nothing,
+    cache_analysis = false,
     iparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
     dparm::Union{Vector{Tuple{Int, Int}}, Nothing} = nothing,
     vendor::Union{Symbol, Nothing} = nothing
 )
 ```
 
-A generic method using  Pardiso. Specifying `solver_type` is required.
+A generic sparse direct solver using Pardiso through Pardiso.jl. It supports square
+sparse systems (`SparseMatrixCSC`, real or complex element types) and both the Panua
+and MKL Pardiso libraries. The convenience constructors `MKLPardisoFactorize`,
+`MKLPardisoIterate`, `PanuaPardisoFactorize` and `PanuaPardisoIterate` fix `vendor` and
+`solver_type` and are what most users should use; `PardisoJL` itself is for choosing
+those settings by hand. `solver_type` is optional: when it is left as `nothing`,
+Pardiso's default (direct) solver is used.
 
 !!! note
 
@@ -737,13 +876,39 @@ A generic method using  Pardiso. Specifying `solver_type` is required.
 
 ## Keyword Arguments
 
-The `vendor` keyword allows to choose between Panua pardiso  (former pardiso-project.org; `vendor=:Panua`)
-and  MKL Pardiso (`vendor=:MKL`). If `vendor==nothing`, Panua pardiso is preferred over MKL Pardiso.
+  - `vendor`: `:Panua` for Panua Pardiso (formerly pardiso-project.org) or `:MKL` for
+    MKL Pardiso. Defaults to `nothing`, which selects Panua Pardiso when it is available
+    and MKL Pardiso otherwise.
+  - `solver_type`: `0` for the sparse direct (LU) solver, `1` for the LU-preconditioned
+    Krylov iteration (Pardiso factors the first system and reuses those factors as a
+    preconditioner for the following solves, refactoring when the iteration does not
+    converge). A `Pardiso.Solver` value is also accepted. Defaults to `nothing`, which
+    keeps Pardiso's default. For `vendor = :Panua` the value is passed to
+    `Pardiso.set_solver!`; for `vendor = :MKL` it is not passed to Pardiso, but
+    `solver_type = 1` still sets `iparm[4]` from `reltol` for either vendor, which is
+    what enables MKL's CGS iteration.
+  - `nprocs`: number of threads, passed to `Pardiso.set_nprocs!`. Defaults to `nothing`
+    (Pardiso's default). The extension currently applies this only for `vendor = :MKL`.
+  - `matrix_type`: Pardiso matrix type (`Pardiso.MatrixType` or its integer code),
+    passed to `Pardiso.set_matrixtype!`. Defaults to `nothing`, which selects
+    `Pardiso.REAL_NONSYM` for real and `Pardiso.COMPLEX_NONSYM` for complex element
+    types.
+  - `cache_analysis`: when `true`, disables Pardiso's scaling and matching defaults
+    (`iparm[11] = iparm[13] = 0`), runs the analysis phase once at `init`, and reuses it
+    for every later factorization, so only the numerical factorization is repeated when
+    `A` changes with the same sparsity pattern. Defaults to `false`, in which case
+    analysis and numerical factorization are redone together on each fresh `A`.
+  - `iparm`: vector of `(index, value)` tuples, each applied as
+    `Pardiso.set_iparm!(solver, index, value)` after the settings above, so they
+    override them. Defaults to `nothing`. `iparm[12]` is set by the extension to
+    account for the CSC storage and should not be overridden.
+  - `dparm`: vector of `(index, value)` tuples, each applied as
+    `Pardiso.set_dparm!(solver, index, value)`. Defaults to `nothing`. Note that the
+    field is typed `Vector{Tuple{Int, Int}}`, so only integer values can be passed.
 
-For the definition of the other keyword arguments, see the Pardiso.jl documentation.
-All values default to `nothing` and the solver internally determines the values
-given the input types, and these keyword arguments are only for overriding the
-default handling process. This should not be required by most users.
+The defaults let the solver determine everything from the input types; these keywords
+are only for overriding that handling and should not be required by most users. See the
+Pardiso.jl documentation for the meaning of the individual `iparm`/`dparm` entries.
 """
 struct PardisoJL{T1, T2} <: AbstractSparseFactorization
     nprocs::Union{Int, Nothing}
@@ -780,15 +945,44 @@ end
 
 """
 ```julia
-KrylovKitJL(args...; KrylovAlg = Krylov.gmres!, kwargs...)
+KrylovKitJL(args...; KrylovAlg = KrylovKit.GMRES, gmres_restart = 0,
+    precs = DEFAULT_PRECS, kwargs...)
 ```
 
-A generic iterative solver implementation allowing the choice of KrylovKit.jl
-solvers.
+A generic iterative solver wrapping `KrylovKit.linsolve` from KrylovKit.jl. Each solve
+calls `KrylovKit.linsolve(A, b, u; atol = abstol, rtol = reltol, maxiter = maxiters,
+krylovdim, verbosity, kwargs...)`, so `A` may be any matrix or operator supporting
+`mul!`. KrylovKit selects the actual method from its `issymmetric`, `ishermitian` and
+`isposdef` keywords (checked automatically for an `AbstractMatrix`, `false` by default
+for other operators): CG for Hermitian positive definite input, GMRES otherwise. Use
+`KrylovKitJL_CG` and `KrylovKitJL_GMRES` for the common cases; use `KrylovJL_GMRES`
+instead when preconditioning is needed, since KrylovKit has no preconditioner support.
 
 !!! note
 
     Using this solver requires adding the package KrylovKit.jl, i.e. `using KrylovKit`
+
+## Positional Arguments
+
+  - `args...`: stored on the algorithm; not currently used by the solve.
+
+## Keyword Arguments
+
+  - `KrylovAlg`: the KrylovKit algorithm type, `KrylovKit.GMRES` or `KrylovKit.CG`.
+    Defaults to `KrylovKit.GMRES`. It is stored on the algorithm but not passed to
+    `KrylovKit.linsolve`; the method is chosen by KrylovKit as described above
+    (`KrylovKitJL_CG` requests CG by forcing `isposdef = true`).
+  - `gmres_restart`: the GMRES restart length, passed to KrylovKit as `krylovdim`.
+    `0` means `min(20, size(A, 1))`. Defaults to `0`. Note that KrylovKit's `maxiter`
+    (set from `maxiters`) counts restart cycles for GMRES, and the CG iteration cap is
+    `krylovdim * maxiter`.
+  - `precs`: a preconditioner builder `(A, p) -> (Pl, Pr)`, called at `init` like for
+    `KrylovJL`. Defaults to `DEFAULT_PRECS` (identity). KrylovKit ignores
+    preconditioners: any non-identity `Pl`/`Pr`, whether from `precs` or from
+    `init`/`solve`, only produces a one-time warning and is otherwise dropped.
+  - `kwargs...`: any remaining keywords are forwarded to `KrylovKit.linsolve` on every
+    solve (for example `issymmetric`, `ishermitian`, `isposdef`, `orth`), on top of the
+    `atol`/`rtol`/`maxiter`/`krylovdim`/`verbosity` set by the cache.
 """
 struct KrylovKitJL{F, I, P, A, K} <: LinearSolve.AbstractKrylovSubspaceMethod
     KrylovAlg::F
@@ -800,10 +994,19 @@ end
 
 """
 ```julia
-KrylovKitJL_CG(args...; Pl = nothing, Pr = nothing, kwargs...)
+KrylovKitJL_CG(args...; kwargs...)
 ```
 
-A generic CG implementation for Hermitian and positive definite linear systems
+A CG implementation for Hermitian (real symmetric) positive definite linear systems
+via KrylovKit.jl. It is `KrylovKitJL(args...; KrylovAlg = KrylovKit.CG, kwargs...,
+isposdef = true)`, so `isposdef = true` is always forwarded to `KrylovKit.linsolve`;
+KrylovKit then runs CG when it also knows the operator is Hermitian, which is detected
+automatically for an `AbstractMatrix` but must be stated with `ishermitian = true` (or
+`issymmetric = true` for a real problem) for a function-like operator, otherwise
+KrylovKit falls back to GMRES. Keyword arguments (`gmres_restart`, `precs`, and any `KrylovKit.linsolve`
+keywords) are those of `KrylovKitJL`. There are no `Pl`/`Pr` keywords: KrylovKit does
+not support preconditioners, and any set through `precs` or `init`/`solve` are ignored
+with a warning.
 
 !!! note
 
@@ -813,10 +1016,17 @@ function KrylovKitJL_CG end
 
 """
 ```julia
-KrylovKitJL_GMRES(args...; Pl = nothing, Pr = nothing, gmres_restart = 0, kwargs...)
+KrylovKitJL_GMRES(args...; gmres_restart = 0, kwargs...)
 ```
 
-A generic GMRES implementation.
+A GMRES implementation for general (square, possibly non-symmetric) linear systems via
+KrylovKit.jl. It is `KrylovKitJL(args...; KrylovAlg = KrylovKit.GMRES, kwargs...)`.
+Keyword arguments (`gmres_restart`, `precs`, and any `KrylovKit.linsolve` keywords)
+are those of `KrylovKitJL`; in particular `gmres_restart` becomes KrylovKit's
+`krylovdim`, with `0` meaning `min(20, size(A, 1))`. There are no `Pl`/`Pr` keywords:
+KrylovKit does not support preconditioners, and any set through `precs` or
+`init`/`solve` are ignored with a warning. Use `KrylovJL_GMRES` when preconditioning
+is needed.
 
 !!! note
 
@@ -840,6 +1050,21 @@ for you. Remaining keywords are forwarded to the underlying solver, so
 ConjugateGradients.jl solves for real element types in a plain `Vector` only, so a
 complex or otherwise-typed problem is rejected at `init` rather than partway
 through a solve.
+
+## Keyword Arguments
+
+  - `solver`: `:cg` (for symmetric positive definite systems) or `:bicgstab` (for
+    general square systems). Defaults to `:cg`.
+  - `precs`: a preconditioner builder, a function `(A, p) -> (Pl, Pr)`, called at
+    `init` and again in `solve!` whenever `A` or `p` has changed; its result becomes
+    `cache.Pl`/`cache.Pr`. `nothing` means no preconditioning unless `Pl` is given to
+    `init`/`solve`. Defaults to `nothing`. Only a left preconditioner is supported: `Pl`
+    is applied as `ldiv!(z, Pl, r)`, and `solve!` throws an `ArgumentError` if a
+    non-identity `Pr` is present.
+  - `kwargs...`: forwarded to `ConjugateGradients.cg!`/`bicgstab!` on every solve.
+
+Only `reltol` and `maxiters` from the cache are used: they are passed as
+ConjugateGradients.jl's `tol` and `maxIter`. `abstol` is not used.
 
 !!! note
 
@@ -884,15 +1109,48 @@ function ConjugateGradientsJL_BICGSTAB end
 ```julia
 IterativeSolversJL(args...;
     generate_iterator = IterativeSolvers.gmres_iterable!,
-    Pl = nothing, Pr = nothing,
-    gmres_restart = 0, kwargs...)
+    gmres_restart = 0, precs = DEFAULT_PRECS, kwargs...)
 ```
 
-A generic wrapper over the IterativeSolvers.jl solvers.
+A generic wrapper over the IterativeSolvers.jl solvers. The chosen iterator constructor
+is called with the cache's `u`, `A`, `b`, tolerances and iteration cap on every fresh
+`A` (and, for every iterator other than `gmres_iterable!`, on every solve), and each
+`solve!` then steps through the resulting iterable. The convenience
+constructors `IterativeSolversJL_CG`, `IterativeSolversJL_GMRES`,
+`IterativeSolversJL_IDRS`, `IterativeSolversJL_BICGSTAB` and `IterativeSolversJL_MINRES`
+select `generate_iterator` for you.
 
 !!! note
 
     Using this solver requires adding the package IterativeSolvers.jl, i.e. `using IterativeSolvers`
+
+## Positional Arguments
+
+  - `args...`: passed positionally to the iterator constructor after `u, A, b` for
+    `bicgstabl_iterator!` (where the first one is the BiCGStab(l) `l`) and for
+    `minres_iterable!` (which takes none). They are not used by the CG, GMRES and
+    IDR(s) iterators.
+
+## Keyword Arguments
+
+  - `generate_iterator`: the IterativeSolvers.jl iterator constructor to use, one of
+    `IterativeSolvers.cg_iterator!`, `gmres_iterable!`, `idrs_iterable!`,
+    `bicgstabl_iterator!` or `minres_iterable!`. Defaults to
+    `IterativeSolvers.gmres_iterable!`.
+  - `gmres_restart`: the GMRES restart length, passed as `restart` to
+    `gmres_iterable!`. `0` means `min(20, size(A, 1))`. Defaults to `0`. Ignored by
+    the other iterators.
+  - `precs`: a preconditioner builder `(A, p) -> (Pl, Pr)`, called at `init` like for
+    `KrylovJL`; the resulting `cache.Pl`/`cache.Pr` are handed to the iterator
+    constructor. Defaults to `DEFAULT_PRECS` (identity). Explicit `Pl`/`Pr` are given
+    to `init`/`solve`, not to this constructor: a `Pl` or `Pr` keyword passed here would
+    be forwarded to the iterator constructor as-is. Which preconditioners each iterator
+    supports is listed on the convenience constructors.
+  - `kwargs...`: any remaining keywords are forwarded to the iterator constructor on top
+    of `abstol`, `reltol` and `maxiter` from the cache (for example `initially_zero`,
+    `orth_meth`, `skew_hermitian`). `maxiters` is accepted here as an alias for
+    IterativeSolvers' `maxiter` and overrides the cache's `maxiters`. `idrs_s` is read
+    by the IDR(s) path.
 """
 struct IterativeSolversJL{F, I, P, A, K} <: LinearSolve.AbstractKrylovSubspaceMethod
     generate_iterator::F
@@ -904,10 +1162,18 @@ end
 
 """
 ```julia
-IterativeSolversJL_CG(args...; Pl = nothing, Pr = nothing, kwargs...)
+IterativeSolversJL_CG(args...; kwargs...)
 ```
 
-A wrapper over the IterativeSolvers.jl CG.
+A wrapper over the IterativeSolvers.jl CG (`IterativeSolvers.cg_iterator!`) for
+symmetric positive definite systems. It is
+`IterativeSolversJL(args...; generate_iterator = IterativeSolvers.cg_iterator!, kwargs...)`,
+so the keyword arguments (`precs` and any `cg_iterator!` keywords such as
+`initially_zero`) are those of `IterativeSolversJL`; `args...` are not used. There are
+no `Pl`/`Pr` constructor keywords: preconditioners come from `precs` or from
+`init`/`solve`, and passing a `Pl` keyword here would reach `cg_iterator!` as an
+unknown keyword. Only left preconditioning is supported; a non-identity `Pr` is dropped
+with a `no_right_preconditioning` message.
 
 !!! note
 
@@ -917,10 +1183,17 @@ function IterativeSolversJL_CG end
 
 """
 ```julia
-IterativeSolversJL_GMRES(args...; Pl = nothing, Pr = nothing, gmres_restart = 0, kwargs...)
+IterativeSolversJL_GMRES(args...; gmres_restart = 0, kwargs...)
 ```
 
-A wrapper over the IterativeSolvers.jl GMRES.
+A wrapper over the IterativeSolvers.jl GMRES (`IterativeSolvers.gmres_iterable!`) for
+general square systems. It is
+`IterativeSolversJL(args...; generate_iterator = IterativeSolvers.gmres_iterable!, kwargs...)`,
+so the keyword arguments (`gmres_restart`, `precs` and any `gmres_iterable!` keywords
+such as `orth_meth`) are those of `IterativeSolversJL`; `args...` are not used.
+`gmres_restart` is the restart length, with `0` meaning `min(20, size(A, 1))`. Both left
+and right preconditioning are supported; `Pl`/`Pr` are taken from `precs` or from
+`init`/`solve`, not from constructor keywords.
 
 !!! note
 
@@ -930,10 +1203,18 @@ function IterativeSolversJL_GMRES end
 
 """
 ```julia
-IterativeSolversJL_IDRS(args...; Pl = nothing, idrs_s = 4, kwargs...)
+IterativeSolversJL_IDRS(args...; idrs_s = 4, kwargs...)
 ```
 
-A wrapper over the IterativeSolvers.jl IDR(S).
+A wrapper over the IterativeSolvers.jl IDR(s) (`IterativeSolvers.idrs_iterable!`) for
+general square systems. It is
+`IterativeSolversJL(args...; generate_iterator = IterativeSolvers.idrs_iterable!, kwargs...)`,
+so the keyword arguments are those of `IterativeSolversJL`; `args...` are not used.
+`idrs_s` is the dimension of the shadow space `s` (larger values typically converge in
+fewer iterations at more work per iteration). Defaults to `4`. Remaining keywords are
+forwarded to `idrs_iterable!`, which only accepts `smoothing` and `verbose`. Only left
+preconditioning is supported: `Pl` comes from `precs` or from `init`/`solve` (not from
+a constructor keyword), and a right preconditioner is dropped.
 
 !!! note
 
@@ -943,10 +1224,18 @@ function IterativeSolversJL_IDRS end
 
 """
 ```julia
-IterativeSolversJL_BICGSTAB(args...; Pl = nothing, Pr = nothing, kwargs...)
+IterativeSolversJL_BICGSTAB(args...; kwargs...)
 ```
 
-A wrapper over the IterativeSolvers.jl BICGSTAB.
+A wrapper over the IterativeSolvers.jl BiCGStab(l) (`IterativeSolvers.bicgstabl_iterator!`)
+for general square systems. It is
+`IterativeSolversJL(args...; generate_iterator = IterativeSolvers.bicgstabl_iterator!, kwargs...)`.
+The first positional argument, if given, is the BiCGStab(l) parameter `l`
+(IterativeSolvers' default is `2`). The keyword arguments are those of
+`IterativeSolversJL`; `maxiters` is mapped to `max_mv_products = 2 * maxiters`, and
+remaining keywords (for example `initial_zero`) are forwarded to `bicgstabl_iterator!`.
+Only left preconditioning is supported: `Pl` comes from `precs` or from `init`/`solve`
+(not from a constructor keyword), and a right preconditioner is dropped.
 
 !!! note
 
@@ -956,10 +1245,17 @@ function IterativeSolversJL_BICGSTAB end
 
 """
 ```julia
-IterativeSolversJL_MINRES(args...; Pl = nothing, Pr = nothing, kwargs...)
+IterativeSolversJL_MINRES(args...; kwargs...)
 ```
 
-A wrapper over the IterativeSolvers.jl MINRES.
+A wrapper over the IterativeSolvers.jl MINRES (`IterativeSolvers.minres_iterable!`) for
+symmetric (Hermitian) indefinite systems. It is
+`IterativeSolversJL(args...; generate_iterator = IterativeSolvers.minres_iterable!, kwargs...)`.
+`args...` are passed positionally to `minres_iterable!`, which takes none, so leave
+them empty. The keyword arguments are those of `IterativeSolversJL`; remaining keywords
+(for example `skew_hermitian`, `initially_zero`) are forwarded to `minres_iterable!`.
+This iterator accepts no preconditioner at all: any `Pl`/`Pr`, whether from `precs` or
+from `init`/`solve`, is silently ignored.
 
 !!! note
 
@@ -980,16 +1276,27 @@ including OpenMP, CUDA, HIP, and SYCL, making it suitable for both CPU and GPU c
 
     Using this solver requires adding the package Ginkgo.jl, i.e. `using Ginkgo`
 
+## Positional Arguments
+
+  - `args...`: stored on the algorithm; not currently forwarded to Ginkgo.
+
 ## Keyword Arguments
 
   - `KrylovAlg`: The Ginkgo solver to use. Supported values:
-    - `:gmres` (default): GMRES — for general non-symmetric systems
-      (not yet exposed by Ginkgo.jl v1; use `GinkgoJL_CG()` in the meantime)
-    - `:cg`: Conjugate Gradient — for symmetric positive definite systems only
-  - `executor`: The Ginkgo backend executor. Options:
+    - `:gmres` (default): GMRES, for general non-symmetric systems
+      (not yet exposed by Ginkgo.jl v1, so this errors at solve time; use
+      `GinkgoJL_CG()` in the meantime)
+    - `:cg`: Conjugate Gradient, for symmetric positive definite systems only
+  - `executor`: The Ginkgo backend executor, passed to `Ginkgo.create`. Options:
     - `:omp` (default): OpenMP CPU executor
     - `:cuda`: NVIDIA GPU executor
     - `:reference`: Reference (single-threaded) executor
+  - `kwargs...`: stored on the algorithm; not currently forwarded to Ginkgo, so extra
+    solver options passed here have no effect.
+
+Each solve rebuilds Ginkgo's CSR matrix and dense vectors from the cache and calls the
+Ginkgo solver with `maxiters` and `reltol` from the cache. `abstol` and any `Pl`/`Pr`
+preconditioners are not used.
 
 !!! warning
 
@@ -1023,7 +1330,20 @@ needs_concrete_A(::GinkgoJL) = true
 GinkgoJL_CG(args...; executor = :omp, kwargs...)
 ```
 
-A CG solver via Ginkgo.jl for symmetric positive definite systems.
+A CG solver via Ginkgo.jl for symmetric positive definite systems. It is
+`GinkgoJL(args...; KrylovAlg = :cg, executor, kwargs...)`; see `GinkgoJL` for the full
+description.
+
+## Keyword Arguments
+
+  - `executor`: The Ginkgo backend executor: `:omp` (OpenMP CPU), `:cuda` (NVIDIA GPU)
+    or `:reference` (single-threaded). Defaults to `:omp`.
+  - `kwargs...`: stored on the algorithm; not currently forwarded to Ginkgo. Likewise
+    `args...` are stored and unused.
+
+The solve uses `maxiters` and `reltol` from the cache; `abstol` and preconditioners are
+not used. Ginkgo.jl currently only supports `Float32` with `Int32` indices, so the
+matrix and vectors are converted to `Float32` on every solve.
 
 !!! note
 
@@ -1036,7 +1356,19 @@ function GinkgoJL_CG end
 GinkgoJL_GMRES(args...; executor = :omp, kwargs...)
 ```
 
-A GMRES solver via Ginkgo.jl for general non-symmetric systems.
+A GMRES solver via Ginkgo.jl for general non-symmetric systems. It is
+`GinkgoJL(args...; KrylovAlg = :gmres, executor, kwargs...)`; see `GinkgoJL` for the
+full description.
+
+## Keyword Arguments
+
+  - `executor`: The Ginkgo backend executor: `:omp` (OpenMP CPU), `:cuda` (NVIDIA GPU)
+    or `:reference` (single-threaded). Defaults to `:omp`.
+  - `kwargs...`: stored on the algorithm; not currently forwarded to Ginkgo. Likewise
+    `args...` are stored and unused.
+
+Once available, the solve will use `maxiters` and `reltol` from the cache like
+`GinkgoJL_CG`, with the same `Float32`/`Int32` conversion of the inputs.
 
 !!! note
 
@@ -1047,18 +1379,31 @@ A GMRES solver via Ginkgo.jl for general non-symmetric systems.
 function GinkgoJL_GMRES end
 
 """
-    MetalLUFactorization()
+    MetalLUFactorization(; throwerror = true, residualsafety = false)
 
-A wrapper over Apple's Metal GPU library for LU factorization. Direct calls to Metal
-in a way that pre-allocates workspace to avoid allocations and automatically offloads
-to the GPU. This solver is optimized for Metal-capable Apple Silicon Macs.
+A wrapper over Apple's Metal GPU library for LU factorization. On each fresh
+factorization the dense CPU matrix is copied to an `MtlArray` and factored on the GPU
+with Metal's `lu`; the resulting factors and pivots are copied back to the host, and
+the back-solve for each right-hand side then runs on the CPU with `ldiv!`. Only the
+factorization is offloaded, and the GPU array is allocated per factorization. This
+solver targets Metal-capable Apple Silicon Macs.
+
+## Keyword Arguments
+
+  - `throwerror`: whether to throw an error at construction when not on an Apple
+    platform or when the Metal extension is not loaded. Defaults to `true`.
+  - `residualsafety`: intended to enable the post-solve residual check described for
+    `LUFactorization`. Defaults to `false`. That check lives in the generic
+    factorization `solve!`, which the Metal extension replaces with its own `solve!` for
+    this algorithm, so the flag currently has no effect here.
 
 ## Requirements
-Using this solver requires that Metal.jl is loaded: `using Metal`
+Using this solver requires that Metal.jl is loaded: `using Metal`. The constructor also
+errors on any non-Apple platform, even with Metal.jl loaded, unless
+`throwerror = false`.
 
 ## Performance Notes
-- Most efficient for large dense matrices where GPU acceleration benefits outweigh transfer costs
-- Automatically manages GPU memory and transfers
+- Most efficient for large dense matrices where GPU acceleration of the factorization outweighs transfer costs
 - Particularly effective on Apple Silicon Macs with unified memory
 
 ## Example
@@ -1089,11 +1434,17 @@ struct MetalLUFactorization <: AbstractFactorization
 end
 
 """
-    MetalOffload32MixedLUFactorization()
+    MetalOffload32MixedLUFactorization(; throwerror = true)
 
 A mixed precision Metal GPU-accelerated LU factorization that converts matrices to Float32
-before offloading to Metal GPU for factorization, then converts back for the solve.
-This can provide speedups on Apple Silicon when reduced precision is acceptable.
+(ComplexF32 for complex inputs) before offloading to Metal GPU for factorization, then
+converts back for the solve. This can provide speedups on Apple Silicon when reduced
+precision is acceptable.
+
+## Keyword Arguments
+
+  - `throwerror`: whether to throw an error at construction when not on an Apple
+    platform or when the Metal extension is not loaded. Defaults to `true`.
 
 ## Performance Notes
 - Converts Float64 matrices to Float32 for GPU factorization
@@ -1102,7 +1453,8 @@ This can provide speedups on Apple Silicon when reduced precision is acceptable.
 - May have reduced accuracy compared to full precision methods
 
 ## Requirements
-Using this solver requires that Metal.jl is loaded: `using Metal`
+Using this solver requires that Metal.jl is loaded: `using Metal`, and an Apple
+platform.
 
 ## Example
 ```julia
@@ -1161,6 +1513,56 @@ struct BLISLUFactorization <: AbstractFactorization
         else
             return new(residualsafety)
         end
+    end
+end
+
+"""
+    AMGXPreconditioner(A; config = nothing)
+
+An algebraic multigrid preconditioner for a GPU matrix, backed by
+[AMGX.jl](https://github.com/JuliaGPU/AMGX.jl). Requires `using AMGX`.
+
+AMGX is a solver in its own right, but it is most useful here as the preconditioner
+of a Krylov method, which is what the `precs` callback is for:
+
+```julia
+using LinearSolve, CUDA, AMGX
+alg = KrylovJL_GMRES(precs = (A, p) -> (AMGXPreconditioner(A), I))
+sol = solve(LinearProblem(A_gpu_csr, b_gpu), alg)
+```
+
+`config` takes a `Dict{String, String}` of AMGX configuration entries, and defaults
+to a classical AMG cycle used as a single-pass preconditioner. `A` must be a
+`CuSparseMatrixCSR`, which is the layout AMGX uploads from.
+
+The AMGX resources are freed by a finalizer, so the preconditioner can be left to
+the garbage collector.
+"""
+mutable struct AMGXPreconditioner{C, R, M, S, V}
+    config::C
+    resources::R
+    matrix::M
+    solver::S
+    xvec::V
+    bvec::V
+    n::Int
+    closed::Bool
+
+    function AMGXPreconditioner(A; config = nothing)
+        ext = Base.get_extension(@__MODULE__, :LinearSolveAMGXExt)
+        if ext === nothing
+            error("AMGXPreconditioner requires that AMGX is loaded, i.e. `using AMGX`")
+        end
+        return ext.build_amgx_preconditioner(A, config)
+    end
+
+    # The inner constructor above hides the default one, so the extension needs a way
+    # to build the struct once it holds the AMGX objects. The types are AMGX's, which
+    # only exist once the extension is loaded, hence the parameters.
+    global function _new_amgx_preconditioner(
+            cfg::C, res::R, mat::M, solver::S, xv::V, bv::V, n
+        ) where {C, R, M, S, V}
+        return new{C, R, M, S, V}(cfg, res, mat, solver, xv, bv, n, false)
     end
 end
 
@@ -1270,7 +1672,8 @@ sol = solve(prob, alg)
 struct OpenBLAS32MixedLUFactorization <: AbstractDenseFactorization end
 
 """
-    RF32MixedLUFactorization{P, T}(; pivot = Val(true), thread = Val(true))
+    RF32MixedLUFactorization(; pivot = Val(true), thread = Val(true), throwerror = true)
+    RF32MixedLUFactorization(pivot::Val, thread::Val; throwerror = true)
 
 A mixed precision LU factorization using RecursiveFactorization.jl that performs
 factorization in Float32 precision while maintaining Float64 interface. This combines
@@ -1286,6 +1689,7 @@ for additional performance gains.
   at the cost of numerical stability.
 - `thread = Val(true)`: Enable multi-threading. Set to `Val{false}` for single-threaded
   execution.
+- `throwerror = true`: Whether to throw an error if RecursiveFactorization.jl is not loaded.
 
 ## Performance Notes
 - Converts Float64 matrices to Float32 for factorization
@@ -1323,7 +1727,11 @@ end
     AlgebraicMultigridJL(args...; kwargs...)
 
 A wrapper for [AlgebraicMultigrid.jl](https://github.com/JuliaLinearAlgebra/AlgebraicMultigrid.jl)
-solvers.
+solvers. The AMG hierarchy is built with `SciMLBase.init(amg_alg, A, b; kwargs...)` on
+each fresh `A` and then used as a standalone iterative solver via `solve!`. It is meant
+for square sparse systems of the kind algebraic multigrid handles well, typically
+symmetric positive definite or M-matrix-like discretizations of elliptic PDEs; a
+non-square `A` fails an assertion at `init`.
 
 ## Positional Arguments
 
@@ -1333,6 +1741,11 @@ defaults to `AlgebraicMultigrid.RugeStubenAMG()`.
 ## Keyword Arguments
 
 All keyword arguments are forwarded to the AMG hierarchy constructor.
+
+Only `reltol` and `maxiters` from the cache are used (as `reltol` and `maxiter` of the
+AMG `solve!`); `abstol` and any `Pl`/`Pr` preconditioners are not used. The returned
+solution always reports `ReturnCode.Success`, so check the residual yourself if
+convergence matters.
 
 ## Example
 

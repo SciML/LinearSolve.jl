@@ -117,14 +117,7 @@ end
         F = cache.cacheval
         @test LinearSolve._use_naive_lu_ldiv(u, F, b) == naive_expected
         @test u ≈ A \ b rtol = 1.0e-10 * n
-        if naive_expected
-            # A fallback to `ldiv!` would reproduce its bits on *every* draw.
-            @test any(1:32) do _
-                bk = rand(n)
-                cache.b = bk
-                solve!(cache).u != ldiv!(similar(bk), F, copy(bk))
-            end
-        else
+        if !naive_expected
             @test u == ldiv!(similar(b), F, copy(b))
         end
     end

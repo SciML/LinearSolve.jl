@@ -70,6 +70,7 @@ else
             @time @safetestset "LU Refactorization Reuse" include("Core/lu_refactorization.jl")
             @time @safetestset "Direct BLAS Refactorization Reuse" include("Core/direct_blas_refactorization.jl")
             @time @safetestset "Lightweight Solution (no cache)" include("Core/lightweight_solution.jl")
+            @time @safetestset "LHL Factorization" include("Core/lhl.jl")
             @time @safetestset "Return codes" include("Core/retcodes.jl")
             @time @safetestset "Re-solve" include("Core/resolve.jl")
             @time @safetestset "SupernodalLU internals" include("Core/supernodal_lu.jl")

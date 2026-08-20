@@ -1,4 +1,4 @@
-# Getting Started with Solving Eigenvalue Problems in Julia
+# [Getting Started with Solving Eigenvalue Problems in Julia](@id eigenvalue_tutorial)
 
 An eigenvalue problem $$Av = \lambda v$$ (or, generalized, $$Av = \lambda Bv$$) is
 specified by defining an `EigenvalueProblem`. As with `LinearProblem`, the same
@@ -25,7 +25,7 @@ decomposition.
 
 For large problems, computing every eigenpair is wasteful when only a handful are
 needed. `num_eigenpairs` controls how many eigenpairs are returned, and `eigentarget`
-(an [`EigenvalueTarget`](https://docs.sciml.ai/SciMLBase/stable/interfaces/EigenvalueProblem/)) controls which part of the spectrum they come from:
+(an [`EigenvalueTarget`](@ref eigenvalue_problem)) controls which part of the spectrum they come from:
 
 ```@example eigsys1
 prob = LS.EigenvalueProblem(

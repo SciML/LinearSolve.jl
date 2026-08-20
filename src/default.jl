@@ -7,7 +7,7 @@ update_tolerances_internal!(cache, ::DefaultLinearSolver, abstol, reltol) = noth
 
 mutable struct DefaultLinearSolverInit{
         T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12,
-        T13, T14, T15, T16, T17, T18, T19, T20, T21, T22, T23, T24, T25,
+        T13, T14, T15, T16, T17, T18, T19, T20, T21, T22, T23, T24, T25, T26,
         TA, Tb, TR,
     }
     LUFactorization::T1
@@ -35,6 +35,7 @@ mutable struct DefaultLinearSolverInit{
     CudaOffloadLUFactorization::T23
     MetalLUFactorization::T24
     SparseColumnPivotedQRFactorization::T25
+    LHLFactorization::T26
     A_backup::TA  # backup of cache.A for restoring after in-place LU and QR fallback
     residual_buf::Tb  # pre-allocated buffer for post-solve residual check (same size/type as b)
     a_backup_synced::Bool  # true if A_backup content matches cache.A (before LU modifies it)
@@ -205,6 +206,55 @@ end
 function defaultalg(A::Hermitian, b, ::OperatorAssumptions{Bool})
     return DefaultLinearSolver(DefaultAlgorithmChoice.CholeskyFactorization)
 end
+
+"""
+    LinearSolve.LHL_DEFAULT_MIN_SIZE
+
+Smallest `n` at which `defaultalg` prefers `LHLFactorization` for a split `WOperator`.
+
+Measured, not derived. Costing one γ-cycle — a re-shift plus the ~14 solves it serves, with
+the reduction amortized over the ~55 γ a Jacobian serves, both ratios taken from
+instrumented BDF runs — against a fresh LU plus its solves, the default `refine = 1`
+crosses at `n ≈ 16` and reaches a 1.4× margin by `n = 32`; `refine = 0` wins from `n = 4`.
+
+That model is per-operation. End to end it is optimistic near the cutoff, because a real
+problem need not hit those two ratios: measured on stiff ODE runs, `refine = 1` is roughly
+break-even between `n = 32` and `n = 40` (0.98×–1.47×) and only pulls clear above
+`n ≈ 100`. The cutoff is therefore where the algorithm stops *losing*, not where it starts
+winning; the win grows with `n`, reaching 2–5× by `n = 800`.
+"""
+const LHL_DEFAULT_MIN_SIZE = 32
+
+# A `WOperator` holds `J` and `gamma` apart, which is the statement that the shift will
+# move while `J` stays put. When its Jacobian is a dense matrix, the algorithm that
+# exploits that split is the right default; a matrix-free `J` still wants Krylov.
+# `defaultalg` and the cacheval initializer must agree exactly: if the slot is selected
+# but left uninitialized the solve fails, and if it is initialized but never selected the
+# buffers are wasted. Both ask here.
+function _lhl_defaultable(A::WOperator, assump::OperatorAssumptions)
+    # Only a plain dense `J`. An operator `J` — a `MatrixOperator` in particular — is
+    # updated in place by `update_coefficients!`, which moves the numbers while leaving
+    # both the object identity and `jac_stale` untouched, so the reduction cannot tell it
+    # went stale and would silently answer with the previous Jacobian.
+    return assump.issq && A.J isa DenseMatrix && size(A, 1) >= LHL_DEFAULT_MIN_SIZE &&
+        _lhl_scalar_massmatrix(A.mass_matrix)
+end
+_lhl_defaultable(A, assump) = false
+
+function defaultalg(A::WOperator, b, assump::OperatorAssumptions{Bool})
+    if _lhl_defaultable(A, assump)
+        # Refinement is the right default for a bare linear solve; a caller running an
+        # outer correction loop should ask for `LHLFactorization(refine = 0)`.
+        return DefaultLinearSolver(DefaultAlgorithmChoice.LHLFactorization)
+    end
+    # Everything else — a matrix-free Jacobian, a general mass matrix, or a problem too
+    # small to pay for the reduction — keeps whatever the operator path already chose.
+    return @invoke defaultalg(A::SciMLOperators.AbstractSciMLOperator, b, assump)
+end
+
+_lhl_scalar_massmatrix(::UniformScaling) = true
+_lhl_scalar_massmatrix(::Number) = true
+_lhl_scalar_massmatrix(::Any) = false
 
 function defaultalg(A::Symmetric{<:Number, <:Array}, b, ::OperatorAssumptions{Bool})
     return DefaultLinearSolver(DefaultAlgorithmChoice.BunchKaufmanFactorization)
@@ -479,6 +529,8 @@ function algchoice_to_alg(alg::Symbol)
         PureKLUFactorization()
     elseif alg === :SupernodalLUFactorization
         SupernodalLUFactorization()
+    elseif alg === :LHLFactorization
+        LHLFactorization()
     elseif alg === :KrylovJL_GMRES
         KrylovJL_GMRES()
     elseif alg === :GenericLUFactorization
@@ -583,7 +635,20 @@ end
         A_original
     )
     caches = map(first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))) do alg
-        if alg === :KrylovJL_GMRES || alg === :KrylovJL_CRAIGMR || alg === :KrylovJL_LSMR
+        if alg === :LHLFactorization
+            # Three n×n buffers, wanted only by the split form. Every other `A` — which is
+            # nearly every `A` — would pay for them and never use the slot.
+            quote
+                if _lhl_defaultable(A, assump)
+                    init_cacheval(
+                        $(algchoice_to_alg(alg)), A, b, u, Pl, Pr, maxiters, abstol,
+                        reltol, verbose, assump
+                    )
+                else
+                    nothing
+                end
+            end
+        elseif alg === :KrylovJL_GMRES || alg === :KrylovJL_CRAIGMR || alg === :KrylovJL_LSMR
             quote
                 if A isa DenseMatrix || issparsematrixcsc(A)
                     nothing
@@ -964,13 +1029,15 @@ function _algchoice_to_alg_with_safety(alg::Symbol)
     end
 end
 
-"""
-if alg.alg === DefaultAlgorithmChoice.LUFactorization
-SciMLBase.solve!(cache, LUFactorization(), args...; kwargs...))
-else
-...
-end
-"""
+# Generated body has the shape
+#
+#     if alg.alg === DefaultAlgorithmChoice.LUFactorization
+#         SciMLBase.solve!(cache, LUFactorization(), args...; kwargs...)
+#     elseif ...
+#     end
+#
+# with one branch per DefaultAlgorithmChoice, so each branch calls solve! on a
+# concrete algorithm type instead of going through a Symbol-to-algorithm lookup.
 @generated function SciMLBase.solve!(
         cache::LinearCache, alg::DefaultLinearSolver,
         args...;

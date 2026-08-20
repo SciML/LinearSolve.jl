@@ -266,15 +266,18 @@ end
 ## LU Factorizations
 
 """
-`LUFactorization(pivot=LinearAlgebra.RowMaximum())`
+    LUFactorization(; pivot = LinearAlgebra.RowMaximum(), reuse_symbolic = true,
+                    check_pattern = true, residualsafety = false)
 
 Julia's built in `lu`. Equivalent to calling `lu!(A)`
 
   - On dense matrices, this uses the current BLAS implementation of the user's computer,
     which by default is OpenBLAS but will use MKL if the user does `using MKL` in their
     system.
-  - On sparse matrices, this will use UMFPACK from SparseArrays. Note that this will not
-    cache the symbolic factorization.
+  - On sparse matrices, this will use UMFPACK from SparseArrays. With the default
+    `reuse_symbolic = true` the symbolic factorization is cached and reused across
+    refactorizations (via `lu!` on the cached factorization) whenever the sparsity pattern
+    is unchanged.
   - On CuMatrix, it will use a CUDA-accelerated LU from CuSolver.
   - On BandedMatrix and BlockBandedMatrix, it will use a banded LU.
 
@@ -284,10 +287,21 @@ triangular sweeps as `GenericLUFactorization`, which beat `getrs!`'s call and bl
 overhead at those sizes; larger vectors and matrix right-hand sides use `ldiv!`
 (LAPACK `getrs!`).
 
-## Positional Arguments
+## Keyword Arguments
 
-  - pivot: The choice of pivoting. Defaults to `LinearAlgebra.RowMaximum()`. The other choice is
-    `LinearAlgebra.NoPivot()`.
+  - `pivot`: The choice of pivoting. Defaults to `LinearAlgebra.RowMaximum()`. The other choice is
+    `LinearAlgebra.NoPivot()`. Only the keyword form changes the pivoting: the legacy
+    positional method `LUFactorization(pivot)` is kept for compatibility but ignores its
+    argument and always constructs the `RowMaximum()` algorithm.
+  - `reuse_symbolic`: for sparse matrices, reuse the cached UMFPACK symbolic factorization
+    across solves when the sparsity pattern is unchanged. Defaults to `true`.
+  - `check_pattern`: for sparse matrices, check whether the sparsity pattern changed before
+    reusing the symbolic factorization, recomputing it from scratch if it did. Set to
+    `false` to skip the check (this may error if the pattern does change). Defaults to
+    `true`.
+  - `residualsafety`: after each fresh factorization, compute the residual `A*u - b`
+    against a copy of the original `A` and return `ReturnCode.APosterioriSafetyFailure`
+    if its norm exceeds `abstol + reltol * norm(b)`. Defaults to `false`.
 """
 Base.@kwdef struct LUFactorization{P} <: AbstractDenseFactorization
     pivot::P = LinearAlgebra.RowMaximum()
@@ -300,7 +314,7 @@ end
 LUFactorization(pivot) = LUFactorization(; pivot = RowMaximum())
 
 """
-`GenericLUFactorization(pivot=LinearAlgebra.RowMaximum())`
+    GenericLUFactorization(pivot = LinearAlgebra.RowMaximum(); residualsafety = false)
 
 Julia's built in generic LU factorization. Equivalent to calling LinearAlgebra.generic_lufact!.
 Supports arbitrary number types. Has low overhead and is good for small matrices.
@@ -330,8 +344,14 @@ default algorithm instead.
 
 ## Positional Arguments
 
-  - pivot: The choice of pivoting. Defaults to `LinearAlgebra.RowMaximum()`. The other choice is
+  - `pivot`: The choice of pivoting. Defaults to `LinearAlgebra.RowMaximum()`. The other choice is
     `LinearAlgebra.NoPivot()`.
+
+## Keyword Arguments
+
+  - `residualsafety`: after each fresh factorization, compute the residual `A*u - b`
+    against a copy of the original `A` and return `ReturnCode.APosterioriSafetyFailure`
+    if its norm exceeds `abstol + reltol * norm(b)`. Defaults to `false`.
 """
 struct GenericLUFactorization{P} <: AbstractDenseFactorization
     pivot::P
@@ -622,6 +642,7 @@ end
 
 function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
     A = cache.A
+    _check_woperator_convertible(alg, A)
     A = convert(AbstractMatrix, A)
     check_safety = alg.residualsafety && cache.isfresh
     needs_backup = check_safety ||
@@ -836,6 +857,50 @@ function init_cacheval(
     return nothing
 end
 
+# An out-of-place `WOperator`, or one over an operator Jacobian, rebuilds its concrete form
+# on `convert` and so can be factorized like any matrix; the operator fallback above would
+# leave the cacheval `nothing` and `solve!` would fail on the first assignment into it.
+function init_cacheval(
+        alg::LUFactorization,
+        A::WOperator, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions
+    )
+    (SciMLOperators.isconvertible(A) && _woperator_convert_rebuilds(A)) || return nothing
+    return ArrayInterface.lu_instance(convert(AbstractMatrix, A))
+end
+
+"""
+    _woperator_convert_rebuilds(W) -> Bool
+
+Whether `convert(AbstractMatrix, W)` rebuilds the concrete form from the current `gamma`
+and `J`, rather than handing back a buffer someone else maintains.
+
+For an in-place `WOperator` over a plain-matrix Jacobian it does not: `_concrete_form` is
+written by the operator's owner (OrdinaryDiffEq's `jacobian2W!`), so it is stale the moment
+`gamma` moves or `J` is written in place, and factorizing it gives a confidently wrong
+answer. Every other shape rebuilds and is safe.
+"""
+_woperator_convert_rebuilds(W::WOperator{true}) = W.J isa AbstractSciMLOperator
+_woperator_convert_rebuilds(::WOperator) = true
+
+"""
+    _check_woperator_convertible(alg, A)
+
+Guard a concrete factorization against a `WOperator` whose conversion is not current.
+
+Checked at `solve!` rather than `init_cacheval` on purpose: the default algorithm builds a
+cacheval for every slot up front, so refusing there would break problems that never reach
+this factorization at all.
+"""
+_check_woperator_convertible(alg, A) = nothing
+@noinline function _check_woperator_convertible(alg, W::WOperator)
+    _woperator_convert_rebuilds(W) || throw(
+        ArgumentError("$(nameof(typeof(alg))) cannot safely factorize an in-place WOperator over a plain-matrix Jacobian: its concrete form is maintained by the operator's owner, not rebuilt on conversion, so it is stale after any change of `gamma` or in-place write to `J`. Use `LHLFactorization`, which consumes the split form directly, or assemble the matrix yourself.")
+    )
+    return nothing
+end
+
 function init_cacheval(
         alg::GenericLUFactorization,
         A::AbstractSciMLOperator, b, u, Pl, Pr,
@@ -932,16 +997,32 @@ end
 ## QRFactorization
 
 """
-`QRFactorization(pivot=LinearAlgebra.NoPivot(),blocksize=16)`
+    QRFactorization(inplace = true)
+    QRFactorization(pivot::LinearAlgebra.PivotingStrategy, inplace = true)
 
-Julia's built in `qr`. Equivalent to calling `qr!(A)`.
+Julia's built in `qr`. Equivalent to calling `qr!(A, pivot)` (or `qr(A, pivot)` when
+`inplace = false`).
 
   - On dense matrices, this uses the current BLAS implementation of the user's computer
     which by default is OpenBLAS but will use MKL if the user does `using MKL` in their
     system.
-  - On sparse matrices, this will use SPQR from SparseArrays
-  - On CuMatrix, it will use a CUDA-accelerated QR from CuSolver.
+  - On sparse matrices, this will use SPQR from SparseArrays (the pivoting strategy is
+    not passed through; SPQR chooses its own column ordering).
+  - On CuMatrix, it will use a CUDA-accelerated QR from CuSolver (again via the plain
+    `qr(A)` form).
   - On BandedMatrix and BlockBandedMatrix, it will use a banded QR.
+
+## Positional Arguments
+
+  - `pivot`: The choice of pivoting. Defaults to `LinearAlgebra.NoPivot()`; the other
+    choice is `LinearAlgebra.ColumnNorm()` for a rank-revealing column-pivoted QR.
+  - `inplace`: whether to factorize with `qr!`, overwriting `A`, rather than the
+    copying `qr`. Only affects mutable CPU matrices; `Symmetric` wrappers, sparse CSC,
+    GPU arrays and immutable matrices always use the out-of-place `qr`. Defaults to
+    `true`.
+
+The struct also carries a `blocksize` field (set to `16` by both constructors) that is
+not read by any solver path; it is kept for structural compatibility only.
 
 With the default `NoPivot()` this is not rank-revealing, so it cannot solve a
 rank-deficient (least-squares) system: it reports `ReturnCode.Failure` when a
@@ -1043,16 +1124,34 @@ end
 ## CholeskyFactorization
 
 """
-`CholeskyFactorization(; pivot = nothing, tol = 0.0, shift = 0.0, perm = nothing)`
+    CholeskyFactorization(; pivot = nothing, tol = 0.0, shift = 0.0, perm = nothing)
 
-Julia's built in `cholesky`. Equivalent to calling `cholesky!(A)`.
+Julia's built in `cholesky`. Equivalent to calling `cholesky!(A, pivot)` on dense
+matrices and `cholesky(A; shift, perm)` (CHOLMOD) on sparse CSC matrices; GPU arrays
+use `cholesky(A)`.
+
+The matrix must be symmetric (or Hermitian) positive definite. Failures such as an
+indefinite matrix are not thrown (the factorization runs with `check = false`) but are
+reported through the solution's `retcode` (`ReturnCode.Failure`). For such matrices
+this is roughly twice as fast as an LU factorization and uses half the storage, so it is
+the preferred direct method whenever positive definiteness is known; use
+`LUFactorization` for general matrices and `BunchKaufmanFactorization` or
+`LDLtFactorization` for symmetric indefinite ones.
 
 ## Keyword Arguments
 
-  - pivot: defaluts to NoPivot, can also be RowMaximum.
-  - tol: the tol argument in CHOLMOD. Only used for sparse matrices.
-  - shift: the shift argument in CHOLMOD. Only used for sparse matrices.
-  - perm: the perm argument in CHOLMOD. Only used for sparse matrices.
+  - `pivot`: the pivoting strategy for dense matrices. `nothing` (the default) means
+    `LinearAlgebra.NoPivot()`; `LinearAlgebra.RowMaximum()` selects the pivoted
+    (rank-revealing) Cholesky. Not used for sparse or GPU matrices.
+  - `tol`: accepted for backwards compatibility but currently not stored: the
+    constructor always sets the internal tolerance to `16`, which is passed as `tol` to
+    `cholesky!(A, RowMaximum(); tol)` on the dense pivoted path only. It is not
+    forwarded to the sparse CHOLMOD factorization.
+  - `shift`: the `shift` argument of CHOLMOD's `cholesky` (a multiple of the identity
+    added before factorizing). Only used for sparse matrices. Defaults to `0.0`.
+  - `perm`: the `perm` argument of CHOLMOD's `cholesky` (a user-supplied fill-reducing
+    permutation). Only used for sparse matrices. Defaults to `nothing` (CHOLMOD's own
+    ordering).
 """
 struct CholeskyFactorization{P, P2} <: AbstractDenseFactorization
     pivot::P
@@ -1177,12 +1276,29 @@ end
 ## SVDFactorization
 
 """
-    SVDFactorization(full=false, alg=nothing)
-Julia's built-in `svd`. Equivalent to `svd!(A)`.
+    SVDFactorization()
+    SVDFactorization(full::Bool, alg)
 
-- On dense matrices, this uses the current BLAS implementation.
-- When `alg = nothing`, the backend default SVD algorithm is used
-  (required for CUDA compatibility).
+Julia's built-in `svd`. Equivalent to `svd!(A; full, alg)` (or the copying `svd` on
+immutable matrices). Solving with the SVD is the most robust of the dense direct
+methods, handling rank-deficient and ill-conditioned (least-squares) systems by
+minimum-norm pseudo-inverse solves, but it is also the slowest; prefer LU or QR when
+the system is well-posed.
+
+  - On dense matrices, this uses the current BLAS/LAPACK implementation.
+  - When `alg = nothing`, the backend default SVD algorithm is used
+    (required for CUDA compatibility).
+
+Only the zero-argument and the two-positional-argument forms exist; there are no
+defaults for a single positional argument.
+
+## Positional Arguments
+
+  - `full`: whether to compute the full SVD (`U` and `V` square) rather than the thin
+    SVD. Passed to `svd!` as `full`. Defaults to `false`.
+  - `alg`: the LAPACK SVD algorithm, `LinearAlgebra.DivideAndConquer()` or
+    `LinearAlgebra.QRIteration()`, or `nothing` to let the backend choose. Defaults to
+    `nothing`.
 """
 struct SVDFactorization{A} <: AbstractDenseFactorization
     full::Bool
@@ -1814,14 +1930,14 @@ end
 A pure-Julia port of SuiteSparse's KLU sparse LU solver, provided by
 [PureKLU.jl](https://github.com/SciML/PureKLU.jl). It has no SuiteSparse binary
 dependency and supports generic element types in addition to `Float64`/`ComplexF64`.
-Loading PureKLU (`using PureKLU`) makes this the default sparse LU for "less
-structured" sparse matrices, replacing the SuiteSparse-backed [`KLUFactorization`](@ref)
-in the default polyalgorithm.
+PureKLU is a hard dependency of LinearSolve, so no extra `using` is required, and
+this is the default sparse LU for "less structured" sparse matrices in the default
+polyalgorithm; the SuiteSparse-backed `KLUFactorization` remains available when
+requested explicitly.
 
 !!! note
 
-    `PureKLUFactorization` is only available once the `PureKLU` package is loaded
-    (`using PureKLU`). It mirrors [`KLUFactorization`](@ref): by default the symbolic
+    `PureKLUFactorization` mirrors `KLUFactorization`: by default the symbolic
     factorization is cached. If the sparsity pattern of `A` may change between solves,
     set `reuse_symbolic = false`. To skip the pattern check entirely (which errors if the
     pattern unexpectedly changes), set `check_pattern = false`.
@@ -1912,8 +2028,9 @@ function init_cacheval(
 end
 
 """
-`SupernodalLUFactorization(; reuse_symbolic = true, check_pattern = true, ordering = :amd,
-                            matching = :auto, eps_pivot = 1e-8, threaded = false)`
+    SupernodalLUFactorization(; reuse_symbolic = true, check_pattern = true, ordering = :amd,
+                              matching = :auto, eps_pivot = 1e-8, threaded = false,
+                              dense_alg = nothing)
 
 A pure-Julia implementation of the supernodal left–right-looking sparse LU
 method of O. Schenk and K. Gärtner (FGCS 20(3), 2004; ETNA 23, 2006),
@@ -1997,9 +2114,9 @@ default polyalgorithm and the fallback when the default sparse LU
   - `reuse_symbolic`: reuse the cached symbolic factorization across solves when
     the sparsity pattern is unchanged. Defaults to `true`.
   - `ordering`: column ordering passed to `SparseColumnPivotedQR.scpqr`
-    (`:default`, `:amd`, `:natural`). LinearSolve loads AMD alongside the sparse
-    extension, so `:default` resolves to AMD ordering (1.5-2x faster factorization
-    than `:natural`). Defaults to `:default`.
+    (`:default`, `:amd`, `:natural`). LinearSolve imports AMD as a hard dependency,
+    so `:default` resolves to AMD ordering (1.5-2x faster factorization than
+    `:natural`). Defaults to `:default`.
 """
 Base.@kwdef struct SparseColumnPivotedQRFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool = true
@@ -2018,11 +2135,11 @@ end
 ## CHOLMODFactorization
 
 """
-`CHOLMODFactorization(; shift = 0.0, perm = nothing)`
+    CHOLMODFactorization(; shift = 0.0, perm = nothing)
 
 A wrapper of CHOLMOD's polyalgorithm, mixing Cholesky factorization and ldlt.
-Tries cholesky for performance and retries ldlt if conditioning causes Cholesky
-to fail.
+Tries `cholesky(A; check = false)` for performance and retries with
+`ldlt!(fact, A; check = false)` if conditioning causes Cholesky to fail.
 
 Only supports sparse matrices.
 
@@ -2034,8 +2151,14 @@ Only supports sparse matrices.
 
 ## Keyword Arguments
 
-  - shift: the shift argument in CHOLMOD.
-  - perm: the perm argument in CHOLMOD
+  - `shift`: intended as the `shift` argument of CHOLMOD's `cholesky`/`ldlt` (a
+    multiple of the identity added before factorizing). Defaults to `0.0`. Currently
+    stored on the algorithm but not forwarded: `solve!` calls CHOLMOD with its default
+    shift, so this keyword has no effect. Use `CholeskyFactorization(shift = ...)` or
+    `LDLtFactorization(shift, perm)` when a shift or ordering must be applied.
+  - `perm`: intended as the `perm` argument of CHOLMOD (a user-supplied fill-reducing
+    permutation). Defaults to `nothing`. Like `shift`, it is currently stored but not
+    forwarded to the factorization calls.
 """
 Base.@kwdef struct CHOLMODFactorization{T} <: AbstractSparseFactorization
     shift::Float64 = 0.0
@@ -2075,11 +2198,12 @@ end
 ## NormalCholeskyFactorization
 
 """
-`NormalCholeskyFactorization(pivot = RowMaximum())`
+    NormalCholeskyFactorization(; pivot = nothing)
 
-A fast factorization which uses a Cholesky factorization on A * A'. Can be much
-faster than LU factorization, but is not as numerically stable and thus should only
-be applied to well-conditioned matrices.
+A fast factorization which solves the normal equations `A' * A * u = A' * b` with a
+Cholesky factorization of `Symmetric(A' * A)`. Can be much faster than LU
+factorization, but squares the condition number of `A` and thus should only be
+applied to well-conditioned matrices.
 
 !!! warning
 
@@ -2088,9 +2212,12 @@ be applied to well-conditioned matrices.
     recommended that the user checks `A*u-b` is approximately zero, as this may be untrue
     even if `sol.retcode === ReturnCode.Success` due to numerical stability issues.
 
-## Positional Arguments
+## Keyword Arguments
 
-  - pivot: Defaults to RowMaximum(), but can be NoPivot()
+  - `pivot`: the pivoting strategy passed to `cholesky` for dense matrices. `nothing`
+    (the default) means `LinearAlgebra.NoPivot()`; `LinearAlgebra.RowMaximum()` selects
+    the pivoted Cholesky. Sparse, GPU and static matrices always use the unpivoted
+    `cholesky`.
 """
 struct NormalCholeskyFactorization{P} <: AbstractDenseFactorization
     pivot::P
@@ -2181,15 +2308,16 @@ end
 ## NormalBunchKaufmanFactorization
 
 """
-`NormalBunchKaufmanFactorization(rook = false)`
+    NormalBunchKaufmanFactorization(; rook = false)
 
-A fast factorization which uses a BunchKaufman factorization on A * A'. Can be much
-faster than LU factorization, but is not as numerically stable and thus should only
-be applied to well-conditioned matrices.
+A fast factorization which solves the normal equations `A' * A * u = A' * b` with a
+Bunch-Kaufman factorization of `Symmetric(A' * A)`. Can be much faster than LU
+factorization, but squares the condition number of `A` and thus should only be
+applied to well-conditioned matrices.
 
-## Positional Arguments
+## Keyword Arguments
 
-  - rook: whether to perform rook pivoting. Defaults to false.
+  - `rook`: whether to perform rook pivoting in `bunchkaufman`. Defaults to `false`.
 """
 struct NormalBunchKaufmanFactorization <: AbstractDenseFactorization
     rook::Bool
@@ -2265,9 +2393,13 @@ end
 ## SparspakFactorization is here since it's MIT licensed, not GPL
 
 """
-`SparspakFactorization(reuse_symbolic = true)`
+    SparspakFactorization(; reuse_symbolic = true, throwerror = true)
 
-This is the translation of the well-known sparse matrix software Sparspak
+A sparse LU factorization using the pure-Julia
+[Sparspak.jl](https://github.com/PetrKryslUCSD/Sparspak.jl) package (`sparspaklu`),
+made available through the `LinearSolveSparspakExt` extension.
+
+Sparspak.jl is the translation of the well-known sparse matrix software Sparspak
 (Waterloo Sparse Matrix Package), solving
 large sparse systems of linear algebraic equations. Sparspak is composed of the
 subroutines from the book "Computer Solution of Large Sparse Positive Definite
@@ -2279,6 +2411,27 @@ from the authors of the Fortran package. The package uses multiple
 dispatch to route around standard BLAS routines in the case e.g. of arbitrary-precision
 floating point numbers or ForwardDiff.Dual.
 This e.g. allows for Automatic Differentiation (AD) of a sparse-matrix solve.
+
+Use it for square sparse CSC systems whose element type is not supported by the
+SuiteSparse (UMFPACK/KLU) solvers, such as `BigFloat` or dual numbers, or as a
+non-GPL alternative to UMFPACK. It is not part of the default polyalgorithm (which
+uses the pure-Julia `PureKLUFactorization` for generic element types), and for
+`Float64`/`ComplexF64` matrices `PureKLUFactorization`, `SupernodalLUFactorization`
+and `UMFPACKFactorization` are usually faster.
+
+## Keyword Arguments
+
+  - `reuse_symbolic`: reuse the cached symbolic factorization (ordering) across
+    refactorizations by calling `sparspaklu!` on the cached object rather than
+    recomputing it with `sparspaklu`. Set to `false` if the sparsity pattern of `A`
+    changes between solves. Defaults to `true`.
+  - `throwerror`: whether to throw an error at construction time if Sparspak.jl is not
+    loaded. Defaults to `true`.
+
+!!! note
+
+    Using this solver requires that the Sparspak.jl package is loaded, i.e.
+    `using Sparspak`.
 """
 struct SparspakFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool
@@ -2294,35 +2447,49 @@ struct SparspakFactorization <: AbstractSparseFactorization
 end
 
 """
-`STRUMPACKFactorization(; use_initial_guess = false, options = String[], kwargs...)`
+    STRUMPACKFactorization(; use_initial_guess = false, options = String[],
+                           compression = nothing, rel_tol = nothing, abs_tol = nothing,
+                           max_rank = nothing, leaf_size = nothing, reordering = nothing,
+                           matching = nothing, throwerror = true)
 
 A sparse direct solver based on
 [STRUMPACK](https://github.com/pghysels/STRUMPACK) via the
 `LinearSolveSTRUMPACKExt` extension.
 
 This wrapper targets the single-node (`MT`) sparse interface and currently supports
-real sparse matrices (`AbstractSparseMatrixCSC{<:AbstractFloat}`), solving in
+square real sparse matrices (`AbstractSparseMatrixCSC{<:AbstractFloat}`), solving in
 `Float64` precision.
 
-Pass STRUMPACK runtime options through `options` to expose advanced functionality.
+## Keyword Arguments
+
+  - `use_initial_guess`: passed as the `use_initial_guess` flag of `STRUMPACK_solve`,
+    so that the current contents of `cache.u` are used as the starting guess for
+    STRUMPACK's iterative refinement / iterative solve. Defaults to `false`.
+  - `options`: STRUMPACK runtime options, given as a flat `Vector{String}` of
+    command-line style tokens where each flag is followed by its value, for example
+    `["--sp_rel_tol", "1e-6", "--sp_compression", "HSS"]`. The tokens are handed to
+    `STRUMPACK_init_mt` as `argv`, so any unexposed or version-specific knob can be set
+    this way. Defaults to `String[]`.
+  - `throwerror`: whether to throw an error at construction time if the STRUMPACK
+    extension (or its shared library) is not available. Defaults to `true`.
 
 Convenience keyword arguments are provided for common low-rank/compression tuning
-and are translated to STRUMPACK-style runtime options:
+and are appended to `options` as STRUMPACK-style runtime options (each defaults to
+`nothing`, meaning "not set"):
 - `compression` -> `--sp_compression`
-- `rel_tol` -> `--sp_rel_tol`
-- `abs_tol` -> `--sp_abs_tol`
-- `max_rank` -> `--sp_max_rank`
-- `leaf_size` -> `--sp_leaf_size`
+- `rel_tol` -> `--sp_rel_tol` (must be non-negative)
+- `abs_tol` -> `--sp_abs_tol` (must be non-negative)
+- `max_rank` -> `--sp_max_rank` (integer, at least 1)
+- `leaf_size` -> `--sp_leaf_size` (integer, at least 1)
 - `reordering` -> `--sp_reordering_method`
-- `matching` -> `--sp_enable_matching`
-
-Any unexposed or version-specific knobs can still be passed through `options`.
+- `matching` -> `--sp_enable_matching` (a `Bool`, written as `1`/`0`)
 
 !!! note
 
-    Using this solver requires:
-    1. `using SparseArrays` (to enable sparse matrix support), and
-    2. loading `STRUMPACK_jll` (for example `import STRUMPACK_jll`).
+    Using this solver requires loading `STRUMPACK_jll` (for example
+    `import STRUMPACK_jll`), which activates the `LinearSolveSTRUMPACKExt` extension.
+    LinearSolve's sparse matrix support is built in and no longer needs a separate
+    extension to be loaded.
 """
 struct STRUMPACKFactorization <: AbstractSparseFactorization
     use_initial_guess::Bool
@@ -2407,15 +2574,37 @@ end
 ## CliqueTreesFactorization is here since it's MIT licensed, not GPL
 
 """
-    CliqueTreesFactorization(
-        alg = nothing,
-        snd = nothing,
-        reuse_symbolic = true,
-    )
+    CliqueTreesFactorization(; alg = nothing, snd = nothing, reuse_symbolic = true,
+                             throwerror = true)
 
-The sparse Cholesky factorization algorithm implemented in CliqueTrees.jl.
-The implementation is pure-Julia and accepts arbitrary numeric types. It is
-somewhat slower than CHOLMOD.
+The sparse Cholesky factorization algorithm implemented in
+[CliqueTrees.jl](https://github.com/AlgebraicJulia/CliqueTrees.jl)
+(`CliqueTrees.Multifrontal.ChordalCholesky`), made available through the
+`LinearSolveCliqueTreesExt` extension. The implementation is pure-Julia and
+accepts arbitrary numeric types. It is somewhat slower than CHOLMOD.
+
+The matrix must be a sparse symmetric positive definite matrix. Use it as a
+CHOLMOD replacement when the element type is not `Float64`/`ComplexF64` (for example
+`BigFloat` or dual numbers), or when a SuiteSparse-free stack is wanted.
+
+## Keyword Arguments
+
+  - `alg`: the elimination (fill-reducing ordering) algorithm option of
+    `ChordalCholesky`, forwarded as its `alg` keyword when not `nothing`. Defaults to
+    `nothing` (CliqueTrees' default ordering).
+  - `snd`: the supernode partition option of `ChordalCholesky`, forwarded as its `snd`
+    keyword when not `nothing`. Defaults to `nothing` (CliqueTrees' default supernodes).
+  - `reuse_symbolic`: reuse the cached symbolic factorization (elimination tree and
+    supernodal structure) across refactorizations, only recomputing the numeric
+    factorization with `cholesky!`. Set to `false` to rebuild the symbolic analysis
+    on every fresh matrix, e.g. when the sparsity pattern changes. Defaults to `true`.
+  - `throwerror`: whether to throw an error at construction time if CliqueTrees.jl is
+    not loaded. Defaults to `true`.
+
+!!! note
+
+    Using this solver requires that the CliqueTrees.jl package is loaded, i.e.
+    `using CliqueTrees`.
 """
 struct CliqueTreesFactorization{A, S} <: AbstractSparseFactorization
     alg::A

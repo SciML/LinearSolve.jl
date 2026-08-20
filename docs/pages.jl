@@ -14,6 +14,7 @@ pages = [
         "tutorials/gpu.md",
         "tutorials/autotune.md",
         "tutorials/eigenvalue.md",
+        "tutorials/shifted_systems.md",
     ],
     "Basics" => Any[
         "basics/LinearProblem.md",

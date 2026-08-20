@@ -3,8 +3,8 @@
 
 The matrix ``A + U C V^{*}``, held in that form rather than assembled.
 
-This is a problem-side type: pass it as the matrix of a `LinearProblem` and solve with
-whichever factorization suits `A`. The solve factorizes `A` once and applies the Woodbury
+This is a problem-side type: pass it as the matrix of a `LinearProblem` and solve with a
+factorization that suits `A`. The solve factorizes `A` once and applies the Woodbury
 identity
 
 ```math
@@ -68,6 +68,14 @@ function Base.getindex(M::LowRankUpdatedMatrix, i::Integer, j::Integer)
     return M.A[i, j] + upd
 end
 
+# Without this, `copy` falls through to `Base.copymutable`, which materializes the wrapper
+# elementwise through `getindex` into a dense `Matrix`. `__init` copies the matrix unless
+# the caller aliases it, so the fallback would assemble the very sum this type exists to
+# avoid, and the solve would never reach the Woodbury path.
+function Base.copy(M::LowRankUpdatedMatrix)
+    return LowRankUpdatedMatrix(copy(M.A), copy(M.U), copy(M.V); C = M.C)
+end
+
 function LinearAlgebra.mul!(y::AbstractVector, M::LowRankUpdatedMatrix, x::AbstractVector)
     mul!(y, M.A, x)
     Vx = M.V' * x
@@ -91,9 +99,15 @@ _lowrank_capacitance(C, VAiU) = lu((C === I ? VAiU + I : inv(C) + VAiU); check =
 # Dispatching on the matrix with a general algorithm would be ambiguous against every
 # `solve!` that dispatches on a specific algorithm with a general matrix, so the supported
 # factorizations are enumerated instead. Each method is then strictly more specific.
+#
+# The correction reaches the base factorization through `do_factorization`, so only the
+# algorithms that implement it can appear here. `GenericLUFactorization`,
+# `UMFPACKFactorization` and `KLUFactorization` route through their own `solve!` instead and
+# would throw a `MethodError`, so they are left out rather than advertised and broken. A
+# sparse `A` is still covered: `LUFactorization` dispatches `lu` to UMFPACK for it.
 const _LOWRANK_ALGS = (
-    LUFactorization, GenericLUFactorization, QRFactorization, CholeskyFactorization,
-    SVDFactorization, BunchKaufmanFactorization, UMFPACKFactorization, KLUFactorization,
+    LUFactorization, QRFactorization, CholeskyFactorization,
+    SVDFactorization, BunchKaufmanFactorization,
 )
 
 for Alg in _LOWRANK_ALGS
@@ -128,6 +142,7 @@ function _lowrank_solve!(cache::LinearCache{<:LowRankUpdatedMatrix}, alg)
         A = cache.alias_A ? M.A : copy(M.A)
         fact = do_factorization(alg, A, cache.b, cache.u)
         if _notsuccessful(fact)
+            @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
             )
@@ -141,6 +156,8 @@ function _lowrank_solve!(cache::LinearCache{<:LowRankUpdatedMatrix}, alg)
 
     cacheval = cache.cacheval
     if !issuccess(cacheval.capfact)
+        # `A` factorized, so the update itself is what made the system singular.
+        @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
         return SciMLBase.build_linear_solution(
             alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
         )

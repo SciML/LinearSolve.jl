@@ -68,14 +68,65 @@ using LinearSolve, LinearAlgebra, SparseArrays, Test, Random
         end
     end
 
-    @testset "an explicit factorization algorithm works" begin
+    # Numerical agreement alone does not show the Woodbury path ran: assembling the sum and
+    # factorizing it densely gives the same answer. `__init` copies the matrix unless the
+    # caller aliases it, and without a `copy` method the wrapper was materialized
+    # elementwise into a dense `Matrix`, so every solve silently took the generic path.
+    @testset "the low-rank path is actually taken" begin
+        A = rand(n, n) + n * I
+        U = rand(n, k)
+        V = rand(n, k)
+        M = LowRankUpdatedMatrix(A, U, V)
+
+        @test copy(M) isa LowRankUpdatedMatrix
+        @test copy(M) ≈ A + U * V'
+
+        cache = init(LinearProblem(M, rand(n)), LUFactorization())
+        @test cache.A isa LowRankUpdatedMatrix
+        solve!(cache)
+        @test cache.cacheval isa LinearSolve.LowRankUpdatedCache
+    end
+
+    # Every algorithm the type advertises has to reach `do_factorization`. Three of the
+    # originally listed ones route through their own `solve!` instead and threw a
+    # `MethodError`, so the list and the behaviour are pinned together here.
+    @testset "every advertised factorization solves" begin
+        spd = (X = rand(n, n); X'X + n * I)
+        sym = (X = rand(n, n); Symmetric(X + X' + n * I))
+        bases = Dict(
+            LUFactorization => rand(n, n) + n * I,
+            QRFactorization => rand(n, n) + n * I,
+            SVDFactorization => rand(n, n) + n * I,
+            CholeskyFactorization => spd,
+            BunchKaufmanFactorization => sym,
+        )
+        @test Set(LinearSolve._LOWRANK_ALGS) == Set(keys(bases))
+
+        for Alg in LinearSolve._LOWRANK_ALGS
+            @testset "$(nameof(Alg))" begin
+                A = bases[Alg]
+                U = rand(n, k)
+                V = rand(n, k)
+                b = rand(n)
+                cache = init(LinearProblem(LowRankUpdatedMatrix(A, U, V), b), Alg())
+                sol = solve!(cache)
+                @test cache.cacheval isa LinearSolve.LowRankUpdatedCache
+                @test sol.u ≈ (Matrix(A) + U * V') \ b rtol = 1.0e-8
+            end
+        end
+    end
+
+    # A matrix-free method needs no factorization at all: `mul!` is enough, so the wrapper
+    # goes straight through without ever being assembled.
+    @testset "a Krylov method consumes the wrapper directly" begin
         A = rand(n, n) + n * I
         U = rand(n, k)
         V = rand(n, k)
         b = rand(n)
         M = LowRankUpdatedMatrix(A, U, V)
-        for alg in (LUFactorization(), QRFactorization())
-            @test solve(LinearProblem(M, b), alg).u ≈ (A + U * V') \ b rtol = 1.0e-9
+        for alg in (KrylovJL_GMRES(), SimpleGMRES())
+            sol = solve(LinearProblem(M, b), alg)
+            @test sol.u ≈ (A + U * V') \ b rtol = 1.0e-6
         end
     end
 
@@ -87,8 +138,11 @@ using LinearSolve, LinearAlgebra, SparseArrays, Test, Random
         u = rand(m)
         v = rand(m)
         b = rand(m)
-        sol = solve(LinearProblem(LowRankUpdatedMatrix(A, u, v), b))
+        cache = init(LinearProblem(LowRankUpdatedMatrix(A, u, v), b))
+        sol = solve!(cache)
         @test sol.u ≈ (Matrix(A) + u * v') \ b rtol = 1.0e-8
+        # The sparse factorization of `A` is what has to survive, not just the answer.
+        @test cache.cacheval.fact isa SparseArrays.UMFPACK.UmfpackLU
     end
 
     # An update that makes the whole matrix singular shows up as a singular capacitance

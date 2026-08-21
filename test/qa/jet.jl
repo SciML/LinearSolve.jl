@@ -1,6 +1,12 @@
 using LinearSolve, ForwardDiff, ForwardDiff, RecursiveFactorization, LinearAlgebra, SparseArrays, Test
 using JET
 
+# Loaded for the extension module, matching test/qa/allocations.jl: without both
+# JLLs the BLIS extension never loads and BLISLUFactorization() throws.
+if Sys.islinux()
+    import LAPACK_jll, blis_jll
+end
+
 # Dense problem setup
 A = rand(4, 4)
 b = rand(4)
@@ -121,7 +127,9 @@ end
     if Sys.isapple() && @isdefined(MetalLUFactorization)
         JET.@test_opt solve(prob, MetalLUFactorization()) broken = true
     end
-    if @isdefined(BLISLUFactorization)
+    # BLISLUFactorization is exported unconditionally, so @isdefined does not
+    # tell us whether it can be constructed; the extension has to be loaded.
+    if Base.get_extension(LinearSolve, :LinearSolveBLISExt) !== nothing
         JET.@test_opt solve(prob, BLISLUFactorization()) broken = true
     end
 end

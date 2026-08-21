@@ -54,6 +54,11 @@ versions = ["lts", "1"]
 runner = "self-hosted"
 num_threads = 2
 
+[Reactant]
+versions = ["1"]
+runner = "self-hosted"
+num_threads = 2
+
 [LinearSolveHYPRE]
 versions = ["lts", "1"]
 runner = "self-hosted"

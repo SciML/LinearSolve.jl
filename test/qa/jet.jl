@@ -121,7 +121,9 @@ end
     if Sys.isapple() && @isdefined(MetalLUFactorization)
         JET.@test_opt solve(prob, MetalLUFactorization()) broken = true
     end
-    if @isdefined(BLISLUFactorization)
+    blis_ext = Base.get_extension(LinearSolve, :LinearSolveBLISExt)
+    @test isnothing(blis_ext)
+    if !isnothing(blis_ext)
         JET.@test_opt solve(prob, BLISLUFactorization()) broken = true
     end
 end

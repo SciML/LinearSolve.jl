@@ -818,6 +818,7 @@ export MUMPSFactorization
 export SuperLUDISTFactorization
 export MKLLUFactorization
 export OpenBLASLUFactorization
+export BLISLUFactorization
 export OpenBLAS32MixedLUFactorization
 export MKL32MixedLUFactorization
 export AppleAccelerateLUFactorization

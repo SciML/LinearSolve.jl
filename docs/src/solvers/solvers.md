@@ -19,7 +19,8 @@ For efficiency, `RFLUFactorization` is the fastest for dense LU-factorizations u
 point, `MKLLUFactorization` is usually faster on most hardware. Note that on Mac computers
 that `AppleAccelerateLUFactorization` is generally always the fastest. `OpenBLASLUFactorization` 
 provides direct OpenBLAS calls without going through libblastrampoline and can be faster than 
-`LUFactorization` in some configurations. `LUFactorization` will use your base system BLAS which 
+`LUFactorization` in some configurations, and `BLISLUFactorization` does the same for
+[BLIS](https://github.com/flame/blis), the library AMD's AOCL-BLAS is derived from. `LUFactorization` will use your base system BLAS which 
 can be fast or slow depending on the hardware configuration. `SimpleLUFactorization` will be fast 
 only on very small matrices but can cut down on compile times.
 
@@ -433,6 +434,17 @@ MKL32MixedLUFactorization
 ```@docs
 OpenBLASLUFactorization
 OpenBLAS32MixedLUFactorization
+```
+
+### BLIS
+
+!!! note
+
+    Using this solver requires both JLLs that back the extension, i.e.
+    `using blis_jll, LAPACK_jll`
+
+```@docs
+BLISLUFactorization
 ```
 
 ### AppleAccelerate.jl

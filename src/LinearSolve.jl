@@ -15,7 +15,7 @@ using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, Bunc
     RowMaximum, RowNonZero, SymTridiagonal, Symmetric, Transpose,
     Tridiagonal, UniformScaling, axpby!, axpy!, bunchkaufman,
     bunchkaufman!,
-    cholesky, cholesky!, diagind, dot, inv, ldiv!, ldlt!, lu, lu!, mul!,
+    cholesky, cholesky!, diagind, dot, inv, issuccess, ldiv!, ldlt!, lu, lu!, mul!,
     norm,
     qr, qr!, svd, svd!
 using SciMLBase: SciMLBase, LinearAliasSpecifier,
@@ -455,6 +455,7 @@ include("appleaccelerate.jl")
 include("mkl.jl")
 include("openblas.jl")
 include("simplelu.jl")
+include("lowrank.jl")
 include("lhl.jl")
 include("adjoint_factorization.jl")
 include("simplegmres.jl")
@@ -771,6 +772,7 @@ is_cusparse_csr(A) = false
 is_cusparse_csc(A) = false
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
+    LowRankUpdatedMatrix,
     GenericLUFactorization, GESVFactorization, SimpleLUFactorization,
     RFLUFactorization, ButterflyFactorization,
     NormalCholeskyFactorization, NormalBunchKaufmanFactorization,

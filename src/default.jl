@@ -252,10 +252,18 @@ function defaultalg(A::WOperator, b, assump::OperatorAssumptions{Bool})
     return @invoke defaultalg(A::SciMLOperators.AbstractSciMLOperator, b, assump)
 end
 
+# Routed to the operator default rather than to the `WOperator` method above, because
+# that one can answer `LHLFactorization`. The reduction behind it lives in
+# LHLFactorization.jl and runs on the host, while a GPU array still satisfies
+# `DenseMatrix` (`CuArray <: DenseArray`), so `_lhl_defaultable` would accept a device
+# Jacobian and the solve would then die on scalar indexing.
 function defaultalg(
         A::WOperator, b::GPUArraysCore.AnyGPUArray, assump::OperatorAssumptions{Bool}
     )
-    return @invoke defaultalg(A::WOperator, b::Any, assump::OperatorAssumptions{Bool})
+    return @invoke defaultalg(
+        A::SciMLOperators.AbstractSciMLOperator, b::GPUArraysCore.AnyGPUArray,
+        assump::OperatorAssumptions{Bool}
+    )
 end
 
 _lhl_scalar_massmatrix(::UniformScaling) = true

@@ -1483,26 +1483,43 @@ struct MetalOffload32MixedLUFactorization <: AbstractFactorization
 end
 
 """
-    BLISLUFactorization()
+    BLISLUFactorization(; throwerror = true, residualsafety = false)
 
-An LU factorization implementation using the BLIS (BLAS-like Library Instantiation Software)
-framework. BLIS provides high-performance dense linear algebra kernels optimized for various
-CPU architectures.
+An LU factorization for dense matrices that calls [BLIS](https://github.com/flame/blis)
+directly for its BLAS kernels, with the factorization and back-solve themselves coming
+from LAPACK's `getrf`/`getrs`. Like `OpenBLASLUFactorization`, it bypasses
+libblastrampoline and calls a fixed library, so the solve does not depend on which BLAS
+the running session happens to have forwarded.
 
-## Requirements
-Using this solver requires that blis_jll is available and the BLIS extension is loaded.
-The solver will be automatically available when conditions are met.
+Supports `Float32`, `Float64`, `ComplexF32` and `ComplexF64` dense matrices, and reuses
+the factorization across repeated `solve!` calls on the same cache.
 
-## Performance Notes
-- Optimized for modern CPU architectures with BLIS-specific optimizations
-- May provide better performance than standard BLAS on certain processors
-- Best suited for dense matrices with Float32, Float64, ComplexF32, or ComplexF64 elements
+!!! note
+
+    Using this solver requires both JLLs that back the extension to be loaded:
+    `using blis_jll, LAPACK_jll`.
+
+## Keyword Arguments
+
+  - `throwerror`: whether the constructor errors when the BLIS extension is not loaded.
+    Defaults to `true`; pass `false` to construct the algorithm anyway, which is what the
+    default algorithm machinery does when it probes for availability.
+  - `residualsafety`: whether to compute the a posteriori residual after the solve and
+    return `ReturnCode.APosterioriSafetyFailure` when it exceeds the tolerances. Defaults
+    to `false`.
 
 ## Example
+
 ```julia
-alg = BLISLUFactorization()
-sol = solve(prob, alg)
+using LinearSolve, blis_jll, LAPACK_jll
+
+A = rand(100, 100) + 100I
+b = rand(100)
+sol = solve(LinearProblem(A, b), BLISLUFactorization())
 ```
+
+`LinearSolveAutotune` can also select BLIS for the default algorithm on hardware where it
+benchmarks fastest, in which case `solve(prob)` uses it without naming it explicitly.
 """
 struct BLISLUFactorization <: AbstractFactorization
     residualsafety::Bool

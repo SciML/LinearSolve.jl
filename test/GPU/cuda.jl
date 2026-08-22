@@ -124,8 +124,18 @@ y = solve(prob1)
 using BlockDiagonals
 
 @testset "Block Diagonal Specialization" begin
-    A = BlockDiagonal([rand(2, 2) for _ in 1:3]) |> cu
-    b = rand(size(A, 1)) |> cu
+    # Seeded, Float32 end-to-end, and gated against the direct solution. The
+    # earlier form compared the blocked and unblocked iterative answers to each
+    # other at the default isapprox rtol (~3.4f-4): on GPU each path converges
+    # to within the solver's own Float32 tolerance, so two correct answers can
+    # legitimately differ by ~1f-3 and the comparison flaked (measured 9/400
+    # draws on a T4; worst observed error vs direct was 8.6f-4).
+    rng_bd = StableRNG(42)
+    A_cpu = BlockDiagonal([rand(rng_bd, Float32, 2, 2) + 2.0f0 * I for _ in 1:3])
+    b_cpu = rand(rng_bd, Float32, size(A_cpu, 1))
+    ref = Matrix(A_cpu) \ b_cpu
+    A = A_cpu |> cu
+    b = b_cpu |> cu
 
     x1 = zero(b) |> cu
     x2 = zero(b) |> cu
@@ -134,7 +144,11 @@ using BlockDiagonals
 
     test_interface(SimpleGMRES(; blocksize = 2), prob1, prob2)
 
-    @test solve(prob1, SimpleGMRES(; blocksize = 2)).u ≈ solve(prob2, SimpleGMRES()).u
+    u1 = solve(prob1, SimpleGMRES(; blocksize = 2)).u
+    u2 = solve(prob2, SimpleGMRES()).u
+    @test Array(u1) ≈ ref rtol = 5.0f-3
+    @test Array(u2) ≈ ref rtol = 5.0f-3
+    @test u1 ≈ u2 rtol = 5.0f-3
 end
 
 # Test Dispatches for Adjoint/Transpose Types
@@ -178,4 +192,30 @@ if Base.find_package("CUSOLVERRF") !== nothing
     @testset "CUSOLVERRF" begin
         include("cusolverrf.jl")
     end
+end
+
+# A `WOperator` with a device Jacobian used to default to `LHLFactorization`, whose
+# reduction runs on the host: `CuArray <: DenseArray`, so `A.J isa DenseMatrix` holds on
+# the GPU and `_lhl_defaultable` accepted it. The solve then died on scalar indexing.
+@testset "WOperator on the GPU does not default to LHLFactorization" begin
+    n = 64
+    γ = 0.1
+    J = CUDACore.adapt(CuArray, rand(n, n) + n * I)
+    b_gpu = CUDACore.adapt(CuArray, rand(n))
+    W = LinearSolve.WOperator{true}(I, γ, J, similar(b_gpu))
+
+    @test LinearSolve.defaultalg(W, b_gpu, OperatorAssumptions(true)).alg !==
+        LinearSolve.DefaultAlgorithmChoice.LHLFactorization
+
+    sol = solve(LinearProblem(W, b_gpu))
+    @test SciMLBase.successful_retcode(sol)
+    ref = Array(J - I / γ) \ Array(b_gpu)
+    @test Array(sol.u) ≈ ref rtol = 1.0e-6
+
+    # A host `WOperator` of the same shape still takes the LHL path.
+    Jc = rand(n, n) + n * I
+    bc = rand(n)
+    Wc = LinearSolve.WOperator{true}(I, γ, Jc, similar(bc))
+    @test LinearSolve.defaultalg(Wc, bc, OperatorAssumptions(true)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.LHLFactorization
 end

@@ -232,12 +232,16 @@ const LHL_DEFAULT_MIN_SIZE = 32
 # but left uninitialized the solve fails, and if it is initialized but never selected the
 # buffers are wasted. Both ask here.
 function _lhl_defaultable(A::WOperator, assump::OperatorAssumptions)
-    # Only a plain dense `J`. An operator `J` — a `MatrixOperator` in particular — is
-    # updated in place by `update_coefficients!`, which moves the numbers while leaving
-    # both the object identity and `jac_stale` untouched, so the reduction cannot tell it
-    # went stale and would silently answer with the previous Jacobian.
-    return assump.issq && A.J isa DenseMatrix && size(A, 1) >= LHL_DEFAULT_MIN_SIZE &&
-        _lhl_scalar_massmatrix(A.mass_matrix)
+    # Only a plain dense `J`, or a plain sparse `J` the sparse block-triangular solver is
+    # expected to win on (a reducible pattern — see `lhl_prefers_sparse`). An operator `J`
+    # — a `MatrixOperator` in particular — is updated in place by `update_coefficients!`,
+    # which moves the numbers while leaving both the object identity and `jac_stale`
+    # untouched, so the reduction cannot tell it went stale and would silently answer with
+    # the previous Jacobian, so those are excluded.
+    (assump.issq && size(A, 1) >= LHL_DEFAULT_MIN_SIZE && _lhl_scalar_massmatrix(A.mass_matrix)) ||
+        return false
+    A.J isa DenseMatrix && return true
+    return issparsematrixcsc(A.J) && lhl_prefers_sparse(A.J)
 end
 _lhl_defaultable(A, assump) = false
 

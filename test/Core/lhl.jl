@@ -359,3 +359,64 @@ end
     cache.isfresh = true
     @test solve!(cache).u ≈ (Anew - I / γ) \ b rtol = 1.0e-6
 end
+
+# `J` sparse: LHLFactorization's SparseArrays + PureKLU extension (auto-loaded here, since
+# both are LinearSolve dependencies). `defaultalg` routes a *reducible* sparse-`J` WOperator
+# to LHL — where the block-triangular reduction can beat a sparse LU — and leaves one big
+# irreducible block to KLU.
+@testset "sparse Jacobian: solve, update_gamma!, cost-model-gated default" begin
+    assump = LinearSolve.OperatorAssumptions(true)
+
+    # a block upper triangular J with several irreducible blocks (reducible), permuted
+    function btf(sizes; rng = MersenneTwister(3))
+        m = sum(sizes)
+        I_ = Int[]; J_ = Int[]; V = Float64[]; off = 0
+        for bb in sizes
+            if bb == 1
+                push!(I_, off + 1); push!(J_, off + 1); push!(V, randn(rng))
+            else
+                for j in 1:bb, i in 1:bb
+                    (i == j || rand(rng) < 0.5) || continue
+                    push!(I_, off + i); push!(J_, off + j); push!(V, randn(rng))
+                end
+                for i in 1:(bb - 1)
+                    push!(I_, off + i + 1); push!(J_, off + i); push!(V, randn(rng))
+                end
+                push!(I_, off + 1); push!(J_, off + bb); push!(V, randn(rng))
+            end
+            off > 0 && (push!(I_, rand(rng, 1:off)); push!(J_, off + rand(rng, 1:bb)); push!(V, randn(rng)))
+            off += bb
+        end
+        Jm = sparse(I_, J_, V, m, m)
+        p = randperm(rng, m)
+        return Jm[p, p]
+    end
+
+    Js = btf([1, 3, 5, 8, 4, 20, 10])
+    ns = size(Js, 1)
+    bs = randn(MersenneTwister(5), ns)
+    Ws = wop(Js, 0.01; u = zeros(ns))
+    @test LinearSolve._lhl_defaultable(Ws, assump)        # reducible sparse -> default LHL
+    @test solve(LinearProblem(Ws, bs), LHLFactorization()).u ≈ dense(Js, 0.01) \ bs rtol = 1.0e-9
+
+    # cheap re-shift reuses the reduction
+    cache = init(LinearProblem(wop(Js, 0.01; u = zeros(ns)), bs), LHLFactorization())
+    solve!(cache)
+    for γ in (0.02, 1.0e-6, 5.0)
+        update_gamma!(cache, γ)
+        @test copy(solve!(cache).u) ≈ dense(Js, γ) \ bs rtol = 1.0e-9
+    end
+
+    # one big irreducible block: KLU's regime, not defaulted to LHL, but opt-in still solves
+    Jbig = btf([120])
+    @test !LinearSolve._lhl_defaultable(wop(Jbig, 0.01; u = zeros(120)), assump)
+    bb = randn(MersenneTwister(6), 120)
+    @test solve(LinearProblem(wop(Jbig, 0.01; u = zeros(120)), bb), LHLFactorization()).u ≈
+        dense(Jbig, 0.01) \ bb rtol = 1.0e-9
+
+    # complex γ on a real sparse J: real reduction, complex shift and solve
+    γc = 0.01 + 0.005im
+    Wc = WOperator{true}(I, γc, Js, zeros(ComplexF64, ns))
+    bc = randn(MersenneTwister(7), ComplexF64, ns)
+    @test solve(LinearProblem(Wc, bc), LHLFactorization()).u ≈ (Js - I / γc) \ bc rtol = 1.0e-8
+end

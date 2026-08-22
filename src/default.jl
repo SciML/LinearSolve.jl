@@ -252,6 +252,12 @@ function defaultalg(A::WOperator, b, assump::OperatorAssumptions{Bool})
     return @invoke defaultalg(A::SciMLOperators.AbstractSciMLOperator, b, assump)
 end
 
+function defaultalg(
+        A::WOperator, b::GPUArraysCore.AnyGPUArray, assump::OperatorAssumptions{Bool}
+    )
+    return @invoke defaultalg(A::WOperator, b::Any, assump::OperatorAssumptions{Bool})
+end
+
 _lhl_scalar_massmatrix(::UniformScaling) = true
 _lhl_scalar_massmatrix(::Number) = true
 _lhl_scalar_massmatrix(::Any) = false

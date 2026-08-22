@@ -534,6 +534,50 @@ CUSOLVERRFFactorization
 AlgebraicMultigridJL
 ```
 
+### AMGCLWrap.jl
+
+!!! note
+
+    Using these solvers requires adding the package AMGCLWrap.jl, i.e.
+    `using AMGCLWrap`
+
+[AMGCLWrap.jl](https://github.com/j-fu/AMGCLWrap.jl) wraps
+[AMGCL](https://github.com/ddemidov/amgcl), a header-only C++ algebraic multigrid
+library, through a pre-instantiated C API shipped as a binary package. It runs on
+the CPU (multithreaded via OpenMP) and requires `A` as a `SparseMatrixCSC` or a
+`SparseMatrixCSR`. Loading AMGCLWrap provides two LinearSolve algorithms:
+
+  - `AMGSolverAlgorithm(; blocksize = 1, param = nothing, coarsening, relax, solver)`:
+    an algebraic-multigrid-preconditioned Krylov solver (BiCGStab by default).
+  - `RLXSolverAlgorithm(; blocksize = 1, param = nothing, precond, solver)`: a
+    single-level relaxation-preconditioned Krylov solver (incomplete LU by default).
+
+Options are given either through typed keyword arguments (e.g.
+`coarsening = AMGCLWrap.RugeStubenCoarsening()`) or as a JSON-style named tuple
+via `param`; see the
+[AMGCLWrap solver documentation](https://j-fu.github.io/AMGCLWrap.jl/stable/solvers/)
+for the full parameter space.
+
+```julia
+using LinearSolve, AMGCLWrap, SparseArrays, LinearAlgebra
+
+n = 100  # 2-D finite-difference Laplacian, N = n^2 unknowns
+lap1d = spdiagm(-1 => -ones(n - 1), 0 => 2 * ones(n), 1 => -ones(n - 1))
+A = kron(I(n), lap1d) + kron(lap1d, I(n))
+b = rand(size(A, 1))
+prob = LinearProblem(A, b)
+
+sol = solve(prob, AMGSolverAlgorithm())
+
+sol = solve(prob,
+    RLXSolverAlgorithm(param = (solver = (type = "bicgstab", tol = 1.0e-10),
+        precond = (type = "ilu0",))))
+```
+
+AMGCLWrap also provides AMG and relaxation preconditioners for LinearSolve's own
+Krylov methods through the `precs` interface; see the
+[Preconditioners](@ref prec) page.
+
 ### ConjugateGradients.jl
 
 !!! note

@@ -677,6 +677,38 @@ end
         end
     end
 
+    # The Arnoldi loop builds its Krylov space from `Pl \ (b - Ax)`, so the
+    # starting residual has to be preconditioned the same way. `_init_cacheval`
+    # applied `Pl` instead of `Pl \ `, which seeded the first pass with the wrong
+    # vector: the solve still reported `Success`, off by a factor of ~4000.
+    @testset "Simple GMRES preconditioned: restart = $restart, blocksize = $blocksize" for
+        restart in (true, false), blocksize in (0, 2)
+
+        np = 6
+        Ap = [
+            float(i == j ? 10 + 5i : 0.3 * (i + j)) *
+                (blocksize == 0 || (i - 1) ÷ blocksize == (j - 1) ÷ blocksize)
+                for i in 1:np, j in 1:np
+        ]
+        bp = float.(1:np)
+        alg = SimpleGMRES(; restart, blocksize)
+
+        for (desc, Pl, Pr) in (
+                ("Pl", Diagonal(diag(Ap)), I),
+                ("Pr", I, Diagonal(diag(Ap))),
+                ("Pl and Pr", Diagonal(sqrt.(diag(Ap))), Diagonal(sqrt.(diag(Ap)))),
+            )
+            @testset "$desc" begin
+                sol = solve(
+                    LinearProblem(copy(Ap), copy(bp)), alg;
+                    Pl, Pr, abstol = 1.0e-12, reltol = 1.0e-12, maxiters = 100
+                )
+                @test SciMLBase.successful_retcode(sol)
+                @test sol.u ≈ Ap \ bp rtol = 1.0e-8
+            end
+        end
+    end
+
     @testset "KrylovJL" begin
         kwargs = (; gmres_restart = 5)
         precs = (A, p = nothing) -> (Diagonal(inv.(diag(A))), I)

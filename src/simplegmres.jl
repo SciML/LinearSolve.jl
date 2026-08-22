@@ -185,6 +185,193 @@ _norm2(x, dims) = .√(sum(abs2, x; dims))
 default_alias_A(::SimpleGMRES, ::Any, ::Any) = false
 default_alias_b(::SimpleGMRES, ::Any, ::Any) = false
 
+# The Arnoldi bookkeeping (`s`, `c`, `z`, `R`) is a scalar per Krylov vector for a
+# general matrix, and one entry per diagonal block for a uniform block diagonal
+# matrix, where every block runs its own GMRES over a shared Krylov index. That is
+# the only thing separating the two cases: the Arnoldi loop, the Givens
+# bookkeeping, the stopping criteria and the restart logic are identical. The two
+# layouts below carry the element level operations, so the iteration itself is
+# written once and `SimpleGMRESCache{UBD}` selects the layout.
+struct ScalarLayout end
+
+struct BatchedLayout{F}
+    # Reshape a length `n` vector into `(blocksize, bsize)`, one column per block.
+    batch::F
+    bsize::Int
+end
+
+_layout(::Val{false}, blocksize::Int, n::Int) = ScalarLayout()
+
+function _layout(::Val{true}, blocksize::Int, n::Int)
+    bsize = n ÷ blocksize
+    return BatchedLayout(Base.Fix2(reshape, (blocksize, bsize)), bsize)
+end
+
+function _layout(cache::SimpleGMRESCache{UBD}) where {UBD}
+    return _layout(Val(UBD), cache.blocksize, cache.n)
+end
+
+# Storage for `len` slots of Arnoldi bookkeeping.
+_gmres_scratch(::ScalarLayout, u, len::Int) = Vector{eltype(u)}(undef, len)
+_gmres_scratch(l::BatchedLayout, u, len::Int) = [similar(u, l.bsize) for _ in 1:len]
+
+# A fresh slot matching what `_gmres_scratch` produced for `proto`.
+_gmres_element(::ScalarLayout, proto, ::Type{T}) where {T} = zero(T)
+_gmres_element(l::BatchedLayout, proto, ::Type) = similar(first(proto), l.bsize)
+
+# `restart = false` lets the Arnoldi basis outrun `memory`, so the QR bookkeeping
+# has to grow with it.
+function _gmres_grow_pass!(layout, R, s, c, inner_iter::Int, ::Type{T}) where {T}
+    append!(R, [_gmres_element(layout, R, T) for _ in 1:inner_iter])
+    push!(s, _gmres_element(layout, s, T))
+    push!(c, _gmres_element(layout, c, T))
+    return nothing
+end
+
+function _gmres_grow_krylov!(layout, V, z, ::Type{T}) where {T}
+    push!(V, similar(first(V)))
+    push!(z, _gmres_element(layout, z, T))
+    return nothing
+end
+
+# Initial ζ₁ and V₁ for the current pass.
+function _gmres_start!(::ScalarLayout, z, V, r₀)
+    β = _norm2(r₀)
+    z[1] = β
+    V[1] .= r₀ ./ β
+    return nothing
+end
+
+function _gmres_start!(l::BatchedLayout, z, V, r₀)
+    β = _norm2(l.batch(r₀), 1)
+    z[1] .= vec(β)
+    V[1] .= vec(l.batch(r₀) ./ β)
+    return nothing
+end
+
+# One Gram-Schmidt step: hᵢₖ = (vᵢ)ᴴq stored at `R[k]`, then q ← q - hᵢₖvᵢ.
+function _gmres_orth_step!(::ScalarLayout, R, k::Int, V, i::Int, q)
+    R[k] = dot(V[i], q)
+    axpy!(-R[k], V[i], q)
+    return nothing
+end
+
+function _gmres_orth_step!(l::BatchedLayout, R, k::Int, V, i::Int, q)
+    sum!(R[k]', l.batch(V[i]) .* l.batch(q))
+    q .-= vec(R[k]' .* l.batch(V[i]))
+    return nothing
+end
+
+# hₖ₊₁.ₖ = ‖vₖ₊₁‖₂
+_gmres_hbis(::ScalarLayout, q) = _norm2(q)
+_gmres_hbis(l::BatchedLayout, q) = vec(_norm2(l.batch(q), 1))
+
+# Apply the previous Givens reflection Ωᵢ to rows i, i+1 of the current column.
+# [cᵢ  sᵢ] [ r̄ᵢ.ₖ ] = [ rᵢ.ₖ ]
+# [s̄ᵢ -cᵢ] [rᵢ₊₁.ₖ]   [r̄ᵢ₊₁.ₖ]
+function _gmres_apply_givens!(::ScalarLayout, c, s, R, nr::Int, i::Int)
+    Rtmp = c[i] * R[nr + i] + s[i] * R[nr + i + 1]
+    R[nr + i + 1] = conj(s[i]) * R[nr + i] - c[i] * R[nr + i + 1]
+    R[nr + i] = Rtmp
+    return nothing
+end
+
+function _gmres_apply_givens!(::BatchedLayout, c, s, R, nr::Int, i::Int)
+    Rtmp = c[i] .* R[nr + i] .+ s[i] .* R[nr + i + 1]
+    R[nr + i + 1] .= conj.(s[i]) .* R[nr + i] .- c[i] .* R[nr + i + 1]
+    R[nr + i] .= Rtmp
+    return nothing
+end
+
+# Compute and apply the current Givens reflection Ωₖ.
+# [cₖ  sₖ] [ r̄ₖ.ₖ ] = [rₖ.ₖ]
+# [s̄ₖ -cₖ] [hₖ₊₁.ₖ]   [ 0  ]
+function _gmres_new_givens!(::ScalarLayout, c, s, R, nr::Int, k::Int, Hbis)
+    c[k], s[k], R[nr + k] = _sym_givens(R[nr + k], Hbis)
+    return nothing
+end
+
+function _gmres_new_givens!(l::BatchedLayout, c, s, R, nr::Int, k::Int, Hbis)
+    _sym_givens!(c, s, R, nr, k, l.bsize, Hbis)
+    return nothing
+end
+
+# Update zₖ = (Qₖ)ᴴβe₁, returning the carried over ζₖ₊₁.
+function _gmres_update_z!(::ScalarLayout, z, c, s, k::Int)
+    ζₖ₊₁ = conj(s[k]) * z[k]
+    z[k] = c[k] * z[k]
+    return ζₖ₊₁
+end
+
+function _gmres_update_z!(::BatchedLayout, z, c, s, k::Int)
+    ζₖ₊₁ = conj.(s[k]) .* z[k]
+    z[k] .= c[k] .* z[k]
+    return ζₖ₊₁
+end
+
+# ‖ Pl(b - Axₖ) ‖₂ = |ζₖ₊₁|. The batched solve stops on its slowest block.
+_gmres_rnorm(::ScalarLayout, ζₖ₊₁) = abs(ζₖ₊₁)
+_gmres_rnorm(::BatchedLayout, ζₖ₊₁) = maximum(abs, ζₖ₊₁)
+
+_gmres_maximum(::ScalarLayout, Hbis) = Hbis
+_gmres_maximum(::BatchedLayout, Hbis) = maximum(Hbis)
+
+# hₖ₊₁.ₖvₖ₊₁ = q
+function _gmres_next_v!(::ScalarLayout, V, z, q, Hbis, ζₖ₊₁, k::Int)
+    @. V[k + 1] = q / Hbis
+    z[k + 1] = ζₖ₊₁
+    return nothing
+end
+
+function _gmres_next_v!(l::BatchedLayout, V, z, q, Hbis, ζₖ₊₁, k::Int)
+    V[k + 1] .= vec(l.batch(q) ./ Hbis')
+    z[k + 1] .= ζₖ₊₁
+    return nothing
+end
+
+# yᵢ ← yᵢ - rᵢⱼyⱼ
+function _gmres_backsub_update!(::ScalarLayout, y, i::Int, R, pos::Int, j::Int)
+    y[i] = y[i] - R[pos] * y[j]
+    return nothing
+end
+
+function _gmres_backsub_update!(::BatchedLayout, y, i::Int, R, pos::Int, j::Int)
+    y[i] .= y[i] .- R[pos] .* y[j]
+    return nothing
+end
+
+# yᵢ ← yᵢ / rᵢᵢ. Rₖ can be singular if the system is inconsistent, which is what
+# the return value reports.
+function _gmres_backsub_solve!(
+        ::ScalarLayout, y, i::Int, R, pos::Int, btol, ::Type{T}
+    ) where {T}
+    if abs(R[pos]) ≤ btol
+        y[i] = zero(T)
+        return true
+    end
+    y[i] = y[i] / R[pos]
+    return false
+end
+
+function _gmres_backsub_solve!(
+        ::BatchedLayout, y, i::Int, R, pos::Int, btol, ::Type{T}
+    ) where {T}
+    singular = abs.(R[pos]) .≤ btol
+    y[i] .= ifelse.(singular, zero(T), y[i] ./ R[pos])
+    return any(singular)
+end
+
+# xₖ ← xₖ + yᵢvᵢ
+function _gmres_add_correction!(::ScalarLayout, xr, V, y, i::Int)
+    axpy!(y[i], V[i], xr)
+    return nothing
+end
+
+function _gmres_add_correction!(l::BatchedLayout, xr, V, y, i::Int)
+    xr .+= vec(l.batch(V[i]) .* y[i]')
+    return nothing
+end
+
 function SciMLBase.solve!(cache::LinearCache, alg::SimpleGMRES; kwargs...)
     if cache.isfresh
         solver = init_cacheval(
@@ -207,270 +394,35 @@ function init_cacheval(alg::SimpleGMRES{UDB}, args...; kwargs...) where {UDB}
 end
 
 function _init_cacheval(
-        ::Val{false}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiters::Int,
-        abstol, reltol, ::Union{LinearVerbosity, Bool}, ::OperatorAssumptions; zeroinit = true, kwargs...
-    )
-    (; memory, restart, blocksize, warm_start) = alg
-
-    if zeroinit
-        return SimpleGMRESCache{false}(
-            memory, 0, restart, maxiters, blocksize,
-            zero(eltype(u)) * reltol + abstol, false, false, Pl, Pr, similar(u, 0),
-            similar(u, 0), similar(u, 0), u, A, b, abstol, reltol, similar(u, 0),
-            Vector{typeof(u)}(undef, 0), Vector{eltype(u)}(undef, 0),
-            Vector{eltype(u)}(undef, 0), Vector{eltype(u)}(undef, 0),
-            Vector{eltype(u)}(undef, 0), zero(eltype(u)), warm_start
-        )
-    end
-
-    T = eltype(u)
-    n = LinearAlgebra.checksquare(A)
-    @assert n == length(b) "The size of `A` and `b` must match."
-    memory = min(memory, maxiters)
-
-    PlisI = _no_preconditioner(Pl)
-    PrisI = _no_preconditioner(Pr)
-
-    Δx = restart ? similar(u, n) : similar(u, 0)
-    q = PlisI ? similar(u, 0) : similar(u, n)
-    p = PrisI ? similar(u, 0) : similar(u, n)
-    x = u
-    x .= zero(T)
-
-    w = similar(u, n)
-    V = [similar(u) for _ in 1:memory]
-    s = Vector{eltype(x)}(undef, memory)
-    c = Vector{eltype(x)}(undef, memory)
-
-    z = Vector{eltype(x)}(undef, memory)
-    R = Vector{eltype(x)}(undef, (memory * (memory + 1)) ÷ 2)
-
-    q = PlisI ? w : q
-    r₀ = PlisI ? w : q
-
-    # Initial residual r₀.
-    if warm_start
-        mul!(w, A, Δx)
-        axpby!(one(T), b, -one(T), w)
-        restart && axpy!(one(T), Δx, x)
-    else
-        w .= b
-    end
-    PlisI || mul!(r₀, Pl, w)  # r₀ = Pl(b - Ax₀)
-    β = _norm2(r₀)         # β = ‖r₀‖₂
-
-    rNorm = β
-    ε = abstol + reltol * rNorm
-
-    return SimpleGMRESCache{false}(
-        memory, n, restart, maxiters, blocksize, ε, PlisI, PrisI,
-        Pl, Pr, Δx, q, p, x, A, b, abstol, reltol, w, V, s, c, z, R, β, warm_start
-    )
-end
-
-function SciMLBase.solve!(cache::SimpleGMRESCache{false}, lincache::LinearCache)
-    (; memory, n, restart, maxiters, blocksize, ε, PlisI, PrisI, Pl, Pr) = cache
-    (; Δx, q, p, x, A, b, abstol, reltol, w, V, s, c, z, R, β, warm_start) = cache
-
-    T = eltype(x)
-    q = PlisI ? w : q
-    r₀ = PlisI ? w : q
-    xr = restart ? Δx : x
-
-    if β == 0
-        return SciMLBase.build_linear_solution(
-            lincache.alg, x, r₀, nothing;
-            retcode = ReturnCode.Success
-        )
-    end
-
-    rNorm = β
-    npass = 0        # Number of pass
-
-    iter = 0        # Cumulative number of iterations
-    inner_iter = 0  # Number of iterations in a pass
-
-    # Tolerance for breakdown detection.
-    btol = eps(T)^(3 / 4)
-
-    # Stopping criterion
-    breakdown = false
-    inconsistent = false
-    solved = rNorm ≤ ε
-    inner_maxiters = maxiters
-    tired = iter ≥ maxiters
-    inner_tired = inner_iter ≥ inner_maxiters
-    status = ReturnCode.Default
-
-    while !(solved || tired || breakdown)
-        # Initialize workspace.
-        nr = 0  # Number of coefficients stored in Rₖ.
-
-        if restart
-            xr .= zero(T)  # xr === Δx when restart is set to true
-            if npass ≥ 1
-                mul!(w, A, x)
-                axpby!(one(T), b, -one(T), w)
-                PlisI || ldiv!(r₀, Pl, w)
-            end
-        end
-
-        # Initial ζ₁ and V₁
-        β = _norm2(r₀)
-        z[1] = β
-        V[1] .= r₀ / β
-
-        npass = npass + 1
-        inner_iter = 0
-        inner_tired = false
-
-        while !(solved || inner_tired || breakdown)
-            # Update iteration index
-            inner_iter += 1
-            # Update workspace if more storage is required and restart is set to false
-            if !restart && (inner_iter > memory)
-                append!(R, zeros(T, inner_iter))
-                push!(s, zero(T))
-                push!(c, zero(T))
-            end
-
-            # Continue the Arnoldi process.
-            p = PrisI ? V[inner_iter] : p
-            PrisI || ldiv!(p, Pr, V[inner_iter])  # p ← Nvₖ
-            mul!(w, A, p)                         # w ← ANvₖ
-            PlisI || ldiv!(q, Pl, w)                 # q ← MANvₖ
-            for i in 1:inner_iter
-                R[nr + i] = dot(V[i], q)       # hᵢₖ = (vᵢ)ᴴq
-                axpy!(-R[nr + i], V[i], q)     # q ← q - hᵢₖvᵢ
-            end
-
-            # Compute hₖ₊₁.ₖ
-            Hbis = _norm2(q)  # hₖ₊₁.ₖ = ‖vₖ₊₁‖₂
-
-            # Update the QR factorization of Hₖ₊₁.ₖ.
-            # Apply previous Givens reflections Ωᵢ.
-            # [cᵢ  sᵢ] [ r̄ᵢ.ₖ ] = [ rᵢ.ₖ ]
-            # [s̄ᵢ -cᵢ] [rᵢ₊₁.ₖ]   [r̄ᵢ₊₁.ₖ]
-            for i in 1:(inner_iter - 1)
-                Rtmp = c[i] * R[nr + i] + s[i] * R[nr + i + 1]
-                R[nr + i + 1] = conj(s[i]) * R[nr + i] - c[i] * R[nr + i + 1]
-                R[nr + i] = Rtmp
-            end
-
-            # Compute and apply current Givens reflection Ωₖ.
-            # [cₖ  sₖ] [ r̄ₖ.ₖ ] = [rₖ.ₖ]
-            # [s̄ₖ -cₖ] [hₖ₊₁.ₖ]   [ 0  ]
-            (
-                c[inner_iter], s[inner_iter],
-                R[nr + inner_iter],
-            ) = _sym_givens(
-                R[nr + inner_iter],
-                Hbis
-            )
-
-            # Update zₖ = (Qₖ)ᴴβe₁
-            ζₖ₊₁ = conj(s[inner_iter]) * z[inner_iter]
-            z[inner_iter] = c[inner_iter] * z[inner_iter]
-
-            # Update residual norm estimate.
-            # ‖ Pl(b - Axₖ) ‖₂ = |ζₖ₊₁|
-            rNorm = abs(ζₖ₊₁)
-
-            # Update the number of coefficients in Rₖ
-            nr = nr + inner_iter
-
-            # Stopping conditions that do not depend on user input.
-            # This is to guard against tolerances that are unreasonably small.
-            resid_decrease_mach = (rNorm + one(T) ≤ one(T))
-
-            # Update stopping criterion.
-            resid_decrease_lim = rNorm ≤ ε
-            breakdown = Hbis ≤ btol
-            solved = resid_decrease_lim || resid_decrease_mach
-            inner_tired = restart ? inner_iter ≥ min(memory, inner_maxiters) :
-                inner_iter ≥ inner_maxiters
-
-            # Compute vₖ₊₁.
-            if !(solved || inner_tired || breakdown)
-                if !restart && (inner_iter ≥ memory)
-                    push!(V, similar(first(V)))
-                    push!(z, zero(T))
-                end
-                @. V[inner_iter + 1] = q / Hbis  # hₖ₊₁.ₖvₖ₊₁ = q
-                z[inner_iter + 1] = ζₖ₊₁
-            end
-        end
-
-        # Compute yₖ by solving Rₖyₖ = zₖ with backward substitution.
-        y = z  # yᵢ = zᵢ
-        for i in inner_iter:-1:1
-            pos = nr + i - inner_iter      # position of rᵢ.ₖ
-            for j in inner_iter:-1:(i + 1)
-                y[i] = y[i] - R[pos] * y[j]  # yᵢ ← yᵢ - rᵢⱼyⱼ
-                pos = pos - j + 1            # position of rᵢ.ⱼ₋₁
-            end
-            # Rₖ can be singular if the system is inconsistent
-            if abs(R[pos]) ≤ btol
-                y[i] = zero(T)
-                inconsistent = true
-            else
-                y[i] = y[i] / R[pos]  # yᵢ ← yᵢ / rᵢᵢ
-            end
-        end
-
-        # Form xₖ = NVₖyₖ
-        for i in 1:inner_iter
-            axpy!(y[i], V[i], xr)
-        end
-        if !PrisI
-            p .= xr
-            ldiv!(xr, Pr, p)
-        end
-        restart && axpy!(one(T), xr, x)
-
-        # Update inner_itmax, iter, tired and overtimed variables.
-        inner_maxiters = inner_maxiters - inner_iter
-        iter = iter + inner_iter
-        tired = iter ≥ maxiters
-    end
-
-    # Termination status
-    tired && (status = ReturnCode.MaxIters)
-    solved && (status = ReturnCode.Success)
-    inconsistent && (status = ReturnCode.Infeasible)
-
-    # Update x
-    warm_start && !restart && axpy!(one(T), Δx, x)
-    cache.warm_start = false
-
-    return SciMLBase.build_linear_solution(
-        lincache.alg, x, rNorm, nothing;
-        retcode = status, iters = iter
-    )
-end
-
-function _init_cacheval(
-        ::Val{true}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiters::Int,
-        abstol, reltol, ::Union{LinearVerbosity, Bool}, ::OperatorAssumptions; zeroinit = true,
-        blocksize = alg.blocksize
-    )
+        ::Val{UBD}, alg::SimpleGMRES, A, b, u, Pl, Pr, maxiters::Int,
+        abstol, reltol, ::Union{LinearVerbosity, Bool}, ::OperatorAssumptions;
+        zeroinit = true, blocksize = alg.blocksize, kwargs...
+    ) where {UBD}
     (; memory, restart, warm_start) = alg
+    # `blocksize` is a property of the batched layout only. A `SimpleGMRES{false}`
+    # reaching here through the `BlockDiagonal` dispatch is handed the block size of
+    # a matrix it will not treat blockwise, so the scalar cache keeps recording the
+    # algorithm's own setting.
+    blocksize = UBD ? blocksize : alg.blocksize
 
     if zeroinit
-        return SimpleGMRESCache{true}(
+        layout = _layout(Val(UBD), blocksize, 0)
+        return SimpleGMRESCache{UBD}(
             memory, 0, restart, maxiters, blocksize,
             zero(eltype(u)) * reltol + abstol, false, false, Pl, Pr, similar(u, 0),
             similar(u, 0), similar(u, 0), u, A, b, abstol, reltol, similar(u, 0),
-            [u], [u], [u], [u], [u], zero(eltype(u)), warm_start
+            Vector{typeof(u)}(undef, 0), _gmres_scratch(layout, u, 0),
+            _gmres_scratch(layout, u, 0), _gmres_scratch(layout, u, 0),
+            _gmres_scratch(layout, u, 0), zero(eltype(u)), warm_start
         )
     end
 
     T = eltype(u)
     n = LinearAlgebra.checksquare(A)
-    @assert mod(n, blocksize) == 0 "The blocksize must divide the size of the matrix."
+    UBD && @assert mod(n, blocksize) == 0 "The blocksize must divide the size of the matrix."
     @assert n == length(b) "The size of `A` and `b` must match."
     memory = min(memory, maxiters)
-    bsize = n ÷ blocksize
+    layout = _layout(Val(UBD), blocksize, n)
 
     PlisI = _no_preconditioner(Pl)
     PrisI = _no_preconditioner(Pr)
@@ -483,11 +435,10 @@ function _init_cacheval(
 
     w = similar(u, n)
     V = [similar(u) for _ in 1:memory]
-    s = [similar(u, bsize) for _ in 1:memory]
-    c = [similar(u, bsize) for _ in 1:memory]
-
-    z = [similar(u, bsize) for _ in 1:memory]
-    R = [similar(u, bsize) for _ in 1:((memory * (memory + 1)) ÷ 2)]
+    s = _gmres_scratch(layout, u, memory)
+    c = _gmres_scratch(layout, u, memory)
+    z = _gmres_scratch(layout, u, memory)
+    R = _gmres_scratch(layout, u, (memory * (memory + 1)) ÷ 2)
 
     q = PlisI ? w : q
     r₀ = PlisI ? w : q
@@ -503,21 +454,18 @@ function _init_cacheval(
     PlisI || ldiv!(r₀, Pl, w)  # r₀ = Pl(b - Ax₀)
     β = _norm2(r₀)         # β = ‖r₀‖₂
 
-    rNorm = β
-    ε = abstol + reltol * rNorm
+    ε = abstol + reltol * β
 
-    return SimpleGMRESCache{true}(
+    return SimpleGMRESCache{UBD}(
         memory, n, restart, maxiters, blocksize, ε, PlisI, PrisI,
         Pl, Pr, Δx, q, p, x, A, b, abstol, reltol, w, V, s, c, z, R, β, warm_start
     )
 end
 
-function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
-    (; memory, n, restart, maxiters, blocksize, ε, PlisI, PrisI, Pl, Pr) = cache
-    (; Δx, q, p, x, A, b, abstol, reltol, w, V, s, c, z, R, β, warm_start) = cache
-    bsize = n ÷ blocksize
-
-    __batch = Base.Fix2(reshape, (blocksize, bsize))
+function SciMLBase.solve!(cache::SimpleGMRESCache, lincache::LinearCache)
+    (; memory, restart, maxiters, ε, PlisI, PrisI, Pl, Pr) = cache
+    (; Δx, q, p, x, A, b, w, V, s, c, z, R, β, warm_start) = cache
+    layout = _layout(cache)
 
     T = eltype(x)
     q = PlisI ? w : q
@@ -564,9 +512,7 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
         end
 
         # Initial ζ₁ and V₁
-        β = _norm2(__batch(r₀), 1)
-        z[1] .= vec(β)
-        V[1] .= vec(__batch(r₀) ./ β)
+        _gmres_start!(layout, z, V, r₀)
 
         npass = npass + 1
         inner_iter = 0
@@ -577,9 +523,7 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
             inner_iter += 1
             # Update workspace if more storage is required and restart is set to false
             if !restart && (inner_iter > memory)
-                append!(R, [similar(first(R), bsize) for _ in 1:inner_iter])
-                push!(s, similar(first(s), bsize))
-                push!(c, similar(first(c), bsize))
+                _gmres_grow_pass!(layout, R, s, c, inner_iter, T)
             end
 
             # Continue the Arnoldi process.
@@ -588,35 +532,23 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
             mul!(w, A, p)                         # w ← ANvₖ
             PlisI || ldiv!(q, Pl, w)                 # q ← MANvₖ
             for i in 1:inner_iter
-                sum!(R[nr + i]', __batch(V[i]) .* __batch(q))
-                q .-= vec(R[nr + i]' .* __batch(V[i])) # q ← q - hᵢₖvᵢ
+                _gmres_orth_step!(layout, R, nr + i, V, i, q)
             end
 
             # Compute hₖ₊₁.ₖ
-            Hbis = vec(_norm2(__batch(q), 1))  # hₖ₊₁.ₖ = ‖vₖ₊₁‖₂
+            Hbis = _gmres_hbis(layout, q)
 
-            # Update the QR factorization of Hₖ₊₁.ₖ.
-            # Apply previous Givens reflections Ωᵢ.
-            # [cᵢ  sᵢ] [ r̄ᵢ.ₖ ] = [ rᵢ.ₖ ]
-            # [s̄ᵢ -cᵢ] [rᵢ₊₁.ₖ]   [r̄ᵢ₊₁.ₖ]
+            # Update the QR factorization of Hₖ₊₁.ₖ, applying the previous Givens
+            # reflections Ωᵢ before computing the current one.
             for i in 1:(inner_iter - 1)
-                Rtmp = c[i] .* R[nr + i] .+ s[i] .* R[nr + i + 1]
-                R[nr + i + 1] .= conj.(s[i]) .* R[nr + i] .- c[i] .* R[nr + i + 1]
-                R[nr + i] .= Rtmp
+                _gmres_apply_givens!(layout, c, s, R, nr, i)
             end
+            _gmres_new_givens!(layout, c, s, R, nr, inner_iter, Hbis)
 
-            # Compute and apply current Givens reflection Ωₖ.
-            # [cₖ  sₖ] [ r̄ₖ.ₖ ] = [rₖ.ₖ]
-            # [s̄ₖ -cₖ] [hₖ₊₁.ₖ]   [ 0  ]
-            _sym_givens!(c, s, R, nr, inner_iter, bsize, Hbis)
-
-            # Update zₖ = (Qₖ)ᴴβe₁
-            ζₖ₊₁ = conj.(s[inner_iter]) .* z[inner_iter]
-            z[inner_iter] .= c[inner_iter] .* z[inner_iter]
+            ζₖ₊₁ = _gmres_update_z!(layout, z, c, s, inner_iter)
 
             # Update residual norm estimate.
-            # ‖ Pl(b - Axₖ) ‖₂ = |ζₖ₊₁|
-            rNorm = maximum(abs, ζₖ₊₁)
+            rNorm = _gmres_rnorm(layout, ζₖ₊₁)
 
             # Update the number of coefficients in Rₖ
             nr = nr + inner_iter
@@ -627,7 +559,7 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
 
             # Update stopping criterion.
             resid_decrease_lim = rNorm ≤ ε
-            breakdown = maximum(Hbis) ≤ btol
+            breakdown = _gmres_maximum(layout, Hbis) ≤ btol
             solved = resid_decrease_lim || resid_decrease_mach
             inner_tired = restart ? inner_iter ≥ min(memory, inner_maxiters) :
                 inner_iter ≥ inner_maxiters
@@ -635,11 +567,9 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
             # Compute vₖ₊₁.
             if !(solved || inner_tired || breakdown)
                 if !restart && (inner_iter ≥ memory)
-                    push!(V, similar(first(V)))
-                    push!(z, similar(first(z), bsize))
+                    _gmres_grow_krylov!(layout, V, z, T)
                 end
-                V[inner_iter + 1] .= vec(__batch(q) ./ Hbis')  # hₖ₊₁.ₖvₖ₊₁ = q
-                z[inner_iter + 1] .= ζₖ₊₁
+                _gmres_next_v!(layout, V, z, q, Hbis, ζₖ₊₁, inner_iter)
             end
         end
 
@@ -648,17 +578,15 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
         for i in inner_iter:-1:1
             pos = nr + i - inner_iter      # position of rᵢ.ₖ
             for j in inner_iter:-1:(i + 1)
-                y[i] .= y[i] .- R[pos] .* y[j]  # yᵢ ← yᵢ - rᵢⱼyⱼ
+                _gmres_backsub_update!(layout, y, i, R, pos, j)
                 pos = pos - j + 1            # position of rᵢ.ⱼ₋₁
             end
-            # Rₖ can be singular if the system is inconsistent
-            y[i] .= ifelse.(abs.(R[pos]) .≤ btol, zero(T), y[i] ./ R[pos])  # yᵢ ← yᵢ / rᵢᵢ
-            inconsistent = any(abs.(R[pos]) .≤ btol)
+            inconsistent |= _gmres_backsub_solve!(layout, y, i, R, pos, btol, T)
         end
 
         # Form xₖ = NVₖyₖ
         for i in 1:inner_iter
-            xr .+= vec(__batch(V[i]) .* y[i]')
+            _gmres_add_correction!(layout, xr, V, y, i)
         end
         if !PrisI
             p .= xr
@@ -679,6 +607,7 @@ function SciMLBase.solve!(cache::SimpleGMRESCache{true}, lincache::LinearCache)
 
     # Update x
     warm_start && !restart && axpy!(one(T), Δx, x)
+    cache.warm_start = false
 
     return SciMLBase.build_linear_solution(
         lincache.alg, x, rNorm, nothing;

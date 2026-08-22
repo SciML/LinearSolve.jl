@@ -179,3 +179,29 @@ if Base.find_package("CUSOLVERRF") !== nothing
         include("cusolverrf.jl")
     end
 end
+
+# A `WOperator` with a device Jacobian used to default to `LHLFactorization`, whose
+# reduction runs on the host: `CuArray <: DenseArray`, so `A.J isa DenseMatrix` holds on
+# the GPU and `_lhl_defaultable` accepted it. The solve then died on scalar indexing.
+@testset "WOperator on the GPU does not default to LHLFactorization" begin
+    n = 64
+    γ = 0.1
+    J = CUDACore.adapt(CuArray, rand(n, n) + n * I)
+    b_gpu = CUDACore.adapt(CuArray, rand(n))
+    W = LinearSolve.WOperator{true}(I, γ, J, similar(b_gpu))
+
+    @test LinearSolve.defaultalg(W, b_gpu, OperatorAssumptions(true)).alg !==
+        LinearSolve.DefaultAlgorithmChoice.LHLFactorization
+
+    sol = solve(LinearProblem(W, b_gpu))
+    @test SciMLBase.successful_retcode(sol)
+    ref = Array(J - I / γ) \ Array(b_gpu)
+    @test Array(sol.u) ≈ ref rtol = 1.0e-6
+
+    # A host `WOperator` of the same shape still takes the LHL path.
+    Jc = rand(n, n) + n * I
+    bc = rand(n)
+    Wc = LinearSolve.WOperator{true}(I, γ, Jc, similar(bc))
+    @test LinearSolve.defaultalg(Wc, bc, OperatorAssumptions(true)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.LHLFactorization
+end

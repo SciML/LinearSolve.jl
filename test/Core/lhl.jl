@@ -246,12 +246,86 @@ end
     @test bwd(ref1) < 1.0e-13
 end
 
-@testset "adjoint solve" begin
+@testset "adjoint solve reuses the reduction" begin
+    @test LinearSolve._adjoint_factorization_reuse(LHLFactorization) isa
+        LinearSolve._CustomAdjointFactorizationReuse
+
     n = 30
     J = randn(MersenneTwister(19), n, n)
     b = randn(MersenneTwister(20), n)
-    @test LinearSolve._adjoint_factorization_reuse(LHLFactorization) isa
-        LinearSolve._NoAdjointFactorizationReuse
+
+    # dense WOperator: the reverse pass solves Wᴴ x = b from the same reduction, and
+    # returning non-nothing proves it took the reuse path rather than the refactorizing
+    # fallback.
+    for γ in (0.4, 1.0e-3, 5.0)
+        cache = init(LinearProblem(wop(J, γ), b), LHLFactorization())
+        solve!(cache)
+        @test LinearSolve._custom_can_reuse_adjoint_factorization(cache.alg, cache.cacheval)
+        reused = LinearSolve._adjoint_factorization_solve(cache.alg, cache.cacheval, cache.A, b)
+        @test reused !== nothing
+        @test reused ≈ adjoint(dense(J, γ)) \ b rtol = 1.0e-9
+        @test LinearSolve._adjoint_solve(cache, b) ≈ adjoint(dense(J, γ)) \ b rtol = 1.0e-9
+    end
+
+    # a cheap re-shift keeps the adjoint current too
+    cache = init(LinearProblem(wop(J, 0.4), b), LHLFactorization())
+    solve!(cache)
+    update_gamma!(cache, 0.05)
+    @test LinearSolve._adjoint_solve(cache, b) ≈ adjoint(dense(J, 0.05)) \ b rtol = 1.0e-9
+
+    # complex γ on a real J: the adjoint keeps the real reduction and a complex shift
+    let γ = 0.2 + 0.3im, bc = randn(MersenneTwister(21), ComplexF64, n)
+        cache = init(
+            LinearProblem(WOperator{true}(I, γ, J, zeros(ComplexF64, n)), bc),
+            LHLFactorization()
+        )
+        solve!(cache)
+        @test LinearSolve._adjoint_solve(cache, bc) ≈ adjoint(J - I / γ) \ bc rtol = 1.0e-8
+    end
+
+    # a bare matrix reuses its reduction on the reverse pass as well
+    let A = randn(MersenneTwister(22), n, n)
+        cache = init(LinearProblem(A, b), LHLFactorization())
+        solve!(cache)
+        @test LinearSolve._adjoint_solve(cache, b) ≈ adjoint(A) \ b rtol = 1.0e-8
+    end
+
+    # a fully complex Jacobian
+    let Jc = randn(MersenneTwister(24), ComplexF64, n, n),
+            bc = randn(MersenneTwister(25), ComplexF64, n), γ = 0.3 + 0.1im
+
+        cache = init(
+            LinearProblem(wop(Jc, γ; u = zeros(ComplexF64, n)), bc),
+            LHLFactorization()
+        )
+        solve!(cache)
+        @test LinearSolve._adjoint_solve(cache, bc) ≈ adjoint(Jc - I / γ) \ bc rtol = 1.0e-8
+    end
+
+    # a batched (matrix) right-hand side solves column by column against the one reduction
+    let B = randn(MersenneTwister(26), n, 4), γ = 0.15
+        cache = init(LinearProblem(wop(J, γ), B[:, 1]), LHLFactorization())
+        solve!(cache)
+        X = LinearSolve._custom_adjoint_factorization_solve(cache.alg, cache.cacheval, cache.A, B)
+        @test X ≈ adjoint(dense(J, γ)) \ B rtol = 1.0e-8
+    end
+
+    # the block-triangular sparse LHL has no adjoint kernel, so it does not *reuse* the
+    # reduction (can_reuse is false), but the adjoint is still solved — against the
+    # assembled system with a fresh sparse LU
+    let Jsp = sparse([1, 2, 2, 3, 1], [1, 2, 3, 3, 3], [1.5, 2.0, 0.7, 1.1, 0.3], 3, 3),
+            bsp = randn(MersenneTwister(23), 3)
+
+        cache = init(LinearProblem(wop(Jsp, 0.1; u = zeros(3)), bsp), LHLFactorization())
+        solve!(cache)
+        @test !LinearSolve._custom_can_reuse_adjoint_factorization(cache.alg, cache.cacheval)
+        ref = adjoint(Matrix(Jsp) - I / 0.1) \ bsp
+        @test LinearSolve._adjoint_factorization_solve(cache.alg, cache.cacheval, cache.A, bsp) ≈
+            ref rtol = 1.0e-9
+        @test LinearSolve._adjoint_solve(cache, bsp) ≈ ref rtol = 1.0e-9
+    end
+
+    # still solves an assembled adjoint system when handed one directly
     @test solve(LinearProblem(adjoint(dense(J, 0.4)), b), LHLFactorization()).u ≈
         adjoint(dense(J, 0.4)) \ b rtol = 1.0e-9
 end

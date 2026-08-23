@@ -223,6 +223,19 @@ LinearSolveFunction
 LinearSolveAdjoint
 ```
 
+#### Low-rank updates of a factorized matrix
+
+A rank-`k` change to a matrix does not need a fresh factorization of it.
+`LowRankUpdatedMatrix(A, U, V; C = I)` carries `A + U C V'` unassembled, so the solve
+factorizes `A` once and absorbs the update through the Woodbury identity at the cost of a
+`k × k` factorization. It matters most when the update would destroy the structure of `A`:
+a dense update to a sparse matrix otherwise assembles to a dense one.
+
+See the [Low-Rank Updated System Solvers](@ref lowranksolvers) page for the supported
+factorizations and the cost breakdown, and the
+[Low-Rank Updates of a Factorized Matrix](@ref lowrankupdates) tutorial for a worked
+example.
+
 #### Repeated solves of `I - γJ` for varying `γ`
 
 An implicit ODE/DAE solver factorizes `W = I - γJ` (or `J - M/(dt·γ)`) at every step, but

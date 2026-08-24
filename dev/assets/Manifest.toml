@@ -5,9 +5,10 @@ manifest_format = "2.0"
 project_hash = "3bd0ffc55d6cdfc5517502fa5c5bb7a9044cbc00"
 
 [[deps.ADTypes]]
-git-tree-sha1 = "5970c86505ae9c07bf5bc521ef2bbbb3849e8b7b"
+deps = ["PrecompileTools"]
+git-tree-sha1 = "629de23e1c16911b439dabd2303c08af9575b226"
 uuid = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
-version = "1.23.0"
+version = "1.24.0"
 
     [deps.ADTypes.extensions]
     ADTypesChainRulesCoreExt = "ChainRulesCore"
@@ -296,14 +297,16 @@ uuid = "5ae59095-9a9b-59fe-a467-6f913c188581"
 version = "0.13.1"
 
 [[deps.CommonSolve]]
-git-tree-sha1 = "cf963add2340ad9960e5eb22844e61ad8f931fe1"
+deps = ["PrecompileTools"]
+git-tree-sha1 = "6c389fa857f6ca5a95474b52a52023fd77f24cb7"
 uuid = "38540f10-b2f7-11e9-35d8-d573e4eb0ff2"
-version = "0.2.13"
+version = "0.2.14"
 
 [[deps.CommonWorldInvalidations]]
-git-tree-sha1 = "ef2022bff55342a8c9846cdf218f62e475f0444d"
+deps = ["PrecompileTools"]
+git-tree-sha1 = "bc209b1a67dd03551fe305d72e88128764b89cf5"
 uuid = "f70d9fcc-98c5-4d4a-abd7-e4cdeebd8ca8"
-version = "1.1.2"
+version = "1.2.0"
 
 [[deps.Compat]]
 deps = ["TOML", "UUIDs"]
@@ -330,9 +333,10 @@ weakdeps = ["InverseFunctions"]
     CompositionsBaseInverseFunctionsExt = "InverseFunctions"
 
 [[deps.ConcreteStructs]]
-git-tree-sha1 = "804fc3ca1cbfdd5aa52ae3149c0cb0555f875eec"
+deps = ["PrecompileTools"]
+git-tree-sha1 = "a72c3b5ce6d2a477f55b5c9b8756e91e695c67f6"
 uuid = "2569d6c7-a4a2-43d3-a901-331e8e4be471"
-version = "0.2.7"
+version = "0.2.8"
 
 [[deps.ConcurrentUtilities]]
 deps = ["Serialization", "Sockets"]
@@ -831,14 +835,15 @@ uuid = "88015f11-f218-50d7-93a8-a6af411a945d"
 version = "4.1.0+0"
 
 [[deps.LHLFactorization]]
-deps = ["LinearAlgebra"]
-git-tree-sha1 = "3317936e66b2ab663af6908abd48f7d8f11e3ee8"
+deps = ["LinearAlgebra", "PrecompileTools"]
+git-tree-sha1 = "7b40ce7fd1962d83f252252db61b85827b1d6d2f"
 uuid = "2faa5264-e118-4071-8864-e10559f68c7c"
-version = "2.0.0"
-weakdeps = ["Polyester"]
+version = "2.2.0"
+weakdeps = ["Polyester", "PureKLU", "SparseArrays"]
 
     [deps.LHLFactorization.extensions]
     LHLFactorizationPolyesterExt = "Polyester"
+    LHLFactorizationSparseExt = ["PureKLU", "SparseArrays"]
 
 [[deps.LLVM]]
 deps = ["CEnum", "LLVMExtra_jll", "Libdl", "PrecompileTools", "Preferences", "Printf", "Unicode"]
@@ -990,7 +995,7 @@ version = "1.12.0"
 
 [[deps.LinearSolve]]
 deps = ["AMD", "ArrayInterface", "ConcreteStructs", "DocStringExtensions", "EnumX", "GPUArraysCore", "InteractiveUtils", "Krylov", "LHLFactorization", "Libdl", "LinearAlgebra", "MKL_jll", "Markdown", "OpenBLAS_jll", "PrecompileTools", "Preferences", "PureKLU", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLLogging", "SciMLOperators", "SciMLStructures", "Setfield", "SparseArrays", "SparseColumnPivotedQR", "StaticArraysCore"]
-path = "/home/runner/_work/LinearSolve.jl/LinearSolve.jl"
+path = "/home/runner/work/LinearSolve.jl/LinearSolve.jl"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 version = "5.13.0"
 
@@ -1373,9 +1378,9 @@ version = "1.4.3"
 
 [[deps.PreallocationTools]]
 deps = ["Adapt", "ArrayInterface", "PrecompileTools", "SciMLPublic"]
-git-tree-sha1 = "5e1c95fb1366c7f92c44839b22fc362257895a34"
+git-tree-sha1 = "64ec7ddf029c70030b313601d5804259310fdbeb"
 uuid = "d236fae5-4411-538c-8e31-a6e3d9e00b46"
-version = "1.5.0"
+version = "1.6.0"
 
     [deps.PreallocationTools.extensions]
     PreallocationToolsEnzymeCoreExt = "EnzymeCore"
@@ -1586,10 +1591,10 @@ uuid = "ae029012-a4dd-5104-9daa-d747884805df"
 version = "1.3.1"
 
 [[deps.RuntimeGeneratedFunctions]]
-deps = ["ExprTools", "SHA", "Serialization"]
-git-tree-sha1 = "65c9e1142f0372bfc16ba14b9edd57737fe0039f"
+deps = ["ExprTools", "PrecompileTools", "SHA", "Serialization"]
+git-tree-sha1 = "6cb9b83354089fcb33c643773acfd3235f2f1bf5"
 uuid = "7e49a35a-f44a-4d26-94aa-eba1b4ca6b47"
-version = "0.5.24"
+version = "0.5.25"
 
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
@@ -1608,9 +1613,9 @@ version = "0.6.46"
 
 [[deps.SciMLBase]]
 deps = ["ADTypes", "Accessors", "Adapt", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FindFirstFunctions", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "LoggingExtras", "Markdown", "PreallocationTools", "PrecompileTools", "Preferences", "Printf", "Random", "RecipesBase", "RecursiveArrayTools", "RuntimeGeneratedFunctions", "SciMLOperators", "SciMLPublic", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface"]
-git-tree-sha1 = "ecef3adefb299e19a08d03ebb60d7c2a8e5db3d9"
+git-tree-sha1 = "b0f7b7317a89b643e474292ef7b8e4a7ae87a1d1"
 uuid = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
-version = "3.49.1"
+version = "3.49.2"
 
     [deps.SciMLBase.extensions]
     SciMLBaseChainRulesCoreExt = "ChainRulesCore"
@@ -1657,20 +1662,20 @@ version = "3.49.1"
     ZygoteRules = "700de1a5-db45-46bc-99cf-38207098b444"
 
 [[deps.SciMLLogging]]
-deps = ["Logging", "LoggingExtras", "Preferences"]
-git-tree-sha1 = "36be2198d9dc476ac27efb1fe0f789d9e1dca01c"
+deps = ["Logging", "LoggingExtras", "PrecompileTools", "Preferences"]
+git-tree-sha1 = "3aafee7edc2ec7e71f50dcc6816cb031fac390a0"
 uuid = "a6db7da4-7206-11f0-1eab-35f2a5dbe1d1"
-version = "2.0.4"
+version = "2.1.0"
 weakdeps = ["Tracy"]
 
     [deps.SciMLLogging.extensions]
     SciMLLoggingTracyExt = "Tracy"
 
 [[deps.SciMLOperators]]
-deps = ["Accessors", "Adapt", "ArrayInterface", "DocStringExtensions", "LinearAlgebra", "SciMLPublic"]
-git-tree-sha1 = "fdba76643b52cc34baeda645b7a0c9a7a89db01a"
+deps = ["Accessors", "Adapt", "ArrayInterface", "DocStringExtensions", "LinearAlgebra", "PrecompileTools", "SciMLPublic"]
+git-tree-sha1 = "bfc5c186382cc6afa718ca1c228a437d5893e918"
 uuid = "c0aeaf25-5076-4817-a8d5-81caf7dfa961"
-version = "1.28.0"
+version = "1.29.0"
 weakdeps = ["LoopVectorization", "SparseArrays"]
 
     [deps.SciMLOperators.extensions]
@@ -1678,9 +1683,10 @@ weakdeps = ["LoopVectorization", "SparseArrays"]
     SciMLOperatorsSparseArraysExt = "SparseArrays"
 
 [[deps.SciMLPublic]]
-git-tree-sha1 = "cf9aaf8b9ed5db993259ea8b24cf2b7ba9bd3b79"
+deps = ["PrecompileTools"]
+git-tree-sha1 = "74685afb51732a464fbce79a72708f7c4203ceb7"
 uuid = "431bcebd-1456-4ced-9d72-93c2757fff0b"
-version = "1.2.4"
+version = "1.3.0"
 
 [[deps.SciMLStructures]]
 deps = ["ArrayInterface", "PrecompileTools"]
@@ -1756,9 +1762,9 @@ version = "1.4.0"
 
 [[deps.SparseColumnPivotedQR]]
 deps = ["LinearAlgebra", "PrecompileTools", "SparseArrays"]
-git-tree-sha1 = "ee8155fd93f0efc510e4523850bd9e0bb6e03199"
+git-tree-sha1 = "01ac65d0bf2f42a9491b80c4076f4e02b462a9e6"
 uuid = "a57abbd0-fea5-4d57-96be-5e525945e8e4"
-version = "2.1.6"
+version = "2.1.7"
 weakdeps = ["AMD"]
 
     [deps.SparseColumnPivotedQR.extensions]

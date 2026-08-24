@@ -1204,12 +1204,12 @@ function init_cacheval(
         alg::CholeskyFactorization, A::GPUArraysCore.AnyGPUArray, b, u, Pl,
         Pr, maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
-    # `cholesky` needs a square matrix. The default solver initializes every slot it
-    # holds, this one included, before it knows which it will use, so a non-square `A`
-    # would fail here rather than reaching the least-squares algorithm that will actually
-    # serve it. Leave the slot empty instead.
+    # `cholesky` needs a square matrix, and the default solver initializes this slot for
+    # every `A` before it knows which algorithm it will use. Instance an empty
+    # factorization for a non-square `A`, rather than returning `nothing`, so the return
+    # type does not depend on the runtime value of `assumptions.issq`.
     # See https://github.com/SciML/NonlinearSolve.jl/issues/746
-    assumptions.issq || return nothing
+    assumptions.issq || return cholesky(similar(A, 0, 0); check = false)
     return cholesky(A; check = false)
 end
 

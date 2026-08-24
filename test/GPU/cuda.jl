@@ -245,7 +245,7 @@ end
 
         @test LinearSolve.defaultalg(A, b, OperatorAssumptions(false)).alg ===
             LinearSolve.DefaultAlgorithmChoice.QRFactorization
-        @test solve(LinearProblem(A, b), QRFactorization()).u ≈ ref rtol = 1.0e-4
+        @test Array(solve(LinearProblem(A, b), QRFactorization()).u) ≈ ref rtol = 1.0e-4
     end
 
     # The wide solve has to be the minimum-norm one, which is what dense `\` gives on

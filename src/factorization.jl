@@ -1054,7 +1054,13 @@ function do_factorization(alg::QRFactorization, A, b, u)
         # `alg.pivot` so the return type is determined by the static
         # `QRFactorization{P}` parameter (otherwise this branch returns
         # `Union{QRCompactWY, QRPivoted}` depending on `alg.inplace`).
-        if A isa GPUArraysCore.AnyGPUArray || is_cusparse(A) || issparsematrixcsc(A)
+        if A isa GPUArraysCore.AnyGPUArray && !is_cusparse(A) && is_underdetermined(A)
+            # A GPU `qr` factors a wide matrix happily, but solving with the result
+            # builds `UpperTriangular(R)` on an `R` that is not square and throws.
+            # Going through `Aᵀ` turns it back into a triangular solve and gives the
+            # minimum-norm solution, which is what dense `\` returns on the CPU.
+            fact = MinNormQR(qr(copy(transpose(A))))
+        elseif A isa GPUArraysCore.AnyGPUArray || is_cusparse(A) || issparsematrixcsc(A)
             fact = qr(A)
         elseif alg.inplace
             if A isa Symmetric
@@ -1076,7 +1082,13 @@ function init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    return ArrayInterface.qr_instance(convert(AbstractMatrix, A), alg.pivot)
+    A_ = convert(AbstractMatrix, A)
+    # Matches the wide GPU branch of `do_factorization`: the slot has to be typed for
+    # what will be stored in it, not for a plain `QR`.
+    if A_ isa GPUArraysCore.AnyGPUArray && !is_cusparse(A_) && is_underdetermined(A_)
+        return MinNormQR(qr(copy(transpose(A_))))
+    end
+    return ArrayInterface.qr_instance(A_, alg.pivot)
 end
 
 function init_cacheval(
@@ -1192,6 +1204,12 @@ function init_cacheval(
         alg::CholeskyFactorization, A::GPUArraysCore.AnyGPUArray, b, u, Pl,
         Pr, maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
+    # `cholesky` needs a square matrix. The default solver initializes every slot it
+    # holds, this one included, before it knows which it will use, so a non-square `A`
+    # would fail here rather than reaching the least-squares algorithm that will actually
+    # serve it. Leave the slot empty instead.
+    # See https://github.com/SciML/NonlinearSolve.jl/issues/746
+    assumptions.issq || return nothing
     return cholesky(A; check = false)
 end
 

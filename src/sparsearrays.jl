@@ -1133,6 +1133,13 @@ function LinearSolve.init_cacheval(
         nothing
     elseif LinearSolve.is_cusparse_csr(A) && !LinearSolve.cudss_loaded(A)
         nothing
+    elseif A isa LinearSolve.GPUArraysCore.AnyGPUArray && !assumptions.issq
+        # A non-square GPU `A` cannot be instanced here: `cholesky_instance` needs a
+        # square matrix, and the default solver reaches this slot for every `A` before
+        # it knows which algorithm it will use. Sparse CPU input is deliberately not
+        # covered by this branch, since `cholesky_instance` handles a non-square sparse
+        # `A` and `solve!` stores a real factorization into the slot afterwards.
+        nothing
     else
         ArrayInterface.cholesky_instance(convert(AbstractMatrix, A))
     end

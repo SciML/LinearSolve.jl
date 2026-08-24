@@ -219,3 +219,39 @@ end
     @test LinearSolve.defaultalg(Wc, bc, OperatorAssumptions(true)).alg ===
         LinearSolve.DefaultAlgorithmChoice.LHLFactorization
 end
+
+# Two separate failures kept a non-square GPU `A` from solving at all.
+#
+# `_init_default_cacheval` builds a cacheval for every algorithm slot before it knows
+# which one it will use, and two of those slots called `cholesky` on `A` itself, so
+# `init` threw `DimensionMismatch` before any algorithm ran. Then for a wide `A`, the
+# QR solve itself threw: a GPU `qr` factors a wide matrix, but solving with the result
+# builds `UpperTriangular(R)` on a non-square `R`.
+# See https://github.com/SciML/NonlinearSolve.jl/issues/746 and #857.
+@testset "Non-square GPU matrices" begin
+    tall = CUDACore.adapt(CuArray, Float32[1 2; 3 4; 5 6; 7 8])
+    btall = CUDACore.adapt(CuArray, Float32[1, 2, 3, 4])
+    wide = CUDACore.adapt(CuArray, Float32[1 2 3 4; 5 6 7 8])
+    bwide = CUDACore.adapt(CuArray, Float32[1, 2])
+
+    @testset "$name" for (name, A, b) in (("tall", tall, btall), ("wide", wide, bwide))
+        ref = Array(A) \ Array(b)
+
+        # `init` is where every slot gets built, and where this used to throw.
+        cache = init(LinearProblem(A, b))
+        sol = solve!(cache)
+        @test SciMLBase.successful_retcode(sol)
+        @test Array(sol.u) ≈ ref rtol = 1.0e-4
+
+        @test LinearSolve.defaultalg(A, b, OperatorAssumptions(false)).alg ===
+            LinearSolve.DefaultAlgorithmChoice.QRFactorization
+        @test solve(LinearProblem(A, b), QRFactorization()).u ≈ ref rtol = 1.0e-4
+    end
+
+    # The wide solve has to be the minimum-norm one, which is what dense `\` gives on
+    # the CPU. Agreeing on the residual alone would not distinguish it from any other
+    # point on the solution manifold.
+    xwide = Array(solve(LinearProblem(wide, bwide)).u)
+    @test norm(xwide) ≈ norm(Array(wide) \ Array(bwide)) rtol = 1.0e-4
+    @test Array(wide) * xwide ≈ Array(bwide) rtol = 1.0e-4
+end

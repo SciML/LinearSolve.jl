@@ -345,3 +345,33 @@ end
         end
     end
 end
+
+# `get_KrylovJL_solver` matched `cg_lanczos!` twice. The first branch handed back the
+# *shifted* workspace, so the documented `KrylovAlg = Krylov.cg_lanczos!` threw a
+# `MethodError` out of the workspace constructor, and the second branch, the correct
+# one, was unreachable. See SciML/LinearSolve.jl#554.
+@testset "documented KrylovAlg values map to their own workspace" begin
+    for (f, W) in (
+            (Krylov.cg!, Krylov.CgWorkspace),
+            (Krylov.cg_lanczos!, Krylov.CgLanczosWorkspace),
+            (Krylov.cgls!, Krylov.CglsWorkspace),
+            (Krylov.minres!, Krylov.MinresWorkspace),
+            (Krylov.gmres!, Krylov.GmresWorkspace),
+        )
+        @test LinearSolve.get_KrylovJL_solver(f) === W
+    end
+
+    # The shifted variants need a `shifts` argument that this wrapper never passes, and
+    # the docstring does not list them, so they stay unmapped rather than advertised.
+    @test_throws ErrorException LinearSolve.get_KrylovJL_solver(Krylov.cg_lanczos_shift!)
+
+    # `cg_lanczos!` wants a symmetric positive definite system.
+    Random.seed!(554)
+    nl = 24
+    Xl = rand(nl, nl)
+    Al = Xl' * Xl + nl * I
+    bl = rand(nl)
+    sol = solve(LinearProblem(Al, bl), KrylovJL(KrylovAlg = Krylov.cg_lanczos!))
+    @test SciMLBase.successful_retcode(sol)
+    @test sol.u ≈ Al \ bl rtol = 1.0e-6
+end

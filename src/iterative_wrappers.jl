@@ -373,8 +373,6 @@ function get_KrylovJL_solver(KrylovAlg)
         Krylov.CrmrWorkspace
     elseif (KrylovAlg === Krylov.cg!)
         Krylov.CgWorkspace
-    elseif (KrylovAlg === Krylov.cg_lanczos!)
-        Krylov.CgLanczosShiftWorkspace
     elseif (KrylovAlg === Krylov.cgls!)
         Krylov.CglsWorkspace
     elseif (KrylovAlg === Krylov.cg_lanczos!)

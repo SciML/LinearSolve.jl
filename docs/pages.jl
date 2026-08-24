@@ -15,6 +15,7 @@ pages = [
         "tutorials/autotune.md",
         "tutorials/eigenvalue.md",
         "tutorials/shifted_systems.md",
+        "tutorials/low_rank_updates.md",
     ],
     "Basics" => Any[
         "basics/LinearProblem.md",
@@ -25,7 +26,10 @@ pages = [
         "basics/Preconditioners.md",
         "basics/FAQ.md",
     ],
-    "Solvers" => Any["solvers/solvers.md", "solvers/eigenvalue_solvers.md"],
+    "Solvers" => Any[
+        "solvers/solvers.md", "solvers/eigenvalue_solvers.md",
+        "solvers/low_rank_solvers.md",
+    ],
     "Advanced" => Any[
         "advanced/algorithm_interface.md",
         "advanced/developing.md",

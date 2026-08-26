@@ -717,7 +717,7 @@ function _blocked_generic_lufact!(
         ipiv::AbstractVector{<:Integer}, pack::Union{Nothing, Vector{T}};
         check::Bool = true, allowsingular::Bool = false
     ) where {T <: Union{Float32, Float64}}
-    Base.require_one_based_indexing(A, ipiv)
+    require_one_based_indexing(A, ipiv)
     if check && !all(isfinite, A)
         throw(ArgumentError("matrix contains Infs or NaNs"))
     end

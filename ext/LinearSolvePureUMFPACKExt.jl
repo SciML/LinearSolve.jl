@@ -5,7 +5,7 @@ using LinearSolve: LinearSolve, PureUMFPACKFactorization, OperatorAssumptions,
 using PureUMFPACK: PureUMFPACK, PureLU, splu
 using SparseArrays: SparseArrays, AbstractSparseArray, SparseMatrixCSC,
     nonzeros, rowvals, getcolptr
-using SciMLOperators: AbstractSciMLOperator, has_concretization
+using SciMLOperators: AbstractSciMLOperator
 using SciMLLogging: @SciMLMessage
 using SciMLBase: SciMLBase, ReturnCode
 using LinearAlgebra: diag
@@ -42,7 +42,7 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
-    if has_concretization(A)
+    if LinearSolve._has_concretization(A)
         return LinearSolve.init_cacheval(
             alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions

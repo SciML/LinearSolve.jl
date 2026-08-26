@@ -302,6 +302,14 @@ needs_concrete_A(alg::AbstractKrylovSubspaceMethod) = false
 needs_concrete_A(alg::AbstractSolveFunction) = false
 
 # Util
+# `SciMLOperators.has_concretization(::AbstractWOperator)` is an unconditional `true`, so a
+# `WOperator` over a matrix-free Jacobian says it can be concretized and then throws from
+# `convert`. The default solver builds a cacheval for every slot it holds, several of which
+# concretize, so that lands as a `MethodError` from `init` before any algorithm runs. Ask
+# the Jacobian instead. See https://github.com/SciML/LinearSolve.jl/issues/1236.
+_has_concretization(A) = SciMLOperators.has_concretization(A)
+_has_concretization(W::SciMLOperators.AbstractWOperator) = _has_concretization(W.J)
+
 is_underdetermined(x) = false
 is_underdetermined(A::AbstractMatrix) = size(A, 1) < size(A, 2)
 is_underdetermined(A::AbstractSciMLOperator) = size(A, 1) < size(A, 2)

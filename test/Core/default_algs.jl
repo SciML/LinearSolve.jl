@@ -677,3 +677,36 @@ let
     # Default solver path: should fall back to SPQR and succeed.
     @test solve(pr_991).retcode === ReturnCode.Success
 end
+
+# `SciMLOperators.has_concretization` answers `true` for any `WOperator`, without looking
+# at its Jacobian, so a matrix-free `J` used to claim it could be concretized and then
+# throw a `MethodError` out of `convert`. The default solver builds a cacheval for every
+# slot it holds, several of which concretize, so this happened during `init` before any
+# algorithm ran, while an explicit Krylov solve on the same operator worked fine.
+# See SciML/LinearSolve.jl#1236.
+@testset "matrix-free WOperator reaches the default solver (#1236)" begin
+    n = 40
+    Jm = rand(n, n) + n * I
+    bw = rand(n)
+    γ = 0.1
+    fj(v, u, p, t) = Jm * v
+    fj(w, v, u, p, t) = mul!(w, Jm, v)
+    Jfree = FunctionOperator(fj, zeros(n), zeros(n); islinear = true)
+
+    Wfree = WOperator{true}(I, γ, Jfree, zeros(n))
+    Wdense = WOperator{true}(I, γ, Jm, zeros(n))
+    ref = (Jm - I / γ) \ bw
+
+    @test !LinearSolve._has_concretization(Wfree)
+    @test LinearSolve._has_concretization(Wdense)
+
+    # This is what threw: `init` builds every slot.
+    sol = solve(LinearProblem(Wfree, bw))
+    @test SciMLBase.successful_retcode(sol)
+    @test sol.u ≈ ref rtol = 1.0e-6
+
+    # A concretizable Jacobian is untouched and still reaches the shifted-system path.
+    @test LinearSolve.defaultalg(Wdense, bw, OperatorAssumptions(true)).alg ===
+        LinearSolve.DefaultAlgorithmChoice.LHLFactorization
+    @test solve(LinearProblem(Wdense, bw)).u ≈ ref rtol = 1.0e-8
+end

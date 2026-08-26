@@ -17,7 +17,7 @@
 # (CUSOLVERRF, CliqueTrees, Enzyme, Ginkgo, HSL, MUMPS, PETSc, PETScMPI, ParU,
 # PureUMFPACK, Pardiso, SuperLUDIST, STRUMPACK, Sparspak).
 
-using SciMLOperators: AbstractSciMLOperator, has_concretization
+using SciMLOperators: AbstractSciMLOperator
 using ArrayInterface: ArrayInterface
 using LinearAlgebra: LinearAlgebra, I, Hermitian, Symmetric, cholesky, ldiv!, lu, lu!
 using SparseArrays: SparseArrays, AbstractSparseArray, AbstractSparseMatrixCSC,
@@ -529,7 +529,7 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
-    if has_concretization(A)
+    if LinearSolve._has_concretization(A)
         return LinearSolve.init_cacheval(
             alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions
@@ -544,7 +544,7 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
-    if has_concretization(A)
+    if LinearSolve._has_concretization(A)
         return LinearSolve.init_cacheval(
             alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions
@@ -559,7 +559,7 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
-    if has_concretization(A)
+    if LinearSolve._has_concretization(A)
         return LinearSolve.init_cacheval(
             alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions
@@ -575,7 +575,7 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
-    if has_concretization(A)
+    if LinearSolve._has_concretization(A)
         return LinearSolve.init_cacheval(
             alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions
@@ -743,7 +743,7 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
-    if has_concretization(A)
+    if LinearSolve._has_concretization(A)
         return LinearSolve.init_cacheval(
             alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions
@@ -876,7 +876,7 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
-    if has_concretization(A)
+    if LinearSolve._has_concretization(A)
         return LinearSolve.init_cacheval(
             alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions
@@ -1009,7 +1009,7 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
-    if has_concretization(A)
+    if LinearSolve._has_concretization(A)
         return LinearSolve.init_cacheval(
             alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
             maxiters, abstol, reltol, verbose, assumptions

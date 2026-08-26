@@ -1,5 +1,5 @@
 using LinearSolve, RecursiveFactorization, LinearAlgebra, SparseArrays, Test
-using SciMLOperators: FunctionOperator, MatrixOperator, WOperator
+using SciMLOperators: FunctionOperator, MatrixOperator, WOperator, has_concretization
 
 @test LinearSolve.defaultalg(nothing, zeros(3)).alg === LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
 prob = LinearProblem(rand(3, 3), rand(3))
@@ -678,9 +678,9 @@ let
     @test solve(pr_991).retcode === ReturnCode.Success
 end
 
-# `SciMLOperators.has_concretization` answers `true` for any `WOperator`, without looking
-# at its Jacobian, so a matrix-free `J` used to claim it could be concretized and then
-# throw a `MethodError` out of `convert`. The default solver builds a cacheval for every
+# `has_concretization` used to answer `true` for any `WOperator` without looking at its
+# Jacobian, so a matrix-free `J` claimed it could be concretized and then threw a
+# `MethodError` out of `convert`. Fixed in SciMLOperators (SciML/SciMLOperators.jl#427). The default solver builds a cacheval for every
 # slot it holds, several of which concretize, so this happened during `init` before any
 # algorithm ran, while an explicit Krylov solve on the same operator worked fine.
 # See SciML/LinearSolve.jl#1236.
@@ -697,8 +697,8 @@ end
     Wdense = WOperator{true}(I, γ, Jm, zeros(n))
     ref = (Jm - I / γ) \ bw
 
-    @test !LinearSolve._has_concretization(Wfree)
-    @test LinearSolve._has_concretization(Wdense)
+    @test !has_concretization(Wfree)
+    @test has_concretization(Wdense)
 
     # This is what threw: `init` builds every slot.
     sol = solve(LinearProblem(Wfree, bw))

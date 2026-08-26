@@ -142,7 +142,7 @@ linearsolve_internal_accesses = (
     :_SPARSE_LU_FALLBACK_ALGORITHMS, :_SPARSE_ONLY_ALGORITHMS,
     :__is_extension_loaded, :__nonstructural_zeros, :_adjoint_factorization_solve,
     :_adjoint_krylov_solve, :_adjoint_precs, :_adjoint_solve, :_can_reuse_cache_factorization,
-    :_check_matrix_support, :_check_residual_safety, :_has_concretization,
+    :_check_matrix_support, :_check_residual_safety,
     :_custom_adjoint_factorization_solve, :_custom_cache_factorization,
     :_custom_can_reuse_adjoint_factorization, Symbol("_direct_lu_factorize!"),
     Symbol("_direct_lu_solve!"), Symbol("_fast_sym_givens!"), :_init_cacheval,

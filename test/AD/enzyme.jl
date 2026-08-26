@@ -611,3 +611,69 @@ end
         @test db ≈ ForwardDiff.gradient(y -> f(A, y), copy(b)) rtol = 1.0e-8
     end
 end
+
+# A `LinearProblem` holds `A` and `b` in one struct, so building one from an active `A`
+# and a constant `b` used to make Enzyme store constant memory into a differentiable
+# object and demand runtime activity. The rule on the constructor gives it a zero for the
+# constant field instead. See SciML/LinearSolve.jl#766.
+@testset "mixed activity differentiates under plain Reverse (#766)" begin
+    n = 8
+    A0 = rand(n, n) + n * I
+    b0 = rand(n)
+    f(A, b) = sum(solve(LinearProblem(A, b), LUFactorization()).u)
+
+    # d/dA sum(A \ b) = -(A' \ 1) * (A \ b)',  d/db sum(A \ b) = A' \ 1
+    grad_A = -(A0' \ ones(n)) * (A0 \ b0)'
+    grad_b = A0' \ ones(n)
+
+    dA = zeros(n, n)
+    bconst = copy(b0)
+    Enzyme.autodiff(
+        Enzyme.Reverse, f, Active, Duplicated(copy(A0), dA), Const(bconst)
+    )
+    @test dA ≈ grad_A rtol = 1.0e-8
+    # The constant must come back untouched: its shadow is a throwaway zero, not itself.
+    @test bconst == b0
+
+    db = zeros(n)
+    Enzyme.autodiff(
+        Enzyme.Reverse, f, Active, Const(copy(A0)), Duplicated(copy(b0), db)
+    )
+    @test db ≈ grad_b rtol = 1.0e-8
+
+    # Both active is the case that already worked, and has to keep working.
+    dA2 = zeros(n, n)
+    db2 = zeros(n)
+    Enzyme.autodiff(
+        Enzyme.Reverse, f, Active,
+        Duplicated(copy(A0), dA2), Duplicated(copy(b0), db2)
+    )
+    @test dA2 ≈ grad_A rtol = 1.0e-8
+    @test db2 ≈ grad_b rtol = 1.0e-8
+end
+
+@testset "the returned solution is the differentiable one (#766)" begin
+    function via_sol(lambda)
+        A = zeros(100, 100)
+        b = ones(100)
+        for i in 1:size(A, 1)
+            A[i, i] += lambda
+        end
+        return sum(solve!(init(LinearProblem(A, b), KrylovJL_CG())).u)
+    end
+
+    function via_cache(lambda)
+        A = zeros(100, 100)
+        b = ones(100)
+        for i in 1:size(A, 1)
+            A[i, i] += lambda
+        end
+        cache = init(LinearProblem(A, b), KrylovJL_CG())
+        solve!(cache)
+        return sum(cache.u)
+    end
+
+    # sum(x) where (lambda * I) x = 1 is 100 / lambda, so the derivative is -100 / lambda^2.
+    @test Enzyme.gradient(Enzyme.Reverse, via_sol, 0.3)[1] ≈ -100 / 0.3^2 rtol = 1.0e-6
+    @test_throws ErrorException Enzyme.gradient(Enzyme.Reverse, via_cache, 0.3)
+end

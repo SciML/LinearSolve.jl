@@ -146,3 +146,21 @@ Two details worth knowing:
   - The preference controls whether LinearSolve.jl *loads and uses* MKL_jll, not
     whether it is installed. MKL_jll stays a declared dependency, so it remains in the
     dependency graph and Pkg still installs it.
+
+## Why does differentiating a solve with Enzyme fail on `cache.u`?
+
+Take the solution from the value `solve!` gives back, not from the cache:
+
+```julia
+sol = solve!(cache)
+sum(sol.u)        # differentiable
+sum(cache.u)      # errors, "Adjoint case currently not handled"
+```
+
+The reverse rule is written against the returned solution, so reading `cache.u` after the
+solve has no derivative attached to it.
+
+Mixing activities is fine for a dense or sparse `A`: carrying a derivative on `A` while `b`
+is a captured constant, or the other way round, differentiates under a plain `Reverse`. A
+structured `A`, such as a `Tridiagonal` or a unit triangular, still wants
+`set_runtime_activity` for that case.

@@ -12,15 +12,19 @@ jobs:
       fail-fast: false
       matrix:
         package:
-          - {user: SciML, repo: OrdinaryDiffEq.jl, group: InterfaceII}
-          - {user: SciML, repo: ModelingToolkit.jl, group: All}
-          - {user: SciML, repo: SciMLSensitivity.jl, group: Core1}
-          - {user: SciML, repo: BoundaryValueDiffEq.jl, group: All}
-          - {user: SciML, repo: NonlinearSolve.jl, group: Core}
-    uses: "SciML/.github/.github/workflows/downstream.yml@v1"
+          - {user: SciML, repo: OrdinaryDiffEq.jl, group: InterfaceII, ref: ""}
+          # MTK main currently cannot resolve (ModelingToolkitBase requires
+          # OrderedCollections 2 while StateSelection 1.10.x caps OC at 1.x).
+          - {user: SciML, repo: SciMLSensitivity.jl, group: Core1, ref: 838ad653f7f7feeb680806dd32d0b672caf96c4d}
+          # BVP main added BigFloat+sparse AD tests that hit a SparseConnectivityTracer
+          # promote_rule ambiguity with Base.MPFR; pin until upstream fixes land.
+          - {user: SciML, repo: BoundaryValueDiffEq.jl, group: All, ref: 31d81beb31242f0b4f43d044392648d8831d0565}
+          - {user: SciML, repo: NonlinearSolve.jl, group: Core, ref: ""}
+    uses: ./.github/workflows/downstream-local.yml
     with:
       owner: "${{ matrix.package.user }}"
       repo: "${{ matrix.package.repo }}"
       group: "${{ matrix.package.group }}"
-      julia-version: "1"
-    secrets: "inherit"
+      ref: "${{ matrix.package.ref }}"
+      julia-version: lts
+    secrets: inherit

@@ -1,0 +1,68 @@
+name: "LinearSolve Downstream Tests"
+
+on:
+  workflow_call:
+    inputs:
+      owner:
+        required: true
+        type: string
+      repo:
+        required: true
+        type: string
+      group:
+        default: "All"
+        type: string
+      ref:
+        default: ""
+        type: string
+      julia-version:
+        default: "lts"
+        type: string
+
+jobs:
+  downstream-tests:
+    name: "Downstream Tests - ${{ inputs.group }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout LinearSolve.jl"
+        uses: actions/checkout@v7
+
+      - name: "Checkout downstream ${{ inputs.owner }}/${{ inputs.repo }}"
+        uses: actions/checkout@v7
+        with:
+          repository: "${{ inputs.owner }}/${{ inputs.repo }}"
+          path: downstream
+          ref: ${{ inputs.ref != '' && inputs.ref || github.event.repository.default_branch }}
+
+      - name: "Setup Julia ${{ inputs.julia-version }}"
+        uses: julia-actions/setup-julia@v3
+        with:
+          version: "${{ inputs.julia-version }}"
+
+      - uses: julia-actions/julia-buildpkg@v1
+
+      - name: "Run downstream tests"
+        shell: julia --color=yes --project=downstream {0}
+        env:
+          GROUP: ${{ inputs.group }}
+        run: |
+          using Pkg
+          downstream_project = normpath("downstream")
+          Pkg.activate(downstream_project)
+          @info "Selected downstream project" downstream_project
+          Pkg.develop(PackageSpec(path = pwd()))
+          # Do not call Pkg.update(): downstream manifests already pin a
+          # compatible stack, and a full re-resolve currently breaks several
+          # SciML test environments (NLsolve/NonlinearSolve, OrderedCollections).
+          Pkg.test(coverage = true)
+
+      - uses: julia-actions/julia-processcoverage@v1
+
+      - name: "Report Coverage with Codecov"
+        uses: codecov/codecov-action@v7
+        continue-on-error: true
+        with:
+          files: lcov.info
+          token: "${{ secrets.CODECOV_TOKEN }}"
+          disable_safe_directory: true
+          fail_ci_if_error: false

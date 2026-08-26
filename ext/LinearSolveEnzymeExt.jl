@@ -631,6 +631,70 @@ verbatim (the staleness flags, the algorithm, a cacheval), and is passed through
 _shadow_of_constant(x::AbstractArray) = zero(x)
 _shadow_of_constant(x) = x
 
+# Enzyme works out the shadow of a `LinearProblem` from the activity of the arguments it
+# was built from. With `A` active and `b` constant, or the other way round, that means
+# storing constant memory into a struct it has to treat as differentiable, which its
+# static analysis rejects: "Constant memory is stored (or returned) to a differentiable
+# variable". Building the shadow here instead, with a zero standing in for each constant
+# argument, keeps every field differentiable and lets a plain `Reverse` through, so
+# callers do not need `set_runtime_activity` just because one of `A` and `b` is a
+# captured constant. See https://github.com/SciML/LinearSolve.jl/issues/766.
+#
+# Nothing has to be propagated in reverse: an active argument contributes its own `dval`
+# to the shadow, so whatever accumulates into the shadow problem is already accumulating
+# into the caller's array. A constant contributes a fresh zero, which absorbs its share
+# and is dropped, which is what a constant should get.
+# Only the plain dense and sparse matrices need this. Structured types already
+# differentiate through the generic path, and routing them through a hand-built shadow
+# trips an assertion inside Enzyme, so they are left alone.
+const _LP_RULE_MATRIX = Union{Matrix, AbstractSparseMatrixCSC}
+
+_lp_shadow(x::Const, _) = _shadow_of_constant(x.val)
+_lp_shadow(x::Duplicated, _) = x.dval
+_lp_shadow(x::EnzymeCore.BatchDuplicated, i::Int) = x.dval[i]
+_lp_shadow(x, _) = x.dval
+
+# `u0` and `f` arrive as keywords rather than as annotated arguments, so their activity is
+# not visible here. Zeroing any array among them keeps the shadow from aliasing the
+# primal, which would otherwise let an accumulation into the shadow corrupt the problem.
+_lp_shadow_kwargs(kwargs) =
+    NamedTuple{keys(kwargs)}(map(_shadow_of_constant, values(values(kwargs))))
+
+function EnzymeRules.augmented_primal(
+        config, func::Const{Type{LinearSolve.LinearProblem}}, ::Type{RT},
+        A::EnzymeCore.Annotation{<:_LP_RULE_MATRIX}, b::EnzymeCore.Annotation,
+        args::EnzymeCore.Annotation...; kwargs...
+    ) where {RT}
+    primal = func.val(A.val, b.val, map(x -> x.val, args)...; kwargs...)
+    EnzymeRules.needs_shadow(config) ||
+        return EnzymeRules.AugmentedReturn(primal, nothing, nothing)
+
+    dkwargs = _lp_shadow_kwargs(kwargs)
+    shadow = if EnzymeRules.width(config) == 1
+        func.val(
+            _lp_shadow(A, 1), _lp_shadow(b, 1),
+            map(x -> _lp_shadow(x, 1), args)...; dkwargs...
+        )
+    else
+        ntuple(Val(EnzymeRules.width(config))) do i
+            Base.@_inline_meta
+            func.val(
+                _lp_shadow(A, i), _lp_shadow(b, i),
+                map(x -> _lp_shadow(x, i), args)...; dkwargs...
+            )
+        end
+    end
+    return EnzymeRules.AugmentedReturn(primal, shadow, nothing)
+end
+
+function EnzymeRules.reverse(
+        config, func::Const{Type{LinearSolve.LinearProblem}}, ::Type{RT}, tape,
+        A::EnzymeCore.Annotation{<:_LP_RULE_MATRIX}, b::EnzymeCore.Annotation,
+        args::EnzymeCore.Annotation...; kwargs...
+    ) where {RT}
+    return ntuple(_ -> nothing, Val(2 + length(args)))
+end
+
 # `setproperty!` is the public way to change a `LinearCache` between solves, so it is the
 # one place that has to copy. Reverse restores what the assignment overwrote, which walks
 # the cache backwards into the state each earlier `solve!` ran against, and that is what

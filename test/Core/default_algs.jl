@@ -1,6 +1,15 @@
 using LinearSolve, RecursiveFactorization, LinearAlgebra, SparseArrays, Test
 using SciMLOperators: FunctionOperator, MatrixOperator, WOperator, has_concretization
 
+struct CountingIdentityPreconditioner
+    calls::Base.RefValue{Int}
+end
+
+function LinearAlgebra.ldiv!(y, P::CountingIdentityPreconditioner, x)
+    P.calls[] += 1
+    return copyto!(y, x)
+end
+
 @test LinearSolve.defaultalg(nothing, zeros(3)).alg === LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
 prob = LinearProblem(rand(3, 3), rand(3))
 solve(prob)
@@ -709,4 +718,21 @@ end
     @test LinearSolve.defaultalg(Wdense, bw, OperatorAssumptions(true)).alg ===
         LinearSolve.DefaultAlgorithmChoice.LHLFactorization
     @test solve(LinearProblem(Wdense, bw)).u ≈ ref rtol = 1.0e-8
+end
+
+@testset "default matrix-free solver uses supplied preconditioners" begin
+    n = 4
+    Jm = rand(n, n) + n * I
+    b = rand(n)
+    fj(v, u, p, t) = Jm * v
+    fj(w, v, u, p, t) = mul!(w, Jm, v)
+    Jfree = FunctionOperator(fj, zeros(n), zeros(n); islinear = true)
+    Wfree = WOperator{true}(I, 0.1, Jfree, zeros(n))
+    Pl = CountingIdentityPreconditioner(Ref(0))
+    Pr = CountingIdentityPreconditioner(Ref(0))
+
+    solve(LinearProblem(Wfree, b), nothing; Pl, Pr)
+
+    @test Pl.calls[] > 0
+    @test Pr.calls[] > 0
 end

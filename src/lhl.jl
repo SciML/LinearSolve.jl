@@ -104,8 +104,10 @@ not-yet-reduced state widens it.
 mutable struct LHLCache{WS, JT}
     ws::WS
     jac::Union{Nothing, JT}
+    LHLCache{WS, JT}(ws, jac) where {WS, JT} = new{WS, JT}(ws, jac)
 end
 
+LHLCache(ws::WS, jac::JT) where {WS, JT} = LHLCache{WS, JT}(ws, jac)
 LHLCache(ws, ::Type{JT}) where {JT} = LHLCache{typeof(ws), JT}(ws, nothing)
 
 function init_cacheval(

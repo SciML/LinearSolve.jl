@@ -146,3 +146,39 @@ Two details worth knowing:
   - The preference controls whether LinearSolve.jl *loads and uses* MKL_jll, not
     whether it is installed. MKL_jll stays a declared dependency, so it remains in the
     dependency graph and Pkg still installs it.
+
+## Why does differentiating a solve with Enzyme ask for runtime activity?
+
+A `LinearProblem` holds `A` and `b` in one struct. If one of them carries a derivative and
+the other is a constant, Enzyme has to build a shadow problem that stores the constant
+array alongside the active one, and its static activity analysis cannot prove on its own
+that the constant field is non-differentiable. It stops with
+`EnzymeRuntimeActivityError: Detected potential need for runtime activity`.
+
+This is the common shape whenever the matrix is built from the parameters being
+differentiated and the right hand side is a captured constant:
+
+```julia
+const x = rand(N)
+f(p) = sum(solve(LinearProblem(p[1] * A + p[2] * B + I, x)).u)
+
+Enzyme.gradient(Reverse, f, p)                          # errors
+Enzyme.gradient(set_runtime_activity(Reverse), f, p)    # works
+```
+
+Turning on runtime activity is the supported answer, and the gradients it produces are
+correct. It only asks Enzyme to decide activity at run time instead of proving it during
+compilation. If you would rather avoid it, make both arguments active by passing the right
+hand side in as a differentiated argument rather than closing over it.
+
+Separately, take the solution from the value `solve!` returns rather than reading it back
+off the cache:
+
+```julia
+sol = solve!(cache)
+sum(sol.u)        # differentiable
+sum(cache.u)      # errors, "Adjoint case currently not handled"
+```
+
+The reverse rule is written against the returned solution, so reading `cache.u` after the
+solve has no derivative attached to it.

@@ -611,3 +611,55 @@ end
         @test db ≈ ForwardDiff.gradient(y -> f(A, y), copy(b)) rtol = 1.0e-8
     end
 end
+
+# A `LinearProblem` holds `A` and `b` in one struct, so an active `A` with a constant `b`
+# makes Enzyme store constant memory into a differentiable object and it asks for runtime
+# activity. That is the supported answer rather than a bug, and the gradients it gives are
+# the right ones. See SciML/LinearSolve.jl#766.
+@testset "mixed activity needs runtime activity, and is correct with it (#766)" begin
+    n = 8
+    A0 = rand(n, n) + n * I
+    b0 = rand(n)
+    f(A, b) = sum(solve(LinearProblem(A, b), LUFactorization()).u)
+
+    # d/dA sum(A \ b) = -(A' \ 1) * (A \ b)'
+    analytic = -(A0' \ ones(n)) * (A0 \ b0)'
+
+    # Plain `Reverse` raises here, from inside Enzyme rather than from LinearSolve, so
+    # the error type is not pinned: it is Enzyme's to change if the analysis improves.
+    dA = zeros(n, n)
+    Enzyme.autodiff(
+        Enzyme.set_runtime_activity(Enzyme.Reverse), f, Active,
+        Duplicated(copy(A0), dA), Const(copy(b0))
+    )
+    @test dA ≈ analytic rtol = 1.0e-8
+end
+
+# The reverse rule is written against the solution `solve!` returns. Reading `cache.u`
+# back off the cache instead has no derivative attached, and errors with a message saying
+# so rather than silently producing nothing. See SciML/LinearSolve.jl#766.
+@testset "the returned solution is the differentiable one (#766)" begin
+    function via_sol(lambda)
+        A = zeros(100, 100)
+        b = ones(100)
+        for i in 1:size(A, 1)
+            A[i, i] += lambda
+        end
+        return sum(solve!(init(LinearProblem(A, b), KrylovJL_CG())).u)
+    end
+
+    function via_cache(lambda)
+        A = zeros(100, 100)
+        b = ones(100)
+        for i in 1:size(A, 1)
+            A[i, i] += lambda
+        end
+        cache = init(LinearProblem(A, b), KrylovJL_CG())
+        solve!(cache)
+        return sum(cache.u)
+    end
+
+    # sum(x) where (lambda * I) x = 1 is 100 / lambda, so the derivative is -100 / lambda^2.
+    @test Enzyme.gradient(Enzyme.Reverse, via_sol, 0.3)[1] ≈ -100 / 0.3^2 rtol = 1.0e-6
+    @test_throws ErrorException Enzyme.gradient(Enzyme.Reverse, via_cache, 0.3)
+end

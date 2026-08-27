@@ -254,9 +254,6 @@ end
     J = randn(MersenneTwister(19), n, n)
     b = randn(MersenneTwister(20), n)
 
-    # dense WOperator: the reverse pass solves Wᴴ x = b from the same reduction, and
-    # returning non-nothing proves it took the reuse path rather than the refactorizing
-    # fallback.
     for γ in (0.4, 1.0e-3, 5.0)
         cache = init(LinearProblem(wop(J, γ), b), LHLFactorization())
         solve!(cache)
@@ -267,13 +264,11 @@ end
         @test LinearSolve._adjoint_solve(cache, b) ≈ adjoint(dense(J, γ)) \ b rtol = 1.0e-9
     end
 
-    # a cheap re-shift keeps the adjoint current too
     cache = init(LinearProblem(wop(J, 0.4), b), LHLFactorization())
     solve!(cache)
     update_gamma!(cache, 0.05)
     @test LinearSolve._adjoint_solve(cache, b) ≈ adjoint(dense(J, 0.05)) \ b rtol = 1.0e-9
 
-    # complex γ on a real J: the adjoint keeps the real reduction and a complex shift
     let γ = 0.2 + 0.3im, bc = randn(MersenneTwister(21), ComplexF64, n)
         cache = init(
             LinearProblem(WOperator{true}(I, γ, J, zeros(ComplexF64, n)), bc),
@@ -283,14 +278,12 @@ end
         @test LinearSolve._adjoint_solve(cache, bc) ≈ adjoint(J - I / γ) \ bc rtol = 1.0e-8
     end
 
-    # a bare matrix reuses its reduction on the reverse pass as well
     let A = randn(MersenneTwister(22), n, n)
         cache = init(LinearProblem(A, b), LHLFactorization())
         solve!(cache)
         @test LinearSolve._adjoint_solve(cache, b) ≈ adjoint(A) \ b rtol = 1.0e-8
     end
 
-    # a fully complex Jacobian
     let Jc = randn(MersenneTwister(24), ComplexF64, n, n),
             bc = randn(MersenneTwister(25), ComplexF64, n), γ = 0.3 + 0.1im
 
@@ -302,7 +295,6 @@ end
         @test LinearSolve._adjoint_solve(cache, bc) ≈ adjoint(Jc - I / γ) \ bc rtol = 1.0e-8
     end
 
-    # a batched (matrix) right-hand side solves column by column against the one reduction
     let B = randn(MersenneTwister(26), n, 4), γ = 0.15
         cache = init(LinearProblem(wop(J, γ), B[:, 1]), LHLFactorization())
         solve!(cache)
@@ -310,9 +302,6 @@ end
         @test X ≈ adjoint(dense(J, γ)) \ B rtol = 1.0e-8
     end
 
-    # the block-triangular sparse LHL has no adjoint kernel, so it does not *reuse* the
-    # reduction (can_reuse is false), but the adjoint is still solved — against the
-    # assembled system with a fresh sparse LU
     let Jsp = sparse([1, 2, 2, 3, 1], [1, 2, 3, 3, 3], [1.5, 2.0, 0.7, 1.1, 0.3], 3, 3),
             bsp = randn(MersenneTwister(23), 3)
 
@@ -325,7 +314,6 @@ end
         @test LinearSolve._adjoint_solve(cache, bsp) ≈ ref rtol = 1.0e-9
     end
 
-    # still solves an assembled adjoint system when handed one directly
     @test solve(LinearProblem(adjoint(dense(J, 0.4)), b), LHLFactorization()).u ≈
         adjoint(dense(J, 0.4)) \ b rtol = 1.0e-9
 end
@@ -354,8 +342,6 @@ Base.:\(P::CountingPrec, x) = (P.applied += 1; P.inner \ x)
     nsmall = LinearSolve.LHL_DEFAULT_MIN_SIZE - 1
     Jsmall = randn(MersenneTwister(13), nsmall, nsmall)
     bsmall = randn(MersenneTwister(14), nsmall)
-    Jsparse = sprandn(MersenneTwister(17), nbig, nbig, 0.3) + 2I
-
     # Each is a reason `defaultalg` hands the WOperator back to the operator path. The
     # selection assertions elsewhere only check which algorithm comes out; these check
     # that the algorithm which comes out actually produces the right answer, and that the
@@ -369,7 +355,6 @@ Base.:\(P::CountingPrec, x) = (P.applied += 1; P.inner \ x)
             J - Matrix(mass) / γ, bbig, nothing,
         ),
         ("below the size cutoff", wop(Jsmall, γ), dense(Jsmall, γ), bsmall, nothing),
-        ("sparse J", wop(Jsparse, γ), Matrix(Jsparse) - I / γ, bbig, nothing),
     )
     for (label, W, dW, rhs, alg) in cases
         assump = LinearSolve.OperatorAssumptions(true)
@@ -434,14 +419,9 @@ end
     @test solve!(cache).u ≈ (Anew - I / γ) \ b rtol = 1.0e-6
 end
 
-# `J` sparse: LHLFactorization's SparseArrays + PureKLU extension (auto-loaded here, since
-# both are LinearSolve dependencies). `defaultalg` routes a *reducible* sparse-`J` WOperator
-# to LHL — where the block-triangular reduction can beat a sparse LU — and leaves one big
-# irreducible block to KLU.
-@testset "sparse Jacobian: solve, update_gamma!, cost-model-gated default" begin
+@testset "sparse Jacobian: solve, update_gamma!, default" begin
     assump = LinearSolve.OperatorAssumptions(true)
 
-    # a block upper triangular J with several irreducible blocks (reducible), permuted
     function btf(sizes; rng = MersenneTwister(3))
         m = sum(sizes)
         I_ = Int[]; J_ = Int[]; V = Float64[]; off = 0
@@ -470,10 +450,9 @@ end
     ns = size(Js, 1)
     bs = randn(MersenneTwister(5), ns)
     Ws = wop(Js, 0.01; u = zeros(ns))
-    @test LinearSolve._lhl_defaultable(Ws, assump)        # reducible sparse -> default LHL
+    @test LinearSolve._lhl_defaultable(Ws, assump)
     @test solve(LinearProblem(Ws, bs), LHLFactorization()).u ≈ dense(Js, 0.01) \ bs rtol = 1.0e-9
 
-    # cheap re-shift reuses the reduction
     cache = init(LinearProblem(wop(Js, 0.01; u = zeros(ns)), bs), LHLFactorization())
     solve!(cache)
     for γ in (0.02, 1.0e-6, 5.0)
@@ -481,14 +460,20 @@ end
         @test copy(solve!(cache).u) ≈ dense(Js, γ) \ bs rtol = 1.0e-9
     end
 
-    # one big irreducible block: KLU's regime, not defaulted to LHL, but opt-in still solves
+    # An irreducible sparse Jacobian uses LHL too; its internal cost model chooses the
+    # appropriate block kernel.
     Jbig = btf([120])
-    @test !LinearSolve._lhl_defaultable(wop(Jbig, 0.01; u = zeros(120)), assump)
+    @test LinearSolve._lhl_defaultable(wop(Jbig, 0.01; u = zeros(120)), assump)
     bb = randn(MersenneTwister(6), 120)
     @test solve(LinearProblem(wop(Jbig, 0.01; u = zeros(120)), bb), LHLFactorization()).u ≈
         dense(Jbig, 0.01) \ bb rtol = 1.0e-9
 
-    # complex γ on a real sparse J: real reduction, complex shift and solve
+    Jsmall = sparse([1, 2, 3, 2, 3, 1], [1, 2, 3, 1, 2, 3], [4.0, 5.0, 6.0, 1.0, 1.0, 1.0], 3, 3)
+    Wsmall = wop(Jsmall, 0.1; u = zeros(3))
+    @test LinearSolve._lhl_defaultable(Wsmall, assump)
+    @test LinearSolve.defaultalg(Wsmall, ones(3), assump).alg ===
+        LinearSolve.DefaultAlgorithmChoice.LHLFactorization
+
     γc = 0.01 + 0.005im
     Wc = WOperator{true}(I, γc, Js, zeros(ComplexF64, ns))
     bc = randn(MersenneTwister(7), ComplexF64, ns)

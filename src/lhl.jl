@@ -116,9 +116,7 @@ function init_cacheval(
         return LHLCache(LHLWorkspace{eltype(u)}(0), Nothing)
     J = _lhl_jacobian(A)
     if _lhl_is_sparse(J)
-        # sparse `J`: the block-triangular sparse LHL of LHLFactorization's SparseArrays +
-        # PureKLU extension. `lhl(J)` analyzes and reduces; the returned factorization answers
-        # the same verbs as an `LHLWorkspace`.
+        # The sparse extension chooses its per-block factorization during analysis.
         F = lhl(J; shift = _lhl_shift_eltype(A, u), thread = _lhl_thread_bool(alg))
         return LHLCache(F, typeof(J))
     end
@@ -130,14 +128,10 @@ end
 _lhl_is_sparse(J) = issparsematrixcsc(J)
 _lhl_thread_bool(::LHLFactorization{T}) where {T} = T
 
-# The reduction step, dispatched on the workspace kind: a dense `LHLWorkspace` reduces in
-# place with the balance/thread the algorithm carries; the sparse factorization re-reduces
-# with `lhl!` (its analysis and per-block kernel choice are fixed at construction).
 _lhl_do_reduce!(ws::LHLWorkspace, J, alg::LHLFactorization) =
     lhl_reduce!(ws, J, alg.balance, _lhl_thread(alg))
 _lhl_do_reduce!(F, J, ::LHLFactorization) = lhl!(F, J)
 
-# Size and reduced-state of the workspace, polymorphic over dense/sparse.
 _lhl_size1(ws::LHLWorkspace) = ws.n
 _lhl_size1(F) = size(F, 1)
 

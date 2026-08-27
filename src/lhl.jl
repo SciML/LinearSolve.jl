@@ -115,25 +115,18 @@ function init_cacheval(
     (A isa AbstractMatrix || A isa WOperator) ||
         return LHLCache(LHLWorkspace{eltype(u)}(0), Nothing)
     J = _lhl_jacobian(A)
-    if _lhl_is_sparse(J)
+    if issparsematrixcsc(J)
         # The sparse extension chooses its per-block factorization during analysis.
-        F = lhl(J; shift = _lhl_shift_eltype(A, u), thread = _lhl_thread_bool(alg))
+        F = lhl(J; shift = _lhl_shift_eltype(A, u), thread = _lhl_unwrap(_lhl_thread(alg)))
         return LHLCache(F, typeof(J))
     end
     ws = LHLWorkspace{eltype(J)}(size(A, 1); shift = _lhl_shift_eltype(A, u))
     return LHLCache(ws, typeof(J))
 end
 
-# `J` sparse enough to want the block-triangular sparse solver.
-_lhl_is_sparse(J) = issparsematrixcsc(J)
-_lhl_thread_bool(::LHLFactorization{T}) where {T} = T
-
 _lhl_do_reduce!(ws::LHLWorkspace, J, alg::LHLFactorization) =
     lhl_reduce!(ws, J, alg.balance, _lhl_thread(alg))
 _lhl_do_reduce!(F, J, ::LHLFactorization) = lhl!(F, J)
-
-_lhl_size1(ws::LHLWorkspace) = ws.n
-_lhl_size1(F) = size(F, 1)
 
 """
     _lhl_shift_eltype(A, u) -> Type
@@ -191,7 +184,7 @@ end
 # different `J` altogether, whose flag may already have been cleared by someone else.
 function _lhl_needs_reduce(c::LHLCache, A, isfresh::Bool)
     ws = c.ws
-    (lhl_isreduced(ws) && _lhl_size1(ws) == size(A, 1)) || return true
+    lhl_isreduced(ws) || return true
     c.jac === _lhl_jacobian(A) || return true
     return _lhl_contents_moved(A, isfresh)
 end

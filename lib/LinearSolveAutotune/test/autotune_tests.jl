@@ -433,17 +433,25 @@ if isempty(VERSION.prerelease)
             LinearSolveAutotune.clear_algorithm_preferences()
 
             # Run a minimal autotune that sets preferences
-            result = LinearSolveAutotune.autotune_setup(
-                sizes = [:tiny],
-                set_preferences = true,  # KEY: Must be true to test preference setting
-                samples = 1,
-                seconds = 0.1,
-                eltypes = (Float64,),
-                collect_solve_path_data = false,
-                collect_supernodal_panel_data = false
-            )
+            result, summary_output = mktemp() do _, io
+                result = redirect_stdout(io) do
+                    LinearSolveAutotune.autotune_setup(
+                        sizes = [:tiny],
+                        set_preferences = true,  # KEY: Must be true to test preference setting
+                        samples = 1,
+                        seconds = 0.1,
+                        eltypes = (Float64,),
+                        collect_solve_path_data = false,
+                        collect_supernodal_panel_data = false
+                    )
+                end
+                flush(io)
+                seekstart(io)
+                return result, read(io, String)
+            end
 
             @test isa(result, AutotuneResults)
+            @test contains(summary_output, "Algorithm")
 
             # Check if any preferences were set
             prefs_after_autotune = LinearSolveAutotune.get_algorithm_preferences()

@@ -393,7 +393,9 @@ function autotune_setup(;
                         return v
                     end
                 end,
-            ]
+            ],
+            fit_table_in_display_horizontally = false,
+            fit_table_in_display_vertically = false
         )
     else
         @warn "No successful benchmark results!"

@@ -90,11 +90,6 @@ for Alg in (
         ElementalJL,
         SpecializedLUFactorization,
         SpecializedQRFactorization,
-        # The LHL workspace is a Hessenberg reduction of J plus an LU of the shifted
-        # Hessenberg, not a `Factorization` of the system matrix; `Wᴴ = Z⁻ᴴ(I-γH)ᴴZᴴ` is
-        # solvable from the same pieces but is not implemented, so the adjoint reduces
-        # `Aᴴ` from scratch.
-        LHLFactorization,
     )
     @eval _adjoint_factorization_reuse(::Type{<:$Alg}) =
         _NoAdjointFactorizationReuse()
@@ -228,6 +223,59 @@ function _custom_adjoint_factorization_solve(
 
     @inbounds for i in 1:n
         x[factorization.perms[i]] = z[i]
+    end
+    return x
+end
+
+# `LHLFactorization` reuses its reduction on the reverse pass. The system is `σI + τJ` and
+# the cache already holds `J = ZHZ⁻¹` and the LU of the shifted Hessenberg for the current
+# shift, so `Aᴴ x = b` is `x = Z⁻ᴴ(σI+τH)⁻ᴴZᴴ b` — the same three `O(n²)` phases as the
+# forward solve, no refactorization (`lhl_ldivH!`), with the forward's iterative refinement
+# mirrored against `Aᴴ` (`lhl_refineH!`). Only the dense workspace has these adjoint
+# kernels; the block-triangular sparse factorization has none, so its adjoint is solved
+# against the assembled system with a fresh sparse LU rather than reused.
+_adjoint_factorization_reuse(::Type{<:LHLFactorization}) =
+    _CustomAdjointFactorizationReuse()
+
+_custom_can_reuse_adjoint_factorization(::LHLFactorization, c::LHLCache) =
+    c.ws isa LHLWorkspace
+_custom_can_reuse_adjoint_factorization(::LHLFactorization, ::Any) = false
+
+# `σI + τJ` assembled — the adjoint the reverse pass forms its residual against. A
+# `WOperator`'s own `adjoint` does not track `update_gamma!` (its forward `mul!` does, but
+# the adjoint keeps the γ it was built with), so refinement must not lean on `A'`; and the
+# generic reverse fallback cannot factorize an `adjoint(WOperator)` at all, so the sparse
+# branch assembles the matrix here too.
+_lhl_system_matrix(σ, τ, J) = σ * I + τ * J
+
+function _custom_adjoint_factorization_solve(alg::LHLFactorization, c::LHLCache, A, b)
+    (A isa AbstractMatrix || A isa WOperator) || return nothing
+    σ, τ = _lhl_shift_pair(A)
+    J = _lhl_jacobian(A)
+    if c.ws isa LHLWorkspace
+        ws = _lhl_sync!(c, A, alg, false)              # match the reduction and shift to A
+        ws.info == 0 || return nothing                 # singular shift: let the caller report it
+        T = promote_type(eltype(b), typeof(ws.σ))      # complex when the shift or b is
+        x = copyto!(similar(b, T), b)
+        M = alg.refine > 0 ? _lhl_system_matrix(σ, τ, J) : nothing
+        return _lhl_adjoint_reuse_solve!(x, M, b, ws, alg.refine)
+    end
+    # sparse LHL has no adjoint reduction: solve the adjoint of the assembled system.
+    return adjoint(_lhl_system_matrix(σ, τ, J)) \ b
+end
+
+function _lhl_adjoint_reuse_solve!(x::AbstractVector, M, b, ws, refine::Int)
+    lhl_ldivH!(x, ws)
+    refine > 0 && lhl_refineH!(x, M, b, ws, refine)
+    return x
+end
+
+# A batched (matrix) right-hand side solves column by column against the one reduction.
+function _lhl_adjoint_reuse_solve!(x::AbstractMatrix, M, b, ws, refine::Int)
+    for j in axes(x, 2)
+        xj = view(x, :, j)
+        lhl_ldivH!(xj, ws)
+        refine > 0 && lhl_refineH!(xj, M, view(b, :, j), ws, refine)
     end
     return x
 end

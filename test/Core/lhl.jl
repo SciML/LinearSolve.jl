@@ -246,12 +246,74 @@ end
     @test bwd(ref1) < 1.0e-13
 end
 
-@testset "adjoint solve" begin
+@testset "adjoint solve reuses the reduction" begin
+    @test LinearSolve._adjoint_factorization_reuse(LHLFactorization) isa
+        LinearSolve._CustomAdjointFactorizationReuse
+
     n = 30
     J = randn(MersenneTwister(19), n, n)
     b = randn(MersenneTwister(20), n)
-    @test LinearSolve._adjoint_factorization_reuse(LHLFactorization) isa
-        LinearSolve._NoAdjointFactorizationReuse
+
+    for γ in (0.4, 1.0e-3, 5.0)
+        cache = init(LinearProblem(wop(J, γ), b), LHLFactorization())
+        solve!(cache)
+        @test LinearSolve._custom_can_reuse_adjoint_factorization(cache.alg, cache.cacheval)
+        reused = LinearSolve._adjoint_factorization_solve(cache.alg, cache.cacheval, cache.A, b)
+        @test reused !== nothing
+        @test reused ≈ adjoint(dense(J, γ)) \ b rtol = 1.0e-9
+        @test LinearSolve._adjoint_solve(cache, b) ≈ adjoint(dense(J, γ)) \ b rtol = 1.0e-9
+    end
+
+    cache = init(LinearProblem(wop(J, 0.4), b), LHLFactorization())
+    solve!(cache)
+    update_gamma!(cache, 0.05)
+    @test LinearSolve._adjoint_solve(cache, b) ≈ adjoint(dense(J, 0.05)) \ b rtol = 1.0e-9
+
+    let γ = 0.2 + 0.3im, bc = randn(MersenneTwister(21), ComplexF64, n)
+        cache = init(
+            LinearProblem(WOperator{true}(I, γ, J, zeros(ComplexF64, n)), bc),
+            LHLFactorization()
+        )
+        solve!(cache)
+        @test LinearSolve._adjoint_solve(cache, bc) ≈ adjoint(J - I / γ) \ bc rtol = 1.0e-8
+    end
+
+    let A = randn(MersenneTwister(22), n, n)
+        cache = init(LinearProblem(A, b), LHLFactorization())
+        solve!(cache)
+        @test LinearSolve._adjoint_solve(cache, b) ≈ adjoint(A) \ b rtol = 1.0e-8
+    end
+
+    let Jc = randn(MersenneTwister(24), ComplexF64, n, n),
+            bc = randn(MersenneTwister(25), ComplexF64, n), γ = 0.3 + 0.1im
+
+        cache = init(
+            LinearProblem(wop(Jc, γ; u = zeros(ComplexF64, n)), bc),
+            LHLFactorization()
+        )
+        solve!(cache)
+        @test LinearSolve._adjoint_solve(cache, bc) ≈ adjoint(Jc - I / γ) \ bc rtol = 1.0e-8
+    end
+
+    let B = randn(MersenneTwister(26), n, 4), γ = 0.15
+        cache = init(LinearProblem(wop(J, γ), B[:, 1]), LHLFactorization())
+        solve!(cache)
+        X = LinearSolve._custom_adjoint_factorization_solve(cache.alg, cache.cacheval, cache.A, B)
+        @test X ≈ adjoint(dense(J, γ)) \ B rtol = 1.0e-8
+    end
+
+    let Jsp = sparse([1, 2, 2, 3, 1], [1, 2, 3, 3, 3], [1.5, 2.0, 0.7, 1.1, 0.3], 3, 3),
+            bsp = randn(MersenneTwister(23), 3)
+
+        cache = init(LinearProblem(wop(Jsp, 0.1; u = zeros(3)), bsp), LHLFactorization())
+        solve!(cache)
+        @test !LinearSolve._custom_can_reuse_adjoint_factorization(cache.alg, cache.cacheval)
+        ref = adjoint(Matrix(Jsp) - I / 0.1) \ bsp
+        @test LinearSolve._adjoint_factorization_solve(cache.alg, cache.cacheval, cache.A, bsp) ≈
+            ref rtol = 1.0e-9
+        @test LinearSolve._adjoint_solve(cache, bsp) ≈ ref rtol = 1.0e-9
+    end
+
     @test solve(LinearProblem(adjoint(dense(J, 0.4)), b), LHLFactorization()).u ≈
         adjoint(dense(J, 0.4)) \ b rtol = 1.0e-9
 end
@@ -280,8 +342,6 @@ Base.:\(P::CountingPrec, x) = (P.applied += 1; P.inner \ x)
     nsmall = LinearSolve.LHL_DEFAULT_MIN_SIZE - 1
     Jsmall = randn(MersenneTwister(13), nsmall, nsmall)
     bsmall = randn(MersenneTwister(14), nsmall)
-    Jsparse = sprandn(MersenneTwister(17), nbig, nbig, 0.3) + 2I
-
     # Each is a reason `defaultalg` hands the WOperator back to the operator path. The
     # selection assertions elsewhere only check which algorithm comes out; these check
     # that the algorithm which comes out actually produces the right answer, and that the
@@ -295,7 +355,6 @@ Base.:\(P::CountingPrec, x) = (P.applied += 1; P.inner \ x)
             J - Matrix(mass) / γ, bbig, nothing,
         ),
         ("below the size cutoff", wop(Jsmall, γ), dense(Jsmall, γ), bsmall, nothing),
-        ("sparse J", wop(Jsparse, γ), Matrix(Jsparse) - I / γ, bbig, nothing),
     )
     for (label, W, dW, rhs, alg) in cases
         assump = LinearSolve.OperatorAssumptions(true)
@@ -358,4 +417,65 @@ end
     copyto!(Aop.A, Anew)
     cache.isfresh = true
     @test solve!(cache).u ≈ (Anew - I / γ) \ b rtol = 1.0e-6
+end
+
+@testset "sparse Jacobian: solve, update_gamma!, default" begin
+    assump = LinearSolve.OperatorAssumptions(true)
+
+    function btf(sizes; rng = MersenneTwister(3))
+        m = sum(sizes)
+        I_ = Int[]; J_ = Int[]; V = Float64[]; off = 0
+        for bb in sizes
+            if bb == 1
+                push!(I_, off + 1); push!(J_, off + 1); push!(V, randn(rng))
+            else
+                for j in 1:bb, i in 1:bb
+                    (i == j || rand(rng) < 0.5) || continue
+                    push!(I_, off + i); push!(J_, off + j); push!(V, randn(rng))
+                end
+                for i in 1:(bb - 1)
+                    push!(I_, off + i + 1); push!(J_, off + i); push!(V, randn(rng))
+                end
+                push!(I_, off + 1); push!(J_, off + bb); push!(V, randn(rng))
+            end
+            off > 0 && (push!(I_, rand(rng, 1:off)); push!(J_, off + rand(rng, 1:bb)); push!(V, randn(rng)))
+            off += bb
+        end
+        Jm = sparse(I_, J_, V, m, m)
+        p = randperm(rng, m)
+        return Jm[p, p]
+    end
+
+    Js = btf([1, 3, 5, 8, 4, 20, 10])
+    ns = size(Js, 1)
+    bs = randn(MersenneTwister(5), ns)
+    Ws = wop(Js, 0.01; u = zeros(ns))
+    @test LinearSolve._lhl_defaultable(Ws, assump)
+    @test solve(LinearProblem(Ws, bs), LHLFactorization()).u ≈ dense(Js, 0.01) \ bs rtol = 1.0e-9
+
+    cache = init(LinearProblem(wop(Js, 0.01; u = zeros(ns)), bs), LHLFactorization())
+    solve!(cache)
+    for γ in (0.02, 1.0e-6, 5.0)
+        update_gamma!(cache, γ)
+        @test copy(solve!(cache).u) ≈ dense(Js, γ) \ bs rtol = 1.0e-9
+    end
+
+    # An irreducible sparse Jacobian uses LHL too; its internal cost model chooses the
+    # appropriate block kernel.
+    Jbig = btf([120])
+    @test LinearSolve._lhl_defaultable(wop(Jbig, 0.01; u = zeros(120)), assump)
+    bb = randn(MersenneTwister(6), 120)
+    @test solve(LinearProblem(wop(Jbig, 0.01; u = zeros(120)), bb), LHLFactorization()).u ≈
+        dense(Jbig, 0.01) \ bb rtol = 1.0e-9
+
+    Jsmall = sparse([1, 2, 3, 2, 3, 1], [1, 2, 3, 1, 2, 3], [4.0, 5.0, 6.0, 1.0, 1.0, 1.0], 3, 3)
+    Wsmall = wop(Jsmall, 0.1; u = zeros(3))
+    @test LinearSolve._lhl_defaultable(Wsmall, assump)
+    @test LinearSolve.defaultalg(Wsmall, ones(3), assump).alg ===
+        LinearSolve.DefaultAlgorithmChoice.LHLFactorization
+
+    γc = 0.01 + 0.005im
+    Wc = WOperator{true}(I, γc, Js, zeros(ComplexF64, ns))
+    bc = randn(MersenneTwister(7), ComplexF64, ns)
+    @test solve(LinearProblem(Wc, bc), LHLFactorization()).u ≈ (Js - I / γc) \ bc rtol = 1.0e-8
 end

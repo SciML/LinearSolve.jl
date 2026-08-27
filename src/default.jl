@@ -210,7 +210,8 @@ end
 """
     LinearSolve.LHL_DEFAULT_MIN_SIZE
 
-Smallest `n` at which `defaultalg` prefers `LHLFactorization` for a split `WOperator`.
+Smallest `n` at which `defaultalg` prefers `LHLFactorization` for a split `WOperator`
+with a dense Jacobian. Sparse Jacobians use `LHLFactorization` at every size.
 
 Measured, not derived. Costing one γ-cycle — a re-shift plus the ~14 solves it serves, with
 the reduction amortized over the ~55 γ a Jacobian serves, both ratios taken from
@@ -232,12 +233,11 @@ const LHL_DEFAULT_MIN_SIZE = 32
 # but left uninitialized the solve fails, and if it is initialized but never selected the
 # buffers are wasted. Both ask here.
 function _lhl_defaultable(A::WOperator, assump::OperatorAssumptions)
-    # Only a plain dense `J`. An operator `J` — a `MatrixOperator` in particular — is
-    # updated in place by `update_coefficients!`, which moves the numbers while leaving
-    # both the object identity and `jac_stale` untouched, so the reduction cannot tell it
-    # went stale and would silently answer with the previous Jacobian.
-    return assump.issq && A.J isa DenseMatrix && size(A, 1) >= LHL_DEFAULT_MIN_SIZE &&
-        _lhl_scalar_massmatrix(A.mass_matrix)
+    # A `MatrixOperator` is updated in place while its identity and `jac_stale` remain
+    # unchanged, so the reduction cannot detect that its contents moved.
+    (assump.issq && _lhl_scalar_massmatrix(A.mass_matrix)) || return false
+    A.J isa DenseMatrix && return size(A, 1) >= LHL_DEFAULT_MIN_SIZE
+    return issparsematrixcsc(A.J)
 end
 _lhl_defaultable(A, assump) = false
 
@@ -247,8 +247,6 @@ function defaultalg(A::WOperator, b, assump::OperatorAssumptions{Bool})
         # outer correction loop should ask for `LHLFactorization(refine = 0)`.
         return DefaultLinearSolver(DefaultAlgorithmChoice.LHLFactorization)
     end
-    # Everything else — a matrix-free Jacobian, a general mass matrix, or a problem too
-    # small to pay for the reduction — keeps whatever the operator path already chose.
     return @invoke defaultalg(A::SciMLOperators.AbstractSciMLOperator, b, assump)
 end
 

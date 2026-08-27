@@ -2046,6 +2046,38 @@ struct SuperLUDISTFactorization <: AbstractSparseFactorization
 end
 
 """
+`CKTSOFactorization(; threads = 0, kwargs...)`
+
+A sparse direct solver powered by [CKTSO](https://github.com/chenxm1986/cktso), through
+[CKTSO.jl](https://github.com/AJ0070/CKTSO.jl). CKTSO is written for SPICE-style circuit
+simulation, where the same sparsity pattern is refactorized many times with new values, so
+it keeps the symbolic analysis and reuses it across solves.
+
+## Keyword Arguments
+
+  - `threads`: threads CKTSO may use. `0` takes every physical core, `-1` every logical
+    core, a positive value that many.
+
+!!! note
+
+    CKTSO ships as a prebuilt library with a license key file and is not redistributable,
+    so CKTSO.jl does not bundle it. Point CKTSO.jl at your copy with the `CKTSO_LIBRARY`
+    environment variable or `CKTSO.set_library!`, keeping `cktso.lic` beside the library.
+"""
+struct CKTSOFactorization{K} <: AbstractSparseFactorization
+    threads::Int
+    kwargs::K
+
+    function CKTSOFactorization(; threads::Integer = 0, kwargs...)
+        ext = Base.get_extension(@__MODULE__, :LinearSolveCKTSOExt)
+        if ext === nothing
+            error("CKTSOFactorization requires `using CKTSO, SparseArrays`. CKTSO.jl needs a CKTSO library, see its README.")
+        end
+        return new{typeof(kwargs)}(Int(threads), kwargs)
+    end
+end
+
+"""
 `HSLMA57Factorization(; kwargs...)`
 
 A sparse symmetric direct solver powered by

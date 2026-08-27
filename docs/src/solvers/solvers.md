@@ -362,6 +362,26 @@ MUMPSFactorization
 SuperLUDISTFactorization
 ```
 
+### CKTSO.jl
+
+!!! note
+
+    Using this solver requires loading `CKTSO.jl` and `SparseArrays`. CKTSO ships as a
+    prebuilt library with a license key file and is not redistributable, so `CKTSO.jl`
+    does not bundle it: download it from
+    [the CKTSO repository](https://github.com/chenxm1986/cktso) and point `CKTSO.jl` at
+    your copy with `CKTSO_LIBRARY` or `CKTSO.set_library!`, keeping `cktso.lic` beside
+    the library.
+
+CKTSO is written for SPICE-style circuit simulation, where the same sparsity pattern is
+refactorized many times with new values, so the cache keeps the symbolic analysis and
+reuses it. Assigning a matrix with the same pattern to `cache.A` refactorizes; a different
+pattern falls back to a fresh analysis.
+
+```@docs
+CKTSOFactorization
+```
+
 ### HSL.jl
 
 !!! note

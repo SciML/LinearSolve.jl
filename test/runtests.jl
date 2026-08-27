@@ -169,6 +169,11 @@ else
                     return @time @safetestset "Pardiso" include("LinearSolvePardiso/pardiso.jl")
                 end
             ),
+            "LinearSolveCKTSO" => (;
+                env = joinpath(@__DIR__, "LinearSolveCKTSO"), body = function ()
+                    return @time @safetestset "CKTSO" include("LinearSolveCKTSO/cktso.jl")
+                end
+            ),
             "LinearSolveHSL" => (;
                 env = joinpath(@__DIR__, "LinearSolveHSL"), body = function ()
                     return @time @safetestset "HSL" include("LinearSolveHSL/hsl.jl")

@@ -384,15 +384,18 @@ function autotune_setup(;
         println("="^60)
         pretty_table(
             full_summary,
-            header = ["Algorithm", "Avg GFLOPs", "Max GFLOPs", "Success", "Total"],
-            formatters = (v, i, j) -> begin
-                if j in [2, 3] && isa(v, Float64)
-                    return isnan(v) ? "NaN" : @sprintf("%.2f", v)
-                else
-                    return v
-                end
-            end,
-            crop = :none
+            column_labels = ["Algorithm", "Avg GFLOPs", "Max GFLOPs", "Success", "Total"],
+            formatters = [
+                (v, i, j) -> begin
+                    if j in [2, 3] && isa(v, Float64)
+                        return isnan(v) ? "NaN" : @sprintf("%.2f", v)
+                    else
+                        return v
+                    end
+                end,
+            ],
+            fit_table_in_display_horizontally = false,
+            fit_table_in_display_vertically = false
         )
     else
         @warn "No successful benchmark results!"

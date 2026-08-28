@@ -1008,7 +1008,7 @@ version = "1.12.0"
 deps = ["AMD", "ArrayInterface", "ConcreteStructs", "DocStringExtensions", "EnumX", "GPUArraysCore", "InteractiveUtils", "Krylov", "LHLFactorization", "Libdl", "LinearAlgebra", "MKL_jll", "Markdown", "OpenBLAS_jll", "PrecompileTools", "Preferences", "PureKLU", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLLogging", "SciMLOperators", "SciMLStructures", "Setfield", "SparseArrays", "SparseColumnPivotedQR", "StaticArraysCore"]
 path = "/home/runner/_work/LinearSolve.jl/LinearSolve.jl"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
-version = "5.14.0"
+version = "5.14.1"
 
     [deps.LinearSolve.extensions]
     LinearSolveAMDGPUExt = "AMDGPU"
@@ -1105,7 +1105,7 @@ version = "5.14.0"
 deps = ["Base64", "BenchmarkTools", "CPUSummary", "DataFrames", "Dates", "FastLapackInterface", "GitHub", "LAPACK_jll", "LinearAlgebra", "LinearSolve", "MKL_jll", "Metal", "OpenBLAS_jll", "Pkg", "Plots", "Preferences", "PrettyTables", "Printf", "ProgressMeter", "Random", "RecursiveFactorization", "SciMLBase", "Statistics", "blis_jll", "cuSOLVER", "gh_cli_jll"]
 path = "../lib/LinearSolveAutotune"
 uuid = "67398393-80e8-4254-b7e4-1b9a36a3c5b6"
-version = "1.14.1"
+version = "1.14.2"
 
 [[deps.LinearSolvePyAMG]]
 deps = ["CondaPkg", "LinearAlgebra", "LinearSolve", "PythonCall", "SciMLBase", "SparseArrays"]

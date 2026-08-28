@@ -8,8 +8,19 @@ import PrecompileTools
 using ArrayInterface: ArrayInterface
 # Explicit names, not the module: LinearSolve defines its own `LHLFactorization` (the
 # algorithm object) and `using LHLFactorization` would shadow it.
-using LHLFactorization: LHLWorkspace, lhl_reduce!, lhl_shift!, lhl_ldiv!, lhl_refine!,
-    lhl_ldivH!, lhl_refineH!, lhl, lhl!, lhl_isreduced
+module LHLFactorizationBindings
+    using LHLFactorization: LHLWorkspace, lhl_reduce!, lhl_shift!, lhl_ldiv!, lhl_refine!,
+        lhl_ldivH!, lhl_refineH!, lhl, lhl!, lhl_isreduced
+    const bindings = (
+        LHLWorkspace, lhl_reduce!, lhl_shift!, lhl_ldiv!, lhl_refine!,
+        lhl_ldivH!, lhl_refineH!, lhl, lhl!, lhl_isreduced,
+    )
+end
+const (
+    LHLWorkspace, lhl_reduce!, lhl_shift!, lhl_ldiv!, lhl_refine!, lhl_ldivH!,
+    lhl_refineH!, lhl, lhl!, lhl_isreduced,
+) =
+    LHLFactorizationBindings.bindings
 using Base: Bool, convert, copyto!, adjoint, transpose, /, \, require_one_based_indexing
 using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, BunchKaufman,
     ColumnNorm, cond, Diagonal, Factorization, Hermitian, I, LAPACK, NoPivot,

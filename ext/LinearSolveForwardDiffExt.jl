@@ -858,9 +858,9 @@ function partials_to_list(partial_matrix::SparseMatrixCSC)
     V = ForwardDiff.valtype(T) # use type for concrete array below in empty-nz case (e.g. all-zero Jacobian at init)
     return [
         SparseMatrixCSC(
-                m, n, partial_matrix.colptr, partial_matrix.rowval,
-                V[nz[i][k] for i in eachindex(nz)]
-            ) for k in 1:p
+            m, n, partial_matrix.colptr, partial_matrix.rowval,
+            V[nz[i][k] for i in eachindex(nz)]
+        ) for k in 1:p
     ]
 end
 

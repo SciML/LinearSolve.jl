@@ -112,8 +112,8 @@ const DUAL_XP_LINSOLVE_RHS! = getproperty(
 function dual_linear_problem(n, p)
     A = [
         ForwardDiff.Dual{Nothing}(
-                float(i == j ? 10 + i : 0.3 * (i + j)), ntuple(k -> 0.1k + 0.01 * (i + j), p)
-            ) for i in 1:n, j in 1:n
+            float(i == j ? 10 + i : 0.3 * (i + j)), ntuple(k -> 0.1k + 0.01 * (i + j), p)
+        ) for i in 1:n, j in 1:n
     ]
     b = [ForwardDiff.Dual{Nothing}(float(i), ntuple(k -> 0.05k + 0.1i, p)) for i in 1:n]
     return A, b

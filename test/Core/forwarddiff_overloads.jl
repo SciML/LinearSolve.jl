@@ -303,8 +303,8 @@ prob = LinearProblem(sparse(plain_A), b)
     for nchunk in (1, 2, 3)
         bd = [
             ForwardDiff.Dual{Nothing, Float64, nchunk}(
-                    Float64(i), ForwardDiff.Partials(ntuple(k -> sin(i + k), nchunk))
-                ) for i in 1:5
+                Float64(i), ForwardDiff.Partials(ntuple(k -> sin(i + k), nchunk))
+            ) for i in 1:5
         ]
         cache = LinearSolve.__init(LinearProblem(Asp, bd), PureKLUFactorization())
         @test eltype(cache.A) == Float64                 # A not promoted
@@ -313,9 +313,9 @@ prob = LinearProblem(sparse(plain_A), b)
         @test isapprox(ForwardDiff.value.(u), ForwardDiff.value.(uref); rtol = 1.0e-10)
         @test all(
             isapprox(
-                    ForwardDiff.partials(u[i], j), ForwardDiff.partials(uref[i], j);
-                    rtol = 1.0e-8, atol = 1.0e-12
-                ) for i in 1:5, j in 1:nchunk
+                ForwardDiff.partials(u[i], j), ForwardDiff.partials(uref[i], j);
+                rtol = 1.0e-8, atol = 1.0e-12
+            ) for i in 1:5, j in 1:nchunk
         )
     end
 
@@ -863,9 +863,9 @@ end
     p = 3
     A = [
         ForwardDiff.Dual{Nothing}(
-                float(i == j ? 10 + i : 0.3 * (i + j)),
-                ntuple(k -> 0.1k + 0.01 * (i + j), p)
-            ) for i in 1:n, j in 1:n
+            float(i == j ? 10 + i : 0.3 * (i + j)),
+            ntuple(k -> 0.1k + 0.01 * (i + j), p)
+        ) for i in 1:n, j in 1:n
     ]
     b = [ForwardDiff.Dual{Nothing}(float(i), ntuple(k -> 0.05k + 0.1i, p)) for i in 1:n]
     reference = solve(LinearProblem(A, b), LUFactorization()).u

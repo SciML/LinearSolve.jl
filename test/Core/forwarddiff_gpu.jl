@@ -30,8 +30,8 @@ end
 function dual_problem(n, p)
     A = [
         ForwardDiff.Dual{Nothing}(
-                float(i == j ? 10 + i : 0.3 * (i + j)), ntuple(k -> 0.1k + 0.01 * (i + j), p)
-            ) for i in 1:n, j in 1:n
+            float(i == j ? 10 + i : 0.3 * (i + j)), ntuple(k -> 0.1k + 0.01 * (i + j), p)
+        ) for i in 1:n, j in 1:n
     ]
     b = [ForwardDiff.Dual{Nothing}(float(i), ntuple(k -> 0.05k + 0.1i, p)) for i in 1:n]
     return A, b
@@ -42,9 +42,9 @@ value_error(got, ref) = maximum(abs, ForwardDiff.value.(got) .- ForwardDiff.valu
 function partials_error(got, ref)
     return maximum(
         maximum(
-                abs,
-                collect(ForwardDiff.partials(x)) .- collect(ForwardDiff.partials(y))
-            ) for (x, y) in zip(got, ref)
+            abs,
+            collect(ForwardDiff.partials(x)) .- collect(ForwardDiff.partials(y))
+        ) for (x, y) in zip(got, ref)
     )
 end
 

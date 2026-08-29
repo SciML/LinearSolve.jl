@@ -88,6 +88,10 @@ for Alg in (
         ParUFactorization,
         SuperLUDISTFactorization,
         ElementalJL,
+        # CKTSO can solve the transposed system from the same factorization via its
+        # `row0_column1` flag, but CKTSO.jl does not expose that, so the adjoint
+        # refactorizes.
+        CKTSOFactorization,
         SpecializedLUFactorization,
         SpecializedQRFactorization,
         # The LHL workspace is a Hessenberg reduction of J plus an LU of the shifted

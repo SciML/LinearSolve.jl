@@ -798,7 +798,8 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
     AMGXPreconditioner,
     STRUMPACKFactorization, MUMPSFactorization, SuperLUDISTFactorization,
     SpecializedLUFactorization, SpecializedQRFactorization,
-    HSLMA57Factorization, HSLMA97Factorization
+    HSLMA57Factorization, HSLMA97Factorization,
+    CKTSOFactorization
 
 export LHLFactorization, update_gamma!
 

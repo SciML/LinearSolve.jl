@@ -74,6 +74,10 @@ for alg in vcat(
             (
             !(alg == HSLMA97Factorization) ||
                 Base.get_extension(LinearSolve, :LinearSolveHSLExt) !== nothing
+        ) &&
+            (
+            !(alg == CKTSOFactorization) ||
+                Base.get_extension(LinearSolve, :LinearSolveCKTSOExt) !== nothing
         )
         A = [1.0 2.0; 3.0 4.0]
         alg in [

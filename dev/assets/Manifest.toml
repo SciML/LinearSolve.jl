@@ -208,9 +208,9 @@ version = "0.2.7"
 
 [[deps.CUDACore]]
 deps = ["Adapt", "BFloat16s", "CEnum", "CUDA_Compiler_jll", "CUDA_Driver_jll", "CUDA_Runtime_Discovery", "CUDA_Runtime_jll", "ExprTools", "GPUArrays", "GPUCompiler", "GPUToolbox", "KernelAbstractions", "LLVM", "LLVMLoopInfo", "LazyArtifacts", "Libdl", "LinearAlgebra", "Logging", "NVPTX_LLVM_Backend_jll", "PrecompileTools", "Preferences", "Printf", "Random", "Random123", "RandomNumbers", "StaticArrays"]
-git-tree-sha1 = "ef92f2c28a80631ea7e5217f1ea678c9d236f1de"
+git-tree-sha1 = "47e69386b3520240126a6ed8e2adb2bfe7a30b62"
 uuid = "bd0ed864-bdfe-4181-a5ed-ce625a5fdea2"
-version = "6.3.0"
+version = "6.3.1"
 
     [deps.CUDACore.extensions]
     ChainRulesCoreExt = "ChainRulesCore"
@@ -225,9 +225,9 @@ version = "6.3.0"
 
 [[deps.CUDA_Compiler_jll]]
 deps = ["Artifacts", "CUDA_Driver_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "TOML"]
-git-tree-sha1 = "96d67516639108f7062bd6f580b966ef740c0ca3"
+git-tree-sha1 = "5d71f707e383f2ce837d74072bdbad86831119af"
 uuid = "d1e2174e-dfdc-576e-b43e-73b79eb1aca8"
-version = "0.5.1+0"
+version = "0.6.0+0"
 
 [[deps.CUDA_Driver_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -243,9 +243,9 @@ version = "2.1.0"
 
 [[deps.CUDA_Runtime_jll]]
 deps = ["Artifacts", "CUDA_Compiler_jll", "CUDA_Driver_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "TOML"]
-git-tree-sha1 = "50d0cc99094dd67d7ef08783d7b5c0d4fc7d1c88"
+git-tree-sha1 = "d0f9e2c726dc803adf4e23ee6090762e7843f8a6"
 uuid = "76a88914-d11a-5bdc-97e0-2f5a05c973a2"
-version = "0.24.1+0"
+version = "0.24.2+0"
 
 [[deps.Cairo_jll]]
 deps = ["Artifacts", "Bzip2_jll", "CompilerSupportLibraries_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "JLLWrappers", "Libdl", "Pixman_jll", "Xorg_libXext_jll", "Xorg_libXrender_jll", "Zlib_jll", "libpng_jll"]
@@ -596,10 +596,10 @@ uuid = "46192b85-c4d5-4398-a991-12ede77f4527"
 version = "0.2.0"
 
 [[deps.GPUCompiler]]
-deps = ["CompilerCaching", "ExprTools", "InteractiveUtils", "LLVM", "Libdl", "Logging", "PrecompileTools", "Preferences", "REPL", "TOML", "Tracy", "UUIDs", "tree_sitter_gcn_jll", "tree_sitter_llvm_jll", "tree_sitter_ptx_jll", "tree_sitter_spirv_jll"]
-git-tree-sha1 = "e7471494720dcdfa5572e283e9fe43b65b5f1a62"
+deps = ["CompilerCaching", "ExprTools", "InteractiveUtils", "LLVM", "Libdl", "Logging", "PrecompileTools", "Preferences", "REPL", "ScopedValues", "TOML", "Tracy", "UUIDs", "tree_sitter_gcn_jll", "tree_sitter_llvm_jll", "tree_sitter_ptx_jll", "tree_sitter_spirv_jll"]
+git-tree-sha1 = "fbac30686037905a82e388dfbe45f28d7be752e1"
 uuid = "61eb1bfa-7361-4325-ad38-22787b887f55"
-version = "2.4.2"
+version = "2.5.0"
 
     [deps.GPUCompiler.extensions]
     HighlightsExt = "Highlights"
@@ -689,9 +689,9 @@ version = "1.0.2"
 
 [[deps.HTTP]]
 deps = ["Base64", "CodecZlib", "Dates", "EnumX", "PrecompileTools", "Random", "Reseau", "SHA", "URIs", "UUIDs", "Zlib_jll"]
-git-tree-sha1 = "d6e390d1515836237b837fb7b6fca7ba1d752db6"
+git-tree-sha1 = "49a90cd540681d5b79bf5c8ca13c92677e37005e"
 uuid = "cd3eb016-35fb-5094-929b-558a96fad6f3"
-version = "2.6.5"
+version = "2.6.6"
 
 [[deps.HarfBuzz_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "Graphite2_jll", "JLLWrappers", "Libdl", "Libffi_jll"]
@@ -1006,7 +1006,7 @@ version = "1.12.0"
 
 [[deps.LinearSolve]]
 deps = ["AMD", "ArrayInterface", "ConcreteStructs", "DocStringExtensions", "EnumX", "GPUArraysCore", "InteractiveUtils", "Krylov", "LHLFactorization", "Libdl", "LinearAlgebra", "MKL_jll", "Markdown", "OpenBLAS_jll", "PrecompileTools", "Preferences", "PureKLU", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLLogging", "SciMLOperators", "SciMLStructures", "Setfield", "SparseArrays", "SparseColumnPivotedQR", "StaticArraysCore"]
-path = "/home/runner/_work/LinearSolve.jl/LinearSolve.jl"
+path = "/home/runner/work/LinearSolve.jl/LinearSolve.jl"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 version = "5.14.1"
 
@@ -1019,6 +1019,7 @@ version = "5.14.1"
     LinearSolveBLISExt = ["blis_jll", "LAPACK_jll"]
     LinearSolveBandedMatricesExt = "BandedMatrices"
     LinearSolveBlockDiagonalsExt = "BlockDiagonals"
+    LinearSolveCKTSOExt = "CKTSO"
     LinearSolveCUDAExt = ["cuSOLVER"]
     LinearSolveCUDSSExt = "CUDSS"
     LinearSolveCUSOLVERRFExt = "CUSOLVERRF"
@@ -1061,6 +1062,7 @@ version = "5.14.1"
     Arpack = "7d9fca2a-8960-54d3-9f78-7d1dccf2cb97"
     BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
     BlockDiagonals = "0a1fb500-61f7-11e9-3c65-f5ef3456f9f0"
+    CKTSO = "8e543fc2-2ef1-4e2d-a99e-39beaa046845"
     CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
     CUDSS = "45b445bb-4962-46a0-9369-b4df9d0f772e"
     CUSOLVERRF = "a8cc9031-bad2-4722-94f5-40deabb4245c"
@@ -2206,9 +2208,9 @@ version = "0.9.0+4"
 
 [[deps.cuBLAS]]
 deps = ["Adapt", "BFloat16s", "CEnum", "CUDACore", "CUDA_Runtime_Discovery", "CUDA_Runtime_jll", "GPUArrays", "GPUToolbox", "LLVM", "LinearAlgebra"]
-git-tree-sha1 = "09ee8f27305e9778a1f88104e901864a522198ab"
+git-tree-sha1 = "a480ea97d416f5be86acbe1138ee53014f4b86c4"
 uuid = "182d3088-87b7-4494-8cad-fc6afaa545bc"
-version = "6.3.0"
+version = "6.3.1"
 
     [deps.cuBLAS.extensions]
     EnzymeCoreExt = "EnzymeCore"
@@ -2218,15 +2220,15 @@ version = "6.3.0"
 
 [[deps.cuSOLVER]]
 deps = ["CEnum", "CUDACore", "CUDA_Runtime_Discovery", "CUDA_Runtime_jll", "GPUToolbox", "LinearAlgebra", "SparseArrays", "cuBLAS", "cuSPARSE"]
-git-tree-sha1 = "bb6c154ba992c116732fff8024ba78587efac94e"
+git-tree-sha1 = "7c3ce90b5a56c2675365619fda814fa48f23522e"
 uuid = "887afef0-6a32-4de5-add4-7827692ba8fc"
-version = "6.3.0"
+version = "6.3.1"
 
 [[deps.cuSPARSE]]
 deps = ["Adapt", "CEnum", "CUDACore", "CUDA_Runtime_Discovery", "CUDA_Runtime_jll", "GPUArrays", "GPUToolbox", "KernelAbstractions", "LinearAlgebra", "SparseArrays"]
-git-tree-sha1 = "0b3b045a0ff35e8fbd6687d2f6610bbead7e40c8"
+git-tree-sha1 = "39cfa7dc11d75f24378711317292ec9d82e2af18"
 uuid = "b26da814-b3bc-49ef-b0ee-c816305aa060"
-version = "6.3.0"
+version = "6.3.1"
 
     [deps.cuSPARSE.extensions]
     SparseMatricesCSRExt = "SparseMatricesCSR"

@@ -55,6 +55,7 @@ for alg in vcat(
             (!(alg == AppleAccelerate32MixedLUFactorization) || Sys.isapple()) &&
             (!(alg == OpenBLAS32MixedLUFactorization) || LinearSolve.useopenblas) &&
             (!(alg == SparspakFactorization) || false) &&
+            (!(alg == SLATEFactorization) || LinearSolve.slate_isavailable()) &&
             (!(alg == STRUMPACKFactorization) || HAS_STRUMPACK) &&
             (
             !(alg == ParUFactorization) ||

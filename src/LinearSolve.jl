@@ -803,7 +803,7 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
 
 export LHLFactorization, update_gamma!
 
-export LinearSolveFunction, DirectLdiv!, show_algorithm_choices
+export LinearSolveFunction, DirectLdiv!, show_algorithm_choices, InvPreconditioner
 
 export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
     KrylovJL_BICGSTAB, KrylovJL_LSMR, KrylovJL_CRAIGMR, KrylovJL_FGMRES, WarmStart,

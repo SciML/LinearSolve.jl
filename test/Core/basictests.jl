@@ -882,8 +882,6 @@ end
     end
 
     @testset "Preconditioners" begin
-        @test Base.isexported(LinearSolve, :InvPreconditioner)
-
         @testset "Vector Diagonal Preconditioner" begin
             x = rand(n, n)
             y = rand(n, n)

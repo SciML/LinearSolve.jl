@@ -139,7 +139,7 @@ linearsolve_internal_accesses = (
     :DefaultLinearSolverInit, :GPUArraysCore, :LinearCache, :MinNormQR,
     :NONPERSISTENT_ZERO_FRACTION, :PERSISTENT_ZERO_FRACTION_THRESHOLD,
     :PrecompileTools, :SciMLLinearSolveAlgorithm, :SupernodalLU,
-    :_SPARSE_LU_FALLBACK_ALGORITHMS, :_SPARSE_ONLY_ALGORITHMS,
+    :_SLATE_JLL_LIBPATH, :_SPARSE_LU_FALLBACK_ALGORITHMS, :_SPARSE_ONLY_ALGORITHMS,
     :__is_extension_loaded, :__nonstructural_zeros, :_adjoint_factorization_solve,
     :_adjoint_krylov_solve, :_adjoint_precs, :_adjoint_solve, :_can_reuse_cache_factorization,
     :_check_matrix_support, :_check_residual_safety,

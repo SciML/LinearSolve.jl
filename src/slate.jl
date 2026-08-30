@@ -44,6 +44,12 @@ function _slate_eltype(A, b)
     end
 end
 
+# Filled in by `LinearSolveSLATEExt` when SLATE_jll is loaded and has a build for this
+# platform, so `using SLATE_jll` is enough to make `SLATEFactorization` work without
+# pointing at a library by hand. An explicit `libpath` or `ENV` setting still wins, so a
+# hand-built SLATE keeps working and can be preferred over the JLL.
+const _SLATE_JLL_LIBPATH = Ref{Union{Nothing, String}}(nothing)
+
 function _slate_library_candidates(libpath)
     candidates = String[]
     libpath === nothing || push!(candidates, String(libpath))
@@ -51,6 +57,9 @@ function _slate_library_candidates(libpath)
         if haskey(ENV, key) && !isempty(ENV[key])
             push!(candidates, ENV[key])
         end
+    end
+    let jll = _SLATE_JLL_LIBPATH[]
+        jll === nothing || push!(candidates, jll)
     end
     append!(
         candidates,
@@ -97,9 +106,11 @@ function _slate_lib(alg::SLATEFactorization)
     lib = _load_libslate(alg.libpath)
     lib !== nothing && return lib
     error(
-        "SLATEFactorization requires SLATE's LAPACK API library. " *
-            "Build SLATE with `slate_lapack_api`, then pass `SLATEFactorization(libpath = \"/path/to/libslate_lapack_api.so\")` " *
-            "or set ENV[\"SLATE_LAPACK_LIB\"]."
+        "SLATEFactorization requires SLATE's LAPACK API library. The simplest way to " *
+            "get one is `using SLATE_jll`, which supplies it on the platforms it builds " *
+            "for. To use your own build instead, pass " *
+            "`SLATEFactorization(libpath = \"/path/to/libslate_lapack_api.so\")` or set " *
+            "ENV[\"SLATE_LAPACK_LIB\"]."
     )
 end
 

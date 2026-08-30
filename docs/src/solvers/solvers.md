@@ -429,9 +429,19 @@ STRUMPACKFactorization
 ### SLATE
 
 `SLATEFactorization` wraps SLATE's LAPACK compatibility API for dense LU solves.
-It requires a local SLATE build with the `slate_lapack_api` library available.
-Pass the library explicitly with `SLATEFactorization(libpath = "/path/to/libslate_lapack_api.so")`
-or set `ENV["SLATE_LAPACK_LIB"]`.
+
+The simplest way to get the library is `using SLATE_jll`, which supplies it on the
+platforms it builds for (Linux only, at the time of writing):
+
+```julia
+using LinearSolve, SLATE_jll
+solve(LinearProblem(A, b), SLATEFactorization())
+```
+
+To use a local SLATE build instead, pass it explicitly with
+`SLATEFactorization(libpath = "/path/to/libslate_lapack_api.so")` or set
+`ENV["SLATE_LAPACK_LIB"]`. Either takes precedence over SLATE_jll, so loading the JLL
+for something else will not redirect an explicit choice.
 
 ```@docs
 SLATEFactorization

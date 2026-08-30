@@ -1,4 +1,6 @@
 needs_concrete_A(alg::DefaultLinearSolver) = true
+# Jacobian staleness belongs to the wrapper, so copying it would disconnect the signal.
+default_alias_A(::DefaultLinearSolver, ::WOperator, ::Any) = true
 
 # Every algorithm the default can dispatch to either ignores the tolerances
 # (the factorizations) or reads `cache.abstol`/`cache.reltol` at solve time (the
@@ -233,11 +235,11 @@ const LHL_DEFAULT_MIN_SIZE = 32
 # but left uninitialized the solve fails, and if it is initialized but never selected the
 # buffers are wasted. Both ask here.
 function _lhl_defaultable(A::WOperator, assump::OperatorAssumptions)
-    # A `MatrixOperator` is updated in place while its identity and `jac_stale` remain
-    # unchanged, so the reduction cannot detect that its contents moved.
     (assump.issq && _lhl_scalar_massmatrix(A.mass_matrix)) || return false
-    A.J isa DenseMatrix && return size(A, 1) >= LHL_DEFAULT_MIN_SIZE
-    return issparsematrixcsc(A.J)
+    (A.J isa AbstractMatrix || A.J isa MatrixOperator) || return false
+    J = _lhl_jacobian(A)
+    J isa DenseMatrix && return size(A, 1) >= LHL_DEFAULT_MIN_SIZE
+    return issparsematrixcsc(J)
 end
 _lhl_defaultable(A, assump) = false
 

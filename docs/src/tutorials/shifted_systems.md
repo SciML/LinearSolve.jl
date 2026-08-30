@@ -189,9 +189,9 @@ uc ≈ (J - LA.I / γc) \ bc
 ## When it is chosen automatically
 
 Wrapping a matrix in a `WOperator` is itself the statement that the shift will move while
-`J` stays put, so `defaultalg` treats it as one: for a `WOperator` with a dense Jacobian, a
-scalar multiple of `I` as the mass matrix, and `n ≥ LinearSolve.LHL_DEFAULT_MIN_SIZE`, no
-algorithm argument is needed.
+`J` stays put, so `defaultalg` treats it as one: for a `WOperator` with a dense matrix or
+matrix-backed operator as its Jacobian, a scalar multiple of `I` as the mass matrix, and
+`n ≥ LinearSolve.LHL_DEFAULT_MIN_SIZE`, no algorithm argument is needed.
 
 ```@example shifted
 LS.defaultalg(W, b, LS.OperatorAssumptions(true))

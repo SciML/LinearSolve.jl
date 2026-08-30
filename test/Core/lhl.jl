@@ -393,11 +393,7 @@ end
     end
 end
 
-@testset "an operator Jacobian is never claimed by the reduction" begin
-    # `update_coefficients!` moves a `MatrixOperator`'s numbers in place, leaving both the
-    # object identity and `jac_stale` untouched. Nothing tells the reduction it went
-    # stale, so the split form must not be claimed at all for an operator `J` — it would
-    # answer with the previous Jacobian and raise nothing.
+@testset "a dense operator Jacobian uses LHL by default" begin
     n = 40
     γ = 0.1
     A = randn(MersenneTwister(21), n, n)
@@ -406,16 +402,18 @@ end
     W = WOperator{true}(I, γ, Aop, zeros(n))
     assump = LinearSolve.OperatorAssumptions(true)
 
-    @test !LinearSolve._lhl_defaultable(W, assump)
-    @test LinearSolve.defaultalg(W, b, assump) !=
+    @test LinearSolve._lhl_defaultable(W, assump)
+    @test LinearSolve.defaultalg(W, b, assump) ==
         LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LHLFactorization)
 
     cache = init(LinearProblem(W, b))
+    @test cache.A === W
+    @test cache.cacheval.LHLFactorization !== nothing
     @test solve!(cache).u ≈ (A - I / γ) \ b rtol = 1.0e-6
 
     Anew = randn(MersenneTwister(23), n, n)
     copyto!(Aop.A, Anew)
-    cache.isfresh = true
+    mark_jacobian_updated!(W)
     @test solve!(cache).u ≈ (Anew - I / γ) \ b rtol = 1.0e-6
 end
 

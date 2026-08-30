@@ -19,9 +19,9 @@ fixed for many steps.
 
 Give it the system matrix unassembled, as a `SciMLOperators.WOperator` — the split
 `J - M/γ` an implicit solver already builds — and move the shift with
-[`update_gamma!`](@ref).  A `WOperator` whose Jacobian is a dense matrix is also what
-`defaultalg` selects this algorithm for, at sizes where the reduction pays.  The mass
-matrix must be a multiple of `I`.
+[`update_gamma!`](@ref).  A `WOperator` whose Jacobian is a dense matrix or matrix-backed
+operator is also what `defaultalg` selects this algorithm for, at sizes where the
+reduction pays.  The mass matrix must be a multiple of `I`.
 
 Handed an ordinary matrix `A`, it solves `Ax = b` as `Z H⁻¹ Z⁻¹ b`; that works, but it is
 strictly worse than an LU and the algorithm has no reason to be chosen.

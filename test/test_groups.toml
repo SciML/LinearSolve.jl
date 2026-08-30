@@ -23,6 +23,12 @@ versions = ["lts", "1", "pre"]
 runner = "self-hosted"
 num_threads = 2
 
+# Keep the direct Accelerate refactorization allocation contract covered on Apple hardware.
+[AppleAccelerate]
+versions = ["lts", "1", "pre"]
+os = ["macos-latest"]
+num_threads = 2
+
 [LinearSolveSTRUMPACK]
 versions = ["lts", "1", "pre"]
 runner = "self-hosted"
@@ -45,6 +51,11 @@ num_threads = 2
 
 [AD]
 versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
+
+[Reactant]
+versions = ["1"]
 runner = "self-hosted"
 num_threads = 2
 
@@ -78,6 +89,11 @@ versions = ["lts", "1"]
 runner = "self-hosted"
 num_threads = 2
 
+[LinearSolveCKTSO]
+versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
+
 [LinearSolveHSL]
 versions = ["lts", "1"]
 runner = "self-hosted"
@@ -101,10 +117,15 @@ num_threads = 2
 [LinearSolvePureUMFPACK]
 versions = ["lts", "1", "pre"]
 
-# Trim ran on GitHub-hosted ubuntu-latest (self-hosted was false for this
-# group); keep it on the default ubuntu-latest runner.
+# juliac links the trimmed executable with gcc/clang, so Trim is the one group
+# that needs a runner with a C compiler. `ubuntu-latest` does not give that:
+# SciML's self-hosted pool advertises the same label, so the job is routed by
+# whichever pool has capacity, and a persistent runner without gcc fails the
+# link ("could not find a compiler, looked for gcc and clang" -- #977). Pin a
+# versioned GitHub-hosted label, which the self-hosted pool does not advertise.
 [Trim]
 versions = ["1"]
+runner = "ubuntu-24.04"
 
 # GPU folds the former bespoke GPU.yml: a dep-adding CUDA group on a
 # self-hosted GPU runner.

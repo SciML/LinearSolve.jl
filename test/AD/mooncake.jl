@@ -3,6 +3,26 @@ using LinearSolve, LinearAlgebra, Test
 using FiniteDiff, RecursiveFactorization
 using Mooncake
 
+struct OpaqueDenseFactorization <: LinearSolve.AbstractDenseFactorization end
+struct OpaqueDenseFactorizationCache end
+
+function LinearSolve.init_cacheval(
+        ::OpaqueDenseFactorization, A, b, u, Pl, Pr, maxiters::Int,
+        abstol, reltol, verbose::Union{LinearSolve.LinearVerbosity, Bool},
+        assumptions::LinearSolve.OperatorAssumptions
+    )
+    return OpaqueDenseFactorizationCache()
+end
+
+function LinearSolve.solve!(
+        cache::LinearSolve.LinearCache, alg::OpaqueDenseFactorization; kwargs...
+    )
+    cache.u .= cache.A \ cache.b
+    return LinearSolve.SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
+    )
+end
+
 # first test
 n = 4
 A = rand(n, n);
@@ -27,6 +47,45 @@ db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x), copy(b1))
 @test value ≈ f_primal
 @test gradient[2] ≈ dA2
 @test gradient[3] ≈ db12
+
+@testset "OpenBLAS solve! reverse rule" begin
+    A = [3.0 1.0; 1.0 2.0]
+    b = [1.0, 2.0]
+
+    function openblas_solve!(A, b)
+        cache = init(LinearProblem(A, b), OpenBLASLUFactorization())
+        return sum(solve!(cache).u)
+    end
+
+    rule = Mooncake.build_rrule(openblas_solve!, copy(A), copy(b))
+    value, gradient = Mooncake.value_and_pullback!!(
+        rule, 1.0, openblas_solve!, copy(A), copy(b)
+    )
+    dA = FiniteDiff.finite_difference_gradient(A -> openblas_solve!(A, b), A)
+    db = FiniteDiff.finite_difference_gradient(b -> openblas_solve!(A, b), b)
+
+    @test value ≈ openblas_solve!(A, b)
+    @test gradient[2] ≈ dA
+    @test gradient[3] ≈ db
+end
+
+@testset "Opaque factorization cache solve! reverse rule" begin
+    A = rand(4, 4) + 4I
+    b = rand(4)
+
+    function opaque_factorization_solve!(b)
+        cache = init(LinearProblem(A, b), OpaqueDenseFactorization())
+        return sum(solve!(cache).u)
+    end
+
+    rule = Mooncake.build_rrule(opaque_factorization_solve!, copy(b))
+    value, gradient = Mooncake.value_and_pullback!!(
+        rule, 1.0, opaque_factorization_solve!, copy(b)
+    )
+
+    @test value ≈ opaque_factorization_solve!(b)
+    @test gradient[2] ≈ transpose(A) \ ones(4)
+end
 
 # Second test
 A = rand(n, n);

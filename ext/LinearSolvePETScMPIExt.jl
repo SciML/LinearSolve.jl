@@ -362,7 +362,10 @@ function PETScExt.run_ksp!(pcache, petsclib, alg, b::PVector, u::PVector)
     return nothing
 end
 
-function PETScExt.postsolve_solution_check(cache, alg, pcache, A::PSparseMatrix, u::PVector)
+function PETScExt.postsolve_solution_check(
+        cache, alg, pcache, A::PSparseMatrix, u::PVector;
+        iters::Int = 0, resid = nothing
+    )
     u_consistent = consistent(u, partition(axes(A, 2))) |> fetch
     Au = similar(u_consistent, axes(A, 1))
     LinearAlgebra.mul!(Au, A, u_consistent)
@@ -385,8 +388,11 @@ function PETScExt.postsolve_solution_check(cache, alg, pcache, A::PSparseMatrix,
     tol = cache.abstol + cache.reltol * b_norm
 
     if res_norm > tol
+        # Unlike LinearSolve._check_residual_safety, falling back to res_norm is
+        # type-safe here: the sole call site always supplies the KSP residual.
         return SciMLBase.build_linear_solution(
-            alg, u, nothing, cache; retcode = ReturnCode.APosterioriSafetyFailure
+            alg, u, something(resid, res_norm), nothing;
+            retcode = ReturnCode.APosterioriSafetyFailure, iters
         )
     end
     return nothing

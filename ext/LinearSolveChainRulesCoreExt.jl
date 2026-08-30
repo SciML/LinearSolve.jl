@@ -1,13 +1,12 @@
 module LinearSolveChainRulesCoreExt
 
-using LinearSolve
-using LinearSolve: SciMLLinearSolveAlgorithm, AbstractFactorization,
+using LinearSolve: LinearSolve, SciMLLinearSolveAlgorithm, AbstractFactorization,
     AbstractKrylovSubspaceMethod, DefaultLinearSolver, OperatorAssumptions,
-    defaultalg, default_alias_A, defaultalg_adjoint_eval, LinearSolveAdjoint
+    defaultalg, default_alias_A, LinearSolveAdjoint
 using SciMLBase: SciMLBase, LinearProblem, init, solve, solve!
 using SciMLOperators: issquare
 using ChainRulesCore: ChainRulesCore, NoTangent
-using LinearAlgebra: Factorization, adjoint
+using LinearAlgebra: adjoint
 
 const CRC = ChainRulesCore
 
@@ -31,16 +30,20 @@ function CRC.rrule(
 
     @assert sensealg isa LinearSolveAdjoint "Currently only `LinearSolveAdjoint` is supported for adjoint sensitivity analysis."
 
-    # Decide if we need to cache `A` and `b` for the reverse pass
+    A_ = nothing
     if sensealg.linsolve === missing
-        # We can reuse the factorization so no copy is needed
-        # Krylov Methods don't modify `A`, so it's safe to just reuse it
-        # No Copy is needed even for the default case
+        can_reuse_factorization = LinearSolve._can_reuse_cache_factorization(
+            alg, cache.cacheval
+        )
         if !(
-                alg isa AbstractFactorization || alg isa AbstractKrylovSubspaceMethod ||
+                can_reuse_factorization || alg isa AbstractKrylovSubspaceMethod ||
                     alg isa DefaultLinearSolver
             )
-            A_ = alias_A ? deepcopy(A) : A
+            A_ = if alg isa AbstractFactorization
+                deepcopy(A)
+            else
+                alias_A ? deepcopy(A) : A
+            end
         end
     else
         A_ = deepcopy(A)
@@ -53,23 +56,17 @@ function CRC.rrule(
 
         ∂u = hasproperty(∂sol, :u) ? ∂sol.u : ∂sol
         if sensealg.linsolve === missing
-            λ = if cache.cacheval isa Factorization
-                cache.cacheval' \ ∂u
-            elseif cache.cacheval isa Tuple && cache.cacheval[1] isa Factorization
-                first(cache.cacheval)' \ ∂u
-            elseif alg isa AbstractKrylovSubspaceMethod
-                invprob = LinearProblem(adjoint(cache.A), ∂u)
-                solve(invprob, alg; cache.abstol, cache.reltol, cache.verbose).u
-            elseif alg isa DefaultLinearSolver
-                LinearSolve.defaultalg_adjoint_eval(cache, ∂u)
-            else
-                invprob = LinearProblem(adjoint(A_), ∂u) # We cached `A`
-                solve(invprob, alg; cache.abstol, cache.reltol, cache.verbose).u
-            end
+            # Same route as `solve!(cache; adjoint = true)`. `A_` is the copy preserved
+            # above when the factorization may have overwritten `cache.A`.
+            λ = LinearSolve._adjoint_solve(cache, ∂u, A_ === nothing ? cache.A : A_)
         else
+            adj_Pl, adj_Pr = LinearSolve._adjoint_precs(
+                sensealg.linsolve, sensealg, cache.Pl, cache.Pr
+            )
             invprob = LinearProblem(adjoint(A_), ∂u) # We cached `A`
             λ = solve(
-                invprob, sensealg.linsolve; cache.abstol, cache.reltol, cache.verbose
+                invprob, sensealg.linsolve; cache.abstol, cache.reltol, cache.verbose,
+                Pl = adj_Pl, Pr = adj_Pr
             ).u
         end
 

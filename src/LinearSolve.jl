@@ -6,27 +6,44 @@ end
 
 import PrecompileTools
 using ArrayInterface: ArrayInterface
+# Explicit names, not the module: LinearSolve defines its own `LHLFactorization` (the
+# algorithm object) and `using LHLFactorization` would shadow it.
+module LHLFactorizationBindings
+    using LHLFactorization: LHLWorkspace, lhl_reduce!, lhl_shift!, lhl_ldiv!, lhl_refine!,
+        lhl_ldivH!, lhl_refineH!, lhl, lhl!, lhl_isreduced
+    const bindings = (
+        LHLWorkspace, lhl_reduce!, lhl_shift!, lhl_ldiv!, lhl_refine!,
+        lhl_ldivH!, lhl_refineH!, lhl, lhl!, lhl_isreduced,
+    )
+end
+const (
+    LHLWorkspace, lhl_reduce!, lhl_shift!, lhl_ldiv!, lhl_refine!, lhl_ldivH!,
+    lhl_refineH!, lhl, lhl!, lhl_isreduced,
+) =
+    LHLFactorizationBindings.bindings
 using Base: Bool, convert, copyto!, adjoint, transpose, /, \, require_one_based_indexing
 using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, BunchKaufman,
     ColumnNorm, cond, Diagonal, Factorization, Hermitian, I, LAPACK, NoPivot,
     RowMaximum, RowNonZero, SymTridiagonal, Symmetric, Transpose,
     Tridiagonal, UniformScaling, axpby!, axpy!, bunchkaufman,
     bunchkaufman!,
-    cholesky, cholesky!, diagind, dot, inv, ldiv!, ldlt!, lu, lu!, mul!,
+    cholesky, cholesky!, diagind, dot, inv, issuccess, ldiv!, ldlt!, lu, lu!, mul!,
     norm,
     qr, qr!, svd, svd!
-using SciMLBase: SciMLBase, LinearAliasSpecifier, AbstractSciMLOperator,
+using SciMLBase: SciMLBase, LinearAliasSpecifier,
     init, solve!, reinit!, solve, ReturnCode, LinearProblem
 using SciMLOperators: SciMLOperators, AbstractSciMLOperator, IdentityOperator,
-    MatrixOperator,
-    has_ldiv!, issquare, has_concretization
+    MatrixOperator, WOperator, jacobian_stale,
+    mark_jacobian_current!,
+    has_ldiv!, issquare
+using SciMLStructures: SciMLStructures
 using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_int,
     AbstractVerbositySpecifier, AbstractVerbosityPreset,
     Silent, InfoLevel, WarnLevel, MessageLevel, None, Minimal, Standard, Detailed, All
 using Setfield: Setfield, @set!
 using DocStringExtensions: DocStringExtensions
 using EnumX: EnumX
-using Markdown: Markdown, @doc_str
+using Markdown: Markdown
 using Reexport: Reexport, @reexport
 using Libdl: Libdl
 import InteractiveUtils
@@ -103,6 +120,39 @@ specialized subtypes rather than directly from this type.
 This type integrates with the SciMLBase ecosystem, providing a consistent
 interface for linear algebra operations across the Julia scientific computing
 ecosystem.
+
+# Interface
+
+A concrete `MyAlg <: SciMLLinearSolveAlgorithm` must implement
+`SciMLBase.solve!(cache::LinearCache, alg::MyAlg; kwargs...)` and
+[`needs_concrete_A`](@ref)`(alg::MyAlg)::Bool`. It may implement
+[`init_cacheval`](@ref), [`default_alias_A`](@ref), [`default_alias_b`](@ref),
+[`needs_square_A`](@ref), and [`update_tolerances_internal!`](@ref); each of
+these has a documented default.
+
+Subtyping one of the categorized abstract types below supplies
+`needs_concrete_A` and the aliasing defaults. Direct subtypes must define
+`needs_concrete_A` themselves. The complete contract, including cache lifecycle
+rules and extension boundaries, is documented on the
+[Linear Solver Algorithm Interface](@ref) page.
+
+# Extension rules
+
+Define the four traits `needs_concrete_A`, `needs_square_A`, `default_alias_A`,
+and `default_alias_b` in the package that defines `MyAlg`, next to the algorithm
+type. Downstream solvers query them before an optional backend is loaded. Methods
+that actually call the backend, such as `solve!` and `init_cacheval`, may be
+defined in the package extension instead.
+
+# Examples
+
+```julia
+struct MyAlg <: LinearSolve.AbstractKrylovSubspaceMethod end
+LinearSolve.needs_square_A(::MyAlg) = true
+```
+
+Use [`algorithm_interface_issues`](@ref) to check a custom algorithm before
+passing it to `init` or `solve`.
 """
 abstract type SciMLLinearSolveAlgorithm <: SciMLBase.AbstractLinearAlgorithm end
 
@@ -114,22 +164,18 @@ These algorithms typically decompose the matrix `A` into a product of simpler
 matrices (e.g., `A = LU`, `A = QR`, `A = LDL'`) and then solve the system
 using forward/backward substitution.
 
-## Characteristics
+# Interface
 
-  - Requires concrete matrix representation (`needs_concrete_A() = true`)
-  - Typically efficient for multiple solves with the same matrix
-  - Generally provides high accuracy for well-conditioned problems
-  - Memory requirements depend on the specific factorization type
+Factorization algorithms receive a concrete representation of `A`, normally
+factorize it when `cache.isfresh` is true, store the factorization in
+`cache.cacheval`, and return a `SciMLBase.build_linear_solution` from `solve!`.
+The concrete subtypes are [`AbstractDenseFactorization`](@ref) and
+[`AbstractSparseFactorization`](@ref).
 
-## Subtypes
+# Examples
 
-  - `AbstractDenseFactorization`: For dense matrix factorizations
-  - `AbstractSparseFactorization`: For sparse matrix factorizations
-
-## Examples of concrete subtypes
-
-  - `LUFactorization`, `QRFactorization`, `CholeskyFactorization`
-  - `UMFPACKFactorization`, `KLUFactorization`
+`LUFactorization`, `QRFactorization`, `CholeskyFactorization`, `UMFPACKFactorization`,
+and `KLUFactorization` are concrete subtypes.
 """
 abstract type AbstractFactorization <: SciMLLinearSolveAlgorithm end
 
@@ -140,20 +186,18 @@ Abstract type for factorization-based linear solvers optimized for sparse matric
 These algorithms take advantage of sparsity patterns to reduce memory usage and
 computational cost compared to dense factorizations.
 
-## Characteristics
+# Interface
 
-  - Optimized for matrices with many zero entries
-  - Often use specialized pivoting strategies to preserve sparsity
-  - May reorder rows/columns to minimize fill-in during factorization
-  - Typically more memory-efficient than dense methods for sparse problems
+Use this supertype when the algorithm can preserve and exploit sparse structure.
+The default `needs_concrete_A`, `default_alias_A`, and `default_alias_b` traits
+are appropriate for the usual non-mutating sparse factorization workflow. An
+algorithm that mutates its input must override the aliasing traits and document
+that requirement.
 
-## Examples of concrete subtypes
+# Examples
 
-  - `UMFPACKFactorization`: General sparse LU with partial pivoting
-  - `KLUFactorization`: Sparse LU optimized for circuit simulation
-  - `CHOLMODFactorization`: Sparse Cholesky for positive definite systems
-  - `SparspakFactorization`: Envelope/profile method for sparse systems
-  - `ParUFactorization`: Parallel sparse LU using OpenMP (requires `import ParU_jll`)
+`UMFPACKFactorization`, `KLUFactorization`, `CHOLMODFactorization`,
+`SparspakFactorization`, and `ParUFactorization` are concrete subtypes.
 """
 abstract type AbstractSparseFactorization <: AbstractFactorization end
 
@@ -164,19 +208,17 @@ Abstract type for factorization-based linear solvers optimized for dense matrice
 These algorithms assume the matrix has no particular sparsity structure and use
 dense linear algebra routines (typically from BLAS/LAPACK) for optimal performance.
 
-## Characteristics
+# Interface
 
-  - Optimized for matrices with few zeros or no sparsity structure
-  - Leverage highly optimized BLAS/LAPACK routines when available
-  - Generally provide excellent performance for moderately-sized dense problems
-  - Memory usage scales as O(n²) with matrix size
+Use this supertype when the algorithm needs the entries of a dense `A` to build
+a factorization. The default `needs_concrete_A` is `true` and the default
+aliasing traits are `false`, preserving the caller's matrix while a
+factorization is built.
 
-## Examples of concrete subtypes
+# Examples
 
-  - `LUFactorization`: Dense LU with partial pivoting (via LAPACK)
-  - `QRFactorization`: Dense QR factorization for overdetermined systems
-  - `CholeskyFactorization`: Dense Cholesky for symmetric positive definite matrices
-  - `BunchKaufmanFactorization`: For symmetric indefinite matrices
+`LUFactorization`, `QRFactorization`, `CholeskyFactorization`, and
+`BunchKaufmanFactorization` are concrete subtypes.
 """
 abstract type AbstractDenseFactorization <: AbstractFactorization end
 
@@ -187,27 +229,19 @@ Abstract type for iterative linear solvers based on Krylov subspace methods.
 These algorithms solve linear systems by iteratively building an approximation
 from a sequence of Krylov subspaces, without requiring explicit matrix factorization.
 
-## Characteristics
+# Interface
 
-  - Does not require concrete matrix representation (`needs_concrete_A() = false`)
-  - Only needs matrix-vector products `A*v` (can work with operators/functions)
-  - Memory usage typically O(n) or O(kn) where k << n
-  - Convergence depends on matrix properties (condition number, eigenvalue distribution)
-  - Often benefits significantly from preconditioning
+Use this supertype for algorithms that can solve from matrix-vector products
+without materializing `A`. `needs_concrete_A` defaults to `false`. The
+implementation reads the right-hand side and tolerances from `LinearCache`,
+uses `cache.Pl` and `cache.Pr` when it supports preconditioning, writes into
+`cache.u`, and returns a `SciMLBase.build_linear_solution`.
 
-## Advantages
+# Examples
 
-  - Low memory requirements for large sparse systems
-  - Can handle matrix-free operators (functions that compute `A*v`)
-  - Often the only feasible approach for very large systems
-  - Can exploit matrix structure through specialized operators
-
-## Examples of concrete subtypes
-
-  - `GMRESIteration`: Generalized Minimal Residual method
-  - `CGIteration`: Conjugate Gradient (for symmetric positive definite systems)
-  - `BiCGStabLIteration`: Bi-Conjugate Gradient Stabilized
-  - Wrapped external iterative solvers (KrylovKit.jl, IterativeSolvers.jl)
+Krylov wrappers such as `KrylovJL_GMRES`, `KrylovJL_CG`, and
+`IterativeSolversJL_GMRES` are concrete subtypes. A matrix-free implementation
+must support the `mul!` operations required by its algorithm.
 """
 abstract type AbstractKrylovSubspaceMethod <: SciMLLinearSolveAlgorithm end
 
@@ -218,17 +252,18 @@ Abstract type for linear solvers that wrap custom solving functions or
 provide direct interfaces to specific solve methods. These provide flexibility
 for integrating custom algorithms or simple solve strategies.
 
-## Characteristics
+# Interface
 
-  - Does not require concrete matrix representation (`needs_concrete_A() = false`)
-  - Provides maximum flexibility for custom solving strategies
-  - Can wrap external solver libraries or implement specialized algorithms
-  - Performance and stability depend entirely on the wrapped implementation
+Use this supertype for an algorithm that delegates solving to a callable or a
+specialized direct operation. `needs_concrete_A` defaults to `false`, but the
+wrapped implementation is responsible for accepting the operator types that
+the algorithm advertises. The callable must return a solution compatible with
+`cache.u`.
 
-## Examples of concrete subtypes
+# Examples
 
-  - `LinearSolveFunction`: Wraps arbitrary user-defined solve functions
-  - `DirectLdiv!`: Direct application of the `\\` operator
+`LinearSolveFunction` wraps a user callable, while `DirectLdiv!` delegates to
+Julia's `ldiv!` implementation.
 """
 abstract type AbstractSolveFunction <: SciMLLinearSolveAlgorithm end
 
@@ -252,13 +287,19 @@ a concrete matrix representation or can work with abstract operators.
 ## Usage
 
 This trait is used internally by LinearSolve.jl to optimize algorithm dispatch
-and determine when matrix operators need to be converted to concrete arrays.
+and determine when matrix operators need to be converted to concrete arrays. It
+is also queried by downstream solvers such as OrdinaryDiffEq.jl and
+NonlinearSolve.jl to decide whether to assemble a concrete Jacobian, which is
+why every algorithm must implement it, and why it must be implemented next to
+the algorithm struct rather than in a package extension: the callers run before
+the backend package is necessarily loaded.
 
 ## Algorithm-Specific Behavior
 
   - `AbstractFactorization`: `true` (needs explicit matrix entries for factorization)
   - `AbstractKrylovSubspaceMethod`: `false` (only needs matrix-vector products)
   - `AbstractSolveFunction`: `false` (depends on the wrapped function's requirements)
+  - Direct subtypes of `SciMLLinearSolveAlgorithm`: no default; defining this is required
 
 ## Example
 
@@ -298,11 +339,6 @@ issparsematrix(A) = false
 make_SparseMatrixCSC(A) = nothing
 makeempty_SparseMatrixCSC(A) = nothing
 
-# Stub functions for SparseArrays - overridden in extension
-getcolptr(A) = error("SparseArrays extension not loaded")
-rowvals(A) = error("SparseArrays extension not loaded")
-nonzeros(A) = error("SparseArrays extension not loaded")
-
 EnumX.@enumx DefaultAlgorithmChoice begin
     LUFactorization
     QRFactorization
@@ -310,7 +346,7 @@ EnumX.@enumx DefaultAlgorithmChoice begin
     DirectLdiv!
     SparspakFactorization
     KLUFactorization
-    UMFPACKFactorization
+    SupernodalLUFactorization
     KrylovJL_GMRES
     GenericLUFactorization
     RFLUFactorization
@@ -329,6 +365,7 @@ EnumX.@enumx DefaultAlgorithmChoice begin
     CudaOffloadLUFactorization
     MetalLUFactorization
     SparseColumnPivotedQRFactorization
+    LHLFactorization
 end
 
 # Autotune preference constants - loaded once at package import time
@@ -358,6 +395,8 @@ function is_algorithm_available(alg::DefaultAlgorithmChoice.T)
         return usemetal(nothing)  # Available if Metal extension is loaded
     elseif alg === DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization
         return true  # SparseColumnPivotedQR is a hard dependency, always available
+    elseif alg === DefaultAlgorithmChoice.LHLFactorization
+        return true  # LHLFactorization.jl is a hard dependency, always available
     else
         # For extension-dependent algorithms not explicitly handled above,
         # we cannot easily check availability without trying to use them.
@@ -407,10 +446,21 @@ const BLASELTYPES = Union{Float32, Float64, ComplexF32, ComplexF64}
 
 function defaultalg_symbol end
 
+"""
+    _check_matrix_support(A)
+
+Reject a matrix format that would otherwise be solved incorrectly. Extensions add
+methods for their own formats; the fallback accepts everything.
+"""
+_check_matrix_support(A) = nothing
+
 include("verbosity.jl")
 include("blas_logging.jl")
 include("generic_lufact.jl")
+include("blocked_lufact.jl")
+include("eigenvalue.jl")
 include("common.jl")
+include("interface.jl")
 include("extension_algs.jl")
 include("factorization.jl")
 include("slate.jl")
@@ -418,12 +468,119 @@ include("appleaccelerate.jl")
 include("mkl.jl")
 include("openblas.jl")
 include("simplelu.jl")
+include("lowrank.jl")
+include("lhl.jl")
+include("adjoint_factorization.jl")
 include("simplegmres.jl")
 include("iterative_wrappers.jl")
 include("preconditioners.jl")
 include("preferences.jl")
 include("solve_function.jl")
 include("default.jl")
+"""
+    supernodal_panel_solve!(W, B, np; operation, algorithm = :auto)
+
+Apply a supernodal triangular-panel operation using the requested backend.
+
+# Arguments
+
+  - `W`: Matrix containing the factored diagonal block.
+  - `B`: Panel or right-hand side to update in place.
+  - `np`: Width of the diagonal block in `W`.
+
+# Keywords
+
+  - `operation`: which triangular operation to apply. One of
+
+      + `:factor_right_upper`: `B := B / U11`, a right solve with the non-unit
+        upper triangle (used during numeric factorization to form `L21`).
+      + `:factor_lower`: `B := L11 \\ B`, a left solve with the unit-lower triangle
+        (used during numeric factorization to form `U12`).
+      + `:lower`: `B := L11 \\ B`, the unit-lower forward substitution of the solve
+        phase.
+      + `:upper`: `B := U11 \\ B`, the non-unit upper back substitution of the
+        solve phase.
+
+    Any other symbol throws an `ArgumentError`. `:factor_lower` and `:lower`
+    compute the same result; they differ only in which backend code path each
+    `algorithm` routes them to (see below).
+  - `algorithm`: backend to dispatch to through `supernodal_panel_solve_backend!`.
+    Defaults to `:auto`. Accepted values:
+
+      + `:kernel`: the in-tree column-oriented kernels (generic over the element
+        type, allocation-free) for `:lower`/`:upper`; the `:factor_*` operations
+        are forwarded to `:triangularsolve`.
+      + `:blas`: `BLAS.trsm!` for `:lower`/`:upper` when `W` and `B` are strided
+        `BlasFloat` matrices, the kernels for other element types; the `:factor_*`
+        operations are forwarded to `:triangularsolve`.
+      + `:triangularsolve`: `LinearAlgebra.ldiv!`/`rdiv!` on the triangular
+        wrappers, replaced by TriangularSolve.jl kernels for strided `Float32`
+        and `Float64` panels when RecursiveFactorization.jl and TriangularSolve.jl
+        are loaded.
+      + `:auto`: `:factor_right_upper` and `:factor_lower` always go to
+        `:triangularsolve`. `:lower` and `:upper` use `:kernel` when
+        `np <= PANEL_KERNEL_MAX_NP` (256), when `B` has a single column, or when
+        the element type is not a `BlasFloat`; otherwise `:blas` when
+        `np > PANEL_BLAS_MIN_NP` (1792) and `:triangularsolve` in between.
+
+# Returns
+
+The updated `B`.
+
+!!! note
+
+    The TriangularSolve.jl backend is only active when both RecursiveFactorization.jl
+    and TriangularSolve.jl are loaded; `using RecursiveFactorization` is enough,
+    since RecursiveFactorization.jl depends on TriangularSolve.jl. Without them
+    `:triangularsolve` routes `:lower`/`:upper` back to `:blas` and the
+    `:factor_*` operations to the stdlib triangular solves.
+"""
+function supernodal_panel_solve! end
+
+"""
+    supernodal_panel_solve_backend!(algorithm, W, B, np; operation)
+
+Backend extension hook for [`supernodal_panel_solve!`](@ref).
+
+# Interface rules
+
+An extension may specialize `algorithm::Val` for supported operand types. The method
+must apply `operation` to `B` in place, return `B`, and treat the factored diagonal
+block `W[1:np, 1:np]` as read-only. `B` may be a view into the remainder of `W`.
+Unsupported operations must throw `ArgumentError`.
+
+The built-in backends use `Val(:kernel)`, `Val(:blas)`, and
+`Val(:triangularsolve)`. Extensions should add methods only for backend and operand
+combinations they implement; the generic methods provide the fallback behavior.
+
+# Built-in backends
+
+  - `Val(:kernel)`: runs `:lower`/`:upper` through the in-tree column-oriented
+    kernels; `:factor_right_upper`/`:factor_lower` are forwarded to
+    `Val(:triangularsolve)`.
+  - `Val(:blas)`: runs `:lower`/`:upper` through `BLAS.trsm!` when `W` and `B` are
+    strided `BlasFloat` matrices, and through the kernels otherwise;
+    `:factor_right_upper`/`:factor_lower` are forwarded to `Val(:triangularsolve)`.
+  - `Val(:triangularsolve)`: the in-tree method runs `:factor_right_upper` through
+    `LinearAlgebra.rdiv!` with `UpperTriangular` and `:factor_lower` through
+    `LinearAlgebra.ldiv!` with `UnitLowerTriangular`, and forwards
+    `:lower`/`:upper` to `Val(:blas)`.
+
+This is the extension hook: a package can add a more specific method for
+`Val(:triangularsolve)` and supported panel types. The
+`LinearSolveRecursiveFactorizationExt` extension defines
+
+    supernodal_panel_solve_backend!(::Val{:triangularsolve}, W::StridedMatrix{Tv},
+        B::StridedMatrix{Tv}, np::Int; operation::Symbol) where {Tv <: Union{Float32, Float64}}
+
+which runs all four operations through TriangularSolve.jl and is active once
+RecursiveFactorization.jl and TriangularSolve.jl are both loaded
+(`using RecursiveFactorization` is enough, since it depends on TriangularSolve.jl).
+"""
+function supernodal_panel_solve_backend! end
+# after default.jl: the vendored solver caches its dense diagonal blocks
+# with LinearSolve's own default solver, so it needs DefaultLinearSolver{,Init}
+include("SupernodalLU/SupernodalLU.jl")
 include("init.jl")
 include("adjoint.jl") # LinearSolveAdjoint struct definition only; rrules are in ChainRulesCore ext
 
@@ -455,18 +612,115 @@ end
 @inline _notsuccessful(F) = hasmethod(LinearAlgebra.issuccess, (typeof(F),)) ?
     !LinearAlgebra.issuccess(F) : false
 
+"""
+    _qr_rank_deficient(F)
+
+Cheap `O(min(m, n))` rank-deficiency test for an *unpivoted* QR factorization,
+using the same relative threshold LAPACK's `xGELSY` (and therefore `A \\ b`) uses
+to truncate the rank: a factorization is called rank-deficient when the smallest
+`|R[i, i]|` falls at or below `min(m, n) * eps * max|R[i, i]|`.
+
+This scans the `R` diagonal rather than reading a LAPACK `info` because
+unpivoted QR has none to read: `geqrf`/`geqrt` only set `info < 0` for an
+illegal argument and return `info == 0` on an exactly rank-deficient matrix, and
+`QRCompactWY` correspondingly stores only `factors` and `T` with no `issuccess`
+method. That is the same reason `_notsuccessful(::QRCompactWY)` above hand-scans
+for an exact zero on the diagonal; this is that scan with a relative threshold,
+so it also catches a merely negligible entry.
+
+Unpivoted QR does not order the diagonal of `R` by magnitude, so this is a
+heuristic rather than a rank-revealing test: it can miss a deficiency that only
+column pivoting would expose (Kahan-style matrices). It exists so the default
+algorithm can keep unpivoted QR on the fast path and only pay for a pivoted
+refactorization when the cheap check says the answer would otherwise be garbage;
+see `_default_qr_solve_with_fallback`. Factorization types the test does not
+apply to (SPQR, GPU) return `false` and keep their existing behavior.
+
+Being a threshold test, it is decisive only away from the threshold. For a matrix
+sitting *on* the cutoff -- say a column scaled to roughly `1e-14` of another, where
+the corresponding `R` diagonal entry lands at eps-level noise -- whether this fires
+depends on rounding, and the answer can differ from `A \\ b`, which reaches the
+same cutoff through a genuinely rank-revealing pivoted QR with better numerics.
+Clearly rank-deficient input is handled; input engineered to sit at the boundary is
+inherently ambiguous, and callers who need a decision there should ask for
+`QRFactorization(ColumnNorm())` or `SVDFactorization()` directly.
+"""
+@inline _qr_rank_deficient(F) = false
+
+# GPU factorizations cannot be indexed elementwise. Mirrors the GPU method on
+# `_notsuccessful` above, and is constrained on the same `T` as the scanning
+# method below so that it is strictly more specific (no dispatch ambiguity).
+@inline function _qr_rank_deficient(
+        ::LinearAlgebra.QRCompactWY{
+            T, A,
+        }
+    ) where {T <: BLASELTYPES, A <: GPUArraysCore.AnyGPUArray}
+    return false
+end
+
+@inline function _qr_rank_deficient(
+        F::LinearAlgebra.QRCompactWY{
+            T, A,
+        }
+    ) where {T <: BLASELTYPES, A}
+    (m, n) = size(F)
+    mn = min(m, n)
+    mn == 0 && return false
+    R = view(F.factors, 1:mn, 1:n)
+    dmin = typemax(real(T))
+    dmax = zero(real(T))
+    for x in @view R[diagind(R)]
+        a = abs(x)
+        a < dmin && (dmin = a)
+        a > dmax && (dmax = a)
+    end
+    return dmin <= mn * eps(real(T)) * dmax
+end
+
 # Solver Specific Traits
 ## Needs Square Matrix
 """
     needs_square_A(alg)
 
 Returns `true` if the algorithm requires a square matrix.
+
+`init` enforces this: an algorithm that returns `true` and is handed a
+non-square `A` throws an `ArgumentError` naming the algorithms that do solve
+least-squares/minimum-norm systems, rather than letting a `DimensionMismatch`
+(or worse) escape from inside the factorization. Anything not listed below falls
+back to the conservative `true`, so a new algorithm is rejected on non-square
+input until it is declared otherwise.
 """
 needs_square_A(::Nothing) = false  # Linear Solve automatically will use a correct alg!
 needs_square_A(alg::SciMLLinearSolveAlgorithm) = true
 for alg in (
+        # Same reason as the `Nothing` method above: by the time `init` runs, an
+        # unspecified algorithm has already been resolved to a
+        # `DefaultLinearSolver`, and the polyalgorithm picks a non-square-capable
+        # algorithm (pivoted QR, sparse column-pivoted QR, or a least-squares
+        # Krylov method) for a non-square `A` itself.
+        :DefaultLinearSolver,
         :QRFactorization, :FastQRFactorization, :NormalCholeskyFactorization,
         :NormalBunchKaufmanFactorization,
+        # Rank-revealing/least-squares capable: `svd` and the column-pivoted
+        # sparse QR both accept a non-square `A` and return the same answer as
+        # `A \ b`. `SparseColumnPivotedQRFactorization` is in fact the default
+        # for non-square sparse systems, so it must not be rejected here.
+        :SVDFactorization, :SparseColumnPivotedQRFactorization,
+        # Rank-revealing column-pivoted QR (`geqp3`): documented to return the
+        # least-squares solution for any shape, including rank-deficient.
+        :SpecializedQRFactorization,
+        # QR-based GPU offloads. These cannot be exercised on a machine without
+        # the corresponding GPU, and a QR is least-squares capable in principle,
+        # so they are declared permissive: enforcing `true` here would newly
+        # reject a shape that may work today.
+        :CudaOffloadQRFactorization, :AMDGPUOffloadQRFactorization,
+        :CudaOffloadFactorization,
+        # A wrapper around a user-supplied factorization: whether a non-square
+        # `A` is allowed depends on `fact_alg`, and the default (`factorize`) as
+        # well as the obvious choices (`qr`, `svd`) all handle it. Leave the
+        # rejection to the wrapped factorization.
+        :GenericFactorization,
     )
     @eval needs_square_A(::$(alg)) = false
 end
@@ -478,8 +732,8 @@ for kralg in (
     @eval needs_square_A(::KrylovJL{$(typeof(kralg))}) = false
 end
 for alg in (
-        :LUFactorization, :FastLUFactorization, :SVDFactorization,
-        :GenericFactorization, :GenericLUFactorization, :SimpleLUFactorization,
+        :LUFactorization, :FastLUFactorization,
+        :GenericLUFactorization, :SimpleLUFactorization,
         :RFLUFactorization, :ButterflyFactorization, :UMFPACKFactorization, :KLUFactorization, :SparspakFactorization,
         :DiagonalFactorization, :CholeskyFactorization, :BunchKaufmanFactorization,
         :CHOLMODFactorization, :LDLtFactorization, :AppleAccelerateLUFactorization,
@@ -502,6 +756,11 @@ useblis(x) = false
 usecuda(x) = false
 usemetal(x) = false
 
+# Formerly ext/LinearSolveSparseArraysExt.jl; kept as one excisable unit, see its
+# header. Order matters both ways: after the traits above, which its own workload
+# calls, and before the workload below, which it would otherwise invalidate.
+include("sparsearrays.jl")
+
 PrecompileTools.@compile_workload begin
     A = rand(4, 4)
     b = rand(4)
@@ -509,6 +768,12 @@ PrecompileTools.@compile_workload begin
     sol = solve(prob)
     sol = solve(prob, LUFactorization())
     sol = solve(prob, KrylovJL_GMRES())
+    # 80 x 80 is past both `GenericLUFactorization` size switches: the blocked
+    # driver (panel, trsm, row swaps) and the register-blocked Schur kernel,
+    # neither of which the 4 x 4 problem above reaches.
+    Ablocked = rand(80, 80) + 80I
+    bblocked = rand(80)
+    sol = solve(LinearProblem(Ablocked, bblocked), GenericLUFactorization())
 end
 
 ALREADY_WARNED_CUDSS = Ref{Bool}(false)
@@ -516,25 +781,34 @@ error_no_cudss_lu(A) = nothing
 cudss_loaded(A) = false
 is_cusparse(A) = false
 is_cusparse_csr(A) = false
+
 is_cusparse_csc(A) = false
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
-    GenericLUFactorization, SimpleLUFactorization, RFLUFactorization, ButterflyFactorization,
+    LowRankUpdatedMatrix,
+    GenericLUFactorization, GESVFactorization, SimpleLUFactorization,
+    RFLUFactorization, ButterflyFactorization,
     NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
     UMFPACKFactorization, KLUFactorization, PureKLUFactorization,
+    SupernodalLUFactorization, supernodal_panel_solve!, supernodal_panel_solve_backend!,
     PureUMFPACKFactorization, SparseColumnPivotedQRFactorization, FastLUFactorization,
     FastQRFactorization,
     SparspakFactorization, DiagonalFactorization, CholeskyFactorization,
     BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization,
     CUSOLVERRFFactorization, CliqueTreesFactorization, ParUFactorization,
+    AMGXPreconditioner,
     STRUMPACKFactorization, SLATEFactorization, MUMPSFactorization, SuperLUDISTFactorization,
     SpecializedLUFactorization, SpecializedQRFactorization,
-    HSLMA57Factorization, HSLMA97Factorization
+    HSLMA57Factorization, HSLMA97Factorization,
+    CKTSOFactorization
 
-export LinearSolveFunction, DirectLdiv!, show_algorithm_choices
+export LHLFactorization, update_gamma!
+
+export LinearSolveFunction, DirectLdiv!, show_algorithm_choices, InvPreconditioner
 
 export KrylovJL, KrylovJL_CG, KrylovJL_MINRES, KrylovJL_GMRES,
-    KrylovJL_BICGSTAB, KrylovJL_LSMR, KrylovJL_CRAIGMR, KrylovJL_FGMRES,
+    KrylovJL_BICGSTAB, KrylovJL_LSMR, KrylovJL_CRAIGMR, KrylovJL_FGMRES, WarmStart,
+    ConjugateGradientsJL, ConjugateGradientsJL_CG, ConjugateGradientsJL_BICGSTAB,
     IterativeSolversJL, IterativeSolversJL_CG, IterativeSolversJL_GMRES,
     IterativeSolversJL_BICGSTAB, IterativeSolversJL_MINRES, IterativeSolversJL_IDRS,
     KrylovKitJL, KrylovKitJL_CG, KrylovKitJL_GMRES, KrylovJL_MINARES, AlgebraicMultigridJL
@@ -560,6 +834,7 @@ export MUMPSFactorization
 export SuperLUDISTFactorization
 export MKLLUFactorization
 export OpenBLASLUFactorization
+export BLISLUFactorization
 export OpenBLAS32MixedLUFactorization
 export MKL32MixedLUFactorization
 export AppleAccelerateLUFactorization
@@ -574,5 +849,9 @@ export OperatorAssumptions, OperatorCondition, NonstructuralZeros
 export LinearSolveAdjoint
 
 export LinearVerbosity
+
+export AbstractEigenvalueAlgorithm,
+    DenseEigen, ArpackJL, ArnoldiMethod, ArnoldiMethodJL,
+    KrylovKitEigen, JacobiDavidsonJL
 
 end

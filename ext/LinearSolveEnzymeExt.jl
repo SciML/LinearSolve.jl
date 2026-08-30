@@ -1,12 +1,9 @@
 module LinearSolveEnzymeExt
 
-using LinearSolve: LinearSolve, SciMLLinearSolveAlgorithm, init, solve!, LinearProblem,
-    LinearCache, AbstractKrylovSubspaceMethod, DefaultLinearSolver,
-    defaultalg_adjoint_eval, solve
-using LinearSolve.LinearAlgebra
-using EnzymeCore
-using EnzymeCore: EnzymeRules
-using SparseArrays: AbstractSparseMatrix, AbstractSparseMatrixCSC, SparseMatrixCSC
+using LinearSolve: LinearSolve
+using LinearAlgebra: LinearAlgebra, diag
+using EnzymeCore: EnzymeCore, EnzymeRules, Active, Const, Duplicated
+using SparseArrays: AbstractSparseMatrixCSC, SparseMatrixCSC
 
 @inline EnzymeCore.EnzymeRules.inactive_type(::Type{<:LinearSolve.SciMLLinearSolveAlgorithm}) = true
 
@@ -18,7 +15,7 @@ using SparseArrays: AbstractSparseMatrix, AbstractSparseMatrixCSC, SparseMatrixC
 # change the sparsity pattern, corrupting both shadow AND primal. We must operate
 # directly on nzval to preserve the sparsity pattern.
 
-using SparseArrays: nonzeros, rowvals, getcolptr, nzrange
+using SparseArrays: nonzeros, rowvals, getcolptr
 
 """
     _safe_add!(dst, src)
@@ -624,6 +621,134 @@ function EnzymeRules.reverse(
     return (nothing, nothing)
 end
 
+"""
+    _shadow_of_constant(x)
+
+Shadow value to store alongside a constant assigned into a cache. A constant carries no
+derivative, so an array shadow is zeroed; anything else is a field the shadow cache holds
+verbatim (the staleness flags, the algorithm, a cacheval), and is passed through.
+"""
+_shadow_of_constant(x::AbstractArray) = zero(x)
+_shadow_of_constant(x) = x
+
+# Enzyme works out the shadow of a `LinearProblem` from the activity of the arguments it
+# was built from. With `A` active and `b` constant, or the other way round, that means
+# storing constant memory into a struct it has to treat as differentiable, which its
+# static analysis rejects: "Constant memory is stored (or returned) to a differentiable
+# variable". Building the shadow here instead, with a zero standing in for each constant
+# argument, keeps every field differentiable and lets a plain `Reverse` through, so
+# callers do not need `set_runtime_activity` just because one of `A` and `b` is a
+# captured constant. See https://github.com/SciML/LinearSolve.jl/issues/766.
+#
+# Nothing has to be propagated in reverse: an active argument contributes its own `dval`
+# to the shadow, so whatever accumulates into the shadow problem is already accumulating
+# into the caller's array. A constant contributes a fresh zero, which absorbs its share
+# and is dropped, which is what a constant should get.
+# Only the plain dense and sparse matrices need this. Structured types already
+# differentiate through the generic path, and routing them through a hand-built shadow
+# trips an assertion inside Enzyme, so they are left alone.
+const _LP_RULE_MATRIX = Union{Matrix, AbstractSparseMatrixCSC}
+
+_lp_shadow(x::Const, _) = _shadow_of_constant(x.val)
+_lp_shadow(x::Duplicated, _) = x.dval
+_lp_shadow(x::EnzymeCore.BatchDuplicated, i::Int) = x.dval[i]
+_lp_shadow(x, _) = x.dval
+
+# `u0` and `f` arrive as keywords rather than as annotated arguments, so their activity is
+# not visible here. Zeroing any array among them keeps the shadow from aliasing the
+# primal, which would otherwise let an accumulation into the shadow corrupt the problem.
+_lp_shadow_kwargs(kwargs) =
+    NamedTuple{keys(kwargs)}(map(_shadow_of_constant, values(values(kwargs))))
+
+function EnzymeRules.augmented_primal(
+        config, func::Const{Type{LinearSolve.LinearProblem}}, ::Type{RT},
+        A::EnzymeCore.Annotation{<:_LP_RULE_MATRIX}, b::EnzymeCore.Annotation,
+        args::EnzymeCore.Annotation...; kwargs...
+    ) where {RT}
+    primal = func.val(A.val, b.val, map(x -> x.val, args)...; kwargs...)
+    EnzymeRules.needs_shadow(config) ||
+        return EnzymeRules.AugmentedReturn(primal, nothing, nothing)
+
+    dkwargs = _lp_shadow_kwargs(kwargs)
+    shadow = if EnzymeRules.width(config) == 1
+        func.val(
+            _lp_shadow(A, 1), _lp_shadow(b, 1),
+            map(x -> _lp_shadow(x, 1), args)...; dkwargs...
+        )
+    else
+        ntuple(Val(EnzymeRules.width(config))) do i
+            Base.@_inline_meta
+            func.val(
+                _lp_shadow(A, i), _lp_shadow(b, i),
+                map(x -> _lp_shadow(x, i), args)...; dkwargs...
+            )
+        end
+    end
+    return EnzymeRules.AugmentedReturn(primal, shadow, nothing)
+end
+
+function EnzymeRules.reverse(
+        config, func::Const{Type{LinearSolve.LinearProblem}}, ::Type{RT}, tape,
+        A::EnzymeCore.Annotation{<:_LP_RULE_MATRIX}, b::EnzymeCore.Annotation,
+        args::EnzymeCore.Annotation...; kwargs...
+    ) where {RT}
+    return ntuple(_ -> nothing, Val(2 + length(args)))
+end
+
+# `setproperty!` is the public way to change a `LinearCache` between solves, so it is the
+# one place that has to copy. Reverse restores what the assignment overwrote, which walks
+# the cache backwards into the state each earlier `solve!` ran against, and that is what
+# lets the `solve!` rule hold the live cache instead of copying it defensively every time.
+# See https://github.com/SciML/LinearSolve.jl/issues/380.
+function EnzymeRules.augmented_primal(
+        config, func::Const{typeof(Base.setproperty!)}, ::Type{RT},
+        cache::EnzymeCore.Annotation{<:LinearSolve.LinearCache},
+        name::Const{Symbol}, x::EnzymeCore.Annotation
+    ) where {RT}
+    field = name.val
+    old = getfield(cache.val, field)
+    # Assigning any of these also flips the staleness flags, so they rewind together.
+    old_isfresh = getfield(cache.val, :isfresh)
+    old_precsisfresh = getfield(cache.val, :precsisfresh)
+    # A new `A` is what invalidates the factorization, and the next `solve!` builds the
+    # replacement over the same cacheval, so this is the assignment that has to copy.
+    old_cacheval = field === :A ? deepcopy(getfield(cache.val, :cacheval)) : nothing
+
+    func.val(cache.val, field, x.val)
+    if !(cache isa Const)
+        dcaches = EnzymeRules.width(config) == 1 ? (cache.dval,) : cache.dval
+        dxs = if x isa Const
+            ntuple(_ -> _shadow_of_constant(x.val), Val(EnzymeRules.width(config)))
+        elseif EnzymeRules.width(config) == 1
+            (x.dval,)
+        else
+            x.dval
+        end
+        for (dcache, dx) in zip(dcaches, dxs)
+            func.val(dcache, field, dx)
+        end
+    end
+
+    tape = (field, old, old_isfresh, old_precsisfresh, old_cacheval)
+    primal = EnzymeRules.needs_primal(config) ? x.val : nothing
+    return EnzymeRules.AugmentedReturn(primal, nothing, tape)
+end
+
+function EnzymeRules.reverse(
+        config, func::Const{typeof(Base.setproperty!)}, ::Type{RT}, tape,
+        cache::EnzymeCore.Annotation{<:LinearSolve.LinearCache},
+        name::Const{Symbol}, x::EnzymeCore.Annotation
+    ) where {RT}
+    field, old, old_isfresh, old_precsisfresh, old_cacheval = tape
+    # `setfield!` rather than `setproperty!`: this is a rewind, so it must not re-run the
+    # bookkeeping that the forward assignment already did.
+    setfield!(cache.val, field, old)
+    setfield!(cache.val, :isfresh, old_isfresh)
+    setfield!(cache.val, :precsisfresh, old_precsisfresh)
+    old_cacheval === nothing || setfield!(cache.val, :cacheval, old_cacheval)
+    return (nothing, nothing, nothing)
+end
+
 # y=inv(A) B
 #   dA −= z y^T
 #   dB += z, where  z = inv(A^T) dy
@@ -678,9 +803,9 @@ function EnzymeRules.augmented_primal(
         end
     end
 
-    cachesolve = deepcopy(linsolve.val)
-
-    cache = (copy(res.u), resvals, cachesolve, dAs, dbs)
+    # No copy: the `setproperty!` rules above rewind the cache as the tape unwinds, so by
+    # the time this solve's reverse runs the live cache is back to what this solve saw.
+    cache = (copy(res.u), resvals, linsolve.val, dAs, dbs)
 
     _res = EnzymeRules.needs_primal(config) ? res : nothing
     _dres = EnzymeRules.needs_shadow(config) ? dres : nothing
@@ -716,24 +841,9 @@ function EnzymeRules.reverse(
         # Add the contribution from direct `linsolve.u` modifications
         dy .+= dy2.u
 
-        z = if _linsolve.cacheval isa Factorization
-            _linsolve.cacheval' \ dy
-        elseif _linsolve.cacheval isa Tuple && _linsolve.cacheval[1] isa Factorization
-            _linsolve.cacheval[1]' \ dy
-        elseif _linsolve.alg isa LinearSolve.AbstractKrylovSubspaceMethod
-            # Doesn't modify `A`, so it's safe to just reuse it
-            invprob = LinearSolve.LinearProblem(transpose(_linsolve.A), dy)
-            solve(
-                invprob, _linsolve.alg;
-                abstol = _linsolve.abstol,
-                reltol = _linsolve.reltol,
-                verbose = _linsolve.verbose
-            )
-        elseif _linsolve.alg isa LinearSolve.DefaultLinearSolver
-            LinearSolve.defaultalg_adjoint_eval(_linsolve, dy)
-        else
-            error("Algorithm $(_linsolve.alg) is currently not supported by Enzyme rules on LinearSolve.jl. Please open an issue on LinearSolve.jl detailing which algorithm is missing the adjoint handling")
-        end
+        # Same route as `solve!(cache; adjoint = true)`. The cache is the one this solve
+        # ran against, so `A` is read from it rather than passed separately.
+        z = LinearSolve._adjoint_solve(_linsolve, dy)
 
         # Use sparse-safe outer product subtraction to preserve sparsity pattern
         _sparse_outer_sub!(dA, z, y)

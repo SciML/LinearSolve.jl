@@ -1,6 +1,16 @@
 module LinearSolveBandedMatricesExt
 
-using BandedMatrices, LinearAlgebra, LinearSolve
+using ArrayInterface: ArrayInterface
+using BandedMatrices: BandedMatrices, BandedMatrix
+using LinearAlgebra: LinearAlgebra, ColumnNorm, NoPivot, Symmetric, lu, lu!, qr, qr!
+# The `@eval` loops below generate `init_cacheval` methods for every algorithm type,
+# which ExplicitImports cannot see, so they are all imported explicitly here.
+using LinearSolve: LinearSolve, LUFactorization, OperatorAssumptions, QRFactorization,
+    AppleAccelerateLUFactorization, BunchKaufmanFactorization, CHOLMODFactorization,
+    CholeskyFactorization, DiagonalFactorization, GenericLUFactorization,
+    KLUFactorization, LDLtFactorization, MKLLUFactorization,
+    NormalCholeskyFactorization, RFLUFactorization, SVDFactorization,
+    SparspakFactorization, UMFPACKFactorization
 import LinearSolve: defaultalg,
     do_factorization, init_cacheval, DefaultLinearSolver,
     DefaultAlgorithmChoice, LinearVerbosity
@@ -9,11 +19,10 @@ import LinearSolve: defaultalg,
 function defaultalg(A::BandedMatrix, b, oa::OperatorAssumptions{Bool})
     if oa.issq
         return DefaultLinearSolver(DefaultAlgorithmChoice.LUFactorization)
-    elseif LinearSolve.is_underdetermined(A)
-        error("No solver for underdetermined `A::BandedMatrix` is currently implemented!")
-    else
-        return DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
     end
+    # Both non-square cases go to QR. The underdetermined one is solved through
+    # the QR of `Aᵀ`; see `MinNormQR`.
+    return DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
 end
 
 function defaultalg(
@@ -29,11 +38,22 @@ end
 # BandedMatrices `qr` doesn't support column pivoting, so convert to dense when
 # pivoting is requested (e.g. ColumnNorm fallback from singular LU).
 function do_factorization(alg::QRFactorization, A::BandedMatrix, b, u)
-    if alg.pivot isa NoPivot
-        return alg.inplace ? qr!(A) : qr(A)
-    else
+    if !(alg.pivot isa NoPivot)
         return qr!(Matrix(A), alg.pivot)
+    elseif LinearSolve.is_underdetermined(A)
+        # `A \ b` on a wide banded factorization throws "Not implemented", so the
+        # solve goes through `Aᵀ`, which is banded too since the bandwidths swap.
+        # `alg.inplace` does not apply: `A` itself is not what gets factored.
+        return LinearSolve.MinNormQR(qr(BandedMatrix(transpose(A))))
     end
+    # `alg.inplace` is deliberately not honoured here. The R of a banded QR has
+    # upper bandwidth `l + u`, so factoring into `A`'s own `(l, u)` storage has
+    # nowhere to put the fill and drops it, silently returning a wrong answer for
+    # square systems and a non-least-squares one for overdetermined ones. `qr`
+    # allocates storage of the right bandwidth, so the copy is what makes the
+    # result correct rather than an avoidable overhead. See
+    # SciML/LinearSolve.jl#1202.
+    return qr(A)
 end
 
 function do_factorization(alg::LUFactorization, A::BandedMatrix, b, u)
@@ -66,6 +86,19 @@ function init_cacheval(
     ) where {T}
     (T <: BigFloat) && return qr(similar(A, 0, 0))
     return lu(similar(A, 0, 0))
+end
+
+# `cache.cacheval` is typed from this, and the underdetermined path stores a
+# `MinNormQR` rather than a plain `QR`, so the placeholder has to be
+# that same wrapper. Square and overdetermined `A` keep the generic instance.
+function init_cacheval(
+        alg::QRFactorization{NoPivot}, A::BandedMatrix, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions
+    )
+    LinearSolve.is_underdetermined(A) ||
+        return ArrayInterface.qr_instance(A, alg.pivot)
+    return LinearSolve.MinNormQR(qr(BandedMatrix(transpose(similar(A, 0, 0)))))
 end
 
 # Column-pivoted QR on BandedMatrix converts to dense, so cache a dense QRPivoted

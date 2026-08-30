@@ -120,7 +120,7 @@ function SciMLBase.solve!(
         HSL.ma57_solve!(hcache.ma57, cache.u, hcache.work)
 
         return SciMLBase.build_linear_solution(
-            alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+            alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
         )
     catch err
         if err isa HSL.Ma57Exception
@@ -131,11 +131,24 @@ function SciMLBase.solve!(
             )
             cache.isfresh = true
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
             )
         end
         rethrow(err)
     end
+end
+
+LinearSolve._custom_can_reuse_adjoint_factorization(
+    ::LinearSolve.HSLMA57Factorization, ::HSLMA57Cache
+) = true
+
+function LinearSolve._custom_adjoint_factorization_solve(
+        ::LinearSolve.HSLMA57Factorization, hcache::HSLMA57Cache, A, b
+    )
+    solution = copy(b)
+    _resize_ma57_work!(hcache, b)
+    HSL.ma57_solve!(hcache.ma57, solution, hcache.work)
+    return solution
 end
 
 function SciMLBase.solve!(
@@ -169,7 +182,7 @@ function SciMLBase.solve!(
         HSL.ma97_solve!(hcache.ma97, cache.u)
 
         return SciMLBase.build_linear_solution(
-            alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+            alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
         )
     catch err
         if err isa HSL.Ma97Exception
@@ -180,11 +193,23 @@ function SciMLBase.solve!(
             )
             cache.isfresh = true
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
             )
         end
         rethrow(err)
     end
+end
+
+LinearSolve._custom_can_reuse_adjoint_factorization(
+    ::LinearSolve.HSLMA97Factorization, ::HSLMA97Cache
+) = true
+
+function LinearSolve._custom_adjoint_factorization_solve(
+        ::LinearSolve.HSLMA97Factorization, hcache::HSLMA97Cache, A, b
+    )
+    solution = copy(b)
+    HSL.ma97_solve!(hcache.ma97, solution)
+    return solution
 end
 
 end

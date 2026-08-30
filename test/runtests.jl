@@ -62,18 +62,37 @@ else
         default = "All",
         core = function ()
             @time @safetestset "Basic Tests" include("Core/basictests.jl")
+            @time @safetestset "EigenvalueProblem" include("Core/eigenvalue.jl")
+            @time @safetestset "Batched RHS" include("Core/batch.jl")
+            @time @safetestset "GenericLU naive back-solve" include("Core/genericlu_naive_ldiv.jl")
+            @time @safetestset "Blocked generic_lufact! kernel" include("Core/blocked_lufact.jl")
+            @time @safetestset "GESV Factorization" include("Core/gesv.jl")
+            @time @safetestset "LU Refactorization Reuse" include("Core/lu_refactorization.jl")
+            @time @safetestset "Direct BLAS Refactorization Reuse" include("Core/direct_blas_refactorization.jl")
+            @time @safetestset "Lightweight Solution (no cache)" include("Core/lightweight_solution.jl")
+            @time @safetestset "LHL Factorization" include("Core/lhl.jl")
             @time @safetestset "Return codes" include("Core/retcodes.jl")
             @time @safetestset "Re-solve" include("Core/resolve.jl")
+            @time @safetestset "SupernodalLU internals" include("Core/supernodal_lu.jl")
+            @time @safetestset "Krylov warm start" include("Core/warm_start.jl")
             @time @safetestset "Zero Initialization Tests" include("Core/zeroinittests.jl")
             @time @safetestset "Non-Square Tests" include("Core/nonsquare.jl")
             @time @safetestset "SparseVector b Tests" include("Core/sparse_vector.jl")
+            @time @safetestset "ArrayPartition" include("Core/arraypartition.jl")
+            @time @safetestset "SciMLStructures RHS" include("Core/scimlstructures_rhs.jl")
+            @time @safetestset "Low Rank Updated Matrix" include("Core/lowrank.jl")
+            @time @safetestset "UMFPACK control" include("Core/umfpack_control.jl")
+            @time @safetestset "ConjugateGradients" include("Core/conjugategradients.jl")
             @time @safetestset "Nonstructural Zeros" include("Core/nonstructural_zeros.jl")
             @time @safetestset "Default Alg Tests" include("Core/default_algs.jl")
             @time @safetestset "FixedSizeArrays" include("Core/fixedsizearrays.jl")
+            @time @safetestset "ComponentArrays" include("Core/componentarrays.jl")
             @time @safetestset "Adjoint Sensitivity" include("Core/adjoint.jl")
             @time @safetestset "ForwardDiff Overloads" include("Core/forwarddiff_overloads.jl")
+            @time @safetestset "ForwardDiff GPU Arrays" include("Core/forwarddiff_gpu.jl")
             @time @safetestset "Traits" include("Core/traits.jl")
             @time @safetestset "SLATE" include("Core/slate.jl")
+            @time @safetestset "Algorithm Interface" include("Core/interface.jl")
             @time @safetestset "Verbosity" include("Core/verbosity.jl")
             @time @safetestset "BandedMatrices" include("Core/banded.jl")
             @time @safetestset "Butterfly Factorization" include("Core/butterfly.jl")
@@ -82,6 +101,12 @@ else
             return @time @safetestset "SpecializingFactorizations" include("Core/specializing_factorizations.jl")
         end,
         groups = Dict(
+            "AppleAccelerate" => function ()
+                @time @safetestset "Apple Accelerate Refactorization Reuse" include("Core/lu_refactorization.jl")
+                @time @safetestset "Apple Accelerate Mixed Precision" include("Core/test_mixed_precision.jl")
+                activate_group_env(joinpath(@__DIR__, "qa"))
+                return @time @safetestset "Apple Accelerate Allocation QA" include("qa/allocations.jl")
+            end,
             # STRUMPACK runs in the base env: STRUMPACK_jll is a base test dep (the
             # Core suite also probes the STRUMPACK extension), so this group adds no
             # deps.
@@ -104,8 +129,8 @@ else
             # activation as well as the test body). GPU, Pardiso, and HSL have no such
             # guard in the old dispatch, so they activate unconditionally via `env =`.
 
-            # Don't run Enzyme tests on prerelease or Julia >= 1.12 (Enzyme
-            # compatibility issues). See:
+            # Don't run the AD group on prerelease Julia (some AD backends lag
+            # behind Julia prereleases). See:
             # https://github.com/SciML/LinearSolve.jl/issues/817
             "AD" => function ()
                 if isempty(VERSION.prerelease)
@@ -113,10 +138,14 @@ else
                     @time @safetestset "Mooncake Derivative Rules" include("AD/mooncake.jl")
                     @time @safetestset "Static Arrays" include("AD/static_arrays.jl")
                     @time @safetestset "Caching Allocation Tests" include("AD/caching_allocation_tests.jl")
-                    # Disable Enzyme tests on Julia >= 1.12 due to compatibility issues
-                    if VERSION < v"1.12.0-"
-                        @time @safetestset "Enzyme Derivative Rules" include("AD/enzyme.jl")
-                    end
+                    @time @safetestset "Enzyme Derivative Rules" include("AD/enzyme.jl")
+                end
+                return nothing
+            end,
+            "Reactant" => function ()
+                if isempty(VERSION.prerelease)
+                    activate_group_env(joinpath(@__DIR__, "Reactant"))
+                    @time @safetestset "Reactant JIT" include("Reactant/reactant.jl")
                 end
                 return nothing
             end,
@@ -139,6 +168,11 @@ else
             "LinearSolvePardiso" => (;
                 env = joinpath(@__DIR__, "LinearSolvePardiso"), body = function ()
                     return @time @safetestset "Pardiso" include("LinearSolvePardiso/pardiso.jl")
+                end
+            ),
+            "LinearSolveCKTSO" => (;
+                env = joinpath(@__DIR__, "LinearSolveCKTSO"), body = function ()
+                    return @time @safetestset "CKTSO" include("LinearSolveCKTSO/cktso.jl")
                 end
             ),
             "LinearSolveHSL" => (;
@@ -215,8 +249,18 @@ else
         qa = function ()
             if isempty(VERSION.prerelease)
                 activate_group_env(joinpath(@__DIR__, "qa"))
-                @time @safetestset "Quality Assurance" include("qa/qa.jl")
+                # qa.jl runs last: it loads the extension trigger packages so that
+                # ExplicitImports can analyze the extensions, and package loading is
+                # process-global. Several of those extensions change algorithm
+                # selection (LinearSolveBLISExt makes BLIS the default LU, for
+                # instance), which would otherwise perturb the JET and allocation
+                # assertions below.
                 @time @safetestset "JET Tests" include("qa/jet.jl")
+                @time @safetestset "Allocation QA" include("qa/allocations.jl")
+                @time @safetestset "SupernodalLU Allocation QA" include(
+                    "qa/supernodal_allocations.jl"
+                )
+                @time @safetestset "Quality Assurance" include("qa/qa.jl")
             end
             return nothing
         end,

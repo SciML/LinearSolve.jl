@@ -22,6 +22,17 @@ mutable struct HYPRECache
     isfresh_u::Bool
 end
 
+function LinearSolve.update_tolerances_internal!(cache, alg::HYPREAlgorithm, abstol, reltol)
+    # The HYPRE solver is created lazily in solve!, so any tolerance change is
+    # naturally picked up from cache.abstol/cache.reltol the next time the
+    # solver is instantiated. Mark the cached solver as stale so it gets
+    # recreated with the updated tolerances.
+    if cache.cacheval isa HYPRECache && cache.cacheval.solver !== nothing
+        cache.cacheval.solver = nothing
+    end
+    return nothing
+end
+
 function LinearSolve.init_cacheval(
         alg::HYPREAlgorithm, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol,
@@ -44,6 +55,14 @@ is_distributed_comm(comm) = !(comm === nothing) && comm != MPI.COMM_NULL && MPI.
 
 auto_hypre_matrix(::HYPREAlgorithm, A::HYPREMatrix) = A
 auto_hypre_vector(::HYPREAlgorithm, b::HYPREVector) = b
+
+function ensure_hypre_initialized(A, b, u0)
+    if A isa HYPREMatrix && b isa HYPREVector && (u0 === nothing || u0 isa HYPREVector)
+        return nothing
+    end
+    HYPRE.Init()
+    return nothing
+end
 
 function auto_hypre_matrix(alg::HYPREAlgorithm, A)
     if !is_distributed_comm(alg.comm)
@@ -178,6 +197,8 @@ function SciMLBase.init(
         init_cache_verb = verb_spec
     end
 
+    # Auto-construction of HYPREMatrix/HYPREVector touches MPI inside HYPRE.jl.
+    ensure_hypre_initialized(A, b, u0)
     A = auto_hypre_matrix(alg, A)
     b = auto_hypre_vector(alg, b)
     u0 = u0 === nothing ? nothing : auto_hypre_vector(alg, u0)
@@ -201,7 +222,7 @@ function SciMLBase.init(
         typeof(__issquare(assumptions)), typeof(sensealg), Nothing,
     }(
         A, b, u0, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
-        maxiters, verb_spec, assumptions, sensealg, nothing
+        maxiters, verb_spec, assumptions, sensealg, nothing, alias_A
     )
     return cache
 end
@@ -342,7 +363,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::HYPREAlgorithm, args...; kwar
         copy!(cache.u, hcache.u)
     end
 
-    # Note: Inlining SciMLBase.build_linear_solution(alg, u, resid, cache; retcode, iters)
+    # Note: Inlining SciMLBase.build_linear_solution(alg, u, resid, nothing; retcode, iters)
     # since some of the functions used in there does not play well with HYPREVector.
 
     T = cache.u isa HYPREVector ? HYPRE_Complex : eltype(cache.u) # eltype(u)
@@ -354,10 +375,10 @@ function SciMLBase.solve!(cache::LinearCache, alg::HYPREAlgorithm, args...; kwar
 
     ret = SciMLBase.LinearSolution{
         T, N, typeof(cache.u), typeof(resid), typeof(alg),
-        typeof(cache), typeof(stats),
+        Nothing, typeof(stats),
     }(
         cache.u, resid, alg, retc,
-        iters, cache, stats
+        iters, nothing, stats
     )
 
     return ret

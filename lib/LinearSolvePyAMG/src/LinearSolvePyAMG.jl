@@ -1,7 +1,7 @@
 """
     LinearSolvePyAMG
 
-A wrapper around [PyAMG](https://pyamg.readthedocs.io) (Algebraic Multigrid Solvers in
+A wrapper around [PyAMG](https://github.com/pyamg/pyamg) (Algebraic Multigrid Solvers in
 Python) for use with [LinearSolve.jl](https://github.com/SciML/LinearSolve.jl).
 The Python library is accessed via [PythonCall.jl](https://github.com/JuliaPy/PythonCall.jl)
 and installed automatically via [CondaPkg.jl](https://github.com/JuliaPy/CondaPkg.jl).
@@ -27,14 +27,12 @@ sol = solve(prob, PyAMG(accel = "gmres"))
 """
 module LinearSolvePyAMG
 
-using LinearSolve
-using LinearAlgebra
-using SparseArrays
-using PythonCall
-using CondaPkg
+using LinearSolve: LinearSolve, LinearCache, LinearVerbosity, OperatorAssumptions
+using LinearAlgebra: norm
+using SparseArrays: SparseMatrixCSC, sparse
+using PythonCall: Py, pyimport, pyconvert
+using CondaPkg: CondaPkg
 using SciMLBase: SciMLBase, ReturnCode
-
-import LinearSolve: LinearCache, LinearVerbosity, OperatorAssumptions
 
 # ---------------------------------------------------------------------------
 # Algorithm types
@@ -43,7 +41,7 @@ import LinearSolve: LinearCache, LinearVerbosity, OperatorAssumptions
 """
     PyAMG(; method = :RugeStuben, accel = nothing, kwargs...)
 
-Algebraic Multigrid solver backed by [PyAMG](https://pyamg.readthedocs.io)
+Algebraic Multigrid solver backed by [PyAMG](https://github.com/pyamg/pyamg)
 (Python) via PythonCall.jl.
 
 PyAMG is automatically installed into the Julia-managed Python environment via
@@ -247,7 +245,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::PyAMG; kwargs...)
 
     resid = norm(cache.A * cache.u .- cache.b)
     return SciMLBase.build_linear_solution(
-        alg, cache.u, resid, cache;
+        alg, cache.u, resid, nothing;
         retcode = ReturnCode.Success
     )
 end

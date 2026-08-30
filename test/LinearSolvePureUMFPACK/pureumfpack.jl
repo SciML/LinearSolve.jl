@@ -1,5 +1,5 @@
 using LinearSolve
-import PureUMFPACK
+using PureUMFPACK  # plain `using` must not shadow `solve` (PureUMFPACK >= 1.0)
 using SparseArrays
 using LinearAlgebra
 using Test
@@ -42,6 +42,25 @@ end
     sol = solve(prob, PureUMFPACKFactorization(reuse_symbolic = false))
     @test sol.retcode == ReturnCode.Success
     @test norm(A * sol.u - b) < 1.0e-9
+end
+
+@testset "PureUMFPACKFactorization: errors when PureUMFPACK is not loaded" begin
+    # Without the extension the algorithm would otherwise fall through to the generic
+    # `AbstractFactorization` `solve!` and hit a `do_factorization` MethodError.
+    script = """
+    using LinearSolve
+    @assert Base.get_extension(LinearSolve, :LinearSolvePureUMFPACKExt) === nothing
+    try
+        PureUMFPACKFactorization()
+        exit(1)
+    catch e
+        e isa ErrorException && occursin("PureUMFPACK", e.msg) || exit(2)
+    end
+    PureUMFPACKFactorization(throwerror = false)
+    exit(0)
+    """
+    cmd = `$(Base.julia_cmd()) --startup-file=no --project=$(Base.active_project()) -e $script`
+    @test success(run(cmd; wait = true))
 end
 
 @testset "PureUMFPACKFactorization: singular -> Infeasible" begin

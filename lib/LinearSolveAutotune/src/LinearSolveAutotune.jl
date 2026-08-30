@@ -1,9 +1,9 @@
 module LinearSolveAutotune
 
 # Ensure MKL is available for benchmarking by setting the preference before loading LinearSolve
-using Preferences
-using MKL_jll
-using OpenBLAS_jll
+using Preferences: Preferences
+using MKL_jll: MKL_jll
+using OpenBLAS_jll: OpenBLAS_jll
 
 # Set MKL preference to true for benchmarking if MKL is available
 # We need to use UUID instead of the module since LinearSolve isn't loaded yet
@@ -18,34 +18,40 @@ if MKL_jll.is_available()
     end
 end
 
-using LinearSolve
-using BenchmarkTools
-using DataFrames
-using PrettyTables
-using Statistics
-using Random
-using LinearAlgebra
-using Printf
-using Dates
-using Base64
-using ProgressMeter
-using CPUSummary
+using LinearSolve: LinearSolve, AppleAccelerateLUFactorization,
+    CudaOffloadLUFactorization, FastLUFactorization, GenericLUFactorization,
+    LUFactorization, LinearAliasSpecifier, LinearProblem, MKLLUFactorization,
+    MetalLUFactorization, OpenBLASLUFactorization, RFLUFactorization,
+    SimpleLUFactorization, solve, solve!
+using BenchmarkTools: BenchmarkTools, @benchmarkable
+using DataFrames: DataFrames, DataFrame, combine, groupby, nrow
+using PrettyTables: PrettyTables, pretty_table
+using Statistics: Statistics
+using Random: Random, MersenneTwister
+using LinearAlgebra: I, LinearAlgebra, norm
+using SciMLBase: init
+using Printf: Printf, @sprintf
+using Dates: Dates
+using Base64: Base64, base64encode
+using ProgressMeter: ProgressMeter, Progress
+using CPUSummary: CPUSummary
+using Pkg: Pkg
 
 # Hard dependency to ensure RFLUFactorization others solvers are available
-using RecursiveFactorization
-using blis_jll
-using LAPACK_jll
-using cuSOLVER
-using Metal
-using FastLapackInterface
-
+using RecursiveFactorization: RecursiveFactorization
+using blis_jll: blis_jll
+using LAPACK_jll: LAPACK_jll
+using cuSOLVER: cuSOLVER
+using Metal: Metal
+using FastLapackInterface: FastLapackInterface
 
 # Optional dependencies for telemetry and plotting
-using GitHub
-using gh_cli_jll
-using Plots
+using GitHub: GitHub
+using gh_cli_jll: gh_cli_jll
+using Plots: Plots, plot, plot!, savefig
 
-export autotune_setup, share_results, AutotuneResults, plot
+export autotune_setup, benchmark_solve_paths, benchmark_supernodal_panels, share_results,
+    AutotuneResults, plot
 
 include("algorithms.jl")
 include("gpu_detection.jl")
@@ -54,7 +60,18 @@ include("plotting.jl")
 include("telemetry.jl")
 include("preferences.jl")
 
-# Define the AutotuneResults struct
+"""
+    AutotuneResults
+
+Benchmark results returned by [`autotune_setup`](@ref).
+
+## Fields
+
+  - `results_df`: table of benchmark measurements, tested algorithms, element
+    types, matrix sizes, success flags, and any recorded errors.
+  - `sysinfo`: dictionary of system information collected with the benchmark,
+    including Julia, operating system, CPU, GPU, and BLAS details when available.
+"""
 struct AutotuneResults
     results_df::DataFrame
     sysinfo::Dict
@@ -129,7 +146,7 @@ function Base.show(io::IO, results::AutotuneResults)
     println(io, "\n" * "="^60)
     println(io, "🚀 For comprehensive results, consider running:")
     println(io, "   results_full = autotune_setup(")
-    println(io, "       sizes = [:tiny, :small, :medium, :large, :big],")
+    println(io, "       sizes = [:cutoff, :tiny, :small, :medium, :large, :big],")
     println(io, "       eltypes = (Float32, Float64, ComplexF32, ComplexF64)")
     println(io, "   )")
     println(io, "\n📈 See community results at:")
@@ -139,7 +156,14 @@ function Base.show(io::IO, results::AutotuneResults)
     return println(io, "="^60)
 end
 
-# Plot method for AutotuneResults
+"""
+    plot(results::AutotuneResults; kwargs...)
+
+Create performance plots from the benchmark data in `results`.
+
+Keyword arguments are forwarded to the underlying Plots.jl layout call used to
+assemble the per-element-type plots.
+"""
 function Plots.plot(results::AutotuneResults; kwargs...)
     # Generate plots from the results data
     plots_dict = create_benchmark_plots(results.results_df)
@@ -175,13 +199,15 @@ end
 
 """
     autotune_setup(; 
-        sizes = [:small, :medium, :large],
+        sizes = [:cutoff, :tiny, :small, :medium, :large],
         set_preferences::Bool = true,
         samples::Int = 5,
         seconds::Float64 = 0.5,
         eltypes = (Float32, Float64, ComplexF32, ComplexF64),
         skip_missing_algs::Bool = false,
         include_fastlapack::Bool = false,
+        collect_solve_path_data::Bool = true,
+        collect_supernodal_panel_data::Bool = true,
         maxtime::Float64 = 100.0)
 
 Run a comprehensive benchmark of all available LU factorization methods and optionally:
@@ -199,13 +225,15 @@ Run a comprehensive benchmark of all available LU factorization methods and opti
 
 # Arguments
 
-  - `sizes = [:small, :medium, :large]`: Size categories to test. Options: :tiny (5-20), :small (20-100), :medium (100-300), :large (300-1000), :big (1000-15000)
+  - `sizes = [:cutoff, :tiny, :small, :medium, :large]`: Size categories to test. Options: :cutoff (dense LU crossover sizes), :tiny (5-20), :small (20-100), :medium (100-300), :large (300-1000), :big (1000-15000)
   - `set_preferences::Bool = true`: Update LinearSolve preferences with optimal algorithms
   - `samples::Int = 5`: Number of benchmark samples per algorithm/size
   - `seconds::Float64 = 0.5`: Maximum time per benchmark
   - `eltypes = (Float32, Float64, ComplexF32, ComplexF64)`: Element types to benchmark
   - `skip_missing_algs::Bool = false`: If false, error when expected algorithms are missing; if true, warn instead
   - `include_fastlapack::Bool = false`: If true, includes FastLUFactorization in benchmarks
+  - `collect_solve_path_data::Bool = true`: Measure cached vector/multi-RHS solves for normal and adjoint factors
+  - `collect_supernodal_panel_data::Bool = true`: Measure SupernodalLU panel kernels, TriangularSolve, and BLAS
   - `maxtime::Float64 = 100.0`: Maximum time in seconds for each algorithm test (including accuracy check). 
     If exceeded, the run is skipped and recorded as NaN
 
@@ -236,13 +264,15 @@ share_results(results)
 ```
 """
 function autotune_setup(;
-        sizes = [:tiny, :small, :medium, :large],
+        sizes = [:cutoff, :tiny, :small, :medium, :large],
         set_preferences::Bool = true,
         samples::Int = 5,
         seconds::Float64 = 0.5,
         eltypes = (Float64,),
         skip_missing_algs::Bool = false,
         include_fastlapack::Bool = false,
+        collect_solve_path_data::Bool = true,
+        collect_supernodal_panel_data::Bool = true,
         maxtime::Float64 = 100.0
     )
     @info "Starting LinearSolve.jl autotune setup..."
@@ -282,6 +312,18 @@ function autotune_setup(;
         matrix_sizes, all_algs, all_names, eltypes;
         samples = samples, seconds = seconds, sizes = sizes, maxtime = maxtime
     )
+    if collect_solve_path_data
+        solve_path_sizes = (8, 16, 32, 64, 128, 256, 257, 512, 513, 600, 1000)
+        solve_path_results = benchmark_solve_paths(
+            solve_path_sizes, cpu_algs, cpu_names, eltypes;
+            samples = samples, seconds = seconds
+        )
+        results_df = vcat(results_df, solve_path_results; cols = :union)
+    end
+    if collect_supernodal_panel_data
+        panel_results = benchmark_supernodal_panels(; samples = samples, seconds = seconds)
+        results_df = vcat(results_df, panel_results; cols = :union)
+    end
 
     # Display results table - show all results including NaN values to indicate what was tested
     all_results = results_df
@@ -342,15 +384,18 @@ function autotune_setup(;
         println("="^60)
         pretty_table(
             full_summary,
-            header = ["Algorithm", "Avg GFLOPs", "Max GFLOPs", "Success", "Total"],
-            formatters = (v, i, j) -> begin
-                if j in [2, 3] && isa(v, Float64)
-                    return isnan(v) ? "NaN" : @sprintf("%.2f", v)
-                else
-                    return v
-                end
-            end,
-            crop = :none
+            column_labels = ["Algorithm", "Avg GFLOPs", "Max GFLOPs", "Success", "Total"],
+            formatters = [
+                (v, i, j) -> begin
+                    if j in [2, 3] && isa(v, Float64)
+                        return isnan(v) ? "NaN" : @sprintf("%.2f", v)
+                    else
+                        return v
+                    end
+                end,
+            ],
+            fit_table_in_display_horizontally = false,
+            fit_table_in_display_vertically = false
         )
     else
         @warn "No successful benchmark results!"

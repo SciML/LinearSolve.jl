@@ -1,6 +1,12 @@
 using LinearSolve, ForwardDiff, ForwardDiff, RecursiveFactorization, LinearAlgebra, SparseArrays, Test
 using JET
 
+# Loaded for the extension module, matching test/qa/allocations.jl: without both
+# JLLs the BLIS extension never loads and BLISLUFactorization() throws.
+if Sys.islinux()
+    import LAPACK_jll, blis_jll
+end
+
 # Dense problem setup
 A = rand(4, 4)
 b = rand(4)
@@ -121,7 +127,9 @@ end
     if Sys.isapple() && @isdefined(MetalLUFactorization)
         JET.@test_opt solve(prob, MetalLUFactorization()) broken = true
     end
-    if @isdefined(BLISLUFactorization)
+    # BLISLUFactorization is exported unconditionally, so @isdefined does not
+    # tell us whether it can be constructed; the extension has to be loaded.
+    if Base.get_extension(LinearSolve, :LinearSolveBLISExt) !== nothing
         JET.@test_opt solve(prob, BLISLUFactorization()) broken = true
     end
 end
@@ -131,7 +139,18 @@ end
     # The dispatches occur in sparse_check_Ti and SparseMatrixCSC constructor
     # These are stdlib issues, not LinearSolve issues
     JET.@test_opt solve(prob_sparse, UMFPACKFactorization()) broken = true
-    JET.@test_opt solve(prob_sparse, KLUFactorization()) broken = true
+    # Passes since the 5.0 lightweight solution: with the cache no longer
+    # captured in the returned LinearSolution, the KLU solve is dispatch-clean.
+    #
+    # Except on the LTS. `@SciMLMessage` in the failure branches expands to
+    # `Logging.@logmsg`, and on 1.10 the `Base.CoreLogging` path it enters
+    # reaches `Base.typejoin`, which is itself a runtime dispatch there. That
+    # makes *any* solve able to emit a log fail `@test_opt` on 1.10, regardless
+    # of anything LinearSolve does; 1.11 carries the Base fix. Measured on this
+    # assertion: 2 reports on 1.10.11, 0 on 1.12.6, and the 1.10 reports name
+    # only `typejoin`/`CoreLogging`/`_emit_log`, none of the KLU internals that
+    # #1148 and #1163 dealt with. See SciML/LinearSolve.jl#1190.
+    JET.@test_opt solve(prob_sparse, KLUFactorization()) broken = VERSION < v"1.11"
     JET.@test_opt solve(prob_sparse_spd, CHOLMODFactorization()) broken = true
 
     # SparspakFactorization requires Sparspak to be loaded
@@ -169,10 +188,18 @@ end
 
 @testset "JET Tests for Default Solver" begin
     # Test the default solver selection
-    # These tests have various runtime dispatch issues in stdlib code:
-    # - Dense: Captured variables in appleaccelerate.jl (platform-specific)
-    # - Sparse: Runtime dispatch in SparseArrays stdlib, Base.show, etc.
-    JET.@test_opt solve(prob) broken = true
+    # Julia 1.10 reports runtime dispatch through stdlib and Krylov fallback paths.
+    #
+    # `target_modules` for the same reason as the MKLLUFactorization test above:
+    # JET analyzes every branch of the generated DefaultLinearSolver `solve!`
+    # regardless of which one would run, and the MKL branch's failure-logging
+    # path (`get_blas_operation_info`'s `string(::Type)`) dispatches inside
+    # Base's `show` machinery. Those frames are stdlib-internal; real dispatch
+    # in LinearSolve/SciMLBase code is still reported. This was masked until
+    # the KLU getproperty fix (#1148) let the suite get past the sparse testset.
+    JET.@test_opt target_modules = (LinearSolve, SciMLBase) solve(prob) broken =
+        VERSION < v"1.12.0-"
+    # Sparse has runtime dispatch in SparseArrays stdlib, Base.show, etc.
     JET.@test_opt solve(prob_sparse) broken = true
 end
 
@@ -254,4 +281,45 @@ end
             @test_broken isconcretetype(rt)
         end
     end
+end
+
+@testset "JET Tests for SupernodalLU" begin
+    # The dense block caches are concretely typed, so the repeated-use paths -
+    # solve and numeric refactorization, i.e. the ODE/Newton workload - must be
+    # free of runtime dispatch.  Analysis is scoped to the solver module, as
+    # elsewhere in this file, so Base error-path noise (show/AssertionError
+    # reachable from sparse indexing) does not mask our own code.
+    SNLU_MOD = LinearSolve.SupernodalLU
+    n = 60
+    A_snlu = SparseArrays.spdiagm(
+        0 => fill(4.0, n), 1 => fill(-1.0, n - 1), -1 => fill(-1.0, n - 1)
+    )
+    b_snlu = ones(n)
+    F_snlu = SNLU_MOD.snlu(A_snlu)
+    x_snlu = similar(b_snlu)
+
+    # The solve path never touches the block caches, so it must be free of
+    # runtime dispatch.
+    JET.@test_opt target_modules = (SNLU_MOD,) SNLU_MOD.solve!(x_snlu, F_snlu, b_snlu)
+    JET.@test_opt target_modules = (SNLU_MOD,) SNLU_MOD._solve_panels!(x_snlu, F_snlu)
+
+    # Factorization carries exactly one dispatch per *cached* supernode: the
+    # `_cache_lu!` barrier, whose cache argument is deliberately untyped (see
+    # the `bcaches` field docs - putting the cache type in the factorization
+    # type breaks `@inferred init(prob, nothing)` for sparse matrices, because
+    # the sparse default holds a SupernodalLUFactor in its cacheval).  Tens of
+    # calls against hundreds of ms of GEMM; the alternative costs far more.
+    JET.@test_opt target_modules = (SNLU_MOD,) SNLU_MOD.snlu!(F_snlu, A_snlu) broken = true
+    JET.@test_opt target_modules = (SNLU_MOD,) SNLU_MOD.snlu(A_snlu) broken = true
+
+    # The factorization object itself is concrete, and its block-cache vector
+    # is a two-member union rather than Any.
+    @test isconcretetype(typeof(F_snlu))
+    @test typeof(F_snlu) === SNLU_MOD.SupernodalLUFactor{Float64, Int}
+
+    # The factorization type itself is fully concrete and inferable from its
+    # inputs, which is what the sparse default solver depends on.
+    @test isconcretetype(
+        Core.Compiler.return_type(SNLU_MOD.snlu, Tuple{typeof(A_snlu)})
+    )
 end

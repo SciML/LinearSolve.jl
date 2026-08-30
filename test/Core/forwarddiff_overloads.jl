@@ -32,6 +32,16 @@ function dual_isapprox(x, y; rtol)
     )
 end
 
+@testset "ForwardDiff square-system initialization" begin
+    A_dual = [
+        ForwardDiff.Dual(2.0, 1.0) ForwardDiff.Dual(1.0, 0.0)
+        ForwardDiff.Dual(1.0, 0.0) ForwardDiff.Dual(3.0, 1.0)
+    ]
+    b_dual = [ForwardDiff.Dual(1.0, 1.0), ForwardDiff.Dual(2.0, 0.0)]
+    sol = solve(LinearProblem(A_dual, b_dual), LUFactorization())
+    @test dual_isapprox(sol.u, A_dual \ b_dual; rtol = 1.0e-9)
+end
+
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 prob = LinearProblem(A, b)
 backslash_x_p = A \ b
@@ -66,6 +76,20 @@ plain_A = ForwardDiff.value.(A)
 prob = LinearProblem(plain_A, b)
 @test ≈(solve(prob, GenericLUFactorization()), plain_A \ b, rtol = 1.0e-9)
 @test ≈(solve(prob, RFLUFactorization()), plain_A \ b, rtol = 1.0e-9)
+
+# Regression test for #1052: RFLUFactorization must stay on the split
+# primal/partials path and NOT take the direct dual solve. Its fast Float64
+# factorization is BLAS/SIMD-grade; routing the Dual problem through it falls
+# back to generic scalar dual arithmetic (~40x slower). Guard the routing
+# decision directly so RFLU is never re-added to the direct path.
+@testset "RFLU stays off the direct dual path (#1052)" begin
+    ext = Base.get_extension(LinearSolve, :LinearSolveForwardDiffExt)
+    @test !ext._use_direct_dual_solve(RFLUFactorization())
+    # Sanity: the genuinely-cheap-in-dual algorithms are still on the direct path.
+    @test ext._use_direct_dual_solve(GenericLUFactorization())
+    @test ext._use_direct_dual_solve(SpecializedLUFactorization())
+    @test ext._use_direct_dual_solve(PureKLUFactorization())
+end
 
 # Overload Dense
 
@@ -267,6 +291,44 @@ plain_A = ForwardDiff.value.(A)
 prob = LinearProblem(sparse(plain_A), b)
 @test ≈(solve(prob, PureKLUFactorization()), plain_A \ b, rtol = 1.0e-9)
 
+# Mixed-type ldiv!: a primal (Float64) KLU factorization backsolving a Dual RHS
+# without promoting A. The factor stays Float64; duals ride through the
+# back-substitution (value + each partial column solved in one multi-RHS solve).
+@testset "PureKLU primal factor \\ Dual RHS (mixed ldiv!)" begin
+    Asp = sparse(2.0I, 5, 5) + sparse(plain_A[1, 1] * 0.0I, 5, 5)
+    for i in 1:4
+        Asp[i, i + 1] = 0.3
+        Asp[i + 1, i] = 0.2
+    end
+    for nchunk in (1, 2, 3)
+        bd = [
+            ForwardDiff.Dual{Nothing, Float64, nchunk}(
+                Float64(i), ForwardDiff.Partials(ntuple(k -> sin(i + k), nchunk))
+            ) for i in 1:5
+        ]
+        cache = LinearSolve.__init(LinearProblem(Asp, bd), PureKLUFactorization())
+        @test eltype(cache.A) == Float64                 # A not promoted
+        u = solve!(cache).u
+        uref = Matrix{eltype(bd)}(Asp) \ bd
+        @test isapprox(ForwardDiff.value.(u), ForwardDiff.value.(uref); rtol = 1.0e-10)
+        @test all(
+            isapprox(
+                ForwardDiff.partials(u[i], j), ForwardDiff.partials(uref[i], j);
+                rtol = 1.0e-8, atol = 1.0e-12
+            ) for i in 1:5, j in 1:nchunk
+        )
+    end
+
+    # Duals-only-in-b is routed to a plain LinearCache (native solve), not the split
+    # DualLinearCache, and that routing is type-stable.
+    Adual, bdual = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+    plain_Asp = sparse(ForwardDiff.value.(Adual))
+    bprob = LinearProblem(plain_Asp, bdual)
+    @test init(bprob, PureKLUFactorization()) isa LinearSolve.LinearCache
+    @test (@inferred init(bprob, PureKLUFactorization())) isa LinearSolve.LinearCache
+    @test ≈(solve(bprob, PureKLUFactorization()), Adual \ bdual, rtol = 1.0e-9)
+end
+
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 
 prob = LinearProblem(sparse(A), sparse(b))
@@ -288,13 +350,13 @@ backslash_x_p = A \ b
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 
 prob = LinearProblem(sparse(A), sparse(b))
-overload_x_p = solve(prob, UMFPACKFactorization())
+cache = init(prob, UMFPACKFactorization())
+overload_x_p = solve!(cache)
 backslash_x_p = A \ b
 
 @test ≈(overload_x_p, backslash_x_p, rtol = 1.0e-9)
 
 A[1, 1] += 2
-cache = overload_x_p.cache
 reinit!(cache; A = sparse(A))
 overload_x_p = solve!(cache, UMFPACKFactorization())
 backslash_x_p = A \ b
@@ -557,4 +619,259 @@ end
     @test ForwardDiff.value.(sol.u) ≈ ForwardDiff.value.(ref) rtol = 1.0e-9
     extract_partials(v) = [collect(ForwardDiff.partials(x)) for x in v]
     @test all(((a, b),) -> a ≈ b, zip(extract_partials(sol.u), extract_partials(ref)))
+end
+
+# The DualLinearCache tracks partials-list validity for A and b independently,
+# so mutating only one side does not force the other's partials to be recomputed
+# (relevant e.g. in an ODE where A is fixed while b changes, and vice versa).
+#
+# A flag means "this list is in sync with the partials it was built from". The
+# property that has to hold everywhere is the one-way implication: a flag is
+# never true while its list is stale, because every consumer of a list trusts
+# the flag. The converse does not hold. The fused dense-∂A rhs path reads
+# neither list, so it leaves both flags alone and they stay false after a
+# mutation -- that is the honest state rather than a missed refresh, since
+# nothing on that path consumes the lists. The paths that do consume them
+# (sparse ∂A, and the non-square normal-equations branch) still refresh on
+# solve!.
+function partials_lists_in_sync(cache)
+    function in_sync(∂, list)
+        (isnothing(∂) || isnothing(list)) && return true
+        return all(
+            k -> all(i -> list[k][i] == ∂[i][k], eachindex(∂)), eachindex(list)
+        )
+    end
+    return (
+        in_sync(getfield(cache, :partials_A), getfield(cache, :partials_A_list)),
+        in_sync(getfield(cache, :partials_b), getfield(cache, :partials_b_list)),
+    )
+end
+
+# A valid flag pointing at a stale list would make a consumer silently use wrong
+# derivative data, which is the failure this whole mechanism exists to prevent.
+function test_flags_never_overstate(cache)
+    A_in_sync, b_in_sync = partials_lists_in_sync(cache)
+    @test !getfield(cache, :A_partials_valid) || A_in_sync
+    return @test !getfield(cache, :b_partials_valid) || b_in_sync
+end
+
+@testset "DualLinearCache separate A/b partials validity" begin
+    A, b = h([ForwardDiff.Dual(10.0, 1.0, 0.0), ForwardDiff.Dual(10.0, 0.0, 1.0)])
+    _, new_b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+    new_A, _ = h([ForwardDiff.Dual(2.0, 1.0, 0.0), ForwardDiff.Dual(2.0, 0.0, 1.0)])
+
+    @testset "invalidation is tracked per side" begin
+        cache = init(LinearProblem(A, b), LUFactorization())
+
+        # Both lists start valid (populated eagerly at init).
+        @test getfield(cache, :A_partials_valid)
+        @test getfield(cache, :b_partials_valid)
+        test_flags_never_overstate(cache)
+
+        # Mutating only b invalidates b's list and leaves A's untouched.
+        cache.b = new_b
+        @test getfield(cache, :A_partials_valid)
+        @test !getfield(cache, :b_partials_valid)
+        test_flags_never_overstate(cache)
+
+        # Symmetrically for A.
+        cache.A = new_A
+        @test !getfield(cache, :A_partials_valid)
+        test_flags_never_overstate(cache)
+    end
+
+    @testset "dense ∂A: the fused rhs path consumes neither list" begin
+        cache = init(LinearProblem(A, b), LUFactorization())
+
+        cache.b = new_b
+        x_p = solve!(cache)
+        @test ≈(x_p, A \ new_b, rtol = 1.0e-9)
+        @test !getfield(cache, :b_partials_valid)
+        test_flags_never_overstate(cache)
+
+        cache.A = new_A
+        x_p = solve!(cache)
+        @test ≈(x_p, new_A \ new_b, rtol = 1.0e-9)
+        @test !getfield(cache, :A_partials_valid)
+        test_flags_never_overstate(cache)
+    end
+
+    @testset "sparse ∂A: solve! revalidates the lists it consumes" begin
+        cache = init(LinearProblem(sparse(A), b), KLUFactorization())
+
+        cache.b = new_b
+        @test !getfield(cache, :b_partials_valid)
+        x_p = solve!(cache)
+        @test getfield(cache, :b_partials_valid)
+        test_flags_never_overstate(cache)
+        @test ≈(x_p, Matrix(A) \ new_b, rtol = 1.0e-9)
+    end
+
+    @testset "non-square: solve! revalidates the lists it consumes" begin
+        # Full rank: `i + 0.3j` would span only {(1:5), ones} and leave A'A
+        # singular, making the normal-equations reference meaningless.
+        A_ns = [
+            ForwardDiff.Dual(sin(1.7i + 2.3j) + (i == j), 0.1i, 0.2j)
+                for i in 1:5, j in 1:3
+        ]
+        b_ns = [ForwardDiff.Dual(1.0 * i, 0.3i, 0.1i) for i in 1:5]
+        cache = init(LinearProblem(A_ns, b_ns), QRFactorization())
+
+        cache.b = b_ns
+        @test !getfield(cache, :b_partials_valid)
+        x_p = solve!(cache)
+        @test getfield(cache, :b_partials_valid)
+        test_flags_never_overstate(cache)
+        @test ≈(x_p, (A_ns' * A_ns) \ (A_ns' * b_ns), rtol = 1.0e-7)
+    end
+end
+
+@testset "Sparse matrices" begin
+    # Case 1: same number of nonzeros, same sparsity pattern, updated values
+    A1 = sparse([1, 2], [1, 2], [ForwardDiff.Dual(1.0, 10.0, 11.0), ForwardDiff.Dual(2.0, 20.0, 21.0)], 2, 2)
+    b = [1.0, 1.0]
+    prob = LinearProblem(A1, b)
+    cache = init(prob, KLUFactorization())
+    solve!(cache)
+    cache.A = A1
+    @test ≈(solve!(cache), Matrix(A1) \ b, rtol = 1.0e-9)
+
+    # Case 2: same number of nonzeros, but different positions
+    A2 = sparse([2, 1], [1, 2], [ForwardDiff.Dual(3.0, 30.0, 31.0), ForwardDiff.Dual(4.0, 40.0, 41.0)], 2, 2)
+    cache.A = A2
+    @test ≈(solve!(cache), Matrix(A2) \ b, rtol = 1.0e-9)
+
+    # Case 3: number of nonzeros increases
+    A3 = sparse([1, 2, 1], [1, 2, 2], [ForwardDiff.Dual(3.0, 30.0, 31.0), ForwardDiff.Dual(4.0, 40.0, 41.0), ForwardDiff.Dual(5.0, 50.0, 51.0)], 2, 2)
+    cache.A = A3
+    @test ≈(solve!(cache), Matrix(A3) \ b, rtol = 1.0e-9)
+
+    # Case 4: dual b (both A and b carry partials)
+    b_dual = [ForwardDiff.Dual(3.0, 1.0, 0.0), ForwardDiff.Dual(4.0, 0.0, 1.0)]
+    prob = LinearProblem(A1, b_dual)
+    cache = init(prob, KLUFactorization())
+    @test ≈(solve!(cache), Matrix(A1) \ b_dual, rtol = 1.0e-9)
+    b_dual2 = [ForwardDiff.Dual(5.0, 2.0, 0.0), ForwardDiff.Dual(6.0, 0.0, 2.0)]
+    cache.b = b_dual2
+    @test ≈(solve!(cache), Matrix(A1) \ b_dual2, rtol = 1.0e-9)
+
+    # Case 5: in-place mutation of A's nonzeros via setindex! (ODE solver pattern)
+    A = sparse([1, 2], [1, 2], [ForwardDiff.Dual(1.0, 10.0, 11.0), ForwardDiff.Dual(2.0, 20.0, 21.0)], 2, 2)
+    prob = LinearProblem(A, b)
+    cache = init(prob, KLUFactorization())
+    solve!(cache)
+    A[1, 1] = ForwardDiff.Dual(5.0, 50.0, 51.0)
+    A[2, 2] = ForwardDiff.Dual(6.0, 60.0, 61.0)
+    cache.A = A
+    @test ≈(solve!(cache), Matrix(A) \ b, rtol = 1.0e-9)
+end
+
+@testset "PureKLU direct dual path reuses inner LinearCache" begin
+    # The direct dual path (PureKLUFactorization can handle Dual arithmetic
+    # natively) pre-creates an inner LinearCache in DualLinearCache.dual_linear_cache
+    # at init time and reuses it on every solve!, only re-factorising when
+    # linear_cache.isfresh is set. Verify that the inner cache object identity
+    # is preserved across successive solves with different A and b.
+    A1 = sparse([1, 2], [1, 2], [ForwardDiff.Dual(1.0, 10.0, 0.0), ForwardDiff.Dual(2.0, 0.0, 20.0)], 2, 2)
+    b1 = [ForwardDiff.Dual(3.0, 1.0, 0.0), ForwardDiff.Dual(4.0, 0.0, 1.0)]
+    prob = LinearProblem(A1, b1)
+    cache = init(prob, PureKLUFactorization())
+
+    # The inner dual cache must be pre-created at init time (not nothing).
+    inner = getfield(cache, :dual_linear_cache)
+    @test inner !== nothing
+
+    sol1 = solve!(cache)
+    @test ≈(sol1, Matrix(A1) \ b1, rtol = 1.0e-9)
+
+    # After mutating A the inner cache object must be the same — only its
+    # contents change, no new allocation.
+    A2 = sparse([1, 2], [1, 2], [ForwardDiff.Dual(3.0, 30.0, 0.0), ForwardDiff.Dual(4.0, 0.0, 40.0)], 2, 2)
+    cache.A = A2
+    sol2 = solve!(cache)
+    @test getfield(cache, :dual_linear_cache) === inner
+    @test ≈(sol2, Matrix(A2) \ b1, rtol = 1.0e-9)
+
+    # Same after mutating only b.
+    b2 = [ForwardDiff.Dual(5.0, 2.0, 0.0), ForwardDiff.Dual(6.0, 0.0, 2.0)]
+    cache.b = b2
+    sol3 = solve!(cache)
+    @test getfield(cache, :dual_linear_cache) === inner
+    @test ≈(sol3, Matrix(A2) \ b2, rtol = 1.0e-9)
+end
+
+struct ReinterpretTestTag end
+
+@testset "Default algorithm selection uses primal values (issue with reinterpret-wrapped duals)" begin
+    # `solve(prob)` with no algorithm must select the default from the *primal*
+    # A/b (what the inner LinearCache actually solves with), not the dual types.
+    # A reinterpret/reshape-wrapped Dual A (as produced by PreallocationTools'
+    # get_tmp) is not a DenseMatrix, so dual-type-based selection picks
+    # KrylovJL_GMRES — but the primal cache is a dense Matrix whose default-solver
+    # Krylov cacheval slots are initialized as Nothing, giving a TypeError in
+    # __setfield! at solve time.
+    DualT = ForwardDiff.Dual{ForwardDiff.Tag{ReinterpretTestTag, Float64}, Float64, 1}
+
+    A_buf = zeros(2)
+    b_buf = zeros(2)
+    A = reshape(reinterpret(DualT, A_buf), 1, 1)
+    b = reinterpret(DualT, b_buf)
+    A[1, 1] = DualT(2.0, ForwardDiff.Partials((1.0,)))
+    b[1] = DualT(3.0, ForwardDiff.Partials((0.5,)))
+
+    @test !(A isa DenseMatrix)  # the wrapper that triggered dual-based GMRES selection
+
+    sol = solve(LinearProblem(A, b))
+    # u = b/A = 1.5, du = (db - u * dA)/A = (0.5 - 1.5)/2 = -0.5
+    @test ForwardDiff.value(sol.u[1]) ≈ 1.5
+    @test ForwardDiff.partials(sol.u[1])[1] ≈ -0.5
+
+    # The init entry point selects from primal values too and must agree.
+    cache = init(LinearProblem(A, b), nothing)
+    @test solve!(cache).u ≈ sol.u
+end
+
+@testset "SupernodalLU matching accepts Dual entries" begin
+    # MC64 matching decides its assignment in Float64, so it needs a real
+    # magnitude per entry.  An anti-diagonal matrix has no structural diagonal
+    # at all, so `matching = :auto` engages and the factorization goes through
+    # `_costabs` — which threw on Duals until the ForwardDiff extension
+    # supplied the primal-extracting overload its docstring promised.
+    SNLU = LinearSolve.SupernodalLU
+    n = 40
+    vals = [ForwardDiff.Dual{Nothing}(2.0 + i / n, 1.0) for i in 1:n]
+    P = sparse(collect(n:-1:1), collect(1:n), vals, n, n)
+    @test SNLU.needs_matching(P)
+    F = SNLU.snlu(P)
+    @test F.matched
+
+    # Solving must be right in both the value and the derivative.  With
+    # A(t) = diag-reversed(2 + i/n + t) and b fixed, each x_i = b_j / a_i, so
+    # dx_i/dt = -b_j / a_i^2.
+    b = randn(n)
+    x = similar(b, eltype(vals))
+    SNLU.solve!(x, F, ForwardDiff.Dual{Nothing}.(b, 0.0))
+    @test ForwardDiff.value.(x) ≈ [b[n + 1 - i] / (2.0 + i / n) for i in 1:n] rtol = 1.0e-10
+    @test ForwardDiff.partials.(x, 1) ≈
+        [-b[n + 1 - i] / (2.0 + i / n)^2 for i in 1:n] rtol = 1.0e-10
+end
+
+@testset "Iterative algorithms get the partials right through the split path" begin
+    # The split path re-solves the primal cache once per partial, updating `b`
+    # in place — which `SimpleGMRES` missed, giving partials off by ~3e-2.
+    n = 6
+    p = 3
+    A = [
+        ForwardDiff.Dual{Nothing}(
+            float(i == j ? 10 + i : 0.3 * (i + j)),
+            ntuple(k -> 0.1k + 0.01 * (i + j), p)
+        ) for i in 1:n, j in 1:n
+    ]
+    b = [ForwardDiff.Dual{Nothing}(float(i), ntuple(k -> 0.05k + 0.1i, p)) for i in 1:n]
+    reference = solve(LinearProblem(A, b), LUFactorization()).u
+
+    @testset "$(nameof(typeof(alg)))" for alg in (KrylovJL_GMRES(), SimpleGMRES())
+        u = solve(LinearProblem(A, b), alg; abstol = 1.0e-14, reltol = 1.0e-14).u
+        @test dual_isapprox(u, reference; rtol = 1.0e-10)
+    end
 end

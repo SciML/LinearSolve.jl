@@ -13,15 +13,15 @@ cuSOLVER = "887afef0-6a32-4de5-add4-7827692ba8fc"
 cuSPARSE = "b26da814-b3bc-49ef-b0ee-c816305aa060"
 
 [sources]
-LinearSolve = {path = "/home/crackauc/sandbox/tmp_20260531_035946_10202/dg/fr_LinearSolve.jl"}
+LinearSolve = {path = "../.."}
 
 [compat]
 BlockDiagonals = "0.2"
 CUDSS = "0.7"
 LinearAlgebra = "1.10"
-LinearSolve = "3"
+LinearSolve = "5"
 SafeTestsets = "0.1, 1"
-SciMLTesting = "1"
+SciMLTesting = "2.8"
 SparseArrays = "1.10"
 StableRNGs = "1.0"
 Test = "1.10"

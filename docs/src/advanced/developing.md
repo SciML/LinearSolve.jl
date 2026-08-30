@@ -9,6 +9,11 @@ one of two ways:
 For developer ease, we highly recommend (2) as that will automatically make the
 caching API work. Thus, this is the documentation for how to do that.
 
+The full contract that such an algorithm has to satisfy — which methods are
+required, which are optional, and what their defaults are — is on the
+[Linear Solver Algorithm Interface](@ref) page. This page walks through one
+implementation of it.
+
 ## Developing New Linear Solvers with LinearSolve.jl Primitives
 
 Let's create a new wrapper for a simple LU-factorization which uses only the
@@ -17,9 +22,11 @@ basic machinery. A simplified version is:
 ```julia
 struct MyLUFactorization{P} <: LinearSolve.SciMLLinearSolveAlgorithm end
 
+LinearSolve.needs_concrete_A(::MyLUFactorization) = true
+
 function LinearSolve.init_cacheval(
         alg::MyLUFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol, reltol,
-        verbose::Bool, assump::LinearSolve.OperatorAssumptions)
+        verbose, assump::LinearSolve.OperatorAssumptions)
     lu!(convert(AbstractMatrix, A))
 end
 
@@ -54,6 +61,14 @@ While there are cheaper ways to obtain this type for LU factorizations (specific
 LU-factorization to get an `LU{T, Matrix{T}}` which it puts into the `cacheval`
 so it is typed for future use.
 
+`needs_concrete_A` is the other required method. It tells LinearSolve.jl — and
+downstream solvers such as OrdinaryDiffEq.jl, which query it on a user-supplied
+`linsolve` — that this algorithm needs the entries of `A` rather than just
+matrix-vector products with it. Because those callers run before the algorithm's
+backend package is necessarily loaded, it must be defined next to the struct and
+never in a package extension. Subtyping one of the categorized abstract types
+(here `LinearSolve.AbstractDenseFactorization` would fit) provides it instead.
+
 After the `init_cacheval`, the only thing left to do is to define
 `SciMLBase.solve!(cache::LinearCache, alg::MyLUFactorization)`. Many algorithms
 may use a lazy matrix-free representation of the operator `A`. Thus, if the
@@ -65,3 +80,10 @@ should `convert(AbstractMatrix,cache.A)`. The flag `cache.isfresh` states whethe
 so it's updated for future solves. Then `y = ldiv!(cache.u, cache.cacheval, cache.b)`
 performs the solve and a linear solution is returned via
 `SciMLBase.build_linear_solution(alg,y,nothing,cache)`.
+
+Finally, check the result against the interface:
+
+```julia
+using Test
+@test isempty(LinearSolve.algorithm_interface_issues(MyLUFactorization{true}()))
+```

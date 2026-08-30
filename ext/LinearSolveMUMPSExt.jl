@@ -32,12 +32,9 @@ end
 
 cleanup_mumps_cache!(cache::MUMPSCache) = _finalize_mumps_cache!(cache)
 cleanup_mumps_cache!(cache::LinearSolve.LinearCache) = cleanup_mumps_cache!(cache.cacheval)
-cleanup_mumps_cache!(sol::LinearSolution) = cleanup_mumps_cache!(sol.cache.cacheval)
-
 """
     cleanup_mumps_cache!(cache::MUMPSCache)
     cleanup_mumps_cache!(cache::LinearCache)
-    cleanup_mumps_cache!(sol::LinearSolution)
 
 Destroy the live `MUMPS.Mumps` object owned by a LinearSolve cache and reset the
 cache to an empty state. Safe to call multiple times.
@@ -48,8 +45,6 @@ The cache also registers a finalizer as a safety net, but explicit cleanup is
 strongly preferred for deterministic teardown.
 """
 cleanup_mumps_cache!
-
-LinearSolve.needs_concrete_A(::LinearSolve.MUMPSFactorization) = true
 
 function LinearSolve.init_cacheval(
         alg::LinearSolve.MUMPSFactorization, A, b, u, Pl, Pr, maxiters::Int,
@@ -107,7 +102,7 @@ function _solve_failed_solution(
     )
     @SciMLMessage(msg, cache.verbose, :solver_failure)
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+        alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
     )
 end
 
@@ -172,8 +167,33 @@ function SciMLBase.solve!(
     end
 
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+        alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
     )
+end
+
+LinearSolve._custom_can_reuse_adjoint_factorization(
+    ::LinearSolve.MUMPSFactorization, cache::MUMPSCache
+) = true
+
+function LinearSolve._custom_adjoint_factorization_solve(
+        alg::LinearSolve.MUMPSFactorization, cache::MUMPSCache, A, b
+    )
+    solver = cache.solver
+    solver === nothing && return nothing
+    solution = similar(b)
+    reverse_transposed = !alg.transposed
+    # MUMPS exposes transpose but not adjoint solves. Conjugating both sides
+    # turns a transpose solve with the cached factors into an adjoint solve.
+    rhs = eltype(A) <: Real ? b : conj.(b)
+    MUMPS.associate_rhs!(solver, rhs)
+    reverse_transposed && transpose!(solver)
+    try
+        MUMPS.mumps_solve!(solver; rhs_changed = true)
+        MUMPS.get_sol!(solution, solver)
+    finally
+        reverse_transposed && transpose!(solver)
+    end
+    return eltype(A) <: Real ? solution : conj.(solution)
 end
 
 end

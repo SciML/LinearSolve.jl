@@ -132,10 +132,11 @@ A_fail = spdiagm(
     -1 => -ones(n_fail - 1), 0 => 2.0 .* ones(n_fail), 1 => -ones(n_fail - 1)
 )
 b_fail = ones(n_fail)
-sol = solve(
+cache_fail = init(
     LinearProblem(A_fail, b_fail), HYPREAlgorithm(HYPRE.PCG; comm = comm);
     abstol = 1.0e-12, reltol = 1.0e-12, maxiters = 1
 )
+sol = solve!(cache_fail)
 @test sol.retcode == SciMLBase.ReturnCode.MaxIters
 @test sol.iters == 1
-@test sol.resid > sol.cache.reltol
+@test sol.resid > cache_fail.reltol

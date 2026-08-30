@@ -79,12 +79,12 @@ function SciMLBase.solve!(
         y = PureUMFPACK.solve(F, cache.b)
         copyto!(cache.u, y)
         SciMLBase.build_linear_solution(
-            alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+            alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
         )
     else
         @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
         SciMLBase.build_linear_solution(
-            alg, cache.u, nothing, cache; retcode = ReturnCode.Infeasible
+            alg, cache.u, nothing, nothing; retcode = ReturnCode.Infeasible
         )
     end
 end

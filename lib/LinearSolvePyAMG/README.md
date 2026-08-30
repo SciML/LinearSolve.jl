@@ -7,7 +7,7 @@
 [![SciML Code Style](https://img.shields.io/static/v1?label=code%20style&message=SciML&color=9558b2&labelColor=389826)](https://github.com/SciML/SciMLStyle)
 
 LinearSolvePyAMG.jl is a component of the [LinearSolve.jl](https://github.com/SciML/LinearSolve.jl) monorepo. It
-wraps the Python [PyAMG](https://pyamg.readthedocs.io) Algebraic Multigrid (AMG)
+wraps the Python [PyAMG](https://github.com/pyamg/pyamg) Algebraic Multigrid (AMG)
 library via [PythonCall.jl](https://github.com/JuliaPy/PythonCall.jl).
 PyAMG is installed automatically into Julia's managed Python environment via
 [CondaPkg.jl](https://github.com/JuliaPy/CondaPkg.jl).

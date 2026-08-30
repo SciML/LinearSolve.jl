@@ -215,7 +215,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::SimpleLUFactorization; kwargs
     cache.cacheval.x .= cache.u
     y = simplelu_solve!(cache.cacheval)
     return SciMLBase.build_linear_solution(
-        alg, y, nothing, cache;
+        alg, y, nothing, nothing;
         retcode = ReturnCode.Success
     )
 end
@@ -223,6 +223,12 @@ end
 function init_cacheval(
         alg::SimpleLUFactorization, A, b, u, Pl, Pr, maxiters::Int, abstol,
         reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    b isa AbstractMatrix && throw(
+        ArgumentError(
+            "SimpleLUFactorization supports only vector right-hand sides. Use " *
+                "`LUFactorization()` or `GenericLUFactorization()` for batched (matrix) `b`."
+        )
     )
     return LUSolver(convert(AbstractMatrix, A))
 end

@@ -1,10 +1,11 @@
 module LinearSolveMetalExt
 
-using Metal, LinearSolve
-using LinearAlgebra, SciMLBase
-using SciMLBase: AbstractSciMLOperator
-using LinearSolve: ArrayInterface, MKLLUFactorization, MetalOffload32MixedLUFactorization,
-    @get_cacheval, LinearCache, SciMLBase, OperatorAssumptions, LinearVerbosity
+using Metal: Metal, MtlArray, MtlVector
+using LinearAlgebra: LinearAlgebra, LU, ldiv!, lu
+using SciMLBase: SciMLBase
+using LinearSolve: LinearSolve, ArrayInterface, MetalLUFactorization,
+    MetalOffload32MixedLUFactorization, @get_cacheval, LinearCache, OperatorAssumptions,
+    LinearVerbosity
 
 @static if Sys.isapple()
 
@@ -12,8 +13,6 @@ using LinearSolve: ArrayInterface, MKLLUFactorization, MetalOffload32MixedLUFact
 
 end
 
-default_alias_A(::MetalLUFactorization, ::Any, ::Any) = false
-default_alias_b(::MetalLUFactorization, ::Any, ::Any) = false
 
 function LinearSolve.init_cacheval(
         alg::MetalLUFactorization, A::AbstractArray, b, u, Pl, Pr,
@@ -36,12 +35,10 @@ function SciMLBase.solve!(
         cache.isfresh = false
     end
     y = ldiv!(cache.u, @get_cacheval(cache, :MetalLUFactorization), cache.b)
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, y, nothing, nothing)
 end
 
 # Mixed precision Metal LU implementation
-default_alias_A(::MetalOffload32MixedLUFactorization, ::Any, ::Any) = false
-default_alias_b(::MetalOffload32MixedLUFactorization, ::Any, ::Any) = false
 
 function LinearSolve.init_cacheval(
         alg::MetalOffload32MixedLUFactorization, A, b, u, Pl, Pr,
@@ -96,7 +93,7 @@ function SciMLBase.solve!(
 
     # Convert back to original precision
     cache.u .= Torig.(u_f32)
-    return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, cache.u, nothing, nothing)
 end
 
 end

@@ -1,10 +1,13 @@
 module LinearSolveSparspakExt
 
-using LinearSolve, LinearAlgebra
-using LinearSolve: LinearVerbosity
-using Sparspak
-using Sparspak.SparseCSCInterface.SparseArrays
-using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
+using LinearSolve: LinearSolve, LinearVerbosity, OperatorAssumptions,
+    SparspakFactorization
+using SciMLBase: SciMLBase, LinearProblem, solve
+using LinearAlgebra: LinearAlgebra, I, ldiv!
+using Sparspak: Sparspak
+using Sparspak.SparseCSCInterface: sparspaklu, sparspaklu!
+using SparseArrays: SparseArrays, AbstractSparseMatrixCSC, SparseMatrixCSC, nonzeros,
+    rowvals, getcolptr, sprand
 
 const PREALLOCATED_SPARSEPAK = sparspaklu(
     SparseMatrixCSC(0, 0, [1], Int[], Float64[]),
@@ -86,7 +89,7 @@ function SciMLBase.solve!(
         cache.isfresh = false
     end
     y = ldiv!(cache.u, LinearSolve.@get_cacheval(cache, :SparspakFactorization), cache.b)
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, y, nothing, nothing)
 end
 
 LinearSolve.PrecompileTools.@compile_workload begin

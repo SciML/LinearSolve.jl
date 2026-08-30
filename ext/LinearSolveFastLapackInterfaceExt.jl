@@ -1,13 +1,21 @@
 module LinearSolveFastLapackInterfaceExt
 
-using LinearSolve, LinearAlgebra
-using LinearSolve: LinearVerbosity
-using FastLapackInterface
+using LinearSolve: LinearSolve, FastLUFactorization, FastQRFactorization,
+    LinearVerbosity, OperatorAssumptions
+using SciMLBase: SciMLBase
+using LinearAlgebra: LinearAlgebra, ColumnNorm, LAPACK, NoPivot, ldiv!
+using ArrayInterface: ArrayInterface
+using Setfield: @set!
+using FastLapackInterface: FastLapackInterface, LUWs, QRWYWs
 
 struct WorkspaceAndFactors{W, F}
     workspace::W
     factors::F
 end
+
+LinearSolve._custom_cache_factorization(
+    ::Union{FastLUFactorization, FastQRFactorization}, cacheval::WorkspaceAndFactors
+) = cacheval.factors
 
 function LinearSolve.init_cacheval(
         ::FastLUFactorization, A, b, u, Pl, Pr,
@@ -16,7 +24,7 @@ function LinearSolve.init_cacheval(
     )
     ws = LUWs(A)
     return WorkspaceAndFactors(
-        ws, LinearSolve.ArrayInterface.lu_instance(convert(AbstractMatrix, A))
+        ws, ArrayInterface.lu_instance(convert(AbstractMatrix, A))
     )
 end
 
@@ -29,7 +37,7 @@ function SciMLBase.solve!(
     if cache.isfresh
         # we will fail here if A is a different *size* than in a previous version of the same cache.
         # it may instead be desirable to resize the workspace.
-        LinearSolve.@set! ws_and_fact.factors = LinearAlgebra.LU(
+        @set! ws_and_fact.factors = LinearAlgebra.LU(
             LAPACK.getrf!(
                 ws_and_fact.workspace,
                 A
@@ -39,7 +47,7 @@ function SciMLBase.solve!(
         cache.isfresh = false
     end
     y = ldiv!(cache.u, cache.cacheval.factors, cache.b)
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, y, nothing, nothing)
 end
 
 function LinearSolve.init_cacheval(
@@ -50,7 +58,7 @@ function LinearSolve.init_cacheval(
     ws = QRWYWs(A; blocksize = alg.blocksize)
     return WorkspaceAndFactors(
         ws,
-        LinearSolve.ArrayInterface.qr_instance(convert(AbstractMatrix, A))
+        ArrayInterface.qr_instance(convert(AbstractMatrix, A))
     )
 end
 function LinearSolve.init_cacheval(
@@ -61,7 +69,7 @@ function LinearSolve.init_cacheval(
     ws = QRpWs(A)
     return WorkspaceAndFactors(
         ws,
-        LinearSolve.ArrayInterface.qr_instance(convert(AbstractMatrix, A))
+        ArrayInterface.qr_instance(convert(AbstractMatrix, A))
     )
 end
 
@@ -88,14 +96,14 @@ function SciMLBase.solve!(
         # we will fail here if A is a different *size* than in a previous version of the same cache.
         # it may instead be desirable to resize the workspace.
         if P === NoPivot
-            LinearSolve.@set! ws_and_fact.factors = LinearAlgebra.QRCompactWY(
+            @set! ws_and_fact.factors = LinearAlgebra.QRCompactWY(
                 LAPACK.geqrt!(
                     ws_and_fact.workspace,
                     A
                 )...
             )
         else
-            LinearSolve.@set! ws_and_fact.factors = LinearAlgebra.QRPivoted(
+            @set! ws_and_fact.factors = LinearAlgebra.QRPivoted(
                 LAPACK.geqp3!(
                     ws_and_fact.workspace,
                     A
@@ -106,7 +114,7 @@ function SciMLBase.solve!(
         cache.isfresh = false
     end
     y = ldiv!(cache.u, cache.cacheval.factors, cache.b)
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, y, nothing, nothing)
 end
 
 end

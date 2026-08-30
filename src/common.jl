@@ -891,6 +891,10 @@ function __init(
         # TODO: deprecate once all docs are updated to the new form
         #@warn "passing Preconditioners at `init`/`solve` time is deprecated. Instead add a `precs` function to your algorithm."
     end
+    # After the resolution above, so a preconditioner coming from `precs` is checked
+    # the same way one passed to `init`/`solve` is.
+    _check_preconditioner_support(Pl, u0_)
+    _check_preconditioner_support(Pr, u0_)
     # For DefaultLinearSolver, pass the uncopied original `A` so the A_backup field
     # gets the correct type at construction time (it may be e.g. a WOperator while
     # the converted A used for sub-caches is a different concrete type). This is

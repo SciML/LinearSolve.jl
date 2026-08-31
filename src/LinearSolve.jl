@@ -479,6 +479,7 @@ include("common.jl")
 include("interface.jl")
 include("extension_algs.jl")
 include("factorization.jl")
+include("slate.jl")
 include("appleaccelerate.jl")
 include("mkl.jl")
 include("openblas.jl")
@@ -754,7 +755,7 @@ for alg in (
         :CHOLMODFactorization, :LDLtFactorization, :AppleAccelerateLUFactorization,
         :MKLLUFactorization, :MetalLUFactorization, :CUSOLVERRFFactorization, :ParUFactorization,
         :HSLMA57Factorization, :HSLMA97Factorization,
-        :STRUMPACKFactorization,
+        :STRUMPACKFactorization, :SLATEFactorization,
     )
     @eval needs_square_A(::$(alg)) = true
 end
@@ -812,7 +813,7 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
     BunchKaufmanFactorization, CHOLMODFactorization, LDLtFactorization,
     CUSOLVERRFFactorization, CliqueTreesFactorization, ParUFactorization,
     AMGXPreconditioner,
-    STRUMPACKFactorization, MUMPSFactorization, SuperLUDISTFactorization,
+    STRUMPACKFactorization, SLATEFactorization, MUMPSFactorization, SuperLUDISTFactorization,
     SpecializedLUFactorization, SpecializedQRFactorization,
     HSLMA57Factorization, HSLMA97Factorization,
     CKTSOFactorization
@@ -857,6 +858,7 @@ export AppleAccelerate32MixedLUFactorization
 export RF32MixedLUFactorization
 export MetalLUFactorization
 export MetalOffload32MixedLUFactorization
+export slate_isavailable
 
 export OperatorAssumptions, OperatorCondition, NonstructuralZeros
 

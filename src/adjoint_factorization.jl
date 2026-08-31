@@ -88,6 +88,10 @@ for Alg in (
         ParUFactorization,
         SuperLUDISTFactorization,
         ElementalJL,
+        # SLATE is driven through `gesv`, which factors and solves in one call. The
+        # wrapper never calls `getrs`, so there is no retained factorization for the
+        # adjoint to reuse and it refactorizes.
+        SLATEFactorization,
         # CKTSO can solve the transposed system from the same factorization via its
         # `row0_column1` flag, but CKTSO.jl does not expose that, so the adjoint
         # refactorizes.

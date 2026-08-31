@@ -184,6 +184,10 @@ The following preconditioners match the interface of LinearSolve.jl.
       + Incomplete Cholesky decomposition `KrylovPreconditioners.kp_ic0(A)`
       + Incomplete LU decomposition `KrylovPreconditioners.kp_ilu0(A)`
       + Block Jacobi `KrylovPreconditioners.kp_block_jacobi(A)`
+    
+    Reach for these rather than CUSPARSE's `ilu02`/`ic02` directly. Those return the
+    factors packed back into a `CuSparseMatrix`, which stores the factorization but has
+    no `ldiv!` to apply it, so it cannot be used as a preconditioner as-is.
 
 ## GPU algebraic multigrid
 

@@ -454,6 +454,22 @@ methods for their own formats; the fallback accepts everything.
 """
 _check_matrix_support(A) = nothing
 
+"""
+    _check_preconditioner_support(P, u)
+
+Reject a preconditioner that cannot be applied to `u`, in place of the `MethodError`
+that would otherwise surface from inside the iteration with no indication of which
+argument was at fault. Extensions add methods for their own types; the fallback
+accepts everything.
+"""
+_check_preconditioner_support(P, u) = nothing
+
+# A preconditioner is applied through the two-argument `ldiv!(P, x)`. The
+# three-argument form is not a substitute: a bare CUSPARSE matrix has a
+# three-argument method and no two-argument one, which is exactly how the solve in
+# https://github.com/SciML/LinearSolve.jl/issues/341 reaches a `MethodError`.
+_has_ldiv(P, u) = hasmethod(LinearAlgebra.ldiv!, Tuple{typeof(P), typeof(u)})
+
 include("verbosity.jl")
 include("blas_logging.jl")
 include("generic_lufact.jl")

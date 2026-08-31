@@ -255,3 +255,59 @@ end
     @test norm(xwide) ≈ norm(Array(wide) \ Array(bwide)) rtol = 1.0e-4
     @test Array(wide) * xwide ≈ Array(bwide) rtol = 1.0e-4
 end
+
+# `CUSPARSE.ilu02(A)` returns the ILU factors packed back into a CuSparseMatrix, which
+# holds the factorization but cannot apply it. Passing it as `Pl` used to fail inside
+# the Krylov iteration with a bare `MethodError` on `ldiv!`, naming neither the
+# preconditioner nor a way forward. See https://github.com/SciML/LinearSolve.jl/issues/341.
+@testset "A raw CUSPARSE matrix is rejected as a preconditioner (#341)" begin
+    n = 200
+    A_cpu = spdiagm(-1 => -ones(n - 1), 0 => 4ones(n), 1 => -ones(n - 1))
+    b_cpu = rand(StableRNG(341), n)
+    ref = Matrix(A_cpu) \ b_cpu
+
+    A_gpu = cuSPARSE.CuSparseMatrixCSR(cuSPARSE.CuSparseMatrixCSC(A_cpu))
+    b_gpu = CUDACore.adapt(CuArray, b_cpu)
+
+    P_raw = cuSPARSE.ilu02(copy(A_gpu), 'O')
+    # The three-argument `ldiv!` exists for this type while the two-argument one the
+    # preconditioner path calls does not, which is precisely why the old failure was a
+    # `MethodError` from inside the iteration rather than anything actionable.
+    @test !LinearSolve._has_ldiv(P_raw, b_gpu)
+
+    err = try
+        solve(LinearProblem(A_gpu, b_gpu), KrylovJL_GMRES(); Pl = P_raw)
+        nothing
+    catch e
+        e
+    end
+    @test err !== nothing
+    @test !(err isa MethodError)
+    @test occursin("kp_ilu0", sprint(showerror, err))
+
+    # A preconditioner coming from `precs` goes through the same check.
+    err_precs = try
+        solve(
+            LinearProblem(A_gpu, b_gpu),
+            KrylovJL_GMRES(precs = (A, p) -> (cuSPARSE.ilu02(copy(A), 'O'), I))
+        )
+        nothing
+    catch e
+        e
+    end
+    @test err_precs !== nothing
+    @test !(err_precs isa MethodError)
+
+    # Defining `ldiv!` yourself is the way out, so it must not be caught. A Jacobi
+    # preconditioner is used for the solve so this asserts the check, not a
+    # hand-rolled ILU application.
+    dinv = CUDACore.adapt(CuArray, 1 ./ diag(Matrix(A_cpu)))
+    Pd = LinearSolve.InvPreconditioner(Diagonal(dinv))
+    @test LinearSolve._check_preconditioner_support(Pd, b_gpu) === nothing
+    sol = solve(LinearProblem(A_gpu, b_gpu), KrylovJL_GMRES(); Pl = Pd, maxiters = 400)
+    @test Array(sol.u) ≈ ref rtol = 1.0e-6
+
+    # Only the preconditioner slot is affected; the same type as `A` still solves.
+    @test Array(solve(LinearProblem(A_gpu, b_gpu), KrylovJL_GMRES(); maxiters = 400).u) ≈
+        ref rtol = 1.0e-6
+end

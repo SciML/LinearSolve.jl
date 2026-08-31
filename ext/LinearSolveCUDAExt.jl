@@ -39,6 +39,24 @@ function LinearSolve._check_matrix_support(::cuSPARSE.CuSparseMatrixCOO)
     )
 end
 
+# `CUSPARSE.ilu02(A)`/`ic02(A)` return the factors packed back into a CuSparseMatrix.
+# That holds the factorization but cannot apply it: there is no `ldiv!` for a bare
+# CUSPARSE matrix, so it fails inside the Krylov iteration with a `MethodError` naming
+# only `ldiv!`, which does not say that the preconditioner was the problem or what to
+# use instead. Anyone who has defined their own `ldiv!` for one is left alone.
+# See https://github.com/SciML/LinearSolve.jl/issues/341.
+function LinearSolve._check_preconditioner_support(P::cuSPARSE.CuSparseMatrix, u)
+    LinearSolve._has_ldiv(P, u) && return nothing
+    return error(
+        "A $(nameof(typeof(P))) cannot be used as a preconditioner: it stores the " *
+            "factors but has no `ldiv!` to apply them, so the solve would fail inside " *
+            "the iteration. `CUSPARSE.ilu02`/`ic02` return this type. Use " *
+            "KrylovPreconditioners.jl, whose `kp_ilu0(A)` and `kp_ic0(A)` wrap the " *
+            "same factors in an operator that applies them, or define " *
+            "`LinearAlgebra.ldiv!` for your own wrapper."
+    )
+end
+
 function LinearSolve.defaultalg(
         A::cuSPARSE.CuSparseMatrixCSR{Tv, Ti}, b,
         assump::OperatorAssumptions{Bool}

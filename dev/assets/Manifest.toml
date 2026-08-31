@@ -97,9 +97,9 @@ version = "1.1.2"
 
 [[deps.ArrayInterface]]
 deps = ["Adapt", "LinearAlgebra"]
-git-tree-sha1 = "13f3b228c230ef0b4ecafd73c8ca9e99987ca692"
+git-tree-sha1 = "daf5b2aab5b1c1fdcb65b05883cdb4b18abac1b9"
 uuid = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
-version = "7.30.0"
+version = "7.30.1"
 
     [deps.ArrayInterface.extensions]
     ArrayInterfaceAMDGPUExt = "AMDGPU"
@@ -111,6 +111,7 @@ version = "7.30.0"
     ArrayInterfaceChainRulesExt = "ChainRules"
     ArrayInterfaceFillArraysExt = "FillArrays"
     ArrayInterfaceGPUArraysCoreExt = "GPUArraysCore"
+    ArrayInterfaceGPUArraysCoreTrackerExt = ["GPUArraysCore", "Tracker"]
     ArrayInterfaceMetalExt = "Metal"
     ArrayInterfaceReverseDiffExt = "ReverseDiff"
     ArrayInterfaceSparseArraysExt = "SparseArrays"
@@ -328,9 +329,9 @@ weakdeps = ["Dates", "LinearAlgebra"]
     CompatLinearAlgebraExt = "LinearAlgebra"
 
 [[deps.CompilerCaching]]
-git-tree-sha1 = "3c31a4b8fbd0281c599fa2004b3e6ad6ebe725d5"
+git-tree-sha1 = "5d1ebb4a8c6e91ca676fc03edeb072aaa0459674"
 uuid = "9db33cc3-5358-4881-8759-fa4194144afd"
-version = "0.4.2"
+version = "0.4.3"
 
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
@@ -440,9 +441,9 @@ version = "0.9.5"
 
 [[deps.Documenter]]
 deps = ["ANSIColoredPrinters", "AbstractTrees", "Base64", "CodecZlib", "Dates", "DocStringExtensions", "Downloads", "Git", "IOCapture", "InteractiveUtils", "JSON", "Logging", "Markdown", "MarkdownAST", "Pkg", "PrecompileTools", "REPL", "RegistryInstances", "SHA", "TOML", "Test", "Unicode"]
-git-tree-sha1 = "56e9c37b5e7c3b4f080ab1da18d72d5c290e184a"
+git-tree-sha1 = "17d7a103a75db0d3f8c5764d51e478341a905c36"
 uuid = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
-version = "1.17.0"
+version = "1.18.0"
 
 [[deps.Downloads]]
 deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
@@ -682,11 +683,6 @@ git-tree-sha1 = "69ffb934a5c5b7e086a0b4fee3427db2556fba6e"
 uuid = "3b182d85-2403-5c21-9c21-1e1f0cc25472"
 version = "1.3.16+0"
 
-[[deps.Grisu]]
-git-tree-sha1 = "53bb909d1151e57e2484c3d1b53e19552b887fb2"
-uuid = "42e2da0e-8278-4e71-bc24-59509adca0fe"
-version = "1.0.2"
-
 [[deps.HTTP]]
 deps = ["Base64", "CodecZlib", "Dates", "EnumX", "PrecompileTools", "Random", "Reseau", "SHA", "URIs", "UUIDs", "Zlib_jll"]
 git-tree-sha1 = "49a90cd540681d5b79bf5c8ca13c92677e37005e"
@@ -847,9 +843,9 @@ version = "4.1.0+0"
 
 [[deps.LHLFactorization]]
 deps = ["LinearAlgebra", "PrecompileTools"]
-git-tree-sha1 = "845a138f095475e45d0ead9d1f574a1f7c0d78cd"
+git-tree-sha1 = "51d99d9892d0f95b4c9d4d7310785971f2d48298"
 uuid = "2faa5264-e118-4071-8864-e10559f68c7c"
-version = "2.2.1"
+version = "2.2.2"
 weakdeps = ["Polyester", "PureKLU", "SparseArrays"]
 
     [deps.LHLFactorization.extensions]
@@ -1006,7 +1002,7 @@ version = "1.12.0"
 
 [[deps.LinearSolve]]
 deps = ["AMD", "ArrayInterface", "ConcreteStructs", "DocStringExtensions", "EnumX", "GPUArraysCore", "InteractiveUtils", "Krylov", "LHLFactorization", "Libdl", "LinearAlgebra", "MKL_jll", "Markdown", "OpenBLAS_jll", "PrecompileTools", "Preferences", "PureKLU", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLLogging", "SciMLOperators", "SciMLStructures", "Setfield", "SparseArrays", "SparseColumnPivotedQR", "StaticArraysCore"]
-path = "/home/runner/_work/LinearSolve.jl/LinearSolve.jl"
+path = "/home/runner/work/LinearSolve.jl/LinearSolve.jl"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 version = "5.15.1"
 
@@ -1642,9 +1638,9 @@ version = "0.6.46"
 
 [[deps.SciMLBase]]
 deps = ["ADTypes", "Accessors", "Adapt", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FindFirstFunctions", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "LoggingExtras", "Markdown", "PreallocationTools", "PrecompileTools", "Preferences", "Printf", "Random", "RecipesBase", "RecursiveArrayTools", "RuntimeGeneratedFunctions", "SciMLOperators", "SciMLPublic", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface"]
-git-tree-sha1 = "841af95ba0085bbc555bb8edacf1129e616eb051"
+git-tree-sha1 = "872d3d4426adae016693c1300ba47218b9dcb86e"
 uuid = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
-version = "3.50.1"
+version = "3.50.2"
 
     [deps.SciMLBase.extensions]
     SciMLBaseChainRulesCoreExt = "ChainRulesCore"
@@ -1752,10 +1748,10 @@ uuid = "efcf1570-3423-57d1-acb7-fd33fddbac46"
 version = "1.1.2"
 
 [[deps.Showoff]]
-deps = ["Dates", "Grisu"]
-git-tree-sha1 = "91eddf657aca81df9ae6ceb20b959ae5653ad1de"
+deps = ["Dates"]
+git-tree-sha1 = "8238217340ad0aaabe11afe39c1098b5bc9f4c8e"
 uuid = "992d4aef-0814-514b-bc4d-f2e9a6c4116f"
-version = "1.0.3"
+version = "1.1.1"
 
 [[deps.Sockets]]
 uuid = "6462fe0b-24de-5631-8697-dd941f90decc"

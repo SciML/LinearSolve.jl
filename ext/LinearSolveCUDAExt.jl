@@ -1,18 +1,17 @@
 module LinearSolveCUDAExt
 
-using cuSOLVER
+using cuSOLVER: cuSOLVER
+# cuSOLVER is the only trigger, and it is what exposes the rest of the CUDA stack to
+# this extension; cuSPARSE and CUDACore are not reachable on their own from here.
 CUDACore = cuSOLVER.CUDACore
 cuSPARSE = cuSOLVER.cuSPARSE
 
-using LinearSolve: LinearSolve, is_cusparse, defaultalg, cudss_loaded, DefaultLinearSolver,
-    DefaultAlgorithmChoice, ALREADY_WARNED_CUDSS, LinearCache,
-    needs_concrete_A,
-    error_no_cudss_lu, init_cacheval, OperatorAssumptions,
+using LinearSolve: LinearSolve, OperatorAssumptions,
     CudaOffloadFactorization, CudaOffloadLUFactorization, CudaOffloadQRFactorization,
     CUDAOffload32MixedLUFactorization,
     SparspakFactorization, KLUFactorization, UMFPACKFactorization, LinearVerbosity
-using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase, LinearSolve.ArrayInterface
-using SciMLBase: AbstractSciMLOperator
+using LinearAlgebra: LinearAlgebra, LU, ldiv!, lu, qr
+using SciMLBase: SciMLBase
 
 LinearSolve.usecuda(x::Nothing) = CUDACore.functional()
 
@@ -25,6 +24,38 @@ function LinearSolve.is_cusparse(
 end
 LinearSolve.is_cusparse_csr(::cuSPARSE.CuSparseMatrixCSR) = true
 LinearSolve.is_cusparse_csc(::cuSPARSE.CuSparseMatrixCSC) = true
+
+# CUSPARSE's COO routines require the entries sorted by row. A COO assembled by hand is
+# not necessarily sorted that way (`findnz` on a CSC yields column-major order), and the
+# mismatch is silent: the solve converges to a wrong answer rather than failing. The
+# conversions sort as part of the conversion, so they are the way in.
+# See https://github.com/SciML/LinearSolve.jl/issues/350.
+function LinearSolve._check_matrix_support(::cuSPARSE.CuSparseMatrixCOO)
+    return error(
+        "CuSparseMatrixCOO is not supported by LinearSolve.jl. CUSPARSE requires the " *
+            "entries sorted by row, which a hand-assembled COO need not be, and an " *
+            "unsorted one solves to a wrong answer without erroring. Convert first, " *
+            "with `CuSparseMatrixCSR(A)` or `CuSparseMatrixCSC(A)`."
+    )
+end
+
+# `CUSPARSE.ilu02(A)`/`ic02(A)` return the factors packed back into a CuSparseMatrix.
+# That holds the factorization but cannot apply it: there is no `ldiv!` for a bare
+# CUSPARSE matrix, so it fails inside the Krylov iteration with a `MethodError` naming
+# only `ldiv!`, which does not say that the preconditioner was the problem or what to
+# use instead. Anyone who has defined their own `ldiv!` for one is left alone.
+# See https://github.com/SciML/LinearSolve.jl/issues/341.
+function LinearSolve._check_preconditioner_support(P::cuSPARSE.CuSparseMatrix, u)
+    LinearSolve._has_ldiv(P, u) && return nothing
+    return error(
+        "A $(nameof(typeof(P))) cannot be used as a preconditioner: it stores the " *
+            "factors but has no `ldiv!` to apply them, so the solve would fail inside " *
+            "the iteration. `CUSPARSE.ilu02`/`ic02` return this type. Use " *
+            "KrylovPreconditioners.jl, whose `kp_ilu0(A)` and `kp_ic0(A)` wrap the " *
+            "same factors in an operator that applies them, or define " *
+            "`LinearAlgebra.ldiv!` for your own wrapper."
+    )
+end
 
 function LinearSolve.defaultalg(
         A::cuSPARSE.CuSparseMatrixCSR{Tv, Ti}, b,
@@ -73,7 +104,7 @@ function SciMLBase.solve!(
     fact = LinearSolve.@get_cacheval(cache, :CudaOffloadLUFactorization)
     y = Array(ldiv!(CUDACore.CuArray(cache.u), fact, CUDACore.CuArray(cache.b)))
     cache.u .= y
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, y, nothing, nothing)
 end
 
 function LinearSolve.init_cacheval(
@@ -105,7 +136,7 @@ function SciMLBase.solve!(
     end
     y = Array(ldiv!(CUDACore.CuArray(cache.u), cache.cacheval, CUDACore.CuArray(cache.b)))
     cache.u .= y
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, y, nothing, nothing)
 end
 
 function LinearSolve.init_cacheval(
@@ -133,7 +164,7 @@ function SciMLBase.solve!(
     end
     y = Array(ldiv!(CUDACore.CuArray(cache.u), cache.cacheval, CUDACore.CuArray(cache.b)))
     cache.u .= y
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, y, nothing, nothing)
 end
 
 function LinearSolve.init_cacheval(
@@ -142,6 +173,25 @@ function LinearSolve.init_cacheval(
         assumptions::OperatorAssumptions
     )
     return qr(CUDACore.CuArray(A))
+end
+
+# `qr` on a `CuSparseMatrix` falls through to the generic sparse path and dies on scalar
+# indexing, so a sparse QR on the GPU was not reachable through `QRFactorization` at all.
+# cuSOLVER's `csrlsvqr!` does the whole thing on the device. It wants CSR with `Int32`
+# indices, which is also the layout cuSOLVER's other sparse entry points take.
+# See https://github.com/SciML/LinearSolve.jl/issues/410.
+function SciMLBase.solve!(
+        cache::LinearSolve.LinearCache{<:cuSPARSE.CuSparseMatrixCSR{T, Int32}},
+        alg::LinearSolve.QRFactorization; kwargs...
+    ) where {T}
+    A = cache.A
+    # `csrlsvqr!` factorizes and solves in one call, so there is nothing to cache between
+    # solves; `cache.isfresh` is cleared only to keep the flag honest.
+    cuSOLVER.csrlsvqr!(A, cache.b, cache.u, T(cache.reltol), Cint(1), 'O')
+    cache.isfresh = false
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, cache; retcode = LinearSolve.ReturnCode.Success
+    )
 end
 
 for AlgType in (SparspakFactorization, LinearSolve.QRFactorization)
@@ -185,9 +235,9 @@ function SciMLBase.solve!(
         fact, A_gpu_f32, b_gpu_f32, u_gpu_f32 = LinearSolve.@get_cacheval(cache, :CUDAOffload32MixedLUFactorization)
         if isempty(A_gpu_f32)
             m, n = size(cache.A)
-            A_gpu_f32 = CuMatrix{T32}(undef, m, n)
-            b_gpu_f32 = CuVector{T32}(undef, size(cache.b, 1))
-            u_gpu_f32 = CuVector{T32}(undef, size(cache.u, 1))
+            A_gpu_f32 = CUDACore.CuMatrix{T32}(undef, m, n)
+            b_gpu_f32 = CUDACore.CuVector{T32}(undef, size(cache.b, 1))
+            u_gpu_f32 = CUDACore.CuVector{T32}(undef, size(cache.u, 1))
         end
         A_f32 = T32.(cache.A)
         copyto!(A_gpu_f32, A_f32)
@@ -206,7 +256,7 @@ function SciMLBase.solve!(
     # Convert back to original precision
     y = Array(u_gpu_f32)
     cache.u .= Torig.(y)
-    return SciMLBase.build_linear_solution(alg, cache.u, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, cache.u, nothing, nothing)
 end
 
 function LinearSolve.init_cacheval(
@@ -214,19 +264,19 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    if !CUDA.functional()
+    if !CUDACore.functional()
         return nothing
     end
 
     T32 = eltype(A) <: Complex ? ComplexF32 : Float32
     noUnitT = typeof(zero(T32))
     luT = LinearAlgebra.lutype(noUnitT)
-    ipiv = CuVector{Int32}(undef, 0)
+    ipiv = CUDACore.CuVector{Int32}(undef, 0)
     info = zero(LinearAlgebra.BlasInt)
-    fact = LU{luT}(CuMatrix{T32}(undef, 0, 0), ipiv, info)
-    A_gpu_f32 = CuMatrix{T32}(undef, 0, 0)
-    b_gpu_f32 = CuVector{T32}(undef, 0)
-    u_gpu_f32 = CuVector{T32}(undef, 0)
+    fact = LU{luT}(CUDACore.CuMatrix{T32}(undef, 0, 0), ipiv, info)
+    A_gpu_f32 = CUDACore.CuMatrix{T32}(undef, 0, 0)
+    b_gpu_f32 = CUDACore.CuVector{T32}(undef, 0)
+    u_gpu_f32 = CUDACore.CuVector{T32}(undef, 0)
     return (fact, A_gpu_f32, b_gpu_f32, u_gpu_f32)
 end
 

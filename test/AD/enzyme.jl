@@ -1,0 +1,679 @@
+using Enzyme, ForwardDiff
+using LinearSolve, LinearAlgebra, Test
+using FiniteDiff, RecursiveFactorization
+
+n = 4
+A = rand(n, n);
+dA = zeros(n, n);
+b1 = rand(n);
+db1 = zeros(n);
+
+function f(A, b1; alg = LUFactorization())
+    prob = LinearProblem(A, b1)
+
+    sol1 = solve(prob, alg)
+
+    s1 = sol1.u
+    return norm(s1)
+end
+
+f(A, b1) # Uses BLAS
+
+Enzyme.autodiff(Reverse, f, Duplicated(copy(A), dA), Duplicated(copy(b1), db1))
+
+dA2 = ForwardDiff.gradient(x -> f(x, eltype(x).(b1)), copy(A))
+db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x), copy(b1))
+
+@test dA ≈ dA2
+@test db1 ≈ db12
+
+@testset "OpenBLAS solve! reverse rule" begin
+    A = [3.0 1.0; 1.0 2.0]
+    b = [1.0, 2.0]
+    dA = zeros(size(A))
+    db = zeros(size(b))
+
+    function openblas_solve!(A, b)
+        cache = init(LinearProblem(A, b), OpenBLASLUFactorization())
+        return sum(solve!(cache).u)
+    end
+
+    Enzyme.autodiff(
+        Reverse, openblas_solve!, Duplicated(copy(A), dA), Duplicated(copy(b), db)
+    )
+    expected_dA = FiniteDiff.finite_difference_gradient(
+        A -> openblas_solve!(A, b), A
+    )
+    expected_db = FiniteDiff.finite_difference_gradient(
+        b -> openblas_solve!(A, b), b
+    )
+
+    @test dA ≈ expected_dA
+    @test db ≈ expected_db
+end
+
+A = rand(n, n);
+dA = zeros(n, n);
+b1 = rand(n);
+db1 = zeros(n);
+
+_ff = (
+    x,
+    y,
+) -> f(
+    x,
+    y;
+    alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)
+)
+_ff(copy(A), copy(b1))
+
+Enzyme.autodiff(
+    Reverse,
+    (
+        x,
+        y,
+    ) -> f(
+        x,
+        y;
+        alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)
+    ),
+    Duplicated(copy(A), dA),
+    Duplicated(copy(b1), db1)
+)
+
+dA2 = ForwardDiff.gradient(x -> f(x, eltype(x).(b1)), copy(A))
+db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x), copy(b1))
+
+@test dA ≈ dA2
+@test db1 ≈ db12
+
+A = rand(n, n);
+dA = zeros(n, n);
+dA2 = zeros(n, n);
+b1 = rand(n);
+db1 = zeros(n);
+db12 = zeros(n);
+
+# Batch test
+n = 4
+A = rand(n, n);
+dA = zeros(n, n);
+dA2 = zeros(n, n);
+b1 = rand(n);
+db1 = zeros(n);
+db12 = zeros(n);
+
+function f(A, b1; alg = LUFactorization())
+    prob = LinearProblem(A, b1)
+    sol1 = solve(prob, alg)
+    s1 = sol1.u
+    return norm(s1)
+end
+
+function fbatch(y, A, b1; alg = LUFactorization())
+    prob = LinearProblem(A, b1)
+    sol1 = solve(prob, alg)
+    s1 = sol1.u
+    y[1] = norm(s1)
+    return nothing
+end
+
+y = [0.0]
+dy1 = [1.0]
+dy2 = [1.0]
+Enzyme.autodiff(
+    Reverse, fbatch, Duplicated(y, dy1), Duplicated(copy(A), dA), Duplicated(copy(b1), db1)
+)
+
+@test y[1] ≈ f(copy(A), b1)
+dA_2 = ForwardDiff.gradient(x -> f(x, eltype(x).(b1)), copy(A))
+db1_2 = ForwardDiff.gradient(x -> f(eltype(x).(A), x), copy(b1))
+
+@test dA ≈ dA_2
+@test db1 ≈ db1_2
+
+y .= 0
+dy1 .= 1
+dy2 .= 1
+dA .= 0
+dA2 .= 0
+db1 .= 0
+db12 .= 0
+Enzyme.autodiff(
+    Reverse, fbatch, BatchDuplicated(y, (dy1, dy2)),
+    BatchDuplicated(copy(A), (dA, dA2)), BatchDuplicated(copy(b1), (db1, db12))
+)
+
+@test dA ≈ dA_2
+@test db1 ≈ db1_2
+@test dA2 ≈ dA_2
+@test db12 ≈ db1_2
+
+function f(A, b1, b2; alg = LUFactorization())
+    prob = LinearProblem(A, b1)
+    cache = init(prob, alg)
+    s1 = copy(solve!(cache).u)
+    cache.b = b2
+    s2 = solve!(cache).u
+    return norm(s1 + s2)
+end
+
+A = rand(n, n);
+dA = zeros(n, n);
+b1 = rand(n);
+db1 = zeros(n);
+b2 = rand(n);
+db2 = zeros(n);
+
+f(A, b1, b2)
+Enzyme.autodiff(
+    Reverse, f, Duplicated(copy(A), dA),
+    Duplicated(copy(b1), db1), Duplicated(copy(b2), db2)
+)
+
+dA2 = ForwardDiff.gradient(x -> f(x, eltype(x).(b1), eltype(x).(b2)), copy(A))
+db12 = ForwardDiff.gradient(x -> f(eltype(x).(A), x, eltype(x).(b2)), copy(b1))
+db22 = ForwardDiff.gradient(x -> f(eltype(x).(A), eltype(x).(b1), x), copy(b2))
+
+@test dA ≈ dA2
+@test db1 ≈ db12
+@test db2 ≈ db22
+
+function f2(A, b1, b2; alg = RFLUFactorization())
+    prob = LinearProblem(A, b1)
+    cache = init(prob, alg)
+    s1 = copy(solve!(cache).u)
+    cache.b = b2
+    s2 = solve!(cache).u
+    return norm(s1 + s2)
+end
+
+f2(A, b1, b2)
+dA = zeros(n, n);
+db1 = zeros(n);
+db2 = zeros(n);
+Enzyme.autodiff(
+    Reverse, f2, Duplicated(copy(A), dA),
+    Duplicated(copy(b1), db1), Duplicated(copy(b2), db2)
+)
+
+@test dA ≈ dA2
+@test db1 ≈ db12
+@test db2 ≈ db22
+
+function f3(A, b1, b2; alg = KrylovJL_GMRES())
+    prob = LinearProblem(A, b1)
+    cache = init(prob, alg)
+    s1 = copy(solve!(cache).u)
+    cache.b = b2
+    s2 = solve!(cache).u
+    return norm(s1 + s2)
+end
+
+dA = zeros(n, n);
+db1 = zeros(n);
+db2 = zeros(n);
+Enzyme.autodiff(
+    set_runtime_activity(Reverse), f3, Duplicated(copy(A), dA),
+    Duplicated(copy(b1), db1), Duplicated(copy(b2), db2)
+)
+
+@test dA ≈ dA2 atol = 5.0e-5
+@test db1 ≈ db12
+@test db2 ≈ db22
+
+function f4(A, b1, b2; alg = LUFactorization())
+    prob = LinearProblem(A, b1)
+    cache = init(prob, alg)
+    solve!(cache)
+    s1 = copy(cache.u)
+    cache.b = b2
+    solve!(cache)
+    s2 = copy(cache.u)
+    return norm(s1 + s2)
+end
+
+A = rand(n, n);
+dA = zeros(n, n);
+b1 = rand(n);
+db1 = zeros(n);
+b2 = rand(n);
+db2 = zeros(n);
+
+f4(A, b1, b2)
+@test_throws "Adjoint case currently not handled" Enzyme.autodiff(
+    Reverse, f4, Duplicated(copy(A), dA),
+    Duplicated(copy(b1), db1), Duplicated(copy(b2), db2)
+)
+
+#=
+dA2 = ForwardDiff.gradient(x -> f4(x, eltype(x).(b1), eltype(x).(b2)), copy(A))
+db12 = ForwardDiff.gradient(x -> f4(eltype(x).(A), x, eltype(x).(b2)), copy(b1))
+db22 = ForwardDiff.gradient(x -> f4(eltype(x).(A), eltype(x).(b1), x), copy(b2))
+
+@test dA ≈ dA2
+@test db1 ≈ db12
+@test db2 ≈ db22
+=#
+
+A = rand(n, n);
+dA = zeros(n, n);
+b1 = rand(n);
+
+function fnice(A, b, alg)
+    prob = LinearProblem(A, b)
+    sol1 = solve(prob, alg)
+    return sum(sol1.u)
+end
+
+@testset for alg in (
+        LUFactorization(),
+        RFLUFactorization(),    # KrylovJL_GMRES(), fails
+    )
+    fb_closure = b -> fnice(A, b, alg)
+
+    fd_jac = FiniteDiff.finite_difference_jacobian(fb_closure, b1) |> vec
+    @show fd_jac
+
+    en_jac = map(onehot(b1)) do db1
+        return only(
+            Enzyme.autodiff(
+                set_runtime_activity(Forward), fnice,
+                Const(A), Duplicated(b1, db1), Const(alg)
+            )
+        )
+    end |> collect
+    @show en_jac
+
+    @test en_jac ≈ fd_jac rtol = 1.0e-4
+
+    fA_closure = A -> fnice(A, b1, alg)
+
+    fd_jac = FiniteDiff.finite_difference_jacobian(fA_closure, A) |> vec
+    @show fd_jac
+
+    en_jac = map(onehot(A)) do dA
+        return only(
+            Enzyme.autodiff(
+                set_runtime_activity(Forward), fnice,
+                Duplicated(A, dA), Const(b1), Const(alg)
+            )
+        )
+    end |> collect
+    @show en_jac
+
+    @test en_jac ≈ fd_jac rtol = 1.0e-4
+end
+
+# https://github.com/SciML/LinearSolve.jl/issues/479
+function testls(A, b, u)
+    oa = OperatorAssumptions(
+        true, condition = LinearSolve.OperatorCondition.WellConditioned
+    )
+    prob = LinearProblem(A, b)
+    linsolve = init(prob, LUFactorization(), assumptions = oa)
+    cache = solve!(linsolve)
+    return sum(cache.u)
+end
+
+A = [1.0 2.0; 3.0 4.0]
+b = [1.0, 2.0]
+u = zero(b)
+dA = copy(A)
+db = copy(b)
+du = copy(u)
+Enzyme.autodiff(Reverse, testls, Duplicated(A, dA), Duplicated(b, db), Duplicated(u, du))
+
+function testls(A, b, u)
+    oa = OperatorAssumptions(
+        true, condition = LinearSolve.OperatorCondition.WellConditioned
+    )
+    prob = LinearProblem(A, b)
+    linsolve = init(prob, LUFactorization(), assumptions = oa)
+    solve!(linsolve)
+    return sum(linsolve.u)
+end
+A = [1.0 2.0; 3.0 4.0]
+b = [1.0, 2.0]
+u = zero(b)
+dA2 = copy(A)
+db2 = copy(b)
+du2 = copy(u)
+Enzyme.autodiff(Reverse, testls, Duplicated(A, dA2), Duplicated(b, db2), Duplicated(u, du2))
+
+@test dA == dA2
+@test db == db2
+@test du == du2
+
+# https://github.com/SciML/LinearSolve.jl/issues/929
+@testset "Symmetric BunchKaufman reverse" begin
+
+    function bk_solve(b)
+        A = Symmetric(Float64[4 1 0.5; 1 3 0.2; 0.5 0.2 2])
+        prob = LinearProblem(A, copy(b))
+        sol = solve(prob, BunchKaufmanFactorization())
+        return sum(sol.u)
+    end
+
+    b = Float64[1.0, 2.0, 3.0]
+    db = zero(b)
+
+    Enzyme.autodiff(Reverse, Const(bk_solve), Active, Duplicated(copy(b), db))
+
+    A = Symmetric(Float64[4 1 0.5; 1 3 0.2; 0.5 0.2 2])
+    expected = A \ ones(3)
+    @test db ≈ expected rtol = 1.0e-12 atol = 1.0e-12
+end
+
+# https://github.com/SciML/LinearSolve.jl/pull/935 — cover all of LinearAlgebra.jl
+# Each test confirms Enzyme reverse-mode runs on the wrapper type and returns
+# a finite, nontrivial gradient w.r.t. `b`.
+#
+# Use `set_runtime_activity(Reverse)` + `LUFactorization()` consistently for these
+# wrapper-coverage tests to avoid algorithm-specific Enzyme limitations and keep
+# the focus on wrapper-aware adjoint accumulation.
+
+@testset "Hermitian reverse" begin
+    n = 4
+    _A = rand(n, n)
+    _A = _A + _A'  # make symmetric
+    A_herm = Hermitian(_A)
+    b = rand(n)
+
+    function f_herm(b)
+        prob = LinearProblem(Hermitian(_A), copy(b))
+        sol = solve(prob, LUFactorization())
+        return sum(sol.u)
+    end
+
+    db_en = zero(b)
+    Enzyme.autodiff(
+        Enzyme.set_runtime_activity(Enzyme.Reverse), Const(f_herm), Active,
+        Duplicated(copy(b), db_en)
+    )
+    @test all(isfinite, db_en)
+    @test !iszero(db_en)
+end
+
+@testset "UpperTriangular reverse" begin
+    n = 4
+    _A = triu(rand(n, n) + n * I)  # well-conditioned upper triangular
+    A_ut = UpperTriangular(_A)
+    b = rand(n)
+
+    function f_ut(b)
+        prob = LinearProblem(UpperTriangular(_A), copy(b))
+        sol = solve(prob, LUFactorization())
+        return sum(sol.u)
+    end
+
+    db_en = zero(b)
+    Enzyme.autodiff(
+        Enzyme.set_runtime_activity(Enzyme.Reverse), Const(f_ut), Active,
+        Duplicated(copy(b), db_en)
+    )
+    @test all(isfinite, db_en)
+    @test !iszero(db_en)
+end
+
+@testset "LowerTriangular reverse" begin
+    n = 4
+    _A = tril(rand(n, n) + n * I)
+    b = rand(n)
+
+    function f_lt(b)
+        prob = LinearProblem(LowerTriangular(_A), copy(b))
+        sol = solve(prob, LUFactorization())
+        return sum(sol.u)
+    end
+
+    db_en = zero(b)
+    Enzyme.autodiff(
+        Enzyme.set_runtime_activity(Enzyme.Reverse), Const(f_lt), Active,
+        Duplicated(copy(b), db_en)
+    )
+    @test all(isfinite, db_en)
+    @test !iszero(db_en)
+end
+
+@testset "UnitUpperTriangular reverse" begin
+    n = 4
+    _A = triu(rand(n, n))
+    for i in 1:n
+        _A[i, i] = 1.0
+    end
+    b = rand(n)
+
+    function f_uut(b)
+        prob = LinearProblem(UnitUpperTriangular(_A), copy(b))
+        sol = solve(prob, LUFactorization())
+        return sum(sol.u)
+    end
+
+    db_en = zero(b)
+    Enzyme.autodiff(
+        Enzyme.set_runtime_activity(Enzyme.Reverse), Const(f_uut), Active,
+        Duplicated(copy(b), db_en)
+    )
+    @test all(isfinite, db_en)
+    @test !iszero(db_en)
+end
+
+@testset "UnitLowerTriangular reverse" begin
+    n = 4
+    _A = tril(rand(n, n))
+    for i in 1:n
+        _A[i, i] = 1.0
+    end
+    b = rand(n)
+
+    function f_ult(b)
+        prob = LinearProblem(UnitLowerTriangular(_A), copy(b))
+        sol = solve(prob, LUFactorization())
+        return sum(sol.u)
+    end
+
+    db_en = zero(b)
+    Enzyme.autodiff(
+        Enzyme.set_runtime_activity(Enzyme.Reverse), Const(f_ult), Active,
+        Duplicated(copy(b), db_en)
+    )
+    @test all(isfinite, db_en)
+    @test !iszero(db_en)
+end
+
+@testset "Diagonal reverse" begin
+    n = 4
+    d = rand(n) .+ 1.0  # avoid near-zero diagonal
+    b = rand(n)
+
+    function f_diag(b)
+        prob = LinearProblem(Diagonal(d), copy(b))
+        sol = solve(prob, LUFactorization())
+        return sum(sol.u)
+    end
+
+    db_en = zero(b)
+    Enzyme.autodiff(
+        Enzyme.set_runtime_activity(Enzyme.Reverse), Const(f_diag), Active,
+        Duplicated(copy(b), db_en)
+    )
+    @test all(isfinite, db_en)
+    @test !iszero(db_en)
+end
+
+@testset "Bidiagonal reverse" begin
+    n = 4
+    dv = rand(n) .+ 1.0
+    ev = rand(n - 1) .* 0.1
+    b = rand(n)
+
+    function f_bidiag(b)
+        prob = LinearProblem(Bidiagonal(dv, ev, :U), copy(b))
+        sol = solve(prob, LUFactorization())
+        return sum(sol.u)
+    end
+
+    db_en = zero(b)
+    Enzyme.autodiff(
+        Enzyme.set_runtime_activity(Enzyme.Reverse), Const(f_bidiag), Active,
+        Duplicated(copy(b), db_en)
+    )
+    @test all(isfinite, db_en)
+    @test !iszero(db_en)
+end
+
+@testset "Tridiagonal reverse" begin
+    n = 4
+    dl = rand(n - 1) .* 0.1
+    d = rand(n) .+ 2.0
+    du = rand(n - 1) .* 0.1
+    b = rand(n)
+
+    function f_tridiag(b)
+        prob = LinearProblem(Tridiagonal(dl, d, du), copy(b))
+        sol = solve(prob, LUFactorization())
+        return sum(sol.u)
+    end
+
+    db_en = zero(b)
+    Enzyme.autodiff(
+        Enzyme.set_runtime_activity(Enzyme.Reverse), Const(f_tridiag), Active,
+        Duplicated(copy(b), db_en)
+    )
+    @test all(isfinite, db_en)
+    @test !iszero(db_en)
+end
+
+@testset "SymTridiagonal reverse" begin
+    n = 4
+    dv = rand(n) .+ 2.0
+    ev = rand(n - 1) .* 0.1
+    b = rand(n)
+
+    function f_symtridiag(b)
+        prob = LinearProblem(SymTridiagonal(dv, ev), copy(b))
+        sol = solve(prob, LUFactorization())
+        return sum(sol.u)
+    end
+
+    db_en = zero(b)
+    Enzyme.autodiff(
+        Enzyme.set_runtime_activity(Enzyme.Reverse), Const(f_symtridiag), Active,
+        Duplicated(copy(b), db_en)
+    )
+    @test all(isfinite, db_en)
+    @test !iszero(db_en)
+end
+
+@testset "Cache mutation between solves rewinds in reverse (#380)" begin
+    # The `solve!` rule keeps the live cache rather than a defensive `deepcopy`, so the
+    # `setproperty!` rules have to restore what each assignment overwrote. Replacing `A`
+    # is the case that matters: it invalidates the factorization that the next `solve!`
+    # builds over, so the earlier solve's reverse needs the factorization it ran against.
+    n = 12
+
+    single(A, b) = sum(abs2, solve!(init(LinearProblem(A, b), LUFactorization())).u)
+
+    function new_b(A, b)
+        cache = init(LinearProblem(A, b), LUFactorization())
+        s = sum(abs2, solve!(cache).u)
+        cache.b = 2 .* b
+        return s + sum(abs2, solve!(cache).u)
+    end
+
+    function new_A(A, b)
+        cache = init(LinearProblem(A, b), LUFactorization())
+        s = sum(abs2, solve!(cache).u)
+        cache.A = 2 .* A
+        return s + sum(abs2, solve!(cache).u)
+    end
+
+    function both(A, b)
+        cache = init(LinearProblem(A, b), LUFactorization())
+        s = sum(abs2, solve!(cache).u)
+        cache.b = 2 .* b
+        s += sum(abs2, solve!(cache).u)
+        cache.A = 3 .* A
+        return s + sum(abs2, solve!(cache).u)
+    end
+
+    for f in (single, new_b, new_A, both)
+        A = rand(n, n) + n * I
+        b = rand(n)
+        dA = zeros(n, n)
+        db = zeros(n)
+        Enzyme.autodiff(
+            Enzyme.set_runtime_activity(Enzyme.Reverse), f,
+            Duplicated(copy(A), dA), Duplicated(copy(b), db)
+        )
+        @test dA ≈ ForwardDiff.gradient(X -> f(X, b), copy(A)) rtol = 1.0e-8
+        @test db ≈ ForwardDiff.gradient(y -> f(A, y), copy(b)) rtol = 1.0e-8
+    end
+end
+
+# A `LinearProblem` holds `A` and `b` in one struct, so building one from an active `A`
+# and a constant `b` used to make Enzyme store constant memory into a differentiable
+# object and demand runtime activity. The rule on the constructor gives it a zero for the
+# constant field instead. See SciML/LinearSolve.jl#766.
+@testset "mixed activity differentiates under plain Reverse (#766)" begin
+    n = 8
+    A0 = rand(n, n) + n * I
+    b0 = rand(n)
+    f(A, b) = sum(solve(LinearProblem(A, b), LUFactorization()).u)
+
+    # d/dA sum(A \ b) = -(A' \ 1) * (A \ b)',  d/db sum(A \ b) = A' \ 1
+    grad_A = -(A0' \ ones(n)) * (A0 \ b0)'
+    grad_b = A0' \ ones(n)
+
+    dA = zeros(n, n)
+    bconst = copy(b0)
+    Enzyme.autodiff(
+        Enzyme.Reverse, f, Active, Duplicated(copy(A0), dA), Const(bconst)
+    )
+    @test dA ≈ grad_A rtol = 1.0e-8
+    # The constant must come back untouched: its shadow is a throwaway zero, not itself.
+    @test bconst == b0
+
+    db = zeros(n)
+    Enzyme.autodiff(
+        Enzyme.Reverse, f, Active, Const(copy(A0)), Duplicated(copy(b0), db)
+    )
+    @test db ≈ grad_b rtol = 1.0e-8
+
+    # Both active is the case that already worked, and has to keep working.
+    dA2 = zeros(n, n)
+    db2 = zeros(n)
+    Enzyme.autodiff(
+        Enzyme.Reverse, f, Active,
+        Duplicated(copy(A0), dA2), Duplicated(copy(b0), db2)
+    )
+    @test dA2 ≈ grad_A rtol = 1.0e-8
+    @test db2 ≈ grad_b rtol = 1.0e-8
+end
+
+@testset "the returned solution is the differentiable one (#766)" begin
+    function via_sol(lambda)
+        A = zeros(100, 100)
+        b = ones(100)
+        for i in 1:size(A, 1)
+            A[i, i] += lambda
+        end
+        return sum(solve!(init(LinearProblem(A, b), KrylovJL_CG())).u)
+    end
+
+    function via_cache(lambda)
+        A = zeros(100, 100)
+        b = ones(100)
+        for i in 1:size(A, 1)
+            A[i, i] += lambda
+        end
+        cache = init(LinearProblem(A, b), KrylovJL_CG())
+        solve!(cache)
+        return sum(cache.u)
+    end
+
+    # sum(x) where (lambda * I) x = 1 is 100 / lambda, so the derivative is -100 / lambda^2.
+    @test Enzyme.gradient(Enzyme.Reverse, via_sol, 0.3)[1] ≈ -100 / 0.3^2 rtol = 1.0e-6
+    @test_throws ErrorException Enzyme.gradient(Enzyme.Reverse, via_cache, 0.3)
+end

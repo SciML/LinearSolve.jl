@@ -1,0 +1,141 @@
+# Test group declarations for the LinearSolve root package, consumed by the
+# reusable grouped-tests.yml@v1 caller via
+# scripts/compute_affected_sublibraries.jl --root-matrix. Each group runs on
+# every Julia version it lists; `runner`/`timeout`/`num_threads` set any
+# non-default per-group execution settings.
+#
+# This reproduces the matrix the old hand-maintained Tests.yml ran. That
+# workflow declared `os` (ubuntu/macos/windows) and `arch` (x64/x86) matrix
+# axes but never forwarded either to the reusable tests.yml -- it passed only
+# `self-hosted: ${{ matrix.group != 'Trim' }}`, so every non-Trim cell actually
+# executed on a bare `self-hosted` runner (with JULIA_NUM_THREADS auto -> 2)
+# regardless of the os/arch axis value, and only Trim ran on GitHub-hosted
+# ubuntu-latest. The os/arch axes were therefore dead dimensions; the true
+# distinct executions are exactly (group, version), which this file encodes.
+#
+# Base-environment groups (Core, LinearSolveSTRUMPACK, DefaultsLoading,
+# Preferences) run in the package's main test env; `All` runs every base-env
+# group. Dep-adding groups carry their extra dependencies in
+# test/<group>/Project.toml and are excluded from `All`.
+
+[Core]
+versions = ["lts", "1", "pre"]
+runner = "self-hosted"
+num_threads = 2
+
+# Keep the direct Accelerate refactorization allocation contract covered on Apple hardware.
+[AppleAccelerate]
+versions = ["lts", "1", "pre"]
+os = ["macos-latest"]
+num_threads = 2
+
+[LinearSolveSTRUMPACK]
+versions = ["lts", "1", "pre"]
+runner = "self-hosted"
+num_threads = 2
+
+[DefaultsLoading]
+versions = ["lts", "1", "pre"]
+runner = "self-hosted"
+num_threads = 2
+
+[Preferences]
+versions = ["lts", "1", "pre"]
+runner = "self-hosted"
+num_threads = 2
+
+[QA]
+versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
+
+[AD]
+versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
+
+[Reactant]
+versions = ["1"]
+runner = "self-hosted"
+num_threads = 2
+
+[LinearSolveHYPRE]
+versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
+
+[LinearSolvePartitionedSolvers]
+versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
+
+[LinearSolvePETSc]
+versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
+
+[LinearSolveSuperLUDIST]
+versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
+
+[LinearSolveMUMPS]
+versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
+
+[LinearSolvePardiso]
+versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
+
+[LinearSolveCKTSO]
+versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
+
+# SLATE_jll ships Linux builds only, so this group runs where the binary exists.
+[LinearSolveSLATE]
+versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
+
+[LinearSolveHSL]
+versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
+
+[LinearSolveGinkgo]
+versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
+
+[LinearSolveElemental]
+versions = ["lts", "1"]
+runner = "self-hosted"
+num_threads = 2
+
+[LinearSolveParU]
+versions = ["1", "pre"]
+runner = "self-hosted"
+num_threads = 2
+
+[LinearSolvePureUMFPACK]
+versions = ["lts", "1", "pre"]
+
+# juliac links the trimmed executable with gcc/clang, so Trim is the one group
+# that needs a runner with a C compiler. `ubuntu-latest` does not give that:
+# SciML's self-hosted pool advertises the same label, so the job is routed by
+# whichever pool has capacity, and a persistent runner without gcc fails the
+# link ("could not find a compiler, looked for gcc and clang" -- #977). Pin a
+# versioned GitHub-hosted label, which the self-hosted pool does not advertise.
+[Trim]
+versions = ["1"]
+runner = "ubuntu-24.04"
+
+# GPU folds the former bespoke GPU.yml: a dep-adding CUDA group on a
+# self-hosted GPU runner.
+[GPU]
+versions = ["1"]
+runner = ["self-hosted", "gpu-v100"]
+timeout = 180

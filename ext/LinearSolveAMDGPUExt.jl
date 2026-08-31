@@ -1,9 +1,10 @@
 module LinearSolveAMDGPUExt
 
-using AMDGPU
-using LinearSolve: LinearSolve, LinearCache, AMDGPUOffloadLUFactorization,
-    AMDGPUOffloadQRFactorization, init_cacheval, OperatorAssumptions, LinearVerbosity
-using LinearSolve.LinearAlgebra, LinearSolve.SciMLBase
+using AMDGPU: AMDGPU
+using LinearSolve: LinearSolve, AMDGPUOffloadLUFactorization,
+    AMDGPUOffloadQRFactorization, OperatorAssumptions, LinearVerbosity
+using LinearAlgebra: LinearAlgebra
+using SciMLBase: SciMLBase
 
 # LU Factorization
 function SciMLBase.solve!(
@@ -23,7 +24,7 @@ function SciMLBase.solve!(
 
     y = Array(b_gpu)
     cache.u .= y
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, y, nothing, nothing)
 end
 
 function LinearSolve.init_cacheval(
@@ -59,7 +60,7 @@ function SciMLBase.solve!(
 
     y = Array(b_gpu[1:n])
     cache.u .= y
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, y, nothing, nothing)
 end
 
 function LinearSolve.init_cacheval(

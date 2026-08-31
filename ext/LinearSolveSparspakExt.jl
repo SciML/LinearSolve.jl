@@ -1,10 +1,13 @@
 module LinearSolveSparspakExt
 
-using LinearSolve, LinearAlgebra
-using LinearSolve: LinearVerbosity
-using Sparspak
-using Sparspak.SparseCSCInterface.SparseArrays
-using SparseArrays: AbstractSparseMatrixCSC, nonzeros, rowvals, getcolptr
+using LinearSolve: LinearSolve, LinearVerbosity, OperatorAssumptions,
+    SparspakFactorization
+using SciMLBase: SciMLBase, LinearProblem, solve
+using LinearAlgebra: LinearAlgebra, I, ldiv!
+using Sparspak: Sparspak
+using Sparspak.SparseCSCInterface: sparspaklu, sparspaklu!
+using SparseArrays: SparseArrays, AbstractSparseMatrixCSC, SparseMatrixCSC, nonzeros,
+    rowvals, getcolptr, sprand
 
 const PREALLOCATED_SPARSEPAK = sparspaklu(
     SparseMatrixCSC(0, 0, [1], Int[], Float64[]),
@@ -51,9 +54,24 @@ function SciMLBase.solve!(
     )
     A = cache.A
     if cache.isfresh
-        if !(cache.cacheval === PREALLOCATED_SPARSEPAK) && alg.reuse_symbolic
+        cached = LinearSolve.@get_cacheval(cache, :SparspakFactorization)
+        # When the DefaultLinearSolver applies per-solve dropzeros, the reduced
+        # matrix handed to us may have a different sparsity structure (nnz) than
+        # what the cached symbolic factorization was built for. In that case
+        # sparspaklu! (which reuses the symbolic ordering) would produce an invalid
+        # factorization, causing wrong linear-solve results and stalled nonlinear
+        # iterations. Detect this via the `structure_changed` flag on the
+        # SparseReduction state and fall back to a full sparspaklu in that case.
+        skip_symbolic_reuse = if cache.cacheval isa LinearSolve.DefaultLinearSolverInit
+            red = cache.cacheval.sparse_reduction
+            red !== nothing && !red.cache_union && red.active && red.structure_changed
+        else
+            false
+        end
+        if !skip_symbolic_reuse && !(cache.cacheval === PREALLOCATED_SPARSEPAK) &&
+                !(cached === PREALLOCATED_SPARSEPAK) && alg.reuse_symbolic
             fact = sparspaklu!(
-                LinearSolve.@get_cacheval(cache, :SparspakFactorization),
+                cached,
                 SparseMatrixCSC(
                     size(A)..., getcolptr(A), rowvals(A),
                     nonzeros(A)
@@ -71,7 +89,7 @@ function SciMLBase.solve!(
         cache.isfresh = false
     end
     y = ldiv!(cache.u, LinearSolve.@get_cacheval(cache, :SparspakFactorization), cache.b)
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, y, nothing, nothing)
 end
 
 LinearSolve.PrecompileTools.@compile_workload begin

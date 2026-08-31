@@ -162,24 +162,52 @@ diagnostic messages, warnings, and errors during linear system solution.
 
 # Constructors
 
+    LinearVerbosity()
     LinearVerbosity(preset::AbstractVerbosityPreset)
 
-Create a `LinearVerbosity` using a preset configuration:
+Create a `LinearVerbosity` using a preset configuration (`LinearVerbosity()` is the
+`Standard` preset):
 - `SciMLLogging.None()`: All messages disabled
 - `SciMLLogging.Minimal()`: Only critical errors and fatal issues
 - `SciMLLogging.Standard()`: Balanced verbosity (default)
 - `SciMLLogging.Detailed()`: Comprehensive debugging information
 - `SciMLLogging.All()`: Maximum verbosity
 
-    LinearVerbosity(; error_control=nothing, performance=nothing, numerical=nothing, kwargs...)
+    LinearVerbosity(; preset = nothing, error_control = nothing, performance = nothing,
+                    numerical = nothing, kwargs...)
 
-Create a `LinearVerbosity` with group-level or individual field control.
+Create a `LinearVerbosity` with group-level or individual field control. `preset` is the
+`SciMLLogging.AbstractVerbosityPreset` supplying the values of everything not set
+explicitly; `nothing` (default) means `Standard()`. `error_control`, `performance`, and
+`numerical` set every toggle of the corresponding group to one message level, and the
+remaining `kwargs` set individual toggles by name (`default_lu_fallback = ...`,
+`KrylovJL_verbosity = ...`, and so on). Precedence is individual toggle, then group,
+then preset. Toggle values are message levels such as `Silent()`, `InfoLevel()`,
+`WarnLevel()`, `ErrorLevel()`, or `MessageLevel(n)`; unknown toggle names throw an
+`ArgumentError`.
+
+# Usage
+
+The object is passed as the `verbose` keyword of `init`/`solve`, whose default is
+`LinearVerbosity()`. That keyword also accepts a bare preset (`verbose =
+SciMLLogging.None()`, wrapped as `LinearVerbosity(preset)`) or a `Bool` (`true` is
+`LinearVerbosity()`, `false` is `LinearVerbosity(SciMLLogging.None())`).
+
+The preset and message-level types live in SciMLLogging.jl and are not re-exported by
+LinearSolve, so `using SciMLLogging` is needed to name them as in the examples below
+(`LinearSolve.SciMLLogging.Standard()` also works without adding the dependency).
 
 # Examples
 
 ```julia
+using LinearSolve, SciMLLogging
+
 # Use a preset
 verbose = LinearVerbosity(SciMLLogging.Standard())
+sol = solve(prob; verbose)
+
+# Start from a preset and override one toggle
+verbose = LinearVerbosity(preset = SciMLLogging.None(), max_iters = SciMLLogging.WarnLevel())
 
 # Set entire groups
 verbose = LinearVerbosity(

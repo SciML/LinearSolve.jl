@@ -106,7 +106,6 @@ end
 """
     cleanup_petsc_cache!(pcache::PETScCache)
     cleanup_petsc_cache!(cache::LinearCache)
-    cleanup_petsc_cache!(sol::LinearSolution)
 
 Destroy all PETSc objects owned by `pcache` and reset its state to empty.
 Safe to call multiple times — subsequent calls after the first are no-ops.
@@ -144,7 +143,6 @@ function cleanup_petsc_cache!(pcache::PETScCache)
 end
 
 cleanup_petsc_cache!(cache::LinearCache) = cleanup_petsc_cache!(cache.cacheval)
-cleanup_petsc_cache!(sol::LinearSolution) = cleanup_petsc_cache!(sol.cache.cacheval)
 
 # ── Cache initialisation ──────────────────────────────────────────────────────
 
@@ -619,14 +617,17 @@ function gather_petsc_vec_to_all!(u::AbstractVector, petsclib, petsc_x)
     return nothing
 end
 
-function postsolve_solution_check(cache, alg, pcache, A::AbstractMatrix, u::AbstractVector)
+function postsolve_solution_check(
+        cache, alg, pcache, A::AbstractMatrix, u::AbstractVector;
+        iters::Int = 0, resid = nothing
+    )
     if pcache.comm == MPI.COMM_SELF || A isa SparseMatrixCSC
-        return LinearSolve._check_residual_safety(cache, alg, A, u)
+        return LinearSolve._check_residual_safety(cache, alg, A, u; iters, resid)
     end
     return nothing
 end
 
-postsolve_solution_check(cache, alg, pcache, A, u) = nothing
+postsolve_solution_check(cache, alg, pcache, A, u; iters::Int = 0, resid = nothing) = nothing
 
 function run_ksp_mpi!(pcache, petsclib, alg, b::AbstractVector, u::AbstractVector)
     petsc_x = pcache.petsc_x
@@ -659,7 +660,7 @@ end
 function build_nullspace(petsclib, alg::PETScAlgorithm)
     alg.nullspace === :none     && return nothing
     alg.nullspace === :constant && return LibPETSc.MatNullSpaceCreate(
-        petsclib, MPI.COMM_SELF, LibPETSc.PetscBool(true), 0, LibPETSc.PetscVec[]
+        petsclib, MPI.COMM_SELF, LibPETSc.PetscBool(true), 0, LibPETSc.CVec[]
     )
     # :custom
     PScalar = petsclib.PetscScalar
@@ -667,9 +668,11 @@ function build_nullspace(petsclib, alg::PETScAlgorithm)
         create_seq_vec(petsclib, eltype(v) == PScalar ? v : PScalar.(v))
             for v in alg.nullspace_vecs
     ]
+    # PETSc.jl >= 0.4.10 takes the raw Vec handles (Vector{CVec}); passing the
+    # PetscVec wrappers would hand PETSc pointers to the Julia wrapper objects.
     ns = LibPETSc.MatNullSpaceCreate(
         petsclib, MPI.COMM_SELF, LibPETSc.PetscBool(false),
-        length(petsc_vecs), petsc_vecs
+        length(petsc_vecs), LibPETSc.CVec[v.ptr for v in petsc_vecs]
     )
     foreach(PETSc.destroy, petsc_vecs)
     return ns
@@ -830,11 +833,11 @@ function SciMLBase.solve!(cache::LinearCache, alg::PETScAlgorithm; kwargs...)
         retcode = ReturnCode.Failure
     end
     if retcode === ReturnCode.Success
-        failed = postsolve_solution_check(cache, alg, pcache, cache.A, cache.u)
+        failed = postsolve_solution_check(cache, alg, pcache, cache.A, cache.u; iters, resid)
         failed !== nothing && return failed
     end
 
-    return build_linear_solution(alg, cache.u, resid, cache; retcode, iters)
+    return build_linear_solution(alg, cache.u, resid, nothing; retcode, iters)
 end
 
 end

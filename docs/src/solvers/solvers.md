@@ -19,7 +19,8 @@ For efficiency, `RFLUFactorization` is the fastest for dense LU-factorizations u
 point, `MKLLUFactorization` is usually faster on most hardware. Note that on Mac computers
 that `AppleAccelerateLUFactorization` is generally always the fastest. `OpenBLASLUFactorization` 
 provides direct OpenBLAS calls without going through libblastrampoline and can be faster than 
-`LUFactorization` in some configurations. `LUFactorization` will use your base system BLAS which 
+`LUFactorization` in some configurations, and `BLISLUFactorization` does the same for
+[BLIS](https://github.com/flame/blis), the library AMD's AOCL-BLAS is derived from. `LUFactorization` will use your base system BLAS which 
 can be fast or slow depending on the hardware configuration. `SimpleLUFactorization` will be fast 
 only on very small matrices but can cut down on compile times.
 
@@ -33,6 +34,25 @@ CUDA offload supports Float64 but most consumer GPU hardware will be much faster
 this is only recommended for Float32 matrices. Choose `CudaOffloadLUFactorization` for better 
 performance on well-conditioned problems, or `CudaOffloadQRFactorization` for better numerical 
 stability on ill-conditioned problems.
+
+#### Non-Square and Least-Squares Systems
+
+A non-square `A` is solved in the least-squares (tall `A`) or minimum-norm
+(wide `A`) sense, matching `A \ b`. The default algorithm uses an unpivoted
+`QRFactorization()` for the overdetermined case because it is up to ~3x cheaper
+than a column-pivoted QR, and automatically re-solves with
+`QRFactorization(ColumnNorm())` when the factorization shows that `A` is
+rank-deficient — an unpivoted QR cannot solve a rank-deficient system, and would
+otherwise return either all zeros with `ReturnCode.Failure` or an overflowing
+solution. The wide case always uses the column-pivoted QR.
+
+If you select an algorithm explicitly, pick one that can handle a rank-deficient
+`A` when that is a possibility: `QRFactorization(ColumnNorm())` (rank-revealing,
+the same rank truncation LAPACK's `xGELSY` and hence `A \ b` uses),
+`SVDFactorization()` (slowest, most robust), or the least-squares Krylov methods
+`KrylovJL_LSMR()` (tall) and `KrylovJL_CRAIGMR()` (wide). An explicitly requested
+`QRFactorization()` reports `ReturnCode.Failure` on an exactly rank-deficient
+matrix rather than falling back.
 
 #### Mixed Precision Methods
 
@@ -61,12 +81,31 @@ when reduced precision is acceptable for the factorization step.
 
 ### Sparse Matrices
 
-For sparse LU-factorizations, `KLUFactorization` if there is less structure
-to the sparsity pattern and `UMFPACKFactorization` if there is more structure.
+For sparse LU-factorizations, `PureKLUFactorization` (a pure-Julia KLU with no
+SuiteSparse dependency, the default) if there is less structure to the sparsity
+pattern and `SupernodalLUFactorization` (a pure-Julia supernodal
+left–right-looking LU implementing the Schenk & Gärtner method, vendored in
+`src/SupernodalLU`, no binary dependency) if there is more structure — so the
+default sparse LU stack is entirely pure Julia and no longer depends on
+`Base.USE_GPL_LIBS`. The SuiteSparse-backed `KLUFactorization` and
+`UMFPACKFactorization` remain available as explicit alternatives.
+For sparse QR-factorizations (used for non-square, rank-deficient, or least-squares
+systems, and as the fallback when the sparse LU hits a (near-)singular matrix), the
+same less-structure/more-structure split as the LU case applies:
+`SparseColumnPivotedQRFactorization` (a pure-Julia, rank-revealing column-pivoted
+sparse QR with no SuiteSparse dependency, the default) if there is less structure to
+the sparsity pattern, and SPQR — the SuiteSparse-backed sparse QR, used by
+`QRFactorization()` on a sparse matrix — if there is more structure. This mirrors the
+`PureKLUFactorization`/`UMFPACKFactorization` choice for LU:
+`SparseColumnPivotedQRFactorization` is the KLU-style default and SPQR
+(`QRFactorization`) is the more-structured alternative.
 `ParUFactorization` (from SuiteSparse's ParU library) provides a parallel
 alternative to `UMFPACKFactorization` that exploits OpenMP task parallelism
 for the numeric factorization phase, which can give speedups on multicore systems
 for larger sparse problems.
+`MUMPSFactorization` provides a sparse direct alternative through `MUMPS.jl`
+for users who want MUMPS's distributed-memory-capable direct solver interface
+through the standard LinearSolve caching API.
 `STRUMPACKFactorization` provides a sparse direct alternative that can be tuned
 with approximate low-rank compression options (for example HSS/HODLR modes,
 compression tolerances, and rank/leaf-size controls) when supported by the
@@ -134,6 +173,19 @@ LinearSolve.DefaultLinearSolver
 
 ```@docs
 RFLUFactorization
+ButterflyFactorization
+RF32MixedLUFactorization
+```
+
+### SpecializingFactorizations.jl
+
+!!! note
+    
+    Using this solver requires adding the package SpecializingFactorizations.jl, i.e. `using SpecializingFactorizations`
+
+```@docs
+SpecializedLUFactorization
+SpecializedQRFactorization
 ```
 
 ### Base.LinearAlgebra
@@ -145,12 +197,15 @@ customized per-package, details given below describe a subset of important array
 
 ```@docs
 LUFactorization
+GenericFactorization
 GenericLUFactorization
+GESVFactorization
 QRFactorization
 SVDFactorization
 CholeskyFactorization
 BunchKaufmanFactorization
 CHOLMODFactorization
+LDLtFactorization
 NormalCholeskyFactorization
 NormalBunchKaufmanFactorization
 ```
@@ -165,6 +220,38 @@ DiagonalFactorization
 SimpleGMRES
 DirectLdiv!
 LinearSolveFunction
+LinearSolveAdjoint
+```
+
+#### Low-rank updates of a factorized matrix
+
+A rank-`k` change to a matrix does not need a fresh factorization of it.
+`LowRankUpdatedMatrix(A, U, V; C = I)` carries `A + U C V'` unassembled, so the solve
+factorizes `A` once and absorbs the update through the Woodbury identity at the cost of a
+`k × k` factorization. It matters most when the update would destroy the structure of `A`:
+a dense update to a sparse matrix otherwise assembles to a dense one.
+
+See the [Low-Rank Updated System Solvers](@ref lowranksolvers) page for the supported
+factorizations and the cost breakdown, and the
+[Low-Rank Updates of a Factorized Matrix](@ref lowrankupdates) tutorial for a worked
+example.
+
+#### Repeated solves of `I - γJ` for varying `γ`
+
+An implicit ODE/DAE solver factorizes `W = I - γJ` (or `J - M/(dt·γ)`) at every step, but
+`γ` changes with the step size far more often than `J` does. [`LHLFactorization`](@ref)
+reduces `J` to Hessenberg form once and absorbs each new `γ` in `O(n²)`.
+
+Hand it the system matrix unassembled, as the `SciMLOperators.WOperator` that holds `J` and
+`γ` apart, and move the shift with [`update_gamma!`](@ref). The factorization itself lives
+in [LHLFactorization.jl](https://github.com/SciML/LHLFactorization.jl).
+
+See the [Repeated Solves of a Shifted System](@ref) tutorial for a worked example, the
+accuracy tradeoff, complex shifts, and the limits.
+
+```@docs
+LHLFactorization
+update_gamma!
 ```
 
 ### FastLapackInterface.jl
@@ -194,8 +281,41 @@ FastQRFactorization
 
 ```@docs
 KLUFactorization
+LinearSolve.KLU.klu
+LinearSolve.KLU.klu!
+PureKLUFactorization
+PureUMFPACKFactorization
+SupernodalLUFactorization
 UMFPACKFactorization
+SparseColumnPivotedQRFactorization
 ```
+
+!!! note
+    
+    `PureKLUFactorization` is a pure-Julia KLU (from PureKLU.jl, no SuiteSparse
+    dependency) and is the default sparse LU for "less structured" sparsity
+    patterns, replacing the SuiteSparse-backed `KLUFactorization` in the default
+    polyalgorithm.
+
+!!! note
+    
+    `SupernodalLUFactorization` is a pure-Julia implementation of the supernodal
+    left–right-looking sparse LU method of Schenk & Gärtner (vendored
+    self-contained in `src/SupernodalLU`, no binary dependency). It is the
+    strongest choice for "more structured" (PDE-mesh-like) sparse systems,
+    where it outperforms both `UMFPACKFactorization` and `KLUFactorization`,
+    and it is the default for such systems in the polyalgorithm (the
+    `UMFPACKFactorization` slot resolves to it).
+
+!!! note
+    
+    `SparseColumnPivotedQRFactorization` is a pure-Julia, rank-revealing
+    column-pivoted sparse QR (from SparseColumnPivotedQR.jl, no SuiteSparse
+    dependency). It is the default sparse QR: the polyalgorithm selects it for
+    non-square sparse systems and falls back to it from the sparse LU
+    (`PureKLUFactorization`/`UMFPACKFactorization`) when the matrix is
+    (near-)singular — the sparse, KLU-style analog of using a column-pivoted QR
+    for rank-deficient dense systems.
 
 ### ParU (SuiteSparse)
 
@@ -209,6 +329,69 @@ UMFPACKFactorization
 
 ```@docs
 ParUFactorization
+```
+
+### MUMPS.jl
+
+!!! note
+
+    Using this solver requires loading `MUMPS.jl`, `SparseArrays`, and `MPI`,
+    and calling `MPI.Init()` before constructing the solver.
+
+!!! warning
+
+    Call `cleanup_mumps_cache!` explicitly through the extension before
+    `MPI.Finalize()`, using the `LinearCache` from an `init`/`solve!` cycle:
+    ```julia
+    MUMPSExt = Base.get_extension(LinearSolve, :LinearSolveMUMPSExt)
+    MUMPSExt.cleanup_mumps_cache!(cache)
+    ```
+
+```@docs
+MUMPSFactorization
+```
+
+### SuperLUDIST.jl
+
+!!! note
+
+    Using this solver requires loading `SuperLUDIST.jl`, `SparseArrays`, and `MPI`,
+    and calling `MPI.Init()` before constructing the solver.
+
+```@docs
+SuperLUDISTFactorization
+```
+
+### CKTSO.jl
+
+!!! note
+
+    Using this solver requires loading `CKTSO.jl` and `SparseArrays`. CKTSO ships as a
+    prebuilt library with a license key file and is not redistributable, so `CKTSO.jl`
+    does not bundle it: download it from
+    [the CKTSO repository](https://github.com/chenxm1986/cktso) and point `CKTSO.jl` at
+    your copy with `CKTSO_LIBRARY` or `CKTSO.set_library!`, keeping `cktso.lic` beside
+    the library.
+
+CKTSO is written for SPICE-style circuit simulation, where the same sparsity pattern is
+refactorized many times with new values, so the cache keeps the symbolic analysis and
+reuses it. Assigning a matrix with the same pattern to `cache.A` refactorizes; a different
+pattern falls back to a fresh analysis.
+
+```@docs
+CKTSOFactorization
+```
+
+### HSL.jl
+
+!!! note
+
+    Using these solvers requires loading `HSL.jl` and `SparseArrays`.
+    `HSL.jl` requires a manual installation of `HSL_jll.jl`.
+
+```@docs
+HSLMA57Factorization
+HSLMA97Factorization
 ```
 
 ### Sparspak.jl
@@ -243,6 +426,27 @@ You can also pass raw STRUMPACK flags via `options = ["--flag", "value", ...]`.
 STRUMPACKFactorization
 ```
 
+### SLATE
+
+`SLATEFactorization` wraps SLATE's LAPACK compatibility API for dense LU solves.
+
+The simplest way to get the library is `using SLATE_jll`, which supplies it on the
+platforms it builds for (Linux only, at the time of writing):
+
+```julia
+using LinearSolve, SLATE_jll
+solve(LinearProblem(A, b), SLATEFactorization())
+```
+
+To use a local SLATE build instead, pass it explicitly with
+`SLATEFactorization(libpath = "/path/to/libslate_lapack_api.so")` or set
+`ENV["SLATE_LAPACK_LIB"]`. Either takes precedence over SLATE_jll, so loading the JLL
+for something else will not redirect an explicit choice.
+
+```@docs
+SLATEFactorization
+```
+
 ### CliqueTrees.jl
 
 !!! note
@@ -259,10 +463,17 @@ CliqueTreesFactorization
 KrylovJL_CG
 KrylovJL_MINRES
 KrylovJL_GMRES
+KrylovJL_FGMRES
 KrylovJL_BICGSTAB
 KrylovJL_LSMR
 KrylovJL_CRAIGMR
+KrylovJL_MINARES
 KrylovJL
+WarmStart
+WarmStart.Auto
+WarmStart.None
+WarmStart.Previous
+WarmStart.Hegedus
 ```
 
 ### MKL.jl
@@ -276,6 +487,18 @@ MKL32MixedLUFactorization
 
 ```@docs
 OpenBLASLUFactorization
+OpenBLAS32MixedLUFactorization
+```
+
+### BLIS
+
+!!! note
+
+    Using this solver requires both JLLs that back the extension, i.e.
+    `using blis_jll, LAPACK_jll`
+
+```@docs
+BLISLUFactorization
 ```
 
 ### AppleAccelerate.jl
@@ -309,6 +532,8 @@ MetalOffload32MixedLUFactorization
 ```@docs
 MKLPardisoFactorize
 MKLPardisoIterate
+PanuaPardisoFactorize
+PanuaPardisoIterate
 LinearSolve.PardisoJL
 ```
 
@@ -322,6 +547,7 @@ The following are non-standard GPU factorization routines.
     Using these solvers requires adding the package CUDA.jl, i.e. `using CUDA`
 
 ```@docs
+CudaOffloadFactorization
 CudaOffloadLUFactorization
 CudaOffloadQRFactorization
 CUDAOffload32MixedLUFactorization
@@ -348,6 +574,76 @@ AMDGPUOffloadQRFactorization
 
 ```@docs
 CUSOLVERRFFactorization
+```
+
+### AlgebraicMultigrid.jl
+
+!!! note
+
+    Using this solver requires adding the package AlgebraicMultigrid.jl, i.e.
+    `using AlgebraicMultigrid`
+
+```@docs
+AlgebraicMultigridJL
+```
+
+### AMGCLWrap.jl
+
+!!! note
+
+    Using these solvers requires adding the package AMGCLWrap.jl, i.e.
+    `using AMGCLWrap`
+
+[AMGCLWrap.jl](https://github.com/j-fu/AMGCLWrap.jl) wraps
+[AMGCL](https://github.com/ddemidov/amgcl), a header-only C++ algebraic multigrid
+library, through a pre-instantiated C API shipped as a binary package. It runs on
+the CPU (multithreaded via OpenMP) and requires `A` as a `SparseMatrixCSC` or a
+`SparseMatrixCSR`. Loading AMGCLWrap provides two LinearSolve algorithms:
+
+  - `AMGSolverAlgorithm(; blocksize = 1, param = nothing, coarsening, relax, solver)`:
+    an algebraic-multigrid-preconditioned Krylov solver (BiCGStab by default).
+  - `RLXSolverAlgorithm(; blocksize = 1, param = nothing, precond, solver)`: a
+    single-level relaxation-preconditioned Krylov solver (incomplete LU by default).
+
+Options are given either through typed keyword arguments (e.g.
+`coarsening = AMGCLWrap.RugeStubenCoarsening()`) or as a JSON-style named tuple
+via `param`; see the
+[AMGCLWrap solver documentation](https://j-fu.github.io/AMGCLWrap.jl/stable/solvers/)
+for the full parameter space.
+
+```julia
+using LinearSolve, AMGCLWrap, SparseArrays, LinearAlgebra
+
+n = 100  # 2-D finite-difference Laplacian, N = n^2 unknowns
+lap1d = spdiagm(-1 => -ones(n - 1), 0 => 2 * ones(n), 1 => -ones(n - 1))
+A = kron(I(n), lap1d) + kron(lap1d, I(n))
+b = rand(size(A, 1))
+prob = LinearProblem(A, b)
+
+sol = solve(prob, AMGSolverAlgorithm())
+
+sol = solve(prob,
+    RLXSolverAlgorithm(param = (solver = (type = "bicgstab", tol = 1.0e-10),
+        precond = (type = "ilu0",))))
+```
+
+AMGCLWrap also provides AMG and relaxation preconditioners for LinearSolve's own
+Krylov methods through the `precs` interface; see the
+[Preconditioners](@ref prec) page.
+
+### ConjugateGradients.jl
+
+!!! note
+    
+    Using these solvers requires adding the package ConjugateGradients.jl, i.e. `using ConjugateGradients`
+
+ConjugateGradients.jl solves for real element types in a plain `Vector` only. Use
+the Krylov.jl or IterativeSolvers.jl wrappers for complex or other array types.
+
+```@docs
+ConjugateGradientsJL_CG
+ConjugateGradientsJL_BICGSTAB
+ConjugateGradientsJL
 ```
 
 ### IterativeSolvers.jl
@@ -414,6 +710,44 @@ replicated back onto every rank automatically.
 HYPREAlgorithm
 ```
 
+### PartitionedSolvers.jl
+
+!!! note
+
+    Using this integration requires loading `LinearSolve.jl`, `PartitionedArrays.jl`, and the
+    `PartitionedSolvers` subproject:
+    ```julia
+    using LinearSolve, PartitionedArrays, PartitionedSolvers
+    ```
+
+The `PartitionedSolversAlgorithm` extension is intended for
+`PSparseMatrix` / `PVector` inputs from `PartitionedArrays.jl`. It delegates solves to the
+local `PartitionedSolvers` solver constructors, supports repeated `solve!` reuse through the
+cached solver object, and provides a typed `defaultalg` dispatch for square `PSparseMatrix`
+problems.
+
+The integration is solver-agnostic: it forwards only the convergence keywords that the chosen
+solver constructor accepts, so different PartitionedSolvers solvers can be used directly. The
+CG-backed Krylov path is the default,
+
+```julia
+using LinearSolve, PartitionedArrays, PartitionedSolvers
+
+alg = PartitionedSolversAlgorithm(PartitionedSolvers.cg)
+sol = solve(prob, alg; abstol = 1.0e-10, reltol = 1.0e-10)
+```
+
+but other distributed solvers such as the stationary Jacobi iteration work the same way:
+
+```julia
+alg = PartitionedSolversAlgorithm(PartitionedSolvers.jacobi)
+sol = solve(prob, alg; maxiters = 50)
+```
+
+```@docs
+PartitionedSolversAlgorithm
+```
+
 ### Ginkgo.jl
 
 !!! note
@@ -425,6 +759,17 @@ HYPREAlgorithm
 GinkgoJL
 GinkgoJL_CG
 GinkgoJL_GMRES
+```
+
+### Elemental.jl
+
+!!! note
+
+    Using this solver requires adding the package Elemental.jl, i.e.
+    `using Elemental`
+
+```@docs
+ElementalJL
 ```
 
 ### PETSc.jl
@@ -605,8 +950,10 @@ PETSc objects live in C-managed memory outside Julia's GC.  Call
 
 ```julia
 PETScExt = Base.get_extension(LinearSolve, :LinearSolvePETScExt)
-PETScExt.cleanup_petsc_cache!(sol)   # after solve(...)
-PETScExt.cleanup_petsc_cache!(cache) # after init/solve! cycle
+
+cache = SciMLBase.init(prob, PETScAlgorithm(:gmres))
+sol = solve!(cache)
+PETScExt.cleanup_petsc_cache!(cache) # after the init/solve! cycle
 ```
 
 A GC finalizer is registered as a safety net, but explicit cleanup is strongly preferred.
@@ -793,7 +1140,7 @@ PETScAlgorithm
 
     `LinearSolvePyAMG` is a sub-library of LinearSolve.jl. Using these solvers
     requires adding it: `using LinearSolvePyAMG`. The Python
-    [PyAMG](https://pyamg.readthedocs.io) library is installed automatically via
+    [PyAMG](https://github.com/pyamg/pyamg) library is installed automatically via
     CondaPkg.jl; no manual Python setup is required.
 
 `PyAMG(; method = :RugeStuben, accel = nothing, kwargs...)` — Algebraic Multigrid
@@ -801,3 +1148,10 @@ solver. `method` can be `:RugeStuben` (default) or `:SmoothedAggregation`. The o
 `accel` keyword (`"cg"`, `"gmres"`, `"bicgstab"`, …) wraps the AMG cycle in a Krylov
 solver. Convenience constructors `PyAMG_RugeStuben` and `PyAMG_SmoothedAggregation`
 are also provided.
+
+```@docs
+LinearSolvePyAMG.LinearSolvePyAMG
+LinearSolvePyAMG.PyAMG
+LinearSolvePyAMG.PyAMG_RugeStuben
+LinearSolvePyAMG.PyAMG_SmoothedAggregation
+```

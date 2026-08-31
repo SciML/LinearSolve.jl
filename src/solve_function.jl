@@ -54,35 +54,42 @@ function SciMLBase.solve!(
 
     u = solve_func(A, b, u, p, isfresh, Pl, Pr, cacheval; kwargs...)
     return SciMLBase.build_linear_solution(
-        alg, u, nothing, cache;
+        alg, u, nothing, nothing;
         retcode = ReturnCode.Success
     )
 end
 
 """
-    DirectLdiv!{cache}() <: AbstractSolveFunction
+    DirectLdiv!(::Val{cache} = Val(true))
 
 A simple linear solver that directly applies the left-division operator (`\\`)
 to solve the linear system. This algorithm calls `ldiv!(u, A, b)` which computes
-`u = A \\ b` in-place.
+`u = A \\ b` in-place. It is the default algorithm for operators that already know how
+to solve with themselves: `Factorization` objects, `SciMLOperators` with `has_ldiv!`,
+and (on Julia 1.11 and later) square `Tridiagonal` and `Bidiagonal` matrices.
 
-## Type Parameter
+## Positional Arguments
 
-- `cache::Bool`: Whether to cache a copy of the matrix for use with ldiv!.
-  When `true`, a copy of the matrix is stored during `init` and used during `solve!`,
-  preventing mutation of `cache.A`. Default is `true` for matrix types where `ldiv!`
-  mutates the input (e.g., `Tridiagonal`, `SymTridiagonal`).
+  - `::Val{cache}`: `Val(true)` or `Val(false)`, stored as the type parameter
+    `DirectLdiv!{cache}`. Defaults to `Val(true)` for every matrix type. With
+    `Val(true)`, `init` stores a copy of `A` for the matrix types whose `ldiv!`
+    mutates its input, currently `Tridiagonal` and `SymTridiagonal`, and each
+    `solve!` refreshes that copy from `cache.A` and factorizes the copy, so `cache.A`
+    is preserved. For every other `A`, `Val(true)` and `Val(false)` behave the same:
+    `ldiv!(u, A, b)` is called on `cache.A` directly with no copy. With `Val(false)`,
+    `Tridiagonal`/`SymTridiagonal` are also passed straight to `ldiv!`, which
+    overwrites `cache.A` with its LU factors.
 
 ## Usage
 
 ```julia
-# Default: automatically caches for matrix types that need it
+# Default: copies A for the matrix types whose ldiv! mutates it
 alg = DirectLdiv!()
 sol = solve(prob, alg)
 
-# Explicit caching control
-alg = DirectLdiv!(Val(true))   # Always cache
-alg = DirectLdiv!(Val(false))  # Never cache (may mutate A)
+# Explicit control of the copy
+alg = DirectLdiv!(Val(true))   # copy for Tridiagonal/SymTridiagonal
+alg = DirectLdiv!(Val(false))  # never copy (ldiv! may mutate A)
 ```
 
 ## Notes
@@ -93,7 +100,9 @@ alg = DirectLdiv!(Val(false))  # Never cache (may mutate A)
 - No preconditioners or advanced numerical techniques are applied
 - Best used for small to medium problems or when `A` has special structure
 - For `Tridiagonal` and `SymTridiagonal`, `ldiv!` performs in-place LU factorization
-  which mutates the matrix. Use `cache=true` (default) to preserve `cache.A`.
+  which mutates the matrix. Keep the default `Val(true)` to preserve `cache.A`.
+- Only the `Val(...)` positional argument selects the mode; there is no `cache`
+  keyword argument.
 """
 struct DirectLdiv!{cache} <: AbstractSolveFunction
     function DirectLdiv!(::Val{cache} = Val(true)) where {cache}
@@ -106,7 +115,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::DirectLdiv!{false}, args...; 
     (; A, b, u) = cache
     ldiv!(u, A, b)
     return SciMLBase.build_linear_solution(
-        alg, u, nothing, cache;
+        alg, u, nothing, nothing;
         retcode = ReturnCode.Success
     )
 end
@@ -117,7 +126,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::DirectLdiv!{true}, args...; k
     (; A, b, u) = cache
     ldiv!(u, A, b)
     return SciMLBase.build_linear_solution(
-        alg, u, nothing, cache;
+        alg, u, nothing, nothing;
         retcode = ReturnCode.Success
     )
 end
@@ -157,7 +166,7 @@ function SciMLBase.solve!(
     # Perform ldiv! on the copy, preserving the original A
     ldiv!(u, cacheval, b)
     return SciMLBase.build_linear_solution(
-        alg, u, nothing, cache;
+        alg, u, nothing, nothing;
         retcode = ReturnCode.Success
     )
 end
@@ -173,7 +182,7 @@ function SciMLBase.solve!(
     # Perform ldiv! on the copy, preserving the original A
     ldiv!(u, cacheval, b)
     return SciMLBase.build_linear_solution(
-        alg, u, nothing, cache;
+        alg, u, nothing, nothing;
         retcode = ReturnCode.Success
     )
 end

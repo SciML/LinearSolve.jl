@@ -1,10 +1,29 @@
 """
-```julia
-MKLLUFactorization()
-```
+    MKLLUFactorization(; residualsafety::Bool = false)
 
-A wrapper over Intel's Math Kernel Library (MKL). Direct calls to MKL in a way that pre-allocates workspace
-to avoid allocations and does not require libblastrampoline.
+A wrapper over Intel's Math Kernel Library (MKL). Direct calls to MKL's LU routines
+(`getrf!` and `getrs!`) in a way that pre-allocates workspace to avoid allocations and does
+not require libblastrampoline. Supports `Float32`, `Float64`, `ComplexF32`, and `ComplexF64`
+element types.
+
+Use this to guarantee MKL's LU is used regardless of the system BLAS configuration (no
+`using MKL` needed), or when benchmarking shows it beats `LUFactorization` on your hardware.
+Where MKL is loaded, the default algorithm choice already selects this method for larger
+dense BLAS-eltype matrices.
+
+## Keyword Arguments
+
+  - `residualsafety`: If `true`, every solve that (re)factorizes `A` is followed by a
+    residual check against a copy of the original matrix. If `‖A*x - b‖` exceeds
+    `abstol + reltol * ‖b‖` (the tolerances of the solve), the returned solution has
+    `retcode = ReturnCode.APosterioriSafetyFailure`. Defaults to `false`.
+
+!!! note
+
+    MKL is only loaded on x86_64/i686 hosts when the `LoadMKL_JLL` preference is `true`
+    (the default, except on AMD EPYC CPUs where it defaults to `false`) and MKL_jll is at
+    least version 2022.2. Otherwise `solve!` with this algorithm errors that the MKL binary
+    is missing.
 """
 struct MKLLUFactorization <: AbstractFactorization
     residualsafety::Bool
@@ -287,11 +306,12 @@ end
 
 function LinearSolve.init_cacheval(
         alg::MKLLUFactorization,
-        A::AbstractMatrix{<:Union{Float32, ComplexF32, ComplexF64}}, b, u, Pl, Pr,
+        A::DenseMatrix{<:BLASELTYPES}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    A = rand(eltype(A), 0, 0)
+    # Ask `lu_instance` about `A` itself so wrapper-specific dispatch can choose
+    # the factorization container that `solve!` will store.
     return ArrayInterface.lu_instance(A), Ref{BlasInt}()
 end
 
@@ -372,7 +392,7 @@ function SciMLBase.solve!(
         if !LinearAlgebra.issuccess(fact[1])
             @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
             )
         end
         cache.isfresh = false
@@ -384,7 +404,11 @@ function SciMLBase.solve!(
     if m > n
         Bc = copy(cache.b)
         getrs!('N', A.factors, A.ipiv, Bc; info)
-        copyto!(cache.u, 1, Bc, 1, n)
+        if cache.b isa AbstractMatrix
+            copyto!(cache.u, @view(Bc[1:n, :]))
+        else
+            copyto!(cache.u, 1, Bc, 1, n)
+        end
     else
         copyto!(cache.u, cache.b)
         getrs!('N', A.factors, A.ipiv, cache.u; info)
@@ -396,7 +420,7 @@ function SciMLBase.solve!(
     end
 
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+        alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
     )
 end
 
@@ -447,7 +471,7 @@ function SciMLBase.solve!(
         if !LinearAlgebra.issuccess(fact[1])
             @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
             )
         end
         cache.isfresh = false
@@ -467,7 +491,11 @@ function SciMLBase.solve!(
     if m > n
         getrs!('N', A_lu.factors, A_lu.ipiv, b_32; info)
         # Convert back to original precision
-        cache.u[1:n] .= Torig.(b_32[1:n])
+        if cache.b isa AbstractMatrix
+            cache.u .= Torig.(@view(b_32[1:n, :]))
+        else
+            cache.u[1:n] .= Torig.(@view(b_32[1:n]))
+        end
     else
         copyto!(u_32, b_32)
         getrs!('N', A_lu.factors, A_lu.ipiv, u_32; info)
@@ -476,6 +504,6 @@ function SciMLBase.solve!(
     end
 
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+        alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
     )
 end

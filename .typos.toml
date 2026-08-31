@@ -76,3 +76,8 @@ MTK = "MTK"
 ODE = "ODE"
 PDE = "PDE"
 SDE = "SDE"
+
+# SupernodalLU (src/SupernodalLU) identifiers
+pn = "pn"          # SuiteSparse AMD port variable (amd.jl)
+Tpos = "Tpos"      # transpose-position map in the supernodal factorization
+hashi = "hashi"    # SuiteSparse AMD port variable (amd.jl)

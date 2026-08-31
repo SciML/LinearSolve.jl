@@ -1,10 +1,13 @@
 module LinearSolveRecursiveFactorizationExt
 
-using LinearSolve: LinearSolve, userecursivefactorization, LinearCache, @get_cacheval,
-    RFLUFactorization, ButterflyFactorization, RF32MixedLUFactorization,
-    default_alias_A, default_alias_b, LinearVerbosity
-using LinearSolve.LinearAlgebra, LinearSolve.ArrayInterface, RecursiveFactorization
-using SciMLBase: SciMLBase, ReturnCode
+using LinearSolve: LinearSolve, RFLUFactorization, ButterflyFactorization,
+    RF32MixedLUFactorization, LinearVerbosity
+import LinearSolve: supernodal_panel_solve_backend!
+using ArrayInterface: ArrayInterface
+using LinearAlgebra: LinearAlgebra, UnitLowerTriangular, UpperTriangular, ldiv!, mul!
+using RecursiveFactorization: RecursiveFactorization
+using TriangularSolve: TriangularSolve
+using SciMLBase: SciMLBase, LinearProblem, ReturnCode, solve
 using SciMLLogging: @SciMLMessage
 
 LinearSolve.userecursivefactorization(A::Union{Nothing, AbstractMatrix}) = true
@@ -25,19 +28,104 @@ function SciMLBase.solve!(
         if !LinearAlgebra.issuccess(fact)
             @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
             )
         end
 
         cache.isfresh = false
     end
-    y = ldiv!(cache.u, LinearSolve.@get_cacheval(cache, :RFLUFactorization)[1], cache.b)
-    return SciMLBase.build_linear_solution(alg, y, nothing, cache; retcode = ReturnCode.Success)
+    y = _rf_ldiv!(
+        cache.u, LinearSolve.@get_cacheval(cache, :RFLUFactorization)[1], cache.b,
+        Val(P), Val(T)
+    )
+    return SciMLBase.build_linear_solution(alg, y, nothing, nothing; retcode = ReturnCode.Success)
+end
+
+# Apply an RF factorization to a right-hand side.
+#
+# Policy: wherever TriangularSolve has a native kernel (Float32/Float64 with a
+# strided right-hand side), both backsolve legs must run on TriangularSolve —
+# never on a BLAS kernel (`getrs!`/`trsm`/`trsv`).  Matrix right-hand sides,
+# solve-only, 1 BLAS thread, nrhs = 8 (TriangularSolve vs BLAS trsm, measured
+# for #1117/#1153):
+#
+#   U leg (upper ldiv!):            L leg (unit-lower ldiv!):
+#   n     trsm        TS            trsm        TS
+#   64      4.09 us    1.78 us        5.06 us    1.62 us
+#   128    12.36 us    6.27 us       12.57 us    4.42 us
+#   256    49.18 us   22.04 us       48.93 us   19.08 us
+#   500   154.79 us   79.64 us      150.16 us   75.22 us
+#
+# Vector right-hand sides use TriangularSolve's native vector entry, which
+# requires TriangularSolve >= 0.2.5 (compat-enforced): BLAS-free and faster
+# than `getrs!` at every size (0.33-0.79x, 1 thread; older TriangularSolve
+# deferred vectors to BLAS `trsv` above n=128).
+#
+# The `Pivot` flag must come from the algorithm, not from `fact.ipiv`:
+# RecursiveFactorization's pivot-free `lu!` returns the caller-supplied ipiv
+# vector without writing it (identity from RecursiveFactorization >= 0.2.29,
+# undefined memory before), so a `pivot = Val(false)` factorization must never
+# consume `fact.ipiv` — neither through `LAPACK.getrs!` nor `_ipiv_rows!`.
+# Doing so crashed with garbage pivots (segfault in `dlaswp`).
+function _rf_ldiv!(
+        u::StridedVector{T}, fact::LinearAlgebra.LU{T, <:StridedMatrix{T}},
+        b::AbstractVector{T}, ::Val{Pivot}, ::Val{Thread}
+    ) where {T <: Union{Float32, Float64}, Pivot, Thread}
+    u === b || copyto!(u, b)
+    Pivot && LinearAlgebra._ipiv_rows!(fact, 1:length(fact.ipiv), u)
+    F = fact.factors
+    TriangularSolve.ldiv!(UnitLowerTriangular(F), u, Val(Thread))
+    TriangularSolve.ldiv!(UpperTriangular(F), u, Val(Thread))
+    return u
+end
+
+function _rf_ldiv!(
+        U::AbstractMatrix{T}, fact::LinearAlgebra.LU{T, <:StridedMatrix{T}},
+        B::AbstractMatrix{T}, ::Val{Pivot}, ::Val{Thread}
+    ) where {T <: Union{Float32, Float64}, Pivot, Thread}
+    U === B || copyto!(U, B)
+    Pivot && LinearAlgebra._ipiv_rows!(fact, 1:length(fact.ipiv), U)
+    F = fact.factors
+    TriangularSolve.ldiv!(UnitLowerTriangular(F), U, Val(Thread))
+    TriangularSolve.ldiv!(UpperTriangular(F), U, Val(Thread))
+    return U
+end
+
+# Types TriangularSolve has no native kernel for (complex, non-strided,
+# non-BLAS eltypes) keep the stdlib path.
+@inline function _rf_ldiv!(
+        u::AbstractVector, fact::LinearAlgebra.LU, b::AbstractVector,
+        ::Val{Pivot}, ::Val
+    ) where {Pivot}
+    return _rf_stdlib_ldiv!(u, fact, b, Val(Pivot))
+end
+@inline function _rf_ldiv!(
+        U::AbstractMatrix, fact::LinearAlgebra.LU, B::AbstractMatrix,
+        ::Val{Pivot}, ::Val
+    ) where {Pivot}
+    return _rf_stdlib_ldiv!(U, fact, B, Val(Pivot))
+end
+
+@inline _rf_stdlib_ldiv!(u, fact, b, ::Val{true}) = ldiv!(u, fact, b)
+function _rf_stdlib_ldiv!(u, fact, b, ::Val{false})
+    u === b || copyto!(u, b)
+    ldiv!(UpperTriangular(fact.factors), ldiv!(UnitLowerTriangular(fact.factors), u))
+    return u
+end
+
+# Enforcement helper used by the test suite: true iff TriangularSolve resolves
+# `ldiv!(::TA, ::TB, ::Val)` to one of its native kernel methods rather than
+# its LinearAlgebra catch-all, i.e. the argument types above stay off BLAS.
+function _ts_native_backsolve(::Type{TA}, ::Type{TB}) where {TA, TB}
+    for V in (Val{false}, Val{true})
+        catchall = which(TriangularSolve.ldiv!, Tuple{Any, Any, V})
+        m = which(TriangularSolve.ldiv!, Tuple{TA, TB, V})
+        (m !== catchall && m.module === TriangularSolve) || return false
+    end
+    return true
 end
 
 # Mixed precision RecursiveFactorization implementation
-LinearSolve.default_alias_A(::RF32MixedLUFactorization, ::Any, ::Any) = false
-LinearSolve.default_alias_b(::RF32MixedLUFactorization, ::Any, ::Any) = false
 
 const PREALLOCATED_RF32_LU = begin
     A = rand(Float32, 0, 0)
@@ -86,7 +174,7 @@ function SciMLBase.solve!(
 
         if !LinearAlgebra.issuccess(fact)
             return SciMLBase.build_linear_solution(
-                alg, cache.u, nothing, cache; retcode = ReturnCode.Failure
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
             )
         end
 
@@ -104,13 +192,13 @@ function SciMLBase.solve!(
     b_32 .= T32.(cache.b)
 
     # Solve in 32-bit precision
-    ldiv!(u_32, fact_cached, b_32)
+    _rf_ldiv!(u_32, fact_cached, b_32, Val(P), Val(T))
 
     # Convert back to original precision
     cache.u .= Torig.(u_32)
 
     return SciMLBase.build_linear_solution(
-        alg, cache.u, nothing, cache; retcode = ReturnCode.Success
+        alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
     )
 end
 
@@ -143,11 +231,11 @@ function SciMLBase.solve!(
     mul!(tmp, U', b)
 
     # TriangularSolve.ldiv!
-    RecursiveFactorization.ldiv!(F, tmp, thread)
+    TriangularSolve.ldiv!(F, tmp, thread)
 
     mul!(b, V, tmp)
     out .= @view b[1:n]
-    return SciMLBase.build_linear_solution(alg, out, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, out, nothing, nothing)
 end
 
 function LinearSolve.init_cacheval(
@@ -155,6 +243,51 @@ function LinearSolve.init_cacheval(
         abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::LinearSolve.OperatorAssumptions
     )
     return ws = RecursiveFactorization.🦋workspace(A, b), RecursiveFactorization.lu!(rand(1, 1), Val(false), alg.thread)
+end
+
+LinearSolve._custom_can_reuse_adjoint_factorization(
+    ::ButterflyFactorization, ::Tuple
+) = true
+
+function LinearSolve._custom_adjoint_factorization_solve(
+        ::ButterflyFactorization, cacheval::Tuple, A, b::AbstractVector
+    )
+    workspace, factorization = cacheval
+    n = workspace.n
+    T = promote_type(eltype(workspace.U), eltype(b))
+    padded_rhs = zeros(T, size(workspace.U, 1))
+    copyto!(view(padded_rhs, 1:n), b)
+    transformed_rhs = adjoint(workspace.V) * padded_rhs
+    upper_solution = adjoint(factorization.U) \ transformed_rhs
+    factorization_solution = adjoint(factorization.L) \ upper_solution
+    solution = workspace.U * factorization_solution
+    return solution[1:n]
+end
+
+function supernodal_panel_solve_backend!(
+        ::Val{:triangularsolve}, W::StridedMatrix{Tv}, B::StridedMatrix{Tv}, np::Int;
+        operation::Symbol
+    ) where {Tv <: Union{Float32, Float64}}
+    if operation === :factor_right_upper
+        TriangularSolve.rdiv!(B, UpperTriangular(view(W, 1:np, 1:np)), Val(false))
+    elseif operation === :factor_lower || operation === :lower
+        TriangularSolve.ldiv!(UnitLowerTriangular(view(W, 1:np, 1:np)), B, Val(false))
+    elseif operation === :upper
+        TriangularSolve.ldiv!(UpperTriangular(view(W, 1:np, 1:np)), B, Val(false))
+    else
+        throw(ArgumentError("unknown supernodal panel operation: $operation"))
+    end
+    return B
+end
+
+# Re-caches the default solve path, which this extension invalidates via
+# `userecursivefactorization`. Size is not a coverage axis: inference is whole-body.
+LinearSolve.PrecompileTools.@compile_workload begin
+    A = rand(4, 4)
+    b = rand(4)
+    prob = LinearProblem(A, b)
+    sol = solve(prob)
+    sol = solve(prob, RFLUFactorization())
 end
 
 end

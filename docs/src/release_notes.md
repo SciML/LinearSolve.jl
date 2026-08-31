@@ -1,5 +1,26 @@
 # Release Notes
 
+## v4.2
+
+  - New `GESVFactorization` algorithm mirroring LAPACK's `gesv` driver: fresh matrices
+    factorize and solve in a single `LAPACK.gesv!` call, and repeat solves with only a new
+    `b` reuse the cached factors through an allocation-free `LAPACK.getrs!`.
+  - Dense `LUFactorization` refactorizations (`cache.A = X` then `solve!`) now reuse the
+    cached pivot vector (and, without `alias_A`, the cached factors buffer) on
+    Julia >= 1.11, making warm refactorization solves allocation-free.
+  - The dense `LUFactorization` pivot-buffer reuse with `alias_A = true` now also covers
+    the generic-kernel path (`NoPivot`/`RowNonZero` pivoting and non-BLAS element types),
+    on all supported Julia versions.
+
+## v4.0
+
+  - Batched (matrix) right-hand sides are now supported: `solve(LinearProblem(A, B))` with
+    `B::AbstractMatrix` computes the equivalent of `A \ B`, factorizing `A` once and
+    returning `sol.u` as a `size(A, 2) × size(B, 2)` matrix. This is a breaking change:
+    previously a matrix `b` initialized a vector-shaped `u` and generally errored downstream.
+    Batched right-hand sides are supported by the factorization-based algorithms; iterative
+    (Krylov) methods throw an informative `ArgumentError` for matrix `b`.
+
 ## Upcoming Changes
 
   - `CudaOffloadFactorization` has been split into two algorithms:

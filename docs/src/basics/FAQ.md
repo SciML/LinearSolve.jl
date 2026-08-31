@@ -87,3 +87,80 @@ Pr = LA.Diagonal(weights)
 prob = LS.LinearProblem(A, b)
 sol = LS.solve(prob, LS.KrylovJL_GMRES(precs = Returns((Pl, Pr))))
 ```
+
+## Can I use a Krylov solver with a custom array type?
+
+Yes, if `similar` works for it.
+
+Krylov.jl allocates its workspace as `S(undef, n)` with `S = typeof(b)`, so a type
+that cannot be built that way never reaches an iteration.
+`RecursiveArrayTools.ArrayPartition` is the common example: it is stored as several
+separate arrays, so there is no way to know how to split `n` across them.
+
+For these, LinearSolve builds the workspace with
+[`Krylov.KrylovConstructor`](https://jso.dev/Krylov.jl/dev/inplace/#Krylov.KrylovConstructor),
+which uses `similar` on the vectors it is given rather than the `undef` constructor.
+The solve then runs on the caller's own array type, with no flattening and no
+copying, and `u` comes back in the same type it went in as.
+
+`ArrayPartition` works out of the box. Another array type needs `similar` and the
+usual array operations Krylov uses.
+
+A right-hand side that is not an array at all, such as a parameter object, is not
+supported yet: it has neither the `undef` constructor nor `similar`. The intended
+general answer there is the
+[SciMLStructures.jl](https://github.com/SciML/SciMLStructures.jl) interface, since a
+type implementing it can be canonicalized to a flat buffer and repacked afterwards,
+which works for containers that are not arrays. Tracked in
+[#1208](https://github.com/SciML/LinearSolve.jl/issues/1208).
+
+## Why does LinearSolve.jl depend on MKL_jll, and how do I stop it from loading?
+
+MKL is the fastest BLAS on most x86 hardware, often by a wide margin, so LinearSolve.jl
+ships it by default and lets the default algorithm choice pick `MKLLUFactorization`
+where it wins. Without it, most installations end up substantially slower.
+
+If you would rather not load it, for example because you only solve small static-array
+systems where it brings nothing, set the `LoadMKL_JLL` preference to `false`:
+
+```julia
+using Preferences, UUIDs
+
+Preferences.set_preferences!(
+    UUID("7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"),  # LinearSolve
+    "LoadMKL_JLL" => false; force = true
+)
+```
+
+The preference is read when LinearSolve.jl loads, so restart Julia afterwards and let
+the package recompile. From then on `LinearSolve.usemkl` is `false`, MKL_jll is never
+`using`'d, and the default algorithm falls back to the next best choice for your
+matrix, typically `LUFactorization` or `RFLUFactorization`. Nothing else about the
+interface changes and every algorithm you select explicitly keeps working.
+
+Two details worth knowing:
+
+  - The default is already architecture aware. MKL is only considered on `x86_64` and
+    `i686`, and it is off by default on AMD EPYC CPUs, where it does not win. On other
+    architectures such as Apple Silicon it is never loaded regardless of this setting.
+  - The preference controls whether LinearSolve.jl *loads and uses* MKL_jll, not
+    whether it is installed. MKL_jll stays a declared dependency, so it remains in the
+    dependency graph and Pkg still installs it.
+
+## Why does differentiating a solve with Enzyme fail on `cache.u`?
+
+Take the solution from the value `solve!` gives back, not from the cache:
+
+```julia
+sol = solve!(cache)
+sum(sol.u)        # differentiable
+sum(cache.u)      # errors, "Adjoint case currently not handled"
+```
+
+The reverse rule is written against the returned solution, so reading `cache.u` after the
+solve has no derivative attached to it.
+
+Mixing activities is fine for a dense or sparse `A`: carrying a derivative on `A` while `b`
+is a captured constant, or the other way round, differentiates under a plain `Reverse`. A
+structured `A`, such as a `Tridiagonal` or a unit triangular, still wants
+`set_runtime_activity` for that case.

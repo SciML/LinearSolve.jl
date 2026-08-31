@@ -1,8 +1,11 @@
 module LinearSolveCliqueTreesExt
 
-using CliqueTrees.Multifrontal: cholesky!, ldiv!, ChordalCholesky
-using LinearSolve
-using SparseArrays
+using CliqueTrees.Multifrontal: ChordalCholesky
+using LinearAlgebra: cholesky!, ldiv!
+using LinearSolve: LinearSolve, CliqueTreesFactorization, LinearVerbosity,
+    OperatorAssumptions
+using SciMLBase: SciMLBase, LinearProblem, solve
+using SparseArrays: SparseArrays, sparse
 
 function makefactor(A::AbstractMatrix, alg, snd)
     if isnothing(alg) && isnothing(snd)
@@ -41,7 +44,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::CliqueTreesFactor
     end
 
     ldiv!(u, cache.cacheval, b)
-    return SciMLBase.build_linear_solution(alg, u, nothing, cache)
+    return SciMLBase.build_linear_solution(alg, u, nothing, nothing)
 end
 
 LinearSolve.PrecompileTools.@compile_workload begin

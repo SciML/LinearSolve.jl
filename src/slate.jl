@@ -91,6 +91,15 @@ function _load_libslate(libpath = nothing)
     return nothing
 end
 
+"""
+    slate_isavailable(; libpath = nothing)
+
+Return `true` when a SLATE LAPACK API library can be loaded and provides the
+`slate_dgesv` entry point required by [`SLATEFactorization`](@ref).
+
+The optional `libpath` and environment-variable lookup follow the same rules as
+[`SLATEFactorization`](@ref).
+"""
 function slate_isavailable(; libpath = nothing)
     lib = _load_libslate(libpath)
     lib === nothing && return false

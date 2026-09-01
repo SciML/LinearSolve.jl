@@ -445,6 +445,7 @@ for something else will not redirect an explicit choice.
 
 ```@docs
 SLATEFactorization
+slate_isavailable
 ```
 
 ### CliqueTrees.jl

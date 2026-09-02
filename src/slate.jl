@@ -91,6 +91,16 @@ function _load_libslate(libpath = nothing)
     return nothing
 end
 
+"""
+    slate_isavailable(; libpath = nothing) -> Bool
+
+Whether a usable SLATE LAPACK API library can be loaded, so
+[`SLATEFactorization`](@ref) will work.
+
+Loading `SLATE_jll` is enough on the platforms it builds for. A local build is used
+instead when `libpath` is given or `ENV["SLATE_LAPACK_LIB"]` is set, either of which
+takes precedence over the JLL.
+"""
 function slate_isavailable(; libpath = nothing)
     lib = _load_libslate(libpath)
     lib === nothing && return false

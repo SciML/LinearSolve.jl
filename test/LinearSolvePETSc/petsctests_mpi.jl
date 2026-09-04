@@ -76,6 +76,12 @@ end
 
         owned_rows = pcache.rend - pcache.rstart
         @test MPI.Allreduce(owned_rows, +, MPI.COMM_WORLD) == n
+
+        info = Ref{PETSc.LibPETSc.MatInfo}()
+        PETSc.LibPETSc.MatGetInfo(
+            petsclib, pcache.petsc_A, PETSc.LibPETSc.MAT_LOCAL, info
+        )
+        @test info[].mallocs == 0
         PETScExt.cleanup_petsc_cache!(cache)
     end
 

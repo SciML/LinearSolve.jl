@@ -305,7 +305,7 @@ function _to_petsc_mat_mpi_csc(petsclib, A::SparseMatrixCSC, pcache)
     pcache.rstart = rstart
     pcache.rend = rend
 
-    _assemble_local_rows_csr!(petsclib, mat, A, rstart, rend)
+    _assemble_local_rows_csr!(petsclib, mat, A, rstart, rend, comm)
     PETSc.assemble!(mat)
     return mat
 end
@@ -314,7 +314,7 @@ end
 # A is a SparseMatrixCSC with 1-indexed Julia rows [1, m].
 # rstart, rend are 0-indexed PETSc row indices defining which rows this rank owns.
 # rstart <= rowindex < rend (0-indexed).
-function _assemble_local_rows_csr!(petsclib, mat, A::SparseMatrixCSC, rstart, rend)
+function _assemble_local_rows_csr!(petsclib, mat, A::SparseMatrixCSC, rstart, rend, comm)
     PetscInt = PETSc.inttype(petsclib)
     PetscScalar = PETSc.scalartype(petsclib)
 
@@ -365,20 +365,14 @@ function _assemble_local_rows_csr!(petsclib, mat, A::SparseMatrixCSC, rstart, re
         end
     end
 
-    for local_i in 1:local_m
-        row_nnz = local_rowptr[local_i + 1] - local_rowptr[local_i]
-        if row_nnz > 0
-            row_petsc = rstart + local_i - 1
-            row_range = (local_rowptr[local_i] + 1):local_rowptr[local_i + 1]
-            cols = local_colind[row_range]
-            vals = local_vals[row_range]
-            LibPETSc.MatSetValues(
-                petsclib, mat,
-                PetscInt(1), [row_petsc],
-                PetscInt(row_nnz), cols,
-                vals, LibPETSc.INSERT_VALUES
-            )
-        end
+    if MPI.Comm_size(comm) == 1
+        LibPETSc.MatSeqAIJSetPreallocationCSR(
+            petsclib, mat, local_rowptr, local_colind, local_vals
+        )
+    else
+        LibPETSc.MatMPIAIJSetPreallocationCSR(
+            petsclib, mat, local_rowptr, local_colind, local_vals
+        )
     end
 
     return nothing

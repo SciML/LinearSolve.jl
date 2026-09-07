@@ -693,12 +693,6 @@ end
     )
 end
 
-function defaultalg_symbol(::Type{T}) where {T}
-    return Base.typename(SciMLBase.parameterless_type(T)).name
-end
-defaultalg_symbol(::Type{<:GenericFactorization{typeof(ldlt!)}}) = :LDLtFactorization
-
-defaultalg_symbol(::Type{<:QRFactorization{ColumnNorm}}) = :QRFactorizationPivoted
 
 const _SPARSE_ONLY_ALGORITHMS = Symbol.(
     (

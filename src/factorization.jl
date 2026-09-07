@@ -1,51 +1,3 @@
-@generated function SciMLBase.solve!(
-        cache::LinearCache, alg::AbstractFactorization;
-        kwargs...
-    )
-    return quote
-        A = convert(AbstractMatrix, cache.A)
-        check_safety = _get_residualsafety(alg) && cache.isfresh
-        # Back up A before in-place LU when:
-        #   - residualsafety is enabled (for residual check using original A), OR
-        #   - the default solver has safetyfallback (for restoring A after LU failure)
-        needs_backup = check_safety ||
-            (cache.alg isa DefaultLinearSolver && cache.alg.safetyfallback && cache.isfresh)
-        A_original = needs_backup ? _copy_A_for_safety(cache) : A
-
-        if cache.isfresh
-            fact = do_factorization(alg, cache.A, cache.b, cache.u)
-            cache.cacheval = fact
-
-            # If factorization was not successful, return failure. Don't reset `isfresh`
-            if _notsuccessful(fact)
-                @SciMLMessage(
-                    "Solver failed", cache.verbose,
-                    :solver_failure
-                )
-                return SciMLBase.build_linear_solution(
-                    alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
-                )
-            end
-
-            cache.isfresh = false
-        end
-
-        y = _ldiv!(
-            cache.u, @get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
-            cache.b
-        )
-
-        if check_safety
-            failed = _check_residual_safety(cache, alg, A_original, y)
-            failed !== nothing && return failed
-        end
-
-        return SciMLBase.build_linear_solution(
-            alg, y, nothing, nothing; retcode = ReturnCode.Success
-        )
-    end
-end
-
 macro get_cacheval(cache, algsym)
     return quote
         if $(esc(cache)).alg isa DefaultLinearSolver
@@ -2696,6 +2648,65 @@ for alg in vcat(
             alg, A.A, b, u, Pl, Pr,
             maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
             assumptions::OperatorAssumptions
+        )
+    end
+end
+
+# The generated `solve!` below calls `defaultalg_symbol` while it runs, so these methods
+# must be defined first. They dispatch on types defined above, so this is the earliest
+# they can sit. See https://github.com/SciML/LinearSolve.jl/issues/1282.
+
+function defaultalg_symbol(::Type{T}) where {T}
+    return Base.typename(SciMLBase.parameterless_type(T)).name
+end
+defaultalg_symbol(::Type{<:GenericFactorization{typeof(ldlt!)}}) = :LDLtFactorization
+
+defaultalg_symbol(::Type{<:QRFactorization{ColumnNorm}}) = :QRFactorizationPivoted
+
+@generated function SciMLBase.solve!(
+        cache::LinearCache, alg::AbstractFactorization;
+        kwargs...
+    )
+    return quote
+        A = convert(AbstractMatrix, cache.A)
+        check_safety = _get_residualsafety(alg) && cache.isfresh
+        # Back up A before in-place LU when:
+        #   - residualsafety is enabled (for residual check using original A), OR
+        #   - the default solver has safetyfallback (for restoring A after LU failure)
+        needs_backup = check_safety ||
+            (cache.alg isa DefaultLinearSolver && cache.alg.safetyfallback && cache.isfresh)
+        A_original = needs_backup ? _copy_A_for_safety(cache) : A
+
+        if cache.isfresh
+            fact = do_factorization(alg, cache.A, cache.b, cache.u)
+            cache.cacheval = fact
+
+            # If factorization was not successful, return failure. Don't reset `isfresh`
+            if _notsuccessful(fact)
+                @SciMLMessage(
+                    "Solver failed", cache.verbose,
+                    :solver_failure
+                )
+                return SciMLBase.build_linear_solution(
+                    alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
+                )
+            end
+
+            cache.isfresh = false
+        end
+
+        y = _ldiv!(
+            cache.u, @get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
+            cache.b
+        )
+
+        if check_safety
+            failed = _check_residual_safety(cache, alg, A_original, y)
+            failed !== nothing && return failed
+        end
+
+        return SciMLBase.build_linear_solution(
+            alg, y, nothing, nothing; retcode = ReturnCode.Success
         )
     end
 end

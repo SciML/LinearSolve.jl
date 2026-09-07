@@ -283,3 +283,12 @@ run_qa(
 )
 
 run_api_docs(LinearSolve.KLU)
+
+# The generated `solve!` calls `defaultalg_symbol` at generation time, so the methods
+# must not sit in a file included after `factorization.jl`. Reproducing the failure
+# itself needs `--compiled-modules=no`, which is too slow for the suite.
+# See https://github.com/SciML/LinearSolve.jl/issues/1282.
+@testset "defaultalg_symbol is defined before the generated solve! (#1282)" begin
+    files = unique(basename(string(m.file)) for m in methods(LinearSolve.defaultalg_symbol))
+    @test files == ["factorization.jl"]
+end

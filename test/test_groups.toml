@@ -24,6 +24,13 @@ runner = "self-hosted"
 num_threads = 2
 
 # Keep the direct Accelerate refactorization allocation contract covered on Apple hardware.
+
+["Core 32-bit"]
+group = "Core"
+versions = ["1"]
+os = ["ubuntu-latest"]
+arch = "x86"
+
 [AppleAccelerate]
 versions = ["lts", "1", "pre"]
 os = ["macos-latest"]

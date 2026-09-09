@@ -12,88 +12,88 @@ b = rand(size(A, 1))
 prob = LS.LinearProblem(A, b)
 sol = LS.solve(prob)
 sol.u</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">12-element Vector{Float64}:
- 0.04856088301417628
- 0.15166340726106697
- 0.20926296603113465
- 0.1333747286432221
- 0.2389123853092564
- 0.012426033429337973
- 0.14635864448442001
- 0.07707767169273831
- 0.05212621124554509
- 0.2213809298057707
- 0.22293574251601447
- 0.12855371788656267</code></pre><p>The blocks do not have to be the same size:</p><pre><code class="language-julia hljs">A_mixed = BlockDiagonal([rand(n, n) + n * LA.I for n in (2, 3, 4)])
+  0.08728434187652295
+  0.12600836264009246
+  0.22330772078239178
+  0.21112304623012468
+  0.16771610175046464
+  0.009397217287183892
+  0.1425154140283698
+ -0.01866310071200529
+  0.062102751462849784
+  0.03981252763730069
+ -0.01849596439510919
+  0.11263267943318477</code></pre><p>The blocks do not have to be the same size:</p><pre><code class="language-julia hljs">A_mixed = BlockDiagonal([rand(n, n) + n * LA.I for n in (2, 3, 4)])
 b_mixed = rand(size(A_mixed, 1))
 
 LS.solve(LS.LinearProblem(A_mixed, b_mixed)).u</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">9-element Vector{Float64}:
- 0.3259094657564946
- 0.12438514506812427
- 0.16567854726229606
- 0.1943564159158244
- 0.19326087020517613
- 0.11160880112864667
- 0.08403399762673275
- 0.06164318847359401
- 0.13633454861624353</code></pre><h2 id="Which-Solvers-Work"><a class="docs-heading-anchor" href="#Which-Solvers-Work">Which Solvers Work</a><a id="Which-Solvers-Work-1"></a><a class="docs-heading-anchor-permalink" href="#Which-Solvers-Work" title="Permalink"></a></h2><p>All of the standard dense algorithms accept a <code>BlockDiagonal</code>:</p><pre><code class="language-julia hljs">u_ref = Matrix(A) \ b
+ 0.042704628251375505
+ 0.08333844069515821
+ 0.13436121031448714
+ 0.2195969527779653
+ 0.03289724395363012
+ 0.10203239331696014
+ 0.1292468378023014
+ 0.023653955637730206
+ 0.09304188859077342</code></pre><h2 id="Which-Solvers-Work"><a class="docs-heading-anchor" href="#Which-Solvers-Work">Which Solvers Work</a><a id="Which-Solvers-Work-1"></a><a class="docs-heading-anchor-permalink" href="#Which-Solvers-Work" title="Permalink"></a></h2><p>All of the standard dense algorithms accept a <code>BlockDiagonal</code>:</p><pre><code class="language-julia hljs">u_ref = Matrix(A) \ b
 
 for alg in (LS.LUFactorization(), LS.GenericFactorization(),
         LS.QRFactorization(LA.NoPivot()), LS.SimpleGMRES(), LS.KrylovJL_GMRES())
     u = LS.solve(LS.LinearProblem(A, b), alg).u
     println(rpad(nameof(typeof(alg)), 22), &quot; residual = &quot;,
         LA.norm(Matrix(A) * u - b))
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">LUFactorization        residual = 2.1499376424746292e-16
-GenericFactorization   residual = 2.1499376424746292e-16
-QRFactorization        residual = 4.611102534756203e-16
-SimpleGMRES            residual = 6.377745716588144e-16
-KrylovJL               residual = 8.719644844083228e-9</code></pre><p>Sparse-only algorithms such as <code>UMFPACKFactorization</code> and <code>KLUFactorization</code> expect a <code>SparseMatrixCSC</code>, so convert with <code>sparse(A)</code> first if you want those.</p><h2 id="Blockwise-Factorization"><a class="docs-heading-anchor" href="#Blockwise-Factorization">Blockwise Factorization</a><a id="Blockwise-Factorization-1"></a><a class="docs-heading-anchor-permalink" href="#Blockwise-Factorization" title="Permalink"></a></h2><p><code>LUFactorization</code> and <code>QRFactorization</code> do not treat the matrix as a dense <code>N x N</code> system. Because the blocks are independent, each one is factorized on its own, which turns <code>O(N^3)</code> work into <code>O(\sum m_i^3)</code> and lets every per-block call land on BLAS. For <code>k</code> blocks of size <code>m</code> that is roughly a factor of <code>k^2</code> less arithmetic.</p><p>The cache stores the per-block factorizations rather than one big dense one:</p><pre><code class="language-julia hljs">cache_lu = LS.init(LS.LinearProblem(A, b), LS.LUFactorization())
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">LUFactorization        residual = 2.0074880843059296e-16
+GenericFactorization   residual = 2.0074880843059296e-16
+QRFactorization        residual = 4.3567468721686656e-16
+SimpleGMRES            residual = 2.365592990068275e-16
+KrylovJL               residual = 6.67129565704019e-10</code></pre><p>Sparse-only algorithms such as <code>UMFPACKFactorization</code> and <code>KLUFactorization</code> expect a <code>SparseMatrixCSC</code>, so convert with <code>sparse(A)</code> first if you want those.</p><h2 id="Blockwise-Factorization"><a class="docs-heading-anchor" href="#Blockwise-Factorization">Blockwise Factorization</a><a id="Blockwise-Factorization-1"></a><a class="docs-heading-anchor-permalink" href="#Blockwise-Factorization" title="Permalink"></a></h2><p><code>LUFactorization</code> and <code>QRFactorization</code> do not treat the matrix as a dense <code>N x N</code> system. Because the blocks are independent, each one is factorized on its own, which turns <code>O(N^3)</code> work into <code>O(\sum m_i^3)</code> and lets every per-block call land on BLAS. For <code>k</code> blocks of size <code>m</code> that is roughly a factor of <code>k^2</code> less arithmetic.</p><p>The cache stores the per-block factorizations rather than one big dense one:</p><pre><code class="language-julia hljs">cache_lu = LS.init(LS.LinearProblem(A, b), LS.LUFactorization())
 LS.solve!(cache_lu)
 
 (n_block_factorizations = length(cache_lu.cacheval.facts),
     block_factorization = nameof(typeof(first(cache_lu.cacheval.facts))))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(n_block_factorizations = 4, block_factorization = :LU)</code></pre><p>Two cases deliberately keep the generic dense path, because they are not a batch of independent square systems or need machinery the blockwise path does not carry:</p><ul><li>blocks that are not square, which can still add up to a square matrix but do not decompose into independent subsystems, and</li><li><code>LUFactorization(residualsafety = true)</code>, which uses the a-posteriori residual check of the standard LU solve.</li></ul><p>Both still give correct answers, just without the structural speedup.</p><h2 id="The-SimpleGMRES-Specialization"><a class="docs-heading-anchor" href="#The-SimpleGMRES-Specialization">The <code>SimpleGMRES</code> Specialization</a><a id="The-SimpleGMRES-Specialization-1"></a><a class="docs-heading-anchor-permalink" href="#The-SimpleGMRES-Specialization" title="Permalink"></a></h2><p>The iterative side has its own specialization. When every block is the same size, <a href="../../solvers/solvers/#LinearSolve.SimpleGMRES"><code>SimpleGMRES</code></a> solves the batch of subsystems together instead of running one Krylov iteration over the whole stacked system. LinearSolve.jl detects this automatically when the extension is loaded, so no keyword is needed:</p><pre><code class="language-julia hljs">cache_uniform = LS.init(LS.LinearProblem(A, b), LS.SimpleGMRES())
 LS.solve!(cache_uniform).u</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">12-element Vector{Float64}:
- 0.04856088301417628
- 0.1516634072610669
- 0.20926296603113456
- 0.13337472864322206
- 0.23891238530925638
- 0.01242603342933796
- 0.14635864448442
- 0.0770776716927383
- 0.052126211245545034
- 0.2213809298057707
- 0.22293574251601458
- 0.1285537178865627</code></pre><p>You can see the specialization in the cache that <code>init</code> builds. The first type parameter of the cache records whether the batched path was selected, and the <code>blocksize</code> field records the detected block size:</p><pre><code class="language-julia hljs">cache_mixed = LS.init(LS.LinearProblem(A_mixed, b_mixed), LS.SimpleGMRES())
+  0.08728434187652294
+  0.12600836264009246
+  0.22330772078239172
+  0.2111230462301247
+  0.1677161017504646
+  0.009397217287183905
+  0.14251541402836979
+ -0.018663100712005287
+  0.062102751462849784
+  0.039812527637300685
+ -0.01849596439510919
+  0.11263267943318475</code></pre><p>You can see the specialization in the cache that <code>init</code> builds. The first type parameter of the cache records whether the batched path was selected, and the <code>blocksize</code> field records the detected block size:</p><pre><code class="language-julia hljs">cache_mixed = LS.init(LS.LinearProblem(A_mixed, b_mixed), LS.SimpleGMRES())
 
 (uniform_blocksize = cache_uniform.cacheval.blocksize,
     mixed_blocksize = cache_mixed.cacheval.blocksize)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(uniform_blocksize = 3, mixed_blocksize = 0)</code></pre><p>The uniform case reports the block size it found, while the mixed case reports <code>0</code>, meaning it fell back to the generic path. Both give the right answer; only the uniform case gets the batched treatment.</p><p>If your matrix is stored as a plain dense <code>Matrix</code> but you know it is block diagonal with uniform blocks, you can request the same specialization explicitly with the <code>blocksize</code> keyword:</p><pre><code class="language-julia hljs">LS.solve(LS.LinearProblem(Matrix(A), b), LS.SimpleGMRES(; blocksize = 3)).u</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">12-element Vector{Float64}:
- 0.04856088301417627
- 0.1516634072610669
- 0.2092629660311346
- 0.13337472864322208
- 0.23891238530925638
- 0.01242603342933796
- 0.14635864448442
- 0.0770776716927383
- 0.052126211245545034
- 0.2213809298057707
- 0.22293574251601447
- 0.12855371788656267</code></pre><h2 id="Reusing-the-Factorization"><a class="docs-heading-anchor" href="#Reusing-the-Factorization">Reusing the Factorization</a><a id="Reusing-the-Factorization-1"></a><a class="docs-heading-anchor-permalink" href="#Reusing-the-Factorization" title="Permalink"></a></h2><p>The <a href="../caching_interface/#Linear-Solve-with-Caching-Interface">caching interface</a> works with <code>BlockDiagonal</code> exactly as it does for any other matrix, which matters when the same block structure is solved against many right hand sides:</p><pre><code class="language-julia hljs">cache = LS.init(LS.LinearProblem(A, b), LS.QRFactorization(LA.NoPivot()))
+  0.08728434187652294
+  0.12600836264009246
+  0.22330772078239172
+  0.21112304623012473
+  0.1677161017504646
+  0.009397217287183875
+  0.14251541402836979
+ -0.018663100712005287
+  0.062102751462849784
+  0.039812527637300685
+ -0.01849596439510918
+  0.11263267943318475</code></pre><h2 id="Reusing-the-Factorization"><a class="docs-heading-anchor" href="#Reusing-the-Factorization">Reusing the Factorization</a><a id="Reusing-the-Factorization-1"></a><a class="docs-heading-anchor-permalink" href="#Reusing-the-Factorization" title="Permalink"></a></h2><p>The <a href="../caching_interface/#Linear-Solve-with-Caching-Interface">caching interface</a> works with <code>BlockDiagonal</code> exactly as it does for any other matrix, which matters when the same block structure is solved against many right hand sides:</p><pre><code class="language-julia hljs">cache = LS.init(LS.LinearProblem(A, b), LS.QRFactorization(LA.NoPivot()))
 sol1 = LS.solve!(cache)
 
 cache.b = rand(size(A, 1))
 sol2 = LS.solve!(cache)
 
 sol2.u</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">12-element Vector{Float64}:
-  0.11158205548447184
-  0.2410948496741938
-  0.01946290109344246
-  0.15295288683480554
-  0.2403364242527663
-  0.20428668113304502
-  0.06027763232183881
- -0.0038715617200960023
-  0.2399131027280998
- -0.03019832055460517
-  0.19420907359334857
-  0.20874012069528852</code></pre><p>The second solve reuses the stored per-block factorizations and only applies them to the new right hand side.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../static_arrays/">« Solving with StaticArrays</a><a class="docs-footer-nextpage" href="../gpu/">GPU-Accelerated Linear Solving in Julia »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Wednesday 9 September 2026 09:33">Wednesday 9 September 2026</span>. Using Julia version 1.12.7.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+  0.0840103165005622
+  0.23561029370849187
+  0.09105703222186813
+  0.19154864226486812
+  0.23326361806859744
+ -0.02690602860847561
+  0.0326591881939814
+  0.21902921469482076
+  0.249678450868461
+  0.27040337488213045
+  0.09565933402968568
+ -0.013117176111214983</code></pre><p>The second solve reuses the stored per-block factorizations and only applies them to the new right hand side.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../static_arrays/">« Solving with StaticArrays</a><a class="docs-footer-nextpage" href="../gpu/">GPU-Accelerated Linear Solving in Julia »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Wednesday 9 September 2026 20:19">Wednesday 9 September 2026</span>. Using Julia version 1.12.7.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

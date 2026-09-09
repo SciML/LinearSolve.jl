@@ -621,6 +621,11 @@ end
 end
 
 @inline function _notsuccessful(F::LinearAlgebra.QRCompactWY)
+    # Unpivoted LAPACK QR leaves no `info` for rank deficiency and may store a
+    # tiny non-exact-zero on the R diagonal (observed on 32-bit OpenBLAS). Use the
+    # same relative threshold as `_qr_rank_deficient` / `A \\ b`, with an exact
+    # `iszero` fallback for non-BLASELTYPES where that method is a no-op.
+    _qr_rank_deficient(F) && return true
     (m, n) = size(F)
     U = view(F.factors, 1:min(m, n), 1:n)
     return any(iszero, Iterators.reverse(@view U[diagind(U)]))

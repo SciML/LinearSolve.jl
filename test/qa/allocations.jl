@@ -4,6 +4,25 @@ if Sys.islinux()
     import LAPACK_jll, blis_jll
 end
 
+function one_shot_lu_allocations(A, b)
+    solve(LinearProblem(A, b), LUFactorization())
+    GC.gc()
+    return @allocated solve(LinearProblem(A, b), LUFactorization())
+end
+
+@testset "One-shot LU reuses its private matrix copy" begin
+    n = 128
+    A = rand(n, n) + n * I
+    A_original = copy(A)
+    b = rand(n)
+
+    alloc = one_shot_lu_allocations(A, b)
+    sol = solve(LinearProblem(A, b), LUFactorization())
+    @test sol.u ≈ A_original \ b
+    @test A == A_original
+    @test alloc <= sizeof(A) + 8192
+end
+
 @check_allocs function allocation_checked_direct_lu_refactor_solve!(
         cache, Awork, A, alg
     )

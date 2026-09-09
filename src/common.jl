@@ -993,7 +993,12 @@ function SciMLBase.solve(
         prob::LinearProblem, alg::SciMLLinearSolveAlgorithm,
         args...; kwargs...
     )
-    return solve!(init(prob, alg, args...; kwargs...))
+    cache = init(prob, alg, args...; kwargs...)
+    # A non-aliased init owns a private copy, and a one-shot cache is never returned.
+    if cache isa LinearCache && cache.A isa Matrix && !cache.alias_A && cache.A !== prob.A
+        setfield!(cache, :alias_A, true)
+    end
+    return solve!(cache)
 end
 
 """

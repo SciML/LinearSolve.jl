@@ -15,8 +15,7 @@ jobs:
           - {user: SciML, repo: OrdinaryDiffEq.jl, group: InterfaceII}
           - {user: SciML, repo: ModelingToolkit.jl, group: All}
           - {user: SciML, repo: SciMLSensitivity.jl, group: Core1}
-          # Temporarily disabled: MCI≤0.2 vs LatticeRules 0.0.2 (needs MCI 0.3 registry)
-          # - {user: SciML, repo: BoundaryValueDiffEq.jl, group: All}
+          - {user: SciML, repo: BoundaryValueDiffEq.jl, group: All}
           - {user: SciML, repo: NonlinearSolve.jl, group: Core}
     uses: "SciML/.github/.github/workflows/downstream.yml@v1"
     with:

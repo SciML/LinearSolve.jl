@@ -140,7 +140,10 @@ using LinearSolve, SparseArrays, LinearAlgebra, Test, Random
             )
             @test SciMLBase.successful_retcode(off)
             @test SciMLBase.successful_retcode(on)
-            @test relerr(on.u) <= relerr(off.u)
+            # Both residuals are already ~eps on some platforms (notably i686);
+            # allow floating-point noise when comparing refinement vs no
+            # refinement so we do not fail on 1.5e-15 vs 7.7e-16 ties.
+            @test relerr(on.u) <= relerr(off.u) + 100 * eps(Float64)
             @test relerr(on.u) < 1.0e-10
         end
 

@@ -13,7 +13,11 @@ using LinearSolve: LinearSolve, BLISLUFactorization, @get_cacheval, LinearCache,
 using SciMLLogging: SciMLLogging, @SciMLMessage
 using SciMLBase: ReturnCode
 
-const global libblis = blis_jll.blis
+# blis_jll ships no i686 product; skip the product bind and disable useblis there.
+const _blis_available = Sys.WORD_SIZE == 64 && isdefined(blis_jll, :blis)
+@static if _blis_available
+    const global libblis = blis_jll.blis
+end
 const global liblapack = LAPACK_jll.liblapack
 
 # Resolve Julia 1.13 lazy JLL products once so solves call fixed function pointers.
@@ -50,7 +54,7 @@ macro _lapack_function(symbol, pointer)
     return :(($(esc(symbol)), liblapack))
 end
 
-LinearSolve.useblis(x::Nothing) = true
+LinearSolve.useblis(x::Nothing) = _blis_available
 
 @inline function getrf!(
         A::AbstractMatrix{<:ComplexF64}, ipiv::AbstractVector{BlasInt},

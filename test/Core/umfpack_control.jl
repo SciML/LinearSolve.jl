@@ -54,13 +54,13 @@ using LinearSolve, SparseArrays, LinearAlgebra, Test, Random
         # Built directly rather than through a solve so the probe value never has
         # to be a legal setting for that particular knob.
         @testset "every documented setting maps to its own entry" begin
-            reference = get_umfpack_control(Float64, Int64)
+            reference = get_umfpack_control(Float64, Int)
             for setting in LinearSolve.UMFPACK_CONTROL_KEYS
                 idx = LinearSolve._UMFPACK_CONTROL_INDEX[setting]
                 probe = reference[idx] + 1
                 control = LinearSolve._umfpack_control(
                     UMFPACKFactorization(control = NamedTuple{(setting,)}((probe,))),
-                    Float64, Int64
+                    Float64, Int
                 )
                 @test control[idx] == probe
                 moved = findall(i -> control[i] != reference[i], eachindex(reference))
@@ -99,7 +99,7 @@ using LinearSolve, SparseArrays, LinearAlgebra, Test, Random
         end
 
         @testset "unnamed entries keep SparseArrays' defaults" begin
-            reference = get_umfpack_control(Float64, Int64)
+            reference = get_umfpack_control(Float64, Int)
             cache = init(
                 LinearProblem(copy(A), copy(b)),
                 UMFPACKFactorization(control = (; irstep = 2))
@@ -140,7 +140,10 @@ using LinearSolve, SparseArrays, LinearAlgebra, Test, Random
             )
             @test SciMLBase.successful_retcode(off)
             @test SciMLBase.successful_retcode(on)
-            @test relerr(on.u) <= relerr(off.u)
+            # Both residuals are already ~eps on some platforms (notably i686);
+            # allow floating-point noise when comparing refinement vs no
+            # refinement so we do not fail on 1.5e-15 vs 7.7e-16 ties.
+            @test relerr(on.u) <= relerr(off.u) + 100 * eps(Float64)
             @test relerr(on.u) < 1.0e-10
         end
 

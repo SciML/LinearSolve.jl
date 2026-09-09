@@ -3,6 +3,13 @@ module LinearSolveBLISExt
 using Libdl: Libdl
 using blis_jll: blis_jll
 using LAPACK_jll: LAPACK_jll
+using LinearSolve: LinearSolve
+
+# blis_jll has no i686 product; keep the extension loadable but disabled.
+@static if !(Sys.WORD_SIZE == 64 && isdefined(blis_jll, :blis))
+    LinearSolve.useblis(::Nothing) = false
+else
+
 
 using Base: require_one_based_indexing
 using LinearAlgebra: LinearAlgebra, LAPACK, BlasInt
@@ -384,4 +391,7 @@ function SciMLBase.solve!(
     return SciMLBase.build_linear_solution(alg, cache.u, nothing, nothing; retcode = ReturnCode.Success)
 end
 
+
 end
+
+end # module

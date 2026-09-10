@@ -189,10 +189,15 @@ end
 prob = LinearProblem(sprand(1000, 1000, 0.5), zeros(1000))
 solve(prob)
 
+# 11k×11k dense-sparse solve OOMs the 32-bit CI runner during SupernodalLU
+# symbolic analysis (`sym_pattern`); keep the algorithm-selection check on all
+# platforms but only `solve` the huge problem on 64-bit.
 @test LinearSolve.defaultalg(sprand(11000, 11000, 0.001), zeros(11000)).alg ===
     LinearSolve.DefaultAlgorithmChoice.SupernodalLUFactorization
-prob = LinearProblem(sprand(11000, 11000, 0.5), zeros(11000))
-solve(prob)
+if Sys.WORD_SIZE == 64
+    prob = LinearProblem(sprand(11000, 11000, 0.5), zeros(11000))
+    solve(prob)
+end
 
 # Test inference
 A = rand(4, 4)
@@ -600,10 +605,13 @@ let
     @test LinearSolve.defaultalg(A_diag, rand(n), LinearSolve.OperatorAssumptions(true)).alg ===
         LinearSolve.DefaultAlgorithmChoice.KLUFactorization
 
-    # Medium-size, dense sparse → UMFPACK
-    A_med_dense = sprand(5_000, 5_000, 0.5) + I
-    @test LinearSolve.defaultalg(A_med_dense, rand(5_000), LinearSolve.OperatorAssumptions(true)).alg ===
-        LinearSolve.DefaultAlgorithmChoice.SupernodalLUFactorization
+    # Medium-size, dense sparse → UMFPACK. Skip materializing the 5k×5k
+    # density-0.5 matrix on 32-bit (OOM on the x86 CI lane).
+    if Sys.WORD_SIZE == 64
+        A_med_dense = sprand(5_000, 5_000, 0.5) + I
+        @test LinearSolve.defaultalg(A_med_dense, rand(5_000), LinearSolve.OperatorAssumptions(true)).alg ===
+            LinearSolve.DefaultAlgorithmChoice.SupernodalLUFactorization
+    end
 end
 
 # === Sparse LU → SPQR fallback ===

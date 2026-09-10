@@ -100,7 +100,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::ConjugateGradientsJL; kwargs.
     op = (y, x) -> LinearAlgebra.mul!(y, cache.A, x)
     exit_code, iters = solver(
         op, cache.b, cache.u;
-        tol = float(cache.reltol), maxIter = cache.maxiters,
+        tol = float(cache.reltol), maxIter = Int64(cache.maxiters),
         precon, data, alg.kwargs...
     )
 

@@ -166,8 +166,10 @@ end
 # Single-precision sparse has no UMFPACK/KLU (SuiteSparse) support, so the
 # default polyalgorithm — which eagerly builds a cacheval for *every* slot, not
 # just the selected one — must not try to allocate an UMFPACK cacheval for it.
+# CHOLMOD on 32-bit Julia only accepts Ti<:Int32 index types.
+const _SPARSE_INDEX_TYPES = Sys.WORD_SIZE == 64 ? (Int64, Int32) : (Int32,)
 @testset "Sparse $T with $Ti indices" for T in (Float32, ComplexF32),
-        Ti in (Int64, Int32)
+        Ti in _SPARSE_INDEX_TYPES
 
     n = 20
     A32 = sparse(Ti.(1:n), Ti.(1:n), fill(T(n), n), n, n) +
@@ -187,10 +189,15 @@ end
 prob = LinearProblem(sprand(1000, 1000, 0.5), zeros(1000))
 solve(prob)
 
+# 11k×11k dense-sparse solve OOMs the 32-bit CI runner during SupernodalLU
+# symbolic analysis (`sym_pattern`); keep the algorithm-selection check on all
+# platforms but only `solve` the huge problem on 64-bit.
 @test LinearSolve.defaultalg(sprand(11000, 11000, 0.001), zeros(11000)).alg ===
     LinearSolve.DefaultAlgorithmChoice.SupernodalLUFactorization
-prob = LinearProblem(sprand(11000, 11000, 0.5), zeros(11000))
-solve(prob)
+if Sys.WORD_SIZE == 64
+    prob = LinearProblem(sprand(11000, 11000, 0.5), zeros(11000))
+    solve(prob)
+end
 
 # Test inference
 A = rand(4, 4)
@@ -295,19 +302,22 @@ sol = solve!(cache)
 
 ## Non-square Sparse Defaults
 # https://github.com/SciML/NonlinearSolve.jl/issues/599
-A = SparseMatrixCSC{Float64, Int64}(
-    [
-        1.0 0.0
-        1.0 1.0
-    ]
-)
-b = ones(2)
-A2 = hcat(A, A)
-prob = LinearProblem(A, b)
-@test SciMLBase.successful_retcode(solve(prob))
+# Int64 CSC indices are only valid for SuiteSparse/CHOLMOD on 64-bit.
+if Sys.WORD_SIZE == 64
+    A = SparseMatrixCSC{Float64, Int64}(
+        [
+            1.0 0.0
+            1.0 1.0
+        ]
+    )
+    b = ones(2)
+    A2 = hcat(A, A)
+    prob = LinearProblem(A, b)
+    @test SciMLBase.successful_retcode(solve(prob))
 
-prob2 = LinearProblem(A2, b)
-@test SciMLBase.successful_retcode(solve(prob2))
+    prob2 = LinearProblem(A2, b)
+    @test SciMLBase.successful_retcode(solve(prob2))
+end
 
 A = SparseMatrixCSC{Float64, Int32}(
     [
@@ -595,10 +605,13 @@ let
     @test LinearSolve.defaultalg(A_diag, rand(n), LinearSolve.OperatorAssumptions(true)).alg ===
         LinearSolve.DefaultAlgorithmChoice.KLUFactorization
 
-    # Medium-size, dense sparse → UMFPACK
-    A_med_dense = sprand(5_000, 5_000, 0.5) + I
-    @test LinearSolve.defaultalg(A_med_dense, rand(5_000), LinearSolve.OperatorAssumptions(true)).alg ===
-        LinearSolve.DefaultAlgorithmChoice.SupernodalLUFactorization
+    # Medium-size, dense sparse → UMFPACK. Skip materializing the 5k×5k
+    # density-0.5 matrix on 32-bit (OOM on the x86 CI lane).
+    if Sys.WORD_SIZE == 64
+        A_med_dense = sprand(5_000, 5_000, 0.5) + I
+        @test LinearSolve.defaultalg(A_med_dense, rand(5_000), LinearSolve.OperatorAssumptions(true)).alg ===
+            LinearSolve.DefaultAlgorithmChoice.SupernodalLUFactorization
+    end
 end
 
 # === Sparse LU → SPQR fallback ===

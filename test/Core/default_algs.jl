@@ -166,8 +166,10 @@ end
 # Single-precision sparse has no UMFPACK/KLU (SuiteSparse) support, so the
 # default polyalgorithm — which eagerly builds a cacheval for *every* slot, not
 # just the selected one — must not try to allocate an UMFPACK cacheval for it.
+# CHOLMOD on 32-bit Julia only accepts Ti<:Int32 index types.
+const _SPARSE_INDEX_TYPES = Sys.WORD_SIZE == 64 ? (Int64, Int32) : (Int32,)
 @testset "Sparse $T with $Ti indices" for T in (Float32, ComplexF32),
-        Ti in (Int64, Int32)
+        Ti in _SPARSE_INDEX_TYPES
 
     n = 20
     A32 = sparse(Ti.(1:n), Ti.(1:n), fill(T(n), n), n, n) +
@@ -295,19 +297,22 @@ sol = solve!(cache)
 
 ## Non-square Sparse Defaults
 # https://github.com/SciML/NonlinearSolve.jl/issues/599
-A = SparseMatrixCSC{Float64, Int64}(
-    [
-        1.0 0.0
-        1.0 1.0
-    ]
-)
-b = ones(2)
-A2 = hcat(A, A)
-prob = LinearProblem(A, b)
-@test SciMLBase.successful_retcode(solve(prob))
+# Int64 CSC indices are only valid for SuiteSparse/CHOLMOD on 64-bit.
+if Sys.WORD_SIZE == 64
+    A = SparseMatrixCSC{Float64, Int64}(
+        [
+            1.0 0.0
+            1.0 1.0
+        ]
+    )
+    b = ones(2)
+    A2 = hcat(A, A)
+    prob = LinearProblem(A, b)
+    @test SciMLBase.successful_retcode(solve(prob))
 
-prob2 = LinearProblem(A2, b)
-@test SciMLBase.successful_retcode(solve(prob2))
+    prob2 = LinearProblem(A2, b)
+    @test SciMLBase.successful_retcode(solve(prob2))
+end
 
 A = SparseMatrixCSC{Float64, Int32}(
     [

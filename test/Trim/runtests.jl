@@ -51,7 +51,11 @@ end
             "juliac.jl"
         )
     )
-    @test isfile(JULIAC)
+    # Julia 1.13 removed `juliac.jl` from the distribution; juliac now lives
+    # in the JuliaC package (a test dep of this project).
+    JULIAC_CMD = isfile(JULIAC) ? `$(JULIAC)` :
+        Cmd(["-e", "using JuliaC; JuliaC.main(ARGS)", "--"])
+    @test isfile(JULIAC) || VERSION ≥ v"1.13-"
 
     using LinearSolve
     # Build list of tests to run, conditionally including MKL
@@ -65,7 +69,23 @@ end
 
     for (mainfile, expectedtopass) in test_files
         binpath = tempname()
-        cmd = `$(Base.julia_cmd()) --project=. --depwarn=error $(JULIAC) --experimental --trim=unsafe-warn --output-exe $(binpath) $(mainfile)`
+        # JuliaC requires `--output-exe` to be a bare name, so run from the
+        # output directory and pass absolute paths for project and entry file.
+        # The project can't be this directory nor the active env: SciMLTesting's
+        # `activate_group_env` sandboxes the env (instantiated TOMLs, no `src/`),
+        # while this repo dir has the sources but no Manifest. JuliaC copies the
+        # project dir for its buildscript, so assemble one that has both —
+        # sources from here, instantiated Project/Manifest from the active env.
+        project_dir = mktempdir()
+        for f in readdir(@__DIR__)
+            f in ("Project.toml", "Manifest.toml") ||
+                cp(joinpath(@__DIR__, f), joinpath(project_dir, f))
+        end
+        active_env = dirname(Base.active_project())
+        cp(joinpath(active_env, "Project.toml"), joinpath(project_dir, "Project.toml"))
+        manifest = joinpath(active_env, "Manifest.toml")
+        isfile(manifest) && cp(manifest, joinpath(project_dir, "Manifest.toml"))
+        cmd = `$(Base.julia_cmd()) --project=$(project_dir) --depwarn=error $(JULIAC_CMD) --experimental --trim=unsafe-warn --output-exe $(basename(binpath)) $(joinpath(@__DIR__, mainfile))`
 
         # since we are calling Julia from Julia, we first need to clean some
         # environment variables
@@ -75,7 +95,7 @@ end
         # We could just check for success, but then failures are hard to debug.
         # Instead we use `_execute` to also capture `stdout` and `stderr`.
         # @test success(setenv(cmd, clean_env))
-        trimcall = _execute(setenv(cmd, clean_env; dir = @__DIR__))
+        trimcall = _execute(setenv(cmd, clean_env; dir = dirname(binpath)))
         if trimcall.exitcode != 0 && expectedtopass
             @show trimcall.stdout
             @show trimcall.stderr

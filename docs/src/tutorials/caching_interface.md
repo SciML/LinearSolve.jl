@@ -73,6 +73,13 @@ and `U` factor values, is not cheap but must be recomputed for every change in t
 values of `A`. Thus storing the symbolic factorization can lead to some sizable
 gains.
 
+KLU's fast refactorization also reuses numerical pivots. Changing matrix values can
+make those pivots unstable even when the sparsity pattern stays fixed. LinearSolve
+checks for zero pivots and reciprocal pivot growth below `sqrt(eps(Float64))`, then
+recomputes the numerical factorization with fresh pivots when needed. The symbolic
+analysis is retained. The [KLU user guide](https://raw.githubusercontent.com/DrTimothyAldenDavis/SuiteSparse/dev/KLU/Doc/KLU_UserGuide.tex)
+describes why refactorization requires a numerical stability check.
+
 A very common case (for example, the Newton steps of a nonlinear solve or the
 time steps of an implicit ODE/PDE integrator) is that `A` keeps the **same
 sparsity pattern** across solves while only its stored values change. In that

@@ -601,6 +601,11 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
                 )
             else
                 fact = KLU.klu!(cacheval, nonzeros(A), check = false)
+                # Refactorization fixes the old pivots, which can become unstable as A changes.
+                if fact.common.status == KLU.KLU_SINGULAR ||
+                        (fact.common.status == KLU.KLU_OK && KLU.rgrowth(fact) < sqrt(eps(Float64)))
+                    KLU.klu_factor!(fact; check = false)
+                end
             end
         else
             # New fact each time since the sparsity pattern can change

@@ -249,6 +249,46 @@ sol1 = solve(prob)
 sol2 = solve(prob, LinearSolve.KrylovJL_CRAIGMR())
 @test sol1.u == sol2.u
 
+# One builder, so both operators share a closure type and `reinit!` can retype the cache.
+function nonsquare_funcop(A, b)
+    return FunctionOperator(
+        (w, v, u, p, t) -> mul!(w, A, v), zeros(size(A, 2)), b;
+        op_adjoint = (w, v, u, p, t) -> mul!(w, A', v)
+    )
+end
+
+# The non-square operator defaults ran on the LSMR / CRAIGMR workspace but read stats and
+# `x` back from the `:KrylovJL_GMRES` slot: `Failure` with `iters = 0`, and a stale `u`
+# once it stopped aliasing. https://github.com/SciML/LinearSolve.jl/issues/1294
+@testset "non-square operator defaults report their own stats" begin
+    for (m, n, alg) in (
+            (30, 12, LinearSolve.KrylovJL_LSMR()),
+            (12, 30, LinearSolve.KrylovJL_CRAIGMR()),
+        )
+        A = rand(m, n)
+        b = rand(m)
+        prob = LinearProblem(nonsquare_funcop(A, b), b)
+        sol1 = solve(prob; maxiters = 500)
+        sol2 = solve(prob, alg; maxiters = 500)
+        @test sol1.retcode === sol2.retcode
+        @test SciMLBase.successful_retcode(sol1)
+        @test sol1.iters == sol2.iters
+        @test sol1.u == sol2.u
+
+        # A `u` the workspaces do not alias must still get the current solve's answer.
+        cache = init(prob; maxiters = 500)
+        first_u = copy(solve!(cache).u)
+        A2 = rand(m, n)
+        b2 = rand(m)
+        SciMLBase.reinit!(cache; A = nonsquare_funcop(A2, b2), b = b2, u = zeros(n))
+        second_u = copy(solve!(cache).u)
+        @test second_u != first_u
+        @test second_u ≈ solve(
+            LinearProblem(nonsquare_funcop(A2, b2), b2), alg; maxiters = 500
+        ).u
+    end
+end
+
 # Default for Underdetermined problem but the size is a long rectangle.
 # `A` is rank-deficient, so the unpivoted-QR default falls back to column-pivoted
 # QR and returns the same least-squares solution as `A \ b` (it used to report

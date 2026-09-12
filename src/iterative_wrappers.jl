@@ -725,7 +725,11 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
         Krylov.krylov_solve!(args...; kwargs...)
     end
 
-    stats = @get_cacheval(cache, :KrylovJL_GMRES).stats
+    # `cacheval` above, not the `:KrylovJL_GMRES` slot: under the default solver the
+    # non-square operator defaults run on the `:KrylovJL_LSMR` / `:KrylovJL_CRAIGMR`
+    # workspace, and reading GMRES's untouched stats reported `ReturnCode.Failure`
+    # with `iters = 0` for every successful solve.
+    stats = cacheval.stats
     resid = !isempty(stats.residuals) ? last(stats.residuals) :
         zero(eltype(stats.residuals))
 
@@ -746,7 +750,6 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
 
     # Copy the solution to the allocated output array (block workspaces store
     # the batched solution in `X` rather than `x`)
-    cacheval = @get_cacheval(cache, :KrylovJL_GMRES)
     xsol = cacheval isa Union{Krylov.BlockGmresWorkspace, Krylov.BlockMinresWorkspace} ?
         cacheval.X : cacheval.x
     if cache.u !== xsol && ArrayInterface.can_setindex(cache.u)

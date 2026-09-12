@@ -1871,6 +1871,10 @@ end
 
 A fast sparse LU-factorization which specializes on sparsity patterns with “less structure”.
 
+Reused numerical pivots are checked after refactorization. If a pivot becomes zero
+or reciprocal pivot growth falls below `sqrt(eps(Float64))`, the numerical
+factorization is recomputed with new pivots while retaining the symbolic analysis.
+
 !!! note
 
     By default, the SparseArrays.jl are implemented for efficiency by caching the

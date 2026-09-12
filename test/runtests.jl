@@ -68,6 +68,7 @@ else
             @time @safetestset "Blocked generic_lufact! kernel" include("Core/blocked_lufact.jl")
             @time @safetestset "GESV Factorization" include("Core/gesv.jl")
             @time @safetestset "LU Refactorization Reuse" include("Core/lu_refactorization.jl")
+            @time @safetestset "KLU refactorization accuracy" include("Core/klu_refactor_accuracy.jl")
             @time @safetestset "Direct BLAS Refactorization Reuse" include("Core/direct_blas_refactorization.jl")
             @time @safetestset "Lightweight Solution (no cache)" include("Core/lightweight_solution.jl")
             @time @safetestset "LHL Factorization" include("Core/lhl.jl")

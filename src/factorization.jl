@@ -1916,6 +1916,9 @@ requested explicitly.
     set `reuse_symbolic = false`. To skip the pattern check entirely (which errors if the
     pattern unexpectedly changes), set `check_pattern = false`.
 
+    Numerical pivots are selected again whenever matrix values change. Symbolic
+    analysis and numeric workspace are reused without fixing the old pivot order.
+
 ## Keyword Arguments
 
   - `reuse_symbolic`: reuse the cached symbolic factorization across solves. Defaults to `true`.
@@ -1928,8 +1931,7 @@ requested explicitly.
     PureKLU choose automatically based on the maximum block size.
   - `tol`: Pivot on a column's diagonal instead of largest entry if it is at least `tol` times
     larger in magnitude. Set `tol = 1.0` for partial pivoting, and `tol = 0.0` to always use the
-    diagonal. Only applies to the initial factorization; refactorizations reuse the existing
-    pivot ordering. Defaults to `0.001`.
+    diagonal. Applies to initial and subsequent numerical factorizations. Defaults to `0.001`.
 """
 Base.@kwdef struct PureKLUFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool = true

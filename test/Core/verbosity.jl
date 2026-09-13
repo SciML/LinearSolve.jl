@@ -390,7 +390,7 @@ end
                 blas_info = Silent()
             )
 
-            @test_logs (:warn, r"BLAS/LAPACK.*Matrix is singular") solve(
+            @test_logs (:warn, r"BLAS/LAPACK.*Matrix is singular") match_mode = :any solve(
                 prob_singular, AppleAccelerateLUFactorization(); verbose = verbose_errors
             )
 
@@ -401,7 +401,7 @@ end
                 blas_success = Silent()
             )
 
-            @test_logs (:info, r"BLAS/LAPACK.*Matrix is singular") solve(
+            @test_logs (:info, r"BLAS/LAPACK.*Matrix is singular") match_mode = :any solve(
                 prob_singular, AppleAccelerateLUFactorization(); verbose = verbose_info
             )
 

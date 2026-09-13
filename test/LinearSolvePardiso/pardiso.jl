@@ -1,3 +1,10 @@
+# Julia 1.13's SparseArrays stdlib loads libgomp, which makes MKL select
+# libmkl_gnu_thread; its complex CGS path (used by MKLPardisoIterate) crashes or
+# returns zeros there. MKL must bind a threading layer at first use, before
+# `import Pardiso` triggers initialization, and refuses the intel layer while
+# libgomp is loaded, so run the suite on the sequential layer.
+get(ENV, "MKL_THREADING_LAYER", "") == "" && (ENV["MKL_THREADING_LAYER"] = "sequential")
+
 using LinearSolve, SparseArrays, Random, LinearAlgebra
 import Pardiso
 

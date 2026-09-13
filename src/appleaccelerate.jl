@@ -177,6 +177,7 @@ function aa_getrs!(
         1
     )
     LinearAlgebra.LAPACK.chklapackerror(BlasInt(info[]))
+    return B
 end
 
 function aa_getrs!(

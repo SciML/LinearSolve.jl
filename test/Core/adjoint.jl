@@ -491,4 +491,21 @@ end
         solve!(cache)
         @test solve!(cache; adjoint = true).u ≈ adjoint(A) \ bvec
     end
+
+    # https://github.com/SciML/LinearSolve.jl/issues/1302
+    @testset "the default solver leaves the right-hand side alone" begin
+        for T in (Float64, Float32, ComplexF64, ComplexF32), n in (6, m)
+            rtol = real(T) === Float32 ? 1.0f-2 : 1.0e-8
+            A = rand(T, n, n) + n * I
+            bvec = rand(T, n)
+            cvec = rand(T, n)
+            cvec_original = copy(cvec)
+            cache = init(LinearProblem(A, bvec))
+            solve!(cache)
+            cache.b = cvec
+            @test solve!(cache; adjoint = true).u ≈ adjoint(A) \ cvec_original rtol = rtol
+            @test cvec == cvec_original
+            @test solve!(cache).u ≈ A \ cvec_original rtol = rtol
+        end
+    end
 end

@@ -780,8 +780,9 @@ function SciMLBase.solve!(
                     fully_preallocated = alg.fully_preallocated
                 )
             else
-                # Refactorization reuses pivot ordering; `tol` does not apply
-                fact = PureKLU.klu!(cacheval, nonzeros(A), check = false)
+                fact = PureKLU.klu!(
+                    cacheval, nonzeros(A); check = false, reuse_pivots = false
+                )
             end
         else
             # New fact each time since the sparsity pattern can change and thus

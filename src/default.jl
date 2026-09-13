@@ -1265,14 +1265,15 @@ end
                 getproperty(cache.cacheval, $(Meta.quot(alg))).fact' \ dy
             end
         elseif alg == Symbol(DefaultAlgorithmChoice.MKLLUFactorization)
+            # Copy: these two back-solve in place, and `dy` is the caller's `cache.b`.
             quote
                 A = getproperty(cache.cacheval, $(Meta.quot(alg)))[1]
-                getrs!('T', A.factors, A.ipiv, dy)
+                getrs!('C', A.factors, A.ipiv, copy(dy))
             end
         elseif alg == Symbol(DefaultAlgorithmChoice.AppleAccelerateLUFactorization)
             quote
                 A = getproperty(cache.cacheval, $(Meta.quot(alg)))
-                aa_getrs!('T', A.factors, A.ipiv, dy, A.info)
+                aa_getrs!('C', A.factors, A.ipiv, copy(dy), A.info)
             end
         elseif alg in Symbol.(
                 (

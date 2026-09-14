@@ -1510,12 +1510,21 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
     red.pending && _resolve_pending!(red, A)
     red.active || return A
     nz = nonzeros(A)
-    # A change in the stored nnz breaks union caching: an explicit `Persistent`
-    # assumption promised a constant pattern (error), while `Auto` drops the union
-    # and falls back to per-solve dropzeros, handled like the non-union case below.
-    if red.cache_union && length(nz) != length(red.mask)
+    # A change in the stored pattern breaks union caching: `mask`/`keep` index into the
+    # starting matrix's positions, and `_persistent_reduced` lays the kept values out on
+    # the starting `colptr`/`rowval`, so a different pattern would scatter this matrix's
+    # values onto the wrong structure. An explicit `Persistent` assumption promised a
+    # constant pattern (error), while `Auto` drops the union and falls back to per-solve
+    # dropzeros, handled like the non-union case below. Ordered cheapest first: the nnz
+    # count, then `colptr` (O(n)), then `rowval` (O(nnz), the same order as the scatter
+    # this guards).
+    pattern_changed = red.cache_union && (
+        length(nz) != length(red.mask) ||
+            getcolptr(A) != red.colptr || rowvals(A) != red.rowval
+    )
+    if pattern_changed
         red.auto || throw(ArgumentError("nonstructural_zeros reduction requires a constant \
-                             stored sparsity pattern across solves (stored nnz changed)"))
+                             stored sparsity pattern across solves"))
         red.cache_union = false
     end
     # per-solve dropzeros: drop this matrix's own zeros and let the inner solver
@@ -1524,7 +1533,10 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
         new_reduced = deepcopy(LinearSolve.make_SparseMatrixCSC(A))
         dropzeros!(new_reduced)
         new_nnz = nnz(new_reduced)
-        red.structure_changed = new_nnz != red.reduced_nnz
+        # `pattern_changed` is load-bearing: a pattern change whose post-dropzeros nnz
+        # happens to match the previous one is still a structure change to the consumers
+        # of this flag.
+        red.structure_changed = pattern_changed || new_nnz != red.reduced_nnz
         red.reduced_nnz = new_nnz
         red.reduced = new_reduced
         red.nrefactor += 1

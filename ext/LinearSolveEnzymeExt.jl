@@ -757,6 +757,12 @@ function EnzymeRules.augmented_primal(
         ::Type{RT}, linsolve::EnzymeCore.Annotation{LP};
         kwargs...
     ) where {RT, LP <: LinearSolve.LinearCache}
+    # A non-square reverse pass needs the operands themselves (see
+    # `_nonsquare_pullback_term`), which an in-place factorization overwrites, so they are
+    # taken before the primal solve. Square problems keep paying nothing.
+    nonsquare = !LinearSolve.issquare(linsolve.val.A)
+    A_ns = nonsquare ? copy(linsolve.val.A) : nothing
+    b_ns = nonsquare ? copy(linsolve.val.b) : nothing
     res = func.val(linsolve.val; kwargs...)
 
     dres = if EnzymeRules.width(config) == 1
@@ -805,7 +811,7 @@ function EnzymeRules.augmented_primal(
 
     # No copy: the `setproperty!` rules above rewind the cache as the tape unwinds, so by
     # the time this solve's reverse runs the live cache is back to what this solve saw.
-    cache = (copy(res.u), resvals, linsolve.val, dAs, dbs)
+    cache = (copy(res.u), resvals, linsolve.val, dAs, dbs, A_ns, b_ns)
 
     _res = EnzymeRules.needs_primal(config) ? res : nothing
     _dres = EnzymeRules.needs_shadow(config) ? dres : nothing
@@ -818,7 +824,7 @@ function EnzymeRules.reverse(
         ::Type{RT}, cache, linsolve::EnzymeCore.Annotation{LP};
         kwargs...
     ) where {RT, LP <: LinearSolve.LinearCache}
-    y, dys, _linsolve, dAs, dbs = cache
+    y, dys, _linsolve, dAs, dbs, A_ns, b_ns = cache
 
     @assert !(linsolve isa Const)
     @assert !(linsolve isa Active)
@@ -847,6 +853,10 @@ function EnzymeRules.reverse(
 
         # Use sparse-safe outer product subtraction to preserve sparsity pattern
         _sparse_outer_sub!(dA, z, y)
+        if A_ns !== nothing && dA isa StridedMatrix
+            extra = LinearSolve._nonsquare_pullback_term(A_ns, b_ns, y, z, dy)
+            extra === nothing || (dA .+= extra)
+        end
         db .+= z
         dy .= eltype(dy)(0)
     end

@@ -331,19 +331,9 @@ end
         setfield!(cache, :isfresh, true)
         setfield!(cache, :precsisfresh, true)
         if cache.cacheval isa DefaultLinearSolverInit
+            # No `A_backup` refresh here: every algorithm the default can fall back from
+            # snapshots `A` at solve time instead.
             cache.cacheval.fell_back_to_qr = false
-            if x === getfield(cache, :A) && cache.cacheval.a_backup_allocated
-                A_backup = cache.cacheval.A_backup
-                if size(A_backup) == size(x)
-                    copyto!(A_backup, x)
-                else
-                    setfield!(cache.cacheval, :A_backup, copy(x))
-                end
-                cache.cacheval.a_backup_synced = true
-            elseif !(x === getfield(cache, :A))
-                # A was replaced by a different object; A_backup is now stale
-                cache.cacheval.a_backup_synced = false
-            end
         end
         update_cacheval!(cache, :A, x)
     elseif name === :p

@@ -773,6 +773,15 @@ function Base.setproperty!(dc::DualLinearCache, sym::Symbol, val)
         setu!(dc, val)
     elseif sym === :p
         setproperty!(dc.linear_cache, :p, nodual_value(val))
+    elseif sym === :isfresh
+        # `cache.isfresh = true` is the documented way to say that `A` changed, and on a
+        # plain `LinearCache` filling `cache.A` in place is enough for that to be true.
+        # Here `cache.A` is `dual_A`, while the solve factorizes a separate primal copy and
+        # reads cached partials, so both have to be re-derived from whatever `dual_A` now
+        # holds. `setA!` with the current `dual_A` does exactly that.
+        # See https://github.com/SciML/LinearSolve.jl/issues/1315.
+        val && setA!(dc, getfield(dc, :dual_A))
+        setproperty!(dc.linear_cache, :isfresh, val)
     elseif hasfield(DualLinearCache, sym)
         setfield!(dc, sym, val)
     elseif hasfield(LinearSolve.LinearCache, sym)

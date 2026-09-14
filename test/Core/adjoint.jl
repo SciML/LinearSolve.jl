@@ -492,6 +492,32 @@ end
         @test solve!(cache; adjoint = true).u ≈ adjoint(A) \ bvec
     end
 
+    # https://github.com/SciML/LinearSolve.jl/issues/1309
+    # Reverse mode used the square-system formula `-lambda x'` for every shape, dropping
+    # the term a pseudoinverse solve carries, so it disagreed with forward mode.
+    @testset "reverse-mode gradients for a non-square A" begin
+        Random.seed!(1309)
+        for (rows, cols) in ((9, 4), (4, 9))
+            A = randn(rows, cols)
+            bvec = randn(rows)
+            reference = ForwardDiff.gradient(
+                Av -> sum(reshape(Av, rows, cols) \ bvec), vec(A)
+            )
+            for alg in (SVDFactorization(), QRFactorization(), nothing)
+                # only SVD handles both orientations; skip the ones that cannot
+                rows < cols && alg !== SVDFactorization() && continue
+                g(Av) = sum(
+                    (
+                        alg === nothing ?
+                            solve(LinearProblem(reshape(Av, rows, cols), bvec)) :
+                            solve(LinearProblem(reshape(Av, rows, cols), bvec), alg)
+                    ).u
+                )
+                @test Zygote.gradient(g, vec(A))[1] ≈ reference rtol = 1.0e-6
+            end
+        end
+    end
+
     # https://github.com/SciML/LinearSolve.jl/issues/1302
     @testset "the default solver leaves the right-hand side alone" begin
         for T in (Float64, Float32, ComplexF64, ComplexF32), n in (6, m)

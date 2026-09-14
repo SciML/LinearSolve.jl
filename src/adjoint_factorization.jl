@@ -289,6 +289,37 @@ function _lhl_adjoint_reuse_solve!(x::AbstractMatrix, M, b, ws, refine::Int)
 end
 
 """
+    _nonsquare_pullback_term(A, b, x, lambda, dx)
+
+The part of the reverse-mode cotangent of `A` that the square-system formula `-lambda xᴴ`
+leaves out, or `nothing` when there is nothing to add.
+
+For a non-square `A` the solve returns `x = A⁺b`, whose pullback carries a second term.
+Which one depends on the shape, and for a full-rank `A` only one of them is ever nonzero:
+
+  - overdetermined (`m > n`), from the residual `r = b - A x`:  `r (A \\ lambda)ᴴ`
+  - underdetermined (`m < n`), from the null space of `A`:
+    `(Aᴴ \\ x) (dx - A \\ (A dx))ᴴ`
+
+Both are written as solves with `A` rather than through `AᴴA`/`AAᴴ` so the normal
+equations, and the squared condition number that comes with them, stay out of it.
+
+Returns `nothing` for anything that is not an `AbstractMatrix`, since the correction needs
+to solve with `A` itself. See SciML/LinearSolve.jl#1309.
+"""
+_nonsquare_pullback_term(A, b, x, lambda, dx) = nothing
+
+function _nonsquare_pullback_term(A::AbstractMatrix, b, x, lambda, dx)
+    m, n = size(A)
+    m == n && return nothing
+    return if m > n
+        (b - A * x) * adjoint(A \ lambda)
+    else
+        (adjoint(A) \ x) * adjoint(dx - A \ (A * dx))
+    end
+end
+
+"""
     _adjoint_solve(cache::LinearCache, b)
 
 Solve `adjoint(A) x = b` for the cache's current `A`, reusing the factorization the

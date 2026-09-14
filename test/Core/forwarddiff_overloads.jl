@@ -875,3 +875,39 @@ end
         @test dual_isapprox(u, reference; rtol = 1.0e-10)
     end
 end
+
+# https://github.com/SciML/LinearSolve.jl/issues/1315
+@testset "in-place A update plus isfresh refreshes the primal and partials" begin
+    Tg = ForwardDiff.Tag{typeof(identity), Float64}
+    DU = ForwardDiff.Dual{Tg, Float64, 1}
+    dual(v, p) = DU(v, ForwardDiff.Partials((p,)))
+
+    A1 = [dual(2.0, 1.0) dual(1.0, 0.0); dual(1.0, 0.0) dual(3.0, 0.0)]
+    A2 = [dual(5.0, 7.0) dual(1.0, 0.0); dual(1.0, 0.0) dual(4.0, 0.0)]
+    b = [dual(1.0, 0.0), dual(2.0, 0.0)]
+    reference = A2 \ b
+
+    for alg in (
+            nothing, LUFactorization(), GenericLUFactorization(),
+            QRFactorization(), KrylovJL_GMRES(),
+        )
+        cache = alg === nothing ? init(LinearProblem(copy(A1), copy(b))) :
+            init(LinearProblem(copy(A1), copy(b)), alg)
+        solve!(cache)
+        # write through `cache.A` rather than assigning, then declare it stale
+        copyto!(cache.A, A2)
+        cache.isfresh = true
+        u = solve!(cache).u
+        @test ForwardDiff.value.(u) ≈ ForwardDiff.value.(reference) rtol = 1.0e-8
+        @test [ForwardDiff.partials(x)[1] for x in u] ≈
+            [ForwardDiff.partials(x)[1] for x in reference] rtol = 1.0e-6
+    end
+
+    # the primal copy the solve factorizes, and the cached partials, are re-derived
+    cache = init(LinearProblem(copy(A1), copy(b)))
+    solve!(cache)
+    copyto!(cache.A, A2)
+    cache.isfresh = true
+    @test getfield(cache, :linear_cache).A ≈ ForwardDiff.value.(A2)
+    @test !getfield(cache, :A_partials_valid)
+end

@@ -785,10 +785,6 @@ end
                 # them from `alg.kwargs` used to raise a MethodError. MINRES read
                 # `.residual`, which its iterable calls `resnorm`, and threw a
                 # FieldError on every solve.
-                # Note these solves report `ReturnCode.Default` rather than
-                # `Success`: this extension never passes a retcode to
-                # `build_linear_solution`. That is pre-existing and separate from
-                # what is tested here, so assert on the solution itself.
                 for alg in (
                         IterativeSolversJL_IDRS(abstol = 1.0e-10, reltol = 1.0e-10),
                         IterativeSolversJL_MINRES(abstol = 1.0e-10, reltol = 1.0e-10),
@@ -819,6 +815,49 @@ end
                 end
                 @test solve(slow, IterativeSolversJL_CG(maxiter = 3, maxiters = 50)).iters == 3
             end
+
+            @testset "re-solve honors reltol (#1318)" begin
+                # The iterables fix `tol = max(reltol * ||r0||, abstol)` at
+                # construction, against whatever initial guess they were handed.
+                # GMRES kept its iterable and `purge_history!` never refreshed
+                # `tol`; the rest were rebuilt from the previous solution. Either
+                # way a second right hand side was measured against the first.
+                for f in (
+                        IterativeSolversJL_CG, IterativeSolversJL_GMRES,
+                        IterativeSolversJL_IDRS, IterativeSolversJL_MINRES,
+                        IterativeSolversJL_BICGSTAB,
+                    )
+                    cache = init(
+                        prob5, f(); reltol = 1.0e-10, abstol = 0.0, maxiters = 500
+                    )
+                    solve!(cache)
+                    small = b5 .* 1.0e-6
+                    cache.b = small
+                    sol = solve!(cache)
+                    @test norm(A5 * sol.u - small) / norm(small) <= 1.0e-9
+                    @test sol.retcode == ReturnCode.Success
+                end
+            end
+
+            @testset "precs sees the operator and the parameters (#1318)" begin
+                # `precs` used to be handed `(cache.Pl, cache.Pr)`, so a refresh
+                # never saw the updated `A`.
+                seen = Any[]
+                precs = function (A, p)
+                    push!(seen, copy(A))
+                    return (Diagonal(inv.(diag(A))), I)
+                end
+                cache = init(
+                    LinearProblem(Matrix(A5), b5),
+                    IterativeSolversJL_GMRES(precs = precs)
+                )
+                solve!(cache)
+                cache.A = Matrix(2A5)
+                solve!(cache)
+                @test length(seen) == 2
+                @test seen[2] ≈ 2 .* seen[1]
+                @test diag(cache.Pl) ≈ inv.(diag(2A5))
+            end
         end
     end
 
@@ -836,6 +875,18 @@ end
                     test_tolerance_update(alg[2], prob5, u5)
                 end
                 @test alg[2] isa KrylovKitJL
+            end
+
+            @testset "converged solves report Success (#1318)" begin
+                @test solve(prob5, KrylovKitJL_GMRES()).retcode == ReturnCode.Success
+            end
+
+            @testset "no preconditioner warning without Pl/Pr (#1318)" begin
+                # The defaults are `IdentityOperator`, not `UniformScaling`, so
+                # this warned on every plain solve.
+                @test_logs min_level = Base.CoreLogging.Warn solve(
+                    prob5, KrylovKitJL_GMRES()
+                )
             end
         end
     end

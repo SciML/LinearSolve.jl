@@ -3,8 +3,8 @@ module LinearSolveIterativeSolversExt
 using LinearSolve: LinearSolve, LinearCache, DEFAULT_PRECS, LinearVerbosity,
     OperatorAssumptions
 import LinearSolve: IterativeSolversJL
-using SciMLBase: SciMLBase
-using LinearAlgebra: LinearAlgebra, norm
+using SciMLBase: SciMLBase, ReturnCode
+using LinearAlgebra: LinearAlgebra, ldiv!, norm
 using SciMLLogging: SciMLLogging, @SciMLMessage
 
 using IterativeSolvers: IterativeSolvers
@@ -119,7 +119,7 @@ function LinearSolve.init_cacheval(
             kwargs...
         )
     elseif alg.generate_iterator === IterativeSolvers.idrs_iterable!
-        !!LinearSolve._isidentity_struct(Pr) &&
+        !LinearSolve._isidentity_struct(Pr) &&
             @SciMLMessage(
             "$(alg.generate_iterator) doesn't support right preconditioning",
             verbosity, :no_right_preconditioning
@@ -144,7 +144,7 @@ function LinearSolve.init_cacheval(
             filter_kwargs(; alg_kwargs...)...
         )
     elseif alg.generate_iterator === IterativeSolvers.bicgstabl_iterator!
-        !!LinearSolve._isidentity_struct(Pr) &&
+        !LinearSolve._isidentity_struct(Pr) &&
             @SciMLMessage(
             "$(alg.generate_iterator) doesn't support right preconditioning",
             verbosity, :no_right_preconditioning
@@ -170,7 +170,7 @@ end
 
 function SciMLBase.solve!(cache::LinearCache, alg::IterativeSolversJL; kwargs...)
     if cache.precsisfresh && !isnothing(alg.precs)
-        Pl, Pr = alg.precs(cache.Pl, cache.Pr)
+        Pl, Pr = alg.precs(cache.A, cache.p)
         cache.Pl = Pl
         cache.Pr = Pr
         cache.precsisfresh = false
@@ -187,6 +187,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::IterativeSolversJL; kwargs...
         cache.isfresh = false
     end
     purge_history!(cache.cacheval, cache.u, cache.b)
+    reset_tolerance!(cache.cacheval, cache.b, cache.Pl, cache.abstol, cache.reltol)
 
     @SciMLMessage(
         "Using IterativeSolvers.$(alg.generate_iterator)",
@@ -207,7 +208,10 @@ function SciMLBase.solve!(cache::LinearCache, alg::IterativeSolversJL; kwargs...
         resid = resid.current
     end
 
-    return SciMLBase.build_linear_solution(alg, cache.u, resid, nothing; iters = i)
+    retcode = _iterable_converged(cache.cacheval) ? ReturnCode.Success : ReturnCode.MaxIters
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, resid, nothing; iters = i, retcode = retcode
+    )
 end
 
 # IterativeSolvers does not name this field consistently across its iterables.
@@ -217,6 +221,26 @@ end
 _iterable_residual(iterable) = iterable.residual
 _iterable_residual(iterable::IterativeSolvers.IDRSIterable) = iterable.R
 _iterable_residual(iterable::IterativeSolvers.MINRESIterable) = iterable.resnorm
+
+# `IterativeSolvers.converged` covers every iterable reachable here except
+# `IDRSIterable`, which carries its residual norm as `normR`.
+_iterable_converged(iter) = IterativeSolvers.converged(iter)
+_iterable_converged(iter::IterativeSolvers.IDRSIterable) = iter.normR <= iter.tol
+
+# The constructors bake in `tol = max(reltol * ||r0||, abstol)` against whatever initial
+# guess they were handed. LinearSolve's `reltol` is relative to `b`, and the two agree
+# only at a zero guess, so re-solving from the previous solution left the tolerance
+# orders of magnitude too loose (SciML/LinearSolve.jl#1318).
+reset_tolerance!(iter, b, Pl, atol, rtol) = (iter.tol = max(rtol * norm(b), atol))
+function reset_tolerance!(iter::IterativeSolvers.GMRESIterable, b, Pl, atol, rtol)
+    # `purge_history!` has already recomputed this one from the new `b` at a zero guess.
+    return update_tolerances_iterativesolversjl!(iter, atol, rtol)
+end
+function reset_tolerance!(iter::IterativeSolvers.BiCGStabIterable, b, Pl, atol, rtol)
+    # GMRES and bicgstabl are the two that test the left preconditioned residual.
+    ref = LinearSolve._isidentity_struct(Pl) ? norm(b) : norm(ldiv!(Pl, copy(b)))
+    return iter.tol = max(rtol * ref, atol)
+end
 
 purge_history!(iter, x, b) = nothing
 function purge_history!(iter::IterativeSolvers.GMRESIterable, x, b)

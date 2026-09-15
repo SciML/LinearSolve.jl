@@ -26,8 +26,8 @@ end
 
 function SciMLBase.solve!(cache::LinearCache, alg::KrylovKitJL; kwargs...)
     # KrylovKit doesn't use Pl/Pr, so warn if the user set one
-    if !(cache.Pl isa LinearAlgebra.UniformScaling) ||
-            !(cache.Pr isa LinearAlgebra.UniformScaling)
+    if !LinearSolve._isidentity_struct(cache.Pl) ||
+            !LinearSolve._isidentity_struct(cache.Pr)
         @warn "KrylovKit does not support preconditioners. Pl/Pr will be ignored. Use KrylovJL_GMRES() if you need preconditioning." maxlog = 1
     end
     atol = float(cache.abstol)
@@ -46,7 +46,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovKitJL; kwargs...)
     copy!(cache.u, x)
     resid = info.normres
     retcode = if info.converged == 1
-        ReturnCode.Default
+        ReturnCode.Success
     else
         @SciMLMessage("Solver failed", cache.verbose, :convergence_failure)
         ReturnCode.ConvergenceFailure

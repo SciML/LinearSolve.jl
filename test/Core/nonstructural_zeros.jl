@@ -342,4 +342,61 @@ reduction(cache) = cache.cacheval.sparse_reduction
         @test sol2.u ≈ Matrix(full2) \ b rtol = 1.0e-8
         @test !reduction(cache).active
     end
+
+    # https://github.com/SciML/LinearSolve.jl/issues/1308
+    @testset "a same-nnz pattern change is caught" begin
+        n = 8
+        build(offrow) = begin
+            I = Int[]
+            J = Int[]
+            V = Float64[]
+            for j in 1:n
+                push!(I, j)
+                push!(J, j)
+                push!(V, 10.0 + j)
+            end
+            push!(I, offrow)
+            push!(J, 1)
+            push!(V, 4.0)
+            push!(I, 5)
+            push!(J, 6)
+            push!(V, 0.0)
+            push!(I, 6)
+            push!(J, 7)
+            push!(V, 0.0)
+            return sparse(I, J, V, n, n)
+        end
+        A1 = build(3)
+        A2 = build(4)
+        b = collect(1.0:n)
+        @test nnz(A1) == nnz(A2)
+        @test rowvals(A1) != rowvals(A2)
+
+        for nz in (
+                LinearSolve.NonstructuralZeros.Auto,
+                LinearSolve.NonstructuralZeros.None,
+                LinearSolve.NonstructuralZeros.Present,
+            )
+            cache = init(
+                LinearProblem(copy(A1), copy(b));
+                assumptions = OperatorAssumptions(true; nonstructural_zeros = nz)
+            )
+            solve!(cache)
+            cache.A = copy(A2)
+            sol = solve!(cache)
+            @test sol.retcode == ReturnCode.Success
+            @test sol.u ≈ Matrix(A2) \ b rtol = 1.0e-8
+        end
+
+        # `Persistent` promised a constant pattern, so the break is reported
+        cache = init(
+            LinearProblem(copy(A1), copy(b));
+            assumptions = OperatorAssumptions(
+                true; nonstructural_zeros = LinearSolve.NonstructuralZeros.Persistent
+            )
+        )
+        solve!(cache)
+        cache.A = copy(A2)
+        @test_throws ArgumentError solve!(cache)
+    end
 end

@@ -2,6 +2,8 @@ using LinearSolve
 using LinearSolve: LinearVerbosity, option_group, group_options, BLISLUFactorization,
     __appleaccelerate_isavailable, __mkl_isavailable, __openblas_isavailable
 using SciMLLogging
+using IterativeSolvers
+using LinearAlgebra
 using Test
 
 @testset "LinearVerbosity Tests" begin
@@ -505,5 +507,23 @@ end
         else
             @info "Skipping MKL tests - MKL not available"
         end
+    end
+end
+
+@testset "right preconditioning warning (#1318)" begin
+    # `idrs_iterable!` and `bicgstabl_iterator!` guarded with `!!`, which is the
+    # identity, so they warned exactly when no right preconditioner was set.
+    n = 8
+    # not a scaled identity: IterativeSolvers' own bicgstabl breaks down on one.
+    A = Matrix(SymTridiagonal(fill(4.0, n), fill(-1.0, n - 1)))
+    b = ones(n)
+    prob = LinearProblem(A, b)
+    verbose = LinearVerbosity(no_right_preconditioning = WarnLevel())
+
+    for alg in (IterativeSolversJL_CG(), IterativeSolversJL_IDRS(), IterativeSolversJL_BICGSTAB())
+        @test_logs min_level = SciMLLogging.Logging.Warn solve(prob, alg; verbose)
+        @test_logs (:warn, r"doesn't support right preconditioning") match_mode = :any solve(
+            prob, alg; Pr = Diagonal(fill(0.5, n)), verbose
+        )
     end
 end

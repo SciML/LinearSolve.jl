@@ -114,10 +114,7 @@ function Mooncake.rrule!!(
         ∂A = .-(λ .* tu)
         # `cache.A`/`cache.b` were restored from `A_orig`/`b_orig` above, so they are the
         # pristine operands the correction term needs.
-        extra = LinearSolve._nonsquare_pullback_term(
-            cache.A, cache.b, new_sol.u, λ, ∂u
-        )
-        extra === nothing || (∂A = ∂A .+ extra)
+        LinearSolve._add_nonsquare_pullback!(∂A, cache.A, cache.b, new_sol.u, λ, ∂u)
         ∂b = λ
 
         if (iszero(∂b) || iszero(∂A)) && !iszero(tu)

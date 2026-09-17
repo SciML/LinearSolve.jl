@@ -350,3 +350,47 @@ end
         @test Y ≈ UpperTriangular(W) \ Y0 rtol = 1.0e-12
     end
 end
+
+# https://github.com/SciML/LinearSolve.jl/issues/1314
+@testset "refactorization refreshes a stale MC64 scaling" begin
+    berr(A, x, b) = norm(A * x - b) / (opnorm(Matrix(A), 1) * norm(x) + norm(b))
+    # weak diagonal with strong permutation entries, so `needs_matching` is true and the
+    # matching (and its scaling) is built from the first matrix's values
+    function build(n, rng)
+        p = randperm(rng, n)
+        rows = collect(1:n)
+        cols = collect(1:n)
+        vals = fill(1.0e-6, n)
+        append!(rows, p)
+        append!(cols, 1:n)
+        append!(vals, ones(n))
+        S = sprand(rng, n, n, 0.02)
+        Is, Js, Vs = findnz(S)
+        append!(rows, Is)
+        append!(cols, Js)
+        append!(vals, 0.01 .* Vs)
+        return sparse(rows, cols, vals, n, n, (x, y) -> x)
+    end
+
+    rng = MersenneTwister(20260914)
+    n = 300
+    A1 = build(n, rng)
+    A2 = SparseMatrixCSC(
+        n, n, copy(A1.colptr), copy(A1.rowval),
+        nonzeros(A1) .* 10.0 .^ (12.0 .* (rand(rng, nnz(A1)) .- 0.5))
+    )
+    b = randn(rng, n)
+    alg = SupernodalLUFactorization()
+
+    cache = init(LinearProblem(copy(A1), copy(b)), alg)
+    solve!(cache)
+    @test cache.cacheval.matched          # the scaling this test is about exists
+    cache.A = copy(A2)
+    reused = solve!(cache)
+    @test reused.retcode == ReturnCode.Success
+
+    fresh = solve(LinearProblem(copy(A2), copy(b)), alg)
+    # reusing the analysis must not cost accuracy against factorizing A2 outright
+    @test berr(A2, reused.u, b) <= 10 * berr(A2, fresh.u, b) + 1.0e-18
+    @test berr(A2, reused.u, b) < n * eps(Float64)
+end

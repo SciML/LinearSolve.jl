@@ -899,21 +899,33 @@ function LinearSolve.pattern_changed(
     return getcolptr(Aold) != getcolptr(A) || rowvals(Aold) != rowvals(A)
 end
 
+# `‖Ay - b‖ / (‖A‖₁‖y‖ + ‖b‖)`, reusing the factor-owned residual buffer so the check
+# costs one sparse mat-vec and no allocation.
+function _snlu_backward_error(F, y::AbstractVector, b::AbstractVector)
+    r = F.ir_r
+    LinearAlgebra.mul!(r, F.A, y)
+    r .-= b
+    denom = LinearAlgebra.opnorm(F.A, 1) * LinearAlgebra.norm(y) + LinearAlgebra.norm(b)
+    return iszero(denom) ? zero(real(eltype(r))) : LinearAlgebra.norm(r) / denom
+end
+
 function SciMLBase.solve!(
         cache::LinearSolve.LinearCache, alg::SupernodalLUFactorization; kwargs...
     )
     A = cache.A
     A = LinearSolve.reduce_operand!(cache.sparse_reduction, A)
     A = convert(AbstractMatrix, A)
+    reused = false
+    As = SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A))
     if cache.isfresh
         cacheval = LinearSolve.@get_cacheval(cache, :SupernodalLUFactorization)
-        As = SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A))
         if alg.reuse_symbolic && size(cacheval) == size(As) &&
                 nnz(cacheval.A) == nnz(As) &&
                 !(alg.check_pattern && pattern_changed(cacheval, As))
             # numeric-only refactorization: reuses the analysis, matching, and
             # all numeric storage (allocation-free)
             fact = SNLU.snlu!(cacheval, As)
+            reused = true
         else
             # `check = false`: static pivoting never aborts — numerically
             # singular systems surface through the finiteness check below.
@@ -928,6 +940,25 @@ function SciMLBase.solve!(
     end
     F = LinearSolve.@get_cacheval(cache, :SupernodalLUFactorization)
     y = SNLU.solve!(cache.u, F, cache.b)
+    # A reused analysis carries the MC64 matching and its scaling, both derived from the
+    # values of the matrix it was built on. New values can leave those stale and cost most
+    # of the working precision without perturbing a pivot, so the check below cannot catch
+    # it. Measure the backward error once and redo the analysis when it has degraded past
+    # what a stable factorization of this size should deliver. See
+    # https://github.com/SciML/LinearSolve.jl/issues/1314.
+    if reused && F.matched && y isa AbstractVector && all(isfinite, y)
+        if _snlu_backward_error(F, y, cache.b) >
+                size(As, 2) * eps(real(eltype(As)))
+            fact = SNLU.snlu(
+                As; ordering = alg.ordering, matching = alg.matching,
+                eps_pivot = alg.eps_pivot, threaded = alg.threaded,
+                dense_alg = alg.dense_alg, check = false
+            )
+            cache.cacheval = fact
+            F = LinearSolve.@get_cacheval(cache, :SupernodalLUFactorization)
+            y = SNLU.solve!(cache.u, F, cache.b)
+        end
+    end
     # Static pivoting never aborts: a numerically singular system factors with
     # perturbed pivots and produces a finite but meaningless solution. When
     # pivots were perturbed (rare), verify the residual (one sparse mat-vec)

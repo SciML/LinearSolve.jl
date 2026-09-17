@@ -854,8 +854,7 @@ function EnzymeRules.reverse(
         # Use sparse-safe outer product subtraction to preserve sparsity pattern
         _sparse_outer_sub!(dA, z, y)
         if A_ns !== nothing && dA isa StridedMatrix
-            extra = LinearSolve._nonsquare_pullback_term(A_ns, b_ns, y, z, dy)
-            extra === nothing || (dA .+= extra)
+            LinearSolve._add_nonsquare_pullback!(dA, A_ns, b_ns, y, z, dy)
         end
         db .+= z
         dy .= eltype(dy)(0)

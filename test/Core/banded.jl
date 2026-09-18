@@ -1,4 +1,5 @@
 using FastAlmostBandedMatrices, BandedMatrices, LinearAlgebra, LinearSolve, Test
+using SparseArrays: sparse
 
 # Square Case
 n = 8
@@ -146,3 +147,51 @@ A = BandedMatrix{BigFloat}(ones(3, 3), (0, 0))
 b = BigFloat[1, 2, 3]
 prob = LinearProblem(A, b)
 @test_nowarn solve(prob)
+
+@testset "AlmostBandedMatrix caches QR until the matrix changes" begin
+    for storage in (Matrix, sparse), m in (24, 30), alg in (nothing, QRFactorization())
+        n = 24
+        B = BandedMatrix(randn(m, n), (3, 2))
+        B[band(0)] .+= 10
+        L = zeros(2, n)
+        L[1, 1] = L[2, 2] = 10
+        L[:, (n - 1):n] .= 0.5
+        A = AlmostBandedMatrix(B, storage(L))
+        original = Matrix(A)
+        b = randn(m)
+        cache = init(LinearProblem(A, b), alg)
+        if alg === nothing
+            @test cache.alg.alg == LinearSolve.DefaultAlgorithmChoice.QRFactorization
+        end
+        factors() = alg === nothing ? cache.cacheval.QRFactorization : cache.cacheval
+        @test solve!(cache).u ≈ original \ b
+        F = factors()
+        @test F isa FastAlmostBandedMatrices.QR
+        @test !cache.isfresh
+        @test Matrix(A) == original
+
+        # A new right-hand side must reuse exactly the same factorization.
+        b2 = randn(m)
+        cache.b = b2
+        @test !cache.isfresh
+        @test solve!(cache).u ≈ original \ b2
+        @test factors() === F
+
+        # Replacing A invalidates QR, including changes to nonlocal fill entries.
+        A2 = copy(A)
+        A2[band(0)] .+= 2
+        A2[1, n] = 3
+        reference2 = Matrix(A2)
+        cache.A = A2
+        @test cache.isfresh
+        @test solve!(cache).u ≈ reference2 \ b2
+        @test factors() !== F
+        @test !cache.isfresh
+
+        # Also support the caller rewriting and reassigning the same A buffer.
+        copyto!(cache.A, A)
+        cache.A = cache.A
+        @test cache.isfresh
+        @test solve!(cache).u ≈ original \ b2
+    end
+end

@@ -94,9 +94,21 @@ end
         )
         LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.CHOLMODFactorization)
     end
+
+    function LinearSolve.defaultalg(
+            A::Hermitian{<:BLASELTYPES, <:SparseMatrixCSC}, b, ::OperatorAssumptions{Bool}
+        )
+        LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.CHOLMODFactorization)
+    end
 else
     function LinearSolve.defaultalg(
             A::Symmetric{<:BLASELTYPES, <:SparseMatrixCSC}, b, ::OperatorAssumptions{Bool}
+        )
+        LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.CholeskyFactorization)
+    end
+
+    function LinearSolve.defaultalg(
+            A::Hermitian{<:BLASELTYPES, <:SparseMatrixCSC}, b, ::OperatorAssumptions{Bool}
         )
         LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.CholeskyFactorization)
     end
@@ -1100,7 +1112,10 @@ end
 
     function LinearSolve.init_cacheval(
             alg::CHOLMODFactorization,
-            A::Union{SparseMatrixCSC{T, Int}, Symmetric{T, SparseMatrixCSC{T, Int}}}, b, u,
+            A::Union{
+                SparseMatrixCSC{T, Int}, Symmetric{T, SparseMatrixCSC{T, Int}},
+                Hermitian{T, SparseMatrixCSC{T, Int}},
+            }, b, u,
             Pl, Pr,
             maxiters::Int, abstol, reltol,
             verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
@@ -1113,7 +1128,10 @@ end
 
     function LinearSolve.init_cacheval(
             alg::CHOLMODFactorization,
-            A::Union{SparseMatrixCSC{T, Int}, Symmetric{T, SparseMatrixCSC{T, Int}}}, b, u,
+            A::Union{
+                SparseMatrixCSC{T, Int}, Symmetric{T, SparseMatrixCSC{T, Int}},
+                Hermitian{T, SparseMatrixCSC{T, Int}},
+            }, b, u,
             Pl, Pr,
             maxiters::Int, abstol, reltol,
             verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions

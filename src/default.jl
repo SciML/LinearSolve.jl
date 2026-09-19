@@ -205,9 +205,6 @@ function defaultalg(A::Diagonal, b, ::OperatorAssumptions{Bool})
     return DefaultLinearSolver(DefaultAlgorithmChoice.DiagonalFactorization)
 end
 
-function defaultalg(A::Hermitian, b, ::OperatorAssumptions{Bool})
-    return DefaultLinearSolver(DefaultAlgorithmChoice.CholeskyFactorization)
-end
 
 """
     LinearSolve.LHL_DEFAULT_MIN_SIZE
@@ -271,6 +268,10 @@ _lhl_scalar_massmatrix(::Number) = true
 _lhl_scalar_massmatrix(::Any) = false
 
 function defaultalg(A::Symmetric{<:Number, <:Array}, b, ::OperatorAssumptions{Bool})
+    return DefaultLinearSolver(DefaultAlgorithmChoice.BunchKaufmanFactorization)
+end
+
+function defaultalg(A::Hermitian{<:Number, <:Array}, b, ::OperatorAssumptions{Bool})
     return DefaultLinearSolver(DefaultAlgorithmChoice.BunchKaufmanFactorization)
 end
 

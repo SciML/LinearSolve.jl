@@ -789,3 +789,49 @@ end
     @test Pl.calls[] > 0
     @test Pr.calls[] > 0
 end
+
+@testset "Hermitian routes like Symmetric (#1326)" begin
+    rng = Random.MersenneTwister(0)
+    n = 6
+    M = randn(rng, n, n)
+    S = (M + M') / 2
+    b = randn(rng, n)
+    @test !isposdef(S)
+
+    sym = solve(LinearProblem(Symmetric(S), b))
+    herm = solve(LinearProblem(Hermitian(S), b))
+    @test herm.retcode == ReturnCode.Success
+    @test herm.u ≈ sym.u
+    @test norm(Symmetric(S) * herm.u - b) / norm(b) < 1.0e-12
+
+    Mc = randn(rng, ComplexF64, n, n)
+    Hc = (Mc + Mc') / 2
+    bc = randn(rng, ComplexF64, n)
+    solc = solve(LinearProblem(Hermitian(Hc), bc))
+    @test solc.retcode == ReturnCode.Success
+    @test norm(Hermitian(Hc) * solc.u - bc) / norm(bc) < 1.0e-12
+
+    # CHOLMOD wants a positive definite matrix, and an indefinite sparse one throws for
+    # `Symmetric` too, so the indefinite case below checks parity rather than success.
+    Q = sprandn(rng, 8, 8, 0.4)
+    b8 = randn(rng, 8)
+    Apd = Q * Q' + 8I
+    hs = solve(LinearProblem(Hermitian(Apd), b8))
+    ss = solve(LinearProblem(Symmetric(Apd), b8))
+    @test hs.retcode == ReturnCode.Success
+    @test hs.u ≈ ss.u
+
+    outcome(A) = try
+        solve(LinearProblem(A, b8)).retcode
+    catch e
+        typeof(e)
+    end
+    Aind = sparse((Q + Q') / 2)
+    @test outcome(Hermitian(Aind)) == outcome(Symmetric(Aind))
+
+    for A in (Hermitian(S), Hermitian(Hc))
+        rhs = eltype(A) <: Complex ? bc : b
+        sol = solve(LinearProblem(A, rhs), BunchKaufmanFactorization())
+        @test norm(A * sol.u - rhs) / norm(rhs) < 1.0e-12
+    end
+end

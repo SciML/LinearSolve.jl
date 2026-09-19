@@ -960,6 +960,47 @@ end
             @test y ≈ s .* x
         end
 
+        @testset "InvPreconditioner in-place apply (#1322)" begin
+            # `ldiv!(::InvPreconditioner, x)` used to be `mul!(x, P, x)`, which aliases
+            # its destination and source. gemv and the sparse kernels return garbage
+            # rather than erroring, so the preconditioned residual came back zeroed and
+            # the solve stopped at iteration 0 with the zero vector.
+            rng = Random.MersenneTwister(0)
+            m = 5
+            x0 = randn(rng, m)
+            for P in (
+                    randn(rng, m, m) + 5I,
+                    sparse(randn(rng, m, m) + 5I),
+                    Diagonal(randn(rng, m) .+ 3),
+                    2.5I,
+                    LowerTriangular(randn(rng, m, m) + 5I),
+                )
+                x = copy(x0)
+                ldiv!(LinearSolve.InvPreconditioner(P), x)
+                @test x ≈ P * x0
+            end
+
+            # the documented Diagonal path stays allocation free
+            pd = LinearSolve.InvPreconditioner(Diagonal(randn(rng, m) .+ 3))
+            v = randn(rng, m)
+            ldiv!(pd, v)
+            @test (@allocated ldiv!(pd, v)) == 0
+
+            Ap = let Q = sprandn(rng, 40, 40, 0.3)
+                Q * Q' + 40I
+            end
+            bp = randn(rng, 40)
+            pc = LinearSolve.InvPreconditioner(Matrix(Diagonal(1 ./ diag(Ap))))
+            for alg in (
+                    IterativeSolversJL_GMRES(), IterativeSolversJL_BICGSTAB(),
+                    IterativeSolversJL_IDRS(),
+                )
+                sol = solve(LinearProblem(Ap, bp), alg; Pl = pc)
+                @test !iszero(sol.u)
+                @test norm(Ap * sol.u - bp) / norm(bp) < 1.0e-6
+            end
+        end
+
         @testset "ComposePreconditioenr" begin
             s1 = rand(n)
             s2 = rand(n)

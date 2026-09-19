@@ -86,6 +86,13 @@ struct InvPreconditioner{T}
 end
 
 Base.eltype(A::InvPreconditioner) = Base.eltype(A.P)
-LinearAlgebra.ldiv!(A::InvPreconditioner, x) = mul!(x, A.P, x)
+# `mul!(x, P, x)` passes one array as both destination and source, which `mul!` leaves
+# undefined. BLAS `gemv` and the sparse kernels return garbage instead of erroring, so
+# preconditioned solves saw a zero residual and stopped at iteration 0
+# (SciML/LinearSolve.jl#1322). Scale in place when `P` is diagonal, and go through a
+# temporary otherwise rather than relying on any `mul!` tolerating the aliasing.
+LinearAlgebra.ldiv!(A::InvPreconditioner, x) = copyto!(x, A.P * x)
+LinearAlgebra.ldiv!(A::InvPreconditioner{<:Diagonal}, x) = (x .= A.P.diag .* x)
+LinearAlgebra.ldiv!(A::InvPreconditioner{<:UniformScaling}, x) = (x .= A.P.λ .* x)
 LinearAlgebra.ldiv!(y, A::InvPreconditioner, x) = mul!(y, A.P, x)
 LinearAlgebra.mul!(y, A::InvPreconditioner, x) = ldiv!(y, A.P, x)

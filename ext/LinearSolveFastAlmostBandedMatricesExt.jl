@@ -16,11 +16,7 @@ import LinearSolve: defaultalg,
     DefaultAlgorithmChoice, LinearVerbosity
 
 function defaultalg(A::AlmostBandedMatrix, b, oa::OperatorAssumptions{Bool})
-    if oa.issq
-        return DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
-    else
-        return DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
-    end
+    return DefaultLinearSolver(DefaultAlgorithmChoice.QRFactorization)
 end
 
 # `cache.cacheval` is typed from this, and the underdetermined path stores a

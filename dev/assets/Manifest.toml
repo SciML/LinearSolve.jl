@@ -673,10 +673,10 @@ version = "0.2.0"
 
 [[deps.GPUCompiler]]
 deps = ["CompilerCaching", "ExprTools", "InteractiveUtils", "LLVM", "Libdl", "Logging", "PrecompileTools", "Preferences", "REPL", "ScopedValues", "TOML", "Tracy", "UUIDs", "tree_sitter_gcn_jll", "tree_sitter_llvm_jll", "tree_sitter_ptx_jll", "tree_sitter_spirv_jll"]
-git-tree-sha1 = "e08d8f001c2b5b5d3d4b18723f29d424ab8a3396"
+git-tree-sha1 = "776a466823d042ee195309d69f36a246e49e6fac"
 registries = "General"
 uuid = "61eb1bfa-7361-4325-ad38-22787b887f55"
-version = "2.7.0"
+version = "2.8.1"
 
     [deps.GPUCompiler.extensions]
     HighlightsExt = "Highlights"
@@ -687,6 +687,7 @@ version = "2.7.0"
     LLVMDowngrader_jll = "f52de702-fb25-5922-94ba-81dd59b07444"
     NVPTX_LLVM_Backend_jll = "ef6e0fe3-e6ef-59c0-bde6-4989574699e0"
     SPIRV_LLVM_Backend_jll = "4376b9bf-cff8-51b6-bb48-39421dff0d0c"
+    SPIRV_LLVM_Translator_jll = "4a5d46fc-d8cf-5151-a261-86b458210efb"
 
 [[deps.GPUToolbox]]
 deps = ["LLVM"]
@@ -773,10 +774,10 @@ version = "1.3.16+0"
 
 [[deps.HTTP]]
 deps = ["Base64", "CodecZlib", "Dates", "EnumX", "Logging", "PrecompileTools", "Random", "Reseau", "SHA", "URIs", "UUIDs", "Zlib_jll"]
-git-tree-sha1 = "2aa0365e4865778c9c4fef5d22ad4f2c6bd17264"
+git-tree-sha1 = "16ea62e9964138ad04e12408077a9ed0389b0495"
 registries = "General"
 uuid = "cd3eb016-35fb-5094-929b-558a96fad6f3"
-version = "2.7.0"
+version = "2.7.1"
 
 [[deps.HarfBuzz_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "Graphite2_jll", "JLLWrappers", "Libdl", "Libffi_jll"]
@@ -882,10 +883,10 @@ version = "1.8.0"
 
 [[deps.JSON]]
 deps = ["Dates", "Logging", "Parsers", "PrecompileTools", "StructUtils", "UUIDs", "Unicode"]
-git-tree-sha1 = "cb5b63c11dd08229716a8b41a2325ab941a7b797"
+git-tree-sha1 = "633b5a34494e711f694ccbc88a6e00102f10238c"
 registries = "General"
 uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
-version = "1.8.1"
+version = "1.9.0"
 
     [deps.JSON.extensions]
     JSONArrowExt = ["ArrowTypes"]
@@ -975,10 +976,10 @@ weakdeps = ["BFloat16s"]
 
 [[deps.LLVMDowngrader_jll]]
 deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl", "Zlib_jll", "Zstd_jll"]
-git-tree-sha1 = "c919d7c47f352040edfccda88cc1cc6617c40bd8"
+git-tree-sha1 = "0db08eb2fba24173296b28b808d2c4f704aa71c6"
 registries = "General"
 uuid = "f52de702-fb25-5922-94ba-81dd59b07444"
-version = "0.10.0+1"
+version = "0.11.0+0"
 
 [[deps.LLVMExtra_jll]]
 deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl", "TOML"]
@@ -1142,9 +1143,9 @@ version = "1.13.0"
 
 [[deps.LinearSolve]]
 deps = ["AMD", "ArrayInterface", "ConcreteStructs", "DocStringExtensions", "EnumX", "GPUArraysCore", "InteractiveUtils", "Krylov", "LHLFactorization", "Libdl", "LinearAlgebra", "MKL_jll", "Markdown", "OpenBLAS_jll", "PrecompileTools", "Preferences", "PureKLU", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLLogging", "SciMLOperators", "SciMLStructures", "Setfield", "SparseArrays", "SparseColumnPivotedQR", "StaticArraysCore"]
-path = "/home/runner/work/LinearSolve.jl/LinearSolve.jl"
+path = "/home/runner/_work/LinearSolve.jl/LinearSolve.jl"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
-version = "5.17.6"
+version = "5.17.7"
 
     [deps.LinearSolve.extensions]
     LinearSolveAMDGPUExt = "AMDGPU"
@@ -1352,10 +1353,10 @@ version = "0.3.3"
 
 [[deps.Metal]]
 deps = ["AbstractFFTs", "Adapt", "BFloat16s", "CEnum", "CodecBzip2", "Crayons", "ExprTools", "GPUArrays", "GPUCompiler", "GPUToolbox", "KernelAbstractions", "LLVM", "LLVMDowngrader_jll", "LinearAlgebra", "ObjectiveC", "PrecompileTools", "Preferences", "PrettyTables", "Printf", "Random", "Random123", "RandomNumbers", "Reexport", "SHA", "ScopedValues", "Scratch", "Statistics", "UUIDs"]
-git-tree-sha1 = "ae9c6564723e8e0e75859c2794fd7ea5a3510f90"
+git-tree-sha1 = "f6230e33182533b6411c1d82ff894e9b36eaf320"
 registries = "General"
 uuid = "dde4c033-4e86-420c-a63e-0dd931031962"
-version = "1.11.0"
+version = "1.11.1"
 
     [deps.Metal.extensions]
     SpecialFunctionsExt = "SpecialFunctions"
@@ -1644,10 +1645,10 @@ version = "1.5.0"
 
 [[deps.PythonCall]]
 deps = ["CondaPkg", "Dates", "Libdl", "MacroTools", "Markdown", "Preferences", "Serialization", "Tables", "UnsafePointers"]
-git-tree-sha1 = "2b67e030054dd9438a00e3d7f59927e839b00569"
+git-tree-sha1 = "8d29e96192c00e8c2bf027b790d1950b19fe922e"
 registries = "General"
 uuid = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"
-version = "0.9.35"
+version = "0.9.36"
 
     [deps.PythonCall.extensions]
     CategoricalArraysExt = "CategoricalArrays"
@@ -2085,10 +2086,10 @@ version = "0.5.0"
 
 [[deps.StructUtils]]
 deps = ["Dates", "UUIDs"]
-git-tree-sha1 = "3bf3b18614b45effa8f8cc6e8f919d4efc1de7f1"
+git-tree-sha1 = "b814d5005d6a529d740ffe06f8a86396f6501138"
 registries = "General"
 uuid = "ec057cc2-7a8d-4b58-b3b3-92acb9f63b42"
-version = "2.9.1"
+version = "2.9.2"
 
     [deps.StructUtils.extensions]
     StructUtilsLazilyInitializedFieldsExt = ["LazilyInitializedFields"]

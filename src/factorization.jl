@@ -1346,7 +1346,8 @@ function do_factorization(alg::BunchKaufmanFactorization, A, b, u)
 end
 
 function init_cacheval(
-        alg::BunchKaufmanFactorization, A::Symmetric{<:Number, <:Matrix}, b,
+        alg::BunchKaufmanFactorization,
+        A::Union{Symmetric{<:Number, <:Matrix}, Hermitian{<:Number, <:Matrix}}, b,
         u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions

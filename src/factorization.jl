@@ -53,7 +53,6 @@ function _copy_A_for_safety(cache::LinearCache)
             # Reuse existing private buffer (non-allocating).
             copyto!(cv.A_backup, A)
         end
-        cv.a_backup_synced = true
         return cv.A_backup
     else
         return _typed_copy(cache.A)

@@ -40,7 +40,6 @@ mutable struct DefaultLinearSolverInit{
     LHLFactorization::T26
     A_backup::TA  # backup of cache.A for restoring after in-place LU and QR fallback
     residual_buf::Tb  # pre-allocated buffer for post-solve residual check (same size/type as b)
-    a_backup_synced::Bool  # true if A_backup content matches cache.A (before LU modifies it)
     a_backup_allocated::Bool  # true once A_backup has been replaced with a private buffer
     fell_back_to_qr::Bool  # true after QR fallback; reuse QR until matrix is refreshed
     # Persistent-nonstructural-zero reduction state, shared across the sparse
@@ -55,7 +54,6 @@ function resize_cacheval!(cache, cacheval::DefaultLinearSolverInit, i)
     return if A_backup isa AbstractMatrix
         setfield!(cacheval, :A_backup, similar(A_backup, i, i))
         cacheval.a_backup_allocated = true
-        cacheval.a_backup_synced = false
     end
 end
 
@@ -689,7 +687,7 @@ end
     end
     return Expr(
         :call, :DefaultLinearSolverInit, caches...,
-        :A_original, :(similar(b)), true, false, false,
+        :A_original, :(similar(b)), false, false,
         :(init_sparse_reduction(A, assump))
     )
 end
@@ -730,6 +728,20 @@ function _is_gpu_sparse(A)
     hasfield(typeof(A), :nzVal) && return A.nzVal isa GPUArraysCore.AnyGPUArray
     hasfield(typeof(A), :rowVal) && return A.rowVal isa GPUArraysCore.AnyGPUArray
     return false
+end
+
+"""
+    _snapshot_A_for_fallback!(cache::LinearCache, alg::DefaultLinearSolver)
+
+Save `cache.A` into the cacheval's `A_backup` before an in-place factorization, so
+[`_do_qr_fallback`](@ref) has the original matrix to restore.
+
+The in-tree LU algorithms do this themselves through `_copy_A_for_safety`; the ones
+supplied by extensions do not, so the default solver takes the snapshot for them.
+"""
+function _snapshot_A_for_fallback!(cache::LinearCache, alg::DefaultLinearSolver)
+    (alg.safetyfallback && cache.isfresh) && _copy_A_for_safety(cache)
+    return nothing
 end
 
 """
@@ -1076,6 +1088,7 @@ end
                 if !userecursivefactorization(nothing)
                     error("Default algorithm calling solve on RecursiveFactorization without the package being loaded. This shouldn't happen.")
                 end
+                _snapshot_A_for_fallback!(cache, alg)
                 sol = SciMLBase.solve!(cache, $inner_alg_expr)
                 _default_lu_solve_with_fallback(cache, alg, sol)
             end
@@ -1085,6 +1098,7 @@ end
                 if !useblis(nothing)
                     error("Default algorithm calling solve on BLISLUFactorization without the extension being loaded. This shouldn't happen.")
                 end
+                _snapshot_A_for_fallback!(cache, alg)
                 sol = SciMLBase.solve!(cache, $inner_alg_expr)
                 _default_lu_solve_with_fallback(cache, alg, sol)
             end
@@ -1094,6 +1108,7 @@ end
                 if !usecuda(nothing)
                     error("Default algorithm calling solve on CudaOffloadLUFactorization without CUDA.jl being loaded. This shouldn't happen.")
                 end
+                _snapshot_A_for_fallback!(cache, alg)
                 sol = SciMLBase.solve!(cache, $inner_alg_expr)
                 _default_lu_solve_with_fallback(cache, alg, sol)
             end
@@ -1103,6 +1118,7 @@ end
                 if !usemetal(nothing)
                     error("Default algorithm calling solve on MetalLUFactorization without Metal.jl being loaded. This shouldn't happen.")
                 end
+                _snapshot_A_for_fallback!(cache, alg)
                 sol = SciMLBase.solve!(cache, $inner_alg_expr)
                 _default_lu_solve_with_fallback(cache, alg, sol)
             end

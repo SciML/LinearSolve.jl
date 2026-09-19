@@ -1270,6 +1270,13 @@ end
                 A = getproperty(cache.cacheval, $(Meta.quot(alg)))[1]
                 getrs!('C', A.factors, A.ipiv, copy(dy))
             end
+        elseif alg == Symbol(DefaultAlgorithmChoice.NormalCholeskyFactorization)
+            # The cacheval is `cholesky(AᴴA)`, not a factorization of `A`, so the adjoint
+            # solve is `A (AᴴA)⁻¹ dy` rather than `F' \ dy`. Same form
+            # `_NormalAdjointFactorizationReuse` uses for the explicit algorithm.
+            quote
+                cache.A * (getproperty(cache.cacheval, $(Meta.quot(alg))) \ dy)
+            end
         elseif alg == Symbol(DefaultAlgorithmChoice.AppleAccelerateLUFactorization)
             quote
                 A = getproperty(cache.cacheval, $(Meta.quot(alg)))
@@ -1287,7 +1294,6 @@ end
                     DefaultAlgorithmChoice.CHOLMODFactorization,
                     DefaultAlgorithmChoice.SVDFactorization,
                     DefaultAlgorithmChoice.CholeskyFactorization,
-                    DefaultAlgorithmChoice.NormalCholeskyFactorization,
                     DefaultAlgorithmChoice.QRFactorizationPivoted,
                     DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization,
                 )

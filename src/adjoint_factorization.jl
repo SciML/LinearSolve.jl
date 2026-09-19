@@ -289,6 +289,52 @@ function _lhl_adjoint_reuse_solve!(x::AbstractMatrix, M, b, ws, refine::Int)
 end
 
 """
+    _nonsquare_pullback_factors(A, b, x, lambda, dx)
+
+The part of the reverse-mode cotangent of `A` that the square-system formula `-lambda xᴴ`
+leaves out, as the pair `(u, v)` whose outer product `u vᴴ` is that term, or `nothing` when
+there is nothing to add. Factored rather than multiplied out so a caller can accumulate it
+into a cotangent it already holds, without a second `m` by `n` matrix.
+
+For a non-square `A` the solve returns `x = A⁺b`, whose pullback carries a second term.
+Which one depends on the shape, and for a full-rank `A` only one of them is ever nonzero:
+
+  - overdetermined (`m > n`), from the residual `r = b - A x`:  `r (A \\ lambda)ᴴ`
+  - underdetermined (`m < n`), from the null space of `A`:
+    `(Aᴴ \\ x) (dx - A \\ (A dx))ᴴ`
+
+Both are written as solves with `A` rather than through `AᴴA`/`AAᴴ` so the normal
+equations, and the squared condition number that comes with them, stay out of it.
+
+Returns `nothing` for anything that is not an `AbstractMatrix`, since the correction needs
+to solve with `A` itself. See SciML/LinearSolve.jl#1309.
+"""
+_nonsquare_pullback_factors(A, b, x, lambda, dx) = nothing
+
+function _nonsquare_pullback_factors(A::AbstractMatrix, b, x, lambda, dx)
+    m, n = size(A)
+    m == n && return nothing
+    return if m > n
+        (b - A * x, A \ lambda)
+    else
+        (adjoint(A) \ x, dx - A \ (A * dx))
+    end
+end
+
+"""
+    _add_nonsquare_pullback!(dA, A, b, x, lambda, dx)
+
+Accumulate [`_nonsquare_pullback_factors`](@ref) into `dA` in place, leaving it untouched
+when there is no correction to make.
+"""
+function _add_nonsquare_pullback!(dA, A, b, x, lambda, dx)
+    factors = _nonsquare_pullback_factors(A, b, x, lambda, dx)
+    factors === nothing && return dA
+    u, v = factors
+    return mul!(dA, u, adjoint(v), true, true)
+end
+
+"""
     _adjoint_solve(cache::LinearCache, b)
 
 Solve `adjoint(A) x = b` for the cache's current `A`, reusing the factorization the

@@ -822,6 +822,28 @@ function nodual_value(x::AbstractArray{<:Dual})
 end
 nodual_value!(out, x) = map!(nodual_value, out, x) # Update in-place
 
+# `map!` into a `SparseMatrixCSC` is zero-pruning (`SparseArrays._map_zeropres!`):
+# it rebuilds the destination's structure and drops any stored entry whose mapped
+# value is zero. What reaches the factorization would then be not the operand's
+# pattern but its numerically-nonzero subset, which moves as the values do -- so a
+# cache holding a symbolic analysis of that pattern sees it change on a solve
+# where the operand did not. Adopt the operand's structure and map positionally
+# over the stored values instead, as `update_partials_list!` already does.
+function map_stored!(f, out::SparseMatrixCSC, x::SparseMatrixCSC)
+    size(out) == size(x) ||
+        throw(DimensionMismatch("destination is $(size(out)), source is $(size(x))"))
+    if out.colptr != x.colptr || out.rowval != x.rowval
+        copyto!(resize!(out.colptr, length(x.colptr)), x.colptr)
+        copyto!(resize!(out.rowval, length(x.rowval)), x.rowval)
+        resize!(nonzeros(out), length(nonzeros(x)))
+    end
+    map!(f, nonzeros(out), nonzeros(x))
+    return out
+end
+
+nodual_value!(out::SparseMatrixCSC, x::SparseMatrixCSC) = map_stored!(nodual_value, out, x)
+partial_vals!(out::SparseMatrixCSC, x::SparseMatrixCSC) = map_stored!(partial_vals, out, x)
+
 # Both of these are one broadcast per partial index rather than a scalar loop,
 # so a GPU-resident ∂A/∂b works. Kept as separate vector/matrix methods, not one
 # AbstractArray method, so the SparseMatrixCSC specialisations below stay

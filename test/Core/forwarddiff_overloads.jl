@@ -875,3 +875,51 @@ end
         @test dual_isapprox(u, reference; rtol = 1.0e-10)
     end
 end
+
+@testset "A sparse Dual operand keeps its pattern through the primal extraction" begin
+    # `map!` into a SparseMatrixCSC prunes stored zeros, so the primal the
+    # factorization saw was the numerically-nonzero subset of the operand's
+    # pattern rather than the pattern -- and it grew again as soon as one of
+    # those entries became nonzero, which a cached symbolic analysis rejects.
+    D = ForwardDiff.Dual{Nothing, Float64, 1}
+    dual(v) = D(v, ForwardDiff.Partials((1.0,)))
+
+    n = 6
+    pattern = sparse([1:n; 2:n], [1:n; 1:(n - 1)], ones(2n - 1), n, n)
+    function operand(subdiagonal)
+        M = similar(pattern, D)
+        nz, rv = nonzeros(M), rowvals(M)
+        for j in 1:n, k in nzrange(M, j)
+            nz[k] = dual(rv[k] == j ? 3.0 : subdiagonal)
+        end
+        return M
+    end
+    b = dual.(ones(n))
+
+    FDExt = Base.get_extension(LinearSolve, :LinearSolveForwardDiffExt)
+    primal = FDExt.nodual_value(operand(0.0))
+    @test nnz(primal) == nnz(pattern)
+    @test primal.colptr == pattern.colptr
+    @test primal.rowval == pattern.rowval
+
+    # The partials extraction prunes on the same rule, for an entry whose
+    # derivative rather than whose value is zero.
+    constant_entry = sparse(
+        [1, 2], [1, 1], [dual(1.0), D(2.0, ForwardDiff.Partials((0.0,)))], 2, 2
+    )
+    partials = similar(constant_entry, ForwardDiff.Partials{1, Float64})
+    @test nnz(FDExt.partial_vals!(partials, constant_entry)) == 2
+
+    # Two solves through one cache: same stored pattern, sub-diagonal values
+    # zero on the first and nonzero on the second.
+    cache = init(
+        LinearProblem(operand(0.0), b),
+        SupernodalLUFactorization(reuse_symbolic = true)
+    )
+    solve!(cache)
+    cache.A = operand(-1.0)
+    sol = solve!(cache)
+    @test sol.retcode == LinearSolve.ReturnCode.Success
+    @test ForwardDiff.value.(sol.u) ≈
+        Matrix(ForwardDiff.value.(operand(-1.0))) \ ForwardDiff.value.(b)
+end

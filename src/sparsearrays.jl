@@ -1423,6 +1423,20 @@ function LinearSolve.init_cacheval(
     return nothing
 end
 
+# Without this the generic `Adjoint`/`Transpose` method takes it, and that one asks for a
+# pivoted QR, which SPQR rejects for a sparse matrix. It throws from `init`, not `solve`.
+function LinearSolve.init_cacheval(
+        alg::QRFactorization,
+        A::Union{
+            Adjoint{<:Number, <:AbstractSparseArray},
+            Transpose{<:Number, <:AbstractSparseArray},
+        }, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
 LinearSolve.PrecompileTools.@compile_workload begin
     # `local` because `LinearSolve` already has a stray module-global `A`, which
     # otherwise makes this soft-scope assignment ambiguous.

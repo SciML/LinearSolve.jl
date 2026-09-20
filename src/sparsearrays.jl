@@ -1403,6 +1403,23 @@ function LinearSolve.init_cacheval(
     return nothing
 end
 
+const SparseTriangular = Union{
+    UpperTriangular{<:Number, <:AbstractSparseArray},
+    LowerTriangular{<:Number, <:AbstractSparseArray},
+    UnitUpperTriangular{<:Number, <:AbstractSparseArray},
+    UnitLowerTriangular{<:Number, <:AbstractSparseArray},
+}
+
+# `cholesky_instance` really factorizes, and CHOLMOD rejects a triangular matrix as not
+# symmetric, so the eager slot build throws from `init`.
+function LinearSolve.init_cacheval(
+        alg::CholeskyFactorization, A::SparseTriangular, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
 LinearSolve.PrecompileTools.@compile_workload begin
     # `local` because `LinearSolve` already has a stray module-global `A`, which
     # otherwise makes this soft-scope assignment ambiguous.

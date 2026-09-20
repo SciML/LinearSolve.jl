@@ -198,6 +198,15 @@ function defaultalg(A::Bidiagonal, b, ::OperatorAssumptions{Bool})
         DefaultLinearSolver(DefaultAlgorithmChoice.LUFactorization)
     end
 end
+
+function defaultalg(
+        A::Union{
+            UpperTriangular, LowerTriangular,
+            UnitUpperTriangular, UnitLowerTriangular,
+        }, b, ::OperatorAssumptions{Bool}
+    )
+    return DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
+end
 function defaultalg(A::Factorization, b, ::OperatorAssumptions{Bool})
     return DefaultLinearSolver(DefaultAlgorithmChoice.DirectLdiv!)
 end

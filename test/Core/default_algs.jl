@@ -835,3 +835,25 @@ end
         @test norm(A * sol.u - rhs) / norm(rhs) < 1.0e-12
     end
 end
+
+@testset "triangular matrices reach a direct solve (#1335)" begin
+    rng = Random.MersenneTwister(5)
+    n = 10
+    M = randn(rng, n, n) + n * I
+    Ms = sparse(sprandn(rng, n, n, 0.5) + n * I)
+    Mc = randn(rng, ComplexF64, n, n) + n * I
+    b = randn(rng, n)
+    bc = randn(rng, ComplexF64, n)
+
+    for (A, rhs) in (
+            (UpperTriangular(M), b), (LowerTriangular(M), b),
+            (UnitUpperTriangular(M), b), (UnitLowerTriangular(M), b),
+            (UpperTriangular(Mc), bc), (UpperTriangular(Ms), b),
+            (adjoint(UpperTriangular(M)), b), (transpose(LowerTriangular(M)), b),
+        )
+        sol = solve(LinearProblem(A, rhs))
+        @test SciMLBase.successful_retcode(sol)
+        # a direct triangular solve, not the Krylov fallback the unit variants used to take
+        @test norm(Matrix(A) * sol.u - rhs) / norm(rhs) < 1.0e-13
+    end
+end

@@ -1917,8 +1917,9 @@ requested explicitly.
     set `reuse_symbolic = false`. To skip the pattern check entirely (which errors if the
     pattern unexpectedly changes), set `check_pattern = false`.
 
-    Numerical pivots are selected again whenever matrix values change. Symbolic
-    analysis and numeric workspace are reused without fixing the old pivot order.
+    Numerical pivots are selected again when the reciprocal pivot growth of the
+    refactorization reports the old ones unstable. Symbolic analysis and numeric
+    workspace are reused either way.
 
 ## Keyword Arguments
 

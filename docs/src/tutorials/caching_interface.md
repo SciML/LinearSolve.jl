@@ -80,10 +80,10 @@ recomputes the numerical factorization with fresh pivots when needed. The symbol
 analysis is retained. The [KLU user guide](https://raw.githubusercontent.com/DrTimothyAldenDavis/SuiteSparse/dev/KLU/Doc/KLU_UserGuide.tex)
 describes why refactorization requires a numerical stability check.
 
-`PureKLUFactorization` retains this symbolic analysis and its reusable numeric
-workspace while selecting numerical pivots again for each changed matrix. Reusing
-symbolic ordering does not require retaining numerical pivots: pivots that were
-accurate for one set of values can become unstable for the next.
+`PureKLUFactorization` is checked the same way, against its own
+`PureKLU.rgrowth`: the refactorization reuses the pivots, and only when the
+growth it reports says they have gone unstable are new ones chosen, with the
+symbolic analysis and the numeric workspace kept either way.
 
 A very common case (for example, the Newton steps of a nonlinear solve or the
 time steps of an implicit ODE/PDE integrator) is that `A` keeps the **same

@@ -792,9 +792,12 @@ function SciMLBase.solve!(
                     fully_preallocated = alg.fully_preallocated
                 )
             else
-                fact = PureKLU.klu!(
-                    cacheval, nonzeros(A); check = false, reuse_pivots = false
-                )
+                fact = PureKLU.klu!(cacheval, nonzeros(A); check = false)
+                # Refactorization fixes the old pivots, which can become unstable as A changes.
+                unstable_pivots = fact.common.status == PureKLU.KLU_SINGULAR ||
+                    fact.common.status == PureKLU.KLU_OK &&
+                    PureKLU.rgrowth(fact) < sqrt(eps(Float64))
+                unstable_pivots && PureKLU.klu_factor!(fact; check = false)
             end
         else
             # New fact each time since the sparsity pattern can change and thus

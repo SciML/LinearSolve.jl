@@ -682,6 +682,12 @@ function setA!(dc::DualLinearCache, A)
     # nothing to extract and the partials slot may be unallocated.
     setfield!(dc, :dual_A, A)
     if get_dual_type(A) !== nothing
+        if scatter_partials!(getfield(dc, :partials_A_list), A)
+            # The list is now current, so `partials_A` is never read back; keep
+            # its structure valid anyway, since the index arrays are shared.
+            adopt_structure!(getfield(dc, :partials_A), A)
+            return setfield!(dc, :A_partials_valid, true)
+        end
         partial_vals!(getfield(dc, :partials_A), A)
     end
 
@@ -829,16 +835,46 @@ nodual_value!(out, x) = map!(nodual_value, out, x) # Update in-place
 # cache holding a symbolic analysis of that pattern sees it change on a solve
 # where the operand did not. Adopt the operand's structure and map positionally
 # over the stored values instead, as `update_partials_list!` already does.
-function map_stored!(f, out::SparseMatrixCSC, x::SparseMatrixCSC)
+function adopt_structure!(out::SparseMatrixCSC, x::SparseMatrixCSC)
     size(out) == size(x) ||
         throw(DimensionMismatch("destination is $(size(out)), source is $(size(x))"))
     if out.colptr != x.colptr || out.rowval != x.rowval
         copyto!(resize!(out.colptr, length(x.colptr)), x.colptr)
         copyto!(resize!(out.rowval, length(x.rowval)), x.rowval)
-        resize!(nonzeros(out), length(nonzeros(x)))
     end
+    # Outside the branch above: the per-partial matrices share their index
+    # arrays, so the second of them finds the structure already adopted while
+    # its own values still need room.
+    nz = nonzeros(out)
+    length(nz) == length(nonzeros(x)) || resize!(nz, length(nonzeros(x)))
+    return out
+end
+
+function map_stored!(f, out::SparseMatrixCSC, x::SparseMatrixCSC)
+    adopt_structure!(out, x)
     map!(f, nonzeros(out), nonzeros(x))
     return out
+end
+
+# `partials_A` is materialised only so `update_partials_list!` can split it into
+# one matrix per partial index. For a sparse operand both passes and the
+# `Partials`-element store collapse into a single scatter straight into that
+# list. Returns `false` for a layout this does not handle, leaving the caller on
+# the general path.
+scatter_partials!(list, x) = false
+function scatter_partials!(
+        list::AbstractVector{<:SparseMatrixCSC}, x::SparseMatrixCSC{<:Dual}
+    )
+    length(list) == ForwardDiff.npartials(eltype(x)) || return false
+    all(l -> size(l) == size(x), list) || return false
+    xs = nonzeros(x)
+    for k in eachindex(list)
+        nz = nonzeros(adopt_structure!(list[k], x))
+        @inbounds for i in eachindex(nz, xs)
+            nz[i] = ForwardDiff.partials(xs[i], k)
+        end
+    end
+    return true
 end
 
 nodual_value!(out::SparseMatrixCSC, x::SparseMatrixCSC) = map_stored!(nodual_value, out, x)

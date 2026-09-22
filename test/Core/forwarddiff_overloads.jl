@@ -923,3 +923,34 @@ end
     @test ForwardDiff.value.(sol.u) ≈
         Matrix(ForwardDiff.value.(operand(-1.0))) \ ForwardDiff.value.(b)
 end
+
+@testset "Sparse Dual partials scatter straight into the per-partial matrices" begin
+    # The per-partial matrices are filled from the Dual operand directly rather
+    # than through a `SparseMatrixCSC{<:Partials}` intermediate, and they share
+    # their index arrays, so a pattern change has to reach every one of them.
+    n = 40
+    rows = [1:n; 2:n; 1:(n - 1)]
+    cols = [1:n; 1:(n - 1); 2:n]
+    value(i, q) = sum(q[j] * sin(i + j) for j in eachindex(q)) +
+        (rows[i] == cols[i] ? 12.0 : 0.4)
+
+    build(q, m) = sparse(rows[1:m], cols[1:m], [value(i, q) for i in 1:m], n, n)
+    rhs(q) = [sum(q) * i / n + 1.0 for i in 1:n]
+
+    @testset "npartials = $(length(q0))" for q0 in ([0.7], [0.7, -1.3], [0.4, 0.55, 0.7])
+        full = length(rows)
+
+        sparse_u(q) = solve(LinearProblem(build(q, full), rhs(q)), PureKLUFactorization()).u
+        dense_u(q) = Matrix(build(q, full)) \ rhs(q)
+        @test ForwardDiff.jacobian(sparse_u, q0) ≈ ForwardDiff.jacobian(dense_u, q0) rtol = 1.0e-8
+
+        # Same cache, second solve on a strictly larger pattern.
+        function grown(q)
+            cache = init(LinearProblem(build(q, n), rhs(q)), PureKLUFactorization())
+            solve!(cache)
+            cache.A = build(q, full)
+            return solve!(cache).u
+        end
+        @test ForwardDiff.jacobian(grown, q0) ≈ ForwardDiff.jacobian(dense_u, q0) rtol = 1.0e-8
+    end
+end

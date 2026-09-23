@@ -323,9 +323,12 @@ function _paru_solve!(
         )
     end
 
-    # ParU_C_Solve_Axb(Sym, Num, b, x, Control) — separate input/output buffers
-    b_vec = Vector{Float64}(cache.b)
-    x_vec = similar(b_vec)
+    # ParU_C_Solve_Axb(Sym, Num, b, x, Control) — separate input/output buffers, so
+    # `cache.b` and `cache.u` are passed directly when they are distinct `Vector{Float64}`s.
+    direct = cache.b isa Vector{Float64} && cache.u isa Vector{Float64} &&
+        cache.u !== cache.b
+    b_vec = direct ? cache.b : Vector{Float64}(cache.b)
+    x_vec = direct ? cache.u : similar(b_vec)
     info = ccall(
         (:ParU_C_Solve_Axb, libparu), Int32,
         (Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Float64}, Ptr{Float64}, Ptr{Cvoid}),
@@ -338,7 +341,7 @@ function _paru_solve!(
         )
     end
 
-    cache.u .= x_vec
+    direct || (cache.u .= x_vec)
     return SciMLBase.build_linear_solution(
         alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
     )

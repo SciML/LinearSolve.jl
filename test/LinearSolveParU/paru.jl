@@ -44,4 +44,15 @@ end
         cache.A = A2
         @test A2 * solve!(cache) ≈ b1
     end
+
+    @testset "Warm re-solve does not copy b or u" begin
+        m = 1000
+        Am = spdiagm(-1 => -ones(m - 1), 0 => fill(4.0, m), 1 => -ones(m - 1))
+        cache = SciMLBase.init(LinearProblem(Am, rand(m)), ParUFactorization())
+        solve!(cache)
+        cache.b = rand(m)
+        solve!(cache)
+        @test Am * cache.u ≈ cache.b
+        @test (@allocated solve!(cache)) < sizeof(cache.b)
+    end
 end

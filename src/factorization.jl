@@ -2166,7 +2166,17 @@ function SciMLBase.solve!(cache::LinearCache, alg::CHOLMODFactorization; kwargs.
         cache.isfresh = false
     end
 
-    cache.u .= @get_cacheval(cache, :CHOLMODFactorization) \ cache.b
+    F = @get_cacheval(cache, :CHOLMODFactorization)
+    if !LinearAlgebra.issuccess(F)
+        # `ldlt!` above is a fallback, not a guarantee: an indefinite matrix fails both
+        # factorizations, and solving with the failed factor throws.
+        @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
+        return SciMLBase.build_linear_solution(
+            alg, cache.u, nothing, nothing;
+            retcode = ReturnCode.Failure
+        )
+    end
+    cache.u .= F \ cache.b
     return SciMLBase.build_linear_solution(
         alg, cache.u, nothing, nothing;
         retcode = ReturnCode.Success

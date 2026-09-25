@@ -930,6 +930,24 @@ end
                 @test norm(A32 * sol32s.u - b32) < sqrt(eps(T)) * 100
             end
         end
+
+        @testset "indefinite reports failure (#1328)" begin
+            rng = Random.MersenneTwister(0)
+            Q = sprandn(rng, 20, 20, 0.3)
+            Aind = sparse((Q + Q') / 2)
+            bind = randn(rng, 20)
+            @test !isposdef(Matrix(Aind))
+
+            for W in (Symmetric(Aind), Hermitian(Aind))
+                sol = solve(LinearProblem(W, bind))
+                @test sol.retcode == ReturnCode.Failure
+            end
+            @test solve(LinearProblem(Aind, bind), CHOLMODFactorization()).retcode ==
+                ReturnCode.Failure
+
+            pd = Q * Q' + 20I
+            @test solve(LinearProblem(Symmetric(pd), bind)).retcode == ReturnCode.Success
+        end
     end
 
     @testset "Preconditioners" begin

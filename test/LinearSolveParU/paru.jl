@@ -55,4 +55,13 @@ end
         @test Am * cache.u ≈ cache.b
         @test (@allocated solve!(cache)) < sizeof(cache.b)
     end
+
+    @testset "Mismatched u0 length" begin
+        Am = spdiagm(0 => fill(2.0, 8))
+        bm = collect(1.0:8)
+        for u0 in (zeros(7), zeros(9))
+            cache = SciMLBase.init(LinearProblem(Am, bm; u0 = u0), ParUFactorization())
+            @test_throws DimensionMismatch solve!(cache)
+        end
+    end
 end

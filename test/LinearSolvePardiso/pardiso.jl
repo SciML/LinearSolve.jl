@@ -6,6 +6,7 @@
 get(ENV, "MKL_THREADING_LAYER", "") == "" && (ENV["MKL_THREADING_LAYER"] = "sequential")
 
 using LinearSolve, SparseArrays, Random, LinearAlgebra
+using Test
 import Pardiso
 
 Random.seed!(1234)
@@ -287,7 +288,7 @@ end
         B1 = MySparseMatrixCSC2(A1)
 
         pr = LinearProblem(B0, b0)
-        # test default algorithn
+        # test default algorithm
         u = solve(pr, alg)
         @test norm(u - u0, Inf) < 1.0e-13
 
@@ -299,5 +300,60 @@ end
         reinit!(cache; A = B1, b = b1)
         u = solve!(cache)
         @test norm(u - u0, Inf) < 1.0e-13
+
+        # Nonsymmetric AbstractSparseMatrixCSC wrappers must classify and solve.
+        for T in (Float64, ComplexF64)
+            A_ns = sparse(T[4 2; 1 3])
+            b_ns = T[1, 2]
+            sol_ns = solve(LinearProblem(MySparseMatrixCSC2(A_ns), b_ns), alg)
+            @test norm(A_ns * sol_ns.u - b_ns) < 1.0e-12
+        end
+    end
+end
+# SuiteSparse HB/dwt_59 — symmetric graph used by SciMLBenchmarks MatrixDepot.
+const dwt59_n = 59
+const dwt59_colptr = [1, 5, 10, 13, 16, 21, 25, 30, 35, 40, 45, 49, 53, 58, 63, 67, 72, 77, 82, 87, 91, 96, 101, 106, 112, 117, 121, 126, 131, 136, 141, 146, 151, 155, 159, 164, 170, 175, 179, 184, 189, 194, 199, 201, 205, 210, 212, 217, 222, 228, 233, 238, 243, 248, 250, 254, 256, 258, 263, 268]
+const dwt59_rowval = [1, 2, 7, 9, 1, 2, 3, 7, 10, 2, 3, 11, 4, 5, 12, 4, 5, 6, 8, 13, 5, 6, 8, 14, 1, 2, 7, 9, 10, 5, 6, 8, 13, 14, 1, 7, 9, 10, 27, 2, 7, 9, 10, 11, 3, 10, 11, 15, 4, 12, 13, 20, 5, 8, 12, 13, 14, 6, 8, 13, 14, 30, 11, 15, 16, 34, 15, 16, 17, 21, 35, 16, 17, 18, 21, 23, 17, 18, 19, 22, 24, 18, 19, 20, 22, 25, 12, 19, 20, 26, 16, 17, 21, 23, 35, 18, 19, 22, 24, 25, 17, 21, 23, 24, 35, 18, 22, 23, 24, 25, 36, 19, 22, 24, 25, 26, 20, 25, 26, 29, 9, 27, 28, 31, 39, 27, 28, 31, 33, 34, 26, 29, 30, 32, 38, 14, 29, 30, 32, 42, 27, 28, 31, 39, 40, 29, 30, 32, 41, 42, 28, 33, 40, 58, 15, 28, 34, 35, 16, 21, 23, 34, 35, 24, 36, 37, 50, 51, 59, 36, 37, 38, 51, 52, 29, 37, 38, 41, 27, 31, 39, 40, 44, 31, 33, 39, 40, 45, 32, 38, 41, 42, 53, 30, 32, 41, 42, 55, 43, 44, 39, 43, 44, 45, 40, 44, 45, 46, 47, 45, 46, 45, 47, 48, 49, 58, 47, 48, 49, 58, 59, 47, 48, 49, 50, 57, 59, 36, 49, 50, 51, 52, 36, 37, 50, 51, 52, 37, 50, 51, 52, 53, 41, 52, 53, 54, 55, 53, 54, 42, 53, 55, 56, 55, 56, 49, 57, 33, 47, 48, 58, 59, 36, 48, 49, 58, 59]
+const dwt59_nzval = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+
+# Symmetric SuiteSparse graphs must select a symmetric Pardiso matrix type and
+# pass Pardiso.get_matrix (triangular) storage.
+@testset "symmetric SuiteSparse matrix type (HB/dwt_59)" begin
+    A_sym = SparseMatrixCSC(dwt59_n, dwt59_n, dwt59_colptr, dwt59_rowval, dwt59_nzval)
+    @test issymmetric(A_sym)
+    b_sym = rand(MersenneTwister(123), dwt59_n)
+    refres = norm(A_sym * (Matrix(A_sym) \ b_sym) - b_sym) / norm(b_sym)
+
+    if Pardiso.mkl_is_available()
+        cache = init(LinearProblem(copy(A_sym), copy(b_sym)), MKLPardisoFactorize())
+        @test Pardiso.get_matrixtype(cache.cacheval) == Pardiso.REAL_SYM_INDEF
+        sol = solve!(cache)
+        @test norm(A_sym * sol.u - b_sym) / norm(b_sym) <= max(1.0e-10, 10 * refres)
+    end
+
+    if Pardiso.panua_is_available()
+        sol = solve(LinearProblem(copy(A_sym), copy(b_sym)), PanuaPardisoFactorize())
+        @test norm(A_sym * sol.u - b_sym) / norm(b_sym) <= max(1.0e-10, 10 * refres)
+    end
+end
+
+# Updating A from symmetric to nonsymmetric in the same cache must refresh the
+# automatic Pardiso matrix type (and analysis) rather than keep triangular storage.
+@testset "Pardiso matrix type refresh on A update" begin
+    if Pardiso.mkl_is_available()
+        for T in (Float64, ComplexF64), ca in (false, true)
+            A_sym = sparse(T[4 1; 1 3])
+            A_ns = sparse(T[4 2; 1 3])
+            b = T[1, 2]
+            cache = init(LinearProblem(A_sym, b), MKLPardisoFactorize(cache_analysis = ca))
+            solve!(cache)
+            expected_sym = T <: Real ? Pardiso.REAL_SYM_INDEF : Pardiso.COMPLEX_HERM_INDEF
+            expected_ns = T <: Real ? Pardiso.REAL_SYM : Pardiso.COMPLEX_STRUCT_SYM
+            @test Pardiso.get_matrixtype(cache.cacheval) == expected_sym
+            cache.A = A_ns
+            sol = solve!(cache)
+            @test Pardiso.get_matrixtype(cache.cacheval) == expected_ns
+            @test norm(A_ns * sol.u - b) < 1.0e-12
+        end
     end
 end

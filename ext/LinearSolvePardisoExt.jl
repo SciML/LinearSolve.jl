@@ -2,12 +2,74 @@ module LinearSolvePardisoExt
 
 using Pardiso, LinearSolve
 using SparseArrays
-using SparseArrays: nonzeros, rowvals, getcolptr
+using LinearAlgebra: issymmetric, ishermitian
 using LinearSolve: PardisoJL, LinearVerbosity
 using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_bool
 using LinearSolve.SciMLBase
 
 # TODO schur complement functionality
+
+# Concrete CSC for Pardiso; avoid non-public SparseArrays.getcolptr.
+pardiso_csc(A::SparseMatrixCSC) = A
+function pardiso_csc(A)
+    I, J, V = findnz(A)
+    return sparse(I, J, V, size(A)...)
+end
+
+# True when the sparsity pattern of `A` is symmetric (stored values ignored).
+# Public SparseArrays / LinearAlgebra APIs only (no getcolptr).
+function is_structurally_symmetric(A::SparseMatrixCSC)
+    I, J, _ = findnz(A)
+    return issymmetric(sparse(I, J, true, size(A)...))
+end
+
+"""
+    default_pardiso_matrix_type(A)
+
+Choose a Pardiso matrix type from the numerical structure of `A`. Symmetric /
+Hermitian matrices use the indefinite types; structurally symmetric (but not
+numerically symmetric / Hermitian) matrices use `REAL_SYM` /
+`COMPLEX_STRUCT_SYM`; otherwise nonsymmetric types. Symmetric types require the
+triangular storage from `Pardiso.get_matrix`.
+"""
+function default_pardiso_matrix_type(A)
+    A = pardiso_csc(A)
+    Tv = eltype(A)
+    return if Tv <: Real
+        if issymmetric(A)
+            Pardiso.REAL_SYM_INDEF
+        elseif is_structurally_symmetric(A)
+            Pardiso.REAL_SYM
+        else
+            Pardiso.REAL_NONSYM
+        end
+    elseif Tv <: Complex
+        if ishermitian(A)
+            Pardiso.COMPLEX_HERM_INDEF
+        elseif issymmetric(A)
+            Pardiso.COMPLEX_SYM
+        elseif is_structurally_symmetric(A)
+            Pardiso.COMPLEX_STRUCT_SYM
+        else
+            Pardiso.COMPLEX_NONSYM
+        end
+    else
+        error("Number type not supported by Pardiso")
+    end
+end
+
+# Pardiso expects CSR; we pass CSC and set the transpose iparm. Symmetric / Hermitian
+# matrix types additionally need the triangular compression from `get_matrix`.
+# Duck-typed: `AbstractPardisoSolver` is not public (`Base.ispublic` false).
+function pardiso_matrix(ps, A)
+    return Pardiso.get_matrix(ps, pardiso_csc(A), :N)
+end
+
+function release_pardiso!(ps, A, b, u)
+    Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
+    Pardiso.pardiso(ps, u, pardiso_csc(A), b)
+    return nothing
+end
 
 function LinearSolve.init_cacheval(
         alg::PardisoJL,
@@ -35,25 +97,19 @@ function LinearSolve.init_cacheval(
 
     transposed_iparm = 1
     solver = if vendor == :MKL
-        solver = if Pardiso.mkl_is_available()
+        if Pardiso.mkl_is_available()
             solver = Pardiso.MKLPardisoSolver()
-            Pardiso.pardisoinit(solver)
-            nprocs !== nothing && Pardiso.set_nprocs!(solver, nprocs)
-
             # for mkl 1 means conjugated and 2 means transposed.
             # https://www.intel.com/content/www/us/en/docs/onemkl/developer-reference-c/2024-0/pardiso-iparm-parameter.html#IPARM37
             transposed_iparm = 2
-
             solver
         else
             error("MKL Pardiso is not available. On MacOSX, possibly, try Panua Pardiso.")
         end
     elseif vendor == :Panua
-        solver = if Pardiso.panua_is_available()
+        if Pardiso.panua_is_available()
             solver = Pardiso.PardisoSolver()
-            Pardiso.pardisoinit(solver)
             solver_type !== nothing && Pardiso.set_solver!(solver, solver_type)
-
             solver
         else
             error("Panua Pardiso is not available.")
@@ -62,16 +118,16 @@ function LinearSolve.init_cacheval(
         error("Pardiso vendor must be either `:MKL` or `:Panua`")
     end
 
+    # Matrix type must be set before pardisoinit so default iparms match the type
+    # (Pardiso.jl examples / solve! all do set_matrixtype! then pardisoinit).
     if matrix_type !== nothing
         Pardiso.set_matrixtype!(solver, matrix_type)
     else
-        if eltype(A) <: Real
-            Pardiso.set_matrixtype!(solver, Pardiso.REAL_NONSYM)
-        elseif eltype(A) <: Complex
-            Pardiso.set_matrixtype!(solver, Pardiso.COMPLEX_NONSYM)
-        else
-            error("Number type not supported by Pardiso")
-        end
+        Pardiso.set_matrixtype!(solver, default_pardiso_matrix_type(A))
+    end
+    Pardiso.pardisoinit(solver)
+    if vendor == :MKL
+        nprocs !== nothing && Pardiso.set_nprocs!(solver, nprocs)
     end
 
     if verbose isa Bool
@@ -130,7 +186,7 @@ function LinearSolve.init_cacheval(
         Pardiso.pardiso(
             solver,
             u,
-            SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
+            pardiso_matrix(solver, A),
             b
         )
     end
@@ -142,19 +198,34 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::PardisoJL; kwargs
     (; A, b, u) = cache
     A = convert(AbstractMatrix, A)
     if cache.isfresh
+        # Automatic matrix type can change when `A` is updated (e.g. symmetric →
+        # nonsymmetric with the same sparsity). Explicit user overrides are kept.
+        if alg.matrix_type === nothing
+            new_type = default_pardiso_matrix_type(A)
+            if Pardiso.get_matrixtype(cache.cacheval) != new_type
+                release_pardiso!(cache.cacheval, A, b, u)
+                cache.cacheval = LinearSolve.init_cacheval(
+                    alg, A, b, u, cache.Pl, cache.Pr, cache.maxiters,
+                    cache.abstol, cache.reltol, cache.verbose, cache.assumptions
+                )
+            end
+        end
+        A_pardiso = pardiso_matrix(cache.cacheval, A)
         phase = alg.cache_analysis ? Pardiso.NUM_FACT : Pardiso.ANALYSIS_NUM_FACT
         Pardiso.set_phase!(cache.cacheval, phase)
         Pardiso.pardiso(
             cache.cacheval,
-            SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)),
+            A_pardiso,
             eltype(A)[]
         )
         cache.isfresh = false
+    else
+        A_pardiso = pardiso_matrix(cache.cacheval, A)
     end
     Pardiso.set_phase!(cache.cacheval, Pardiso.SOLVE_ITERATIVE_REFINE)
     Pardiso.pardiso(
         cache.cacheval, u,
-        SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)), b
+        A_pardiso, b
     )
     return SciMLBase.build_linear_solution(alg, cache.u, nothing, nothing)
 end
@@ -176,7 +247,7 @@ function LinearSolve._custom_adjoint_factorization_solve(
     try
         Pardiso.pardiso(
             solver, solution,
-            SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A)), rhs
+            pardiso_matrix(solver, A), rhs
         )
     finally
         Pardiso.set_iparm!(solver, 12, transposed_iparm)

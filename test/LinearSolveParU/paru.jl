@@ -64,4 +64,31 @@ end
             @test_throws DimensionMismatch solve!(cache)
         end
     end
+
+    @testset "Mismatched b length" begin
+        Am = spdiagm(0 => fill(2.0, 8))
+        # A long b gives ParU more elements than it reads, so these cases stay
+        # in-bounds even without the check; they must still be rejected.
+        cache = SciMLBase.init(
+            LinearProblem(Am, collect(1.0:9); u0 = zeros(8)), ParUFactorization()
+        )
+        @test_throws DimensionMismatch solve!(cache)
+        # Non-Vector b, with u0 matched to its length so the copying path would
+        # otherwise succeed end to end.
+        bm = @view(collect(1.0:12)[1:9])
+        cache = SciMLBase.init(
+            LinearProblem(Am, bm; u0 = zeros(9)), ParUFactorization()
+        )
+        @test_throws DimensionMismatch solve!(cache)
+        # unsafe_wrap over an 8-element backing keeps the out-of-bounds C read
+        # inside the allocation on a build without the length check.
+        backing = fill(1.0, 8)
+        GC.@preserve backing begin
+            b7 = unsafe_wrap(Vector{Float64}, pointer(backing), 7; own = false)
+            cache = SciMLBase.init(
+                LinearProblem(Am, b7; u0 = zeros(8)), ParUFactorization()
+            )
+            @test_throws DimensionMismatch solve!(cache)
+        end
+    end
 end

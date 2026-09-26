@@ -323,13 +323,17 @@ function _paru_solve!(
         )
     end
 
-    # ParU_C_Solve_Axb(Sym, Num, b, x, Control) — separate input/output buffers, so
-    # `cache.b` and `cache.u` are passed directly when they are distinct `Vector{Float64}`s.
-    # A `cache.u` whose length differs from the system size must not reach C: the
-    # fallback path writes into a correctly sized buffer and the copy back into
-    # `cache.u` then throws DimensionMismatch.
+    # ParU_C_Solve_Axb(Sym, Num, b, x, Control) reads size(A, 1) elements from b
+    # and writes size(A, 2) into x, so both buffers must match the system
+    # dimensions before their pointers reach C. `cache.b` needs an explicit check:
+    # the element conversion below preserves a wrong length. Once the lengths are
+    # known good, distinct `Vector{Float64}`s are passed directly.
+    length(cache.b) == size(A, 1) ||
+        throw(DimensionMismatch("b has length $(length(cache.b)), expected $(size(A, 1))"))
+    length(cache.u) == size(A, 2) ||
+        throw(DimensionMismatch("u has length $(length(cache.u)), expected $(size(A, 2))"))
     direct = cache.b isa Vector{Float64} && cache.u isa Vector{Float64} &&
-        cache.u !== cache.b && length(cache.u) == size(A, 2)
+        cache.u !== cache.b
     b_vec = direct ? cache.b : Vector{Float64}(cache.b)
     x_vec = direct ? cache.u : similar(b_vec)
     info = ccall(

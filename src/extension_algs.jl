@@ -2049,7 +2049,7 @@ end
 `CKTSOFactorization(; threads = 0, kwargs...)`
 
 A sparse direct solver powered by [CKTSO](https://github.com/chenxm1986/cktso), through
-[CKTSO.jl](https://github.com/AJ0070/CKTSO.jl). CKTSO is written for SPICE-style circuit
+[CKTSO.jl](https://github.com/SciML/CKTSO.jl). CKTSO is written for SPICE-style circuit
 simulation, where the same sparsity pattern is refactorized many times with new values, so
 it keeps the symbolic analysis and reuses it across solves.
 

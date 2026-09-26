@@ -2,7 +2,6 @@ module LinearSolvePardisoExt
 
 using Pardiso, LinearSolve
 using SparseArrays
-using SparseArrays: nonzeros, rowvals, getcolptr
 using LinearAlgebra: issymmetric, ishermitian
 using LinearSolve: PardisoJL, LinearVerbosity
 using SciMLLogging: SciMLLogging, @SciMLMessage, verbosity_to_bool
@@ -10,17 +9,18 @@ using LinearSolve.SciMLBase
 
 # TODO schur complement functionality
 
+# Concrete CSC for Pardiso; avoid non-public SparseArrays.getcolptr.
+pardiso_csc(A::SparseMatrixCSC) = A
 function pardiso_csc(A)
-    return SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A))
+    I, J, V = findnz(A)
+    return sparse(I, J, V, size(A)...)
 end
 
 # True when the sparsity pattern of `A` is symmetric (stored values ignored).
-# Implemented with public SparseArrays / LinearAlgebra APIs only.
+# Public SparseArrays / LinearAlgebra APIs only (no getcolptr).
 function is_structurally_symmetric(A::SparseMatrixCSC)
-    pattern = SparseMatrixCSC(
-        size(A)..., getcolptr(A), rowvals(A), ones(Bool, length(nonzeros(A)))
-    )
-    return issymmetric(pattern)
+    I, J, _ = findnz(A)
+    return issymmetric(sparse(I, J, true, size(A)...))
 end
 
 """

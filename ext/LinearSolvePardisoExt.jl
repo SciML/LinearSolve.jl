@@ -10,49 +10,64 @@ using LinearSolve.SciMLBase
 
 # TODO schur complement functionality
 
-"""
-Default Pardiso matrix type from the numerical structure of `A`.
+function pardiso_csc(A)
+    return SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A))
+end
 
-MKL Pardiso's `REAL_NONSYM` / `COMPLEX_NONSYM` paths return wrong solutions on many
-symmetric SuiteSparse matrices (e.g. `HB/dwt_59`, `HB/ash85`). Pardiso.jl's high-level
-`solve!` therefore selects a symmetric / Hermitian type when `issymmetric` /
-`ishermitian` holds. Mirror that here, preferring the indefinite variants so positive-
-definite and indefinite systems share one code path (POSDEF would throw on indefinite
-inputs). Symmetric types also require the triangular storage from `Pardiso.get_matrix`.
+# True when the sparsity pattern of `A` is symmetric (stored values ignored).
+# Implemented with public SparseArrays / LinearAlgebra APIs only.
+function is_structurally_symmetric(A::SparseMatrixCSC)
+    pattern = SparseMatrixCSC(
+        size(A)..., getcolptr(A), rowvals(A), ones(Bool, length(nonzeros(A)))
+    )
+    return issymmetric(pattern)
+end
+
+"""
+    default_pardiso_matrix_type(A)
+
+Choose a Pardiso matrix type from the numerical structure of `A`. Symmetric /
+Hermitian matrices use the indefinite types; structurally symmetric (but not
+numerically symmetric / Hermitian) matrices use `REAL_SYM` /
+`COMPLEX_STRUCT_SYM`; otherwise nonsymmetric types. Symmetric types require the
+triangular storage from `Pardiso.get_matrix`.
 """
 function default_pardiso_matrix_type(A)
+    A = pardiso_csc(A)
     Tv = eltype(A)
-    if Tv <: Real
+    return if Tv <: Real
         if issymmetric(A)
-            return Pardiso.REAL_SYM_INDEF
-        elseif Pardiso.isstructurallysymmetric(A)
-            return Pardiso.REAL_SYM
+            Pardiso.REAL_SYM_INDEF
+        elseif is_structurally_symmetric(A)
+            Pardiso.REAL_SYM
         else
-            return Pardiso.REAL_NONSYM
+            Pardiso.REAL_NONSYM
         end
     elseif Tv <: Complex
         if ishermitian(A)
-            return Pardiso.COMPLEX_HERM_INDEF
+            Pardiso.COMPLEX_HERM_INDEF
         elseif issymmetric(A)
-            return Pardiso.COMPLEX_SYM
-        elseif Pardiso.isstructurallysymmetric(A)
-            return Pardiso.COMPLEX_STRUCT_SYM
+            Pardiso.COMPLEX_SYM
+        elseif is_structurally_symmetric(A)
+            Pardiso.COMPLEX_STRUCT_SYM
         else
-            return Pardiso.COMPLEX_NONSYM
+            Pardiso.COMPLEX_NONSYM
         end
     else
         error("Number type not supported by Pardiso")
     end
 end
 
-function pardiso_csc(A)
-    return SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A))
-end
-
 # Pardiso expects CSR; we pass CSC and set the transpose iparm. Symmetric / Hermitian
 # matrix types additionally need the triangular compression from `get_matrix`.
 function pardiso_matrix(ps::Pardiso.AbstractPardisoSolver, A)
     return Pardiso.get_matrix(ps, pardiso_csc(A), :N)
+end
+
+function release_pardiso!(ps::Pardiso.AbstractPardisoSolver, A, b, u)
+    Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
+    Pardiso.pardiso(ps, u, pardiso_csc(A), b)
+    return nothing
 end
 
 function LinearSolve.init_cacheval(
@@ -181,8 +196,20 @@ end
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::PardisoJL; kwargs...)
     (; A, b, u) = cache
     A = convert(AbstractMatrix, A)
-    A_pardiso = pardiso_matrix(cache.cacheval, A)
     if cache.isfresh
+        # Automatic matrix type can change when `A` is updated (e.g. symmetric →
+        # nonsymmetric with the same sparsity). Explicit user overrides are kept.
+        if alg.matrix_type === nothing
+            new_type = default_pardiso_matrix_type(A)
+            if Pardiso.get_matrixtype(cache.cacheval) != new_type
+                release_pardiso!(cache.cacheval, A, b, u)
+                cache.cacheval = LinearSolve.init_cacheval(
+                    alg, A, b, u, cache.Pl, cache.Pr, cache.maxiters,
+                    cache.abstol, cache.reltol, cache.verbose, cache.assumptions
+                )
+            end
+        end
+        A_pardiso = pardiso_matrix(cache.cacheval, A)
         phase = alg.cache_analysis ? Pardiso.NUM_FACT : Pardiso.ANALYSIS_NUM_FACT
         Pardiso.set_phase!(cache.cacheval, phase)
         Pardiso.pardiso(
@@ -191,6 +218,8 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::PardisoJL; kwargs
             eltype(A)[]
         )
         cache.isfresh = false
+    else
+        A_pardiso = pardiso_matrix(cache.cacheval, A)
     end
     Pardiso.set_phase!(cache.cacheval, Pardiso.SOLVE_ITERATIVE_REFINE)
     Pardiso.pardiso(

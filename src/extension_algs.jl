@@ -894,8 +894,8 @@ Pardiso's default (direct) solver is used.
     from the matrix structure: symmetric / Hermitian inputs use the corresponding
     indefinite Pardiso type (with triangular storage via `Pardiso.get_matrix`),
     structurally symmetric inputs use `REAL_SYM` / `COMPLEX_STRUCT_SYM`, and
-    otherwise `REAL_NONSYM` / `COMPLEX_NONSYM`. Always forcing nonsymmetric types
-    is incorrect for many symmetric SuiteSparse matrices under MKL Pardiso.
+    otherwise `REAL_NONSYM` / `COMPLEX_NONSYM`. The automatic choice is refreshed
+    when `cache.A` changes.
   - `cache_analysis`: when `true`, disables Pardiso's scaling and matching defaults
     (`iparm[11] = iparm[13] = 0`), runs the analysis phase once at `init`, and reuses it
     for every later factorization, so only the numerical factorization is repeated when

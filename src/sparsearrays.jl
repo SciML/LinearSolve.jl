@@ -794,8 +794,9 @@ function SciMLBase.solve!(
             else
                 fact = PureKLU.klu!(cacheval, nonzeros(A); check = false)
                 # Refactorization fixes the old pivots, which can become unstable as A changes.
-                unstable_pivots = fact.common.status == PureKLU.KLU_SINGULAR ||
-                    fact.common.status == PureKLU.KLU_OK &&
+                # `issuccess` is PureKLU's public spelling for a non-singular factor
+                # (status == KLU_OK); also re-factor when reciprocal pivot growth is tiny.
+                unstable_pivots = !issuccess(fact) ||
                     PureKLU.rgrowth(fact) < sqrt(eps(Float64))
                 unstable_pivots && PureKLU.klu_factor!(fact; check = false)
             end

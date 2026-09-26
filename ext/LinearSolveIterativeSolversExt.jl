@@ -222,9 +222,15 @@ _iterable_residual(iterable) = iterable.residual
 _iterable_residual(iterable::IterativeSolvers.IDRSIterable) = iterable.R
 _iterable_residual(iterable::IterativeSolvers.MINRESIterable) = iterable.resnorm
 
-# `IterativeSolvers.converged` covers every iterable reachable here except
-# `IDRSIterable`, which carries its residual norm as `normR`.
-_iterable_converged(iter) = IterativeSolvers.converged(iter)
+# Local residual≤tol check matching IterativeSolvers' internal `converged`
+# methods (GMRES uses `Residual.current`; IDRS uses `normR`).
+function _iterable_converged(iter)
+    resid = _iterable_residual(iter)
+    if resid isa IterativeSolvers.Residual
+        resid = resid.current
+    end
+    return resid ≤ iter.tol
+end
 _iterable_converged(iter::IterativeSolvers.IDRSIterable) = iter.normR <= iter.tol
 
 # The constructors bake in `tol = max(reltol * ||r0||, abstol)` against whatever initial

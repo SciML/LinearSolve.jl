@@ -857,3 +857,17 @@ end
         @test norm(Matrix(A) * sol.u - rhs) / norm(rhs) < 1.0e-13
     end
 end
+
+@testset "transposed sparse matrices reach init (#1333)" begin
+    rng = Random.MersenneTwister(0)
+    Q = sprandn(rng, 20, 20, 0.3)
+    A = sparse(Q * Q' + 20I)
+    b = randn(rng, 20)
+
+    for W in (transpose(A), adjoint(A), Symmetric(A), Hermitian(A))
+        @test_nowarn init(LinearProblem(W, b))
+        sol = solve(LinearProblem(W, b))
+        @test SciMLBase.successful_retcode(sol)
+        @test norm(Matrix(W) * sol.u - b) / norm(b) < 1.0e-6
+    end
+end

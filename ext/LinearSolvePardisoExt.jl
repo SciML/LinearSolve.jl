@@ -60,11 +60,12 @@ end
 
 # Pardiso expects CSR; we pass CSC and set the transpose iparm. Symmetric / Hermitian
 # matrix types additionally need the triangular compression from `get_matrix`.
-function pardiso_matrix(ps::Pardiso.AbstractPardisoSolver, A)
+# Duck-typed: `AbstractPardisoSolver` is not public (`Base.ispublic` false).
+function pardiso_matrix(ps, A)
     return Pardiso.get_matrix(ps, pardiso_csc(A), :N)
 end
 
-function release_pardiso!(ps::Pardiso.AbstractPardisoSolver, A, b, u)
+function release_pardiso!(ps, A, b, u)
     Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
     Pardiso.pardiso(ps, u, pardiso_csc(A), b)
     return nothing

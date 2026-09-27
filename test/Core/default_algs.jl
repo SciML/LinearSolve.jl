@@ -466,6 +466,33 @@ sol_qr2 = solve(
 )
 @test sol2.u ≈ sol_qr2.u
 
+# https://github.com/SciML/LinearSolve.jl/issues/1306
+@testset "extension LU defaults back up A before falling back" begin
+    n = 20
+    alg = LinearSolve.DefaultLinearSolver(
+        LinearSolve.DefaultAlgorithmChoice.RFLUFactorization
+    )
+    A_first = rand(n, n) + n * I
+    b = rand(n)
+    cache = init(LinearProblem(copy(A_first), copy(b)), alg)
+    @test solve!(cache).u ≈ A_first \ b
+
+    A_second = rand(n, n) + n * I
+    A_second[:, 2] .= 0.0
+    for reassign in (
+            c -> (c.A = copy(A_second)),
+            c -> (copyto!(c.A, A_second); c.A = c.A),
+        )
+        cache = init(LinearProblem(copy(A_first), copy(b)), alg)
+        solve!(cache)
+        reassign(cache)
+        sol = solve!(cache)
+        @test sol.retcode === ReturnCode.Success
+        @test sol.u ≈ qr(A_second, ColumnNorm()) \ b
+        @test !(sol.u ≈ qr(A_first, ColumnNorm()) \ b)
+    end
+end
+
 # Regression test for https://github.com/SciML/LinearSolve.jl/issues/890
 # WOperator with init_cacheval overload that unwraps A.J (as OrdinaryDiffEqDifferentiation does)
 function LinearSolve.init_cacheval(

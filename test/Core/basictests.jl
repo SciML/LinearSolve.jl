@@ -822,9 +822,7 @@ end
                         IterativeSolversJL_IDRS, IterativeSolversJL_MINRES,
                         IterativeSolversJL_BICGSTAB,
                     )
-                    # Default `maxiters = length(b)` is tight for IDRS on `prob5`;
-                    # the retcode path under test is residual≤tol, not the cap.
-                    @test solve(prob5, f(; maxiters = 500)).retcode == ReturnCode.Success
+                    @test solve(prob5, f()).retcode == ReturnCode.Success
                 end
             end
 

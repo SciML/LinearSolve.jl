@@ -1,15 +1,12 @@
 macro get_cacheval(cache, algsym)
     return quote
         if $(esc(cache)).alg isa DefaultLinearSolver
-            _unwrap_default_cacheval(getfield($(esc(cache)).cacheval, $algsym))
+            getfield($(esc(cache)).cacheval, $algsym)
         else
             $(esc(cache)).cacheval
         end
     end
 end
-
-_unwrap_default_cacheval(cacheval::Base.RefValue{Any}) = cacheval[]
-_unwrap_default_cacheval(cacheval) = cacheval
 
 # Normalize deprecated Val-based pivot arguments to PivotingStrategy types.
 # Julia 1.12 deprecated Val(true)/Val(false) in favor of RowMaximum()/NoPivot().
@@ -785,7 +782,18 @@ function init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    return ArrayInterface.lu_instance(convert(AbstractMatrix, A))
+    Amat = convert(AbstractMatrix, A)
+    luinst = ArrayInterface.lu_instance(Amat)
+    # `lu_instance` / `lu` rebuild scalars via `zero`, which drops ReverseDiff
+    # TrackedReal origin tags (`TrackedArray` → `Nothing`). The live `lu!` path
+    # keeps `eltype(A)`, so pretype the placeholder with that eltype when they differ.
+    # Keep `luinst`'s pivot vector type (`Int` vs `BlasInt`) so the slot matches `lu!`.
+    if luinst isa LinearAlgebra.LU && eltype(luinst) !== eltype(Amat)
+        return LinearAlgebra.LU{eltype(Amat), typeof(Amat), typeof(luinst.ipiv)}(
+            similar(Amat, 0, 0), similar(luinst.ipiv, 0), luinst.info
+        )
+    end
+    return luinst
 end
 
 function init_cacheval(

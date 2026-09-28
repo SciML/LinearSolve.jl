@@ -621,6 +621,46 @@ end
     @test all(((a, b),) -> a ≈ b, zip(extract_partials(sol.u), extract_partials(ref)))
 end
 
+struct NestedInnerTestTag end
+struct NestedOuterTestTag end
+
+@testset "Nested Duals through DualLinearCache (#1355)" begin
+    nA(p) = [4.0 + p[1]^2 1.0; 1.0 3.0 + p[1]]
+    nb(p) = [1.0, 2.0] .* p[1]
+    TI = typeof(ForwardDiff.Tag(NestedInnerTestTag(), Float64))
+    DI = ForwardDiff.Dual{TI, Float64, 1}
+    TO = typeof(ForwardDiff.Tag(NestedOuterTestTag(), DI))
+    p = ForwardDiff.Dual{TO}(ForwardDiff.Dual{TI}(0.3, 1.0), one(DI))
+
+    @testset "property access on the inner cache infers" begin
+        cache = init(LinearProblem(nA([p]), nb([p])), LUFactorization())
+        inner = cache.linear_cache
+        @inferred (c -> c.A)(inner)
+        @inferred (c -> c.b)(inner)
+        @inferred (c -> c.u)(inner)
+        @inferred (c -> c.isfresh)(inner)
+        @inferred (c -> c.linear_cache.u)(cache)
+    end
+
+    ref = ForwardDiff.hessian(q -> sum(nA(q) \ nb(q)), [0.3])
+    @testset "hessian with $(nameof(typeof(alg)))" for alg in (
+            GenericLUFactorization(), LUFactorization(), nothing,
+        )
+        @test ForwardDiff.hessian(q -> sum(solve(LinearProblem(nA(q), nb(q)), alg).u), [0.3]) ≈ ref
+    end
+
+    @testset "direct dual path resets isfresh through the forwarding" begin
+        cache = init(LinearProblem(nA([p]), nb([p])), GenericLUFactorization())
+        @test solve!(cache).u ≈ nA([p]) \ nb([p])
+        @test !cache.linear_cache.isfresh
+        p2 = ForwardDiff.Dual{TO}(ForwardDiff.Dual{TI}(0.7, 1.0), one(DI))
+        reinit!(cache; A = nA([p2]))
+        @test cache.linear_cache.isfresh
+        @test solve!(cache).u ≈ nA([p2]) \ nb([p])
+        @test !cache.linear_cache.isfresh
+    end
+end
+
 # The DualLinearCache tracks partials-list validity for A and b independently,
 # so mutating only one side does not force the other's partials to be recomputed
 # (relevant e.g. in an ODE where A is fixed while b changes, and vice versa).

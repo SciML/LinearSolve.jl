@@ -14,6 +14,21 @@ end
 prob = LinearProblem(rand(3, 3), rand(3))
 solve(prob)
 
+@testset "Default solver LU cache can change scalar type" begin
+    alg = LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization)
+    # Non-isbits eltypes (BigFloat, ReverseDiff TrackedReal, …) box the LU slot so a
+    # later factorization whose scalar type differs from the init placeholder can be stored.
+    cache = init(LinearProblem(BigFloat[2 0; 0 3], BigFloat[1, 1]), alg)
+    @test cache.cacheval.LUFactorization isa Base.RefValue{Any}
+    fact = lu(ComplexF64[2 0; 0 3])
+    setproperty!(cache, :cacheval, fact)
+    @test cache.cacheval.LUFactorization[] === fact
+
+    # Hot path: isbits Float64 keeps a concrete LU field.
+    cache64 = init(LinearProblem(Float64[2 0; 0 3], Float64[1, 1]), alg)
+    @test cache64.cacheval.LUFactorization isa LU
+end
+
 if LinearSolve.appleaccelerate_isavailable()
     @test LinearSolve.defaultalg(nothing, zeros(50)).alg ===
         LinearSolve.DefaultAlgorithmChoice.AppleAccelerateLUFactorization

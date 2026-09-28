@@ -1014,6 +1014,15 @@ function QRFactorization(pivot::LinearAlgebra.PivotingStrategy, inplace::Bool = 
     return QRFactorization(pivot, 16, inplace)
 end
 
+# A sparse matrix behind `Adjoint`/`Transpose` is still sparse, but `issparsematrixcsc`
+# only sees the bare type. Without this the QR below takes the dense branch and asks SPQR
+# for a pivot, which it rejects. Kept local rather than widening `issparsematrixcsc`,
+# which also drives the `init` normalization.
+_is_wrapped_sparse(A) = false
+function _is_wrapped_sparse(A::Union{<:Adjoint, <:Transpose})
+    return issparsematrixcsc(parent(A))
+end
+
 function do_factorization(alg::QRFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
     if ArrayInterface.can_setindex(typeof(A))
@@ -1029,7 +1038,8 @@ function do_factorization(alg::QRFactorization, A, b, u)
             # Going through `Aᵀ` turns it back into a triangular solve and gives the
             # minimum-norm solution, which is what dense `\` returns on the CPU.
             fact = MinNormQR(qr(copy(transpose(A))))
-        elseif A isa GPUArraysCore.AnyGPUArray || is_cusparse(A) || issparsematrixcsc(A)
+        elseif A isa GPUArraysCore.AnyGPUArray || is_cusparse(A) ||
+                issparsematrixcsc(A) || _is_wrapped_sparse(A)
             fact = qr(A)
         elseif alg.inplace
             if A isa Symmetric

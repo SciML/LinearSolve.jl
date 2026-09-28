@@ -1,12 +1,15 @@
 macro get_cacheval(cache, algsym)
     return quote
         if $(esc(cache)).alg isa DefaultLinearSolver
-            getfield($(esc(cache)).cacheval, $algsym)
+            _unwrap_default_cacheval(getfield($(esc(cache)).cacheval, $algsym))
         else
             $(esc(cache)).cacheval
         end
     end
 end
+
+_unwrap_default_cacheval(cacheval::Base.RefValue{Any}) = cacheval[]
+_unwrap_default_cacheval(cacheval) = cacheval
 
 # Normalize deprecated Val-based pivot arguments to PivotingStrategy types.
 # Julia 1.12 deprecated Val(true)/Val(false) in favor of RowMaximum()/NoPivot().

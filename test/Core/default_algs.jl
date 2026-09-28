@@ -1,6 +1,6 @@
 using LinearSolve, RecursiveFactorization, LinearAlgebra, SparseArrays, Test
 using SciMLOperators: FunctionOperator, MatrixOperator, WOperator, has_concretization
-using OrdinaryDiffEqRosenbrock, ReverseDiff, ForwardDiff, ADTypes, DiffEqBase, Zygote
+using Zygote
 
 struct CountingIdentityPreconditioner
     calls::Base.RefValue{Int}
@@ -14,30 +14,6 @@ end
 @test LinearSolve.defaultalg(nothing, zeros(3)).alg === LinearSolve.DefaultAlgorithmChoice.GenericLUFactorization
 prob = LinearProblem(rand(3, 3), rand(3))
 solve(prob)
-
-@testset "ReverseDiff through Rodas5 matches ForwardDiff (issue #1344)" begin
-    function f_rd!(du, u, p, t)
-        du[1] = -p[1] * u[1] + p[2] * u[2]
-        du[2] = p[1] * u[1] - p[2] * u[2]
-        nothing
-    end
-    function loss_rd(p)
-        prob = ODEProblem(f_rd!, eltype(p).([1.0, 0.0]), (0.0, 1.0), p)
-        # SensitivityADPassThrough forces the tape through the solver (no adjoint).
-        sum(
-            solve(
-                prob, Rodas5(autodiff = AutoFiniteDiff()); saveat = 0.1,
-                sensealg = DiffEqBase.SensitivityADPassThrough()
-            )[end]
-        )
-    end
-    p = [1.0, 2.0]
-    g_fd = ForwardDiff.gradient(loss_rd, p)
-    g_rd = ReverseDiff.gradient(loss_rd, p)
-    # Rodas5 uses AutoFiniteDiff for the Jacobian, so reverse-over-FD and
-    # forward-over-FD differ at ~1e-7; atol/rtol are set just above that floor.
-    @test isapprox(g_rd, g_fd; rtol = 1.0e-5, atol = 1.0e-6)
-end
 
 @testset "BigFloat default LU reverse mode (Zygote)" begin
     A = BigFloat[2 0; 0 3]

@@ -784,13 +784,12 @@ function init_cacheval(
     )
     Amat = convert(AbstractMatrix, A)
     luinst = ArrayInterface.lu_instance(Amat)
-    # `lu_instance` / `lu` rebuild scalars via `zero`, which drops ReverseDiff
-    # TrackedReal origin tags (`TrackedArray` → `Nothing`). The live `lu!` path
-    # keeps `eltype(A)`, so pretype the placeholder with that eltype when they differ.
-    # Keep `luinst`'s pivot vector type (`Int` vs `BlasInt`) so the slot matches `lu!`.
+    # `lu_instance` rebuilds scalars via `zero`, dropping ReverseDiff origin tags;
+    # live `lu!` keeps `eltype(A)`, so match that (and the instance's pivot type).
     if luinst isa LinearAlgebra.LU && eltype(luinst) !== eltype(Amat)
-        return LinearAlgebra.LU{eltype(Amat), typeof(Amat), typeof(luinst.ipiv)}(
-            similar(Amat, 0, 0), similar(luinst.ipiv, 0), luinst.info
+        factors = similar(Amat, 0, 0)
+        return LinearAlgebra.LU{eltype(Amat), typeof(factors), typeof(luinst.ipiv)}(
+            factors, similar(luinst.ipiv, 0), luinst.info
         )
     end
     return luinst

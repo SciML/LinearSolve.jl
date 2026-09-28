@@ -48,19 +48,6 @@ mutable struct DefaultLinearSolverInit{
     sparse_reduction::TR
 end
 
-_default_lu_cacheval(A, cacheval) =
-    isbitstype(eltype(A)) ? cacheval : Ref{Any}(cacheval)
-
-@inline function _set_lu_cacheval!(cache::DefaultLinearSolverInit, value)
-    cacheval = getfield(cache, :LUFactorization)
-    if cacheval isa Base.RefValue{Any}
-        cacheval[] = value
-    else
-        setfield!(cache, :LUFactorization, value)
-    end
-    return value
-end
-
 function resize_cacheval!(cache, cacheval::DefaultLinearSolverInit, i)
     resize_cacheval!(cache, cacheval.GenericLUFactorization, i)
     A_backup = cacheval.A_backup
@@ -78,12 +65,8 @@ end
 @generated function __setfield!(cache::DefaultLinearSolverInit, alg::DefaultLinearSolver, v)
     ex = :()
     for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))
-        newex = if alg === :LUFactorization
-            :(_set_lu_cacheval!(cache, v))
-        else
-            quote
-                setfield!(cache, $(Meta.quot(alg)), v)
-            end
+        newex = quote
+            setfield!(cache, $(Meta.quot(alg)), v)
         end
         alg_enum = getproperty(LinearSolve.DefaultAlgorithmChoice, alg)
         ex = if ex == :()
@@ -701,7 +684,7 @@ end
                 end
             end
         else
-            value = quote
+            quote
                 init_cacheval(
                     $(algchoice_to_alg(alg)), A, b, u, Pl, Pr, maxiters, abstol,
                     reltol,
@@ -709,7 +692,6 @@ end
                     assump
                 )
             end
-            alg === :LUFactorization ? :(_default_lu_cacheval(A, $value)) : value
         end
     end
     return Expr(

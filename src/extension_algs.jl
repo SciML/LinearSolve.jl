@@ -890,9 +890,12 @@ Pardiso's default (direct) solver is used.
   - `nprocs`: number of threads, passed to `Pardiso.set_nprocs!`. Defaults to `nothing`
     (Pardiso's default). The extension currently applies this only for `vendor = :MKL`.
   - `matrix_type`: Pardiso matrix type (`Pardiso.MatrixType` or its integer code),
-    passed to `Pardiso.set_matrixtype!`. Defaults to `nothing`, which selects
-    `Pardiso.REAL_NONSYM` for real and `Pardiso.COMPLEX_NONSYM` for complex element
-    types.
+    passed to `Pardiso.set_matrixtype!`. Defaults to `nothing`, which selects a type
+    from the matrix structure: symmetric / Hermitian inputs use the corresponding
+    indefinite Pardiso type (with triangular storage via `Pardiso.get_matrix`),
+    structurally symmetric inputs use `REAL_SYM` / `COMPLEX_STRUCT_SYM`, and
+    otherwise `REAL_NONSYM` / `COMPLEX_NONSYM`. The automatic choice is refreshed
+    when `cache.A` changes.
   - `cache_analysis`: when `true`, disables Pardiso's scaling and matching defaults
     (`iparm[11] = iparm[13] = 0`), runs the analysis phase once at `init`, and reuses it
     for every later factorization, so only the numerical factorization is repeated when

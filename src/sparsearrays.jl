@@ -1423,6 +1423,37 @@ function LinearSolve.init_cacheval(
     return nothing
 end
 
+# `cholesky_instance` factorizes for real, and CHOLMOD rejects a non-symmetric matrix, so
+# the eager slot build throws from `init`. A 1x1 factor types the slot without touching
+# `A`; an explicit `CholeskyFactorization` then fails inside CHOLMOD with its own message.
+@static if Base.USE_GPL_LIBS
+    function LinearSolve.init_cacheval(
+            alg::CholeskyFactorization,
+            A::Union{
+                Adjoint{T, <:AbstractSparseMatrixCSC},
+                Transpose{T, <:AbstractSparseMatrixCSC},
+            }, b, u, Pl, Pr,
+            maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+            assumptions::OperatorAssumptions
+        ) where {T <: BLASELTYPES}
+        return cholesky(sparse(reshape([one(T)], 1, 1)))
+    end
+end
+
+# Without this the generic `Adjoint`/`Transpose` method takes it, and that one asks SPQR
+# for a pivoted QR, which it rejects for a sparse matrix, throwing from `init`.
+function LinearSolve.init_cacheval(
+        alg::QRFactorization,
+        A::Union{
+            Adjoint{<:Number, <:AbstractSparseArray},
+            Transpose{<:Number, <:AbstractSparseArray},
+        }, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions
+    )
+    return ArrayInterface.qr_instance(convert(AbstractMatrix, A), alg.pivot)
+end
+
 LinearSolve.PrecompileTools.@compile_workload begin
     # `local` because `LinearSolve` already has a stray module-global `A`, which
     # otherwise makes this soft-scope assignment ambiguous.

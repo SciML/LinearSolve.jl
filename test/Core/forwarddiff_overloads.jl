@@ -42,6 +42,48 @@ end
     @test dual_isapprox(sol.u, A_dual \ b_dual; rtol = 1.0e-9)
 end
 
+# Regression for #1359: SimpleLUFactorization must write cache.u so the
+# ForwardDiff extension can rebuild Dual values from the primal solution
+# (partials already came from sol.u). Without copyto!(cache.u, y), Dual
+# values stay at the initial u while partials are correct.
+@testset "SimpleLUFactorization Dual values and cache.u (#1359)" begin
+    struct SimpleLUTag end
+    D(v, p...) = ForwardDiff.Dual{SimpleLUTag}(v, p...)
+    A = [D(4.0, 1.0) D(1.0, 0.0); D(1.0, 0.0) D(3.0, 1.0)]
+    b = [D(1.0, 0.0), D(2.0, 1.0)]
+    expected = A \ b
+
+    sol = solve(LinearProblem(A, b), SimpleLUFactorization())
+    @test dual_isapprox(sol.u, expected; rtol = 1.0e-12)
+
+    sol_u0 = solve(
+        LinearProblem(A, b; u0 = [D(7.0, 0.0), D(7.0, 0.0)]),
+        SimpleLUFactorization()
+    )
+    @test dual_isapprox(sol_u0.u, expected; rtol = 1.0e-12)
+
+    cache = init(LinearProblem(A, b), SimpleLUFactorization())
+    sol_cached = solve!(cache)
+    @test dual_isapprox(sol_cached.u, expected; rtol = 1.0e-12)
+    @test dual_isapprox(cache.u, expected; rtol = 1.0e-12)
+    @test sol_cached.u === cache.u
+
+    b2 = [D(3.0, 0.5), D(1.0, -0.5)]
+    expected2 = A \ b2
+    cache.b = b2
+    sol2 = solve!(cache)
+    @test dual_isapprox(sol2.u, expected2; rtol = 1.0e-12)
+    @test dual_isapprox(cache.u, expected2; rtol = 1.0e-12)
+    @test sol2.u === cache.u
+
+    Af, bf = ForwardDiff.value.(A), ForwardDiff.value.(b)
+    fcache = init(LinearProblem(Af, bf), SimpleLUFactorization())
+    fsol = solve!(fcache)
+    @test fsol.u ≈ Af \ bf rtol = 1.0e-12
+    @test fcache.u ≈ Af \ bf rtol = 1.0e-12
+    @test fsol.u === fcache.u
+end
+
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 prob = LinearProblem(A, b)
 backslash_x_p = A \ b

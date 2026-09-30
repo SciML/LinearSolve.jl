@@ -42,11 +42,8 @@ end
     @test dual_isapprox(sol.u, A_dual \ b_dual; rtol = 1.0e-9)
 end
 
-# Regression for #1359: SimpleLUFactorization must write cache.u so the
-# ForwardDiff extension can rebuild Dual values from the primal solution
-# (partials already came from sol.u). Without copyto!(cache.u, y), Dual
-# values stay at the initial u while partials are correct.
-@testset "SimpleLUFactorization Dual values and cache.u (#1359)" begin
+# SimpleLUFactorization Dual values and Float64 cache.u aliasing.
+@testset "SimpleLUFactorization writes cache.u" begin
     struct SimpleLUTag end
     D(v, p...) = ForwardDiff.Dual{SimpleLUTag}(v, p...)
     A = [D(4.0, 1.0) D(1.0, 0.0); D(1.0, 0.0) D(3.0, 1.0)]

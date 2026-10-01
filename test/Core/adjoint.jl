@@ -97,6 +97,16 @@ end
         @test adjoint(tall_A) * adjoint_solution ≈ tall_adjoint_rhs
     end
 
+    cache = init(
+        LinearProblem(copy(tall_A), copy(tall_b)),
+        LinearSolve.DefaultLinearSolver(
+            LinearSolve.DefaultAlgorithmChoice.NormalCholeskyFactorization
+        )
+    )
+    solve!(cache)
+    @test LinearSolve._adjoint_solve(cache, tall_adjoint_rhs) ≈
+        tall_A * ((adjoint(tall_A) * tall_A) \ tall_adjoint_rhs)
+
     sparse_A = sparse(A_local)
     sparse_alg = SparseColumnPivotedQRFactorization()
     sparse_cache = init(LinearProblem(copy(sparse_A), copy(b_local)), sparse_alg)
@@ -503,9 +513,13 @@ end
             reference = ForwardDiff.gradient(
                 Av -> sum(reshape(Av, rows, cols) \ bvec), vec(A)
             )
-            for alg in (SVDFactorization(), QRFactorization(), nothing)
-                # only SVD handles both orientations; skip the ones that cannot
-                rows < cols && alg !== SVDFactorization() && continue
+            algs = rows > cols ?
+                (
+                    SVDFactorization(), QRFactorization(), NormalCholeskyFactorization(),
+                    KrylovJL_LSMR(), nothing,
+                ) :
+                (SVDFactorization(), KrylovJL_LSMR())
+            for alg in algs
                 g(Av) = sum(
                     (
                         alg === nothing ?

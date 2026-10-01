@@ -38,12 +38,8 @@ function CRC.rrule(
         if !(
                 can_reuse_factorization || alg isa AbstractKrylovSubspaceMethod ||
                     alg isa DefaultLinearSolver
-            ) || !LinearSolve.issquare(A)
-            # falls through to the copy below
-            A_ = if alg isa AbstractFactorization || !LinearSolve.issquare(A)
-                # A non-square `A` is copied unconditionally: the correction term below
-                # solves with `A` itself, so an aliased operand that the factorization
-                # overwrote would feed it garbage.
+            )
+            A_ = if alg isa AbstractFactorization
                 deepcopy(A)
             else
                 alias_A ? deepcopy(A) : A
@@ -53,9 +49,18 @@ function CRC.rrule(
         A_ = deepcopy(A)
     end
 
-    # The correction term for a non-square `A` reads `b`; keep a copy, since an
-    # algorithm permitted to alias it may have written into `cache.b`.
-    b_ = LinearSolve.issquare(A) ? nothing : copy(cache.b)
+    # The correction for a non-square `A` reads `A` and `b`, which the solve may overwrite.
+    nonsquare = !LinearSolve.issquare(A) && A isa AbstractMatrix
+    A_ns = if !nonsquare || alg isa AbstractKrylovSubspaceMethod
+        A
+    elseif A_ !== nothing
+        A_
+    elseif A isa Matrix && A !== prob.A
+        prob.A  # `init` made `A` a private copy
+    else
+        deepcopy(A)
+    end
+    b_ = nonsquare ? copy(cache.b) : nothing
 
     sol = solve!(cache)
 
@@ -80,9 +85,7 @@ function CRC.rrule(
 
         tu = adjoint(sol.u)
         ∂A = .-(λ .* tu)
-        LinearSolve._add_nonsquare_pullback!(
-            ∂A, A_ === nothing ? cache.A : A_, b_, sol.u, λ, ∂u
-        )
+        LinearSolve._add_nonsquare_pullback!(∂A, cache, A_ns, b_, sol.u, λ, ∂u)
         ∂b = λ
         ∂prob = LinearProblem(∂A, ∂b, ∂∅)
 

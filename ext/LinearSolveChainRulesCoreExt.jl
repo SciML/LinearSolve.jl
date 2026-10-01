@@ -49,6 +49,19 @@ function CRC.rrule(
         A_ = deepcopy(A)
     end
 
+    # The correction for a non-square `A` reads `A` and `b`, which the solve may overwrite.
+    nonsquare = !LinearSolve.issquare(A) && A isa AbstractMatrix
+    A_ns = if !nonsquare || alg isa AbstractKrylovSubspaceMethod
+        A
+    elseif A_ !== nothing
+        A_
+    elseif A isa Matrix && A !== prob.A
+        prob.A  # `init` made `A` a private copy
+    else
+        deepcopy(A)
+    end
+    b_ = nonsquare ? copy(cache.b) : nothing
+
     sol = solve!(cache)
 
     function ∇linear_solve(∂sol)
@@ -72,6 +85,7 @@ function CRC.rrule(
 
         tu = adjoint(sol.u)
         ∂A = .-(λ .* tu)
+        LinearSolve._add_nonsquare_pullback!(∂A, cache, A_ns, b_, sol.u, λ, ∂u)
         ∂b = λ
         ∂prob = LinearProblem(∂A, ∂b, ∂∅)
 

@@ -305,6 +305,29 @@ end
     @test en_jac ≈ fd_jac rtol = 1.0e-4
 end
 
+# https://github.com/SciML/LinearSolve.jl/issues/1309
+@testset "non-square reverse" begin
+    for (rows, cols) in ((9, 4), (4, 9))
+        A = randn(rows, cols)
+        b = randn(rows)
+        grad_A = ForwardDiff.gradient(X -> sum(X \ b), A)
+        algs = rows > cols ?
+            (
+                SVDFactorization(), QRFactorization(), NormalCholeskyFactorization(),
+                KrylovJL_LSMR(), nothing,
+            ) :
+            (SVDFactorization(), KrylovJL_LSMR())
+        for alg in algs
+            dA = zeros(rows, cols)
+            Enzyme.autodiff(
+                set_runtime_activity(Reverse), fnice, Active,
+                Duplicated(copy(A), dA), Const(b), Const(alg)
+            )
+            @test dA ≈ grad_A rtol = 1.0e-8
+        end
+    end
+end
+
 # https://github.com/SciML/LinearSolve.jl/issues/479
 function testls(A, b, u)
     oa = OperatorAssumptions(

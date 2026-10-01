@@ -1,7 +1,7 @@
 using LinearSolve, LinearAlgebra, Test, ForwardDiff, ReverseDiff
 
-# ODE-free ReverseDiff reproducer for #1344: `lu_instance` drops TrackedReal origin
-# tags via `zero`, so the default/LU cache slot must be typed from `eltype(A)`.
+# ODE-free ReverseDiff reproducer: `lu_instance` drops TrackedReal origin tags via
+# `zero`, so the default/LU cache slot must be typed from `eltype(A)`.
 function loss_lu(p, alg)
     A = reshape([p[1], p[2], p[3], p[4]], 2, 2)
     return sum(solve(LinearProblem(A, [p[1], p[4]]), alg).u)
@@ -12,7 +12,7 @@ function loss_default_n(p, n)
     return sum(solve(LinearProblem(A, [p[k] for k in 1:n])).u)
 end
 
-@testset "ReverseDiff LU cache matches ForwardDiff (issue #1344)" begin
+@testset "ReverseDiff LU cache matches ForwardDiff" begin
     p0 = [3.0, 0.5, 0.2, 4.0]
     algs = (
         LUFactorization(),

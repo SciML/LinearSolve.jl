@@ -1,5 +1,6 @@
 using LinearSolve, RecursiveFactorization, LinearAlgebra, SparseArrays, Test
 using SciMLOperators: FunctionOperator, MatrixOperator, WOperator, has_concretization
+using Unitful
 using Zygote
 
 struct CountingIdentityPreconditioner
@@ -22,6 +23,29 @@ solve(prob)
     g = Zygote.gradient(b -> sum(solve(LinearProblem(A, b), alg).u), b)[1]
     @test g !== nothing
     @test isapprox(g, BigFloat[0.5, 1 // 3]; rtol = 1.0e-12)
+end
+
+@testset "Unitful LU cache parity with main" begin
+    # NoUnits collapses to Float64 and solves on main and here.
+    Ad = Matrix([2.0 0.5; 0.1 3.0] * Unitful.NoUnits)
+    bd = Vector([1.0, 2.0] * Unitful.NoUnits)
+    sol = solve(LinearProblem(Ad, bd), LUFactorization())
+    @test sol.u ≈ [0.33613445378151263, 0.6554621848739496]
+
+    # Dimensionful Quantity: init still DimensionErrors on main (u0 fill with false);
+    # user-facing init/solve behavior is unchanged. The LU placeholder is typed from
+    # eltype(A) when lu_instance strips units (same branch as TrackedReal).
+    A = Matrix([2.0 0.5; 0.1 3.0] * u"m")
+    b = Vector([1.0, 2.0] * u"m")
+    @test_throws Unitful.DimensionError init(LinearProblem(A, b), LUFactorization())
+    n = size(A, 1)
+    cv = LinearSolve.init_cacheval(
+        LUFactorization(), A, b, similar(b),
+        LinearSolve.IdentityOperator(n), LinearSolve.IdentityOperator(n),
+        1, 1.0e-8, 1.0e-8, false, OperatorAssumptions(true)
+    )
+    @test cv isa LinearAlgebra.LU
+    @test eltype(cv) === eltype(A)
 end
 
 if LinearSolve.appleaccelerate_isavailable()

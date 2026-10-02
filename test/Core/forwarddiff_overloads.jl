@@ -487,6 +487,17 @@ backslash_large = A_large_dual \ b_large_dual
 # Test partials match
 @test ForwardDiff.partials.(sol_large.u) ≈ ForwardDiff.partials.(backslash_large)
 
+# https://github.com/SciML/LinearSolve.jl/issues/1361
+@testset "underdetermined system with dual numbers" begin
+    A = rand(4, 9)
+    b = rand(4)
+    ref = ForwardDiff.gradient(X -> sum(X \ b), A)
+    for alg in (nothing, SVDFactorization(), KrylovJL_LSMR())
+        g(X) = sum(solve(LinearProblem(X, b), alg).u)
+        @test ForwardDiff.gradient(g, A) ≈ ref rtol = 1.0e-6
+    end
+end
+
 # Test that DualLinearCache preserves p through init and reinit!
 # This is needed by OrdinaryDiffEq which passes ODE state as p to LinearProblem
 # for preconditioner access.

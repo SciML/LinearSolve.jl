@@ -138,9 +138,18 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
             end
         end
 
+        # A wide `A` also moves the minimum-norm solution in its null space, by
+        # (I - A⁺A) dAᴴ y with y = Aᴴ \ x: w = dAᴴ y is added and A w taken out of the solve.
+        y = size(A, 1) < size(A, 2) && !isnothing(A_list) ? A_adj \ u : nothing
         for i in eachindex(rhs_list)
             cache.linear_cache.b .= A_adj \ rhs_list[i]
-            rhs_list[i] .= solve!(cache.linear_cache, alg, args...; kwargs...).u
+            if y === nothing
+                rhs_list[i] .= solve!(cache.linear_cache, alg, args...; kwargs...).u
+            else
+                mul!(rhs_list[i], A_list[i]', y)
+                mul!(cache.linear_cache.b, A, rhs_list[i], -1, true)
+                rhs_list[i] .+= solve!(cache.linear_cache, alg, args...; kwargs...).u
+            end
         end
 
         cache.linear_cache.b .= cache.primal_b_cache

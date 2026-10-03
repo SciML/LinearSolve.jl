@@ -412,7 +412,9 @@ end
             cacheval = LinearSolve.@get_cacheval(cache, :UMFPACKFactorization)
             if alg.reuse_symbolic
                 # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
-                if length(cacheval.nzval) != length(nonzeros(A)) || alg.check_pattern && pattern_changed(cacheval, A)
+                if length(cacheval.nzval) != length(nonzeros(A)) ||
+                        _reduction_changed(cache.sparse_reduction) ||
+                        alg.check_pattern && pattern_changed(cacheval, A)
                     fact = _umfpack_lu(
                         alg,
                         SparseMatrixCSC(
@@ -606,7 +608,9 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
     if cache.isfresh
         cacheval = LinearSolve.@get_cacheval(cache, :KLUFactorization)
         if alg.reuse_symbolic
-            if length(cacheval.nzval) != length(nonzeros(A)) || alg.check_pattern && pattern_changed(cacheval, A)
+            if length(cacheval.nzval) != length(nonzeros(A)) ||
+                    _reduction_changed(cache.sparse_reduction) ||
+                    alg.check_pattern && pattern_changed(cacheval, A)
                 fact = KLU.klu(
                     LinearSolve.make_SparseMatrixCSC(A),
                     check = false
@@ -782,6 +786,7 @@ function SciMLBase.solve!(
         cacheval = LinearSolve.@get_cacheval(cache, :KLUFactorization)
         if alg.reuse_symbolic
             if length(cacheval.nzval) != length(nonzeros(A)) ||
+                    _reduction_changed(cache.sparse_reduction) ||
                     alg.check_pattern && pattern_changed(cacheval, A)
                 fact = PureKLU.klu(
                     SparseMatrixCSC(
@@ -936,6 +941,7 @@ function SciMLBase.solve!(
         cacheval = LinearSolve.@get_cacheval(cache, :SupernodalLUFactorization)
         if alg.reuse_symbolic && size(cacheval) == size(As) &&
                 nnz(cacheval.A) == nnz(As) &&
+                !_reduction_changed(cache.sparse_reduction) &&
                 !(alg.check_pattern && pattern_changed(cacheval, As))
             # numeric-only refactorization: reuses the analysis, matching, and
             # all numeric storage (allocation-free)
@@ -1575,6 +1581,12 @@ function _resolve_pending!(red::SparseReduction, A)
     return red
 end
 
+# A cached symbolic factorization is only valid while the pattern of the operand is
+# stable, and the reduction can change that pattern even when the caller's own is constant.
+_reduction_changed(::Nothing) = false
+_reduction_changed(red::SparseReduction) =
+    red.active && !red.cache_union && red.structure_changed
+
 function LinearSolve.reduce_operand!(red::SparseReduction, A)
     red.pending && _resolve_pending!(red, A)
     red.active || return A
@@ -1602,10 +1614,12 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
         new_reduced = deepcopy(LinearSolve.make_SparseMatrixCSC(A))
         dropzeros!(new_reduced)
         new_nnz = nnz(new_reduced)
-        # `pattern_changed` is load-bearing: a pattern change whose post-dropzeros nnz
-        # happens to match the previous one is still a structure change to the consumers
-        # of this flag.
-        red.structure_changed = pattern_changed || new_nnz != red.reduced_nnz
+        # `pattern_changed` only fires on the solve that breaks union caching, so the
+        # reduced pattern is compared directly as well: dropping a different set of zeros
+        # can leave nnz unchanged and still invalidate a cached symbolic factorization.
+        red.structure_changed = pattern_changed || new_nnz != red.reduced_nnz ||
+            getcolptr(new_reduced) != getcolptr(red.reduced) ||
+            rowvals(new_reduced) != rowvals(red.reduced)
         red.reduced_nnz = new_nnz
         red.reduced = new_reduced
         red.nrefactor += 1
@@ -1642,10 +1656,10 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
             red.cache_union = false
             red.reduced = deepcopy(LinearSolve.make_SparseMatrixCSC(A))
             dropzeros!(red.reduced)
-            # First per-solve reduction after switching from union caching.
-            # No "previous" per-solve result, so no structure change yet.
+            # The operand goes from the union-reduced pattern to this matrix's own
+            # dropzeros result, which can differ at equal nnz.
             red.reduced_nnz = nnz(red.reduced)
-            red.structure_changed = false
+            red.structure_changed = true
         end
     else
         rnz = nonzeros(red.reduced)

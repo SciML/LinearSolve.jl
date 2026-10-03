@@ -863,6 +863,29 @@ end
     end
 end
 
+@testset "dense Hermitian and real Symmetric try Cholesky first" begin
+    rng = Random.MersenneTwister(3)
+    n = 8
+    M = randn(rng, n, n)
+    b, b2 = randn(rng, n), randn(rng, n)
+    for S in (M * M' + n * I, (M + M') / 2), W in (Hermitian, Symmetric)
+        cache = init(LinearProblem(W(S), b))
+        @test cache.alg.alg === LinearSolve.DefaultAlgorithmChoice.CholeskyFactorization
+        @test solve!(cache).u ≈ S \ b
+        # a new `b` and the adjoint solve reuse whichever factorization succeeded
+        cache.b = b2
+        @test solve!(cache).u ≈ S \ b2
+        @test LinearSolve._adjoint_solve(cache, b2) ≈ S \ b2
+    end
+
+    Apd = Hermitian(M * M' + n * I)
+    cache = init(LinearProblem(copy(Apd), b))
+    refactor!(cache, A) = (copyto!(cache.A, A); cache.A = cache.A; solve!(cache); nothing)
+    refactor!(cache, Apd)
+    refactor!(cache, Apd)
+    @test (@allocated refactor!(cache, Apd)) == 0
+end
+
 @testset "triangular matrices reach a direct solve (#1335)" begin
     rng = Random.MersenneTwister(5)
     n = 10

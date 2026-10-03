@@ -89,6 +89,14 @@ function __setfield!(
     return setfield!(cache, :QRFactorizationPivoted, v)
 end
 
+# and of the Bunch-Kaufman fallback for Cholesky
+function __setfield!(
+        cache::DefaultLinearSolverInit,
+        alg::DefaultLinearSolver, v::LinearAlgebra.BunchKaufman
+    )
+    return setfield!(cache, :BunchKaufmanFactorization, v)
+end
+
 # Legacy fallback
 # For SciML algorithms already using `defaultalg`, all assume square matrix.
 defaultalg(A, b) = defaultalg(A, b, OperatorAssumptions(true))
@@ -274,12 +282,21 @@ _lhl_scalar_massmatrix(::UniformScaling) = true
 _lhl_scalar_massmatrix(::Number) = true
 _lhl_scalar_massmatrix(::Any) = false
 
+# Cholesky first where it applies, falling back to Bunch-Kaufman for an indefinite `A`
+# (see `_default_cholesky_solve!`). A complex `Symmetric` is not Hermitian, so it has none.
 function defaultalg(A::Symmetric{<:Number, <:Array}, b, ::OperatorAssumptions{Bool})
-    return DefaultLinearSolver(DefaultAlgorithmChoice.BunchKaufmanFactorization)
+    return DefaultLinearSolver(
+        eltype(A) <: Union{Float32, Float64} ?
+            DefaultAlgorithmChoice.CholeskyFactorization :
+            DefaultAlgorithmChoice.BunchKaufmanFactorization
+    )
 end
 
 function defaultalg(A::Hermitian{<:Number, <:Array}, b, ::OperatorAssumptions{Bool})
-    return DefaultLinearSolver(DefaultAlgorithmChoice.BunchKaufmanFactorization)
+    return DefaultLinearSolver(
+        eltype(A) <: BLASELTYPES ? DefaultAlgorithmChoice.CholeskyFactorization :
+            DefaultAlgorithmChoice.BunchKaufmanFactorization
+    )
 end
 
 function defaultalg(A::GPUArraysCore.AnyGPUArray, b, assump::OperatorAssumptions{Bool})
@@ -1030,6 +1047,48 @@ function _default_qr_solve_with_fallback(
 end
 
 """
+    _default_cholesky_solve!(cache::LinearCache, alg::DefaultLinearSolver)
+
+Cholesky for the default solver, falling back to Bunch-Kaufman when a dense `Hermitian` or
+real `Symmetric` `A` turns out not to be positive definite. A failed Cholesky stops at the
+first non-positive pivot, so trying it first is cheap, and a positive definite `A` keeps
+Cholesky's allocation-free refactorization. Solves that reuse the factorization take
+whichever one the last refactorization ended with.
+"""
+function _default_cholesky_solve!(cache::LinearCache, alg::DefaultLinearSolver)
+    cv = cache.cacheval
+    # only a dense `Symmetric`/`Hermitian` has a Bunch-Kaufman slot to fall back to
+    if alg.safetyfallback && cv isa DefaultLinearSolverInit &&
+            cv.BunchKaufmanFactorization isa BunchKaufman
+        if cache.isfresh
+            # factorized here rather than through `solve!`, which would report an
+            # indefinite `A` as a solver failure
+            A_backup = _copy_A_for_safety(cache)
+            cv.CholeskyFactorization = do_factorization(
+                CholeskyFactorization(), cache.A, cache.b, cache.u
+            )
+            if issuccess(cv.CholeskyFactorization)
+                cache.isfresh = false
+            else
+                copyto!(cache.A, A_backup)
+            end
+        end
+        if !issuccess(cv.CholeskyFactorization)
+            sol = SciMLBase.solve!(cache, BunchKaufmanFactorization())
+            return SciMLBase.build_linear_solution(
+                alg, cache.u, nothing, nothing;
+                retcode = sol.retcode, iters = sol.iters, stats = nothing
+            )
+        end
+    end
+    sol = SciMLBase.solve!(cache, CholeskyFactorization())
+    return SciMLBase.build_linear_solution(
+        alg, cache.u, nothing, nothing;
+        retcode = sol.retcode, iters = sol.iters, stats = nothing
+    )
+end
+
+"""
     _algchoice_to_alg_with_safety(alg::Symbol)
 
 Like `algchoice_to_alg`, but generates an expression that passes
@@ -1138,6 +1197,10 @@ end
             newex = quote
                 sol = SciMLBase.solve!(cache, $(algchoice_to_alg(alg)))
                 _default_qr_solve_with_fallback(cache, alg, sol)
+            end
+        elseif alg == Symbol(DefaultAlgorithmChoice.CholeskyFactorization)
+            newex = quote
+                _default_cholesky_solve!(cache, alg)
             end
         else
             if alg in LinearSolve._SPARSE_ONLY_ALGORITHMS
@@ -1286,6 +1349,13 @@ end
             quote
                 getproperty(cache.cacheval, $(Meta.quot(alg)))[1]' \ dy
             end
+        elseif alg == Symbol(DefaultAlgorithmChoice.CholeskyFactorization)
+            # after a Bunch-Kaufman fallback the Cholesky slot holds the failed attempt
+            quote
+                F = cache.cacheval.CholeskyFactorization
+                BK = cache.cacheval.BunchKaufmanFactorization
+                BK isa BunchKaufman && !issuccess(F) ? BK' \ dy : F' \ dy
+            end
         elseif alg == Symbol(DefaultAlgorithmChoice.GenericLUFactorization)
             quote
                 getproperty(cache.cacheval, $(Meta.quot(alg))).fact' \ dy
@@ -1312,7 +1382,6 @@ end
                     DefaultAlgorithmChoice.BunchKaufmanFactorization,
                     DefaultAlgorithmChoice.CHOLMODFactorization,
                     DefaultAlgorithmChoice.SVDFactorization,
-                    DefaultAlgorithmChoice.CholeskyFactorization,
                     DefaultAlgorithmChoice.NormalCholeskyFactorization,
                     DefaultAlgorithmChoice.QRFactorizationPivoted,
                     DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization,

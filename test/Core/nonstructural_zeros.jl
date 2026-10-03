@@ -399,4 +399,33 @@ reduction(cache) = cache.cacheval.sparse_reduction
         cache.A = copy(A2)
         @test_throws ArgumentError solve!(cache)
     end
+
+    # https://github.com/SciML/LinearSolve.jl/issues/1354
+    @testset "KLU with check_pattern = false survives a reduction pattern change" begin
+        function dense4(zero_positions)
+            A = sparse(Float64[4 1 1 1; 1 4 1 1; 1 1 4 1; 1 1 1 4])
+            for (i, j) in zero_positions
+                A[i, j] = 0.0
+            end
+            return A
+        end
+        # 4 stored zeros activates the reduction, then 3 of them filling in switches it
+        # to per-solve dropzeros, and the last matrix moves the remaining zero without
+        # changing nnz.
+        As = [
+            dense4([(1, 2), (2, 1), (3, 4), (4, 3)]),
+            dense4([(1, 2)]),
+            dense4([(2, 1)]),
+        ]
+        b = ones(4)
+        for check_pattern in (true, false)
+            cache = init(LinearProblem(copy(As[1]), b), KLUFactorization(; check_pattern))
+            for A in As
+                cache.A = copy(A)
+                sol = solve!(cache)
+                @test sol.retcode == ReturnCode.Success
+                @test norm(A * sol.u - b) < 1.0e-10
+            end
+        end
+    end
 end

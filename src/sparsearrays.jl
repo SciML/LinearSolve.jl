@@ -603,10 +603,17 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
     # (returns `A`) for the default solver and when no reduction is active.
     A = LinearSolve.reduce_operand!(cache.sparse_reduction, A)
     A = convert(AbstractMatrix, A)
+    # The reduction can change the stored pattern of the operand even when the caller's
+    # own pattern is constant, so a cached symbolic factorization has to be rebuilt even
+    # with `check_pattern = false`.
+    red = cache.sparse_reduction
+    reduction_changed = red !== nothing && red.active && !red.cache_union &&
+        red.structure_changed
     if cache.isfresh
         cacheval = LinearSolve.@get_cacheval(cache, :KLUFactorization)
         if alg.reuse_symbolic
-            if length(cacheval.nzval) != length(nonzeros(A)) || alg.check_pattern && pattern_changed(cacheval, A)
+            if length(cacheval.nzval) != length(nonzeros(A)) || reduction_changed ||
+                    alg.check_pattern && pattern_changed(cacheval, A)
                 fact = KLU.klu(
                     LinearSolve.make_SparseMatrixCSC(A),
                     check = false
@@ -1602,10 +1609,12 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
         new_reduced = deepcopy(LinearSolve.make_SparseMatrixCSC(A))
         dropzeros!(new_reduced)
         new_nnz = nnz(new_reduced)
-        # `pattern_changed` is load-bearing: a pattern change whose post-dropzeros nnz
-        # happens to match the previous one is still a structure change to the consumers
-        # of this flag.
-        red.structure_changed = pattern_changed || new_nnz != red.reduced_nnz
+        # `pattern_changed` only fires on the solve that breaks union caching, so the
+        # reduced pattern is compared directly as well: dropping a different set of zeros
+        # can leave nnz unchanged and still invalidate a cached symbolic factorization.
+        red.structure_changed = pattern_changed || new_nnz != red.reduced_nnz ||
+            getcolptr(new_reduced) != getcolptr(red.reduced) ||
+            rowvals(new_reduced) != rowvals(red.reduced)
         red.reduced_nnz = new_nnz
         red.reduced = new_reduced
         red.nrefactor += 1

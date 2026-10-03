@@ -412,7 +412,9 @@ end
             cacheval = LinearSolve.@get_cacheval(cache, :UMFPACKFactorization)
             if alg.reuse_symbolic
                 # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
-                if length(cacheval.nzval) != length(nonzeros(A)) || alg.check_pattern && pattern_changed(cacheval, A)
+                if length(cacheval.nzval) != length(nonzeros(A)) ||
+                        _reduction_changed(cache.sparse_reduction) ||
+                        alg.check_pattern && pattern_changed(cacheval, A)
                     fact = _umfpack_lu(
                         alg,
                         SparseMatrixCSC(
@@ -603,16 +605,11 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
     # (returns `A`) for the default solver and when no reduction is active.
     A = LinearSolve.reduce_operand!(cache.sparse_reduction, A)
     A = convert(AbstractMatrix, A)
-    # The reduction can change the stored pattern of the operand even when the caller's
-    # own pattern is constant, so a cached symbolic factorization has to be rebuilt even
-    # with `check_pattern = false`.
-    red = cache.sparse_reduction
-    reduction_changed = red !== nothing && red.active && !red.cache_union &&
-        red.structure_changed
     if cache.isfresh
         cacheval = LinearSolve.@get_cacheval(cache, :KLUFactorization)
         if alg.reuse_symbolic
-            if length(cacheval.nzval) != length(nonzeros(A)) || reduction_changed ||
+            if length(cacheval.nzval) != length(nonzeros(A)) ||
+                    _reduction_changed(cache.sparse_reduction) ||
                     alg.check_pattern && pattern_changed(cacheval, A)
                 fact = KLU.klu(
                     LinearSolve.make_SparseMatrixCSC(A),
@@ -789,6 +786,7 @@ function SciMLBase.solve!(
         cacheval = LinearSolve.@get_cacheval(cache, :KLUFactorization)
         if alg.reuse_symbolic
             if length(cacheval.nzval) != length(nonzeros(A)) ||
+                    _reduction_changed(cache.sparse_reduction) ||
                     alg.check_pattern && pattern_changed(cacheval, A)
                 fact = PureKLU.klu(
                     SparseMatrixCSC(
@@ -943,6 +941,7 @@ function SciMLBase.solve!(
         cacheval = LinearSolve.@get_cacheval(cache, :SupernodalLUFactorization)
         if alg.reuse_symbolic && size(cacheval) == size(As) &&
                 nnz(cacheval.A) == nnz(As) &&
+                !_reduction_changed(cache.sparse_reduction) &&
                 !(alg.check_pattern && pattern_changed(cacheval, As))
             # numeric-only refactorization: reuses the analysis, matching, and
             # all numeric storage (allocation-free)
@@ -1582,6 +1581,12 @@ function _resolve_pending!(red::SparseReduction, A)
     return red
 end
 
+# A cached symbolic factorization is only valid while the pattern of the operand is
+# stable, and the reduction can change that pattern even when the caller's own is constant.
+_reduction_changed(::Nothing) = false
+_reduction_changed(red::SparseReduction) =
+    red.active && !red.cache_union && red.structure_changed
+
 function LinearSolve.reduce_operand!(red::SparseReduction, A)
     red.pending && _resolve_pending!(red, A)
     red.active || return A
@@ -1651,10 +1656,10 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
             red.cache_union = false
             red.reduced = deepcopy(LinearSolve.make_SparseMatrixCSC(A))
             dropzeros!(red.reduced)
-            # First per-solve reduction after switching from union caching.
-            # No "previous" per-solve result, so no structure change yet.
+            # The operand goes from the union-reduced pattern to this matrix's own
+            # dropzeros result, which can differ at equal nnz.
             red.reduced_nnz = nnz(red.reduced)
-            red.structure_changed = false
+            red.structure_changed = true
         end
     else
         rnz = nonzeros(red.reduced)

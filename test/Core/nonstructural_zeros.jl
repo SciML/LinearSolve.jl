@@ -417,10 +417,17 @@ reduction(cache) = cache.cacheval.sparse_reduction
             dense4([(1, 2)]),
             dense4([(2, 1)]),
         ]
+        # the solve that switches Auto over to per-solve dropzeros can itself shift the
+        # pattern at equal nnz
+        As_switch = [
+            dense4([(1, 2), (2, 1), (3, 4), (4, 3)]),
+            dense4([(1, 2), (1, 3), (1, 4), (2, 3)]),
+        ]
         b = ones(4)
-        for check_pattern in (true, false)
-            cache = init(LinearProblem(copy(As[1]), b), KLUFactorization(; check_pattern))
-            for A in As
+        algs = [KLUFactorization, UMFPACKFactorization]
+        for Alg in algs, check_pattern in (true, false), seq in (As, As_switch)
+            cache = init(LinearProblem(copy(seq[1]), b), Alg(; check_pattern))
+            for A in seq
                 cache.A = copy(A)
                 sol = solve!(cache)
                 @test sol.retcode == ReturnCode.Success

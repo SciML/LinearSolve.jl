@@ -424,7 +424,10 @@ reduction(cache) = cache.cacheval.sparse_reduction
             dense4([(1, 2), (1, 3), (1, 4), (2, 3)]),
         ]
         b = ones(4)
-        algs = [KLUFactorization, UMFPACKFactorization]
+        algs = [
+            KLUFactorization, UMFPACKFactorization,
+            PureKLUFactorization, SupernodalLUFactorization,
+        ]
         for Alg in algs, check_pattern in (true, false), seq in (As, As_switch)
             cache = init(LinearProblem(copy(seq[1]), b), Alg(; check_pattern))
             for A in seq

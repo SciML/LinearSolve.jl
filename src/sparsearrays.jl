@@ -1481,12 +1481,10 @@ mutable struct SparseReduction{Tv, Ti}
     reduced::SparseMatrixCSC{Tv, Ti}
     nanalyze::Int
     nrefactor::Int
-    # Tracks whether the most recent per-solve dropzeros changed the structure
-    # of `reduced` (i.e. nnz changed). Set to `false` after the first per-solve
-    # dropzeros call so the first call never triggers a false "changed" signal.
-    # Used by the DefaultLinearSolver to decide whether to invalidate cached
-    # symbolic factorizations (Sparspak, KLU) whose symbolic reuse is only valid
-    # when the matrix structure is stable across calls.
+    # Tracks whether the most recent per-solve dropzeros changed the pattern of
+    # `reduced`, including a change that leaves nnz the same. The sparse solvers and
+    # Sparspak read it to invalidate a cached symbolic factorization, whose reuse is
+    # only valid while the pattern is stable across calls.
     reduced_nnz::Int
     structure_changed::Bool
 end

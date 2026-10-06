@@ -1595,7 +1595,7 @@ end
 # there is nothing worth reducing in it either way.
 function _resolve_pending!(red::SparseReduction, A)
     nz = nonzeros(A)
-    (isempty(nz) || all(iszero, nz)) && return red
+    (isempty(nz) || all(iszero, nz) || all(isone, nz)) && return red
     red.pending = false
     count(iszero, nz) / length(nz) >=
         LinearSolve.PERSISTENT_ZERO_FRACTION_THRESHOLD || return red

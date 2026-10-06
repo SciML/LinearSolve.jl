@@ -319,6 +319,38 @@ reduction(cache) = cache.cacheval.sparse_reduction
         @test !reduction(c2).active
     end
 
+    @testset "auto defers the decision on an all-ones starting matrix" begin
+        # OrdinaryDiffEq fills its J/W prototypes with ones before `init` (build_J_W,
+        # OrdinaryDiffEq.jl#3833). Like an all-zero prototype, an all-ones one says nothing
+        # about nonstructural zeros: deciding on it sees 0 % zeros and never activates.
+        proto = copy(mats[1])
+        nonzeros(proto) .= 1.0
+
+        for alg in (nothing, PureKLUFactorization())
+            red(c) = alg === nothing ? reduction(c) : c.sparse_reduction
+            cache = alg === nothing ? init(LinearProblem(copy(proto), copy(b))) :
+                init(LinearProblem(copy(proto), copy(b)), alg)
+            @test !red(cache).active
+            @test red(cache).pending
+
+            # a solve on the unfilled prototype itself keeps the decision deferred
+            solve!(cache)
+            @test red(cache).pending
+            @test !red(cache).active
+
+            # the first filled matrix decides
+            filled = copy(mats[1])
+            cache.A = copy(filled)
+            sol = solve!(cache)
+            @test sol.retcode == ReturnCode.Success
+            @test sol.u ≈ Matrix(filled) \ b rtol = 1.0e-8
+            @test !red(cache).pending
+            @test red(cache).active && red(cache).cache_union
+            @test red(cache).nstart_zeros == count(iszero, nonzeros(filled))
+            @test red(cache).reduced_nnz < nnz(filled)
+        end
+    end
+
     @testset "auto deactivates once the union covers every stored entry" begin
         # The union only grows, so when it covers the whole stored pattern nothing can
         # ever be dropped again: the reduction is dead weight and must switch off rather

@@ -884,3 +884,44 @@ end
         @test norm(Matrix(A) * sol.u - rhs) / norm(rhs) < 1.0e-13
     end
 end
+
+@testset "transposed sparse matrices reach init (#1333)" begin
+    rng = Random.MersenneTwister(0)
+    n = 20
+    # non-symmetric, so `transpose(A) != A` and the wrapper is actually exercised
+    A = sparse(sprandn(rng, n, n, 0.3) + n * I)
+    Ac = sparse(sprandn(rng, ComplexF64, n, n, 0.3) + n * I)
+    Qs = sprandn(rng, n, n, 0.3)
+    Asym = sparse(Qs * Qs' + n * I)
+    b = randn(rng, n)
+    bc = randn(rng, ComplexF64, n)
+    @test !issymmetric(A)
+    @test Matrix(adjoint(Ac)) != Matrix(transpose(Ac))
+
+    for (W, rhs) in (
+            (transpose(A), b), (adjoint(A), b),
+            (transpose(Ac), bc), (adjoint(Ac), bc),
+            (Symmetric(Asym), b), (Hermitian(Asym), b),
+        )
+        @test_nowarn init(LinearProblem(W, rhs))
+        sol = solve(LinearProblem(W, rhs))
+        @test SciMLBase.successful_retcode(sol)
+        @test norm(Matrix(W) * sol.u - rhs) / norm(rhs) < 1.0e-6
+    end
+
+    # an explicitly named QR used to throw on a wrapped sparse matrix
+    for W in (transpose(A), adjoint(A))
+        sol = solve(LinearProblem(W, b), QRFactorization())
+        @test norm(Matrix(W) * sol.u - b) / norm(b) < 1.0e-10
+    end
+
+    # the eager QR and GenericLU slots only type the cache, they do not factorize
+    cv = init(LinearProblem(transpose(A), b)).cacheval
+    @test size(cv.QRFactorization) == (1, 1)
+    @test cv.GenericLUFactorization.fact.factors == transpose(A)
+
+    # a non-square wrapper takes the sparse QR
+    W = transpose(sprandn(rng, n ÷ 2, n, 0.3) + sparse(1.0I, n ÷ 2, n))
+    sol = solve(LinearProblem(W, b))
+    @test norm(W' * (W * sol.u - b)) / norm(W' * b) < 1.0e-10
+end

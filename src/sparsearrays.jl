@@ -1423,6 +1423,57 @@ function LinearSolve.init_cacheval(
     return nothing
 end
 
+# `cholesky_instance` factorizes for real, and CHOLMOD rejects a non-symmetric matrix, so
+# the eager slot build throws from `init`. A 1x1 factor types the slot without touching `A`.
+@static if Base.USE_GPL_LIBS
+    function LinearSolve.init_cacheval(
+            alg::CholeskyFactorization,
+            A::Union{
+                Adjoint{T, <:AbstractSparseMatrixCSC},
+                Transpose{T, <:AbstractSparseMatrixCSC},
+            }, b, u, Pl, Pr,
+            maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+            assumptions::OperatorAssumptions
+        ) where {T <: BLASELTYPES}
+        return cholesky(sparse(reshape([one(T)], 1, 1)))
+    end
+end
+
+# Without this the generic `Adjoint`/`Transpose` method takes it, and that one passes SPQR
+# a pivot, which it rejects for a sparse matrix, throwing from `init`. A 1x1 instance from
+# the parent types the slot, for the element types SPQR supports.
+function LinearSolve.init_cacheval(
+        alg::QRFactorization,
+        A::Union{
+            Adjoint{<:Number, <:AbstractSparseArray},
+            Transpose{<:Number, <:AbstractSparseArray},
+        }, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions
+    )
+    P = parent(A)
+    return eltype(P) <: Union{Float64, ComplexF64} ?
+        ArrayInterface.qr_instance(P, alg.pivot) : nothing
+end
+
+# The generic `Adjoint`/`Transpose` method factorizes `A` element by element, O(n^3) for a
+# wrapped sparse matrix. The solve factorizes anyway, so an unfactorized `LU` types the slot.
+function LinearSolve.init_cacheval(
+        alg::GenericLUFactorization,
+        A::Union{
+            Adjoint{<:Number, <:AbstractSparseArray},
+            Transpose{<:Number, <:AbstractSparseArray},
+        }, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions
+    )
+    ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
+    fact = LinearAlgebra.LU{eltype(A), typeof(A), typeof(ipiv)}(
+        A, ipiv, zero(LinearAlgebra.BlasInt)
+    )
+    return _GenericLUFactorizationCache(fact, ipiv, nothing)
+end
+
 LinearSolve.PrecompileTools.@compile_workload begin
     # `local` because `LinearSolve` already has a stray module-global `A`, which
     # otherwise makes this soft-scope assignment ambiguous.

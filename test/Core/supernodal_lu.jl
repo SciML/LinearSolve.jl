@@ -106,9 +106,7 @@ end
 end
 
 @testset "unrefined poor solve is measured and refined" begin
-    # Restricted pivoting can lose digits through growth the perturbation
-    # count never sees: zero perturbed pivots with an unrefined backward
-    # error of ~1e-9. The solve path refines this to working precision.
+    # Zero perturbed pivots, unrefined ber ~1e-9; solve path refines to working precision.
     rng = MersenneTwister(1001)
     n = 600
     A = sprand(rng, n, n, 0.02)
@@ -129,15 +127,29 @@ end
 end
 
 @testset "multi-RHS solve measures every column" begin
-    # Every right-hand-side column is measured, including matrix ones. This
-    # system is singular to working precision, so the answer is `Infeasible`.
+    # matching=false perturbs pivots that refinement cannot recover (UMFPACK/KLU succeed).
     D = 10.0 .^ range(-9, 9; length = 200)
     A = spdiagm(0 => D, 1 => fill(1.0e-9, 199), -1 => fill(1.0e-9, 199))
     B = Matrix(Float64.(reshape(1:(200 * 3), 200, 3)))
     cache = init(LinearProblem(A, B), SupernodalLUFactorization(matching = false))
     sol = solve!(cache)
     @test SNLU.nperturbed(cache.cacheval) > 0
-    @test sol.retcode == ReturnCode.Infeasible
+    @test sol.retcode == ReturnCode.APosterioriSafetyFailure
+
+    # A bad column beyond column 1 must still trip the gate.
+    n = 80
+    Ag = sprand(MersenneTwister(7), n, n, 0.05) + 10.0 * I
+    Bg = randn(MersenneTwister(8), n, 3)
+    cacheg = init(LinearProblem(Ag, Bg), SupernodalLUFactorization())
+    solg = solve!(cacheg)
+    @test solg.retcode == ReturnCode.Success
+    Fg = cacheg.cacheval
+    tolg = n * eps(Float64)
+    Y = copy(solg.u)
+    @test LinearSolve._snlu_backward_error_max(Fg, view(Y, :, 1), view(Bg, :, 1)) <= tolg
+    Y[:, 3] .+= 1.0
+    @test LinearSolve._snlu_backward_error_max(Fg, Y, Bg) > tolg
+    @test LinearSolve._snlu_backward_error_max(Fg, view(Y, :, 1:2), view(Bg, :, 1:2)) <= tolg
 end
 
 @testset "residual check does not allocate a work vector" begin

@@ -2,6 +2,7 @@ module LinearSolveChainRulesCoreExt
 
 using LinearSolve: LinearSolve, SciMLLinearSolveAlgorithm, AbstractFactorization,
     AbstractKrylovSubspaceMethod, DefaultLinearSolver, OperatorAssumptions,
+    NormalBunchKaufmanFactorization, NormalCholeskyFactorization,
     defaultalg, default_alias_A, LinearSolveAdjoint
 using SciMLBase: SciMLBase, LinearProblem, init, solve, solve!
 using SciMLOperators: issquare
@@ -49,6 +50,22 @@ function CRC.rrule(
         A_ = deepcopy(A)
     end
 
+    # The correction for a non-square `A` reads `A` and `b`, which the solve may overwrite.
+    nonsquare = !LinearSolve.issquare(A) && A isa AbstractMatrix
+    A_ns = if !nonsquare || alg isa Union{
+            AbstractKrylovSubspaceMethod, NormalCholeskyFactorization,
+            NormalBunchKaufmanFactorization,
+        }
+        A  # never written to
+    elseif A_ !== nothing
+        A_
+    elseif A isa Matrix && A !== prob.A
+        prob.A  # `init` made `A` a private copy
+    else
+        deepcopy(A)
+    end
+    b_ = nonsquare ? copy(cache.b) : nothing
+
     sol = solve!(cache)
 
     function ∇linear_solve(∂sol)
@@ -72,6 +89,7 @@ function CRC.rrule(
 
         tu = adjoint(sol.u)
         ∂A = .-(λ .* tu)
+        LinearSolve._add_nonsquare_pullback!(∂A, cache, A_ns, b_, sol.u, λ, ∂u)
         ∂b = λ
         ∂prob = LinearProblem(∂A, ∂b, ∂∅)
 

@@ -105,6 +105,41 @@ end
     @test_throws ArgumentError SNLU.solve!(similar(bp), Fp, bp; refine = :bogus)
 end
 
+@testset "unrefined poor solve is measured and refined" begin
+    # Restricted pivoting can lose digits through growth the perturbation
+    # count never sees: zero perturbed pivots with an unrefined backward
+    # error of ~1e-9. The solve path refines this to working precision.
+    rng = MersenneTwister(1001)
+    n = 600
+    A = sprand(rng, n, n, 0.02)
+    nz = nonzeros(A)
+    nz .= sign.(nz) .* (10.0 .^ (16 .* rand(rng, length(nz)) .- 8))
+    A = A + spdiagm(0 => (10.0 .^ (12 .* rand(rng, n) .- 6)))
+    b = Vector(A * ones(n))
+    cache = init(LinearProblem(A, b), SupernodalLUFactorization())
+    sol = solve!(cache)
+    @test SNLU.nperturbed(cache.cacheval) == 0
+    @test sol.retcode == ReturnCode.Success
+    r = A * sol.u - b
+    ber = max(
+        norm(r) / (opnorm(A, 1) * norm(sol.u) + norm(b)),
+        norm(r, Inf) / (opnorm(A, Inf) * norm(sol.u, Inf) + norm(b, Inf)),
+    )
+    @test ber <= 100 * n * eps(Float64)
+end
+
+@testset "multi-RHS solve measures every column" begin
+    # Every right-hand-side column is measured, including matrix ones. This
+    # system is singular to working precision, so the answer is `Infeasible`.
+    D = 10.0 .^ range(-9, 9; length = 200)
+    A = spdiagm(0 => D, 1 => fill(1.0e-9, 199), -1 => fill(1.0e-9, 199))
+    B = Matrix(Float64.(reshape(1:(200 * 3), 200, 3)))
+    cache = init(LinearProblem(A, B), SupernodalLUFactorization(matching = false))
+    sol = solve!(cache)
+    @test SNLU.nperturbed(cache.cacheval) > 0
+    @test sol.retcode == ReturnCode.Infeasible
+end
+
 @testset "residual check does not allocate a work vector" begin
     # The post-solve residual check on a perturbed factor used to allocate a
     # fresh n-vector (8n+104 = 2504 B at n=300); it now writes into the

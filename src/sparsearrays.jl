@@ -924,6 +924,46 @@ function _snlu_backward_error(F, y::AbstractVector, b::AbstractVector)
     return iszero(denom) ? zero(real(eltype(r))) : LinearAlgebra.norm(r) / denom
 end
 
+# Largest of the 2-norm and inf-norm backward errors from a single residual.
+# The two norms disagree by dimension-dependent factors on badly scaled
+# systems, so the gate takes the larger. Row sums need a buffer CSC cannot
+# stream without; the residual buffer doubles as the accumulator once its
+# own norms are extracted, keeping the check allocation-free.
+function _snlu_backward_error_max(F, y::AbstractVector, b::AbstractVector)
+    r = F.ir_r
+    LinearAlgebra.mul!(r, F.A, y)
+    r .-= b
+    rn = LinearAlgebra.norm(r)
+    rni = LinearAlgebra.norm(r, Inf)
+    yn = LinearAlgebra.norm(y)
+    yni = LinearAlgebra.norm(y, Inf)
+    bn = LinearAlgebra.norm(b)
+    bni = LinearAlgebra.norm(b, Inf)
+    denom = LinearAlgebra.opnorm(F.A, 1) * yn + bn
+    ber = iszero(denom) ? zero(real(eltype(r))) : rn / denom
+    fill!(r, zero(eltype(r)))
+    cp = getcolptr(F.A)
+    rv = rowvals(F.A)
+    xv = nonzeros(F.A)
+    @inbounds for j in 1:size(F.A, 2)
+        for p in cp[j]:(cp[j + 1] - 1)
+            r[rv[p]] += abs(xv[p])
+        end
+    end
+    anormi = maximum(real, r; init = zero(real(eltype(r))))
+    denomi = anormi * yni + bni
+    beri = iszero(denomi) ? zero(real(eltype(r))) : rni / denomi
+    return max(ber, beri)
+end
+
+function _snlu_backward_error_max(F, Y::AbstractMatrix, B::AbstractMatrix)
+    ber = zero(real(eltype(F.ir_r)))
+    for j in axes(Y, 2)
+        ber = max(ber, _snlu_backward_error_max(F, view(Y, :, j), view(B, :, j)))
+    end
+    return ber
+end
+
 function SciMLBase.solve!(
         cache::LinearSolve.LinearCache, alg::SupernodalLUFactorization; kwargs...
     )
@@ -974,17 +1014,21 @@ function SciMLBase.solve!(
             y = SNLU.solve!(cache.u, F, cache.b)
         end
     end
-    # Static pivoting never aborts: a numerically singular system factors with
-    # perturbed pivots and produces a finite but meaningless solution. When
-    # pivots were perturbed (rare), verify the residual (one sparse mat-vec)
-    # so singularity surfaces as `Infeasible` instead of a silent `Success`.
+    # Restricted pivoting can lose accuracy through growth the perturbation
+    # count never sees, so the backward error is measured on every solve and
+    # refined above n*eps; what refinement cannot recover is `Infeasible`.
+    # Skipped when the solution vector lives in a different arithmetic than
+    # the factor (extension-handled solves).
     ok = all(isfinite, y)
-    if ok && SNLU.nperturbed(F) > 0
-        r = F.ir_r                      # factor-owned residual buffer
-        LinearAlgebra.mul!(r, F.A, y)
-        r .-= cache.b
-        bn = LinearAlgebra.norm(cache.b)
-        ok = LinearAlgebra.norm(r) <= 1.0e-6 * max(bn, floatmin(real(eltype(r))))
+    if ok && eltype(y) == eltype(F.ir_r) &&
+            ((y isa AbstractVector && cache.b isa AbstractVector) ||
+                (y isa AbstractMatrix && cache.b isa AbstractMatrix))
+        tol = size(As, 2) * eps(real(eltype(As)))
+        if _snlu_backward_error_max(F, y, cache.b) > tol
+            y = SNLU.solve!(cache.u, F, cache.b; refine = 3)
+            ok = all(isfinite, y)
+        end
+        ok = ok && _snlu_backward_error_max(F, y, cache.b) <= tol
     end
     return if ok
         SciMLBase.build_linear_solution(

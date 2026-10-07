@@ -417,7 +417,8 @@ is called. It's a polyalgorithm that detects the optimal method for a given
 
   - `safetyfallback`: determines whether to fallback to a column-pivoted QR factorization
     when an LU factorization fails (zero pivot) or produces non-finite values (NaN/Inf
-    from near-singular matrices). Defaults to `true`.
+    from near-singular matrices), and to Bunch-Kaufman when Cholesky fails on a dense
+    `Hermitian` or real `Symmetric` `A`. Defaults to `true`.
   - `residualsafety`: when `true`, the inner LU algorithm computes the post-solve residual
     `‖A*x - b‖` and returns `ReturnCode.APosterioriSafetyFailure` if it exceeds
     `abstol + reltol * ‖b‖`. The default solver then falls back to column-pivoted QR.

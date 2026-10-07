@@ -868,7 +868,12 @@ end
     n = 8
     M = randn(rng, n, n)
     b, b2 = randn(rng, n), randn(rng, n)
-    for S in (M * M' + n * I, (M + M') / 2), W in (Hermitian, Symmetric)
+    P = M * M' + n * I
+    # positive diagonal, but Cholesky fails at a late pivot after modifying `A`
+    T = Matrix(SymTridiagonal(fill(1.7, n), fill(-1.0, n - 1)))
+    N = copy(P)
+    N[n, n] = -n
+    for S in (P, (M + M') / 2, T, N), W in (Hermitian, Symmetric)
         cache = init(LinearProblem(W(S), b))
         @test cache.alg.alg === LinearSolve.DefaultAlgorithmChoice.CholeskyFactorization
         @test solve!(cache).u ≈ S \ b
@@ -876,9 +881,19 @@ end
         cache.b = b2
         @test solve!(cache).u ≈ S \ b2
         @test LinearSolve._adjoint_solve(cache, b2) ≈ S \ b2
+        # nor does a Cholesky left over from a positive definite `A`
+        cache.A = W(copy(P))
+        solve!(cache)
+        cache.A = W(copy(S))
+        @test solve!(cache).u ≈ S \ b2
+    end
+    for (i, j) in ((2, 5), (3, 3))
+        S = copy(P)
+        S[i, j] = NaN
+        @test solve(LinearProblem(Hermitian(S), b)).retcode === ReturnCode.Failure
     end
 
-    Apd = Hermitian(M * M' + n * I)
+    Apd = Hermitian(P)
     cache = init(LinearProblem(copy(Apd), b))
     refactor!(cache, A) = (copyto!(cache.A, A); cache.A = cache.A; solve!(cache); nothing)
     refactor!(cache, Apd)

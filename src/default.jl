@@ -1050,10 +1050,11 @@ end
     _default_cholesky_solve!(cache::LinearCache, alg::DefaultLinearSolver)
 
 Cholesky for the default solver, falling back to Bunch-Kaufman when a dense `Hermitian` or
-real `Symmetric` `A` turns out not to be positive definite. A failed Cholesky stops at the
-first non-positive pivot, so trying it first is cheap, and a positive definite `A` keeps
-Cholesky's allocation-free refactorization. Solves that reuse the factorization take
-whichever one the last refactorization ended with.
+real `Symmetric` `A` turns out not to be positive definite. A non-positive diagonal entry
+skips the attempt; otherwise a failed Cholesky costs up to one factorization, depending on
+how late its first non-positive pivot comes. A positive definite `A` keeps Cholesky's
+allocation-free refactorization. Solves that reuse the factorization take whichever one
+the last refactorization ended with.
 """
 function _default_cholesky_solve!(cache::LinearCache, alg::DefaultLinearSolver)
     cv = cache.cacheval
@@ -1061,16 +1062,27 @@ function _default_cholesky_solve!(cache::LinearCache, alg::DefaultLinearSolver)
     if alg.safetyfallback && cv isa DefaultLinearSolverInit &&
             cv.BunchKaufmanFactorization isa BunchKaufman
         if cache.isfresh
-            # factorized here rather than through `solve!`, which would report an
-            # indefinite `A` as a solver failure
-            A_backup = _copy_A_for_safety(cache)
-            cv.CholeskyFactorization = do_factorization(
-                CholeskyFactorization(), cache.A, cache.b, cache.u
-            )
-            if issuccess(cv.CholeskyFactorization)
-                cache.isfresh = false
-            else
-                copyto!(cache.A, A_backup)
+            A = cache.A
+            if all(i -> real(A[i, i]) > 0, axes(A, 1))
+                # factorized here rather than through `solve!`, which would report an
+                # indefinite `A` as a solver failure
+                A_backup = _copy_A_for_safety(cache)
+                cv.CholeskyFactorization = do_factorization(
+                    CholeskyFactorization(), A, cache.b, cache.u
+                )
+                X = cv.CholeskyFactorization.factors
+                # potrf does not flag a NaN, which ends up on the factor's diagonal
+                if issuccess(cv.CholeskyFactorization) &&
+                        all(i -> isfinite(X[i, i]), axes(X, 1))
+                    cache.isfresh = false
+                else
+                    copyto!(A, A_backup)
+                end
+            end
+            # the solves that reuse the factorization must not see an earlier success
+            F = cv.CholeskyFactorization
+            if cache.isfresh && issuccess(F)
+                cv.CholeskyFactorization = LinearAlgebra.Cholesky(F.factors, F.uplo, -1)
             end
         end
         if !issuccess(cv.CholeskyFactorization)

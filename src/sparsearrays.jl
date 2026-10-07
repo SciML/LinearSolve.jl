@@ -1306,28 +1306,46 @@ end
         )
         x .= A \ Vector(b)
     end
+
+    """
+        _spqr_adjoint_solve(F::SparseArrays.SPQR.QRSparse, dy)
+
+    Transpose of the basic-solution map `F \\ b` applies (`_ldiv_basic` in the
+    SparseArrays stdlib), using the stored factorization's own rank estimate
+    and permutations: gather `dy` by `pcol`, adjoint-solve the leading
+    `rank(F)` triangle of `R`, zero-pad, apply `Q`, scatter by `prow`. An
+    adjoint computed from a different factorization differentiates a different
+    basic-solution map — different QR implementations need not select the same
+    basic variables — so the stored `F` itself must be used. `QRSparse` has no
+    adjoint `ldiv` upstream, hence this manual transpose.
+    """
+    function _spqr_adjoint_solve(
+            F::SparseArrays.SPQR.QRSparse, dy::AbstractVector
+        )
+        rnk = LinearAlgebra.rank(F)
+        y = isempty(F.pcol) ? dy : dy[F.pcol]
+        z = UpperTriangular(F.R[Base.OneTo(rnk), Base.OneTo(rnk)])' \ y[Base.OneTo(rnk)]
+        u = zeros(eltype(z), size(F, 1))
+        u[Base.OneTo(rnk)] = z
+        v = LinearAlgebra.lmul!(F.Q, u)
+        λ = similar(v)
+        λ[F.prow] = v
+        return λ
+    end
+    function _spqr_adjoint_solve(
+            F::SparseArrays.SPQR.QRSparse, dy::AbstractMatrix
+        )
+        rnk = LinearAlgebra.rank(F)
+        y = isempty(F.pcol) ? dy : dy[F.pcol, :]
+        z = UpperTriangular(F.R[Base.OneTo(rnk), Base.OneTo(rnk)])' \ y[Base.OneTo(rnk), :]
+        u = zeros(eltype(z), size(F, 1), size(dy, 2))
+        u[Base.OneTo(rnk), :] = z
+        v = LinearAlgebra.lmul!(F.Q, u)
+        λ = similar(v)
+        λ[F.prow, :] = v
+        return λ
+    end
 end # @static if Base.USE_GPL_LIBS
-
-"""
-    _spqr_adjoint_solve(F::SparseArrays.SPQR.QRSparse, dy)
-
-Transpose of the basic-solution map `F \\ b` applies (`_ldiv_basic` in the
-SparseArrays stdlib), using the stored factorization's own rank estimate and
-column/row permutations: gather `dy` by `cpiv`, adjoint-solve the leading
-`rank(F)` triangle of `R`, zero-pad, apply `Q`, gather by `rpivinv`. An adjoint
-computed from a different factorization differentiates a different
-basic-solution map — different QR implementations need not select the same
-basic variables — so the stored `F` itself must be used. `QRSparse` has no
-adjoint `ldiv` upstream, hence this manual transpose.
-"""
-function _spqr_adjoint_solve(F::SparseArrays.SPQR.QRSparse, dy::AbstractVector)
-    rnk = LinearAlgebra.rank(F)
-    y = isempty(F.cpiv) ? dy : dy[F.cpiv]
-    z = UpperTriangular(F.R[Base.OneTo(rnk), Base.OneTo(rnk)])' \ y[Base.OneTo(rnk)]
-    u = zeros(eltype(z), size(F, 1))
-    u[Base.OneTo(rnk)] = z
-    return LinearAlgebra.lmul!(F.Q, u)[F.rpivinv]
-end
 
 function LinearSolve.pattern_changed(
         fact::Nothing,

@@ -549,12 +549,8 @@ end
     @test all(isfinite, db_sp)
     @test db_sp ≈ adjoint(F_sp) \ ones(6)
 
-    # Differing-basis case for the SuiteSparse SPQR slot: the stored
-    # `QRSparse` selects different basic variables than a fresh column-pivoted
-    # sparse QR, so its adjoint must transpose the stored solution map itself.
-    # Compared against central finite differences of the forward solve — a
-    # factored `adjoint(F)` expression cannot express the `QRSparse` map, which
-    # has no adjoint `ldiv`.
+    # Stored-SPQR map whose basic variables differ from a fresh pivoted QR;
+    # the adjoint is checked against finite differences of the forward solve.
     Abig = spdiagm(0 => ones(1001))
     Abig[1:6, 1:6] = sparse(
         [
@@ -567,14 +563,7 @@ end
     cache_spqr = init(LinearProblem(copy(Abig), copy(bbig)))
     solve!(cache_spqr)
     @test cache_spqr.cacheval.fell_back_to_qr
-    if Base.USE_GPL_LIBS
-        @test cache_spqr.cacheval.QRFactorizationPivoted isa
-            SparseArrays.SPQR.QRSparse
-    end
 
-    # `u[2]` is constant in `b` under the stored SPQR map: the gradient is all
-    # zero (an earlier adjoint through a different factorization returned
-    # `db[3] ≈ 0.806`); `u[5]`'s nonzero gradient entries still match FD.
     for (k, idx) in ((2, (1, 3, 6)), (5, (1, 2, 3)))
         fk(y) = solve(LinearProblem(Abig, y)).u[k]
         dbk, = Zygote.gradient(fk, bbig)
@@ -583,6 +572,16 @@ end
             ei[i] = 1
             fd = (fk(bbig .+ 1.0e-4 .* ei) - fk(bbig .- 1.0e-4 .* ei)) / 2.0e-4
             @test dbk[i] ≈ fd atol = 1.0e-6
+        end
+        if Base.USE_GPL_LIBS
+            F = cache_spqr.cacheval.QRFactorizationPivoted
+            @test F isa SparseArrays.SPQR.QRSparse
+            for i in 1:6
+                ei = zeros(1001)
+                ei[i] = 1
+                @test dbk[i] ≈ (F \ ei)[k]
+            end
+            @test iszero(dbk[7:end])
         end
     end
 end

@@ -1315,12 +1315,11 @@ function _qr_fallback_adjoint_eval(cache::LinearCache, dy)
             return reduce(hcat, (adjoint(F) \ c for c in eachcol(dy)))
         end
         return adjoint(F) \ dy
-    elseif F isa SparseArrays.SPQR.QRSparse
-        if dy isa AbstractMatrix
-            return reduce(hcat, (_spqr_adjoint_solve(F, c) for c in eachcol(dy)))
-        end
-        return _spqr_adjoint_solve(F, dy)
-    elseif F isa LinearAlgebra.QRPivoted
+    end
+    @static if Base.USE_GPL_LIBS
+        F isa SparseArrays.SPQR.QRSparse && return _spqr_adjoint_solve(F, dy)
+    end
+    if F isa LinearAlgebra.QRPivoted
         return qr(adjoint(convert(AbstractMatrix, cache.A)), _qr_fallback_pivot(cache.A)) \ dy
     end
     return adjoint(F) \ dy

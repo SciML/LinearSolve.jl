@@ -488,13 +488,23 @@ backslash_large = A_large_dual \ b_large_dual
 @test ForwardDiff.partials.(sol_large.u) ≈ ForwardDiff.partials.(backslash_large)
 
 # https://github.com/SciML/LinearSolve.jl/issues/1361
-@testset "underdetermined system with dual numbers" begin
+@testset "non-square systems with dual numbers" begin
     A = rand(4, 9)
     b = rand(4)
     ref = ForwardDiff.gradient(X -> sum(X \ b), A)
     for alg in (nothing, SVDFactorization(), KrylovJL_LSMR())
         g(X) = sum(solve(LinearProblem(X, b), alg).u)
         @test ForwardDiff.gradient(g, A) ≈ ref rtol = 1.0e-6
+    end
+
+    # a tall `A` without full column rank, whose null space moves with `t`
+    C = rand(9, 3)
+    At(t) = hcat(C, (0.5 + t) * C[:, 1] - 0.3 * C[:, 2])
+    bt = rand(9)
+    h = 1.0e-6
+    ref = (pinv(At(h)) * bt - pinv(At(-h)) * bt) / 2h
+    for alg in (nothing, SVDFactorization(), KrylovJL_LSMR())
+        @test ForwardDiff.derivative(t -> solve(LinearProblem(At(t), bt), alg).u, 0.0) ≈ ref rtol = 1.0e-6
     end
 end
 

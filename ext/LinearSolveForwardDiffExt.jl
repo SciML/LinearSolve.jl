@@ -5,7 +5,7 @@ using LinearSolve: LinearSolve, SciMLLinearSolveAlgorithm, __init, LinearVerbosi
     OperatorAssumptions, PureKLUFactorization, SparspakFactorization, defaultalg,
     default_alias_A
 using ConcreteStructs: @concrete
-using LinearAlgebra: LinearAlgebra, mul!
+using LinearAlgebra: LinearAlgebra, ColumnNorm, QRPivoted, mul!, qr
 using SparseArrays: SparseArrays, SparseMatrixCSC, nonzeros
 using ForwardDiff: ForwardDiff, Dual, Partials
 using SciMLBase: SciMLBase, LinearAliasSpecifier, LinearProblem, init, solve, solve!
@@ -78,12 +78,22 @@ const DualAbstractLinearProblem = Union{
     dual_linear_cache
 end
 
+# the rule of `rank(::QRPivoted)`, which Julia 1.10 does not have
+_full_column_rank(F, A) = size(A, 1) >= size(A, 2)
+function _full_column_rank(F::QRPivoted, A)
+    m, n = size(A)
+    m < n && return false
+    R = F.factors
+    tol = n * eps(real(eltype(R))) * abs(R[1, 1])
+    return all(i -> abs(R[i, i]) > tol, 1:n)
+end
+
 function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kwargs...)
     # Check if A is square - if not, use the non-square system path
     A = cache.linear_cache.A
 
     if !issquare(A)
-        # For overdetermined systems, differentiate the normal equations: A'Ax = A'b
+        # For a non-square `A`, differentiate the normal equations: A'Ax = A'b
         # Taking d/dθ of both sides:
         # dA'/dθ · Ax + A' · dA/dθ · x + A'A · dx/dθ = dA'/dθ · b + A' · db/dθ
         # Rearranging:
@@ -138,11 +148,13 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
             end
         end
 
-        # A wide `A` also moves the minimum-norm solution in its null space, by
-        # (I - A⁺A) dAᴴ y with y = Aᴴ \ x: w = dAᴴ y is added and A w taken out of the solve.
-        y = size(A, 1) < size(A, 2) && !isnothing(A_list) ? A_adj \ u : nothing
+        # one pivoted QR, what `A_adj \` builds on every call, for all the solves with Aᴴ
+        F = A isa StridedMatrix ? qr(A_adj, ColumnNorm()) : A_adj
+        # Without full column rank the minimum-norm solution also moves in the null space of
+        # A, by (I - A⁺A) dAᴴ y with y = Aᴴ \ x: w = dAᴴ y is added and A w taken out of the solve.
+        y = isnothing(A_list) || _full_column_rank(F, A) ? nothing : F \ u
         for i in eachindex(rhs_list)
-            cache.linear_cache.b .= A_adj \ rhs_list[i]
+            cache.linear_cache.b .= F \ rhs_list[i]
             if y === nothing
                 rhs_list[i] .= solve!(cache.linear_cache, alg, args...; kwargs...).u
             else

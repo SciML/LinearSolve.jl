@@ -914,4 +914,14 @@ end
         sol = solve(LinearProblem(W, b), QRFactorization())
         @test norm(Matrix(W) * sol.u - b) / norm(b) < 1.0e-10
     end
+
+    # the eager QR and GenericLU slots only type the cache, they do not factorize
+    cv = init(LinearProblem(transpose(A), b)).cacheval
+    @test size(cv.QRFactorization) == (1, 1)
+    @test cv.GenericLUFactorization.fact.factors == transpose(A)
+
+    # a non-square wrapper takes the sparse QR
+    W = transpose(sprandn(rng, n ÷ 2, n, 0.3) + sparse(1.0I, n ÷ 2, n))
+    sol = solve(LinearProblem(W, b))
+    @test norm(W' * (W * sol.u - b)) / norm(W' * b) < 1.0e-10
 end

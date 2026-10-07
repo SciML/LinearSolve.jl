@@ -353,6 +353,24 @@ function _pinv_solve(cache, A, y)
     return reused === nothing ? A \ y : reused
 end
 
+# The `A` a non-square solve with `cache` differentiates against. An in-place factorization
+# overwrites `cache.A`, so a reused cache rebuilds it from the factorization.
+function _original_A(cache)
+    alg, cacheval = cache.alg, cache.cacheval
+    alg isa Union{
+        AbstractKrylovSubspaceMethod, NormalCholeskyFactorization,
+        NormalBunchKaufmanFactorization,
+    } && return cache.A
+    cache.isfresh && return copy(cache.A)
+    if alg isa DefaultLinearSolver
+        cacheval.fell_back_to_qr && return Matrix(cacheval.QRFactorizationPivoted)
+        choice = Symbol(alg.alg)
+        alg, cacheval = algchoice_to_alg(choice), getproperty(cacheval, choice)
+    end
+    F = alg isa AbstractFactorization ? _cache_factorization(alg, cacheval) : nothing
+    return F === nothing ? copy(cache.A) : Matrix(F)
+end
+
 """
     _add_nonsquare_pullback!(dA, cache, A, b, x, lambda, dx)
 

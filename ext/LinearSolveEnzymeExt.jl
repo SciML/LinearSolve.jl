@@ -758,11 +758,10 @@ function EnzymeRules.augmented_primal(
         kwargs...
     ) where {RT, LP <: LinearSolve.LinearCache}
     # The non-square correction reads the operands, which the solve may overwrite. Only a
-    # dense `A` is corrected; a sparse one keeps the square-system cotangent.
+    # strided `A` is corrected; any other keeps the square-system cotangent.
     A = linsolve.val.A
     nonsquare = !LinearSolve.issquare(A) && A isa StridedMatrix
-    A_ns = nonsquare && !(linsolve.val.alg isa LinearSolve.AbstractKrylovSubspaceMethod) ?
-        copy(A) : A
+    A_ns = nonsquare ? LinearSolve._original_A(linsolve.val) : A
     b_ns = nonsquare ? copy(linsolve.val.b) : nothing
     res = func.val(linsolve.val; kwargs...)
 

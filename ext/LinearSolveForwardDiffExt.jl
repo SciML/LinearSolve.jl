@@ -147,11 +147,11 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
         end
 
         for i in eachindex(rhs_list)
-            cache.linear_cache.b .= A_adj \ rhs_list[i]
+            _fill_b!(cache.linear_cache, A_adj \ rhs_list[i])
             rhs_list[i] .= solve!(cache.linear_cache, alg, args...; kwargs...).u
         end
 
-        cache.linear_cache.b .= cache.primal_b_cache
+        _fill_b!(cache.linear_cache, cache.primal_b_cache)
         cache.linear_cache.u .= cache.primal_u_cache
 
         return sol

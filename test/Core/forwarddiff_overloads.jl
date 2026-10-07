@@ -271,6 +271,15 @@ end
         reinit!(cache; A = copy(A2))
         @test same(solve!(cache).u, A2 \ b)
     end
+
+    # the least-squares branch fills the inner cache's `b` the same way
+    Al, bl = [A; [q 1.0]], [b; q]
+    for alg in (QRFactorization(), nothing)
+        cache = init(LinearProblem(copy(Al), copy(bl)), alg)
+        for _ in 1:3
+            @test same(solve!(cache).u, (Al' * Al) \ (Al' * bl))
+        end
+    end
 end
 
 # Test aliasing

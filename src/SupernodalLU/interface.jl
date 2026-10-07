@@ -187,7 +187,7 @@ function _snlu_assemble(
     n = sym.n
     bcaches, bcacheidx = _dense_block_caches(Tv, sym, dense_alg, dense_threshold)
     F = SupernodalLUFactor{Tv, Ti}(
-        sym, W, Z, collect(1:n), collect(1:n), rowsfac, 0, NaN, eps_pivot,
+        sym, W, Z, collect(1:n), collect(1:n), rowsfac, 0, NaN, NaN, NaN, eps_pivot,
         A, Vector{Tv}(undef, n), Vector{Tv}(undef, 64),
         ms === nothing ? collect(1:n) : ms.rowperm,
         ms === nothing ? ones(n) : ms.r,

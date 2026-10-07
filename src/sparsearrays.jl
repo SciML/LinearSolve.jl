@@ -924,11 +924,35 @@ function _snlu_backward_error(F, y::AbstractVector, b::AbstractVector)
     return iszero(denom) ? zero(real(eltype(r))) : LinearAlgebra.norm(r) / denom
 end
 
-# Largest of the 2-norm and inf-norm backward errors from a single residual.
-# The two norms disagree by dimension-dependent factors on badly scaled
-# systems, so the gate takes the larger. Row sums need a buffer CSC cannot
-# stream without; the residual buffer doubles as the accumulator once its
-# own norms are extracted, keeping the check allocation-free.
+# Largest of the 2-norm / inf-norm backward errors; ‖A‖₁/‖A‖∞ come from the factor.
+function _snlu_cached_anorms(F)
+    Tr = real(eltype(F.ir_r))
+    if !isnan(F.anorm1) && !isnan(F.anorminf)
+        return Tr(F.anorm1), Tr(F.anorminf)
+    end
+    # Non-Float64-convertible eltypes (e.g. Dual): fall back to opnorm.
+    r = F.ir_r
+    fill!(r, zero(eltype(r)))
+    cp = getcolptr(F.A)
+    rv = rowvals(F.A)
+    xv = nonzeros(F.A)
+    anorm1 = zero(Tr)
+    @inbounds for j in 1:size(F.A, 2)
+        s = zero(Tr)
+        for p in cp[j]:(cp[j + 1] - 1)
+            s += abs(xv[p])
+        end
+        anorm1 = max(anorm1, s)
+    end
+    @inbounds for j in 1:size(F.A, 2)
+        for p in cp[j]:(cp[j + 1] - 1)
+            r[rv[p]] += abs(xv[p])
+        end
+    end
+    anorminf = maximum(real, r; init = zero(Tr))
+    return anorm1, anorminf
+end
+
 function _snlu_backward_error_max(F, y::AbstractVector, b::AbstractVector)
     r = F.ir_r
     LinearAlgebra.mul!(r, F.A, y)
@@ -939,19 +963,10 @@ function _snlu_backward_error_max(F, y::AbstractVector, b::AbstractVector)
     yni = LinearAlgebra.norm(y, Inf)
     bn = LinearAlgebra.norm(b)
     bni = LinearAlgebra.norm(b, Inf)
-    denom = LinearAlgebra.opnorm(F.A, 1) * yn + bn
+    anorm1, anorminf = _snlu_cached_anorms(F)
+    denom = anorm1 * yn + bn
     ber = iszero(denom) ? zero(real(eltype(r))) : rn / denom
-    fill!(r, zero(eltype(r)))
-    cp = getcolptr(F.A)
-    rv = rowvals(F.A)
-    xv = nonzeros(F.A)
-    @inbounds for j in 1:size(F.A, 2)
-        for p in cp[j]:(cp[j + 1] - 1)
-            r[rv[p]] += abs(xv[p])
-        end
-    end
-    anormi = maximum(real, r; init = zero(real(eltype(r))))
-    denomi = anormi * yni + bni
+    denomi = anorminf * yni + bni
     beri = iszero(denomi) ? zero(real(eltype(r))) : rni / denomi
     return max(ber, beri)
 end
@@ -1014,21 +1029,21 @@ function SciMLBase.solve!(
             y = SNLU.solve!(cache.u, F, cache.b)
         end
     end
-    # Restricted pivoting can lose accuracy through growth the perturbation
-    # count never sees, so the backward error is measured on every solve and
-    # refined above n*eps; what refinement cannot recover is `Infeasible`.
-    # Skipped when the solution vector lives in a different arithmetic than
-    # the factor (extension-handled solves).
+    # Measure ber on every solve; refine from current y above n*eps; else safety-fail.
     ok = all(isfinite, y)
-    if ok && eltype(y) == eltype(F.ir_r) &&
-            ((y isa AbstractVector && cache.b isa AbstractVector) ||
-                (y isa AbstractMatrix && cache.b isa AbstractMatrix))
+    residual_fail = false
+    shapes_match = (y isa AbstractVector && cache.b isa AbstractVector) ||
+        (y isa AbstractMatrix && cache.b isa AbstractMatrix)
+    if ok && eltype(y) == eltype(F.ir_r) && shapes_match
         tol = size(As, 2) * eps(real(eltype(As)))
         if _snlu_backward_error_max(F, y, cache.b) > tol
-            y = SNLU.solve!(cache.u, F, cache.b; refine = 3)
+            y = SNLU.solve!(cache.u, F, cache.b; refine = 3, resolve = false)
             ok = all(isfinite, y)
         end
-        ok = ok && _snlu_backward_error_max(F, y, cache.b) <= tol
+        if ok && _snlu_backward_error_max(F, y, cache.b) > tol
+            ok = false
+            residual_fail = true
+        end
     end
     return if ok
         SciMLBase.build_linear_solution(
@@ -1039,8 +1054,12 @@ function SciMLBase.solve!(
             "Solver produced a non-finite or inaccurate solution; matrix is likely singular",
             cache.verbose, :solver_failure
         )
+        # Residual gate → APosterioriSafetyFailure (Infeasible means singular/non-finite).
+        # Default sparse-LU fallback treats both retcodes as QR triggers.
         SciMLBase.build_linear_solution(
-            alg, cache.u, nothing, nothing; retcode = ReturnCode.Infeasible
+            alg, cache.u, nothing, nothing;
+            retcode = residual_fail ? ReturnCode.APosterioriSafetyFailure :
+                ReturnCode.Infeasible
         )
     end
 end

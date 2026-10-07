@@ -416,23 +416,25 @@ function _refine_steps(F::SupernodalLUFactor, refine::Symbol)
 end
 
 """
-    solve!(x, F::SupernodalLUFactor, b; refine=:auto) -> x
-    solve(F::SupernodalLUFactor, b; refine=:auto) -> x
+    solve!(x, F::SupernodalLUFactor, b; refine=:auto, resolve=true) -> x
+    solve(F::SupernodalLUFactor, b; refine=:auto, resolve=true) -> x
 
 Solve `A x = b` (also accepts matrix right-hand sides).  `refine` is the
 number of iterative-refinement steps; `:auto` refines (up to 3 steps,
 stopping early on stagnation) whenever the factorization was numerically
 delicate — static pivot perturbation occurred or MC64 matching preprocessing
 was applied — and does 0 steps otherwise.  This is the accuracy-recovery
-mechanism the Schenk–Gärtner method prescribes for restricted pivoting.  Allocation-free after
+mechanism the Schenk–Gärtner method prescribes for restricted pivoting.
+`resolve=false` skips the initial substitution and refines the current `x`
+(used when a post-solve residual check requests more IR).  Allocation-free after
 warmup.
 """
 function solve!(
         x::AbstractVector{Tv}, F::SupernodalLUFactor{Tv}, b::AbstractVector;
-        refine::Union{Symbol, Integer} = :auto
+        refine::Union{Symbol, Integer} = :auto, resolve::Bool = true
     ) where {Tv}
     nref = _refine_steps(F, refine)
-    _solve_once!(x, F, b)
+    resolve && _solve_once!(x, F, b)
     if nref > 0
         r = F.ir_r
         dx = F.ir_dx
@@ -452,15 +454,15 @@ end
 
 function solve!(
         X::AbstractMatrix{Tv}, F::SupernodalLUFactor{Tv}, B::AbstractMatrix;
-        refine::Union{Symbol, Integer} = :auto
+        refine::Union{Symbol, Integer} = :auto, resolve::Bool = true
     ) where {Tv}
     size(X) == size(B) || throw(DimensionMismatch("X and B sizes differ"))
     nref = _refine_steps(F, refine)
     if nref == 0
-        return _solve_once!(X, F, B)
+        return resolve ? _solve_once!(X, F, B) : X
     end
     for r in 1:size(B, 2)                            # refined: column-by-column
-        solve!(view(X, :, r), F, view(B, :, r); refine = nref)
+        solve!(view(X, :, r), F, view(B, :, r); refine = nref, resolve)
     end
     return X
 end

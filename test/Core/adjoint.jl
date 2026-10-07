@@ -509,3 +509,43 @@ end
         end
     end
 end
+
+@testset "adjoint after the default's LU-to-QR fallback (#1367)" begin
+    # On a singular `A` the default falls back to column-pivoted QR and returns
+    # `pinv(A) * b`; the adjoint solve cannot go through the failed LU slot —
+    # its factors no longer match `A` — so the gradient must be `pinv(A)' * ∂u`.
+    rng = MersenneTwister(4)
+    A = randn(rng, 6, 6)
+    A[:, 3] .= 0
+    b = A * randn(rng, 6)
+
+    cache = init(LinearProblem(copy(A), copy(b)))
+    sol = solve!(cache)
+    @test cache.cacheval.fell_back_to_qr
+    @test sol.u ≈ pinv(A) * b
+
+    db, = Zygote.gradient(y -> sum(solve(LinearProblem(copy(A), y)).u), b)
+    @test all(isfinite, db)
+    @test db ≈ pinv(A)' * ones(6)
+
+    # `solve!(cache; adjoint = true)` and the reverse-mode rules share `_adjoint_solve`.
+    @test solve!(cache; adjoint = true).u ≈ pinv(A)' * b
+
+    # The sparse LU -> column-pivoted sparse QR fallback returns a basic
+    # solution, whose consistent adjoint is `adjoint(F) \ dy` on the stored
+    # factorization.
+    As = sparse(A)
+    cache_sp = init(LinearProblem(copy(As), copy(b)))
+    sol_sp = solve!(cache_sp)
+    @test cache_sp.cacheval.fell_back_to_qr
+    F_sp = getfield(cache_sp.cacheval, :SparseColumnPivotedQRFactorization)
+    @test sol_sp.u ≈ F_sp \ b
+    @test LinearSolve._adjoint_solve(cache_sp, ones(6)) ≈ adjoint(F_sp) \ ones(6)
+
+    λ_batched = LinearSolve._adjoint_solve(cache_sp, ones(6, 2))
+    @test λ_batched[:, 1] ≈ adjoint(F_sp) \ ones(6)
+
+    db_sp, = Zygote.gradient(y -> sum(solve(LinearProblem(As, y)).u), b)
+    @test all(isfinite, db_sp)
+    @test db_sp ≈ adjoint(F_sp) \ ones(6)
+end

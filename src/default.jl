@@ -1288,10 +1288,10 @@ stored `QRPivoted` cannot be transposed and reused: its adjoint solve does not
 truncate rank the way its forward solve does.
 
 Sparse: the fallback's `F \\ b` is a basic solution, so the consistent adjoint
-is `adjoint(F) \\ dy` on the same stored factorization. SuiteSparse's `QRSparse`
-has no adjoint `ldiv`, so for that slot an equivalent pure-Julia column-pivoted
-sparse QR of the (unmodified) `cache.A` is factorized and its adjoint solve —
-which truncates rank the same way its forward solve does — is used instead.
+is the transpose of that same stored solution map — `adjoint(F) \\ dy` for
+`SparseColumnPivotedQR`, `_spqr_adjoint_solve` for SuiteSparse's `QRSparse`,
+and the dense-style fresh pivoted QR for a materialized `QRPivoted` (whose
+forward solve is already the minimum-norm least-squares one).
 """
 function _qr_fallback_adjoint_eval(cache::LinearCache, dy)
     cv = cache.cacheval
@@ -1310,13 +1310,18 @@ function _qr_fallback_adjoint_eval(cache::LinearCache, dy)
     else
         getfield(cv, :SparseColumnPivotedQRFactorization)
     end
-    if !(F isa SCPQR.SparseColumnPivotedQRFactorization)
-        F = sparse_colpivqr_factorize(
-            reduce_operand!(cv.sparse_reduction, cache.A)
-        )
-    end
-    if dy isa AbstractMatrix
-        return reduce(hcat, (adjoint(F) \ c for c in eachcol(dy)))
+    if F isa SCPQR.SparseColumnPivotedQRFactorization
+        if dy isa AbstractMatrix
+            return reduce(hcat, (adjoint(F) \ c for c in eachcol(dy)))
+        end
+        return adjoint(F) \ dy
+    elseif F isa SparseArrays.SPQR.QRSparse
+        if dy isa AbstractMatrix
+            return reduce(hcat, (_spqr_adjoint_solve(F, c) for c in eachcol(dy)))
+        end
+        return _spqr_adjoint_solve(F, dy)
+    elseif F isa LinearAlgebra.QRPivoted
+        return qr(adjoint(convert(AbstractMatrix, cache.A)), _qr_fallback_pivot(cache.A)) \ dy
     end
     return adjoint(F) \ dy
 end

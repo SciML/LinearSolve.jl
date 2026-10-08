@@ -805,6 +805,11 @@ is_cusparse_csr(A) = false
 
 is_cusparse_csc(A) = false
 
+PrecompileTools.@compile_workload begin
+    Asparse = SparseArrays.sprand(4, 4, 0.3) + I
+    solve(LinearProblem(Asparse, rand(4)))
+end
+
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
     LowRankUpdatedMatrix,
     GenericLUFactorization, GESVFactorization, SimpleLUFactorization,

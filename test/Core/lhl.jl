@@ -477,3 +477,29 @@ end
     bc = randn(MersenneTwister(7), ComplexF64, ns)
     @test solve(LinearProblem(Wc, bc), LHLFactorization()).u ≈ (Js - I / γc) \ bc rtol = 1.0e-8
 end
+
+@testset "sparse WOperator update step is allocation-free" begin
+    m = 20
+    Tm = spdiagm(-1 => -ones(m - 1), 0 => 4ones(m), 1 => -ones(m - 1))
+    Sm = spdiagm(-1 => -ones(m - 1), 1 => -ones(m - 1))
+    Js = kron(sparse(I, m, m), Tm) + kron(Sm, sparse(I, m, m))
+    n = size(Js, 1)
+    b = randn(MersenneTwister(5), n)
+    W = wop(Js, 0.1; u = zeros(n))
+    cache = init(LinearProblem(W, b), LHLFactorization(; refine = 0))
+    solve!(cache)
+    ref = copy(cache.u)
+    for _ in 1:3
+        mark_jacobian_updated!(W)
+        solve!(cache)
+    end
+    @test copy(cache.u) == ref
+    # The update must add no allocations over a warmed plain re-solve: the
+    # `Union{Nothing,JT}` identity field boxes the immutable sparse matrix on
+    # an unconditional store. Relative bound because Julia 1.10's plain
+    # re-solve allocates 48 B of its own.
+    plain = @allocated solve!(cache)
+    mark_jacobian_updated!(W)
+    @test (@allocated solve!(cache)) == plain
+    @test copy(cache.u) == ref
+end

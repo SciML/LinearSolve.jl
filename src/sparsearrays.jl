@@ -1424,9 +1424,7 @@ function LinearSolve.init_cacheval(
 end
 
 LinearSolve.PrecompileTools.@compile_workload begin
-    # `local` because `LinearSolve` already has a stray module-global `A`, which
-    # otherwise makes this soft-scope assignment ambiguous.
-    local A = sprand(4, 4, 0.3) + I
+    A = sprand(4, 4, 0.3) + I
     b = rand(4)
     prob = LinearProblem(A, b)
     sol = solve(prob, PureKLUFactorization())

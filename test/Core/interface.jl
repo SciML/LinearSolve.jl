@@ -236,3 +236,11 @@ end
 
     @test_throws ArgumentError LinearSolve.algorithm_interface_issues(Matrix{Float64})
 end
+
+@testset "no stray globals leak out of the preallocated-factorization `let` blocks" begin
+    # `const PREALLOCATED_*_LU = begin ... end` used to leak its internal `A`/`luinst`
+    # names as non-const module globals, since a top-level `begin` opens no scope.
+    @test !isdefined(LinearSolve, :luinst)
+    @test !isdefined(LinearSolve, :A)
+    @test isconst(LinearSolve, :ALREADY_WARNED_CUDSS)
+end

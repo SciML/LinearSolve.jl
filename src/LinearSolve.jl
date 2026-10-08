@@ -797,7 +797,7 @@ PrecompileTools.@compile_workload begin
     sol = solve(LinearProblem(Ablocked, bblocked), GenericLUFactorization())
 end
 
-ALREADY_WARNED_CUDSS = Ref{Bool}(false)
+const ALREADY_WARNED_CUDSS = Ref{Bool}(false)
 error_no_cudss_lu(A) = nothing
 cudss_loaded(A) = false
 is_cusparse(A) = false

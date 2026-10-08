@@ -243,4 +243,9 @@ end
     @test !isdefined(LinearSolve, :luinst)
     @test !isdefined(LinearSolve, :A)
     @test isconst(LinearSolve, :ALREADY_WARNED_CUDSS)
+
+    rf_ext = Base.get_extension(LinearSolve, :LinearSolveRecursiveFactorizationExt)
+    @test rf_ext !== nothing
+    @test !isdefined(rf_ext, :luinst)
+    @test !isdefined(rf_ext, :A)
 end

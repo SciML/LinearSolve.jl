@@ -147,12 +147,15 @@ end
     # factorization, for every dense_alg setting
     As = sparse(1.0I, 2000, 2000) + spdiagm(1 => fill(0.1, 1999))
     bs = randn(2000)
-    for alg in (
-            SupernodalLUFactorization(),
-            SupernodalLUFactorization(dense_alg = LUFactorization()),
-            SupernodalLUFactorization(dense_alg = GenericLUFactorization()),
-            SupernodalLUFactorization(dense_alg = MKLLUFactorization()),
-        )
+    algs = [
+        SupernodalLUFactorization(),
+        SupernodalLUFactorization(dense_alg = LUFactorization()),
+        SupernodalLUFactorization(dense_alg = GenericLUFactorization()),
+    ]
+    if !Sys.isapple()
+        push!(algs, SupernodalLUFactorization(dense_alg = MKLLUFactorization()))
+    end
+    for alg in algs
         cache = init(LinearProblem(As, bs), alg)
         sol = solve!(cache)
         @test norm(As * sol.u - bs) <= 1.0e-10 * norm(bs)

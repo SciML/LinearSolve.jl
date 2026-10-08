@@ -151,6 +151,7 @@ end
             SupernodalLUFactorization(),
             SupernodalLUFactorization(dense_alg = LUFactorization()),
             SupernodalLUFactorization(dense_alg = GenericLUFactorization()),
+            SupernodalLUFactorization(dense_alg = MKLLUFactorization()),
         )
         cache = init(LinearProblem(As, bs), alg)
         sol = solve!(cache)

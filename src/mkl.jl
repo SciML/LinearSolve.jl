@@ -25,7 +25,7 @@ dense BLAS-eltype matrices.
     least version 2022.2. Otherwise `solve!` with this algorithm errors that the MKL binary
     is missing.
 """
-struct MKLLUFactorization <: AbstractFactorization
+struct MKLLUFactorization <: AbstractDenseFactorization
     residualsafety::Bool
 end
 

@@ -152,6 +152,9 @@ end
         SupernodalLUFactorization(dense_alg = LUFactorization()),
         SupernodalLUFactorization(dense_alg = GenericLUFactorization()),
     ]
+    if Base.get_extension(LinearSolve, :LinearSolveBLISExt) !== nothing
+        push!(algs, SupernodalLUFactorization(dense_alg = BLISLUFactorization()))
+    end
     if !Sys.isapple()
         push!(algs, SupernodalLUFactorization(dense_alg = MKLLUFactorization()))
     end

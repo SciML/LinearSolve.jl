@@ -350,7 +350,7 @@ function _solve_once!(x::AbstractVector{Tv}, F::SupernodalLUFactor{Tv}, b::Abstr
     require_one_based_indexing(x, b)
     n = F.sym.n
     if length(x) != n || length(b) != n
-        throw(DimensionMismatch("size mismatch"))
+        throw(DimensionMismatch("length(b) = $(length(b)), length(x) = $(length(x)), but the factorization is $(n)×$(n)"))
     end
     y = F.work
     p = F.p
@@ -385,7 +385,7 @@ function _solve_once!(X::AbstractMatrix{Tv}, F::SupernodalLUFactor{Tv}, B::Abstr
     require_one_based_indexing(X, B)
     n = F.sym.n
     if size(X, 1) != n || size(B, 1) != n || size(X, 2) != size(B, 2)
-        throw(DimensionMismatch("size mismatch"))
+        throw(DimensionMismatch("size(B) = $(size(B)), size(X) = $(size(X)), but the factorization is $(n)×$(n)"))
     end
     nrhs = size(B, 2)
     Y = _scratch_mat!(F, nrhs)

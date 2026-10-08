@@ -363,6 +363,10 @@ end
     solve!(cache)
     cache.b = rand(n - 20)
     @test_throws DimensionMismatch solve!(cache)
+    cache = init(LinearProblem(copy(A), copy(b)), alg)
+    solve!(cache)
+    cache.b = rand(n + 20)
+    @test_throws DimensionMismatch solve!(cache)
 end
 
 # https://github.com/SciML/LinearSolve.jl/issues/1314

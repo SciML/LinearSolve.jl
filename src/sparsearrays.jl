@@ -1001,6 +1001,96 @@ function SciMLBase.solve!(
     end
 end
 
+# --- SupernodalQR: pure-Julia multifrontal Householder QR (no GPL) ---
+# The BLAS-3 sparse QR for structured / larger least-squares systems (vendored in
+# src/SupernodalQR).
+
+const SNQR = LinearSolve.SupernodalQR
+
+function LinearSolve.init_cacheval(
+        alg::SupernodalQRFactorization, A::AbstractArray, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
+function LinearSolve.init_cacheval(
+        alg::SupernodalQRFactorization, A::LinearSolve.GPUArraysCore.AnyGPUArray, b, u,
+        Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
+# SupernodalQR is pure Julia and factors any `Number` element type.  An empty
+# factorization of the matching type pins the cacheval slot to a concrete type.
+function LinearSolve.init_cacheval(
+        alg::SupernodalQRFactorization, A::AbstractSparseArray{T, Ti}, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    ) where {T <: Number, Ti <: Integer}
+    return SNQR.snqr(SparseMatrixCSC{T, Ti}(0, 0, [one(Ti)], Ti[], T[]))
+end
+
+function LinearSolve.init_cacheval(
+        alg::SupernodalQRFactorization, A::AbstractSciMLOperator, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    if has_concretization(A)
+        return LinearSolve.init_cacheval(
+            alg, convert(AbstractMatrix, A), b, u, Pl, Pr,
+            maxiters, abstol, reltol, verbose, assumptions
+        )
+    else
+        nothing
+    end
+end
+
+function LinearSolve.pattern_changed(
+        F::SNQR.SupernodalQRFactor, A::SparseArrays.AbstractSparseMatrixCSC
+    )
+    Aold = F.A
+    return getcolptr(Aold) != getcolptr(A) || rowvals(Aold) != rowvals(A)
+end
+
+function SciMLBase.solve!(
+        cache::LinearSolve.LinearCache, alg::SupernodalQRFactorization; kwargs...
+    )
+    A = cache.A
+    A = LinearSolve.reduce_operand!(cache.sparse_reduction, A)
+    A = convert(AbstractMatrix, A)
+    As = SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A))
+    if cache.isfresh
+        cacheval = LinearSolve.@get_cacheval(cache, :SupernodalQRFactorization)
+        fact = if alg.reuse_symbolic && size(cacheval) == size(As) &&
+                nnz(cacheval.A) == nnz(As) &&
+                !(alg.check_pattern && pattern_changed(cacheval, As))
+            SNQR.snqr!(cacheval, As)
+        else
+            SNQR.snqr(As; ordering = alg.ordering, tol = alg.tol, wide = alg.wide)
+        end
+        cache.cacheval = fact
+        cache.isfresh = false
+    end
+    F = LinearSolve.@get_cacheval(cache, :SupernodalQRFactorization)
+    y = SNQR.solve!(cache.u, F, cache.b)
+    return if all(isfinite, y)
+        SciMLBase.build_linear_solution(
+            alg, y, nothing, nothing; retcode = ReturnCode.Success
+        )
+    else
+        @SciMLMessage(
+            "Solver produced a non-finite solution", cache.verbose, :solver_failure
+        )
+        SciMLBase.build_linear_solution(
+            alg, cache.u, nothing, nothing; retcode = ReturnCode.Infeasible
+        )
+    end
+end
+
 # --- SparseColumnPivotedQR: pure-Julia rank-revealing column-pivoted sparse QR ---
 # The default sparse QR (non-square sparse systems) and the singular-LU fallback.
 

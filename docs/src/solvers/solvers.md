@@ -288,6 +288,7 @@ PureUMFPACKFactorization
 SupernodalLUFactorization
 UMFPACKFactorization
 SparseColumnPivotedQRFactorization
+SupernodalQRFactorization
 ```
 
 !!! note
@@ -316,6 +317,18 @@ SparseColumnPivotedQRFactorization
     (`PureKLUFactorization`/`UMFPACKFactorization`) when the matrix is
     (near-)singular — the sparse, KLU-style analog of using a column-pivoted QR
     for rank-deficient dense systems.
+
+!!! note
+    
+    `SupernodalQRFactorization` is a pure-Julia multifrontal sparse Householder
+    QR (vendored self-contained in `src/SupernodalQR`, no binary dependency and
+    no GPL code). It is the BLAS-3, SPQR-style counterpart of
+    `SparseColumnPivotedQRFactorization` for "more structured" and larger
+    sparse least-squares problems, and is available on builds without
+    SuiteSparse's GPL components (`Base.USE_GPL_LIBS = false`), where SPQR is
+    not. It returns least-squares solutions — basic ones (as SPQR) for wide or
+    rank-deficient systems, or minimum-norm ones for wide systems with
+    `wide = :minnorm`.
 
 ### ParU (SuiteSparse)
 

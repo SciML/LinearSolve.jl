@@ -347,7 +347,11 @@ end
 # factorized matrix is M = (Dr·A·Dc)[σ,:], so gather picks up σ and Dr, and
 # the scatter applies Dc.  Safe when x aliases b (b is fully read first).
 function _solve_once!(x::AbstractVector{Tv}, F::SupernodalLUFactor{Tv}, b::AbstractVector) where {Tv}
+    require_one_based_indexing(x, b)
     n = F.sym.n
+    if length(x) != n || length(b) != n
+        throw(DimensionMismatch("size mismatch"))
+    end
     y = F.work
     p = F.p
     qf = F.sym.qf
@@ -378,7 +382,11 @@ function _scratch_mat!(F::SupernodalLUFactor{Tv}, nrhs::Int) where {Tv}
 end
 
 function _solve_once!(X::AbstractMatrix{Tv}, F::SupernodalLUFactor{Tv}, B::AbstractMatrix) where {Tv}
+    require_one_based_indexing(X, B)
     n = F.sym.n
+    if size(X, 1) != n || size(B, 1) != n || size(X, 2) != size(B, 2)
+        throw(DimensionMismatch("size mismatch"))
+    end
     nrhs = size(B, 2)
     Y = _scratch_mat!(F, nrhs)
     _ensure_panel_scratch!(F, nrhs)

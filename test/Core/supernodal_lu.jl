@@ -3,7 +3,7 @@
 # The LinearSolve-level algorithm surface is covered in basictests.jl and
 # resolve.jl; these exercise the solver's own invariants.
 
-using LinearSolve, SparseArrays, LinearAlgebra, Random, Test
+using LinearSolve, SparseArrays, LinearAlgebra, Random, Test, OffsetArrays
 using RecursiveFactorization        # activates the RF/TriangularSolve kernels
 const SNLU = LinearSolve.SupernodalLU
 
@@ -349,6 +349,20 @@ end
         supernodal_panel_solve!(W, Y, 8; algorithm, operation = :upper)
         @test Y ≈ UpperTriangular(W) \ Y0 rtol = 1.0e-12
     end
+end
+
+@testset "SupernodalLU rejects OffsetArray b and wrong-length cache.b" begin
+    A = poisson2d(10)
+    n = size(A, 1)
+    b = randn(n)
+    alg = SupernodalLUFactorization()
+    @test_throws ArgumentError solve(
+        LinearProblem(A, OffsetArray(copy(b), 0:(n - 1))), alg
+    )
+    cache = init(LinearProblem(copy(A), copy(b)), alg)
+    solve!(cache)
+    cache.b = rand(n - 20)
+    @test_throws DimensionMismatch solve!(cache)
 end
 
 # https://github.com/SciML/LinearSolve.jl/issues/1314

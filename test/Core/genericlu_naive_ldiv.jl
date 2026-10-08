@@ -1,4 +1,4 @@
-using LinearSolve, LinearAlgebra, Test, Random
+using LinearSolve, LinearAlgebra, Test, Random, OffsetArrays
 
 Random.seed!(1145)
 
@@ -209,4 +209,14 @@ end
     ) === which(
         LinearSolve._smart_lu_ldiv!, Tuple{Matrix{BigFloat}, luB, Matrix{BigFloat}}
     )
+end
+
+@testset "GenericLU / default reject OffsetArray u0" begin
+    n = 10
+    A = rand(n, n) + n * I
+    b = rand(n)
+    u0 = OffsetArray(zeros(n), 0:(n - 1))
+    for alg in (nothing, GenericLUFactorization())
+        @test_throws ArgumentError solve(LinearProblem(A, b; u0 = u0), alg)
+    end
 end

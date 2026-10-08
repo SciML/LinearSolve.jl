@@ -620,10 +620,51 @@ function _supports_right_preconditioning(alg::KrylovJL)
     )
 end
 
+function _krylov_uses_memory(alg::KrylovJL)
+    return alg.KrylovAlg === Krylov.dqgmres! || alg.KrylovAlg === Krylov.diom! ||
+        alg.KrylovAlg === Krylov.gmres! || alg.KrylovAlg === Krylov.fgmres! ||
+        alg.KrylovAlg === Krylov.gpmr! || alg.KrylovAlg === Krylov.fom!
+end
+
+function _krylov_uses_window(alg::KrylovJL)
+    return alg.KrylovAlg === Krylov.minres! || alg.KrylovAlg === Krylov.symmlq! ||
+        alg.KrylovAlg === Krylov.lslq! || alg.KrylovAlg === Krylov.lsqr! ||
+        alg.KrylovAlg === Krylov.lsmr!
+end
+
+function _krylov_required_memory(alg::KrylovJL, A)
+    kwargs_nt = NamedTuple(alg.kwargs)
+    memory = if haskey(kwargs_nt, :memory)
+        kwargs_nt[:memory]
+    elseif alg.gmres_restart == 0
+        min(20, size(A, 1))
+    else
+        alg.gmres_restart
+    end
+    return min(memory, size(A, 1))
+end
+
+_krylov_required_window(alg::KrylovJL) = alg.window == 0 ? 5 : alg.window
+
+function _krylov_workspace_matches_memory_window(cacheval, alg::KrylovJL, A)
+    if _krylov_uses_memory(alg)
+        return length(cacheval.V) >= _krylov_required_memory(alg, A)
+    elseif _krylov_uses_window(alg)
+        window = _krylov_required_window(alg)
+        if hasfield(typeof(cacheval), :err_vec)
+            return length(cacheval.err_vec) == window
+        elseif hasfield(typeof(cacheval), :clist)
+            return length(cacheval.clist) == window
+        end
+    end
+    return true
+end
+
 function _krylov_can_reuse_workspace(cacheval, alg::KrylovJL, A, b, u)
     KS = get_KrylovJL_solver(alg.KrylovAlg)
     return cacheval isa KS && cacheval.m == size(A, 1) && cacheval.n == size(A, 2) &&
-        typeof(cacheval.x) === typeof(u)
+        typeof(cacheval.x) === typeof(u) &&
+        _krylov_workspace_matches_memory_window(cacheval, alg, A)
 end
 
 function _krylov_can_reuse_workspace(cacheval, alg::KrylovJL, A, b::AbstractMatrix, u)

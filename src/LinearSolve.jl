@@ -597,6 +597,7 @@ function supernodal_panel_solve_backend! end
 # after default.jl: the vendored solver caches its dense diagonal blocks
 # with LinearSolve's own default solver, so it needs DefaultLinearSolver{,Init}
 include("SupernodalLU/SupernodalLU.jl")
+include("SupernodalQR/SupernodalQR.jl")
 include("init.jl")
 include("adjoint.jl") # LinearSolveAdjoint struct definition only; rrules are in ChainRulesCore ext
 
@@ -727,7 +728,10 @@ for alg in (
         # sparse QR both accept a non-square `A` and return the same answer as
         # `A \ b`. `SparseColumnPivotedQRFactorization` is in fact the default
         # for non-square sparse systems, so it must not be rejected here.
+        # `SupernodalQRFactorization` (multifrontal QR) gives least-squares
+        # solutions for tall and minimum-norm solutions for wide `A`.
         :SVDFactorization, :SparseColumnPivotedQRFactorization,
+        :SupernodalQRFactorization,
         # Rank-revealing column-pivoted QR (`geqp3`): documented to return the
         # least-squares solution for any shape, including rank-deficient.
         :SpecializedQRFactorization,
@@ -812,6 +816,7 @@ export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
     NormalCholeskyFactorization, NormalBunchKaufmanFactorization,
     UMFPACKFactorization, KLUFactorization, PureKLUFactorization,
     SupernodalLUFactorization, supernodal_panel_solve!, supernodal_panel_solve_backend!,
+    SupernodalQRFactorization,
     PureUMFPACKFactorization, SparseColumnPivotedQRFactorization, FastLUFactorization,
     FastQRFactorization,
     SparspakFactorization, DiagonalFactorization, CholeskyFactorization,

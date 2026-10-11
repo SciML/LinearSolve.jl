@@ -1038,9 +1038,12 @@ function do_factorization(alg::QRFactorization, A, b, u)
             # Going through `Aᵀ` turns it back into a triangular solve and gives the
             # minimum-norm solution, which is what dense `\` returns on the CPU.
             fact = MinNormQR(qr(copy(transpose(A))))
-        elseif A isa GPUArraysCore.AnyGPUArray || is_cusparse(A) ||
-                issparsematrixcsc(A) || _is_wrapped_sparse(A)
+        elseif A isa GPUArraysCore.AnyGPUArray || is_cusparse(A) || issparsematrixcsc(A)
             fact = qr(A)
+        elseif _is_wrapped_sparse(A)
+            # materialized so every Julia version factors it with SPQR, as the slot is typed;
+            # Julia 1.10's `qr` of the wrapper is a generic dense Householder QR
+            fact = qr(SparseMatrixCSC(A))
         elseif alg.inplace
             if A isa Symmetric
                 fact = qr(A, alg.pivot)

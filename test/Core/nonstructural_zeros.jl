@@ -401,7 +401,7 @@ reduction(cache) = cache.cacheval.sparse_reduction
     end
 
     # https://github.com/SciML/LinearSolve.jl/issues/1354
-    @testset "KLU with check_pattern = false survives a reduction pattern change" begin
+    @testset "sparse LU symbolic reuse survives a reduction pattern change" begin
         function dense4(zero_positions)
             A = sparse(Float64[4 1 1 1; 1 4 1 1; 1 1 4 1; 1 1 1 4])
             for (i, j) in zero_positions

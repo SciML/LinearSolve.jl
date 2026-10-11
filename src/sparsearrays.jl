@@ -1579,8 +1579,7 @@ function _resolve_pending!(red::SparseReduction, A)
     return red
 end
 
-# A cached symbolic factorization is only valid while the pattern of the operand is
-# stable, and the reduction can change that pattern even when the caller's own is constant.
+# The reduction can change the operand's pattern even when the caller's own is constant.
 _reduction_changed(::Nothing) = false
 _reduction_changed(red::SparseReduction) =
     red.active && !red.cache_union && red.structure_changed

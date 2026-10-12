@@ -59,6 +59,11 @@ const SCPQR = SparseColumnPivotedQR
 import AMD
 
 LinearSolve.issparsematrixcsc(A::AbstractSparseMatrixCSC) = true
+
+const _WrappedSparseMatrixCSC = Union{
+    Adjoint{<:Number, <:AbstractSparseMatrixCSC}, Transpose{<:Number, <:AbstractSparseMatrixCSC},
+}
+LinearSolve._is_wrapped_sparse(::_WrappedSparseMatrixCSC) = true
 LinearSolve.issparsematrix(A::AbstractSparseArray) = true
 LinearSolve.make_SparseMatrixCSC(A::SparseMatrixCSC) = A
 function LinearSolve.make_SparseMatrixCSC(A::AbstractSparseArray)
@@ -1444,10 +1449,7 @@ end
 # the parent types the slot, for the element types SPQR supports.
 function LinearSolve.init_cacheval(
         alg::QRFactorization,
-        A::Union{
-            Adjoint{<:Number, <:AbstractSparseArray},
-            Transpose{<:Number, <:AbstractSparseArray},
-        }, b, u, Pl, Pr,
+        A::_WrappedSparseMatrixCSC, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
@@ -1460,10 +1462,7 @@ end
 # wrapped sparse matrix. The solve factorizes anyway, so an unfactorized `LU` types the slot.
 function LinearSolve.init_cacheval(
         alg::GenericLUFactorization,
-        A::Union{
-            Adjoint{<:Number, <:AbstractSparseArray},
-            Transpose{<:Number, <:AbstractSparseArray},
-        }, b, u, Pl, Pr,
+        A::_WrappedSparseMatrixCSC, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )

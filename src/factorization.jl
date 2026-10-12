@@ -1014,14 +1014,12 @@ function QRFactorization(pivot::LinearAlgebra.PivotingStrategy, inplace::Bool = 
     return QRFactorization(pivot, 16, inplace)
 end
 
-# A sparse matrix behind `Adjoint`/`Transpose` is still sparse, but `issparsematrixcsc`
+# A CPU sparse matrix behind `Adjoint`/`Transpose` is still sparse, but `issparsematrixcsc`
 # only sees the bare type. Without this the QR below takes the dense branch and asks SPQR
 # for a pivot, which it rejects. Kept local rather than widening `issparsematrixcsc`,
-# which also drives the `init` normalization.
+# which also drives the `init` normalization. The `true` method is in sparsearrays.jl, on
+# the CPU type only: a wrapped GPU sparse matrix keeps its own path.
 _is_wrapped_sparse(A) = false
-function _is_wrapped_sparse(A::Union{<:Adjoint, <:Transpose})
-    return issparsematrixcsc(parent(A))
-end
 
 function do_factorization(alg::QRFactorization, A, b, u)
     A = convert(AbstractMatrix, A)

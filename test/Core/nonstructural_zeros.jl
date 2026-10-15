@@ -428,13 +428,17 @@ reduction(cache) = cache.cacheval.sparse_reduction
             KLUFactorization, UMFPACKFactorization,
             PureKLUFactorization, SupernodalLUFactorization,
         ]
-        for Alg in algs, check_pattern in (true, false), seq in (As, As_switch)
-            cache = init(LinearProblem(copy(seq[1]), b), Alg(; check_pattern))
-            for A in seq
-                cache.A = copy(A)
-                sol = solve!(cache)
-                @test sol.retcode == ReturnCode.Success
-                @test norm(A * sol.u - b) < 1.0e-10
+        seqs = ["fill-in" => As, "switch" => As_switch]
+        # one testset per case, so a solver that throws does not hide the cases after it
+        for Alg in algs, check_pattern in (true, false), (seqname, seq) in seqs
+            @testset "$(nameof(Alg)) $seqname check_pattern = $check_pattern" begin
+                cache = init(LinearProblem(copy(seq[1]), b), Alg(; check_pattern))
+                for A in seq
+                    cache.A = copy(A)
+                    sol = solve!(cache)
+                    @test sol.retcode == ReturnCode.Success
+                    @test norm(A * sol.u - b) < 1.0e-10
+                end
             end
         end
     end

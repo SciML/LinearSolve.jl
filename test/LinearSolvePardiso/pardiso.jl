@@ -348,12 +348,59 @@ end
             cache = init(LinearProblem(A_sym, b), MKLPardisoFactorize(cache_analysis = ca))
             solve!(cache)
             expected_sym = T <: Real ? Pardiso.REAL_SYM_INDEF : Pardiso.COMPLEX_HERM_INDEF
-            expected_ns = T <: Real ? Pardiso.REAL_SYM : Pardiso.COMPLEX_STRUCT_SYM
+            expected_ns = T <: Real ? Pardiso.REAL_NONSYM : Pardiso.COMPLEX_NONSYM
             @test Pardiso.get_matrixtype(cache.cacheval) == expected_sym
             cache.A = A_ns
             sol = solve!(cache)
             @test Pardiso.get_matrixtype(cache.cacheval) == expected_ns
             @test norm(A_ns * sol.u - b) < 1.0e-12
+        end
+    end
+end
+
+# Saddle-point matrix with a symmetric sparsity pattern, nonsymmetric values and a
+# zero (2,2) block, as in DAE and KKT systems.
+function pardiso_saddle(T, n, m; stored_diagonal)
+    H = spdiagm(-1 => fill(-one(T), n - 1), 0 => fill(4 * one(T), n), 1 => fill(-one(T), n - 1))
+    I_c = [i for i in 1:m for _ in 1:3]
+    J_c = [mod1(i + d, n) for i in 1:m for d in (0, 3, 7)]
+    C = sparse(I_c, J_c, ones(T, length(I_c)), m, n)
+    B = sparse(I_c, J_c, T[1 + k / length(I_c) for k in eachindex(I_c)], m, n)
+    K = [H B'; C spzeros(T, m, m)]
+    stored_diagonal || return K
+    I_k, J_k, V_k = findnz(K)
+    N = n + m
+    return sparse(vcat(I_k, 1:N), vcat(J_k, 1:N), vcat(V_k, zeros(T, N)), N, N)
+end
+
+@testset "Pardiso structurally symmetric saddle point" begin
+    if Pardiso.mkl_is_available()
+        for T in (Float64, ComplexF64), stored_diagonal in (true, false)
+            A = pardiso_saddle(T, 8, 3; stored_diagonal)
+            b = T.(1:size(A, 1))
+            cache = init(LinearProblem(A, b), MKLPardisoFactorize())
+            sol = solve!(cache)
+            nonsym = T <: Real ? Pardiso.REAL_NONSYM : Pardiso.COMPLEX_NONSYM
+            @test Pardiso.get_matrixtype(cache.cacheval) == nonsym
+            @test norm(A * sol.u - b) / norm(b) < 1.0e-12
+        end
+    end
+end
+
+@testset "Pardiso symmetric matrix types with missing diagonal entries" begin
+    if Pardiso.mkl_is_available()
+        cases = (
+            (sparse([4.0 1 0; 2 0 1; 0 3 4]), Pardiso.REAL_SYM),
+            (sparse(ComplexF64[4 1 0; 2 0 1; 0 3 4]), Pardiso.COMPLEX_STRUCT_SYM),
+            (sparse([4.0 1 0; 1 0 1; 0 1 4]), Pardiso.REAL_SYM_INDEF),
+            (sparse(ComplexF64[4 1 + im 0; 1 - im 0 1; 0 1 4]), Pardiso.COMPLEX_HERM_INDEF),
+            (sparse(ComplexF64[4 1 + im 0; 1 + im 0 1; 0 1 4]), Pardiso.COMPLEX_SYM),
+        )
+        for (A, mtype) in cases, ca in (false, true)
+            b = collect(eltype(A), 1:size(A, 1))
+            alg = MKLPardisoFactorize(matrix_type = mtype, cache_analysis = ca)
+            sol = solve(LinearProblem(A, b), alg)
+            @test norm(A * sol.u - b) / norm(b) < 1.0e-12
         end
     end
 end

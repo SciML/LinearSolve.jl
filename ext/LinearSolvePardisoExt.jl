@@ -16,40 +16,36 @@ function pardiso_csc(A)
     return sparse(I, J, V, size(A)...)
 end
 
-# True when the sparsity pattern of `A` is symmetric (stored values ignored).
-# Public SparseArrays / LinearAlgebra APIs only (no getcolptr).
-function is_structurally_symmetric(A::SparseMatrixCSC)
-    I, J, _ = findnz(A)
-    return issymmetric(sparse(I, J, true, size(A)...))
+# The symmetric and structurally symmetric matrix types need every diagonal entry
+# stored; with missing ones MKL's reordering errors, segfaults or hangs.
+function with_stored_diagonal(A::SparseMatrixCSC)
+    m, n = size(A)
+    k = min(m, n)
+    I, J, V = findnz(A)
+    count(I .== J) == k && return A
+    return sparse(vcat(I, 1:k), vcat(J, 1:k), vcat(V, zeros(eltype(A), k)), m, n)
 end
 
 """
     default_pardiso_matrix_type(A)
 
 Choose a Pardiso matrix type from the numerical structure of `A`. Symmetric /
-Hermitian matrices use the indefinite types; structurally symmetric (but not
-numerically symmetric / Hermitian) matrices use `REAL_SYM` /
-`COMPLEX_STRUCT_SYM`; otherwise nonsymmetric types. Symmetric types require the
-triangular storage from `Pardiso.get_matrix`.
+Hermitian matrices use the indefinite types (complex symmetric uses
+`COMPLEX_SYM`); all other matrices, including those with only a symmetric
+sparsity pattern, use the nonsymmetric types: `REAL_SYM` / `COMPLEX_STRUCT_SYM`
+lose accuracy on saddle-point and DAE matrices with zero diagonal entries.
+Symmetric types require the triangular storage from `Pardiso.get_matrix`.
 """
 function default_pardiso_matrix_type(A)
     A = pardiso_csc(A)
     Tv = eltype(A)
     return if Tv <: Real
-        if issymmetric(A)
-            Pardiso.REAL_SYM_INDEF
-        elseif is_structurally_symmetric(A)
-            Pardiso.REAL_SYM
-        else
-            Pardiso.REAL_NONSYM
-        end
+        issymmetric(A) ? Pardiso.REAL_SYM_INDEF : Pardiso.REAL_NONSYM
     elseif Tv <: Complex
         if ishermitian(A)
             Pardiso.COMPLEX_HERM_INDEF
         elseif issymmetric(A)
             Pardiso.COMPLEX_SYM
-        elseif is_structurally_symmetric(A)
-            Pardiso.COMPLEX_STRUCT_SYM
         else
             Pardiso.COMPLEX_NONSYM
         end
@@ -62,7 +58,12 @@ end
 # matrix types additionally need the triangular compression from `get_matrix`.
 # Duck-typed: `AbstractPardisoSolver` is not public (`Base.ispublic` false).
 function pardiso_matrix(ps, A)
-    return Pardiso.get_matrix(ps, pardiso_csc(A), :N)
+    A = pardiso_csc(A)
+    mtype = Pardiso.get_matrixtype(ps)
+    if mtype != Pardiso.REAL_NONSYM && mtype != Pardiso.COMPLEX_NONSYM
+        A = with_stored_diagonal(A)
+    end
+    return Pardiso.get_matrix(ps, A, :N)
 end
 
 function release_pardiso!(ps, A, b, u)

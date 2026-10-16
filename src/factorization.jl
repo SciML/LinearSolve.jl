@@ -53,7 +53,6 @@ function _copy_A_for_safety(cache::LinearCache)
             # Reuse existing private buffer (non-allocating).
             copyto!(cv.A_backup, A)
         end
-        cv.a_backup_synced = true
         return cv.A_backup
     else
         return _typed_copy(cache.A)
@@ -108,6 +107,24 @@ function _check_residual_safety(
 end
 
 _ldiv!(x, A, b) = ldiv!(x, A, b)
+
+@static if VERSION < v"1.11"
+    # Julia 1.10 solves with these through `reshape(x, n, 1)` or `view(x, 1:n, :)`, which
+    # marks `x` as sharing its data, so a later `resize!(cache.u)` throws.
+    function _ldiv!(
+            x::Vector{T}, A::LinearAlgebra.QRPivoted{T}, b::Vector{T}
+        ) where {T <: LinearAlgebra.BlasFloat}
+        n = length(x)
+        size(A) == (n, n) || return ldiv!(x, A, b)
+        ldiv!(A, reshape(view(copyto!(x, b), :), n, 1))
+        return x
+    end
+    function _ldiv!(
+            x::Vector{T}, A::LinearAlgebra.SVD{T}, b::Vector{T}
+        ) where {T <: LinearAlgebra.BlasFloat}
+        return copyto!(x, A \ b)
+    end
+end
 
 raw"""
     MinNormQR(qr_of_transpose)

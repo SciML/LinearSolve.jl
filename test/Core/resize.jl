@@ -196,4 +196,16 @@ using LinearSolve, LinearAlgebra, Test
         @test sol.retcode == ReturnCode.Success
         @test sol.u ≈ expected3
     end
+
+    @testset "u stays resizable after a pivoted QR or SVD solve" begin
+        # Callers such as OrdinaryDiffEq resize the vectors they share with the cache in place.
+        # `A` is singular, so the default solver falls back to pivoted QR.
+        A = [1.0 2.0 0.0; 2.0 4.0 0.0; 0.0 0.0 1.0]
+        b = [1.0, 2.0, 3.0]
+        for alg in (nothing, QRFactorization(ColumnNorm()), SVDFactorization())
+            cache = init(LinearProblem(A, b), alg)
+            @test solve!(cache).u ≈ [0.2, 0.4, 3.0]
+            @test length(resize!(cache.u, 4)) == 4
+        end
+    end
 end

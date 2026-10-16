@@ -196,7 +196,7 @@ external_internal_accesses = (
     Symbol("init_residual!"), Symbol("minres_iterable!"),
     # Krylov / Mooncake / EnumX / PureKLU / MKL_jll / OpenBLAS_jll
     Symbol("warm_start!"), Symbol("increment_and_get_rdata!"), Symbol("rrule!!"),
-    :symbol_map, :KLU_OK, :is_available,
+    :symbol_map, :KLU_OK, :KLU_SINGULAR, :is_available,
     # Reactant has no public callback or non-wrapper registration API; these hooks
     # preserve the solve as one operation and let it traverse LinearSolution.
     Symbol("@reactant_overlay"), :Ops, :_parent_type, :julia_callback,

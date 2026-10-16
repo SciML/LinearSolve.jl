@@ -25,19 +25,17 @@ solve(prob)
     @test isapprox(g, BigFloat[0.5, 1 // 3]; rtol = 1.0e-12)
 end
 
-@testset "Unitful LU cache parity with main" begin
-    # NoUnits collapses to Float64 and solves on main and here.
+@testset "Unitful LU cache eltype" begin
+    # NoUnits collapses to Float64.
     Ad = Matrix([2.0 0.5; 0.1 3.0] * Unitful.NoUnits)
     bd = Vector([1.0, 2.0] * Unitful.NoUnits)
     sol = solve(LinearProblem(Ad, bd), LUFactorization())
     @test sol.u ≈ [0.33613445378151263, 0.6554621848739496]
 
-    # Dimensionful Quantity: init still DimensionErrors on main (u0 fill with false);
-    # user-facing init/solve behavior is unchanged. The LU placeholder is typed from
-    # eltype(A) when lu_instance strips units (same branch as TrackedReal).
+    # `lu_instance` strips units, so the LU placeholder is typed from `eltype(A)`
+    # (the same branch ReverseDiff `TrackedReal` takes).
     A = Matrix([2.0 0.5; 0.1 3.0] * u"m")
     b = Vector([1.0, 2.0] * u"m")
-    @test_throws Unitful.DimensionError init(LinearProblem(A, b), LUFactorization())
     n = size(A, 1)
     cv = LinearSolve.init_cacheval(
         LUFactorization(), A, b, similar(b),

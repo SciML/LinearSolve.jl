@@ -653,7 +653,7 @@ function _solve_direct_dual!(
     # solve! on the regular LinearCache directly with the dual values (bypasses ForwardDiff extension)
     dual_sol = SciMLBase.solve!(dual_cache)
 
-    setfield!(linear_cache, :isfresh, false)
+    linear_cache.isfresh = false
 
     # Update the cache
     if getfield(cache, :dual_u) isa AbstractArray
@@ -790,13 +790,13 @@ end
 # "Forwards" getproperty to LinearCache if necessary
 function Base.getproperty(dc::DualLinearCache, sym::Symbol)
     if sym === :A
-        dc.dual_A
+        return getfield(dc, :dual_A)
     elseif sym === :b
-        dc.dual_b
+        return getfield(dc, :dual_b)
     elseif sym === :u
-        dc.dual_u
+        return getfield(dc, :dual_u)
     elseif hasfield(LinearSolve.LinearCache, sym)
-        return getproperty(dc.linear_cache, sym)
+        return getproperty(getfield(dc, :linear_cache), sym)
     else
         return getfield(dc, sym)
     end

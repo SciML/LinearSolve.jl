@@ -2,9 +2,10 @@ using LinearSolve, LinearAlgebra, Test, ForwardDiff, ReverseDiff
 
 # ODE-free ReverseDiff reproducer: `lu_instance` drops TrackedReal origin tags via
 # `zero`, so the default/LU cache slot must be typed from `eltype(A)`.
-function loss_lu(p, alg)
+function loss_lu(p, alg, alias_A)
     A = reshape([p[1], p[2], p[3], p[4]], 2, 2)
-    return sum(solve(LinearProblem(A, [p[1], p[4]]), alg).u)
+    alias = LinearAliasSpecifier(; alias_A)
+    return sum(solve(LinearProblem(A, [p[1], p[4]]), alg; alias).u)
 end
 
 function loss_default_n(p, n)
@@ -19,9 +20,9 @@ end
         nothing,
         LinearSolve.DefaultLinearSolver(LinearSolve.DefaultAlgorithmChoice.LUFactorization),
     )
-    for alg in algs
-        g_fd = ForwardDiff.gradient(p -> loss_lu(p, alg), p0)
-        g_rd = ReverseDiff.gradient(p -> loss_lu(p, alg), p0)
+    for alg in algs, alias_A in (false, true)
+        g_fd = ForwardDiff.gradient(p -> loss_lu(p, alg, alias_A), p0)
+        g_rd = ReverseDiff.gradient(p -> loss_lu(p, alg, alias_A), p0)
         @test isapprox(g_rd, g_fd; rtol = 1.0e-8, atol = 1.0e-10)
     end
 

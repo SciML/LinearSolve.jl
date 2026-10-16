@@ -23,11 +23,10 @@ const (
     LHLFactorizationBindings.bindings
 using Base: Bool, convert, copyto!, adjoint, transpose, /, \, require_one_based_indexing
 using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, BunchKaufman,
-    ColumnNorm, cond, Diagonal, Factorization, Hermitian, I, LAPACK, LowerTriangular,
-    NoPivot,
+    ColumnNorm, cond, Diagonal, Factorization, Hermitian, I, LAPACK, NoPivot,
     RowMaximum, RowNonZero, SymTridiagonal, Symmetric, Transpose,
     Tridiagonal, UniformScaling, UnitLowerTriangular, UnitUpperTriangular,
-    UpperTriangular, axpby!, axpy!, bunchkaufman,
+    UpperTriangular, LowerTriangular, axpby!, axpy!, bunchkaufman,
     bunchkaufman!,
     cholesky, cholesky!, diagind, dot, inv, issuccess, ldiv!, ldlt!, lu, lu!, mul!,
     norm,

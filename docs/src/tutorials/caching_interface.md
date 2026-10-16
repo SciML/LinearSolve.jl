@@ -77,7 +77,7 @@ KLU's fast refactorization also reuses numerical pivots. Changing matrix values 
 make those pivots unstable even when the sparsity pattern stays fixed. LinearSolve
 checks for zero pivots and reciprocal pivot growth below `sqrt(eps(Float64))`, then
 recomputes the numerical factorization with fresh pivots when needed. The symbolic
-analysis is retained. The [KLU user guide](https://raw.githubusercontent.com/DrTimothyAldenDavis/SuiteSparse/dev/KLU/Doc/KLU_UserGuide.tex)
+analysis is retained. The [KLU user guide](https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/KLU/Doc/KLU_UserGuide.tex)
 describes why refactorization requires a numerical stability check.
 
 `PureKLUFactorization` is checked the same way, against its own

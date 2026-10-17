@@ -696,8 +696,8 @@ refactorization.
   - `nprocs`: number of threads, passed to `Pardiso.set_nprocs!`. Defaults to `nothing`
     (Pardiso's default).
   - `matrix_type`: Pardiso matrix type (`Pardiso.MatrixType` or its integer code),
-    overriding the automatic choice of `Pardiso.REAL_NONSYM` for real and
-    `Pardiso.COMPLEX_NONSYM` for complex element types. Defaults to `nothing`.
+    overriding the automatic choice from the matrix values described in `PardisoJL`.
+    Defaults to `nothing`.
   - `cache_analysis`: when `true`, disables Pardiso's scaling and matching defaults
     (`iparm[11] = iparm[13] = 0`), runs the analysis phase once at `init`, and reuses it
     for all further factorizations with this solver. Defaults to `false`.
@@ -742,8 +742,8 @@ Square sparse systems (`SparseMatrixCSC`, real or complex) are supported.
   - `nprocs`: number of threads, passed to `Pardiso.set_nprocs!`. Defaults to `nothing`
     (Pardiso's default).
   - `matrix_type`: Pardiso matrix type (`Pardiso.MatrixType` or its integer code),
-    overriding the automatic choice of `Pardiso.REAL_NONSYM` for real and
-    `Pardiso.COMPLEX_NONSYM` for complex element types. Defaults to `nothing`.
+    overriding the automatic choice from the matrix values described in `PardisoJL`.
+    Defaults to `nothing`.
   - `cache_analysis`: when `true`, disables Pardiso's scaling and matching defaults
     (`iparm[11] = iparm[13] = 0`), runs the analysis phase once at `init`, and reuses it
     for all further factorizations with this solver. Defaults to `false`.
@@ -785,8 +785,8 @@ likely to converge without a refactorization.
   - `nprocs`: number of threads. Defaults to `nothing` (Pardiso's default). The
     extension currently applies this only for the MKL vendor, so it has no effect here.
   - `matrix_type`: Pardiso matrix type (`Pardiso.MatrixType` or its integer code),
-    overriding the automatic choice of `Pardiso.REAL_NONSYM` for real and
-    `Pardiso.COMPLEX_NONSYM` for complex element types. Defaults to `nothing`.
+    overriding the automatic choice from the matrix values described in `PardisoJL`.
+    Defaults to `nothing`.
   - `cache_analysis`: when `true`, disables Pardiso's scaling and matching defaults
     (`iparm[11] = iparm[13] = 0`), runs the analysis phase once at `init`, and reuses it
     for all further factorizations with this solver. Defaults to `false`.
@@ -833,8 +833,8 @@ are supported.
   - `nprocs`: number of threads. Defaults to `nothing` (Pardiso's default). The
     extension currently applies this only for the MKL vendor, so it has no effect here.
   - `matrix_type`: Pardiso matrix type (`Pardiso.MatrixType` or its integer code),
-    overriding the automatic choice of `Pardiso.REAL_NONSYM` for real and
-    `Pardiso.COMPLEX_NONSYM` for complex element types. Defaults to `nothing`.
+    overriding the automatic choice from the matrix values described in `PardisoJL`.
+    Defaults to `nothing`.
   - `cache_analysis`: when `true`, disables Pardiso's scaling and matching defaults
     (`iparm[11] = iparm[13] = 0`), runs the analysis phase once at `init`, and reuses it
     for all further factorizations with this solver. Defaults to `false`.
@@ -890,9 +890,12 @@ Pardiso's default (direct) solver is used.
   - `nprocs`: number of threads, passed to `Pardiso.set_nprocs!`. Defaults to `nothing`
     (Pardiso's default). The extension currently applies this only for `vendor = :MKL`.
   - `matrix_type`: Pardiso matrix type (`Pardiso.MatrixType` or its integer code),
-    passed to `Pardiso.set_matrixtype!`. Defaults to `nothing`, which selects
-    `Pardiso.REAL_NONSYM` for real and `Pardiso.COMPLEX_NONSYM` for complex element
-    types.
+    passed to `Pardiso.set_matrixtype!`. Defaults to `nothing`, which selects a type
+    from the matrix values: symmetric / Hermitian inputs use the corresponding
+    indefinite Pardiso type (`Pardiso.COMPLEX_SYM` for complex symmetric), with
+    triangular storage via `Pardiso.get_matrix`; all other inputs, including those
+    with only a symmetric sparsity pattern, use `Pardiso.REAL_NONSYM` /
+    `Pardiso.COMPLEX_NONSYM`. The automatic choice is refreshed when `cache.A` changes.
   - `cache_analysis`: when `true`, disables Pardiso's scaling and matching defaults
     (`iparm[11] = iparm[13] = 0`), runs the analysis phase once at `init`, and reuses it
     for every later factorization, so only the numerical factorization is repeated when

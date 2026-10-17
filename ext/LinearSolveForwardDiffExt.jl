@@ -5,7 +5,7 @@ using LinearSolve: LinearSolve, SciMLLinearSolveAlgorithm, __init, LinearVerbosi
     OperatorAssumptions, PureKLUFactorization, SparspakFactorization, defaultalg,
     default_alias_A
 using ConcreteStructs: @concrete
-using LinearAlgebra: LinearAlgebra, mul!
+using LinearAlgebra: LinearAlgebra, Hermitian, Symmetric, mul!
 using SparseArrays: SparseArrays, SparseMatrixCSC, nonzeros
 using ForwardDiff: ForwardDiff, Dual, Partials
 using SciMLBase: SciMLBase, LinearAliasSpecifier, LinearProblem, init, solve, solve!
@@ -814,6 +814,12 @@ partial_vals(x::Dual{T, V, P}) where {T, V <: Dual, P} = ForwardDiff.partials(x)
 partial_vals(x::AbstractArray{<:Dual}) = map(ForwardDiff.partials, x)
 partial_vals(x) = nothing
 partial_vals!(out, x) = map!(partial_vals, out, x) # Update in-place
+# `map` over a sparse `Symmetric`/`Hermitian` visits all n^2 entries and stores every `Partials`
+const SymHermSparseDual = Union{
+    Symmetric{<:Dual, <:SparseMatrixCSC}, Hermitian{<:Dual, <:SparseMatrixCSC},
+}
+partial_vals(x::SymHermSparseDual) = partial_vals(SparseMatrixCSC(x))
+partial_vals!(out::SparseMatrixCSC, x::SymHermSparseDual) = partial_vals!(out, SparseMatrixCSC(x))
 
 # Add recursive handling for nested dual values
 nodual_value(x) = x
@@ -827,6 +833,11 @@ function nodual_value(x::AbstractArray{<:Dual})
     return nodual_value!(similar(x, ForwardDiff.valtype(eltype(x))), x)
 end
 nodual_value!(out, x) = map!(nodual_value, out, x) # Update in-place
+# `Symmetric`/`Hermitian` reject `setindex!` off the diagonal, so fill the parent instead
+function nodual_value!(out::Union{Symmetric, Hermitian}, x::Union{Symmetric, Hermitian})
+    nodual_value!(parent(out), out.uplo == x.uplo ? parent(x) : x)
+    return out
+end
 
 # `map!` into a `SparseMatrixCSC` is zero-pruning (`SparseArrays._map_zeropres!`):
 # it rebuilds the destination's structure and drops any stored entry whose mapped

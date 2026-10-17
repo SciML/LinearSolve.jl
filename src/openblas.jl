@@ -36,7 +36,7 @@ prob = LinearProblem(A, b)
 sol = solve(prob, OpenBLASLUFactorization())
 ```
 """
-struct OpenBLASLUFactorization <: AbstractFactorization
+struct OpenBLASLUFactorization <: AbstractDenseFactorization
     residualsafety::Bool
 end
 

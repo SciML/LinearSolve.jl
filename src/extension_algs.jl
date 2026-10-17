@@ -1521,7 +1521,7 @@ sol = solve(LinearProblem(A, b), BLISLUFactorization())
 `LinearSolveAutotune` can also select BLIS for the default algorithm on hardware where it
 benchmarks fastest, in which case `solve(prob)` uses it without naming it explicitly.
 """
-struct BLISLUFactorization <: AbstractFactorization
+struct BLISLUFactorization <: AbstractDenseFactorization
     residualsafety::Bool
     function BLISLUFactorization(; throwerror = true, residualsafety::Bool = false)
         ext = Base.get_extension(@__MODULE__, :LinearSolveBLISExt)

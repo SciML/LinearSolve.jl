@@ -535,6 +535,11 @@ end
 # No size cutoff here, ever: choosing `GenericLUFactorization` is choosing the
 # generic back-solve; the size-aware path is `_smart_lu_ldiv!` below.
 function _generic_lu_ldiv!(x, F::LU, b)
+    require_one_based_indexing(x)
+    n = size(F, 1)
+    if size(x) != size(b) || size(b, 1) != n
+        throw(DimensionMismatch("length(b) = $(length(b)), length(x) = $(length(x)), but the factorization is $(n)×$(n)"))
+    end
     if x !== b
         copyto!(x, b)
     end

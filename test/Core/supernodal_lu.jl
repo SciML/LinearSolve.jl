@@ -156,6 +156,10 @@ end
         push!(algs, SupernodalLUFactorization(dense_alg = BLISLUFactorization()))
     end
     LinearSolve.usemkl && push!(algs, SupernodalLUFactorization(dense_alg = MKLLUFactorization()))
+    LinearSolve.appleaccelerate_isavailable() &&
+        push!(algs, SupernodalLUFactorization(dense_alg = AppleAccelerateLUFactorization()))
+    LinearSolve.useopenblas &&
+        push!(algs, SupernodalLUFactorization(dense_alg = OpenBLASLUFactorization()))
     for alg in algs
         cache = init(LinearProblem(As, bs), alg)
         sol = solve!(cache)

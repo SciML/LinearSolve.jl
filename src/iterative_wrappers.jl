@@ -641,14 +641,19 @@ function _krylov_required_memory(alg::KrylovJL, A)
     else
         alg.gmres_restart
     end
-    return min(memory, size(A, 1))
+    dimension = alg.KrylovAlg === Krylov.gpmr! ? sum(size(A)) : size(A, 1)
+    return min(memory, dimension)
 end
 
 _krylov_required_window(alg::KrylovJL) = alg.window == 0 ? 5 : alg.window
 
 function _krylov_workspace_matches_memory_window(cacheval, alg::KrylovJL, A)
     if _krylov_uses_memory(alg)
-        return length(cacheval.V) >= _krylov_required_memory(alg, A)
+        memory = _krylov_required_memory(alg, A)
+        fixed_memory = alg.KrylovAlg === Krylov.diom! ||
+            alg.KrylovAlg === Krylov.dqgmres! ||
+            get(NamedTuple(alg.kwargs), :restart, alg.KrylovAlg === Krylov.gmres! && alg.gmres_restart > 0)
+        return fixed_memory ? length(cacheval.V) == memory : length(cacheval.V) >= memory
     elseif _krylov_uses_window(alg)
         window = _krylov_required_window(alg)
         if hasfield(typeof(cacheval), :err_vec)
@@ -670,6 +675,9 @@ end
 function _krylov_can_reuse_workspace(cacheval, alg::KrylovJL, A, b::AbstractMatrix, u)
     if alg.KrylovAlg === Krylov.gmres!
         cacheval isa Krylov.BlockGmresWorkspace || return false
+        if get(NamedTuple(alg.kwargs), :restart, alg.gmres_restart > 0)
+            length(cacheval.V) == min(5, div(size(A, 2), size(b, 2))) || return false
+        end
     elseif alg.KrylovAlg === Krylov.minres!
         cacheval isa Krylov.BlockMinresWorkspace || return false
     else
@@ -680,7 +688,7 @@ function _krylov_can_reuse_workspace(cacheval, alg::KrylovJL, A, b::AbstractMatr
 end
 
 _krylov_rebind_solution!(cacheval::Krylov.KrylovWorkspace, u) = (cacheval.x = u)
-_krylov_rebind_solution!(cacheval::Krylov.BlockKrylovWorkspace, u) = (cacheval.X = u)
+_krylov_rebind_solution!(cacheval::Krylov.BlockKrylovWorkspace, u) = nothing
 
 function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     if cache.precsisfresh && !isnothing(alg.precs)

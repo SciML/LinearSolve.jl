@@ -1,4 +1,4 @@
-using LinearSolve, LinearAlgebra, SparseArrays, SciMLOperators, Random, Test
+using LinearSolve, LinearAlgebra, SparseArrays, SciMLOperators, Random, Test, Krylov
 
 function krylov_a_update_solve_allocations(cache, Awork, A)
     copyto!(Awork, A)
@@ -107,4 +107,62 @@ end
     sol_m = solve!(cache_m)
     @test length(cache_m.cacheval.err_vec) == window
     @test sol_m.retcode == ReturnCode.Success
+end
+
+@testset "KrylovJL block output overlapping RHS" begin
+    rng = MersenneTwister(1378)
+    for alg in (KrylovJL_GMRES(), KrylovJL_MINRES()), overlap in (:same, :view)
+        R = randn(rng, 12, 12)
+        A = R' * R + 10I
+        b = randn(rng, 12, 2)
+        u = overlap === :same ? b : view(b, :, :)
+        rhs = copy(b)
+        cache = init(LinearProblem(A, b; u0 = u), alg; abstol = 1.0e-10, reltol = 1.0e-10)
+        for _ in 1:2
+            b .= rhs
+            cache.A = copy(A)
+            sol = solve!(cache)
+            @test sol.retcode == ReturnCode.Success
+            @test sol.u ≈ A \ rhs rtol = 1.0e-6
+        end
+    end
+end
+
+@testset "KrylovJL decreased subspace memory" begin
+    rng = MersenneTwister(1378)
+    n = 80
+    A = Tridiagonal(fill(-1.0, n - 1), fill(2.0, n), fill(-0.5, n - 1))
+    b = randn(rng, n)
+    for algs in (
+            (KrylovJL_GMRES(gmres_restart = 20), KrylovJL_GMRES(gmres_restart = 5)),
+            (KrylovJL(; KrylovAlg = Krylov.fgmres!, memory = 20, restart = true), KrylovJL(; KrylovAlg = Krylov.fgmres!, memory = 5, restart = true)),
+            (KrylovJL(; KrylovAlg = Krylov.fom!, memory = 20, restart = true), KrylovJL(; KrylovAlg = Krylov.fom!, memory = 5, restart = true)),
+            (KrylovJL(; KrylovAlg = Krylov.diom!, memory = 20), KrylovJL(; KrylovAlg = Krylov.diom!, memory = 5)),
+            (KrylovJL(; KrylovAlg = Krylov.dqgmres!, memory = 20), KrylovJL(; KrylovAlg = Krylov.dqgmres!, memory = 5)),
+        )
+        cache = init(LinearProblem(A, b), algs[1]; reltol = 1.0e-10, abstol = 1.0e-10, maxiters = 80)
+        solve!(cache)
+        cache.alg = algs[2]
+        cache.A = copy(A)
+        sol = solve!(cache)
+        fresh = solve(LinearProblem(A, b), algs[2]; reltol = 1.0e-10, abstol = 1.0e-10, maxiters = 80)
+        @test length(cache.cacheval.V) == 5
+        @test sol.iters == fresh.iters
+        @test sol.retcode == fresh.retcode
+        @test sol.u ≈ fresh.u rtol = 1.0e-10 atol = 1.0e-10
+    end
+    alg = KrylovJL(; KrylovAlg = Krylov.gpmr!, memory = 5, restart = true)
+    ws = Krylov.GpmrWorkspace(A, b; memory = 20)
+    @test !LinearSolve._krylov_can_reuse_workspace(ws, alg, A, b, ws.x)
+
+    cache = init(LinearProblem(A, hcat(b, reverse(b))), KrylovJL_GMRES(); reltol = 1.0e-10)
+    solve!(cache)
+    cache.alg = KrylovJL_GMRES(gmres_restart = 5)
+    cache.A = copy(A)
+    sol = solve!(cache)
+    fresh = solve(LinearProblem(A, cache.b), cache.alg; reltol = 1.0e-10)
+    @test length(cache.cacheval.V) == 5
+    @test sol.iters == fresh.iters
+    @test sol.u ≈ fresh.u rtol = 1.0e-10 atol = 1.0e-10
+
 end

@@ -155,9 +155,7 @@ end
     if Base.get_extension(LinearSolve, :LinearSolveBLISExt) !== nothing
         push!(algs, SupernodalLUFactorization(dense_alg = BLISLUFactorization()))
     end
-    if !Sys.isapple()
-        push!(algs, SupernodalLUFactorization(dense_alg = MKLLUFactorization()))
-    end
+    LinearSolve.usemkl && push!(algs, SupernodalLUFactorization(dense_alg = MKLLUFactorization()))
     for alg in algs
         cache = init(LinearProblem(As, bs), alg)
         sol = solve!(cache)

@@ -162,7 +162,8 @@ function _sym_givens(a::T, b::T) where {T <: AbstractFloat}
 end
 
 function _sym_givens!(c, s, R, nr::Int, inner_iter::Int, bsize::Int, Hbis)
-    if __is_extension_loaded(Val(:KernelAbstractions))
+    # since KA 0.10 the kernel is compiled for CPU arrays too, which rules out non-isbits eltypes
+    if __is_extension_loaded(Val(:KernelAbstractions)) && isbitstype(eltype(Hbis))
         return _fast_sym_givens!(c, s, R, nr, inner_iter, bsize, Hbis)
     end
     __res = _sym_givens.(R[nr + inner_iter], Hbis)

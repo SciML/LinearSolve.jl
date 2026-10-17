@@ -158,7 +158,7 @@ function LinearAlgebra.ldiv!(x::AbstractVector, F::MinNormQR, b::AbstractVector)
     # below it are structurally zero and contribute nothing to the solve.
     R = view(F.qr_of_transpose.R, 1:nrows, 1:nrows)
     y = ldiv!(
-        LinearAlgebra.adjoint(LinearAlgebra.UpperTriangular(R)),
+        adjoint(LinearAlgebra.UpperTriangular(R)),
         copyto!(similar(x, nrows), b)
     )
     fill!(x, zero(eltype(x)))

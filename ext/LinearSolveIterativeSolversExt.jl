@@ -62,7 +62,7 @@ LinearSolve._isidentity_struct(::IterativeSolvers.Identity) = true
 # Accept LinearSolve's `maxiters` spelling on the algorithm and hand
 # IterativeSolvers the `maxiter` it expects. An explicit `maxiter` wins if both
 # are given, and the NamedTuple is rebuilt rather than mutated so the result
-# stays inferrable.
+# stays inferable.
 function _rename_maxiters(kwargs)
     haskey(kwargs, :maxiters) || return NamedTuple(kwargs)
     nt = NamedTuple(kwargs)

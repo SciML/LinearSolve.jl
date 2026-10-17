@@ -289,6 +289,102 @@ function _lhl_adjoint_reuse_solve!(x::AbstractMatrix, M, b, ws, refine::Int)
 end
 
 """
+    _nonsquare_pullback_factors(cache, A, b, x, lambda, dx)
+
+The part of the reverse-mode cotangent of `A` that the square-system formula `-lambda xᴴ`
+leaves out, as the pair `(u, v)` whose outer product `u vᴴ` is that term, or `nothing` when
+there is nothing to add. Factored rather than multiplied out so a caller can accumulate it
+into a cotangent it already holds, without a second `m` by `n` matrix.
+
+For a non-square `A` the solve returns `x = A⁺b`, whose pullback carries a second term.
+Which one depends on the shape, and for a full-rank `A` only one of them is ever nonzero:
+
+  - overdetermined (`m > n`), from the residual `r = b - A x`:  `r (A \\ lambda)ᴴ`
+  - underdetermined (`m < n`), from the null space of `A`:
+    `(Aᴴ \\ x) (dx - A \\ (A dx))ᴴ`
+
+Both are written as solves with `A` rather than through `AᴴA`/`AAᴴ` so the normal
+equations, and the squared condition number that comes with them, stay out of it. The solves
+go through the cache's own solver, reusing its factorization when there is one.
+
+Returns `nothing` for anything that is not an `AbstractMatrix`, since the correction needs
+to solve with `A` itself. See SciML/LinearSolve.jl#1309.
+"""
+_nonsquare_pullback_factors(cache, A, b, x, lambda, dx) = nothing
+
+function _nonsquare_pullback_factors(cache, A::AbstractMatrix, b, x, lambda, dx)
+    m, n = size(A)
+    m == n && return nothing
+    return if m > n
+        (b - A * x, _pinv_solve(cache, A, lambda))
+    else
+        (_adjoint_solve(cache, x, A), dx - _pinv_solve(cache, A, A * dx))
+    end
+end
+
+# `A⁺y` through the forward factorization, the counterpart of `_adjoint_factorization_solve`.
+_pinv_factorization_solve(::_AdjointFactorizationReuse, alg, cacheval, A, y) = nothing
+function _pinv_factorization_solve(
+        ::Union{_DirectAdjointFactorizationReuse, _ExtractedAdjointFactorizationReuse},
+        alg, cacheval, A, y
+    )
+    F = _cache_factorization(alg, cacheval)
+    return F === nothing ? nothing : F \ y
+end
+function _pinv_factorization_solve(::_NormalAdjointFactorizationReuse, alg, cacheval, A, y)
+    F = _standard_cache_factorization(cacheval)
+    return F === nothing ? nothing : F \ (A' * y)
+end
+
+function _pinv_solve(cache, A, y)
+    alg, cacheval = cache.alg, cache.cacheval
+    if alg isa AbstractKrylovSubspaceMethod
+        return solve(LinearProblem(A, y), alg; cache.abstol, cache.reltol, cache.verbose).u
+    elseif alg isa DefaultLinearSolver
+        # after a fallback the active slot no longer holds the factorization that was used
+        cacheval.fell_back_to_qr && return A \ y
+        choice = Symbol(alg.alg)
+        alg, cacheval = algchoice_to_alg(choice), getproperty(cacheval, choice)
+    end
+    reused = alg isa AbstractFactorization ?
+        _pinv_factorization_solve(
+            _adjoint_factorization_reuse(typeof(alg)), alg, cacheval, A, y
+        ) : nothing
+    return reused === nothing ? A \ y : reused
+end
+
+# The `A` a non-square solve with `cache` differentiates against. An in-place factorization
+# overwrites `cache.A`, so a reused cache rebuilds it from the factorization.
+function _original_A(cache)
+    alg, cacheval = cache.alg, cache.cacheval
+    alg isa Union{
+        AbstractKrylovSubspaceMethod, NormalCholeskyFactorization,
+        NormalBunchKaufmanFactorization,
+    } && return cache.A
+    cache.isfresh && return copy(cache.A)
+    if alg isa DefaultLinearSolver
+        cacheval.fell_back_to_qr && return Matrix(cacheval.QRFactorizationPivoted)
+        choice = Symbol(alg.alg)
+        alg, cacheval = algchoice_to_alg(choice), getproperty(cacheval, choice)
+    end
+    F = alg isa AbstractFactorization ? _cache_factorization(alg, cacheval) : nothing
+    return F === nothing ? copy(cache.A) : Matrix(F)
+end
+
+"""
+    _add_nonsquare_pullback!(dA, cache, A, b, x, lambda, dx)
+
+Accumulate [`_nonsquare_pullback_factors`](@ref) into `dA` in place, leaving it untouched
+when there is no correction to make.
+"""
+function _add_nonsquare_pullback!(dA, cache, A, b, x, lambda, dx)
+    factors = _nonsquare_pullback_factors(cache, A, b, x, lambda, dx)
+    factors === nothing && return dA
+    u, v = factors
+    return mul!(dA, u, adjoint(v), true, true)
+end
+
+"""
     _adjoint_solve(cache::LinearCache, b)
 
 Solve `adjoint(A) x = b` for the cache's current `A`, reusing the factorization the

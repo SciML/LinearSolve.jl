@@ -356,3 +356,25 @@ end
     A_grad = en_jac[2] |> vec
     @test A_grad ≈ fd_jac_A rtol = 1.0e-4
 end
+
+# https://github.com/SciML/LinearSolve.jl/issues/1309
+@testset "non-square reverse" begin
+    for (rows, cols) in ((9, 4), (4, 9))
+        A = randn(rows, cols)
+        b = randn(rows)
+        grad_A = ForwardDiff.gradient(X -> sum(X \ b), A)
+        algs = rows > cols ?
+            (
+                SVDFactorization(), QRFactorization(), NormalCholeskyFactorization(),
+                KrylovJL_LSMR(), nothing,
+            ) :
+            (SVDFactorization(), KrylovJL_LSMR())
+        for alg in algs
+            _, grad = Mooncake.value_and_gradient!!(
+                prepare_gradient_cache(fnice, copy(A), copy(b), alg),
+                fnice, copy(A), copy(b), alg
+            )
+            @test grad[2] ≈ grad_A rtol = 1.0e-8
+        end
+    end
+end

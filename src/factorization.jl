@@ -1014,6 +1014,13 @@ function QRFactorization(pivot::LinearAlgebra.PivotingStrategy, inplace::Bool = 
     return QRFactorization(pivot, 16, inplace)
 end
 
+# A CPU sparse matrix behind `Adjoint`/`Transpose` is still sparse, but `issparsematrixcsc`
+# only sees the bare type. Without this the QR below takes the dense branch and asks SPQR
+# for a pivot, which it rejects. Kept local rather than widening `issparsematrixcsc`,
+# which also drives the `init` normalization. The `true` method is in sparsearrays.jl, on
+# the CPU type only: a wrapped GPU sparse matrix keeps its own path.
+_is_wrapped_sparse(A) = false
+
 function do_factorization(alg::QRFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
     if ArrayInterface.can_setindex(typeof(A))
@@ -1031,6 +1038,10 @@ function do_factorization(alg::QRFactorization, A, b, u)
             fact = MinNormQR(qr(copy(transpose(A))))
         elseif A isa GPUArraysCore.AnyGPUArray || is_cusparse(A) || issparsematrixcsc(A)
             fact = qr(A)
+        elseif _is_wrapped_sparse(A)
+            # materialized so every Julia version factors it with SPQR, as the slot is typed;
+            # Julia 1.10's `qr` of the wrapper is a generic dense Householder QR
+            fact = qr(SparseMatrixCSC(A))
         elseif alg.inplace
             if A isa Symmetric
                 fact = qr(A, alg.pivot)

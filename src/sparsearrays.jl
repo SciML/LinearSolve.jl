@@ -24,6 +24,7 @@ using SparseArrays: SparseArrays, AbstractSparseArray, AbstractSparseMatrixCSC,
     SparseMatrixCSC,
     nonzeros, rowvals, getcolptr, sparse, sprand, dropzeros!, nnz
 using SciMLLogging: @SciMLMessage
+using SpecializedDeepcopy: specialized_deepcopy
 
 @static if Base.USE_GPL_LIBS
     using SparseArrays.UMFPACK: UMFPACK_OK, get_umfpack_control,
@@ -1544,7 +1545,7 @@ function _persistent_reduced(
         end
     end
     rcolptr[k + 1] = length(rrowval) + 1
-    reduced = deepcopy(LinearSolve.make_SparseMatrixCSC(A))
+    reduced = specialized_deepcopy(LinearSolve.make_SparseMatrixCSC(A))
     copyto!(getcolptr(reduced), rcolptr)
     resize!(rowvals(reduced), length(rrowval))
     copyto!(rowvals(reduced), rrowval)
@@ -1638,7 +1639,7 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
     # per-solve dropzeros: drop this matrix's own zeros and let the inner solver
     # re-analyze when the pattern changes (no cross-solve union assumed).
     if !red.cache_union
-        new_reduced = deepcopy(LinearSolve.make_SparseMatrixCSC(A))
+        new_reduced = specialized_deepcopy(LinearSolve.make_SparseMatrixCSC(A))
         dropzeros!(new_reduced)
         new_nnz = nnz(new_reduced)
         # `pattern_changed` is load-bearing: a pattern change whose post-dropzeros nnz
@@ -1679,7 +1680,7 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
         if red.auto && red.nstart_zeros > 0 &&
                 activated > LinearSolve.NONPERSISTENT_ZERO_FRACTION * red.nstart_zeros
             red.cache_union = false
-            red.reduced = deepcopy(LinearSolve.make_SparseMatrixCSC(A))
+            red.reduced = specialized_deepcopy(LinearSolve.make_SparseMatrixCSC(A))
             dropzeros!(red.reduced)
             # First per-solve reduction after switching from union caching.
             # No "previous" per-solve result, so no structure change yet.

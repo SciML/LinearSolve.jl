@@ -462,7 +462,7 @@ end
 default_alias_A(::OpenBLAS32MixedLUFactorization, ::Any, ::Any) = false
 default_alias_b(::OpenBLAS32MixedLUFactorization, ::Any, ::Any) = false
 
-const PREALLOCATED_OPENBLAS32_LU = begin
+const PREALLOCATED_OPENBLAS32_LU = let
     A = rand(Float32, 0, 0)
     luinst = ArrayInterface.lu_instance(A), Ref{BlasInt}()
 end

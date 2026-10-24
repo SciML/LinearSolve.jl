@@ -206,6 +206,26 @@ reduction(cache) = cache.cacheval.sparse_reduction
         @test !coff.sparse_reduction.active
     end
 
+    @testset "reduced operand owns its buffers ($nz)" for nz in (
+            NonstructuralZeros.Persistent, NonstructuralZeros.Present,
+        )
+        cache = init(
+            LinearProblem(copy(mats[1]), copy(b)), PureKLUFactorization();
+            assumptions = OperatorAssumptions(true; nonstructural_zeros = nz)
+        )
+        @test solve!(cache).u ≈ refs[1] rtol = 1.0e-8
+        A = cache.A
+        red = cache.sparse_reduction
+        @test red.active
+        reduced = red.reduced
+        @test nonzeros(reduced) !== nonzeros(A)
+        @test rowvals(reduced) !== rowvals(A)
+        @test SparseArrays.getcolptr(reduced) !== SparseArrays.getcolptr(A)
+        before = copy(nonzeros(reduced))
+        fill!(nonzeros(A), 0.0)
+        @test nonzeros(reduced) == before
+    end
+
     @testset "non-square least-squares (default sparse QR) drops zeros" begin
         m, k = 14, 9
         rows = Int[]

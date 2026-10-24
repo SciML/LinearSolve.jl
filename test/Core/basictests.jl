@@ -816,6 +816,16 @@ end
                 @test solve(slow, IterativeSolversJL_CG(maxiter = 3, maxiters = 50)).iters == 3
             end
 
+            @testset "converged solves report Success" begin
+                for f in (
+                        IterativeSolversJL_CG, IterativeSolversJL_GMRES,
+                        IterativeSolversJL_IDRS, IterativeSolversJL_MINRES,
+                        IterativeSolversJL_BICGSTAB,
+                    )
+                    @test solve(prob5, f()).retcode == ReturnCode.Success
+                end
+            end
+
             @testset "re-solve honors reltol (#1318)" begin
                 # The iterables fix `tol = max(reltol * ||r0||, abstol)` at
                 # construction, against whatever initial guess they were handed.

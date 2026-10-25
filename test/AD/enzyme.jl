@@ -305,6 +305,52 @@ end
     @test en_jac ≈ fd_jac rtol = 1.0e-4
 end
 
+function fresolve(A, b, b2, alg)
+    cache = init(LinearProblem(A, b), alg)
+    s = sum(solve!(cache).u)
+    cache.b = b2
+    return s + sum(solve!(cache).u)
+end
+
+# https://github.com/SciML/LinearSolve.jl/issues/1309
+@testset "non-square reverse" begin
+    for (rows, cols) in ((9, 4), (4, 9))
+        A = randn(rows, cols)
+        b = randn(rows)
+        grad_A = ForwardDiff.gradient(X -> sum(X \ b), A)
+        algs = rows > cols ?
+            (
+                SVDFactorization(), QRFactorization(), NormalCholeskyFactorization(),
+                KrylovJL_LSMR(), nothing,
+            ) :
+            (SVDFactorization(), KrylovJL_LSMR())
+        for alg in algs
+            dA = zeros(rows, cols)
+            Enzyme.autodiff(
+                set_runtime_activity(Reverse), fnice, Active,
+                Duplicated(copy(A), dA), Const(b), Const(alg)
+            )
+            @test dA ≈ grad_A rtol = 1.0e-8
+        end
+    end
+
+    # a reused cache rebuilds `A` from the factorization that overwrote it
+    for (rows, cols) in ((9, 4), (4, 9))
+        A, b, b2 = randn(rows, cols), randn(rows), randn(rows)
+        grad_A = ForwardDiff.gradient(X -> sum(X \ b) + sum(X \ b2), A)
+        algs = rows > cols ? (QRFactorization(), SVDFactorization(), nothing) :
+            (SVDFactorization(),)
+        for alg in algs
+            dA = zeros(rows, cols)
+            Enzyme.autodiff(
+                set_runtime_activity(Reverse), fresolve, Active, Duplicated(copy(A), dA),
+                Duplicated(copy(b), zero(b)), Duplicated(copy(b2), zero(b2)), Const(alg)
+            )
+            @test dA ≈ grad_A rtol = 1.0e-8
+        end
+    end
+end
+
 # https://github.com/SciML/LinearSolve.jl/issues/479
 function testls(A, b, u)
     oa = OperatorAssumptions(

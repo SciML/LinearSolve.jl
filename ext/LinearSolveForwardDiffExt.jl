@@ -487,7 +487,7 @@ function __dual_init(
     end
 
     non_partial_cache = init(
-        primal_prob, alg, assumptions, args...;
+        primal_prob, alg, args...;
         alias = alias, abstol = abstol, reltol = reltol,
         maxiters = maxiters, verbose = verbose, Pl = Pl, Pr = Pr, assumptions = assumptions,
         sensealg = sensealg, u0 = new_u0, kwargs...

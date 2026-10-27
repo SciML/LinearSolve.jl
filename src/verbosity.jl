@@ -40,7 +40,7 @@ SciMLLogging.@verbosity_specifier LinearVerbosity begin
             max_iters = Silent(),
         ),
         Minimal = (
-            default_lu_fallback = Silent(),
+            default_lu_fallback = WarnLevel(),
             residual_safety = Silent(),
             no_right_preconditioning = Silent(),
             using_IterativeSolvers = Silent(),

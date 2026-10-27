@@ -763,6 +763,16 @@ let
         LinearProblem(spzeros(3, 3), ones(3)); verbose = quiet
     )
 
+    # OrdinaryDiffEq builds its linear cache with `verbose = integrator.verbose.linear_verbosity`,
+    # which for DEVerbosity's default preset is `LinearVerbosity(Minimal())`.
+    minimal = LinearVerbosity(SciMLLogging.Minimal())
+    @test_logs (:warn, r"falling back to column-pivoted sparse QR") match_mode = :any solve!(
+        init(LinearProblem(spzeros(3, 3), ones(3)); verbose = minimal)
+    )
+    @test_logs (:warn, r"LU factorization failed, falling back to QR") match_mode = :any solve!(
+        init(LinearProblem(A_dense, ones(4)); verbose = minimal)
+    )
+
     if Base.USE_GPL_LIBS
         n = 1_200
         A_big = sparse(sprand(n, n, 0.001) + 1.0 * I)
@@ -789,6 +799,16 @@ let
         A_cplx = sparse(A_cplx)
         @test LinearSolve.spqr_nnz_r_estimate(A_cplx) > 0
         @test solve(LinearProblem(A_cplx, ones(ComplexF64, n))).retcode === ReturnCode.Success
+
+        # The estimate tracks SPQR's real nnz(R) on a KKT saddle-point matrix [K B'; B 0]
+        # (K a 2D Laplacian) with a zero row, like a singular Stokes Newton matrix.
+        m_k = 30
+        T_k = spdiagm(-1 => -ones(m_k - 1), 0 => 2ones(m_k), 1 => -ones(m_k - 1))
+        K_k = kron(T_k, sparse(I, m_k, m_k)) + kron(sparse(I, m_k, m_k), T_k)
+        B_k = sprand(80, m_k^2, 0.01) + sparse(1:80, rand(1:(m_k^2), 80), ones(80), 80, m_k^2)
+        B_k[1, :] .= 0
+        A_kkt = sparse([K_k B_k'; B_k spzeros(80, 80)])
+        @test 0.5 < LinearSolve.spqr_nnz_r_estimate(A_kkt) / nnz(qr(A_kkt).R) < 2
 
         # An estimate that fails (here CHOLMOD rejects the element type) refuses.
         @test LinearSolve.spqr_nnz_r_estimate(sparse(BigFloat.(sprand(10, 10, 0.5) + I))) ==

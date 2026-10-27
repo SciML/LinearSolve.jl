@@ -21,7 +21,7 @@ using Test
         v3_detailed = LinearVerbosity(SciMLLogging.Detailed())
 
         @test v3_all.default_lu_fallback == SciMLLogging.WarnLevel()
-        @test v3_minimal.default_lu_fallback == SciMLLogging.Silent()
+        @test v3_minimal.default_lu_fallback == SciMLLogging.WarnLevel()
         @test v3_minimal.KrylovKit_verbosity == SciMLLogging.Silent()
         @test v3_detailed.KrylovKit_verbosity == SciMLLogging.MessageLevel(2)
     end

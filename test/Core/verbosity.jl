@@ -10,7 +10,7 @@ using Test
     @testset "Default constructor" begin
         v1 = LinearVerbosity()
         @test v1 isa LinearVerbosity
-        @test v1.default_lu_fallback == SciMLLogging.Silent()
+        @test v1.default_lu_fallback == SciMLLogging.WarnLevel()
         @test v1.KrylovKit_verbosity == SciMLLogging.MessageLevel(1)
     end
     @testset "LinearVerbosity constructors" begin

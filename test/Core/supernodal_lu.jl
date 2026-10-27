@@ -394,3 +394,42 @@ end
     @test berr(A2, reused.u, b) <= 10 * berr(A2, fresh.u, b) + 1.0e-18
     @test berr(A2, reused.u, b) < n * eps(Float64)
 end
+
+@testset "in-place pattern edits of the caller's matrix are not mistaken for reuse" begin
+    # Saddle-point [K B'; B 0]: the factor must not share its recorded pattern with a
+    # matrix the caller later edits in place.
+    k = 12
+    T = spdiagm(-1 => -ones(k - 1), 0 => 2 * ones(k), 1 => -ones(k - 1))
+    K = kron(sparse(I, k, k), T) + kron(T, sparse(I, k, k)) + 0.1 * I
+    n = k * k
+    p = n ÷ 4
+    B = sparse(repeat(1:p, inner = 2), [mod1(4i + d, n) for i in 1:p for d in 0:1], 1.0, p, n)
+    A0 = [K B'; B spzeros(p, p)]
+    b = randn(size(A0, 1))
+    alg = SupernodalLUFactorization()
+
+    for edit! in (
+            A -> (nonzeros(A)[7] = 0.0; dropzeros!(A)),
+            A -> (A[1, size(A, 2)] = 2.0),
+        )
+        A = copy(A0)
+        cache = init(LinearProblem(A, b), alg)
+        solve!(cache)
+        edit!(A)
+        cache.A = A
+        sol = solve!(cache)
+        @test sol.retcode == ReturnCode.Success
+        @test norm(A * sol.u - b) < 1.0e-10 * norm(b)
+    end
+
+    # same stored pattern, new values still takes the numeric-only path
+    A = copy(A0)
+    cache = init(LinearProblem(A, b), alg)
+    solve!(cache)
+    F = cache.cacheval
+    nonzeros(A) .*= 1.5
+    cache.A = A
+    sol = solve!(cache)
+    @test cache.cacheval === F
+    @test norm(A * sol.u - b) < 1.0e-10 * norm(b)
+end

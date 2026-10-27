@@ -1384,13 +1384,26 @@ end
 # The symbolic Cholesky factorization of `A'A` gives the column counts of `R` (the
 # fill is `R`'s, since `R'R = A'A`). Measured against SPQR on saddle-point matrices up
 # to `nnz(R) = 5.0e7`, it is 0.75 to 0.97 times the true `nnz(R)` and costs about
-# 0.15 s at that size.
+# 0.15 s at that size. Forming `A'A` is itself unbounded (one dense row gives a dense
+# block), so `nnz(A'A) <= sum(rowcount^2)` is checked first, in O(nnz(A)), and returned
+# as the estimate when it exceeds `SPQR_FALLBACK_MAX_ATA_NNZ`. Any failure of the
+# estimate returns 0 (no bound) rather than throwing.
 @static if Base.USE_GPL_LIBS
     function LinearSolve.spqr_nnz_r_estimate(A::SparseMatrixCSC)
-        AtA = sparse(A' * A)
-        F = SparseArrays.CHOLMOD.symbolic(SparseArrays.CHOLMOD.Sparse(Symmetric(AtA, :L)))
-        counts = unsafe_load(pointer(F)).ColCount
-        return sum(Int, unsafe_wrap(Array, Ptr{eltype(AtA.colptr)}(counts), size(A, 2)))
+        rowcounts = zeros(Int, size(A, 1))
+        for r in rowvals(A)
+            rowcounts[r] += 1
+        end
+        ata_bound = sum(c -> c * c, rowcounts)
+        ata_bound > LinearSolve.SPQR_FALLBACK_MAX_ATA_NNZ[] && return ata_bound
+        try
+            AtA = sparse(A' * A)
+            F = SparseArrays.CHOLMOD.symbolic(SparseArrays.CHOLMOD.Sparse(Hermitian(AtA, :L)))
+            counts = unsafe_load(pointer(F)).ColCount
+            return sum(Int, unsafe_wrap(Array, Ptr{eltype(AtA.colptr)}(counts), size(A, 2)))
+        catch
+            return 0
+        end
     end
 end
 

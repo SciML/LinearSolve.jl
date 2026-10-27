@@ -192,6 +192,10 @@ use_klulike_sparse_structure(A, b) = true
 # 5.0e7), so this caps the fallback at roughly 5 GB.
 const SPQR_FALLBACK_MAX_NNZ_R = Ref(10^8)
 
+# Largest bound on `nnz(A'A)` for which the estimate above forms `A'A` (about 16 bytes
+# per entry); past it the bound itself is returned and the fallback is refused.
+const SPQR_FALLBACK_MAX_ATA_NNZ = Ref(10^8)
+
 # Predicted `nnz(R)` of the SPQR factorization of `A`; zero when it cannot be predicted.
 spqr_nnz_r_estimate(A) = 0
 

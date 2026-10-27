@@ -782,6 +782,35 @@ let
             LinearSolve.SPQR_FALLBACK_MAX_NNZ_R[] = limit
         end
         @test solve(prob).retcode === ReturnCode.Success
+
+        # Complex singular matrix: the estimate must not throw (CHOLMOD needs Hermitian).
+        A_cplx = sparse(sprand(ComplexF64, n, n, 0.001) + 1.0 * I)
+        A_cplx[1, :] .= 0
+        A_cplx = sparse(A_cplx)
+        @test LinearSolve.spqr_nnz_r_estimate(A_cplx) > 0
+        @test solve(LinearProblem(A_cplx, ones(ComplexF64, n))).retcode === ReturnCode.Success
+
+        # A dense row makes `A'A` dense; the bound must refuse before forming it.
+        n_d = 2_000
+        A_row = sparse(1.0 * I, n_d, n_d)
+        A_row[1, :] .= 1
+        A_row[n_d, :] .= 0
+        A_row = sparse(A_row)
+        ata_limit = LinearSolve.SPQR_FALLBACK_MAX_ATA_NNZ[]
+        try
+            LinearSolve.SPQR_FALLBACK_MAX_ATA_NNZ[] = 10^5
+            LinearSolve.SPQR_FALLBACK_MAX_NNZ_R[] = 10^5
+            LinearSolve.spqr_nnz_r_estimate(A_row)
+            @test @allocated(LinearSolve.spqr_nnz_r_estimate(A_row)) < 10^6
+            @test LinearSolve.spqr_nnz_r_estimate(A_row) > 10^5
+            sol_row = @test_logs (:warn, r"SPQR fallback is skipped") match_mode = :any solve(
+                LinearProblem(A_row, ones(n_d))
+            )
+            @test !SciMLBase.successful_retcode(sol_row.retcode)
+        finally
+            LinearSolve.SPQR_FALLBACK_MAX_ATA_NNZ[] = ata_limit
+            LinearSolve.SPQR_FALLBACK_MAX_NNZ_R[] = limit
+        end
     end
 end
 

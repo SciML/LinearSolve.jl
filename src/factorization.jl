@@ -187,6 +187,14 @@ function sparse_colpivqr_factorize end
 # sparse matrices; the generic fallback prefers the pure-Julia option.
 use_klulike_sparse_structure(A, b) = true
 
+# Largest predicted `nnz(R)` for which the default solver's sparse LU -> SPQR fallback
+# runs. SPQR needs about 50 bytes per entry of `R` (measured: 2.4 GB above baseline at
+# 5.0e7), so this caps the fallback at roughly 5 GB.
+const SPQR_FALLBACK_MAX_NNZ_R = Ref(10^8)
+
+# Predicted `nnz(R)` of the SPQR factorization of `A`; zero when it cannot be predicted.
+spqr_nnz_r_estimate(A) = 0
+
 # RF Bad fallback: will fail if `A` is just a stand-in
 # This should instead just create the factorization type.
 function init_cacheval(

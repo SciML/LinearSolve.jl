@@ -857,6 +857,30 @@ is pre-initialized to a `SparseColumnPivotedQRFactorization` of the matching ele
 LU defaults select, so the assignment is type-stable.
 """
 function _do_sparse_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol)
+    # Mirror the KLU/UMFPACK structure split on the QR fallback: less-structured
+    # (KLU-style) matrices fall back to the pure-Julia column-pivoted sparse QR;
+    # more-structured matrices (which would have used UMFPACK) fall back to
+    # SuiteSparse SPQR. Without GPL libraries SPQR is unavailable, so always use
+    # the pure-Julia solver there.
+    use_spqr = Base.USE_GPL_LIBS && !use_klulike_sparse_structure(cache.A, cache.b)
+    if use_spqr
+        # SPQR's fill is unbounded in general (a Stokes Newton matrix took one
+        # process to 32 GB), so refuse when the predicted `R` is too large.
+        nnz_r = spqr_nnz_r_estimate(cache.A)
+        if nnz_r > SPQR_FALLBACK_MAX_NNZ_R[]
+            @SciMLMessage(
+                "Sparse LU failed but the SPQR fallback is skipped: its factor is predicted to have " *
+                    "$nnz_r nonzeros (limit $(SPQR_FALLBACK_MAX_NNZ_R[])), about " *
+                    "$(round(nnz_r * 50 / 2^30; digits = 1)) GiB. Returning the LU failure; " *
+                    "solve with `QRFactorization()` or an iterative method to override.",
+                cache.verbose, :default_lu_fallback
+            )
+            rc = sol.retcode === ReturnCode.Success ? ReturnCode.Failure : sol.retcode
+            return SciMLBase.build_linear_solution(
+                alg, cache.u, nothing, nothing; retcode = rc, iters = sol.iters, stats = nothing
+            )
+        end
+    end
     if reason === :residual_check
         @SciMLMessage(
             "Sparse LU solve residual check failed, falling back to column-pivoted sparse QR. `A` is potentially ill-conditioned.",
@@ -868,12 +892,7 @@ function _do_sparse_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol)
             cache.verbose, :default_lu_fallback
         )
     end
-    # Mirror the KLU/UMFPACK structure split on the QR fallback: less-structured
-    # (KLU-style) matrices fall back to the pure-Julia column-pivoted sparse QR;
-    # more-structured matrices (which would have used UMFPACK) fall back to
-    # SuiteSparse SPQR. Without GPL libraries SPQR is unavailable, so always use
-    # the pure-Julia solver there.
-    if Base.USE_GPL_LIBS && !use_klulike_sparse_structure(cache.A, cache.b)
+    if use_spqr
         qr_fact = qr(convert(AbstractMatrix, cache.A))
         y = _ldiv!(cache.u, qr_fact, cache.b)
         setfield!(cache.cacheval, :QRFactorizationPivoted, qr_fact)

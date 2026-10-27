@@ -1,5 +1,7 @@
 using LinearSolve, RecursiveFactorization, LinearAlgebra, SparseArrays, Test
 using SciMLOperators: FunctionOperator, MatrixOperator, WOperator, has_concretization
+using SciMLLogging: SciMLLogging, Silent
+using LinearSolve: LinearVerbosity
 
 struct CountingIdentityPreconditioner
     calls::Base.RefValue{Int}
@@ -742,6 +744,45 @@ let
     sol_nons = solve(LinearProblem(A_nons, rand(50)))
     @test sol_nons.retcode === ReturnCode.Success
     @test !init(LinearProblem(A_nons, rand(50))).cacheval.fell_back_to_qr
+end
+
+# The LU -> QR fallback changes the algorithm behind the user's back, so it warns by
+# default (and through the same `default_lu_fallback` toggle stays silenceable); the
+# SPQR fallback is also refused when its factor is predicted to be too large, since
+# SPQR fill on a singular saddle-point matrix took one process to 32 GB.
+let
+    A_dense = [1.0 0 0 0; 0 1 0 0; 0 0 1 0; 0 0 0 0]
+    @test_logs (:warn, r"LU factorization failed, falling back to QR") match_mode = :any solve(
+        LinearProblem(A_dense, ones(4))
+    )
+    @test_logs (:warn, r"falling back to column-pivoted sparse QR") match_mode = :any solve(
+        LinearProblem(spzeros(3, 3), ones(3))
+    )
+    quiet = LinearVerbosity(default_lu_fallback = Silent(), solver_failure = Silent())
+    @test_logs min_level = SciMLLogging.Logging.Warn solve(
+        LinearProblem(spzeros(3, 3), ones(3)); verbose = quiet
+    )
+
+    if Base.USE_GPL_LIBS
+        n = 1_200
+        A_big = sparse(sprand(n, n, 0.001) + 1.0 * I)
+        A_big[1, :] .= 0
+        A_big = sparse(A_big)
+        prob = LinearProblem(A_big, ones(n))
+        @test LinearSolve.spqr_nnz_r_estimate(A_big) > 0
+
+        limit = LinearSolve.SPQR_FALLBACK_MAX_NNZ_R[]
+        try
+            LinearSolve.SPQR_FALLBACK_MAX_NNZ_R[] = 1
+            cache = init(prob)
+            sol = @test_logs (:warn, r"SPQR fallback is skipped") match_mode = :any solve!(cache)
+            @test !SciMLBase.successful_retcode(sol.retcode)
+            @test !cache.cacheval.fell_back_to_qr
+        finally
+            LinearSolve.SPQR_FALLBACK_MAX_NNZ_R[] = limit
+        end
+        @test solve(prob).retcode === ReturnCode.Success
+    end
 end
 
 # Regression test for https://github.com/SciML/LinearSolve.jl/issues/991:

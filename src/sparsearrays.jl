@@ -1387,7 +1387,9 @@ end
 # 0.15 s at that size. Forming `A'A` is itself unbounded (one dense row gives a dense
 # block), so `nnz(A'A) <= sum(rowcount^2)` is checked first, in O(nnz(A)), and returned
 # as the estimate when it exceeds `SPQR_FALLBACK_MAX_ATA_NNZ`. Any failure of the
-# estimate returns 0 (no bound) rather than throwing.
+# estimate (out of memory, a CHOLMOD or struct-layout incompatibility) returns
+# `typemax(Int)`: the size is unknown, so the fallback is refused rather than risking
+# the OOM it exists to prevent.
 @static if Base.USE_GPL_LIBS
     function LinearSolve.spqr_nnz_r_estimate(A::SparseMatrixCSC)
         rowcounts = zeros(Int, size(A, 1))
@@ -1399,10 +1401,12 @@ end
         try
             AtA = sparse(A' * A)
             F = SparseArrays.CHOLMOD.symbolic(SparseArrays.CHOLMOD.Sparse(Hermitian(AtA, :L)))
-            counts = unsafe_load(pointer(F)).ColCount
-            return sum(Int, unsafe_wrap(Array, Ptr{eltype(AtA.colptr)}(counts), size(A, 2)))
+            GC.@preserve F begin
+                counts = unsafe_load(pointer(F)).ColCount
+                return sum(Int, unsafe_wrap(Array, Ptr{eltype(AtA.colptr)}(counts), size(A, 2)))
+            end
         catch
-            return 0
+            return typemax(Int)
         end
     end
 end

@@ -790,6 +790,10 @@ let
         @test LinearSolve.spqr_nnz_r_estimate(A_cplx) > 0
         @test solve(LinearProblem(A_cplx, ones(ComplexF64, n))).retcode === ReturnCode.Success
 
+        # An estimate that fails (here CHOLMOD rejects the element type) refuses.
+        @test LinearSolve.spqr_nnz_r_estimate(sparse(BigFloat.(sprand(10, 10, 0.5) + I))) ==
+            typemax(Int)
+
         # A dense row makes `A'A` dense; the bound must refuse before forming it.
         n_d = 2_000
         A_row = sparse(1.0 * I, n_d, n_d)

@@ -1,4 +1,4 @@
-using LinearSolve, LinearAlgebra, SparseArrays, SciMLOperators, Random, Test, Krylov
+using LinearSolve, LinearAlgebra, SparseArrays, SciMLOperators, Random, Test, Krylov, RecursiveArrayTools
 
 function krylov_a_update_solve_allocations(cache, Awork, A)
     copyto!(Awork, A)
@@ -165,4 +165,83 @@ end
     @test sol.iters == fresh.iters
     @test sol.u ≈ fresh.u rtol = 1.0e-10 atol = 1.0e-10
 
+end
+
+
+@testset "KrylovJL rectangular partitioned storage" begin
+    rng = MersenneTwister(1378)
+    A = randn(rng, 6, 3)
+    b = ArrayPartition(randn(rng, 2), randn(rng, 4))
+    for method in (Krylov.lsmr!, Krylov.lsqr!, Krylov.cgls!), partitioned_u in (false, true)
+        @testset "$method, partitioned output $partitioned_u" begin
+            prob = partitioned_u ? LinearProblem(A, b; u0 = ArrayPartition(zeros(3))) : LinearProblem(A, b)
+            cache = init(prob, KrylovJL(; KrylovAlg = method); abstol = 1.0e-12, reltol = 1.0e-12)
+            for scale in (1.0, 2.0)
+                cache.A = scale * A
+                sol = solve!(cache)
+                @test sol.retcode == ReturnCode.Success
+                @test Vector(sol.u) ≈ (scale * A) \ Vector(b) rtol = 1.0e-8
+            end
+        end
+    end
+end
+
+struct KrylovPartitionOperator <: AbstractMatrix{Float64}
+    blocks::Tuple{Matrix{Float64}, Matrix{Float64}}
+end
+Base.size(A::KrylovPartitionOperator) = (sum(size(B, 1) for B in A.blocks), sum(size(B, 2) for B in A.blocks))
+function LinearAlgebra.mul!(y::ArrayPartition, A::KrylovPartitionOperator, x::ArrayPartition)
+    for (yi, Ai, xi) in zip(y.x, A.blocks, x.x)
+        mul!(yi, Ai, xi)
+    end
+    return y
+end
+
+@testset "KrylovJL changed partition layout" begin
+    for alg in (KrylovJL_GMRES(), KrylovJL_CG(), KrylovJL_MINRES())
+        @testset "$(alg.KrylovAlg)" begin
+            operator(parts) = KrylovPartitionOperator((2.0 * Matrix(I, parts[1], parts[1]), 3.0 * Matrix(I, parts[2], parts[2])))
+            rhs(parts) = ArrayPartition(ones(parts[1]), ones(parts[2]))
+            cache = init(LinearProblem(operator((2, 3)), rhs((2, 3))), alg; abstol = 1.0e-12, reltol = 1.0e-12)
+            for parts in ((2, 3), (3, 2))
+                cache.A = operator(parts)
+                cache.b = rhs(parts)
+                cache.u = zero(cache.b)
+                sol = solve!(cache)
+                @test sol.retcode == ReturnCode.Success
+                @test Vector(sol.u) ≈ vcat(fill(1 / 2, parts[1]), fill(1 / 3, parts[2])) rtol = 1.0e-8
+            end
+        end
+    end
+end
+
+@testset "KrylovJL retry after callback exception" begin
+    for constructor in (KrylovJL_GMRES, KrylovJL_FGMRES), update_A in (false, true)
+        @testset "$constructor, update A $update_A" begin
+            throw_once = Ref(true)
+            callback = _ -> begin
+                if throw_once[]
+                    throw_once[] = false
+                    error("callback interrupted solve")
+                end
+                return false
+            end
+            A = Diagonal(collect(1.0:60.0))
+            b = ones(60)
+            alg = constructor(; warm_start = LinearSolve.WarmStart.Previous, callback)
+            cache = init(LinearProblem(A, b; u0 = fill(1.0e6, 60)), alg; abstol = 1.0e-12, reltol = 1.0e-12)
+            @test_throws ErrorException solve!(cache)
+            fill!(cache.u, 0)
+            A2 = update_A ? Diagonal(collect(2.0:61.0)) : A
+            b2 = collect(1.0:60.0)
+            if update_A
+                cache.A = A2
+            end
+            cache.b = b2
+            sol = solve!(cache)
+            @test sol.retcode == ReturnCode.Success
+            @test norm(A2 * sol.u - b2) / norm(b2) < 1.0e-8
+            @test sol.u ≈ b2 ./ diag(A2) rtol = 1.0e-8
+        end
+    end
 end

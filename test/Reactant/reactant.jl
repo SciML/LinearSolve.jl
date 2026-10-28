@@ -2,6 +2,10 @@ using LinearSolve
 using Reactant
 using Test
 
+# XLA hands julia_callbacks device buffers on CUDA-capable backends, which
+# Reactant only wraps when its CUDA extension is loaded; this env has no CUDA.jl.
+Reactant.set_default_backend("cpu")
+
 function solve_once(A, b)
     return solve(LinearProblem(A, b)).u
 end

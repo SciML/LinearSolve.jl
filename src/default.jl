@@ -42,6 +42,7 @@ mutable struct DefaultLinearSolverInit{
     residual_buf::Tb  # pre-allocated buffer for post-solve residual check (same size/type as b)
     a_backup_allocated::Bool  # true once A_backup has been replaced with a private buffer
     fell_back_to_qr::Bool  # true after QR fallback; reuse QR until matrix is refreshed
+    warned_lu_fallback::Bool  # true once this cache has reported an LU fallback; never reset, so a solve that falls back at every step warns once
     # Persistent-nonstructural-zero reduction state, shared across the sparse
     # sub-algorithm slots (the two sparse LU slots + the QR fallback all factor
     # matrix). `nothing` when inactive / non-sparse. See `init_sparse_reduction`.
@@ -696,7 +697,7 @@ end
     end
     return Expr(
         :call, :DefaultLinearSolverInit, caches...,
-        :A_original, :(similar(b)), false, false,
+        :A_original, :(similar(b)), false, false, false,
         :(init_sparse_reduction(A, assump))
     )
 end
@@ -790,21 +791,24 @@ function _do_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol)
             alg, cache.u, nothing, nothing; retcode = rc, iters = iters, stats = nothing
         )
     end
-    if reason === :residual_check
-        @SciMLMessage(
-            "LU solve residual check failed, falling back to QR factorization. `A` is potentially ill-conditioned.",
-            cache.verbose, :default_lu_fallback
-        )
-    elseif reason === :qr_rank_deficient
-        @SciMLMessage(
-            "Unpivoted QR detected a rank-deficient `A`, falling back to column-pivoted QR so the least-squares solution matches `A \\ b`.",
-            cache.verbose, :default_lu_fallback
-        )
-    else
-        @SciMLMessage(
-            "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.",
-            cache.verbose, :default_lu_fallback
-        )
+    if !cache.cacheval.warned_lu_fallback
+        if reason === :residual_check
+            @SciMLMessage(
+                "LU solve residual check failed, falling back to QR factorization. `A` is potentially ill-conditioned.",
+                cache.verbose, :default_lu_fallback
+            )
+        elseif reason === :qr_rank_deficient
+            @SciMLMessage(
+                "Unpivoted QR detected a rank-deficient `A`, falling back to column-pivoted QR so the least-squares solution matches `A \\ b`.",
+                cache.verbose, :default_lu_fallback
+            )
+        else
+            @SciMLMessage(
+                "LU factorization failed, falling back to QR factorization. `A` is potentially rank-deficient.",
+                cache.verbose, :default_lu_fallback
+            )
+        end
+        cache.cacheval.warned_lu_fallback = true
     end
     copyto!(cache.A, cache.cacheval.A_backup)
     cache.isfresh = true
@@ -863,34 +867,43 @@ function _do_sparse_qr_fallback(cache::LinearCache, alg, sol, reason::Symbol)
     # SuiteSparse SPQR. Without GPL libraries SPQR is unavailable, so always use
     # the pure-Julia solver there.
     use_spqr = Base.USE_GPL_LIBS && !use_klulike_sparse_structure(cache.A, cache.b)
+    nnz_r = 0
     if use_spqr
         # SPQR's fill is unbounded in general (a Stokes Newton matrix took one
         # process to 32 GB), so refuse when the predicted `R` is too large.
         nnz_r = spqr_nnz_r_estimate(cache.A)
         if nnz_r > SPQR_FALLBACK_MAX_NNZ_R[]
-            @SciMLMessage(
-                "Sparse LU failed but the SPQR fallback is skipped: its factor is predicted to have " *
-                    "$nnz_r nonzeros (limit $(SPQR_FALLBACK_MAX_NNZ_R[])), about " *
-                    "$(round(nnz_r * 50 / 2^30; digits = 1)) GiB. Returning the LU failure; " *
-                    "solve with `QRFactorization()` or an iterative method to override.",
-                cache.verbose, :default_lu_fallback
-            )
+            if !cache.cacheval.warned_lu_fallback
+                @SciMLMessage(
+                    "Sparse LU failed but the SPQR fallback is skipped: its factor is predicted to have " *
+                        "$nnz_r nonzeros (limit $(SPQR_FALLBACK_MAX_NNZ_R[])), about " *
+                        "$(round(nnz_r * 50 / 2^30; digits = 1)) GiB. Returning the LU failure; " *
+                        "solve with `QRFactorization()` or an iterative method to override.",
+                    cache.verbose, :default_lu_fallback
+                )
+                cache.cacheval.warned_lu_fallback = true
+            end
             rc = sol.retcode === ReturnCode.Success ? ReturnCode.Failure : sol.retcode
             return SciMLBase.build_linear_solution(
                 alg, cache.u, nothing, nothing; retcode = rc, iters = sol.iters, stats = nothing
             )
         end
     end
-    if reason === :residual_check
-        @SciMLMessage(
-            "Sparse LU solve residual check failed, falling back to column-pivoted sparse QR. `A` is potentially ill-conditioned.",
-            cache.verbose, :default_lu_fallback
-        )
-    else
-        @SciMLMessage(
-            "Sparse LU factorization failed, falling back to column-pivoted sparse QR. `A` is potentially rank-deficient or numerically singular.",
-            cache.verbose, :default_lu_fallback
-        )
+    if !cache.cacheval.warned_lu_fallback
+        spqr_note = use_spqr ?
+            " Predicted SPQR nnz(R) = $nnz_r (limit $(SPQR_FALLBACK_MAX_NNZ_R[]))." : ""
+        if reason === :residual_check
+            @SciMLMessage(
+                "Sparse LU solve residual check failed, falling back to column-pivoted sparse QR. `A` is potentially ill-conditioned." * spqr_note,
+                cache.verbose, :default_lu_fallback
+            )
+        else
+            @SciMLMessage(
+                "Sparse LU factorization failed, falling back to column-pivoted sparse QR. `A` is potentially rank-deficient or numerically singular." * spqr_note,
+                cache.verbose, :default_lu_fallback
+            )
+        end
+        cache.cacheval.warned_lu_fallback = true
     end
     if use_spqr
         qr_fact = qr(convert(AbstractMatrix, cache.A))
@@ -951,7 +964,7 @@ function _default_sparse_lu_solve_with_fallback(
             return _do_sparse_qr_fallback(cache, alg, sol, :lu_failure)
         end
         if sol.retcode === ReturnCode.Success && any(!isfinite, sol.u)
-            @SciMLMessage(
+            cache.cacheval.warned_lu_fallback || @SciMLMessage(
                 "Sparse LU solve produced non-finite values (NaN/Inf), falling back to SPQR. Matrix is likely near-singular.",
                 cache.verbose, :default_lu_fallback
             )
@@ -986,7 +999,7 @@ function _default_lu_solve_with_fallback(
             return _do_qr_fallback(cache, alg, sol, :lu_failure)
         end
         if sol.retcode === ReturnCode.Success && any(!isfinite, sol.u)
-            @SciMLMessage(
+            cache.cacheval.warned_lu_fallback || @SciMLMessage(
                 "LU solve produced non-finite values (NaN/Inf), falling back to QR. Matrix is likely near-singular.",
                 cache.verbose, :default_lu_fallback
             )

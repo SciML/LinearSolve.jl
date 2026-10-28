@@ -763,6 +763,16 @@ let
         LinearProblem(spzeros(3, 3), ones(3)); verbose = quiet
     )
 
+    # A solve that falls back at every step (e.g. a DAE Newton loop) warns once per cache.
+    only_fallback = LinearVerbosity(solver_failure = Silent())
+    cache_once = init(LinearProblem(spzeros(3, 3), ones(3)); verbose = only_fallback)
+    @test_logs (:warn, r"falling back to column-pivoted sparse QR") solve!(cache_once)
+    cache_once.A = spzeros(3, 3)
+    @test_logs min_level = SciMLLogging.Logging.Warn solve!(cache_once)
+    @test cache_once.cacheval.fell_back_to_qr
+    cache_new = init(LinearProblem(spzeros(3, 3), ones(3)); verbose = only_fallback)
+    @test_logs (:warn, r"falling back to column-pivoted sparse QR") solve!(cache_new)
+
     # OrdinaryDiffEq builds its linear cache with `verbose = integrator.verbose.linear_verbosity`,
     # which for DEVerbosity's default preset is `LinearVerbosity(Minimal())`.
     minimal = LinearVerbosity(SciMLLogging.Minimal())
@@ -780,6 +790,8 @@ let
         A_big = sparse(A_big)
         prob = LinearProblem(A_big, ones(n))
         @test LinearSolve.spqr_nnz_r_estimate(A_big) > 0
+
+        @test_logs (:warn, r"Predicted SPQR nnz\(R\) = \d+ \(limit 100000000\)") match_mode = :any solve(prob)
 
         limit = LinearSolve.SPQR_FALLBACK_MAX_NNZ_R[]
         try

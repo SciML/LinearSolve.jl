@@ -394,3 +394,70 @@ end
     @test berr(A2, reused.u, b) <= 10 * berr(A2, fresh.u, b) + 1.0e-18
     @test berr(A2, reused.u, b) < n * eps(Float64)
 end
+
+@testset "in-place pattern edits of the caller's matrix are not mistaken for reuse" begin
+    # Saddle-point [K B'; B 0]: the factor must not share its recorded pattern with a
+    # matrix the caller later edits in place.
+    k = 12
+    T = spdiagm(-1 => -ones(k - 1), 0 => 2 * ones(k), 1 => -ones(k - 1))
+    K = kron(sparse(I, k, k), T) + kron(T, sparse(I, k, k)) + 0.1 * I
+    n = k * k
+    p = n ÷ 4
+    B = sparse(repeat(1:p, inner = 2), [mod1(4i + d, n) for i in 1:p for d in 0:1], 1.0, p, n)
+    A0 = [K B'; B spzeros(p, p)]
+    b = randn(size(A0, 1))
+    alg = SupernodalLUFactorization()
+    A_small = copy(A0)
+    A_small[1, 2] = 0.0
+    A_small[2, 1] = 0.0
+    dropzeros!(A_small)
+
+    for edit! in (
+            A -> (nonzeros(A)[7] = 0.0; dropzeros!(A)),
+            A -> (A[1, size(A, 2)] = 2.0),
+            # an in-place copy of a matrix with a smaller stored pattern, as a Newton
+            # matrix refreshed from a Jacobian does
+            A -> copyto!(A, A_small),
+        )
+        A = copy(A0)
+        cache = init(LinearProblem(A, b), alg)
+        solve!(cache)
+        edit!(A)
+        cache.A = A
+        sol = solve!(cache)
+        @test sol.retcode == ReturnCode.Success
+        @test norm(A * sol.u - b) < 1.0e-10 * norm(b)
+    end
+
+    # same stored pattern, new values still takes the numeric-only path
+    A = copy(A0)
+    cache = init(LinearProblem(A, b), alg)
+    solve!(cache)
+    F = cache.cacheval
+    nonzeros(A) .*= 1.5
+    cache.A = A
+    sol = solve!(cache)
+    @test cache.cacheval === F
+    @test norm(A * sol.u - b) < 1.0e-10 * norm(b)
+end
+
+# DFG channel Newton matrix (16430 unknowns) from the FiniteElementMethod station, whose
+# stored pattern is smaller than the Jacobian prototype the cache was analyzed on.  Not
+# committed (10 MB): set LINEARSOLVE_DFG_W_FIXTURE to the serialized `W_first_fail.jls`.
+if haskey(ENV, "LINEARSOLVE_DFG_W_FIXTURE")
+    @testset "DFG Newton matrix shrinking in place" begin
+        using Serialization
+        d = deserialize(ENV["LINEARSOLVE_DFG_W_FIXTURE"])
+        W = SparseMatrixCSC(d.m, d.n, d.colptr, d.rowval, d.nzval)
+        rng = MersenneTwister(2)
+        extra = rand(rng, 1:d.n, 60000)
+        wi, wj, wv = findnz(W)
+        A = sparse([wi; extra], [wj; rand(rng, 1:d.n, 60000)], [wv; zeros(60000)], d.n, d.n)
+        b = randn(rng, d.n)
+        cache = init(LinearProblem(A, b), SupernodalLUFactorization())
+        solve!(cache)
+        copyto!(A, W)
+        cache.A = A
+        @test solve!(cache) isa LinearSolve.SciMLBase.LinearSolution
+    end
+end

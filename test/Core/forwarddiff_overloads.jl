@@ -840,6 +840,30 @@ end
     @test ≈(sol3, Matrix(A2) \ b2, rtol = 1.0e-9)
 end
 
+@testset "DualLinearCache reinit! refactorizes only when A changes" begin
+    A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
+    new_A, new_b = h([ForwardDiff.Dual(2.0, 1.0, 0.0), ForwardDiff.Dual(2.0, 0.0, 1.0)])
+    # RFLU factorizes its copy of A in place, so a needless refactorization
+    # would factorize the LU factors and give wrong values, not just slow ones.
+    @testset "$label" for (label, A0, A1, alg) in (
+            ("Float64 A", ForwardDiff.value.(A), ForwardDiff.value.(new_A), RFLUFactorization()),
+            ("Dual A, split path", A, new_A, RFLUFactorization()),
+            ("Dual A, direct path", A, new_A, GenericLUFactorization()),
+        )
+        cache = init(LinearProblem(copy(A0), b), alg)
+        solve!(cache)
+
+        reinit!(cache; b = new_b)
+        @test !cache.isfresh
+        @test dual_isapprox(solve!(cache).u, A0 \ new_b; rtol = 1.0e-9)
+
+        reinit!(cache; A = copy(A1), reuse_precs = true)
+        @test cache.isfresh
+        @test !cache.precsisfresh
+        @test dual_isapprox(solve!(cache).u, A1 \ new_b; rtol = 1.0e-9)
+    end
+end
+
 struct ReinterpretTestTag end
 
 @testset "Default algorithm selection uses primal values (issue with reinterpret-wrapped duals)" begin

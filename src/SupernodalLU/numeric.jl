@@ -53,6 +53,8 @@ mutable struct SupernodalLUFactor{Tv, Ti <: Integer}
     rowsfac::Vector{Vector{Int}}     # rows[s] relabelled to factor rows
     nperturbed::Int
     anorm::Float64                   # ‖M‖_max (NaN for non-Float64-convertible Tv)
+    anorm1::Float64                  # ‖A‖₁ for post-solve ber (NaN if unavailable)
+    anorminf::Float64                # ‖A‖∞ for post-solve ber (NaN if unavailable)
     eps_pivot::Float64
     A::SparseMatrixCSC{Tv, Ti}       # original matrix (iterative refinement)
     work::Vector{Tv}                 # solve workspace (length n)
@@ -489,6 +491,36 @@ function _factor_core!(F::SupernodalLUFactor{Tv}) where {Tv}
     @inbounds for k in 1:n
         F.p[k] = qf[prow[k]]
     end
+    _store_ber_anorms!(F)
+    return F
+end
+
+# ‖A‖₁ / ‖A‖∞ once per factorization for the post-solve backward-error check.
+function _store_ber_anorms!(F::SupernodalLUFactor{Tv}) where {Tv}
+    A = F.A
+    n = size(A, 1)
+    cp = getcolptr(A)
+    rv = rowvals(A)
+    xv = nonzeros(A)
+    Tr = typeof(abs(zero(Tv)))
+    anorm1 = zero(Tr)
+    @inbounds for j in 1:n
+        s = zero(Tr)
+        for p in cp[j]:(cp[j + 1] - 1)
+            s += abs(xv[p])
+        end
+        anorm1 = max(anorm1, s)
+    end
+    r = F.ir_r
+    fill!(r, zero(Tv))
+    @inbounds for j in 1:n
+        for p in cp[j]:(cp[j + 1] - 1)
+            r[rv[p]] += abs(xv[p])
+        end
+    end
+    anorminf = maximum(abs, r; init = zero(Tr))
+    F.anorm1 = _scalarval(anorm1)
+    F.anorminf = _scalarval(anorminf)
     return F
 end
 

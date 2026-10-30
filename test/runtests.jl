@@ -90,6 +90,7 @@ else
             @time @safetestset "FixedSizeArrays" include("Core/fixedsizearrays.jl")
             @time @safetestset "ComponentArrays" include("Core/componentarrays.jl")
             @time @safetestset "Adjoint Sensitivity" include("Core/adjoint.jl")
+            @time @safetestset "QR Adjoint" include("Core/qr_adjoint.jl")
             @time @safetestset "ForwardDiff Overloads" include("Core/forwarddiff_overloads.jl")
             @time @safetestset "ForwardDiff GPU Arrays" include("Core/forwarddiff_gpu.jl")
             @time @safetestset "Traits" include("Core/traits.jl")

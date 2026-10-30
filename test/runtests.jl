@@ -9,7 +9,7 @@ const HAS_EXTENSIONS = true
 
 # Note on the dependency direction: LinearSolve is an "inverted-leaf" monorepo.
 # The root LinearSolve package does NOT depend on its lib/* sublibraries;
-# instead each sublibrary (LinearSolveAutotune, LinearSolvePyAMG) depends on the
+# instead each sublibrary (LinearSolveAutotune, LinearSolvePyAMG, BorderedLinearSolve) depends on the
 # root LinearSolve via its own [sources] entry. That is why the root Project.toml
 # has no [sources] section pointing at lib/* (the sublibs are not root deps).
 lib_dir = joinpath(dirname(@__DIR__), "lib")

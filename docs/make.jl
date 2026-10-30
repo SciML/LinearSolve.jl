@@ -1,6 +1,7 @@
 using LinearSolve
 using LinearSolveAutotune
 using LinearSolvePyAMG
+using BorderedLinearSolve
 using CommonSolve
 using SparseArrays
 using Documenter
@@ -20,6 +21,7 @@ makedocs(
         LinearSolve,
         LinearSolveAutotune,
         LinearSolvePyAMG,
+        BorderedLinearSolve,
         LinearSolve.KLU,
     ],
     clean = true, doctest = true, linkcheck = true, checkdocs = :exports,

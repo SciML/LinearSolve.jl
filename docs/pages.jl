@@ -28,7 +28,7 @@ pages = [
     ],
     "Solvers" => Any[
         "solvers/solvers.md", "solvers/eigenvalue_solvers.md",
-        "solvers/low_rank_solvers.md",
+        "solvers/low_rank_solvers.md", "solvers/bordered_solvers.md",
     ],
     "Advanced" => Any[
         "advanced/algorithm_interface.md",

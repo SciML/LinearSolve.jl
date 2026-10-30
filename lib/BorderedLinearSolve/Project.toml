@@ -1,6 +1,6 @@
 name = "BorderedLinearSolve"
 uuid = "23d1bec0-83c1-45bc-b5ed-38c76e62a0b7"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Jash Ambaliya"]
 
 [deps]

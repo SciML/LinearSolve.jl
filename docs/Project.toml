@@ -17,7 +17,7 @@ LinearSolvePyAMG = {path = "../lib/LinearSolvePyAMG"}
 
 [compat]
 BlockDiagonals = "0.2"
-BorderedLinearSolve = "0.1"
+BorderedLinearSolve = "1"
 CommonSolve = "0.2"
 Documenter = "1"
 LinearSolve = "5"

@@ -30,7 +30,7 @@ this method for all but the smallest dense BLAS-eltype matrices.
     On other platforms, or if the framework cannot be opened, `solve!` with this algorithm
     errors that the AppleAccelerate binary is missing.
 """
-struct AppleAccelerateLUFactorization <: AbstractFactorization
+struct AppleAccelerateLUFactorization <: AbstractDenseFactorization
     residualsafety::Bool
 end
 

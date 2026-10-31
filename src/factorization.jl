@@ -782,7 +782,17 @@ function init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    return ArrayInterface.lu_instance(convert(AbstractMatrix, A))
+    Amat = convert(AbstractMatrix, A)
+    luinst = ArrayInterface.lu_instance(Amat)
+    # `lu_instance` rebuilds scalars via `zero`, dropping ReverseDiff origin tags;
+    # live `lu!` keeps `eltype(A)`, so match that (and the instance's pivot type).
+    if luinst isa LinearAlgebra.LU && eltype(luinst) !== eltype(Amat)
+        factors = similar(Amat, 0, 0)
+        return LinearAlgebra.LU{eltype(Amat), typeof(factors), typeof(luinst.ipiv)}(
+            factors, similar(luinst.ipiv, 0), luinst.info
+        )
+    end
+    return luinst
 end
 
 function init_cacheval(

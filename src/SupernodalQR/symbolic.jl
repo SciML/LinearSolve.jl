@@ -574,20 +574,39 @@ struct QRSymbolic
     relax::Bool
     maxsuper::Int
     singletons::Bool
+    # private snapshot of the analyzed pattern of A (never aliases the user's
+    # arrays, so an in-place pattern change is still detected)
+    colptr::Vector{Int}
+    rowval::Vector{Int}
 end
 
 # Default dead-column tolerance, SPQR's rule 20 (m + n) eps max_j ‖B[:, j]‖.
+# The column norms are accumulated scaled by each column's largest magnitude
+# (as LAPACK's nrm2), so squaring huge or tiny entries cannot overflow or
+# underflow the tolerance of a well-scaled matrix.
 function _default_tol(A::SparseMatrixCSC{Tv}, transposed::Bool) where {Tv}
     Tr = real(float(Tv))
     mA, nA = size(A)
-    c2 = zeros(Tr, transposed ? mA : nA)
+    nc = transposed ? mA : nA
+    scale = zeros(Tr, nc)
+    ssq = zeros(Tr, nc)
     Ai = rowvals(A)
     Ax = nonzeros(A)
     Ap = getcolptr(A)
     @inbounds for j in 1:nA, p in Ap[j]:(Ap[j + 1] - 1)
-        c2[transposed ? Ai[p] : j] += abs2(Ax[p])
+        c = transposed ? Ai[p] : j
+        scale[c] = max(scale[c], Tr(abs(Ax[p])))
     end
-    mx = isempty(c2) ? zero(Tr) : sqrt(maximum(c2))
+    @inbounds for j in 1:nA, p in Ap[j]:(Ap[j + 1] - 1)
+        c = transposed ? Ai[p] : j
+        sc = scale[c]
+        (iszero(sc) || !isfinite(sc)) && continue
+        ssq[c] += abs2(Ax[p] / sc)
+    end
+    mx = zero(Tr)
+    @inbounds for c in 1:nc
+        mx = max(mx, isfinite(scale[c]) ? scale[c] * sqrt(ssq[c]) : scale[c])
+    end
     return 20 * (mA + nA) * eps(Tr) * mx
 end
 
@@ -780,6 +799,7 @@ function snqr_symbolic(
     return QRSymbolic(
         mB, nB, nmf, transposed, srow, scol, spos, ecol, colpos, qf, parentF, sstart,
         cols, snof, sparent, chp, chld, frp, fri, brp, bcol, brpos, mfest,
-        maxnp, maxnu, ordering, relax, maxsuper, singletons
+        maxnp, maxnu, ordering, relax, maxsuper, singletons,
+        Vector{Int}(getcolptr(A)), Vector{Int}(rowvals(A))
     )
 end

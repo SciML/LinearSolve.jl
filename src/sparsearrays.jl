@@ -1049,12 +1049,32 @@ function LinearSolve.init_cacheval(
     end
 end
 
+# Adjoint / transpose wrappers of a sparse matrix (e.g. the operand of the generic
+# adjoint fallback, which solves `LinearProblem(adjoint(A), b)`) are materialized
+# to CSC, so the cacheval is the same concrete factorization type.
+function LinearSolve.init_cacheval(
+        alg::SupernodalQRFactorization,
+        A::Union{
+            LinearAlgebra.Adjoint{T, <:SparseArrays.AbstractSparseMatrixCSC{T, Ti}},
+            LinearAlgebra.Transpose{T, <:SparseArrays.AbstractSparseMatrixCSC{T, Ti}},
+        },
+        b, u, Pl, Pr, maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    ) where {T <: Number, Ti <: Integer}
+    return SNQR.snqr(SparseMatrixCSC{T, Ti}(0, 0, [one(Ti)], Ti[], T[]))
+end
+
+# The pattern is compared against the factorization's own snapshot: `F.A` shares
+# its index arrays with `cache.A`, so it would follow an in-place pattern change.
 function LinearSolve.pattern_changed(
         F::SNQR.SupernodalQRFactor, A::SparseArrays.AbstractSparseMatrixCSC
     )
-    Aold = F.A
-    return getcolptr(Aold) != getcolptr(A) || rowvals(Aold) != rowvals(A)
+    return !SNQR.same_pattern(F, A)
 end
+
+_snqr_csc(A::SparseArrays.AbstractSparseMatrixCSC) =
+    SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A))
+_snqr_csc(A::AbstractMatrix) = SparseMatrixCSC(A)
 
 function SciMLBase.solve!(
         cache::LinearSolve.LinearCache, alg::SupernodalQRFactorization; kwargs...
@@ -1062,7 +1082,7 @@ function SciMLBase.solve!(
     A = cache.A
     A = LinearSolve.reduce_operand!(cache.sparse_reduction, A)
     A = convert(AbstractMatrix, A)
-    As = SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A))
+    As = _snqr_csc(A)
     if cache.isfresh
         cacheval = LinearSolve.@get_cacheval(cache, :SupernodalQRFactorization)
         fact = if alg.reuse_symbolic && size(cacheval) == size(As) &&

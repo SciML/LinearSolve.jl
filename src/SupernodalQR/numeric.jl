@@ -59,7 +59,8 @@ mutable struct SupernodalQRFactor{Tv, Tr <: Real, Ti <: Integer}
     nrefl::Vector{Int}
     rank::Int
     tol::Tr                        # dead-column threshold of the last factorization
-    usertol::Tr                    # requested threshold; negative = SPQR default rule
+    usertol::Tr                    # requested threshold (used iff !defaulttol; negative = no rank detection)
+    defaulttol::Bool               # `tol = nothing`: SPQR's default rule, recomputed per factorization
     relmap::Vector{Int}            # multifrontal column -> front column
     dead::Vector{Int}              # dead multifrontal columns
     deadidx::Vector{Int}           # multifrontal column -> index into `dead`, 0 if live
@@ -100,9 +101,10 @@ LinearAlgebra.rank(F::SupernodalQRFactor) = F.rank
     return F.sym.transposed ? conj(v) : v
 end
 
-# Dead-column tolerance: an explicit `usertol` ≥ 0, else the SPQR rule.
+# Dead-column tolerance: the SPQR rule for `tol = nothing`, else the explicit
+# `usertol` (a negative value disables rank detection: no pivot is ever dead).
 function _set_tol!(F::SupernodalQRFactor{Tv, Tr}) where {Tv, Tr}
-    F.tol = F.usertol >= 0 ? F.usertol : Tr(_default_tol(F.A, F.sym.transposed))
+    F.tol = F.defaulttol ? Tr(_default_tol(F.A, F.sym.transposed)) : F.usertol
     return F.tol
 end
 

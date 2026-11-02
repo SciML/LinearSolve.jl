@@ -213,3 +213,57 @@ end
         @test X * solve!(cache).u ≈ b
     end
 end
+
+@testset "SupernodalQRFactorization regressions" begin
+    alg = SupernodalQRFactorization()
+
+    # in-place pattern change (same object, same nnz) must not reuse the stale analysis
+    A = spdiagm(0 => [2.0, 3.0, 4.0])
+    b = [2.0, 3.0, 4.0]
+    cache = init(LinearProblem(A, b), alg)
+    @test solve!(cache).u ≈ [1.0, 1.0, 1.0]
+    rowvals(cache.A)[1:2] .= [2, 1]
+    cache.A = cache.A
+    @test solve!(cache).u ≈ Matrix(cache.A) \ b
+
+    # scale invariance: the default tolerance must not overflow on huge entries
+    for s in (1.0e200, 1.0e-200)
+        A = sparse(s .* [2.0 1.0; 1.0 2.0; 1.0 -1.0])
+        sol = solve(LinearProblem(A, A * [1.0, 1.0]), alg)
+        @test sol.u ≈ [1.0, 1.0]
+        F = SNQR.snqr(A)
+        @test rank(F) == 2
+        @test isfinite(F.tol)
+        Fw = SNQR.snqr(sparse(A'); wide = :minnorm)
+        @test isfinite(Fw.tol)
+        @test rank(Fw) == 2
+    end
+
+    # real factor, complex right-hand sides (vector and matrix)
+    A = sparse([3.0 1.0; 1.0 2.0; 1.0 -1.0])
+    x = ComplexF64[1 + 2im, 3 - im]
+    @test solve(LinearProblem(A, A * x), alg).u ≈ x
+    X = ComplexF64[1+2im 1; 3-im 2im]
+    @test solve(LinearProblem(A, A * X), alg).u ≈ X
+    @test SNQR.snqr(A) \ (A * x) ≈ x
+
+    # an explicit negative tol disables rank detection on every refactorization
+    A = spdiagm(0 => [1.0, 1.0e-16])
+    b = [1.0, 1.0e-16]
+    cache = init(LinearProblem(A, b), SupernodalQRFactorization(tol = -1.0))
+    @test solve!(cache).u ≈ [1.0, 1.0]
+    cache.A = copy(A)
+    @test solve!(cache).u ≈ [1.0, 1.0]
+    @test rank(cache.cacheval) == 2
+    # while the default tol still drops the tiny pivot
+    @test solve(LinearProblem(A, b), alg).u ≈ [1.0, 0.0]
+
+    # public adjoint route (generic fallback factorizes adjoint(A))
+    for T in (Float64, ComplexF64)
+        A = sparse(T[3 2; 1 4] .+ (T <: Complex ? T[1im 0; 0 -2im] : zeros(T, 2, 2)))
+        b = T[1, 2]
+        cache = init(LinearProblem(A, b), alg)
+        solve!(cache)
+        @test solve!(cache; adjoint = true).u ≈ Matrix(A)' \ b
+    end
+end

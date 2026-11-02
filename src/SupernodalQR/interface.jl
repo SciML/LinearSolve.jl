@@ -65,11 +65,11 @@ function snqr(
         vend[s] = Vector{Int}(undef, min(mf, nf))
         frows[s] = Vector{Int}(undef, mf)
     end
-    usertol = tol === nothing ? -one(Tr) : Tr(tol)
+    usertol = tol === nothing ? zero(Tr) : Tr(tol)
     maxmf = ns == 0 ? 0 : maximum(sym.mfest)
     F = SupernodalQRFactor{Tv, Tr, Ti}(
         sym, A, fronts, taus, hcol, vend, frows, zeros(Int, ns), zeros(Int, ns),
-        0, zero(Tr), usertol, zeros(Int, sym.nmf),
+        0, zero(Tr), usertol, tol === nothing, zeros(Int, sym.nmf),
         Int[], zeros(Int, sym.nmf), _empty_chol(Tv),
         Matrix{Tv}[], Vector{Int}[],
         Int[], Int[], Tv[], Tv[], Int[], Int[], Int[],
@@ -97,7 +97,7 @@ function snqr!(F::SupernodalQRFactor{Tv}, A::SparseMatrixCSC{Tv}) where {Tv}
     _set_tol!(F)
     if !_singletons_ok(F)
         sym = F.sym
-        tol = F.usertol >= 0 ? F.usertol : nothing
+        tol = F.defaulttol ? nothing : F.usertol
         G = snqr(
             snqr_symbolic(
                 A; ordering = sym.ordering, relax = sym.relax,
@@ -111,6 +111,18 @@ function snqr!(F::SupernodalQRFactor{Tv}, A::SparseMatrixCSC{Tv}) where {Tv}
         return F
     end
     return _factor_core!(F)
+end
+
+"""
+    same_pattern(F::SupernodalQRFactor, A) -> Bool
+
+Whether `A` has the sparsity pattern `F` was analyzed for.  Compared against
+a private snapshot taken at analysis time, so this also detects in-place
+pattern changes to arrays that `F.A` shares with `A`.
+"""
+function same_pattern(F::SupernodalQRFactor, A::SparseMatrixCSC)
+    sym = getfield(F, :sym)
+    return getcolptr(A) == sym.colptr && rowvals(A) == sym.rowval
 end
 
 Base.size(F::SupernodalQRFactor) = size(F.A)

@@ -384,6 +384,25 @@ function solve!(x::AbstractVecOrMat, F::SupernodalQRFactor, b::AbstractVecOrMat)
     return _solve_block!(x, F, b)
 end
 
+# A real factorization applied to a complex right-hand side: the solution map
+# is real-linear, so solve the real and imaginary parts as one 2k-column block.
+function solve!(
+        x::AbstractVecOrMat, F::SupernodalQRFactor{Tv}, b::AbstractVecOrMat{<:Complex}
+    ) where {Tv <: Real}
+    _check_dims(F, x, b)
+    k = size(b, 2)
+    B2 = Matrix{Tv}(undef, size(b, 1), 2k)
+    @inbounds for c in 1:k, i in axes(b, 1)
+        B2[i, c] = real(b[i, c])
+        B2[i, k + c] = imag(b[i, c])
+    end
+    X2 = _solve_block!(Matrix{Tv}(undef, size(x, 1), 2k), F, B2)
+    @inbounds for c in 1:k, i in axes(x, 1)
+        x[i, c] = complex(X2[i, c], X2[i, k + c])
+    end
+    return x
+end
+
 function Base.:\(F::SupernodalQRFactor{Tv}, b::AbstractVector) where {Tv}
     T = promote_type(Tv, eltype(b))
     return solve!(Vector{T}(undef, size(F, 2)), F, b)

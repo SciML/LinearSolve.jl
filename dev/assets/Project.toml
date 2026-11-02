@@ -11,7 +11,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [sources]
 BorderedLinearSolve = {path = "../lib/BorderedLinearSolve"}
-LinearSolve = {path = "/home/runner/work/LinearSolve.jl/LinearSolve.jl"}
+LinearSolve = {path = "/home/runner/_work/LinearSolve.jl/LinearSolve.jl"}
 LinearSolveAutotune = {path = "../lib/LinearSolveAutotune"}
 LinearSolvePyAMG = {path = "../lib/LinearSolvePyAMG"}
 

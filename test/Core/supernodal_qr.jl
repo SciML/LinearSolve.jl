@@ -243,7 +243,7 @@ end
     A = sparse([3.0 1.0; 1.0 2.0; 1.0 -1.0])
     x = ComplexF64[1 + 2im, 3 - im]
     @test solve(LinearProblem(A, A * x), alg).u ≈ x
-    X = ComplexF64[1+2im 1; 3-im 2im]
+    X = ComplexF64[1 + 2im 1; 3 - im 2im]
     @test solve(LinearProblem(A, A * X), alg).u ≈ X
     @test SNQR.snqr(A) \ (A * x) ≈ x
 

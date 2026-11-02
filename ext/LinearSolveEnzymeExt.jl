@@ -629,6 +629,8 @@ derivative, so an array shadow is zeroed; anything else is a field the shadow ca
 verbatim (the staleness flags, the algorithm, a cacheval), and is passed through.
 """
 _shadow_of_constant(x::AbstractArray) = zero(x)
+# `zero` drops a sparse matrix's stored entries, which its shadow has to keep
+_shadow_of_constant(x::AbstractSparseMatrixCSC) = (y = copy(x); fill!(nonzeros(y), 0); y)
 _shadow_of_constant(x) = x
 
 # Enzyme works out the shadow of a `LinearProblem` from the activity of the arguments it

@@ -424,10 +424,10 @@ reduction(cache) = cache.cacheval.sparse_reduction
             dense4([(1, 2), (1, 3), (1, 4), (2, 3)]),
         ]
         b = ones(4)
-        algs = [
-            KLUFactorization, UMFPACKFactorization,
-            PureKLUFactorization, SupernodalLUFactorization,
+        algs = Any[
+            KLUFactorization, PureKLUFactorization, SupernodalLUFactorization,
         ]
+        Base.USE_GPL_LIBS && push!(algs, UMFPACKFactorization)
         seqs = ["fill-in" => As, "switch" => As_switch]
         # one testset per case, so a solver that throws does not hide the cases after it
         for Alg in algs, check_pattern in (true, false), (seqname, seq) in seqs

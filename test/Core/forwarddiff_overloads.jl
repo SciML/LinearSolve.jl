@@ -251,6 +251,37 @@ end
     ForwardDiff.hessian(linprob_f_hes, [5.0])
 )
 
+@testset "nested Dual caches stay correct across repeated solves" begin
+    # `≈` on Duals compares only the primal values, so check every component
+    flat(x::ForwardDiff.Dual) = [flat(ForwardDiff.value(x)); reduce(vcat, flat.(collect(ForwardDiff.partials(x))))]
+    flat(x::Real) = [x]
+    same(x, y) = reduce(vcat, flat.(x)) ≈ reduce(vcat, flat.(y))
+
+    An(p) = [4.0 + p[1]^2 1.0; 1.0 3.0 + p[1]]
+    bn(p) = [1.0, 2.0] .* p[1]
+    q = ForwardDiff.Dual(ForwardDiff.Dual(0.3, 1.0), 1.0)
+    A, b = An([q]), bn([q])
+    A2 = An([q * 1.01])
+
+    for alg in (LUFactorization(), QRFactorization())
+        cache = init(LinearProblem(copy(A), copy(b)), alg)
+        for _ in 1:3
+            @test same(solve!(cache).u, A \ b)
+        end
+        reinit!(cache; A = copy(A2))
+        @test same(solve!(cache).u, A2 \ b)
+    end
+
+    # the least-squares branch fills the inner cache's `b` the same way
+    Al, bl = [A; [q 1.0]], [b; q]
+    for alg in (QRFactorization(), nothing)
+        cache = init(LinearProblem(copy(Al), copy(bl)), alg)
+        for _ in 1:3
+            @test same(solve!(cache).u, (Al' * Al) \ (Al' * bl))
+        end
+    end
+end
+
 # Test aliasing
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 

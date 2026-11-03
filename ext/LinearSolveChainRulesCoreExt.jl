@@ -93,7 +93,7 @@ function CRC.rrule(T::typeof(LinearSolve.init), prob::LinearSolve.LinearProblem,
 end
 
 function CRC.rrule(::typeof(LinearSolve.init), prob::LinearSolve.LinearProblem, alg::Union{LinearSolve.SciMLLinearSolveAlgorithm, Nothing}, args...; kwargs...)
-    init_res = LinearSolve.init(prob, alg)
+    init_res = LinearSolve.init(prob, alg, args...; kwargs...)
     function init_adjoint(∂init)
         ∂prob = LinearProblem(∂init.A, ∂init.b, NoTangent())
         return NoTangent(), ∂prob, NoTangent(), ntuple((_ -> NoTangent(), length(args))...)

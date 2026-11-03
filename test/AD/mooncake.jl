@@ -356,3 +356,13 @@ end
     A_grad = en_jac[2] |> vec
     @test A_grad ≈ fd_jac_A rtol = 1.0e-4
 end
+
+@testset "init keeps its keyword arguments" begin
+    f_kw(A, b) = sum(
+        solve!(init(LinearProblem(A, b), LUFactorization(); verbose = LinearSolve.SciMLLogging.None())).u
+    )
+    rule = Mooncake.build_rrule(f_kw, copy(A), copy(b1))
+    _, (_, dA, db) = Mooncake.value_and_pullback!!(rule, 1.0, f_kw, copy(A), copy(b1))
+    @test dA ≈ ForwardDiff.gradient(x -> f_kw(x, eltype(x).(b1)), copy(A))
+    @test db ≈ ForwardDiff.gradient(x -> f_kw(eltype(x).(A), x), copy(b1))
+end

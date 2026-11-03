@@ -30,6 +30,7 @@ module SupernodalLU
 using SparseArrays: SparseMatrixCSC, sparse, getcolptr, rowvals, nonzeros, nnz
 using LinearAlgebra: LinearAlgebra, SingularException, UpperTriangular,
     UnitLowerTriangular, ldiv!, rdiv!, mul!, norm, BLAS
+using Base: require_one_based_indexing
 using ..LinearSolve: LinearSolve
 import ..LinearSolve: supernodal_panel_solve!, supernodal_panel_solve_backend!
 using SciMLBase: SciMLBase

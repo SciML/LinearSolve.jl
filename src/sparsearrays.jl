@@ -1482,9 +1482,8 @@ mutable struct SparseReduction{Tv, Ti}
     nanalyze::Int
     nrefactor::Int
     # Tracks whether the most recent per-solve dropzeros changed the pattern of
-    # `reduced`, including a change that leaves nnz the same. The sparse solvers and
-    # Sparspak read it to invalidate a cached symbolic factorization, whose reuse is
-    # only valid while the pattern is stable across calls.
+    # `reduced`, including a change that leaves nnz the same. Symbolic reuse is only
+    # valid while that pattern holds, so the sparse solvers read this to invalidate.
     reduced_nnz::Int
     structure_changed::Bool
 end
@@ -1611,9 +1610,8 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
         new_reduced = deepcopy(LinearSolve.make_SparseMatrixCSC(A))
         dropzeros!(new_reduced)
         new_nnz = nnz(new_reduced)
-        # `pattern_changed` only fires on the solve that breaks union caching, so the
-        # reduced pattern is compared directly as well: dropping a different set of zeros
-        # can leave nnz unchanged and still invalidate a cached symbolic factorization.
+        # `pattern_changed` only fires on the solve that breaks union caching, so compare
+        # the reduced pattern too: a different set of dropped zeros can leave nnz the same.
         red.structure_changed = pattern_changed || new_nnz != red.reduced_nnz ||
             getcolptr(new_reduced) != getcolptr(red.reduced) ||
             rowvals(new_reduced) != rowvals(red.reduced)
@@ -1653,8 +1651,8 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
             red.cache_union = false
             red.reduced = deepcopy(LinearSolve.make_SparseMatrixCSC(A))
             dropzeros!(red.reduced)
-            # The operand goes from the union-reduced pattern to this matrix's own
-            # dropzeros result, which can differ at equal nnz.
+            # the operand goes from the union-reduced pattern to this matrix's own
+            # dropzeros result, which can differ at equal nnz
             red.reduced_nnz = nnz(red.reduced)
             red.structure_changed = true
         end

@@ -409,16 +409,14 @@ reduction(cache) = cache.cacheval.sparse_reduction
             end
             return A
         end
-        # 4 stored zeros activates the reduction, then 3 of them filling in switches it
-        # to per-solve dropzeros, and the last matrix moves the remaining zero without
-        # changing nnz.
+        # 4 stored zeros activates the reduction, 3 of them filling in switches it to
+        # per-solve dropzeros, and the last matrix moves a zero at equal nnz.
         As = [
             dense4([(1, 2), (2, 1), (3, 4), (4, 3)]),
             dense4([(1, 2)]),
             dense4([(2, 1)]),
         ]
-        # the solve that switches Auto over to per-solve dropzeros can itself shift the
-        # pattern at equal nnz
+        # the switch to per-solve dropzeros can itself shift the pattern at equal nnz
         As_switch = [
             dense4([(1, 2), (2, 1), (3, 4), (4, 3)]),
             dense4([(1, 2), (1, 3), (1, 4), (2, 3)]),
@@ -429,7 +427,6 @@ reduction(cache) = cache.cacheval.sparse_reduction
         ]
         Base.USE_GPL_LIBS && push!(algs, UMFPACKFactorization)
         seqs = ["fill-in" => As, "switch" => As_switch]
-        # one testset per case, so a solver that throws does not hide the cases after it
         for Alg in algs, check_pattern in (true, false), (seqname, seq) in seqs
             @testset "$(nameof(Alg)) $seqname check_pattern = $check_pattern" begin
                 cache = init(LinearProblem(copy(seq[1]), b), Alg(; check_pattern))

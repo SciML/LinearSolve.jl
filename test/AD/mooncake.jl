@@ -326,6 +326,20 @@ rule = Mooncake.build_rrule(f_4, copy(A), copy(b1), copy(b2))
 # @test grad[3] ≈ db12
 # @test grad[4] ≈ db22
 
+@testset "solve! with a zero cotangent" begin
+    f_5(A, b) = copy(solve!(init(LinearProblem(A, b), LUFactorization())).u)
+    rule = Mooncake.build_rrule(f_5, copy(A), copy(b1))
+    _, (_, dA, db) = Mooncake.value_and_pullback!!(rule, zeros(n), f_5, copy(A), copy(b1))
+    @test iszero(dA)
+    @test iszero(db)
+
+    f_6(A, b) = sum(solve!(init(LinearProblem(A, b), LUFactorization())).u)
+    cache = Mooncake.prepare_gradient_cache(f_6, copy(A), copy(b1))
+    _, (_, dA, db) = Mooncake.value_and_gradient!!(cache, f_6, copy(A), copy(b1))
+    @test dA ≈ ForwardDiff.gradient(x -> f_6(x, eltype(x).(b1)), copy(A))
+    @test db ≈ ForwardDiff.gradient(x -> f_6(eltype(x).(A), x), copy(b1))
+end
+
 A = rand(n, n);
 b1 = rand(n);
 

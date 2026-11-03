@@ -1559,9 +1559,9 @@ function LinearSolve.init_sparse_reduction(
     NZ = LinearSolve.NonstructuralZeros
     nz = nonzeros(A)
     auto = nsz == NZ.Auto
-    # An all-zero starting matrix is a prototype whose values are not filled in yet: its zero
-    # fraction carries no information, so defer the `Auto` decision to the first filled solve.
-    pending = auto && !isempty(nz) && all(iszero, nz)
+    # An all-zero or all-one starting matrix is a prototype whose values are not filled in yet:
+    # its zero fraction carries no information, so defer the `Auto` decision to the first filled solve.
+    pending = auto && !isempty(nz) && (all(iszero, nz) || all(isone, nz))
     active = if nsz == NZ.Persistent || nsz == NZ.Present
         true
     elseif nsz == NZ.None || pending
@@ -1595,7 +1595,7 @@ end
 # there is nothing worth reducing in it either way.
 function _resolve_pending!(red::SparseReduction, A)
     nz = nonzeros(A)
-    (isempty(nz) || all(iszero, nz)) && return red
+    (isempty(nz) || all(iszero, nz) || all(isone, nz)) && return red
     red.pending = false
     count(iszero, nz) / length(nz) >=
         LinearSolve.PERSISTENT_ZERO_FRACTION_THRESHOLD || return red

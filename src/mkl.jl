@@ -291,7 +291,7 @@ _get_residualsafety(alg::MKLLUFactorization) = alg.residualsafety
 default_alias_A(::MKLLUFactorization, ::Any, ::Any) = false
 default_alias_b(::MKLLUFactorization, ::Any, ::Any) = false
 
-const PREALLOCATED_MKL_LU = begin
+const PREALLOCATED_MKL_LU = let
     A = rand(0, 0)
     luinst = ArrayInterface.lu_instance(A), Ref{BlasInt}()
 end
@@ -428,7 +428,7 @@ end
 default_alias_A(::MKL32MixedLUFactorization, ::Any, ::Any) = false
 default_alias_b(::MKL32MixedLUFactorization, ::Any, ::Any) = false
 
-const PREALLOCATED_MKL32_LU = begin
+const PREALLOCATED_MKL32_LU = let
     A = rand(Float32, 0, 0)
     luinst = ArrayInterface.lu_instance(A), Ref{BlasInt}()
 end

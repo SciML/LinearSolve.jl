@@ -594,18 +594,29 @@ function SciMLBase.solve!(
         DT <:
         ForwardDiff.Dual,
     }
+    # `getproperty(cache, :A)` returns `dual_A`, so `copyto!(cache.A, A2)` mutates
+    # only that buffer. The primal factorisation matrix and the cached partials
+    # are derived at `setA!` time; when `isfresh` is raised after an in-place
+    # write they must be re-derived from whatever `dual_A` now holds, the same
+    # way `_solve_direct_dual!` already re-reads `dual_A` on `isfresh`.
+    # See https://github.com/SciML/LinearSolve.jl/issues/1315.
+    linear_cache = getfield(cache, :linear_cache)
+    if linear_cache.isfresh
+        setA!(cache, getfield(cache, :dual_A))
+    end
+
     # Check if this algorithm can work directly with Duals (e.g., GenericLUFactorization)
     # In that case, we solve the dual problem directly without separating primal/partials.
     # Only worthwhile when A itself carries duals: with duals just in b, the split
     # path (one primal factorization + partials back-solves) is strictly cheaper
     # than factorizing in dual arithmetic.
-    if _use_direct_dual_solve(getfield(cache, :linear_cache).alg) &&
+    if _use_direct_dual_solve(linear_cache.alg) &&
             get_dual_type(getfield(cache, :dual_A)) !== nothing
         return _solve_direct_dual!(cache, alg, args...; kwargs...)
     end
 
     primal_sol = linearsolve_forwarddiff_solve!(
-        cache::DualLinearCache, getfield(cache, :linear_cache).alg, args...; kwargs...
+        cache::DualLinearCache, linear_cache.alg, args...; kwargs...
     )
 
     # Construct dual solution from primal solution and partials

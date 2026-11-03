@@ -407,8 +407,7 @@ end
 # there is no reason to build the split DualLinearCache here. This is type-stable: dispatch is
 # purely on the problem
 # subtype (b-dual / A-plain) and the alg type, so `init` always returns a `LinearCache` for
-# this method. It also gets correct factorization reuse across b-only `reinit!`s for free,
-# which the split path's `reinit!` does not (it always marks the inner cache fresh).
+# this method.
 function SciMLBase.init(prob::DualBLinearProblem, alg::PureKLUFactorization, args...; kwargs...)
     return __init(prob, alg, args...; kwargs...)
 end
@@ -743,6 +742,11 @@ function SciMLBase.reinit!(
         p = nothing,
         reuse_precs = false
     )
+    isfresh = !isnothing(A)
+    precsisfresh = !reuse_precs && (isfresh || !isnothing(p))
+    isfresh |= cache.linear_cache.isfresh
+    precsisfresh |= cache.linear_cache.precsisfresh
+
     if !isnothing(A)
         setA!(cache, A)
     end
@@ -759,11 +763,7 @@ function SciMLBase.reinit!(
         cache.linear_cache.p = nodual_value(p)
     end
 
-    isfresh = !isnothing(A)
-    precsisfresh = !reuse_precs && (isfresh || !isnothing(p))
-    isfresh |= cache.linear_cache.isfresh
-    precsisfresh |= cache.linear_cache.precsisfresh
-    cache.linear_cache.isfresh = true
+    cache.linear_cache.isfresh = isfresh
     cache.linear_cache.precsisfresh = precsisfresh
 
     return nothing

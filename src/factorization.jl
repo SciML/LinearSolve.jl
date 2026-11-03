@@ -2090,6 +2090,61 @@ function init_cacheval(
 end
 
 """
+    SupernodalQRFactorization(; reuse_symbolic = true, check_pattern = true,
+                              ordering = :amd, tol = nothing, wide = :basic)
+
+A pure-Julia multifrontal sparse Householder QR, vendored self-contained in
+`src/SupernodalQR`: the column elimination tree of `A` drives a supernodal
+assembly tree whose dense frontal matrices are factored with BLAS-3
+Householder QR (George–Heath / Matstoms multifrontal QR), with Heath's
+dead-column rule for rank deficiency. No binary dependencies and no GPL code,
+so it is available on `Base.USE_GPL_LIBS = false` builds where SuiteSparse
+SPQR (`QRFactorization` on a sparse matrix) is not.
+
+Systems of any shape get a least-squares solution; on wide or rank-deficient
+systems it is a basic one (dead columns set to zero), like SPQR's. Column
+singletons are peeled off before the multifrontal phase, and the column
+ordering never forms `AᴴA`. With `wide = :minnorm`, wide systems are instead
+factored through `Aᴴ` and get the minimum-norm least-squares solution, at the
+cost of the fill of factoring `AAᴴ`. This is the
+BLAS-3 counterpart of [`SparseColumnPivotedQRFactorization`](@ref), aimed at
+"more structured" (PDE-mesh-like) and larger sparse least-squares problems;
+for small or very sparse systems prefer `SparseColumnPivotedQRFactorization`,
+which is fully rank revealing.
+
+## Keyword Arguments
+
+  - `reuse_symbolic`: reuse the cached symbolic analysis (and the front
+    storage) across solves when the sparsity pattern is unchanged. Defaults
+    to `true`.
+  - `check_pattern`: check whether the sparsity pattern changed before
+    reusing the analysis. Defaults to `true`.
+  - `ordering`: fill-reducing column ordering, `:amd` (default; approximate
+    minimum degree on the row cliques of `A`) or `:natural`.
+  - `tol`: dead-column threshold. `nothing` (default) uses SPQR's rule
+    `20 (m + n) eps max_j ‖A[:, j]‖`; a negative value disables rank
+    detection.
+  - `wide`: `:basic` (default) or `:minnorm`, the solution returned for wide
+    systems (see above).
+"""
+Base.@kwdef struct SupernodalQRFactorization <: AbstractSparseFactorization
+    reuse_symbolic::Bool = true
+    check_pattern::Bool = true
+    ordering::Symbol = :amd
+    tol::Union{Nothing, Float64} = nothing
+    wide::Symbol = :basic
+end
+
+function init_cacheval(
+        alg::SupernodalQRFactorization,
+        A, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol,
+        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
+    )
+    return nothing
+end
+
+"""
 `SparseColumnPivotedQRFactorization(; reuse_symbolic = true, ordering = :default)`
 
 A pure-Julia, rank-revealing column-pivoted sparse QR factorization, provided by

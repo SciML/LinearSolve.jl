@@ -24,6 +24,7 @@ linearization = "linearization"
 parameterized = "parameterized"
 discretized = "discretized"
 vectorized = "vectorized"
+Comput = "Comput"  # journal abbreviation (SIAM J. Sci. Stat. Comput.)
 
 # Common variable patterns in Julia/SciML
 ists = "ists"

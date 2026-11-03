@@ -4,6 +4,9 @@
 #
 # Vendored from PureKLU.jl (src/AMD.jl), itself a direct pure-Julia port of
 # SuiteSparse AMD (BSD-3-Clause).  See LICENSE for the BSD-3-Clause text.
+# LinearSolve modification: `amd_2!(...; preset = true)` starts from a
+# caller-built quotient graph that may already contain elements (used by
+# SupernodalQR's column ordering); the default path is unchanged.
 
 """
     AMD
@@ -177,12 +180,14 @@ end
 end
 
 """
-    amd_2!(n, Pe, Iw, Len, iwlen, pfree, Nv, Next, Last, Head, Elen, Degree, W,
-           dense_threshold, aggressive) -> nothing
+    amd_2!(n, Pe, Iw, Len, iwlen, pfree, Nv, Next, Last, Head, Elen, Degree, W;
+           dense_alpha, aggressive, preset = false) -> lnz
 
 Core AMD ordering routine. Operates on the A+A' representation built in
 `Pe`/`Iw`/`Len`. Writes the permutation into `Last` and inverse
-permutation into `Next`. Mirrors `amd_2.c`.
+permutation into `Next`. Mirrors `amd_2.c`; `preset = true` (a LinearSolve
+extension) starts from a caller-built quotient graph that may already hold
+elements, see the comment at the initialization below.
 """
 function amd_2!(
         n::Int, Pe::Vector{Ti}, Iw::Vector{Ti}, Len::Vector{Ti},
@@ -191,7 +196,8 @@ function amd_2!(
         Head::Vector{Ti}, Elen::Vector{Ti}, Degree::Vector{Ti},
         W::Vector{Ti};
         dense_alpha::Float64 = AMD_DEFAULT_DENSE,
-        aggressive::Bool = AMD_DEFAULT_AGGRESSIVE != 0
+        aggressive::Bool = AMD_DEFAULT_AGGRESSIVE != 0,
+        preset::Bool = false
     ) where {Ti <: Integer}
 
     pfree = pfree_in
@@ -206,14 +212,21 @@ function amd_2!(
     dense = max(16, dense)
     dense = min(n, dense)
 
+    # `preset` (LinearSolve extension, used by SupernodalQR's column
+    # ordering): the caller supplies an initial quotient graph that already
+    # contains elements — nodes with Elen < EMPTY, counted as eliminated —
+    # together with Nv, W, Elen and Degree for every node.  Only the list
+    # heads are reset here.
     @inbounds for i in 1:n
         Last[i] = Ti(EMPTY)
         Head[i] = Ti(EMPTY)
         Next[i] = Ti(EMPTY)
-        Nv[i] = Ti(1)
-        W[i] = Ti(1)
-        Elen[i] = Ti(0)
-        Degree[i] = Len[i]
+        if !preset
+            Nv[i] = Ti(1)
+            W[i] = Ti(1)
+            Elen[i] = Ti(0)
+            Degree[i] = Len[i]
+        end
     end
 
     wbig = typemax(Ti) - Ti(n)
@@ -221,6 +234,14 @@ function amd_2!(
 
     ndense = 0
     @inbounds for i in 0:(n - 1)
+        if preset && Elen[i + 1] < EMPTY
+            # W is reused across pivots by advancing wflg by lemax, which is
+            # only sound if no element's degree exceeds lemax; pivot-created
+            # elements guarantee that, preset ones must seed it.
+            nel += Int(Nv[i + 1])
+            lemax = max(lemax, Int(Degree[i + 1]))
+            continue
+        end
         deg = Int(Degree[i + 1])
         if deg == 0
             Elen[i + 1] = Ti(_flip(1))

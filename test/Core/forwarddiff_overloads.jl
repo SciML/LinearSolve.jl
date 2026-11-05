@@ -3,6 +3,7 @@ using ForwardDiff
 using Test
 using LinearAlgebra
 using SparseArrays
+using BandedMatrices
 using ComponentArrays
 using Sparspak
 using SpecializingFactorizations
@@ -506,6 +507,15 @@ backslash_large = A_large_dual \ b_large_dual
     for alg in (nothing, SVDFactorization(), KrylovJL_LSMR())
         @test ForwardDiff.derivative(t -> solve(LinearProblem(At(t), bt), alg).u, 0.0) ≈ ref rtol = 1.0e-6
     end
+
+    # a non-strided `A` gets no pivoted QR to tell its rank; this one has rank one and the
+    # minimum-norm solution [1, t] / (1 + t^2)
+    Ab(t) = BandedMatrix([1, 2, 3] * [1, t]', (2, 1))
+    @test ForwardDiff.derivative(t -> solve(LinearProblem(Ab(t), [1.0, 2, 3]), KrylovJL_LSMR()).u, 0.5) ≈ [-0.64, 0.48]
+    Bb(t) = BandedMatrix([1 t; 2 1; 3 0; 0 1], (3, 1))
+    bb = [1.0, 2, 3, 4]
+    @test ForwardDiff.derivative(t -> solve(LinearProblem(Bb(t), bb)).u, 0.3) ≈
+        ForwardDiff.derivative(t -> Matrix(Bb(t)) \ bb, 0.3)
 end
 
 # Test that DualLinearCache preserves p through init and reinit!

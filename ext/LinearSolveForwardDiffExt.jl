@@ -78,8 +78,9 @@ const DualAbstractLinearProblem = Union{
     dual_linear_cache
 end
 
+# without a pivoted QR the rank is unknown, so the null-space term is kept
+_full_column_rank(F, A) = false
 # the rule of `rank(::QRPivoted)`, which Julia 1.10 does not have
-_full_column_rank(F, A) = size(A, 1) >= size(A, 2)
 function _full_column_rank(F::QRPivoted, A)
     m, n = size(A)
     m < n && return false

@@ -1014,6 +1014,10 @@ function QRFactorization(pivot::LinearAlgebra.PivotingStrategy, inplace::Bool = 
     return QRFactorization(pivot, 16, inplace)
 end
 
+# a CPU sparse matrix behind `Adjoint`/`Transpose`, which `issparsematrixcsc` doesn't see;
+# the `true` method is in sparsearrays.jl
+_is_wrapped_sparse(A) = false
+
 function do_factorization(alg::QRFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
     if ArrayInterface.can_setindex(typeof(A))
@@ -1031,6 +1035,9 @@ function do_factorization(alg::QRFactorization, A, b, u)
             fact = MinNormQR(qr(copy(transpose(A))))
         elseif A isa GPUArraysCore.AnyGPUArray || is_cusparse(A) || issparsematrixcsc(A)
             fact = qr(A)
+        elseif _is_wrapped_sparse(A)
+            # materialized, as Julia 1.10's `qr` of the wrapper is a dense QR, not SPQR
+            fact = qr(SparseMatrixCSC(A))
         elseif alg.inplace
             if A isa Symmetric
                 fact = qr(A, alg.pivot)

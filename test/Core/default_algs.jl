@@ -893,6 +893,19 @@ end
         @test solve(LinearProblem(Hermitian(S), b)).retcode === ReturnCode.Failure
     end
 
+    # the other element types, with only the used triangle set
+    Mc = randn(rng, ComplexF64, n, n)
+    Pc = Mc * Mc' + n * I
+    Nc = copy(Pc)
+    Nc[n, n] = -n
+    for E in (Float32, ComplexF32, ComplexF64), S in (E <: Real ? (P, T, N) : (Pc, T, Nc)),
+            uplo in (:U, :L)
+        A = Hermitian(uplo === :U ? triu(E.(S)) : tril(E.(S)), uplo)
+        cache = init(LinearProblem(A, E.(b)))
+        @test cache.alg.alg === LinearSolve.DefaultAlgorithmChoice.CholeskyFactorization
+        @test solve!(cache).u ≈ A \ E.(b)
+    end
+
     Apd = Hermitian(P)
     cache = init(LinearProblem(copy(Apd), b))
     refactor!(cache, A) = (copyto!(cache.A, A); cache.A = cache.A; solve!(cache); nothing)

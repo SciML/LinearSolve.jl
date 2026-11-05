@@ -1428,8 +1428,7 @@ function LinearSolve.init_cacheval(
     return nothing
 end
 
-# `cholesky_instance` factorizes for real, and CHOLMOD rejects a non-symmetric matrix, so
-# the eager slot build throws from `init`. A 1x1 factor types the slot without touching `A`.
+# a 1x1 factor types the slot, as CHOLMOD rejects `A` in `init` when it isn't symmetric
 @static if Base.USE_GPL_LIBS
     function LinearSolve.init_cacheval(
             alg::CholeskyFactorization,
@@ -1444,9 +1443,7 @@ end
     end
 end
 
-# Without this the generic `Adjoint`/`Transpose` method takes it, and that one passes SPQR
-# a pivot, which it rejects for a sparse matrix, throwing from `init`. A 1x1 instance from
-# the parent types the slot, for the element types SPQR supports.
+# SPQR takes no pivot, so the slot is typed from the parent, for the element types SPQR supports
 function LinearSolve.init_cacheval(
         alg::QRFactorization,
         A::_WrappedSparseMatrixCSC, b, u, Pl, Pr,
@@ -1458,8 +1455,7 @@ function LinearSolve.init_cacheval(
         ArrayInterface.qr_instance(P, alg.pivot) : nothing
 end
 
-# The generic `Adjoint`/`Transpose` method factorizes `A` element by element, O(n^3) for a
-# wrapped sparse matrix. The solve factorizes anyway, so an unfactorized `LU` types the slot.
+# an unfactorized `LU` types the slot, as factorizing a wrapped sparse `A` here is O(n^3)
 function LinearSolve.init_cacheval(
         alg::GenericLUFactorization,
         A::_WrappedSparseMatrixCSC, b, u, Pl, Pr,

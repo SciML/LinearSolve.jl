@@ -217,7 +217,7 @@ function _lhl_sync!(c::LHLCache, A, alg::LHLFactorization, isfresh::Bool)
     if fresh_reduction
         J = _lhl_jacobian(A)
         _lhl_do_reduce!(ws, J, alg)
-        c.jac = J
+        c.jac === J || (c.jac = J)
         _lhl_claim!(A)
     end
     if fresh_reduction || ws.σ != σ || ws.τ != τ

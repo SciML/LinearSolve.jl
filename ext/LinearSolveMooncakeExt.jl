@@ -60,7 +60,6 @@ function Mooncake.rrule!!(
 
     cache = primal(_cache)
     alg = primal(_alg)
-    _args = map(primal, args)
 
     (; A, b, sensealg) = cache
     A_orig = copy(A)
@@ -85,14 +84,14 @@ function Mooncake.rrule!!(
     end
 
     sol = zero_fcodual(solve!(cache))
+    # Keep the forward solution for the pullback, so it need not re-factorise and
+    # re-solve the system to recover it (`cache.u` may be overwritten by later solves).
+    u_fwd = copy(sol.x.u)
     cache.A = A_orig
     cache.b = b_orig
 
     function solve!_adjoint(::NoRData)
         ∂∅ = NoRData()
-        alg = cache.alg
-        cachenew = init(LinearProblem(cache.A, cache.b), alg, _args...; kwargs...)
-        new_sol = solve!(cachenew)
         ∂u = sol.dx.data.u
 
         if sensealg.linsolve === missing
@@ -110,7 +109,7 @@ function Mooncake.rrule!!(
             ).u
         end
 
-        tu = adjoint(new_sol.u)
+        tu = adjoint(u_fwd)
         ∂A = .-(λ .* tu)
         ∂b = λ
 

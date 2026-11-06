@@ -6,7 +6,6 @@ using LinearSolve: LinearSolve, SciMLLinearSolveAlgorithm, AbstractFactorization
 using SciMLBase: SciMLBase, LinearProblem, init, solve, solve!
 using SciMLOperators: issquare
 using ChainRulesCore: ChainRulesCore, NoTangent
-using LinearAlgebra: adjoint
 
 const CRC = ChainRulesCore
 

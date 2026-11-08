@@ -245,6 +245,35 @@ end
         @test rowperm(1.0) == [2, 1] # above threshold: pivot on largest entry
     end
 
+    @testset "KLU row scaling option: $alg" for alg in (KLUFactorization, PureKLUFactorization)
+        @test alg().scale == 2 # default value
+        @test_throws "must be 0 (none), 1 (sum), or 2 (max), got 3" alg(scale = 3)
+        @test_throws "must be 0 (none), 1 (sum), or 2 (max), got -1" alg(scale = -1)
+
+        # Row 1 holds an entry 1e6 times larger than A[1, 1]. Row scaling makes the
+        # scaled A[1, 1] fall below `tol` times the scaled A[2, 1], so KLU pivots on
+        # row 2; without scaling it keeps the diagonal pivot. `Rs` holds the row
+        # scale factors in pivot order.
+        expected = [1.0, 2.0]
+        for (scale, p, Rs) in ((0, [1, 2], [1.0, 1.0]), (2, [2, 1], [1.0, 1.0e6]))
+            A = sparse([1.0 1.0e6; 0.5 1.0])
+            cache = SciMLBase.init(LinearProblem(A, A * expected), alg(; scale))
+            @test solve!(cache).u ≈ expected
+            @test cache.cacheval.common.scale == scale
+            @test cache.cacheval.p == p
+            @test cache.cacheval.Rs == Rs
+
+            # The refactorization with the reused pivots applies the same scaling.
+            B = sparse([2.0 1.0e6; 0.5 3.0])
+            cache.A = B
+            cache.b = B * expected
+            @test solve!(cache).u ≈ expected
+            @test cache.cacheval.common.scale == scale
+            @test cache.cacheval.p == p
+            @test cache.cacheval.Rs == (scale == 0 ? [1.0, 1.0] : [3.0, 1.0e6])
+        end
+    end
+
     @testset "RFLUFactorization multi-RHS" begin
         # The extension routes matrix right-hand sides through TriangularSolve;
         # results must match the stdlib path exactly in behaviour.

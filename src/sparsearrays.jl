@@ -610,7 +610,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
             if length(cacheval.nzval) != length(nonzeros(A)) || alg.check_pattern && pattern_changed(cacheval, A)
                 fact = KLU.klu(
                     LinearSolve.make_SparseMatrixCSC(A),
-                    check = false
+                    check = false, scale = alg.scale
                 )
             else
                 fact = KLU.klu!(cacheval, nonzeros(A), check = false)
@@ -629,7 +629,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
             # https://github.com/SciML/LinearSolve.jl/issues/991.
             fact = KLU.klu(
                 LinearSolve.make_SparseMatrixCSC(A),
-                check = false
+                check = false, scale = alg.scale
             )
         end
         cache.cacheval = fact
@@ -771,6 +771,24 @@ function LinearSolve.init_cacheval(
     end
 end
 
+# `PureKLU.klu` has no `scale` keyword: analyze, set the row scaling on the
+# factorization's `common`, then factor. `PureKLU.klu!` reads the same setting.
+# TODO: SciML/PureKLU.jl#91 adds a `scale` keyword to `PureKLU.klu`. Once the
+# PureKLU compat lower bound includes it, pass `scale = alg.scale` to
+# `PureKLU.klu` in `solve!` and remove this helper.
+function _pureklu_factor(A, alg::PureKLUFactorization)
+    fact = PureKLU.klu(
+        SparseMatrixCSC(
+            size(A)..., getcolptr(A), rowvals(A),
+            nonzeros(A)
+        ),
+        check = false, full_factor = false, use_fma = alg.use_fma, tol = alg.tol,
+        fully_preallocated = alg.fully_preallocated
+    )
+    fact.common.scale = alg.scale
+    return PureKLU.klu_factor!(fact; check = false)
+end
+
 function SciMLBase.solve!(
         cache::LinearSolve.LinearCache, alg::PureKLUFactorization; kwargs...
     )
@@ -784,14 +802,7 @@ function SciMLBase.solve!(
         if alg.reuse_symbolic
             if length(cacheval.nzval) != length(nonzeros(A)) ||
                     alg.check_pattern && pattern_changed(cacheval, A)
-                fact = PureKLU.klu(
-                    SparseMatrixCSC(
-                        size(A)..., getcolptr(A), rowvals(A),
-                        nonzeros(A)
-                    ),
-                    check = false, use_fma = alg.use_fma, tol = alg.tol,
-                    fully_preallocated = alg.fully_preallocated
-                )
+                fact = _pureklu_factor(A, alg)
             else
                 fact = PureKLU.klu!(cacheval, nonzeros(A); check = false)
                 # Refactorization fixes the old pivots, which can become unstable as A changes.
@@ -804,14 +815,7 @@ function SciMLBase.solve!(
             # New fact each time since the sparsity pattern can change and thus
             # it needs to reallocate. `check = false` keeps singular matrices from
             # throwing; the status check below maps that to `ReturnCode.Infeasible`.
-            fact = PureKLU.klu(
-                SparseMatrixCSC(
-                    size(A)..., getcolptr(A), rowvals(A),
-                    nonzeros(A)
-                ),
-                check = false, use_fma = alg.use_fma, tol = alg.tol,
-                fully_preallocated = alg.fully_preallocated
-            )
+            fact = _pureklu_factor(A, alg)
         end
         cache.cacheval = fact
         cache.isfresh = false

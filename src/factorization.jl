@@ -1884,8 +1884,14 @@ function init_cacheval(
     return nothing
 end
 
+function _check_klu_scale(scale)
+    scale in (0, 1, 2) ||
+        throw(ArgumentError("KLU row scaling `scale` must be 0 (none), 1 (sum), or 2 (max), got $scale"))
+    return scale
+end
+
 """
-`KLUFactorization(;reuse_symbolic=true, check_pattern=true)`
+`KLUFactorization(;reuse_symbolic=true, check_pattern=true, scale=2)`
 
 A fast sparse LU-factorization which specializes on sparsity patterns with “less structure”.
 
@@ -1901,10 +1907,26 @@ factorization is recomputed with new pivots while retaining the symbolic analysi
     unnecessary recomputation. To further reduce computational overhead, you can disable
     pattern checks entirely by setting `check_pattern = false`. Note that this may error
     if the sparsity pattern does change unexpectedly.
+
+## Keyword Arguments
+
+  - `reuse_symbolic`: reuse the cached symbolic factorization across solves. Defaults to `true`.
+  - `check_pattern`: check whether the sparsity pattern changed before reusing the
+    symbolic factorization. Defaults to `true`.
+  - `scale`: row scaling applied before pivoting. `2` divides each row by its maximum
+    absolute entry, `1` by the sum of its absolute entries, and `0` disables scaling.
+    Pivots are selected, and the reciprocal pivot growth that triggers re-pivoting is
+    computed, on the scaled matrix. When the row magnitudes differ by many orders of
+    magnitude, row scaling can lead to pivots that make the solution inaccurate;
+    `scale = 0` avoids this. Defaults to `2`.
 """
 Base.@kwdef struct KLUFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool = true
     check_pattern::Bool = true
+    scale::Int = 2
+    function KLUFactorization(reuse_symbolic, check_pattern, scale)
+        return new(reuse_symbolic, check_pattern, _check_klu_scale(scale))
+    end
 end
 
 function init_cacheval(
@@ -1917,7 +1939,7 @@ function init_cacheval(
 end
 
 """
-`PureKLUFactorization(; reuse_symbolic = true, check_pattern = true, use_fma = true, fully_preallocated = nothing, tol = 0.001)`
+`PureKLUFactorization(; reuse_symbolic = true, check_pattern = true, use_fma = true, fully_preallocated = nothing, tol = 0.001, scale = 2)`
 
 A pure-Julia port of SuiteSparse's KLU sparse LU solver, provided by
 [PureKLU.jl](https://github.com/SciML/PureKLU.jl). It has no SuiteSparse binary
@@ -1951,6 +1973,9 @@ requested explicitly.
   - `tol`: Pivot on a column's diagonal instead of largest entry if it is at least `tol` times
     larger in magnitude. Set `tol = 1.0` for partial pivoting, and `tol = 0.0` to always use the
     diagonal. Applies to initial and subsequent numerical factorizations. Defaults to `0.001`.
+  - `scale`: row scaling applied before pivoting, as in [`KLUFactorization`](@ref): `2`
+    divides each row by its maximum absolute entry, `1` by the sum of its absolute entries,
+    and `0` disables scaling. Defaults to `2`.
 """
 Base.@kwdef struct PureKLUFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool = true
@@ -1958,6 +1983,15 @@ Base.@kwdef struct PureKLUFactorization <: AbstractSparseFactorization
     use_fma::Bool = true
     fully_preallocated::Union{Bool, Nothing} = nothing
     tol::Float64 = 0.001
+    scale::Int = 2
+    function PureKLUFactorization(
+            reuse_symbolic, check_pattern, use_fma, fully_preallocated, tol, scale
+        )
+        return new(
+            reuse_symbolic, check_pattern, use_fma, fully_preallocated, tol,
+            _check_klu_scale(scale)
+        )
+    end
 end
 
 function init_cacheval(

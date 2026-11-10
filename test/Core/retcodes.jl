@@ -95,6 +95,65 @@ staticarrayalgs = (
     @test_broken sol = solve(prob1, QRFactorization()) # Needs StaticArrays `qr` fix
 end
 
+@testset "Non-finite or singular factorization reports Failure (#1349)" begin
+    b = [1.0, 2.0]
+    algs = (
+        LUFactorization(), GenericLUFactorization(), GESVFactorization(),
+        GenericFactorization(lu!), GenericFactorization(lu),
+        GenericFactorization(qr), GenericFactorization(),
+    )
+    for A in ([1.0 NaN; 2.0 3.0], [1.0 Inf; 2.0 3.0], [1.0 1.0; 1.0 1.0])
+        for alg in algs
+            # `GenericFactorization()` (`factorize`) factorizes eagerly in
+            # `init_cacheval`, so a singular matrix still throws at `init`;
+            # its `solve!`-time behaviour is covered by the refactorization
+            # cases below.
+            if A == [1.0 1.0; 1.0 1.0] && alg isa GenericFactorization{typeof(factorize)}
+                continue
+            end
+            sol = solve(LinearProblem(copy(A), copy(b)), alg)
+            @test sol.retcode == ReturnCode.Failure
+        end
+    end
+
+    # A non-finite right-hand side cannot produce a successful solve.
+    for alg in algs
+        sol = solve(LinearProblem([2.0 1.0; 1.0 3.0], [NaN, 2.0]), alg)
+        @test sol.retcode == ReturnCode.Failure
+    end
+
+    # Refactorization onto a bad matrix (the ODE W-matrix case) must report
+    # Failure through the retcode so the caller can reject the step.
+    for alg in (
+            LUFactorization(), GenericLUFactorization(),
+            GenericFactorization(lu!), GenericFactorization(lu),
+            GenericFactorization(),
+        )
+        cache = init(LinearProblem([2.0 1.0; 1.0 3.0], copy(b)), alg)
+        @test solve!(cache).retcode == ReturnCode.Success
+        cache.A = [1.0 NaN; 2.0 3.0]
+        @test solve!(cache).retcode == ReturnCode.Failure
+        cache.A = [1.0 1.0; 1.0 1.0]
+        @test solve!(cache).retcode == ReturnCode.Failure
+    end
+
+    # A wrapped factorization that throws on failure (`PosDefException` from
+    # `cholesky` here) is likewise reported through the retcode.
+    cache = init(
+        LinearProblem([2.0 1.0; 1.0 2.0], copy(b)), GenericFactorization(cholesky)
+    )
+    @test solve!(cache).retcode == ReturnCode.Success
+    cache.A = [1.0 2.0; 2.0 1.0]
+    @test solve!(cache).retcode == ReturnCode.Failure
+
+    # Well-posed solves are unchanged.
+    for alg in algs
+        sol = solve(LinearProblem([2.0 1.0; 1.0 3.0], copy(b)), alg)
+        @test sol.retcode == ReturnCode.Success
+        @test sol.u ≈ [0.2, 0.6]
+    end
+end
+
 @testset "StaticArray Singular" begin
     A2 = SA[0.0 0.0; 1.0 -1.0]
     A4 = SMatrix{4, 4}(

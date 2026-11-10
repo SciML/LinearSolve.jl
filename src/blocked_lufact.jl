@@ -620,7 +620,11 @@ function _blocked_lu_schur_micro!(
 end
 
 # The microkernel addresses A through a raw pointer, so it needs the
-# `StridedArray` pointer/stride contract and a unit row stride.
+# `StridedArray` pointer/stride contract and a unit row stride. Compilers
+# without `llvmcall` support (e.g. to WebAssembly) can redefine this to return
+# `false` and take the packed kernel, which computes the same update.
+@inline _blocked_lu_use_microkernel(A::StridedMatrix) = stride(A, 1) == 1
+
 @inline function _blocked_lu_schur_wide!(
         A::AbstractMatrix{T}, m::Int, j0::Int, j1::Int,
         c0::Int, c1::Int, rowblock::Int, pack::Vector{T}
@@ -633,7 +637,7 @@ end
         A::StridedMatrix{T}, m::Int, j0::Int, j1::Int,
         c0::Int, c1::Int, rowblock::Int, pack::Vector{T}
     ) where {T <: Union{Float32, Float64}}
-    if stride(A, 1) == 1
+    if _blocked_lu_use_microkernel(A)
         _blocked_lu_schur_micro!(A, m, j0, j1, c0, c1, rowblock, pack)
     else
         _blocked_lu_schur_packed!(A, m, j0, j1, c0, c1, rowblock, pack)

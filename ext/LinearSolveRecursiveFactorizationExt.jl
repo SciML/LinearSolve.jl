@@ -202,6 +202,20 @@ function SciMLBase.solve!(
     )
 end
 
+# Write `[A 0; 0 I]` into `P`, the padding of `RecursiveFactorization.pad!`.
+function pad!(P, A)
+    n = size(A, 1)
+    pad = (n + 1):size(P, 1)
+    R = CartesianIndices(A)
+    copyto!(P, R, A, R)
+    P[1:n, pad] .= 0
+    P[pad, 1:n] .= 0
+    for j in pad, i in pad
+        P[i, j] = i == j
+    end
+    return P
+end
+
 function SciMLBase.solve!(
         cache::LinearSolve.LinearCache, alg::ButterflyFactorization;
         kwargs...
@@ -216,9 +230,8 @@ function SciMLBase.solve!(
     if cache.isfresh
         @assert M == N "A must be square"
         if (size(workspace.A, 1) != M)
-            # Padded: pad the current `A` again.
-            workspace = RecursiveFactorization.🦋workspace(cache_A, cache_b)
-            A = workspace.A
+            # Padded: write `[A 0; 0 I]` into the workspace.
+            A = pad!(workspace.A, cache_A)
         elseif cache.alias_A || workspace.A === cache_A
             # `A` may be overwritten, or is the copy made by `init`: factorize in place.
             A = cache_A

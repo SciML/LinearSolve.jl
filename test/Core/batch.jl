@@ -1,4 +1,5 @@
 using LinearSolve, LinearAlgebra, SparseArrays, StaticArrays, Test
+using RecursiveFactorization, Sparspak
 using Random
 
 Random.seed!(1234)
@@ -172,6 +173,20 @@ end
     end
     @test occursin("batched", err.msg)
     @test occursin("KrylovJL", err.msg)
+end
+
+@testset "Factorizations with a vector-only back-solve reject a matrix b" begin
+    A = rand(n, n) + n * I
+    B = rand(n, k)
+    for (alg, M) in (
+            (ButterflyFactorization(), A),
+            (SparspakFactorization(), sparse(A)),
+            (LHLFactorization(), A),
+        )
+        @test_throws "$(nameof(typeof(alg))) supports only vector" solve(
+            LinearProblem(M, B), alg
+        )
+    end
 end
 
 @testset "Static arrays" begin

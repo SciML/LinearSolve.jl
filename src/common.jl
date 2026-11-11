@@ -598,10 +598,23 @@ end
 
 Throw an informative `ArgumentError` at `init` time when a matrix (batched)
 right-hand side `b` is used with an algorithm that only supports vector `b`
-(Krylov subspace / iterative methods). Factorization-based algorithms support
+(iterative methods without a block variant, and the factorizations whose
+back-solve takes a single vector). Other factorization-based algorithms support
 matrix `b` and pass through the generic no-op fallback.
 """
 _check_batched_rhs_support(alg, b) = nothing
+
+# For the factorizations whose back-solve takes a single vector. Each adds a
+# `_check_batched_rhs_support` method next to its definition.
+function _throw_vector_rhs_only(alg)
+    throw(
+        ArgumentError(
+            "$(nameof(typeof(alg))) supports only vector right-hand sides. Use " *
+                "`LUFactorization()` for a batched (matrix) `b`, or solve " *
+                "column-by-column."
+        )
+    )
+end
 function _check_batched_rhs_support(alg::AbstractKrylovSubspaceMethod, b::AbstractMatrix)
     throw(
         ArgumentError(

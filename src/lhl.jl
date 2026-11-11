@@ -86,6 +86,8 @@ _lhl_thread(::LHLFactorization{T}) where {T} = Val(T)
 
 default_alias_A(::LHLFactorization, ::Any, ::Any) = true
 
+_check_batched_rhs_support(alg::LHLFactorization, ::AbstractMatrix) = _throw_vector_rhs_only(alg)
+
 """
     LHLCache
 

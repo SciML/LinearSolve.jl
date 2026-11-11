@@ -37,6 +37,30 @@ end
     @test adjoint(A) * adjoint_solution ≈ adjoint_rhs
 end
 
+# `n = 8` is a multiple of 4, which the butterfly workspace takes without padding.
+# `n = 6` is padded to 8.
+@testset "Cache reuse: n = $n, alias_A = $alias_A" for n in (8, 6), alias_A in (false, true)
+    A1 = rand(n, n) + n * I
+    A2 = rand(n, n) + n * I
+    b = rand(n)
+    cache = init(
+        LinearProblem(copy(A1), copy(b)), ButterflyFactorization();
+        alias = LinearAliasSpecifier(; alias_A)
+    )
+    @test solve!(cache).u ≈ A1 \ b
+    @test cache.b == b
+    @test solve!(cache).u ≈ A1 \ b
+    A2c = copy(A2)
+    cache.A = A2c
+    @test solve!(cache).u ≈ A2 \ b
+    # without `alias_A` an assigned matrix is left as it is
+    alias_A || @test A2c == A2
+    # the same array again, refilled in place
+    copyto!(cache.A, A1)
+    cache.A = cache.A
+    @test solve!(cache).u ≈ A1 \ b
+end
+
 function wilkinson(N)
     A = zeros(N, N)
     A[1:(N + 1):(N * N)] .= 1

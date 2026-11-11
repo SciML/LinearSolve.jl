@@ -216,10 +216,17 @@ function SciMLBase.solve!(
     if cache.isfresh
         @assert M == N "A must be square"
         if (size(workspace.A, 1) != M)
+            # Padded: pad the current `A` again.
             workspace = RecursiveFactorization.🦋workspace(cache_A, cache_b)
+            A = workspace.A
+        elseif cache.alias_A || workspace.A === cache_A
+            # `A` may be overwritten, or is the copy made by `init`: factorize in place.
+            A = cache_A
+        else
+            # An assigned `A` without `alias_A`: factorize a copy in the workspace.
+            A = copyto!(workspace.A, cache_A)
         end
-        (; A, b, ws, U, V, out, tmp, n) = workspace
-        RecursiveFactorization.🦋mul!(A, ws)
+        RecursiveFactorization.🦋mul!(A, workspace.ws)
         F = RecursiveFactorization.lu!(A, Val(false), thread)
         cache.cacheval = (workspace, F)
         cache.isfresh = false
@@ -242,7 +249,8 @@ function LinearSolve.init_cacheval(
         alg::ButterflyFactorization, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::LinearSolve.OperatorAssumptions
     )
-    return ws = RecursiveFactorization.🦋workspace(A, b), RecursiveFactorization.lu!(rand(1, 1), Val(false), alg.thread)
+    # The workspace overwrites its `b` with the solution, so it gets its own.
+    return ws = RecursiveFactorization.🦋workspace(A, copy(b)), RecursiveFactorization.lu!(rand(1, 1), Val(false), alg.thread)
 end
 
 LinearSolve._custom_can_reuse_adjoint_factorization(

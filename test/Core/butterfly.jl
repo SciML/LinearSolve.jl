@@ -47,7 +47,9 @@ end
         LinearProblem(copy(A1), copy(b)), ButterflyFactorization();
         alias = LinearAliasSpecifier(; alias_A)
     )
-    @test solve!(cache).u ≈ A1 \ b
+    sol = solve!(cache)
+    @test sol.u ≈ A1 \ b
+    @test cache.u == sol.u
     @test cache.b == b
     @test solve!(cache).u ≈ A1 \ b
     A2c = copy(A2)

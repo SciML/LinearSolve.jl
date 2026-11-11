@@ -233,7 +233,7 @@ function SciMLBase.solve!(
     end
 
     workspace, F = cache.cacheval
-    (; A, b, ws, U, V, out, tmp, n) = workspace
+    (; b, U, V, tmp) = workspace
     b[1:M] .= cache_b
     mul!(tmp, U', b)
 
@@ -241,8 +241,8 @@ function SciMLBase.solve!(
     TriangularSolve.ldiv!(F, tmp, thread)
 
     mul!(b, V, tmp)
-    out .= @view b[1:n]
-    return SciMLBase.build_linear_solution(alg, out, nothing, nothing)
+    cache.u .= @view b[1:M]
+    return SciMLBase.build_linear_solution(alg, cache.u, nothing, nothing)
 end
 
 function LinearSolve.init_cacheval(

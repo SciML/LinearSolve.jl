@@ -421,6 +421,19 @@ A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 prob = LinearProblem(sparse(A), b)
 @test init(prob, SparspakFactorization()) isa LinearSolve.LinearCache
 
+# Duals on one side only take the Dual cache.
+@testset "SparspakFactorization with Duals on one side" begin
+    As = sparse([4.0 1.0 0.0; 1.0 3.0 1.0; 0.0 1.0 5.0])
+    rhs = [1.0, 2.0, 3.0]
+    alg = SparspakFactorization()
+    only_A(p) = solve(LinearProblem(p[1] .* As, rhs), alg).u
+    only_b(p) = solve(LinearProblem(As, p[1] .* rhs), alg).u
+    @test ForwardDiff.jacobian(only_A, [2.0]) ≈
+        ForwardDiff.jacobian(p -> (p[1] .* Matrix(As)) \ rhs, [2.0])
+    @test ForwardDiff.jacobian(only_b, [3.0]) ≈
+        ForwardDiff.jacobian(p -> Matrix(As) \ (p[1] .* rhs), [3.0])
+end
+
 # Test that solve still works correctly with GenericLUFactorization
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 prob = LinearProblem(A, b)

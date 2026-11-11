@@ -38,29 +38,76 @@ end
 end
 
 # `n = 8` is a multiple of 4, which the butterfly workspace takes without padding.
-# `n = 6` is padded to 8.
-@testset "Cache reuse: n = $n, alias_A = $alias_A" for n in (8, 6), alias_A in (false, true)
+# The other sizes are padded to 8.
+@testset "Cache reuse: n = $n" for n in (8, 5, 6, 7)
     A1 = rand(n, n) + n * I
     A2 = rand(n, n) + n * I
-    b = rand(n)
-    cache = init(
-        LinearProblem(copy(A1), copy(b)), ButterflyFactorization();
-        alias = LinearAliasSpecifier(; alias_A)
-    )
+    b1 = rand(n)
+    b2 = rand(n)
+    cache = init(LinearProblem(A1, b1), ButterflyFactorization())
     sol = solve!(cache)
-    @test sol.u ≈ A1 \ b
+    @test sol.u ≈ A1 \ b1
     @test cache.u == sol.u
-    @test cache.b == b
-    @test solve!(cache).u ≈ A1 \ b
-    A2c = copy(A2)
-    cache.A = A2c
-    @test solve!(cache).u ≈ A2 \ b
-    # without `alias_A` an assigned matrix is left as it is
-    alias_A || @test A2c == A2
+    @test cache.b == b1
+    # a new `b`, same factorization
+    cache.b = b2
+    @test solve!(cache).u ≈ A1 \ b2
+    # a new `A`
+    cache.A = A2
+    @test solve!(cache).u ≈ A2 \ b2
     # the same array again, refilled in place
     copyto!(cache.A, A1)
     cache.A = cache.A
-    @test solve!(cache).u ≈ A1 \ b
+    @test solve!(cache).u ≈ A1 \ b2
+end
+
+@testset "alias_A: n = $n" for n in (8, 6)
+    A1 = rand(n, n) + n * I
+    A2 = rand(n, n) + n * I
+    b = rand(n)
+    x1 = A1 \ b
+    x2 = A2 \ b
+
+    # Default: the matrix given to `init` and one assigned later are left as they are.
+    A = copy(A1)
+    cache = init(LinearProblem(A, b), ButterflyFactorization())
+    @test solve!(cache).u ≈ x1
+    @test A == A1
+    A = copy(A2)
+    cache.A = A
+    @test solve!(cache).u ≈ x2
+    @test A == A2
+
+    # `alias_A = true`: a matrix that needs no padding is factorized where it is.
+    A = copy(A1)
+    cache = init(
+        LinearProblem(A, b), ButterflyFactorization();
+        alias = LinearAliasSpecifier(alias_A = true)
+    )
+    @test solve!(cache).u ≈ x1
+    @test (A != A1) == (n == 8)
+    A = copy(A2)
+    cache.A = A
+    @test solve!(cache).u ≈ x2
+    @test (A != A2) == (n == 8)
+end
+
+@testset "Padding as in RecursiveFactorization: n = $n" for n in (5, 6, 7)
+    pad! = Base.get_extension(LinearSolve, :LinearSolveRecursiveFactorizationExt).pad!
+    A = rand(n, n)
+    @test pad!(rand(8, 8), A) == RecursiveFactorization.pad!(A)
+end
+
+# `n = 102` is padded to 104. A new workspace would allocate several matrices.
+@testset "Refactorization allocates no matrix: n = $n" for n in (100, 102)
+    A1 = rand(n, n) + n * I
+    A2 = rand(n, n) + n * I
+    b = rand(n)
+    cache = init(LinearProblem(A1, b), ButterflyFactorization())
+    solve!(cache)
+    refactorize!(cache, A) = (cache.A = A; solve!(cache))
+    @test refactorize!(cache, A2).u ≈ A2 \ b
+    @test @allocated(refactorize!(cache, A1)) < sizeof(A1)
 end
 
 function wilkinson(N)

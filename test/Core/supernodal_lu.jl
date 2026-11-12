@@ -107,8 +107,27 @@ end
 end
 
 @testset "refinement never returns a worse answer" begin
-    # Weak random diagonal -> statically perturbed pivots, where a raw refinement
-    # step can increase the residual.
+    # The pivot d^2 is replaced by d, so the first correction is about 1/d and raises the
+    # residual. It must be rejected and the unrefined answer returned bit for bit: undoing
+    # it by subtraction loses x[1] to cancellation, and with a large b gives NaN.
+    res(A, b, x) = norm(mul!(copy(b), A, x, -1, 1))
+    for (T, p, huge) in ((Float32, 14, 1.0f32), (Float64, 28, 1.0e300)), s in (1, huge)
+        d, c = T(2)^(-2p), T(2)^(-p)
+        A = sparse(T[d * d 0 c; 0 1 d; c d 1])
+        b = T(s) * T[d, 0, c]
+        F = SNLU.snlu(
+            A; ordering = :natural, matching = false, relax = false, maxsuper = 1,
+            eps_pivot = Float64(d)
+        )
+        x0 = SNLU.solve(F, b; refine = 0)
+        dx = SNLU.solve(F, mul!(copy(b), A, x0, -1, 1); refine = 0)
+        @test SNLU.nperturbed(F) > 0 && !(res(A, b, x0 + dx) <= res(A, b, x0))  # step is worse
+        for refine in (1, 3, :auto)
+            @test SNLU.solve(F, b; refine = refine) == x0
+        end
+    end
+
+    # Weak random diagonal -> perturbed pivots; refinement still converges.
     function weakdiag(seed; N = 30)
         rng = StableRNG(seed)
         L1 = spdiagm(-1 => -ones(N - 1), 0 => 2 * ones(N), 1 => -ones(N - 1))
@@ -119,28 +138,6 @@ end
         return A, A * randn(rng, n)
     end
     relres(A, b, x) = norm(b - A * x) / norm(b)
-    slack = 1 + 1.0e-8                                # undoing a step rounds
-
-    # (seed, N, eps_pivot, matching): the first raw step worsens the residual
-    cases = [
-        (5, 30, 1.0e-8, false),
-        (18, 40, 1.0e-2, false),
-        (11, 40, 1.0e-2, false),
-        (14, 40, 1.0e-8, :auto),                      # default eps_pivot and matching
-    ]
-    guards = map(cases) do (seed, N, ε, matching)
-        A, b = weakdiag(seed; N)
-        F = SNLU.snlu(A; eps_pivot = ε, matching = matching)
-        x0 = SNLU.solve(F, b; refine = 0)
-        r0 = relres(A, b, x0)
-        for refine in (:auto, 1, 3)
-            @test relres(A, b, SNLU.solve(F, b; refine = refine)) <= slack * r0
-        end
-        @test SNLU.solve(F, b) ≈ x0
-        SNLU.nperturbed(F) > 0 &&
-            relres(A, b, x0 + SNLU.solve(F, b - A * x0; refine = 0)) > r0
-    end
-    @test all(guards)                                 # the cases still exercise the bug
 
     A, b = weakdiag(1)
     F = SNLU.snlu(A; eps_pivot = 1.0e-4, matching = false)

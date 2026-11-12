@@ -440,16 +440,14 @@ function solve!(
         mul!(r, F.A, x, -one(Tv), one(Tv))           # r = b - A x
         rn = norm(r)
         for _ in 1:nref
-            iszero(rn) && break                      # converged
+            (iszero(rn) || !isfinite(rn)) && break   # converged, or residual overflowed
             _solve_once!(dx, F, r)
-            x .+= dx
+            dx .+= x                                 # candidate; x is kept until accepted
             copyto!(r, b)
-            mul!(r, F.A, x, -one(Tv), one(Tv))
+            mul!(r, F.A, dx, -one(Tv), one(Tv))
             rn_new = norm(r)
-            if !(rn_new <= rn)                       # worse (or NaN): undo the step
-                x .-= dx
-                break
-            end
+            rn_new <= rn || break                    # worse (or NaN): keep x
+            copyto!(x, dx)
             stagnated = rn_new >= 0.5 * rn
             rn = rn_new
             stagnated && break

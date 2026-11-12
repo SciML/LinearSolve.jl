@@ -4,6 +4,7 @@
 # resolve.jl; these exercise the solver's own invariants.
 
 using LinearSolve, SparseArrays, LinearAlgebra, Random, Test
+using StableRNGs
 using RecursiveFactorization        # activates the RF/TriangularSolve kernels
 const SNLU = LinearSolve.SupernodalLU
 
@@ -103,6 +104,61 @@ end
     @test SNLU._refine_steps(Fp, :auto) == 3
     bp = randn(size(Ap, 1))
     @test_throws ArgumentError SNLU.solve!(similar(bp), Fp, bp; refine = :bogus)
+end
+
+@testset "refinement never returns a worse answer" begin
+    # The pivot d^2 is replaced by d, so the first correction is about 1/d and raises the
+    # residual. It must be rejected and the unrefined answer returned bit for bit: undoing
+    # it by subtraction loses x[1] to cancellation, and with a large b gives NaN.
+    res(A, b, x) = norm(mul!(copy(b), A, x, -1, 1))
+    for (T, p, huge) in ((Float32, 14, 1.0f32), (Float64, 28, 1.0e300)), s in (1, huge)
+        d, c = T(2)^(-2p), T(2)^(-p)
+        A = sparse(T[d * d 0 c; 0 1 d; c d 1])
+        b = T(s) * T[d, 0, c]
+        F = SNLU.snlu(
+            A; ordering = :natural, matching = false, relax = false, maxsuper = 1,
+            eps_pivot = Float64(d)
+        )
+        x0 = SNLU.solve(F, b; refine = 0)
+        dx = SNLU.solve(F, mul!(copy(b), A, x0, -1, 1); refine = 0)
+        @test SNLU.nperturbed(F) > 0 && !(res(A, b, x0 + dx) <= res(A, b, x0))  # step is worse
+        for refine in (1, 3, :auto)
+            @test SNLU.solve(F, b; refine = refine) == x0
+        end
+    end
+
+    # x0 is finite but the norm of b - A*x0 overflows, so no step can be judged.
+    A = sparse([2.0^-44 -2.0^36; 0 2.0^-48])
+    b = [2.0^972, -2.0^1004]
+    F = SNLU.snlu(
+        A; ordering = :natural, matching = false, relax = false, maxsuper = 1,
+        eps_pivot = 2.0^-20, check = false
+    )
+    x0 = SNLU.solve(F, b; refine = 0)
+    @test all(isfinite, x0) && !isfinite(res(A, b, x0))
+    for refine in (1, 3, :auto)
+        @test SNLU.solve(F, b; refine = refine) == x0
+    end
+
+    # Weak random diagonal -> perturbed pivots; refinement still converges.
+    function weakdiag(seed; N = 30)
+        rng = StableRNG(seed)
+        L1 = spdiagm(-1 => -ones(N - 1), 0 => 2 * ones(N), 1 => -ones(N - 1))
+        A0 = kron(sparse(I, N, N), L1) + kron(L1, sparse(I, N, N))
+        n = size(A0, 1)
+        A = A0 - Diagonal(diag(A0)) + Diagonal(10.0 .^ (-6 .* rand(rng, n))) +
+            0.5 * sprandn(rng, n, n, 3 / n)
+        return A, A * randn(rng, n)
+    end
+    relres(A, b, x) = norm(b - A * x) / norm(b)
+
+    A, b = weakdiag(1)
+    F = SNLU.snlu(A; eps_pivot = 1.0e-4, matching = false)
+    @test relres(A, b, SNLU.solve(F, b; refine = 10)) <= 1.0e-14
+
+    x = similar(b)
+    SNLU.solve!(x, F, b; refine = 3)
+    @test (@allocated SNLU.solve!(x, F, b; refine = 3)) == 0
 end
 
 @testset "residual check does not allocate a work vector" begin

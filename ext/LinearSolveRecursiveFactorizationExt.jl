@@ -245,6 +245,7 @@ function SciMLBase.solve!(
     workspace, F = cache.cacheval
     (; b, U, V, tmp) = workspace
     b[1:M] .= cache_b
+    b[(M + 1):end] .= 0
     mul!(tmp, U', b)
 
     # TriangularSolve.ldiv!

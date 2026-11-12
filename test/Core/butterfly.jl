@@ -116,6 +116,20 @@ end
     @test y ≈ A' \ b
 end
 
+# `n = 6` is padded. The padding of `b` is mixed into the solution by the transform.
+@testset "Padding of b" begin
+    n = 6
+    A = rand(n, n) + n * I
+    b = 1.0e-12 * rand(n)
+    cache = init(LinearProblem(A, b), ButterflyFactorization())
+    @test solve!(cache).u ≈ A \ b
+    # a large solution in between
+    cache.b = 1.0e30 * rand(n)
+    solve!(cache)
+    cache.b = b
+    @test solve!(cache).u ≈ A \ b
+end
+
 function wilkinson(N)
     A = zeros(N, N)
     A[1:(N + 1):(N * N)] .= 1

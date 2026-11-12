@@ -141,6 +141,7 @@ else
                     @time @safetestset "Static Arrays" include("AD/static_arrays.jl")
                     @time @safetestset "Caching Allocation Tests" include("AD/caching_allocation_tests.jl")
                     @time @safetestset "Enzyme Derivative Rules" include("AD/enzyme.jl")
+                    @time @safetestset "ReverseDiff LU cache" include("AD/reversediff_lu.jl")
                 end
                 return nothing
             end,

@@ -4,6 +4,7 @@
 # resolve.jl; these exercise the solver's own invariants.
 
 using LinearSolve, SparseArrays, LinearAlgebra, Random, Test
+using StableRNGs
 using RecursiveFactorization        # activates the RF/TriangularSolve kernels
 const SNLU = LinearSolve.SupernodalLU
 
@@ -103,6 +104,51 @@ end
     @test SNLU._refine_steps(Fp, :auto) == 3
     bp = randn(size(Ap, 1))
     @test_throws ArgumentError SNLU.solve!(similar(bp), Fp, bp; refine = :bogus)
+end
+
+@testset "refinement never returns a worse answer" begin
+    # Weak random diagonal -> statically perturbed pivots, where a raw refinement
+    # step can increase the residual.
+    function weakdiag(seed; N = 30)
+        rng = StableRNG(seed)
+        L1 = spdiagm(-1 => -ones(N - 1), 0 => 2 * ones(N), 1 => -ones(N - 1))
+        A0 = kron(sparse(I, N, N), L1) + kron(L1, sparse(I, N, N))
+        n = size(A0, 1)
+        A = A0 - Diagonal(diag(A0)) + Diagonal(10.0 .^ (-6 .* rand(rng, n))) +
+            0.5 * sprandn(rng, n, n, 3 / n)
+        return A, A * randn(rng, n)
+    end
+    relres(A, b, x) = norm(b - A * x) / norm(b)
+    slack = 1 + 1.0e-8                                # undoing a step rounds
+
+    # (seed, N, eps_pivot, matching): the first raw step worsens the residual
+    cases = [
+        (5, 30, 1.0e-8, false),
+        (18, 40, 1.0e-2, false),
+        (11, 40, 1.0e-2, false),
+        (14, 40, 1.0e-8, :auto),                      # default eps_pivot and matching
+    ]
+    guards = map(cases) do (seed, N, ε, matching)
+        A, b = weakdiag(seed; N)
+        F = SNLU.snlu(A; eps_pivot = ε, matching = matching)
+        x0 = SNLU.solve(F, b; refine = 0)
+        r0 = relres(A, b, x0)
+        for refine in (:auto, 1, 3)
+            @test relres(A, b, SNLU.solve(F, b; refine = refine)) <= slack * r0
+        end
+        @test SNLU.solve(F, b) ≈ x0
+        SNLU.nperturbed(F) > 0 &&
+            relres(A, b, x0 + SNLU.solve(F, b - A * x0; refine = 0)) > r0
+    end
+    @test all(guards)                                 # the cases still exercise the bug
+
+    A, b = weakdiag(1)
+    F = SNLU.snlu(A; eps_pivot = 1.0e-4, matching = false)
+    @test relres(A, b, SNLU.solve(F, b; refine = 10)) <= 1.0e-14
+
+    x = similar(b)
+    SNLU.solve!(x, F, b; refine = 3)
+    @test (@allocated SNLU.solve!(x, F, b; refine = 3)) == 0
 end
 
 @testset "residual check does not allocate a work vector" begin

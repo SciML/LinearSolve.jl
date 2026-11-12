@@ -61,35 +61,29 @@ end
     @test solve!(cache).u ≈ A1 \ b2
 end
 
-@testset "alias_A: n = $n" for n in (8, 6)
+# The workspace factorizes its own copy of `A`.
+@testset "A is not overwritten: n = $n, alias_A = $alias_A" for n in (8, 6),
+        alias_A in (nothing, false, true)
+
     A1 = rand(n, n) + n * I
     A2 = rand(n, n) + n * I
     b = rand(n)
-    x1 = A1 \ b
-    x2 = A2 \ b
-
-    # Default: the matrix given to `init` and one assigned later are left as they are.
-    A = copy(A1)
-    cache = init(LinearProblem(A, b), ButterflyFactorization())
-    @test solve!(cache).u ≈ x1
-    @test A == A1
-    A = copy(A2)
-    cache.A = A
-    @test solve!(cache).u ≈ x2
-    @test A == A2
-
-    # `alias_A = true`: a matrix that needs no padding is factorized where it is.
     A = copy(A1)
     cache = init(
         LinearProblem(A, b), ButterflyFactorization();
-        alias = LinearAliasSpecifier(alias_A = true)
+        alias = LinearAliasSpecifier(; alias_A)
     )
-    @test solve!(cache).u ≈ x1
-    @test (A != A1) == (n == 8)
+    @test solve!(cache).u ≈ A1 \ b
+    @test A == A1
     A = copy(A2)
     cache.A = A
-    @test solve!(cache).u ≈ x2
-    @test (A != A2) == (n == 8)
+    @test solve!(cache).u ≈ A2 \ b
+    @test A == A2
+end
+
+@testset "init does not copy A" begin
+    A = rand(8, 8) + 8I
+    @test init(LinearProblem(A, rand(8)), ButterflyFactorization()).A === A
 end
 
 @testset "Padding as in RecursiveFactorization: n = $n" for n in (5, 6, 7)

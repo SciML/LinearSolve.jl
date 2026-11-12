@@ -262,7 +262,9 @@ function LinearSolve.init_cacheval(
     )
     # A solve overwrites the workspace's `A` and `b`, so it gets its own.
     workspace = RecursiveFactorization.🦋workspace(copy(A), copy(b))
-    return workspace, RecursiveFactorization.lu!(rand(1, 1), Val(false), alg.thread)
+    # Placeholder with the type of the factorization.
+    F = RecursiveFactorization.lu!(ones(eltype(A), 1, 1), Val(false), alg.thread)
+    return workspace, F
 end
 
 LinearSolve._custom_can_reuse_adjoint_factorization(

@@ -130,6 +130,14 @@ end
     @test solve!(cache).u ≈ A \ b
 end
 
+@testset "Float32: n = $n" for n in (8, 6)
+    A = rand(Float32, n, n) + n * I
+    b = rand(Float32, n)
+    sol = solve(LinearProblem(A, b), ButterflyFactorization())
+    @test sol.u isa Vector{Float32}
+    @test sol.u ≈ A \ b
+end
+
 function wilkinson(N)
     A = zeros(N, N)
     A[1:(N + 1):(N * N)] .= 1

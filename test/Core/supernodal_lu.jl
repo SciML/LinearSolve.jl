@@ -127,6 +127,19 @@ end
         end
     end
 
+    # x0 is finite but the norm of b - A*x0 overflows, so no step can be judged.
+    A = sparse([2.0^-44 -2.0^36; 0 2.0^-48])
+    b = [2.0^972, -2.0^1004]
+    F = SNLU.snlu(
+        A; ordering = :natural, matching = false, relax = false, maxsuper = 1,
+        eps_pivot = 2.0^-20, check = false
+    )
+    x0 = SNLU.solve(F, b; refine = 0)
+    @test all(isfinite, x0) && !isfinite(res(A, b, x0))
+    for refine in (1, 3, :auto)
+        @test SNLU.solve(F, b; refine = refine) == x0
+    end
+
     # Weak random diagonal -> perturbed pivots; refinement still converges.
     function weakdiag(seed; N = 30)
         rng = StableRNG(seed)

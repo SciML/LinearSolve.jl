@@ -230,6 +230,10 @@ function SciMLBase.solve!(
 
     if cache.isfresh
         @assert M == N "A must be square"
+        if workspace.n != M
+            # A new size needs a new workspace.
+            workspace = RecursiveFactorization.🦋workspace(copy(cache_A), copy(cache_b))
+        end
         # Factorize a copy in the workspace. `cache.A` is not overwritten.
         A = pad!(workspace.A, cache_A)
         RecursiveFactorization.🦋mul!(A, workspace.ws)

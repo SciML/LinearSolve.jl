@@ -104,6 +104,18 @@ end
     @test @allocated(refactorize!(cache, A1)) < sizeof(A1)
 end
 
+# 5, 6 and 8 share a workspace of size 8. 3 and 12 need another one.
+@testset "A new size: n = $n to $m" for (n, m) in ((5, 6), (6, 8), (8, 12), (8, 3))
+    cache = init(LinearProblem(rand(n, n) + n * I, rand(n)), ButterflyFactorization())
+    solve!(cache)
+    A = rand(m, m) + m * I
+    b = rand(m)
+    reinit!(cache; A, b, u = zeros(m))
+    @test solve!(cache).u ≈ A \ b
+    y = LinearSolve._adjoint_factorization_solve(cache.alg, cache.cacheval, cache.A, b)
+    @test y ≈ A' \ b
+end
+
 function wilkinson(N)
     A = zeros(N, N)
     A[1:(N + 1):(N * N)] .= 1

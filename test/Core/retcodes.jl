@@ -1,4 +1,4 @@
-using LinearSolve, LinearAlgebra, RecursiveFactorization, StaticArrays, Test
+using LinearSolve, LinearAlgebra, RecursiveFactorization, SparseArrays, StaticArrays, Test
 
 alglist = (
     LUFactorization,
@@ -95,6 +95,65 @@ staticarrayalgs = (
     @test_broken sol = solve(prob1, QRFactorization()) # Needs StaticArrays `qr` fix
 end
 
+@testset "Non-finite or singular factorization reports Failure (#1349)" begin
+    b = [1.0, 2.0]
+    algs = (
+        LUFactorization(), GenericLUFactorization(), GESVFactorization(),
+        GenericFactorization(lu!), GenericFactorization(lu),
+        GenericFactorization(qr), GenericFactorization(),
+    )
+    for A in ([1.0 NaN; 2.0 3.0], [1.0 Inf; 2.0 3.0], [1.0 1.0; 1.0 1.0])
+        for alg in algs
+            # `GenericFactorization()` (`factorize`) factorizes eagerly in
+            # `init_cacheval`, so a singular matrix still throws at `init`;
+            # its `solve!`-time behaviour is covered by the refactorization
+            # cases below.
+            if A == [1.0 1.0; 1.0 1.0] && alg isa GenericFactorization{typeof(factorize)}
+                continue
+            end
+            sol = solve(LinearProblem(copy(A), copy(b)), alg)
+            @test sol.retcode == ReturnCode.Failure
+        end
+    end
+
+    # A non-finite right-hand side cannot produce a successful solve.
+    for alg in algs
+        sol = solve(LinearProblem([2.0 1.0; 1.0 3.0], [NaN, 2.0]), alg)
+        @test sol.retcode == ReturnCode.Failure
+    end
+
+    # Refactorization onto a bad matrix (the ODE W-matrix case) must report
+    # Failure through the retcode so the caller can reject the step.
+    for alg in (
+            LUFactorization(), GenericLUFactorization(),
+            GenericFactorization(lu!), GenericFactorization(lu),
+            GenericFactorization(),
+        )
+        cache = init(LinearProblem([2.0 1.0; 1.0 3.0], copy(b)), alg)
+        @test solve!(cache).retcode == ReturnCode.Success
+        cache.A = [1.0 NaN; 2.0 3.0]
+        @test solve!(cache).retcode == ReturnCode.Failure
+        cache.A = [1.0 1.0; 1.0 1.0]
+        @test solve!(cache).retcode == ReturnCode.Failure
+    end
+
+    # A wrapped factorization that throws on failure (`PosDefException` from
+    # `cholesky` here) is likewise reported through the retcode.
+    cache = init(
+        LinearProblem([2.0 1.0; 1.0 2.0], copy(b)), GenericFactorization(cholesky)
+    )
+    @test solve!(cache).retcode == ReturnCode.Success
+    cache.A = [1.0 2.0; 2.0 1.0]
+    @test solve!(cache).retcode == ReturnCode.Failure
+
+    # Well-posed solves are unchanged.
+    for alg in algs
+        sol = solve(LinearProblem([2.0 1.0; 1.0 3.0], copy(b)), alg)
+        @test sol.retcode == ReturnCode.Success
+        @test sol.u ≈ [0.2, 0.6]
+    end
+end
+
 @testset "StaticArray Singular" begin
     A2 = SA[0.0 0.0; 1.0 -1.0]
     A4 = SMatrix{4, 4}(
@@ -179,4 +238,56 @@ end
     solns = solve(LinearProblem(Ans, bns))
     @test SciMLBase.successful_retcode(solns.retcode)
     @test solns.u ≈ Matrix(Ans) \ Vector(bns)
+end
+
+
+struct FinitenessCountFloat <: AbstractFloat
+    value::Float64
+end
+const finiteness_checks = Ref(0)
+Base.zero(::Type{FinitenessCountFloat}) = FinitenessCountFloat(0.0)
+Base.conj(x::FinitenessCountFloat) = x
+Base.real(x::FinitenessCountFloat) = x
+function Base.isfinite(x::FinitenessCountFloat)
+    finiteness_checks[] += 1
+    return isfinite(x.value)
+end
+
+@testset "Structured factorization finiteness" begin
+    @testset "Active SymTridiagonal storage" begin
+        for padding in (NaN, Inf, -Inf), n in (1, 2, 4)
+            A = SymTridiagonal(fill(2.0, n), [fill(-0.5, n - 1); padding])
+            b = ones(n)
+            for alg in (GenericFactorization(), GenericFactorization(ldlt))
+                sol = solve(LinearProblem(A, b), alg)
+                @test sol.retcode == ReturnCode.Success
+                @test sol.u ≈ Matrix(A) \ b
+            end
+        end
+    end
+
+    @testset "Sparse symmetric finiteness traversal" begin
+        for n in (32, 64), wrapper in (Symmetric, Hermitian), uplo in (:U, :L)
+            P = spdiagm(-1 => fill(-1.0, n - 1), 0 => fill(4.0, n), 1 => fill(-1.0, n - 1))
+            counted = SparseMatrixCSC(
+                n, n, copy(P.colptr), copy(rowvals(P)), FinitenessCountFloat.(nonzeros(P))
+            )
+            finiteness_checks[] = 0
+            @test LinearSolve._matrix_allfinite(wrapper(counted, uplo))
+            @test finiteness_checks[] <= nnz(P)
+
+            i, j = uplo == :U ? (2, 1) : (1, 2)
+            P[i, j] = NaN
+            A = wrapper(P, uplo)
+            @test LinearSolve._matrix_allfinite(A)
+            sol = solve(LinearProblem(A, ones(n)), GenericFactorization())
+            @test sol.retcode == ReturnCode.Success
+            @test A * sol.u ≈ ones(n)
+            cache = init(LinearProblem(A, ones(n)), GenericFactorization())
+            P[j, i] = Inf
+            cache.A = A
+            @test !LinearSolve._matrix_allfinite(A)
+            @test solve!(cache).retcode == ReturnCode.Failure
+        end
+    end
 end

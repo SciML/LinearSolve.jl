@@ -106,6 +106,79 @@ function _check_residual_safety(
     return nothing
 end
 
+const _FLOATLIKE = Union{AbstractFloat, Complex{<:AbstractFloat}}
+
+"""
+    _matrix_allfinite(A)
+
+`false` when a stored entry of `A` is `NaN`/`Inf`, so a factorization `solve!`
+can report `ReturnCode.Failure` instead of factorizing garbage: LAPACK's
+`getrf!` with `check = false` reports success (`info == 0`) on a non-finite
+matrix, so `issuccess` alone cannot detect it. Only matrix types whose stored
+entries are cheap to scan are checked (dense/strided matrices, symmetric wrappers
+with dense or sparse storage, and the banded storage of
+`Diagonal`/`Tridiagonal`/`SymTridiagonal`); other types
+return `true` and rely on the factorization or the solution check.
+Non-floating-point element types are always finite for this purpose.
+"""
+function _matrix_allfinite(A::AbstractMatrix)
+    eltype(A) <: _FLOATLIKE || return true
+    if A isa Union{Symmetric, Hermitian}
+        P = parent(A)
+        if P isa AbstractSparseMatrixCSC
+            rows = rowvals(P)
+            values = nonzeros(P)
+            for j in axes(P, 2), k in SparseArrays.nzrange(P, j)
+                i = rows[k]
+                if A.uplo == 'U' ? i <= j : i >= j
+                    value = A isa Hermitian && i == j ? real(values[k]) : values[k]
+                    isfinite(value) || return false
+                end
+            end
+            return true
+        elseif P isa Union{DenseMatrix, StridedMatrix}
+            return all(isfinite, A)
+        end
+    elseif A isa Union{DenseMatrix, StridedMatrix}
+        return all(isfinite, A)
+    elseif A isa Diagonal
+        return all(isfinite, A.diag)
+    elseif A isa Tridiagonal
+        return all(isfinite, A.dl) && all(isfinite, A.d) && all(isfinite, A.du)
+    elseif A isa SymTridiagonal
+        return all(isfinite, A.dv) &&
+            all(isfinite, @view(A.ev[1:max(0, size(A, 1) - 1)]))
+    end
+    return true
+end
+
+"""
+    _solution_allfinite(y)
+
+`false` when a computed solution contains `NaN`/`Inf`. Such a solution is
+reported as `ReturnCode.Failure`, matching the default solver's and the
+sparse solvers' finiteness checks, instead of a silent `Success`.
+"""
+_solution_allfinite(y) = eltype(y) <: _FLOATLIKE ? all(isfinite, y) : true
+
+"""
+    _is_generic_factorization_failure(e)
+
+Whether `e` is a wrapped factorization reporting failure by throwing
+(singular, not positive definite, a LAPACK failure, or LAPACK's
+non-finite-input `chkfinite` error), as opposed to a usage error.
+`GenericFactorization`'s `solve!` maps the former to
+`ReturnCode.Failure` and rethrows the latter.
+"""
+function _is_generic_factorization_failure(e)
+    e isa LinearAlgebra.SingularException && return true
+    e isa LinearAlgebra.PosDefException && return true
+    e isa LinearAlgebra.LAPACKException && return true
+    e isa ArgumentError || return false
+    msg = e.msg
+    return msg isa AbstractString && occursin("Infs or NaNs", msg)
+end
+
 _ldiv!(x, A, b) = ldiv!(x, A, b)
 
 @static if VERSION < v"1.11"
@@ -271,6 +344,9 @@ overhead at those sizes; larger vectors and matrix right-hand sides use `ldiv!`
   - `residualsafety`: after each fresh factorization, compute the residual `A*u - b`
     against a copy of the original `A` and return `ReturnCode.APosterioriSafetyFailure`
     if its norm exceeds `abstol + reltol * norm(b)`. Defaults to `false`.
+
+A singular or non-finite matrix, or a non-finite solution, is reported as
+`ReturnCode.Failure` rather than thrown or returned as a successful solve.
 """
 Base.@kwdef struct LUFactorization{P} <: AbstractDenseFactorization
     pivot::P = LinearAlgebra.RowMaximum()
@@ -618,6 +694,12 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
         (cache.alg isa DefaultLinearSolver && cache.alg.safetyfallback && cache.isfresh)
     A_original = needs_backup ? _copy_A_for_safety(cache) : A
     if cache.isfresh
+        if !_matrix_allfinite(A)
+            @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
+            return SciMLBase.build_linear_solution(
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
+            )
+        end
         cacheval = @get_cacheval(cache, :LUFactorization)
         local fact
         try
@@ -696,6 +778,13 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
     F = @get_cacheval(cache, :LUFactorization)
     y = _smart_lu_ldiv!(cache.u, F, cache.b)
 
+    if !_solution_allfinite(y)
+        @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
+        return SciMLBase.build_linear_solution(
+            alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
+        )
+    end
+
     if check_safety
         failed = _check_residual_safety(cache, alg, A_original, y)
         failed !== nothing && return failed
@@ -761,6 +850,13 @@ function SciMLBase.solve!(
     A_original = needs_backup ? _copy_A_for_safety(cache) : A
     cacheval = LinearSolve.@get_cacheval(cache, :GenericLUFactorization)
 
+    if cache.isfresh && !_matrix_allfinite(A)
+        @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
+        return SciMLBase.build_linear_solution(
+            alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
+        )
+    end
+
     if !_generic_lu_solve!(cacheval, A, cache.u, cache.b, alg.pivot, cache.isfresh)
         return SciMLBase.build_linear_solution(
             alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
@@ -768,6 +864,13 @@ function SciMLBase.solve!(
     end
     cache.isfresh = false
     y = cache.u
+
+    if !_solution_allfinite(y)
+        @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
+        return SciMLBase.build_linear_solution(
+            alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
+        )
+    end
 
     if check_safety
         failed = _check_residual_safety(cache, alg, A_original, y)
@@ -932,6 +1035,12 @@ function SciMLBase.solve!(cache::LinearCache, alg::GESVFactorization; kwargs...)
     A = convert(AbstractMatrix, cache.A)
     luf = @get_cacheval(cache, :GESVFactorization)
     if cache.isfresh
+        if !_matrix_allfinite(A)
+            @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
+            return SciMLBase.build_linear_solution(
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
+            )
+        end
         if cache.alias_A && A isa Matrix
             # The user permitted overwriting A, so factorize it in place.
             Atarget = A
@@ -958,6 +1067,12 @@ function SciMLBase.solve!(cache::LinearCache, alg::GESVFactorization; kwargs...)
     # Solve into `u`; a matrix `b` (batched RHS) is handled natively by ldiv!.
     copyto!(cache.u, cache.b)
     ldiv!(luf, cache.u)
+    if !_solution_allfinite(cache.u)
+        @SciMLMessage("Solver failed", cache.verbose, :solver_failure)
+        return SciMLBase.build_linear_solution(
+            alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
+        )
+    end
     return SciMLBase.build_linear_solution(
         alg, cache.u, nothing, nothing; retcode = ReturnCode.Success
     )
@@ -1418,6 +1533,12 @@ factorization API. Quoting from Base:
 
   - fact_alg: the factorization algorithm to use. Defaults to `LinearAlgebra.factorize`, but can be
     swapped to choices like `lu`, `qr`
+
+A factorization that fails — a singular or non-finite matrix, or a wrapped
+`fact_alg` such as `lu!`/`cholesky` that reports failure by throwing
+`SingularException`/`PosDefException` — is not thrown from `solve!`; the
+solution carries `ReturnCode.Failure`, so callers such as ODE solvers can
+reject the step. Usage errors from `fact_alg` still throw.
 """
 struct GenericFactorization{F} <: AbstractDenseFactorization
     fact_alg::F
@@ -2702,6 +2823,7 @@ defaultalg_symbol(::Type{<:QRFactorization{ColumnNorm}}) = :QRFactorizationPivot
         cache::LinearCache, alg::AbstractFactorization;
         kwargs...
     )
+    isgeneric = alg <: GenericFactorization
     return quote
         A = convert(AbstractMatrix, cache.A)
         check_safety = _get_residualsafety(alg) && cache.isfresh
@@ -2713,7 +2835,31 @@ defaultalg_symbol(::Type{<:QRFactorization{ColumnNorm}}) = :QRFactorizationPivot
         A_original = needs_backup ? _copy_A_for_safety(cache) : A
 
         if cache.isfresh
-            fact = do_factorization(alg, cache.A, cache.b, cache.u)
+            if $isgeneric && !_matrix_allfinite(A)
+                @SciMLMessage(
+                    "Solver failed", cache.verbose,
+                    :solver_failure
+                )
+                return SciMLBase.build_linear_solution(
+                    alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
+                )
+            end
+            fact = if $isgeneric
+                try
+                    do_factorization(alg, cache.A, cache.b, cache.u)
+                catch e
+                    _is_generic_factorization_failure(e) || rethrow(e)
+                    @SciMLMessage(
+                        "Solver failed", cache.verbose,
+                        :solver_failure
+                    )
+                    return SciMLBase.build_linear_solution(
+                        alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
+                    )
+                end
+            else
+                do_factorization(alg, cache.A, cache.b, cache.u)
+            end
             cache.cacheval = fact
 
             # If factorization was not successful, return failure. Don't reset `isfresh`
@@ -2730,10 +2876,38 @@ defaultalg_symbol(::Type{<:QRFactorization{ColumnNorm}}) = :QRFactorizationPivot
             cache.isfresh = false
         end
 
-        y = _ldiv!(
-            cache.u, @get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
-            cache.b
-        )
+        y = if $isgeneric
+            try
+                _ldiv!(
+                    cache.u, @get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
+                    cache.b
+                )
+            catch e
+                _is_generic_factorization_failure(e) || rethrow(e)
+                @SciMLMessage(
+                    "Solver failed", cache.verbose,
+                    :solver_failure
+                )
+                return SciMLBase.build_linear_solution(
+                    alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
+                )
+            end
+        else
+            _ldiv!(
+                cache.u, @get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
+                cache.b
+            )
+        end
+
+        if !_solution_allfinite(y)
+            @SciMLMessage(
+                "Solver failed", cache.verbose,
+                :solver_failure
+            )
+            return SciMLBase.build_linear_solution(
+                alg, cache.u, nothing, nothing; retcode = ReturnCode.Failure
+            )
+        end
 
         if check_safety
             failed = _check_residual_safety(cache, alg, A_original, y)

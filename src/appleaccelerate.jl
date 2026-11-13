@@ -30,7 +30,7 @@ this method for all but the smallest dense BLAS-eltype matrices.
     On other platforms, or if the framework cannot be opened, `solve!` with this algorithm
     errors that the AppleAccelerate binary is missing.
 """
-struct AppleAccelerateLUFactorization <: AbstractFactorization
+struct AppleAccelerateLUFactorization <: AbstractDenseFactorization
     residualsafety::Bool
 end
 
@@ -433,7 +433,7 @@ end
 default_alias_A(::AppleAccelerate32MixedLUFactorization, ::Any, ::Any) = false
 default_alias_b(::AppleAccelerate32MixedLUFactorization, ::Any, ::Any) = false
 
-const PREALLOCATED_APPLE32_LU = begin
+const PREALLOCATED_APPLE32_LU = let
     A = rand(Float32, 0, 0)
     luinst = ArrayInterface.lu_instance(A)
     LU(luinst.factors, similar(A, Cint, 0), luinst.info), Ref{Cint}()

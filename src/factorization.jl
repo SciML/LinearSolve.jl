@@ -115,21 +115,39 @@ const _FLOATLIKE = Union{AbstractFloat, Complex{<:AbstractFloat}}
 can report `ReturnCode.Failure` instead of factorizing garbage: LAPACK's
 `getrf!` with `check = false` reports success (`info == 0`) on a non-finite
 matrix, so `issuccess` alone cannot detect it. Only matrix types whose stored
-entries are cheap to scan are checked (dense/strided, symmetric wrappers, and
-the banded storage of `Diagonal`/`Tridiagonal`/`SymTridiagonal`); other types
+entries are cheap to scan are checked (dense/strided matrices, symmetric wrappers
+with dense or sparse storage, and the banded storage of
+`Diagonal`/`Tridiagonal`/`SymTridiagonal`); other types
 return `true` and rely on the factorization or the solution check.
 Non-floating-point element types are always finite for this purpose.
 """
 function _matrix_allfinite(A::AbstractMatrix)
     eltype(A) <: _FLOATLIKE || return true
-    if A isa Union{DenseMatrix, StridedMatrix, Symmetric, Hermitian}
+    if A isa Union{Symmetric, Hermitian}
+        P = parent(A)
+        if P isa AbstractSparseMatrixCSC
+            rows = rowvals(P)
+            values = nonzeros(P)
+            for j in axes(P, 2), k in SparseArrays.nzrange(P, j)
+                i = rows[k]
+                if A.uplo == 'U' ? i <= j : i >= j
+                    value = A isa Hermitian && i == j ? real(values[k]) : values[k]
+                    isfinite(value) || return false
+                end
+            end
+            return true
+        elseif P isa Union{DenseMatrix, StridedMatrix}
+            return all(isfinite, A)
+        end
+    elseif A isa Union{DenseMatrix, StridedMatrix}
         return all(isfinite, A)
     elseif A isa Diagonal
         return all(isfinite, A.diag)
     elseif A isa Tridiagonal
         return all(isfinite, A.dl) && all(isfinite, A.d) && all(isfinite, A.du)
     elseif A isa SymTridiagonal
-        return all(isfinite, A.dv) && all(isfinite, A.ev)
+        return all(isfinite, A.dv) &&
+            all(isfinite, @view(A.ev[1:max(0, size(A, 1) - 1)]))
     end
     return true
 end

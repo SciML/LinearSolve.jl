@@ -1,4 +1,4 @@
-using LinearSolve, LinearAlgebra, RecursiveFactorization, StaticArrays, Test
+using LinearSolve, LinearAlgebra, RecursiveFactorization, SparseArrays, StaticArrays, Test
 
 alglist = (
     LUFactorization,
@@ -238,4 +238,56 @@ end
     solns = solve(LinearProblem(Ans, bns))
     @test SciMLBase.successful_retcode(solns.retcode)
     @test solns.u ≈ Matrix(Ans) \ Vector(bns)
+end
+
+
+struct FinitenessCountFloat <: AbstractFloat
+    value::Float64
+end
+const finiteness_checks = Ref(0)
+Base.zero(::Type{FinitenessCountFloat}) = FinitenessCountFloat(0.0)
+Base.conj(x::FinitenessCountFloat) = x
+Base.real(x::FinitenessCountFloat) = x
+function Base.isfinite(x::FinitenessCountFloat)
+    finiteness_checks[] += 1
+    return isfinite(x.value)
+end
+
+@testset "Structured factorization finiteness" begin
+    @testset "Active SymTridiagonal storage" begin
+        for padding in (NaN, Inf, -Inf), n in (1, 2, 4)
+            A = SymTridiagonal(fill(2.0, n), [fill(-0.5, n - 1); padding])
+            b = ones(n)
+            for alg in (GenericFactorization(), GenericFactorization(ldlt))
+                sol = solve(LinearProblem(A, b), alg)
+                @test sol.retcode == ReturnCode.Success
+                @test sol.u ≈ Matrix(A) \ b
+            end
+        end
+    end
+
+    @testset "Sparse symmetric finiteness traversal" begin
+        for n in (32, 64), wrapper in (Symmetric, Hermitian), uplo in (:U, :L)
+            P = spdiagm(-1 => fill(-1.0, n - 1), 0 => fill(4.0, n), 1 => fill(-1.0, n - 1))
+            counted = SparseMatrixCSC(
+                n, n, copy(P.colptr), copy(rowvals(P)), FinitenessCountFloat.(nonzeros(P))
+            )
+            finiteness_checks[] = 0
+            @test LinearSolve._matrix_allfinite(wrapper(counted, uplo))
+            @test finiteness_checks[] <= nnz(P)
+
+            i, j = uplo == :U ? (2, 1) : (1, 2)
+            P[i, j] = NaN
+            A = wrapper(P, uplo)
+            @test LinearSolve._matrix_allfinite(A)
+            sol = solve(LinearProblem(A, ones(n)), GenericFactorization())
+            @test sol.retcode == ReturnCode.Success
+            @test A * sol.u ≈ ones(n)
+            cache = init(LinearProblem(A, ones(n)), GenericFactorization())
+            P[j, i] = Inf
+            cache.A = A
+            @test !LinearSolve._matrix_allfinite(A)
+            @test solve!(cache).retcode == ReturnCode.Failure
+        end
+    end
 end

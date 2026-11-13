@@ -37,6 +37,107 @@ end
     @test adjoint(A) * adjoint_solution ≈ adjoint_rhs
 end
 
+# `n = 8` is a multiple of 4, which the butterfly workspace takes without padding.
+# The other sizes are padded to 8.
+@testset "Cache reuse: n = $n" for n in (8, 5, 6, 7)
+    A1 = rand(n, n) + n * I
+    A2 = rand(n, n) + n * I
+    b1 = rand(n)
+    b2 = rand(n)
+    cache = init(LinearProblem(A1, b1), ButterflyFactorization())
+    sol = solve!(cache)
+    @test sol.u ≈ A1 \ b1
+    @test cache.u == sol.u
+    @test cache.b == b1
+    # a new `b`, same factorization
+    cache.b = b2
+    @test solve!(cache).u ≈ A1 \ b2
+    # a new `A`
+    cache.A = A2
+    @test solve!(cache).u ≈ A2 \ b2
+    # the same array again, refilled in place
+    copyto!(cache.A, A1)
+    cache.A = cache.A
+    @test solve!(cache).u ≈ A1 \ b2
+end
+
+# The workspace factorizes its own copy of `A`.
+@testset "A is not overwritten: n = $n, alias_A = $alias_A" for n in (8, 6),
+        alias_A in (nothing, false, true)
+
+    A1 = rand(n, n) + n * I
+    A2 = rand(n, n) + n * I
+    b = rand(n)
+    A = copy(A1)
+    cache = init(
+        LinearProblem(A, b), ButterflyFactorization();
+        alias = LinearAliasSpecifier(; alias_A)
+    )
+    @test solve!(cache).u ≈ A1 \ b
+    @test A == A1
+    A = copy(A2)
+    cache.A = A
+    @test solve!(cache).u ≈ A2 \ b
+    @test A == A2
+end
+
+@testset "init does not copy A" begin
+    A = rand(8, 8) + 8I
+    @test init(LinearProblem(A, rand(8)), ButterflyFactorization()).A === A
+end
+
+@testset "Padding as in RecursiveFactorization: n = $n" for n in (5, 6, 7)
+    pad! = Base.get_extension(LinearSolve, :LinearSolveRecursiveFactorizationExt).pad!
+    A = rand(n, n)
+    @test pad!(rand(8, 8), A) == RecursiveFactorization.pad!(A)
+end
+
+# `n = 102` is padded to 104. A new workspace would allocate several matrices.
+@testset "Refactorization allocates no matrix: n = $n" for n in (100, 102)
+    A1 = rand(n, n) + n * I
+    A2 = rand(n, n) + n * I
+    b = rand(n)
+    cache = init(LinearProblem(A1, b), ButterflyFactorization())
+    solve!(cache)
+    refactorize!(cache, A) = (cache.A = A; solve!(cache))
+    @test refactorize!(cache, A2).u ≈ A2 \ b
+    @test @allocated(refactorize!(cache, A1)) < sizeof(A1)
+end
+
+# 5, 6 and 8 share a workspace of size 8. 3 and 12 need another one.
+@testset "A new size: n = $n to $m" for (n, m) in ((5, 6), (6, 8), (8, 12), (8, 3))
+    cache = init(LinearProblem(rand(n, n) + n * I, rand(n)), ButterflyFactorization())
+    solve!(cache)
+    A = rand(m, m) + m * I
+    b = rand(m)
+    reinit!(cache; A, b, u = zeros(m))
+    @test solve!(cache).u ≈ A \ b
+    y = LinearSolve._adjoint_factorization_solve(cache.alg, cache.cacheval, cache.A, b)
+    @test y ≈ A' \ b
+end
+
+# `n = 6` is padded. The padding of `b` is mixed into the solution by the transform.
+@testset "Padding of b" begin
+    n = 6
+    A = rand(n, n) + n * I
+    b = 1.0e-12 * rand(n)
+    cache = init(LinearProblem(A, b), ButterflyFactorization())
+    @test solve!(cache).u ≈ A \ b
+    # a large solution in between
+    cache.b = 1.0e30 * rand(n)
+    solve!(cache)
+    cache.b = b
+    @test solve!(cache).u ≈ A \ b
+end
+
+@testset "Float32: n = $n" for n in (8, 6)
+    A = rand(Float32, n, n) + n * I
+    b = rand(Float32, n)
+    sol = solve(LinearProblem(A, b), ButterflyFactorization())
+    @test sol.u isa Vector{Float32}
+    @test sol.u ≈ A \ b
+end
+
 function wilkinson(N)
     A = zeros(N, N)
     A[1:(N + 1):(N * N)] .= 1

@@ -202,6 +202,21 @@ function SciMLBase.solve!(
     )
 end
 
+# Write `[A 0; 0 I]` into `P`, the padding of `RecursiveFactorization.pad!`.
+# A copy when `P` has the size of `A`.
+function pad!(P, A)
+    n = size(A, 1)
+    pad = (n + 1):size(P, 1)
+    R = CartesianIndices(A)
+    copyto!(P, R, A, R)
+    P[1:n, pad] .= 0
+    P[pad, 1:n] .= 0
+    for j in pad, i in pad
+        P[i, j] = i == j
+    end
+    return P
+end
+
 function SciMLBase.solve!(
         cache::LinearSolve.LinearCache, alg::ButterflyFactorization;
         kwargs...
@@ -215,34 +230,41 @@ function SciMLBase.solve!(
 
     if cache.isfresh
         @assert M == N "A must be square"
-        if (size(workspace.A, 1) != M)
-            workspace = RecursiveFactorization.🦋workspace(cache_A, cache_b)
+        if workspace.n != M
+            # A new size needs a new workspace.
+            workspace = RecursiveFactorization.🦋workspace(copy(cache_A), copy(cache_b))
         end
-        (; A, b, ws, U, V, out, tmp, n) = workspace
-        RecursiveFactorization.🦋mul!(A, ws)
+        # Factorize a copy in the workspace. `cache.A` is not overwritten.
+        A = pad!(workspace.A, cache_A)
+        RecursiveFactorization.🦋mul!(A, workspace.ws)
         F = RecursiveFactorization.lu!(A, Val(false), thread)
         cache.cacheval = (workspace, F)
         cache.isfresh = false
     end
 
     workspace, F = cache.cacheval
-    (; A, b, ws, U, V, out, tmp, n) = workspace
+    (; b, U, V, tmp) = workspace
     b[1:M] .= cache_b
+    b[(M + 1):end] .= 0
     mul!(tmp, U', b)
 
     # TriangularSolve.ldiv!
     TriangularSolve.ldiv!(F, tmp, thread)
 
     mul!(b, V, tmp)
-    out .= @view b[1:n]
-    return SciMLBase.build_linear_solution(alg, out, nothing, nothing)
+    cache.u .= @view b[1:M]
+    return SciMLBase.build_linear_solution(alg, cache.u, nothing, nothing)
 end
 
 function LinearSolve.init_cacheval(
         alg::ButterflyFactorization, A, b, u, Pl, Pr, maxiters::Int,
         abstol, reltol, verbose::Union{LinearVerbosity, Bool}, assumptions::LinearSolve.OperatorAssumptions
     )
-    return ws = RecursiveFactorization.🦋workspace(A, b), RecursiveFactorization.lu!(rand(1, 1), Val(false), alg.thread)
+    # A solve overwrites the workspace's `A` and `b`, so it gets its own.
+    workspace = RecursiveFactorization.🦋workspace(copy(A), copy(b))
+    # Placeholder with the type of the factorization.
+    F = RecursiveFactorization.lu!(ones(eltype(A), 1, 1), Val(false), alg.thread)
+    return workspace, F
 end
 
 LinearSolve._custom_can_reuse_adjoint_factorization(

@@ -1,5 +1,0 @@
-{
-  "formatters": {
-    ".jl": ["runic", "--check", "{files}"]
-  }
-}

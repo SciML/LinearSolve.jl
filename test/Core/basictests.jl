@@ -252,10 +252,14 @@ end
 
         # Row 1 holds an entry 1e6 times larger than A[1, 1]. Row scaling makes the
         # scaled A[1, 1] fall below `tol` times the scaled A[2, 1], so KLU pivots on
-        # row 2; without scaling it keeps the diagonal pivot. `Rs` holds the row
-        # scale factors in pivot order.
+        # row 2; without scaling it keeps the diagonal pivot. `Rs` and `RsB` hold the
+        # row scale factors of A and B in pivot order.
         expected = [1.0, 2.0]
-        for (scale, p, Rs) in ((0, [1, 2], [1.0, 1.0]), (2, [2, 1], [1.0, 1.0e6]))
+        for (scale, p, Rs, RsB) in (
+                (0, [1, 2], [1.0, 1.0], [1.0, 1.0]),
+                (1, [2, 1], [1.5, 1000001.0], [3.5, 1000002.0]),
+                (2, [2, 1], [1.0, 1.0e6], [3.0, 1.0e6]),
+            )
             A = sparse([1.0 1.0e6; 0.5 1.0])
             cache = SciMLBase.init(LinearProblem(A, A * expected), alg(; scale))
             @test solve!(cache).u ≈ expected
@@ -270,7 +274,7 @@ end
             @test solve!(cache).u ≈ expected
             @test cache.cacheval.common.scale == scale
             @test cache.cacheval.p == p
-            @test cache.cacheval.Rs == (scale == 0 ? [1.0, 1.0] : [3.0, 1.0e6])
+            @test cache.cacheval.Rs == RsB
         end
     end
 

@@ -25,7 +25,8 @@ using Base: Bool, convert, copyto!, adjoint, transpose, /, \, require_one_based_
 using LinearAlgebra: LinearAlgebra, BlasInt, LU, Adjoint, BLAS, Bidiagonal, BunchKaufman,
     ColumnNorm, cond, Diagonal, Factorization, Hermitian, I, LAPACK, NoPivot,
     RowMaximum, RowNonZero, SymTridiagonal, Symmetric, Transpose,
-    Tridiagonal, UniformScaling, axpby!, axpy!, bunchkaufman,
+    Tridiagonal, UniformScaling, UnitLowerTriangular, UnitUpperTriangular,
+    UpperTriangular, LowerTriangular, axpby!, axpy!, bunchkaufman,
     bunchkaufman!,
     cholesky, cholesky!, diagind, dot, inv, issuccess, ldiv!, ldlt!, lu, lu!, mul!,
     norm,
@@ -797,13 +798,18 @@ PrecompileTools.@compile_workload begin
     sol = solve(LinearProblem(Ablocked, bblocked), GenericLUFactorization())
 end
 
-ALREADY_WARNED_CUDSS = Ref{Bool}(false)
+const ALREADY_WARNED_CUDSS = Ref{Bool}(false)
 error_no_cudss_lu(A) = nothing
 cudss_loaded(A) = false
 is_cusparse(A) = false
 is_cusparse_csr(A) = false
 
 is_cusparse_csc(A) = false
+
+PrecompileTools.@compile_workload begin
+    Asparse = SparseArrays.sprand(4, 4, 0.3) + I
+    solve(LinearProblem(Asparse, rand(4)))
+end
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
     LowRankUpdatedMatrix,

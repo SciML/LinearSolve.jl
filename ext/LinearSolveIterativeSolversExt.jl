@@ -62,7 +62,7 @@ LinearSolve._isidentity_struct(::IterativeSolvers.Identity) = true
 # Accept LinearSolve's `maxiters` spelling on the algorithm and hand
 # IterativeSolvers the `maxiter` it expects. An explicit `maxiter` wins if both
 # are given, and the NamedTuple is rebuilt rather than mutated so the result
-# stays inferrable.
+# stays inferable.
 function _rename_maxiters(kwargs)
     haskey(kwargs, :maxiters) || return NamedTuple(kwargs)
     nt = NamedTuple(kwargs)
@@ -208,7 +208,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::IterativeSolversJL; kwargs...
         resid = resid.current
     end
 
-    retcode = _iterable_converged(cache.cacheval) ? ReturnCode.Success : ReturnCode.MaxIters
+    retcode = _iterable_converged(cache.cacheval, resid) ? ReturnCode.Success : ReturnCode.MaxIters
     return SciMLBase.build_linear_solution(
         alg, cache.u, resid, nothing; iters = i, retcode = retcode
     )
@@ -222,10 +222,13 @@ _iterable_residual(iterable) = iterable.residual
 _iterable_residual(iterable::IterativeSolvers.IDRSIterable) = iterable.R
 _iterable_residual(iterable::IterativeSolvers.MINRESIterable) = iterable.resnorm
 
-# `IterativeSolvers.converged` covers every iterable reachable here except
-# `IDRSIterable`, which carries its residual norm as `normR`.
-_iterable_converged(iter) = IterativeSolvers.converged(iter)
-_iterable_converged(iter::IterativeSolvers.IDRSIterable) = iter.normR <= iter.tol
+# IterativeSolvers' own `converged(iter)` (never exported/public) reduces to exactly
+# this for every iterable reachable here: the residual already extracted by
+# `_iterable_residual` above compared against `iter.tol`. `IDRSIterable` has no
+# `converged` method upstream and carries its residual norm separately as `normR`,
+# not through `_iterable_residual`.
+_iterable_converged(iter, resid) = resid <= iter.tol
+_iterable_converged(iter::IterativeSolvers.IDRSIterable, resid) = iter.normR <= iter.tol
 
 # The constructors bake in `tol = max(reltol * ||r0||, abstol)` against whatever initial
 # guess they were handed. LinearSolve's `reltol` is relative to `b`, and the two agree

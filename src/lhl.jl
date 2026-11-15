@@ -284,6 +284,9 @@ function _update_gamma!(cache::LinearCache, c::LHLCache, A::WOperator)
         return cache
     end
     σ, τ = _lhl_shift_pair(A)
-    _lhl_load_shift!(c.ws, σ, τ)
+    ws = c.ws
+    if ws.σ != σ || ws.τ != τ
+        _lhl_load_shift!(ws, σ, τ)
+    end
     return cache
 end

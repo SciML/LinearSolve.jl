@@ -84,6 +84,7 @@ _full_column_rank(F, A) = false
 function _full_column_rank(F::QRPivoted, A)
     m, n = size(A)
     m < n && return false
+    n == 0 && return true
     R = F.factors
     tol = n * eps(real(eltype(R))) * abs(R[1, 1])
     return all(i -> abs(R[i, i]) > tol, 1:n)

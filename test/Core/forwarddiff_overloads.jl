@@ -508,6 +508,11 @@ backslash_large = A_large_dual \ b_large_dual
         @test ForwardDiff.derivative(t -> solve(LinearProblem(At(t), bt), alg).u, 0.0) ≈ ref rtol = 1.0e-6
     end
 
+    # an `A` with no columns has full column rank
+    for alg in (nothing, SVDFactorization(), KrylovJL_LSMR())
+        @test ForwardDiff.derivative(t -> solve(LinearProblem(fill(t, 3, 0), zeros(3)), alg).u, 0.5) == Float64[]
+    end
+
     # a non-strided `A` gets no pivoted QR to tell its rank; this one has rank one and the
     # minimum-norm solution [1, t] / (1 + t^2)
     Ab(t) = BandedMatrix([1, 2, 3] * [1, t]', (2, 1))

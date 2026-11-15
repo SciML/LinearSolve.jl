@@ -375,12 +375,14 @@ end
     _add_nonsquare_pullback!(dA, cache, A, b, x, lambda, dx)
 
 Accumulate [`_nonsquare_pullback_factors`](@ref) into `dA` in place, leaving it untouched
-when there is no correction to make.
+when there is no correction to make. An immutable `dA`, such as an `SMatrix`, gets a new
+array instead, so callers use the returned value.
 """
 function _add_nonsquare_pullback!(dA, cache, A, b, x, lambda, dx)
     factors = _nonsquare_pullback_factors(cache, A, b, x, lambda, dx)
     factors === nothing && return dA
     u, v = factors
+    ArrayInterface.can_setindex(dA) || return dA + u * adjoint(v)
     return mul!(dA, u, adjoint(v), true, true)
 end
 

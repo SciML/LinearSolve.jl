@@ -112,7 +112,7 @@ function Mooncake.rrule!!(
         tu = adjoint(u_fwd)
         ∂A = .-(λ .* tu)
         # `cache.A`/`cache.b` were restored above to the operands the solve saw
-        LinearSolve._add_nonsquare_pullback!(∂A, cache, cache.A, cache.b, u_fwd, λ, ∂u)
+        ∂A = LinearSolve._add_nonsquare_pullback!(∂A, cache, cache.A, cache.b, u_fwd, λ, ∂u)
         ∂b = λ
 
         if (iszero(∂b) || iszero(∂A)) && !iszero(tu)

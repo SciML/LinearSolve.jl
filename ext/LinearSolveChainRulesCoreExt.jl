@@ -88,7 +88,7 @@ function CRC.rrule(
 
         tu = adjoint(sol.u)
         ∂A = .-(λ .* tu)
-        LinearSolve._add_nonsquare_pullback!(∂A, cache, A_ns, b_, sol.u, λ, ∂u)
+        ∂A = LinearSolve._add_nonsquare_pullback!(∂A, cache, A_ns, b_, sol.u, λ, ∂u)
         ∂b = λ
         ∂prob = LinearProblem(∂A, ∂b, ∂∅)
 

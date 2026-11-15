@@ -1,7 +1,7 @@
 using Zygote, ForwardDiff
 using LinearSolve, LinearAlgebra, Test
 using FiniteDiff, RecursiveFactorization
-using InteractiveUtils, Random, SparseArrays
+using InteractiveUtils, Random, SparseArrays, StaticArrays
 import CliqueTrees
 
 struct UnregisteredFactorization <: LinearSolve.AbstractFactorization end
@@ -529,6 +529,14 @@ end
                 )
                 @test Zygote.gradient(g, vec(A))[1] ≈ reference rtol = 1.0e-6
             end
+        end
+
+        # a static `A` has an immutable cotangent; varying A[3, 1] to t gives
+        # sum(x) = (1 + 3t) / (1 + t^2) + 2, whose derivative at t = 0.5 is 4/5
+        As = @SMatrix [1.0 0.0; 0.0 1.0; 0.5 0.0]
+        bs = @SVector [1.0, 2.0, 3.0]
+        for alg in (NormalCholeskyFactorization(), KrylovJL_LSMR())
+            @test Zygote.gradient(X -> sum(solve(LinearProblem(X, bs), alg).u), As)[1][3, 1] ≈ 0.8 rtol = 1.0e-6
         end
     end
 

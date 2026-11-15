@@ -29,10 +29,10 @@ using AMDGPU, CUDSS, Metal, cuSOLVER
 #   julia >= 1.12 - LinearSolveParUExt (ParU_jll needs a newer SuiteSparse_jll than
 #                   the LTS stdlib ships, and QA also runs on lts)
 #   unresolvable  - LinearSolveCUSOLVERRFExt. CUSOLVERRF 0.2.6 pins CUDA to 5.7-5.11
-#                   while CUDSS 0.7 requires CUDACore 6, so the root [compat] entries
-#                   for the two cannot both be satisfied in one environment. CUDSS is
-#                   loaded here; adding CUSOLVERRF back needs that conflict resolved
-#                   upstream first.
+#                   while CUDSS 0.7 and 0.8 require CUDACore 6, so the root
+#                   [compat] entries for the two cannot both be satisfied in
+#                   one environment. CUDSS is loaded here; adding CUSOLVERRF
+#                   back needs that conflict resolved upstream first.
 loaded_extensions = (
     :LinearSolveAMDGPUExt, :LinearSolveAlgebraicMultigridExt,
     :LinearSolveArnoldiMethodExt, :LinearSolveArpackExt, :LinearSolveBLISExt,
@@ -197,7 +197,7 @@ external_internal_accesses = (
     Symbol("init_residual!"), Symbol("minres_iterable!"),
     # Krylov / Mooncake / EnumX / PureKLU / MKL_jll / OpenBLAS_jll
     Symbol("warm_start!"), Symbol("increment_and_get_rdata!"), Symbol("rrule!!"),
-    :symbol_map, :KLU_OK, :is_available,
+    :symbol_map, :KLU_OK, :KLU_SINGULAR, :is_available,
     # Reactant has no public callback or non-wrapper registration API; these hooks
     # preserve the solve as one operation and let it traverse LinearSolution.
     Symbol("@reactant_overlay"), :Ops, :_parent_type, :julia_callback,

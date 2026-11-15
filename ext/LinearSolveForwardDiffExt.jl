@@ -838,6 +838,7 @@ function nodual_value!(out::Union{Symmetric, Hermitian}, x::Union{Symmetric, Her
     nodual_value!(parent(out), out.uplo == x.uplo ? parent(x) : x)
     return out
 end
+nodual_value!(out::SparseMatrixCSC, x::SymHermSparseDual) = nodual_value!(out, SparseMatrixCSC(x))
 
 # `map!` into a `SparseMatrixCSC` is zero-pruning (`SparseArrays._map_zeropres!`):
 # it rebuilds the destination's structure and drops any stored entry whose mapped

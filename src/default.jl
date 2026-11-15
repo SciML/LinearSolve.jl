@@ -1271,6 +1271,61 @@ end
 end
 
 """
+    _qr_fallback_adjoint_eval(cache::LinearCache, dy)
+
+Adjoint solve for the state where a previous solve fell back to QR
+(`fell_back_to_qr` set, matrix unchanged since). The slot
+`defaultalg_adjoint_eval` would pick from `cache.alg.alg` then holds the failed
+LU — for the in-place dense factorizations not even of `A`, since the
+fallback's `qr!` overwrote `cache.A` with its own factors — so the adjoint is
+routed the way `_reuse_qr_fallback` / `_reuse_sparse_qr_fallback` route the
+forward solve.
+
+Dense: the fallback returns the minimum-norm least-squares solution `pinv(A) b`,
+whose adjoint is `pinv(A)' dy` — the minimum-norm least-squares solution of
+`Aᴴ λ = dy`, computed by a fresh column-pivoted QR of the backed-up `A`. The
+stored `QRPivoted` cannot be transposed and reused: its adjoint solve does not
+truncate rank the way its forward solve does.
+
+Sparse: the fallback's `F \\ b` is a basic solution, so the consistent adjoint
+is the transpose of that same stored solution map — `adjoint(F) \\ dy` for
+`SparseColumnPivotedQR`, `_spqr_adjoint_solve` for SuiteSparse's `QRSparse`,
+and the dense-style fresh pivoted QR for a materialized `QRPivoted` (whose
+forward solve is already the minimum-norm least-squares one).
+"""
+function _qr_fallback_adjoint_eval(cache::LinearCache, dy)
+    cv = cache.cacheval
+    if cache.A isa DenseMatrix
+        A = cv.A_backup
+        Aq = adjoint(A)
+        F = if A isa GPUArraysCore.AnyGPUArray || is_cusparse(A)
+            qr(Aq)
+        else
+            qr(Aq, _qr_fallback_pivot(A))
+        end
+        return F \ dy
+    end
+    F = if Base.USE_GPL_LIBS && !use_klulike_sparse_structure(cache.A, cache.b)
+        getfield(cv, :QRFactorizationPivoted)
+    else
+        getfield(cv, :SparseColumnPivotedQRFactorization)
+    end
+    if F isa SCPQR.SparseColumnPivotedQRFactorization
+        if dy isa AbstractMatrix
+            return reduce(hcat, (adjoint(F) \ c for c in eachcol(dy)))
+        end
+        return adjoint(F) \ dy
+    end
+    @static if Base.USE_GPL_LIBS
+        F isa SparseArrays.SPQR.QRSparse && return _spqr_adjoint_solve(F, dy)
+    end
+    if F isa LinearAlgebra.QRPivoted
+        return qr(adjoint(convert(AbstractMatrix, cache.A)), _qr_fallback_pivot(cache.A)) \ dy
+    end
+    return adjoint(F) \ dy
+end
+
+"""
 ```
 elseif DefaultAlgorithmChoice.LUFactorization === cache.alg
     (cache.cacheval.LUFactorization)' \\ dy
@@ -1365,5 +1420,13 @@ end
             )
         end
     end
-    return ex = Expr(:if, ex.args...)
+    alg_dispatch = Expr(:if, ex.args...)
+    return quote
+        if cache.cacheval isa DefaultLinearSolverInit &&
+                cache.cacheval.fell_back_to_qr && !cache.isfresh
+            _qr_fallback_adjoint_eval(cache, dy)
+        else
+            $alg_dispatch
+        end
+    end
 end

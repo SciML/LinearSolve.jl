@@ -495,7 +495,7 @@ end
         test_interface(LinearSolve.FastLUFactorization(), prob1, prob2)
         test_interface(LinearSolve.FastQRFactorization(), prob1, prob2)
         # Column pivoting has its own workspace type.
-        test_interface(LinearSolve.FastQRFactorization(ColumnNorm(), 36), prob1, prob2)
+        test_interface(LinearSolve.FastQRFactorization(ColumnNorm()), prob1, prob2)
 
         # TODO: Resizing tests. Upstream doesn't currently support it.
         # Need to be absolutely certain we never segfault with incorrect

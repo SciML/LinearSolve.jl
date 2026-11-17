@@ -540,7 +540,7 @@ backslash_large = A_large_dual \ b_large_dual
     end
 
     # an `A` with no columns has full column rank
-    for alg in (nothing, KrylovJL_LSMR())
+    for alg in (nothing, SVDFactorization(), KrylovJL_LSMR())
         @test ForwardDiff.derivative(t -> solve(LinearProblem(fill(t, 3, 0), zeros(3)), alg).u, 0.5) == Float64[]
     end
 

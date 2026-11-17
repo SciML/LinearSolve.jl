@@ -544,14 +544,27 @@ backslash_large = A_large_dual \ b_large_dual
         @test ForwardDiff.derivative(t -> solve(LinearProblem(fill(t, 3, 0), zeros(3)), alg).u, 0.5) == Float64[]
     end
 
-    # a non-strided `A` gets no pivoted QR to tell its rank; this one has rank one and the
-    # minimum-norm solution [1, t] / (1 + t^2)
+    # rank one, with the minimum-norm solution [1, t] / (1 + t^2)
     Ab(t) = BandedMatrix([1, 2, 3] * [1, t]', (2, 1))
     @test ForwardDiff.derivative(t -> solve(LinearProblem(Ab(t), [1.0, 2, 3]), KrylovJL_LSMR()).u, 0.5) ≈ [-0.64, 0.48]
     Bb(t) = BandedMatrix([1 t; 2 1; 3 0; 0 1], (3, 1))
     bb = [1.0, 2, 3, 4]
     @test ForwardDiff.derivative(t -> solve(LinearProblem(Bb(t), bb)).u, 0.3) ≈
         ForwardDiff.derivative(t -> Matrix(Bb(t)) \ bb, 0.3)
+
+    # ill-conditioned, with the least-squares solution [-t / δ, 1]
+    for (T, k) in ((Float32, 13), (Float64, 27))
+        δ = T(2)^(-k)
+        Aδ(t) = BandedMatrix([δ t; zero(t) one(t); zero(t) zero(t)], (0, 1))
+        @test ForwardDiff.derivative(t -> solve(LinearProblem(Aδ(t), T[0, 1, 0])).u, one(T)) ≈ [-1 / δ, 0]
+    end
+
+    # rank two and ill-conditioned, with a null space that moves with `t` and the
+    # minimum-norm solution [-2^20 t, 1 / (1 + t^2), t / (1 + t^2)]
+    Ar(t) = [2.0^-20 t t^2; 0 1 t; 0 0 0; 0 0 0]
+    for alg in (nothing, SVDFactorization())
+        @test ForwardDiff.derivative(t -> solve(LinearProblem(Ar(t), [0.0, 1, 0, 0]), alg).u, 0.5) ≈ [-2.0^20, -0.64, 0.48]
+    end
 end
 
 # Test that DualLinearCache preserves p through init and reinit!

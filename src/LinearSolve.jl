@@ -798,13 +798,18 @@ PrecompileTools.@compile_workload begin
     sol = solve(LinearProblem(Ablocked, bblocked), GenericLUFactorization())
 end
 
-ALREADY_WARNED_CUDSS = Ref{Bool}(false)
+const ALREADY_WARNED_CUDSS = Ref{Bool}(false)
 error_no_cudss_lu(A) = nothing
 cudss_loaded(A) = false
 is_cusparse(A) = false
 is_cusparse_csr(A) = false
 
 is_cusparse_csc(A) = false
+
+PrecompileTools.@compile_workload begin
+    Asparse = SparseArrays.sprand(4, 4, 0.3) + I
+    solve(LinearProblem(Asparse, rand(4)))
+end
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
     LowRankUpdatedMatrix,

@@ -127,7 +127,7 @@ end
 
 # Mixed precision RecursiveFactorization implementation
 
-const PREALLOCATED_RF32_LU = begin
+const PREALLOCATED_RF32_LU = let
     A = rand(Float32, 0, 0)
     luinst = ArrayInterface.lu_instance(A)
     (luinst, Vector{LinearAlgebra.BlasInt}(undef, 0))

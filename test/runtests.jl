@@ -77,6 +77,7 @@ else
             @time @safetestset "Re-solve" include("Core/resolve.jl")
             @time @safetestset "SupernodalLU internals" include("Core/supernodal_lu.jl")
             @time @safetestset "Krylov warm start" include("Core/warm_start.jl")
+            @time @safetestset "Krylov workspace reuse" include("Core/krylov_workspace_reuse.jl")
             @time @safetestset "Zero Initialization Tests" include("Core/zeroinittests.jl")
             @time @safetestset "Non-Square Tests" include("Core/nonsquare.jl")
             @time @safetestset "SparseVector b Tests" include("Core/sparse_vector.jl")

@@ -19,7 +19,9 @@ Replace the given parts of the cached problem and keep the rest, as `LinearSolve
 Passing `J` marks the factorization stale, also when it is the same array changed in
 place, so the next `solve!` refactors. A cache cannot see an in-place change on its own:
 without `reinit!`, `solve!` keeps solving against the factorization of the old `J`.
-Passing only `b`, `c`, `d`, `f` or `g` keeps the factorization.
+A new `b`, `c` or `d` keeps a [`BorderingBLS`](@ref) factorization, and refactors a
+[`DirectBLS`](@ref) cache, since they sit in its assembled matrix. Passing only `f` or
+`g` keeps the factorization.
 
 Assigning `cache.prob = prob` replaces the whole problem and always refactors.
 
@@ -39,7 +41,7 @@ function SciMLBase.reinit!(
         cache::Union{BorderedCache, DirectCache};
         J = nothing, b = nothing, c = nothing, d = nothing, f = nothing, g = nothing
     )
-    refactor = !isnothing(J)
+    refactor = _refactors(cache, J, b, c, d)
     # A part passed in may have changed in place, so the factors are stale from here on,
     # also if the new problem is rejected below.
     refactor && setfield!(cache, :stale, true)
@@ -51,6 +53,9 @@ function SciMLBase.reinit!(
     _install!(cache, prob, refactor)
     return nothing
 end
+
+# Whether a change of these parts invalidates the cache's factorization: that of `J`.
+_refactors(cache, J, b, c, d) = !isnothing(J)
 
 function Base.setproperty!(cache::Union{BorderedCache, DirectCache}, name::Symbol, x)
     if name === :prob

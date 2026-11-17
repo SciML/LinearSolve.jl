@@ -79,7 +79,7 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
     @testset "reinit! refactors for a new J and reuses the factorization for a new f and g" begin
         # A cache cannot see a `J` changed in place, so `reinit!` has to say so. Without
         # it the next solve ran against the old factorization and returned a wrong answer
-        # with a Success retcode. DirectBLS factors anew at every solve.
+        # with a Success retcode.
         n = 12
         for alg in (BorderingBLS(LUFactorization()), DirectBLS(), DirectBLS(LUFactorization()))
             J = rand(n, n) + n * I
@@ -89,7 +89,7 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
 
             f2, g2 = rand(n), -0.2
             reinit!(cache; f = f2, g = g2)
-            alg isa BorderingBLS && @test !cache.inner.isfresh
+            @test !cache.inner.isfresh
             sol = solve!(cache)
             vref, σref = reference(J, b, c, d, f2, g2)
             @test sol.v ≈ vref rtol = 1.0e-9
@@ -97,16 +97,16 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
 
             view(J, diagind(J)) .+= 3
             reinit!(cache; J)
-            alg isa BorderingBLS && @test cache.inner.isfresh
+            @test cache.inner.isfresh
             sol = solve!(cache)
             vref, σref = reference(J, b, c, d, f2, g2)
             @test sol.v ≈ vref rtol = 1.0e-9
             @test sol.σ ≈ σref rtol = 1.0e-9
 
-            # The border sits outside J, so bordering keeps its factorization.
+            # The border sits in DirectBLS's assembled matrix, and outside J for bordering.
             b3 = rand(n); c3 = rand(n); d3 = 0.9
             reinit!(cache; b = b3, c = c3, d = d3)
-            alg isa BorderingBLS && @test !cache.inner.isfresh
+            @test cache.inner.isfresh == (alg isa DirectBLS)
             sol = solve!(cache)
             vref, σref = reference(J, b3, c3, d3, f2, g2)
             @test sol.v ≈ vref rtol = 1.0e-9
@@ -114,7 +114,7 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
 
             J4 = J + 2I
             cache.prob = BorderedLinearProblem(J4, b, c, d, f, g)
-            alg isa BorderingBLS && @test cache.inner.isfresh
+            @test cache.inner.isfresh
             sol = solve!(cache)
             vref, σref = reference(J4, b, c, d, f, g)
             @test sol.v ≈ vref rtol = 1.0e-9
@@ -132,6 +132,7 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
         solve!(cache)
         f2, g2 = rand(n), rand(m)
         reinit!(cache; f = f2, g = g2)
+        @test !cache.inner.isfresh
         sol = solve!(cache)
         xref = [J reduce(hcat, collect(bt)); reduce(hcat, collect(ct))' d] \ vcat(f2, g2)
         @test sol.v ≈ xref[1:n] rtol = 1.0e-9

@@ -71,8 +71,18 @@ is the case the package is for:
 ```julia
 cache = init(prob, BorderingBLS(LUFactorization()))
 sol = solve!(cache)
-# ... update J in place, then solve! again, reusing the factorization
+# a new right-hand side reuses the factorization
+reinit!(cache; f = f2, g = g2)
+sol = solve!(cache)
+# after updating J in place, pass it so the next solve! refactors
+J .= J_next
+reinit!(cache; J)
+sol = solve!(cache)
 ```
+
+A cache cannot see an in-place change to `J` on its own: without `reinit!`, `solve!` keeps
+solving against the factorization of the old `J`. Assigning `cache.prob = prob` replaces
+the whole problem and always refactors.
 
 ## Algorithms
 

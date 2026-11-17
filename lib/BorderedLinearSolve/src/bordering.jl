@@ -37,7 +37,8 @@ BorderingBLS(inner) = BorderingBLS(; inner)
 
 Holds the `LinearSolve` cache for `J` across solves. Reusing it is the whole reason to
 prefer this over assembling the bordered matrix: the factorization or Krylov workspace
-built for `J` is kept, and `J` can be updated in place between outer steps.
+built for `J` is kept. After updating `J` in place between outer steps, pass it to
+[`reinit!`](@ref) so the next `solve!` refactors.
 """
 mutable struct BorderedCache{A, C, P}
     alg::A
@@ -51,6 +52,15 @@ function SciMLBase.init(prob::BorderedLinearProblem, alg::BorderingBLS; kwargs..
     op = _flatten_operator(prob.J, prob.f)
     inner = init(LinearProblem(op, _rhs_copy(_flatten(prob.f, prob.f))), alg.inner; kwargs...)
     return BorderedCache(alg, inner, prob)
+end
+
+# The `J`-side refresh behind `reinit!` and `cache.prob = prob`. Unless `alias_A` allows it, the
+# inner cache gets a copy, as at `init`: most dense factorizations overwrite `A` on a refactor,
+# and the BEC+k residual re-reads `J`.
+function _refresh!(cache::BorderedCache)
+    op = _flatten_operator(cache.prob.J, cache.prob.f)
+    cache.inner.A = op isa AbstractMatrix && !cache.inner.alias_A ? copy(op) : op
+    return nothing
 end
 
 # The right-hand side is copied in. Some backends solve in place and overwrite `b`,

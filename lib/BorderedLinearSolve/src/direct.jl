@@ -15,7 +15,7 @@ Base.@kwdef struct DirectBLS{S}
     inner::S = nothing
 end
 
-struct DirectCache{A, P}
+mutable struct DirectCache{A, P}
     alg::A
     prob::P
 end
@@ -30,6 +30,9 @@ function _assemble(prob::BorderedLinearProblem)
     d = m == 1 ? fill(prob.d, 1, 1) : Array(prob.d)
     return [Matrix(prob.J) bcols; ccols' d]
 end
+
+# Every solve! assembles and factors anew, so a new problem needs no refresh.
+_refresh!(::DirectCache) = nothing
 
 function SciMLBase.solve!(cache::DirectCache)
     prob = cache.prob

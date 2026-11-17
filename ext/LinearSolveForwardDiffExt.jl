@@ -78,6 +78,14 @@ const DualAbstractLinearProblem = Union{
     dual_linear_cache
 end
 
+# For a nested `DualLinearCache`, `lc.b` is only its dual array: `.=` into it leaves the
+# primal copy underneath and the partials holding the previous right hand side.
+function _fill_b!(lc, src)
+    lc.b .= src
+    lc isa DualLinearCache && setb!(lc, getfield(lc, :dual_b))
+    return nothing
+end
+
 # without a pivoted QR the rank is unknown, so the null-space term is kept
 _full_column_rank(F, A) = false
 # the rule of `rank(::QRPivoted)`, which Julia 1.10 does not have
@@ -156,17 +164,19 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
         # A, by (I - A⁺A) dAᴴ y with y = Aᴴ \ x: w = dAᴴ y is added and A w taken out of the solve.
         y = isnothing(A_list) || _full_column_rank(F, A) ? nothing : F \ u
         for i in eachindex(rhs_list)
-            cache.linear_cache.b .= F \ rhs_list[i]
+            z = F \ rhs_list[i]
             if y === nothing
+                _fill_b!(cache.linear_cache, z)
                 rhs_list[i] .= solve!(cache.linear_cache, alg, args...; kwargs...).u
             else
                 mul!(rhs_list[i], A_list[i]', y)
-                mul!(cache.linear_cache.b, A, rhs_list[i], -1, true)
+                mul!(z, A, rhs_list[i], -1, true)
+                _fill_b!(cache.linear_cache, z)
                 rhs_list[i] .+= solve!(cache.linear_cache, alg, args...; kwargs...).u
             end
         end
 
-        cache.linear_cache.b .= cache.primal_b_cache
+        _fill_b!(cache.linear_cache, cache.primal_b_cache)
         cache.linear_cache.u .= cache.primal_u_cache
 
         return sol
@@ -190,18 +200,12 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
     cache.linear_cache.u .= cache.dual_u0_cache
     # We can reuse the linear cache, because the same factorization will work for the partials.
     for i in eachindex(rhs_list)
-        if cache.linear_cache isa DualLinearCache
-            # For nested duals, assign directly to partials_b
-            cache.linear_cache.b = copy(rhs_list[i])
-        else
-            # For regular linear cache, use broadcasting assignment
-            cache.linear_cache.b .= rhs_list[i]
-        end
+        _fill_b!(cache.linear_cache, rhs_list[i])
         rhs_list[i] .= solve!(cache.linear_cache, alg, args...; kwargs...).u
     end
 
     # Reset to the original `b` and `u`, users will expect that `b` doesn't change if they don't tell it to
-    cache.linear_cache.b .= cache.primal_b_cache
+    _fill_b!(cache.linear_cache, cache.primal_b_cache)
     cache.linear_cache.u .= cache.primal_u_cache
 
     return sol
@@ -510,7 +514,7 @@ function __dual_init(
     end
 
     non_partial_cache = init(
-        primal_prob, alg, assumptions, args...;
+        primal_prob, alg, args...;
         alias = alias, abstol = abstol, reltol = reltol,
         maxiters = maxiters, verbose = verbose, Pl = Pl, Pr = Pr, assumptions = assumptions,
         sensealg = sensealg, u0 = new_u0, kwargs...

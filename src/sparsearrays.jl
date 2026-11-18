@@ -27,6 +27,7 @@ using SciMLLogging: @SciMLMessage
 using SpecializedDeepcopy: specialized_deepcopy
 
 @static if Base.USE_GPL_LIBS
+    using SparseArrays.LibSuiteSparse: UMFPACK_PIVOT_TOLERANCE, UMFPACK_STRATEGY
     using SparseArrays.UMFPACK: UMFPACK_OK, get_umfpack_control,
         JL_UMFPACK_PRL, JL_UMFPACK_DENSE_ROW, JL_UMFPACK_DENSE_COL,
         JL_UMFPACK_BLOCK_SIZE, JL_UMFPACK_ORDERING,
@@ -368,6 +369,8 @@ end
         front_alloc_init = JL_UMFPACK_FRONT_ALLOC_INIT,
         droptol = JL_UMFPACK_DROPTOL,
         irstep = JL_UMFPACK_IRSTEP,
+        pivot_tolerance = UMFPACK_PIVOT_TOLERANCE + 1,
+        strategy = UMFPACK_STRATEGY + 1,
     )
 
     # UMFPACK's control vector for `alg`, or `nothing` when it asks for no

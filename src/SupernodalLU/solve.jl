@@ -436,15 +436,21 @@ function solve!(
     if nref > 0
         r = F.ir_r
         dx = F.ir_dx
-        prevn = Inf
+        copyto!(r, b)
+        mul!(r, F.A, x, -one(Tv), one(Tv))           # r = b - A x
+        rn = norm(r)
         for _ in 1:nref
-            copyto!(r, b)
-            mul!(r, F.A, x, -one(Tv), one(Tv))       # r = b - A x
-            rn = norm(r)
-            (iszero(rn) || rn >= 0.5 * prevn) && break  # converged / stagnated
-            prevn = rn
+            (iszero(rn) || !isfinite(rn)) && break   # converged, or residual overflowed
             _solve_once!(dx, F, r)
-            x .+= dx
+            dx .+= x                                 # candidate; x is kept until accepted
+            copyto!(r, b)
+            mul!(r, F.A, dx, -one(Tv), one(Tv))
+            rn_new = norm(r)
+            rn_new <= rn || break                    # worse (or NaN): keep x
+            copyto!(x, dx)
+            stagnated = rn_new >= 0.5 * rn
+            rn = rn_new
+            stagnated && break
         end
     end
     return x

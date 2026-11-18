@@ -40,27 +40,35 @@ prefer this over assembling the bordered matrix: the factorization or Krylov wor
 built for `J` is kept. After updating `J` in place between outer steps, pass it to
 [`reinit!`](@ref) so the next `solve!` refactors.
 """
-mutable struct BorderedCache{A, C, P}
+mutable struct BorderedCache{A, C, P, K}
     alg::A
     inner::C
     prob::P
+    # The `init` keywords, kept to build a new inner cache for a new state size.
+    kwargs::K
 end
 
-function SciMLBase.init(prob::BorderedLinearProblem, alg::BorderingBLS; kwargs...)
+SciMLBase.init(prob::BorderedLinearProblem, alg::BorderingBLS; kwargs...) =
+    BorderedCache(alg, _inner_cache(prob, alg, kwargs), prob, kwargs)
+
+function _inner_cache(prob::BorderedLinearProblem, alg::BorderingBLS, kwargs)
     # A state that is not a vector is flattened for the inner solve only; see
     # flatten.jl. The bordering algebra below always works in the state's own shape.
     op = _flatten_operator(prob.J, prob.f)
-    inner = init(LinearProblem(op, _rhs_copy(_flatten(prob.f, prob.f))), alg.inner; kwargs...)
-    return BorderedCache(alg, inner, prob)
+    return init(LinearProblem(op, _rhs_copy(_flatten(prob.f, prob.f))), alg.inner; kwargs...)
 end
 
-# The `J`-side refresh behind `reinit!` and `cache.prob = prob`. Unless `alias_A` allows it, the
-# inner cache gets a copy, as at `init`: most dense factorizations overwrite `A` on a refactor,
-# and the BEC+k residual re-reads `J`.
+# The refresh behind `reinit!` and `cache.prob = prob`. A new state size gets a new inner cache,
+# built as at `init`. Otherwise `refactor` hands the inner cache `J` again, copied unless
+# `alias_A` allows otherwise: most dense factorizations overwrite `A`, and BEC+k re-reads `J`.
 function _refresh!(cache::BorderedCache, refactor::Bool)
-    refactor || return nothing
-    op = _flatten_operator(cache.prob.J, cache.prob.f)
-    cache.inner.A = op isa AbstractMatrix && !cache.inner.alias_A ? copy(op) : op
+    prob = cache.prob
+    if length(prob.f) != length(cache.inner.b)
+        cache.inner = _inner_cache(prob, cache.alg, cache.kwargs)
+    elseif refactor
+        op = _flatten_operator(prob.J, prob.f)
+        cache.inner.A = op isa AbstractMatrix && !cache.inner.alias_A ? copy(op) : op
+    end
     return nothing
 end
 

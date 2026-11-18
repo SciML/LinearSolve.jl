@@ -309,6 +309,31 @@ end
         end
     end
 
+    @testset "an update may change the state size" begin
+        # The inner cache kept its buffers for the old size, so the next solve! threw.
+        inners = (
+            (nothing, 1.0e-9), (LUFactorization(), 1.0e-9), (GenericLUFactorization(), 1.0e-9),
+            (QRFactorization(), 1.0e-9), (KrylovJL_GMRES(), 1.0e-6),
+        )
+        for (inner, rtol) in inners, (n1, n2) in ((6, 3), (3, 6)), update in (:reinit, :prob)
+            J = rand(n1, n1) + n1 * I
+            prob = BorderedLinearProblem(J, rand(n1), rand(n1), 1.5, rand(n1), 0.7)
+            cache = init(prob, BorderingBLS(; inner, k = 2); reltol = 1.0e-10)
+            solve!(cache)
+            J2 = rand(n2, n2) + n2 * I
+            b = rand(n2); c = rand(n2); d = 0.9; f = rand(n2); g = -0.2
+            update === :reinit ? reinit!(cache; J = J2, b, c, d, f, g) :
+                (cache.prob = BorderedLinearProblem(J2, b, c, d, f, g))
+            # The new inner cache is built with the keywords given to `init`.
+            @test cache.inner.reltol == 1.0e-10
+            sol = solve!(cache)
+            vref, σref = reference(J2, b, c, d, f, g)
+            @test successful_retcode(sol)
+            @test sol.v ≈ vref rtol = rtol
+            @test sol.σ ≈ σref rtol = rtol
+        end
+    end
+
     @testset "a state that is not a vector" begin
         # A 2D problem keeps its state as a matrix. Requiring a vector would push
         # `vec`/`reshape` onto the caller, so the state shape is preserved end to end

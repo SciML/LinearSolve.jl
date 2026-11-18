@@ -23,7 +23,8 @@ Passing only `b`, `c`, `d`, `f` or `g` keeps the factorization.
 
 Assigning `cache.prob = prob` replaces the whole problem and always refactors.
 
-An update that throws leaves the cache with its old problem, which the next `solve!`
+The new parts may change the state size; the cache then builds its buffers anew, as `init`
+does. An update that throws leaves the cache with its old problem, which the next `solve!`
 refactors.
 """
 function SciMLBase.reinit!(

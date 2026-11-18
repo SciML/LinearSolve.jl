@@ -73,16 +73,22 @@ end
 _default_options(::Type{I}) where {I} =
     SuperLUDIST.Options isa UnionAll ? SuperLUDIST.Options{I}() : SuperLUDIST.Options()
 
+function _copy_options!(dst, src)
+    for name in propertynames(src)
+        setproperty!(dst, name, getproperty(src, name))
+    end
+    return dst
+end
+
 function _build_options(opt, ::Type{I}) where {I}
-    options = _default_options(I)
     if opt === nothing
-        return options
+        return _default_options(I)
     elseif opt isa NamedTuple
-        for (name, value) in pairs(opt)
-            setproperty!(options, name, value)
-        end
-        return options
+        return _copy_options!(_default_options(I), opt)
     elseif opt isa SuperLUDIST.Options
+        if SuperLUDIST.Options isa UnionAll && !(opt isa SuperLUDIST.Options{I})
+            return _copy_options!(_default_options(I), opt)
+        end
         return deepcopy(opt)
     else
         throw(

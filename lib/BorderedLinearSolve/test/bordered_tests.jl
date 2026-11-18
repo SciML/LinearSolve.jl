@@ -302,11 +302,17 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
     @testset "a failed update leaves the cache solving the old problem" begin
         # The new problem was stored before the refresh ran. When the refresh threw, the next
         # solve! paired it with the old factorization: a wrong answer with a Success retcode.
+        # After its first refactor DirectBLS factors its matrix in place, so a refresh that
+        # fails partway has also overwritten part of the old factors.
         n = 6
-        for inner in (LUFactorization(), GenericLUFactorization(), QRFactorization()), k in (0, 2), update in (:reinit, :prob)
+        inners = (LUFactorization(), GenericLUFactorization(), QRFactorization())
+        algs = Iterators.flatten((BorderingBLS(; inner, k = 0), BorderingBLS(; inner, k = 2), DirectBLS(; inner)) for inner in inners)
+        for alg in algs, update in (:reinit, :prob)
             J = rand(n, n) + n * I
             b = rand(n); c = rand(n); d = 1.5; f = rand(n); g = 0.7
-            cache = init(BorderedLinearProblem(BreakableMatrix(J, false), b, c, d, f, g), BorderingBLS(; inner, k))
+            cache = init(BorderedLinearProblem(BreakableMatrix(J, false), b, c, d, f, g), alg)
+            solve!(cache)
+            reinit!(cache; J = BreakableMatrix(J, false))
             solve!(cache)
             broken, f2 = BreakableMatrix(J + I, true), rand(n)
             fail!() = update === :reinit ? reinit!(cache; J = broken, f = f2) :

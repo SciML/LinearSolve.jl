@@ -3,6 +3,7 @@ using ForwardDiff
 using Test
 using LinearAlgebra
 using SparseArrays
+using BandedMatrices
 using ComponentArrays
 using Sparspak
 using SpecializingFactorizations
@@ -251,6 +252,37 @@ end
     ForwardDiff.hessian(linprob_f_hes, [5.0])
 )
 
+@testset "nested Dual caches stay correct across repeated solves" begin
+    # `≈` on Duals compares only the primal values, so check every component
+    flat(x::ForwardDiff.Dual) = [flat(ForwardDiff.value(x)); reduce(vcat, flat.(collect(ForwardDiff.partials(x))))]
+    flat(x::Real) = [x]
+    same(x, y) = reduce(vcat, flat.(x)) ≈ reduce(vcat, flat.(y))
+
+    An(p) = [4.0 + p[1]^2 1.0; 1.0 3.0 + p[1]]
+    bn(p) = [1.0, 2.0] .* p[1]
+    q = ForwardDiff.Dual(ForwardDiff.Dual(0.3, 1.0), 1.0)
+    A, b = An([q]), bn([q])
+    A2 = An([q * 1.01])
+
+    for alg in (LUFactorization(), QRFactorization())
+        cache = init(LinearProblem(copy(A), copy(b)), alg)
+        for _ in 1:3
+            @test same(solve!(cache).u, A \ b)
+        end
+        reinit!(cache; A = copy(A2))
+        @test same(solve!(cache).u, A2 \ b)
+    end
+
+    # the least-squares branch fills the inner cache's `b` the same way
+    Al, bl = [A; [q 1.0]], [b; q]
+    for alg in (QRFactorization(), nothing)
+        cache = init(LinearProblem(copy(Al), copy(bl)), alg)
+        for _ in 1:3
+            @test same(solve!(cache).u, (Al' * Al) \ (Al' * bl))
+        end
+    end
+end
+
 # Test aliasing
 A, b = h([ForwardDiff.Dual(5.0, 1.0, 0.0), ForwardDiff.Dual(5.0, 0.0, 1.0)])
 
@@ -486,6 +518,54 @@ backslash_large = A_large_dual \ b_large_dual
 
 # Test partials match
 @test ForwardDiff.partials.(sol_large.u) ≈ ForwardDiff.partials.(backslash_large)
+
+# https://github.com/SciML/LinearSolve.jl/issues/1361
+@testset "non-square systems with dual numbers" begin
+    A = rand(4, 9)
+    b = rand(4)
+    ref = ForwardDiff.gradient(X -> sum(X \ b), A)
+    for alg in (nothing, SVDFactorization(), KrylovJL_LSMR())
+        g(X) = sum(solve(LinearProblem(X, b), alg).u)
+        @test ForwardDiff.gradient(g, A) ≈ ref rtol = 1.0e-6
+    end
+
+    # a tall `A` without full column rank, whose null space moves with `t`
+    C = rand(9, 3)
+    At(t) = hcat(C, (0.5 + t) * C[:, 1] - 0.3 * C[:, 2])
+    bt = rand(9)
+    h = 1.0e-6
+    ref = (pinv(At(h)) * bt - pinv(At(-h)) * bt) / 2h
+    for alg in (nothing, SVDFactorization(), KrylovJL_LSMR())
+        @test ForwardDiff.derivative(t -> solve(LinearProblem(At(t), bt), alg).u, 0.0) ≈ ref rtol = 1.0e-6
+    end
+
+    # an `A` with no columns has full column rank
+    for alg in (nothing, SVDFactorization(), KrylovJL_LSMR())
+        @test ForwardDiff.derivative(t -> solve(LinearProblem(fill(t, 3, 0), zeros(3)), alg).u, 0.5) == Float64[]
+    end
+
+    # rank one, with the minimum-norm solution [1, t] / (1 + t^2)
+    Ab(t) = BandedMatrix([1, 2, 3] * [1, t]', (2, 1))
+    @test ForwardDiff.derivative(t -> solve(LinearProblem(Ab(t), [1.0, 2, 3]), KrylovJL_LSMR()).u, 0.5) ≈ [-0.64, 0.48]
+    Bb(t) = BandedMatrix([1 t; 2 1; 3 0; 0 1], (3, 1))
+    bb = [1.0, 2, 3, 4]
+    @test ForwardDiff.derivative(t -> solve(LinearProblem(Bb(t), bb)).u, 0.3) ≈
+        ForwardDiff.derivative(t -> Matrix(Bb(t)) \ bb, 0.3)
+
+    # ill-conditioned, with the least-squares solution [-t / δ, 1]
+    for (T, k) in ((Float32, 13), (Float64, 27))
+        δ = T(2)^(-k)
+        Aδ(t) = BandedMatrix([δ t; zero(t) one(t); zero(t) zero(t)], (0, 1))
+        @test ForwardDiff.derivative(t -> solve(LinearProblem(Aδ(t), T[0, 1, 0])).u, one(T)) ≈ [-1 / δ, 0]
+    end
+
+    # rank two and ill-conditioned, with a null space that moves with `t` and the
+    # minimum-norm solution [-2^20 t, 1 / (1 + t^2), t / (1 + t^2)]
+    Ar(t) = [2.0^-20 t t^2; 0 1 t; 0 0 0; 0 0 0]
+    for alg in (nothing, SVDFactorization())
+        @test ForwardDiff.derivative(t -> solve(LinearProblem(Ar(t), [0.0, 1, 0, 0]), alg).u, 0.5) ≈ [-2.0^20, -0.64, 0.48]
+    end
+end
 
 # Test that DualLinearCache preserves p through init and reinit!
 # This is needed by OrdinaryDiffEq which passes ODE state as p to LinearProblem

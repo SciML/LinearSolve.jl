@@ -76,12 +76,13 @@ end
 
 A generic wrapper over the Krylov.jl Krylov-subspace iterative solvers. The chosen
 in-place solver is run through `Krylov.krylov_solve!` on a Krylov.jl workspace
-that `solve!` builds on the first solve, rebuilds whenever `A` has been replaced
-(`cache.A = newA` or `reinit!` with a new `A`), and otherwise reuses across
-solves of the same cache (for example when only `b` changes). Preconditioners,
-whether given as `Pl`/`Pr` to `init`/`solve` or built by `precs`, are handed to
-Krylov.jl as its `M` (left) and `N` (right) operators, for the methods that take
-them (see the last paragraph). The named constructors `KrylovJL_GMRES`,
+that `solve!` reuses across compatible updates to `A` (`cache.A = newA` or
+`reinit!` with a new `A`). It rebuilds when dimensions, storage types, subspace
+settings or error-estimation windows are incompatible. Partitioned RHS storage
+is rebuilt on an `A` update; interrupted warm starts require a fresh workspace
+on retry. Preconditioners, whether given as `Pl`/`Pr` to `init`/`solve` or built
+by `precs`, are handed to Krylov.jl as its `M` (left) and `N` (right) operators,
+for the methods that take them (see the last paragraph). The named constructors `KrylovJL_GMRES`,
 `KrylovJL_CG`, `KrylovJL_MINRES`, `KrylovJL_FGMRES`, `KrylovJL_BICGSTAB`,
 `KrylovJL_LSMR`, `KrylovJL_CRAIGMR`, and `KrylovJL_MINARES` fix `KrylovAlg` and
 forward everything else here.
@@ -620,6 +621,82 @@ function _supports_right_preconditioning(alg::KrylovJL)
     )
 end
 
+function _krylov_uses_memory(alg::KrylovJL)
+    return alg.KrylovAlg === Krylov.dqgmres! || alg.KrylovAlg === Krylov.diom! ||
+        alg.KrylovAlg === Krylov.gmres! || alg.KrylovAlg === Krylov.fgmres! ||
+        alg.KrylovAlg === Krylov.gpmr! || alg.KrylovAlg === Krylov.fom!
+end
+
+function _krylov_uses_window(alg::KrylovJL)
+    return alg.KrylovAlg === Krylov.minres! || alg.KrylovAlg === Krylov.symmlq! ||
+        alg.KrylovAlg === Krylov.lslq! || alg.KrylovAlg === Krylov.lsqr! ||
+        alg.KrylovAlg === Krylov.lsmr!
+end
+
+function _krylov_required_memory(alg::KrylovJL, A)
+    kwargs_nt = NamedTuple(alg.kwargs)
+    memory = if haskey(kwargs_nt, :memory)
+        kwargs_nt[:memory]
+    elseif alg.gmres_restart == 0
+        min(20, size(A, 1))
+    else
+        alg.gmres_restart
+    end
+    dimension = alg.KrylovAlg === Krylov.gpmr! ? sum(size(A)) : size(A, 1)
+    return min(memory, dimension)
+end
+
+_krylov_required_window(alg::KrylovJL) = alg.window == 0 ? 5 : alg.window
+
+function _krylov_workspace_matches_memory_window(cacheval, alg::KrylovJL, A)
+    if _krylov_uses_memory(alg)
+        memory = _krylov_required_memory(alg, A)
+        fixed_memory = alg.KrylovAlg === Krylov.diom! ||
+            alg.KrylovAlg === Krylov.dqgmres! ||
+            get(NamedTuple(alg.kwargs), :restart, alg.KrylovAlg === Krylov.gmres! && alg.gmres_restart > 0)
+        return fixed_memory ? length(cacheval.V) == memory : length(cacheval.V) >= memory
+    elseif _krylov_uses_window(alg)
+        window = _krylov_required_window(alg)
+        if hasfield(typeof(cacheval), :err_vec)
+            return length(cacheval.err_vec) == window
+        elseif hasfield(typeof(cacheval), :clist)
+            return length(cacheval.clist) == window
+        end
+    end
+    return true
+end
+
+function _krylov_can_reuse_workspace(cacheval, alg::KrylovJL, A, b, u)
+    KS = get_KrylovJL_solver(alg.KrylovAlg)
+    return cacheval isa KS && cacheval.m == size(A, 1) && cacheval.n == size(A, 2) &&
+        typeof(cacheval.x) === typeof(u) && !_krylov_pending_warm_start(cacheval) &&
+        _krylov_workspace_matches_memory_window(cacheval, alg, A)
+end
+
+# Partition lengths are runtime values; matching types and total sizes cannot
+# establish that the workspace's range and domain scratch storage is compatible.
+_krylov_can_reuse_workspace(cacheval, alg::KrylovJL, A, b::RecursiveArrayTools.ArrayPartition, u) = false
+
+function _krylov_can_reuse_workspace(cacheval, alg::KrylovJL, A, b::AbstractMatrix, u)
+    if alg.KrylovAlg === Krylov.gmres!
+        cacheval isa Krylov.BlockGmresWorkspace || return false
+        if get(NamedTuple(alg.kwargs), :restart, alg.gmres_restart > 0)
+            length(cacheval.V) == min(5, div(size(A, 2), size(b, 2))) || return false
+        end
+    elseif alg.KrylovAlg === Krylov.minres!
+        cacheval isa Krylov.BlockMinresWorkspace || return false
+    else
+        return false
+    end
+    return cacheval.m == size(A, 1) && cacheval.n == size(A, 2) &&
+        cacheval.p == size(b, 2) && typeof(cacheval.X) === typeof(u)
+end
+
+_krylov_rebind_solution!(cacheval, u) = (cacheval.x = u)
+_krylov_rebind_solution!(cacheval::Krylov.BlockKrylovWorkspace, u) = nothing
+
+_krylov_pending_warm_start(cacheval) = hasfield(typeof(cacheval), :warm_start) && cacheval.warm_start
+
 function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
     if cache.precsisfresh && !isnothing(alg.precs)
         Pl, Pr = alg.precs(cache.A, cache.p)
@@ -627,13 +704,18 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
         cache.Pr = Pr
         cache.precsisfresh = false
     end
-    if cache.isfresh
-        solver = init_cacheval(
-            alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr,
-            cache.maxiters, cache.abstol, cache.reltol, cache.verbose,
-            cache.assumptions, zeroinit = false
-        )
-        cache.cacheval = solver
+    if cache.isfresh || _krylov_pending_warm_start(cache.cacheval)
+        if _krylov_can_reuse_workspace(
+                cache.cacheval, alg, cache.A, cache.b, cache.u
+            )
+            _krylov_rebind_solution!(cache.cacheval, cache.u)
+        else
+            cache.cacheval = init_cacheval(
+                alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr,
+                cache.maxiters, cache.abstol, cache.reltol, cache.verbose,
+                cache.assumptions, zeroinit = false
+            )
+        end
         cache.isfresh = false
     end
 

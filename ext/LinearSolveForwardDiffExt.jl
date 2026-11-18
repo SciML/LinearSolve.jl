@@ -5,7 +5,7 @@ using LinearSolve: LinearSolve, SciMLLinearSolveAlgorithm, __init, LinearVerbosi
     OperatorAssumptions, PureKLUFactorization, SparspakFactorization, defaultalg,
     default_alias_A
 using ConcreteStructs: @concrete
-using LinearAlgebra: LinearAlgebra, Hermitian, Symmetric, mul!
+using LinearAlgebra: LinearAlgebra, ColumnNorm, Hermitian, QRPivoted, Symmetric, lmul!, mul!, qr
 using SparseArrays: SparseArrays, SparseMatrixCSC, nonzeros
 using ForwardDiff: ForwardDiff, Dual, Partials
 using SciMLBase: SciMLBase, LinearAliasSpecifier, LinearProblem, init, solve, solve!
@@ -78,23 +78,37 @@ const DualAbstractLinearProblem = Union{
     dual_linear_cache
 end
 
+# For a nested `DualLinearCache`, `lc.b` is only its dual array: `.=` into it leaves the
+# primal copy underneath and the partials holding the previous right hand side.
+function _fill_b!(lc, src)
+    lc.b .= src
+    lc isa DualLinearCache && setb!(lc, getfield(lc, :dual_b))
+    return nothing
+end
+
+# the rule of `rank(::QRPivoted)`, which Julia 1.10 does not have
+function _rank(F::QRPivoted)
+    R = F.factors
+    k = minimum(size(R))
+    k == 0 && return 0
+    tol = k * eps(real(eltype(R))) * abs(R[1, 1])
+    return something(findfirst(i -> abs(R[i, i]) <= tol, 1:k), k + 1) - 1
+end
+
 function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kwargs...)
     # Check if A is square - if not, use the non-square system path
     A = cache.linear_cache.A
 
     if !issquare(A)
-        # For overdetermined systems, differentiate the normal equations: A'Ax = A'b
-        # Taking d/dθ of both sides:
-        # dA'/dθ · Ax + A' · dA/dθ · x + A'A · dx/dθ = dA'/dθ · b + A' · db/dθ
-        # Rearranging:
-        # A'A · dx/dθ = A' · db/dθ + dA'/dθ · (b  - Ax) - A' · dA/dθ · x
+        # The minimum-norm least-squares solution x = A⁺b of a non-square system moves by
+        # dx = A⁺(db - dA x + (Aᴴ)⁺ dAᴴ r) + (I - A⁺A) dAᴴ y, with r = b - Ax and y = (Aᴴ)⁺x.
 
         # Solve the primal problem first
         cache.dual_u0_cache .= cache.linear_cache.u
         sol = solve!(cache.linear_cache, alg, args...; kwargs...)
         cache.primal_u_cache .= cache.linear_cache.u
         cache.primal_b_cache .= cache.linear_cache.b
-        u = sol.u
+        u = cache.primal_u_cache
 
         # Get the partials and primal values
         # After solve!, cache.linear_cache.A may be modified by factorization,
@@ -102,9 +116,7 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
         ∂_A = cache.partials_A
         ∂_b = cache.partials_b
         A = nodual_value(cache.dual_A)
-        A_adj = A'
         b = cache.primal_b_cache
-        residual = b - A * u  # residual r = b - Ax
 
         rhs_list = cache.rhs_list
 
@@ -120,30 +132,32 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
         A_list = cache.partials_A_list
         b_list = cache.partials_b_list
 
-        # Compute RHS: A' · db/dθ + dA'/dθ · (b - Ax) - A' · dA/dθ · x
+        if !isnothing(A_list)
+            residual = b - A * u
+            # One pivoted QR of Aᴴ for all the solves with it and for the rank. `A' \` would build
+            # it on every call, and makes a non-strided `A` dense too.
+            F = qr(A isa StridedMatrix ? A' : Matrix(A'), ColumnNorm())
+            r = _rank(F)
+            y = r == size(A, 2) ? nothing : F \ u
+        end
         for i in eachindex(rhs_list)
-            if !isnothing(b_list)
-                # A' · db/dθ
-                rhs_list[i] .= A_adj * b_list[i]
-            else
-                fill!(rhs_list[i], 0)
-            end
-
+            z = isnothing(b_list) ? zero(b) : copy(b_list[i])
             if !isnothing(A_list)
-                # Add dA'/dθ · (b - Ax) = (dA/dθ)' · residual
-                rhs_list[i] .+= A_list[i]' * residual
-                # Subtract A' · dA/dθ · x
-                temp = A_list[i] * u
-                rhs_list[i] .-= A_adj * temp
+                z .+= F \ (A_list[i]' * residual)
+                mul!(z, A_list[i], u, -1, true)
+            end
+            _fill_b!(cache.linear_cache, z)
+            rhs_list[i] .= solve!(cache.linear_cache, alg, args...; kwargs...).u
+            if !isnothing(A_list) && y !== nothing
+                # The first r columns of F.Q span the row space of A, so zeroing those entries
+                # of F.Qᴴ dAᴴ y leaves its null-space part, where subtracting A⁺A dAᴴ y cancels.
+                w = lmul!(F.Q', A_list[i]' * y)
+                w[1:r] .= 0
+                rhs_list[i] .+= lmul!(F.Q, w)
             end
         end
 
-        for i in eachindex(rhs_list)
-            cache.linear_cache.b .= A_adj \ rhs_list[i]
-            rhs_list[i] .= solve!(cache.linear_cache, alg, args...; kwargs...).u
-        end
-
-        cache.linear_cache.b .= cache.primal_b_cache
+        _fill_b!(cache.linear_cache, cache.primal_b_cache)
         cache.linear_cache.u .= cache.primal_u_cache
 
         return sol
@@ -167,18 +181,12 @@ function linearsolve_forwarddiff_solve!(cache::DualLinearCache, alg, args...; kw
     cache.linear_cache.u .= cache.dual_u0_cache
     # We can reuse the linear cache, because the same factorization will work for the partials.
     for i in eachindex(rhs_list)
-        if cache.linear_cache isa DualLinearCache
-            # For nested duals, assign directly to partials_b
-            cache.linear_cache.b = copy(rhs_list[i])
-        else
-            # For regular linear cache, use broadcasting assignment
-            cache.linear_cache.b .= rhs_list[i]
-        end
+        _fill_b!(cache.linear_cache, rhs_list[i])
         rhs_list[i] .= solve!(cache.linear_cache, alg, args...; kwargs...).u
     end
 
     # Reset to the original `b` and `u`, users will expect that `b` doesn't change if they don't tell it to
-    cache.linear_cache.b .= cache.primal_b_cache
+    _fill_b!(cache.linear_cache, cache.primal_b_cache)
     cache.linear_cache.u .= cache.primal_u_cache
 
     return sol

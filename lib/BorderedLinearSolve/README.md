@@ -46,7 +46,9 @@ sol.v, sol.σ
 here asks you to `vec` and `reshape` around the solver.
 
 `J` is only applied and solved against, so it can be a matrix or a matrix-free
-operator, and no assumption is made about its shape.
+operator. For a vector state of length `n`, a matrix or `SciMLOperators` operator `J` must
+be `n x n`. On a state of another shape, `J` acts on that shape. A part that does not match
+the state or the border width throws a `DimensionMismatch`.
 
 A border wider than 1 is given explicitly as a tuple of states, with `d` an `m x m`
 matrix and `g` of length `m`:

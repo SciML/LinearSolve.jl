@@ -1,7 +1,7 @@
 using BorderedLinearSolve
 using LinearAlgebra, SparseArrays, Random, Test
 using LinearSolve: LUFactorization, GenericLUFactorization, QRFactorization, KrylovJL_GMRES
-using SciMLOperators: FunctionOperator
+using SciMLOperators: FunctionOperator, MatrixOperator
 using SciMLBase: successful_retcode
 
 # Reference: assemble the bordered matrix and solve it densely. Everything below is
@@ -522,15 +522,35 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
     end
 
     @testset "shape errors are caught" begin
+        # The state fixes n, and b fixes the border width m; every other part must match them.
+        # DirectBLS copied a misshapen J into its matrix entry by entry, then returned a wrong
+        # answer with a Success retcode.
         n = 5
-        J = rand(n, n)
-        # `J` is only applied and solved against, so it is deliberately not checked:
-        # it may be matrix-free. The border is checked against the state instead.
-        @test_throws DimensionMismatch BorderedLinearProblem(
-            J, rand(n + 1), rand(n), 1.0, rand(n), 1.0
-        )
-        @test_throws DimensionMismatch BorderedLinearProblem(
-            J, rand(n), rand(n), 1.0, rand(n + 1), 1.0
-        )
+        J = rand(n, n); x = rand(n); wide = (rand(n), rand(n))
+        for parts in (
+                (rand(1, 4), rand(2), rand(2), 1.0, rand(2), 1.0),
+                (rand(2, 2), rand(3), rand(3), 1.0, rand(3), 1.0),
+                (rand(n, n + 1), x, x, 1.0, x, 1.0),
+                (MatrixOperator(rand(n + 1, n + 1)), x, x, 1.0, x, 1.0),
+                (J, rand(n + 1), x, 1.0, x, 1.0),
+                (J, x, rand(n + 1), 1.0, x, 1.0),
+                (J, x, x, 1.0, rand(n + 1), 1.0),
+                (J, wide, x, 1.0, x, 1.0),
+                (J, x, x, fill(1.0, 1, 1), x, 1.0),
+                (J, x, x, 1.0, x, [1.0]),
+                (J, wide, wide, rand(3, 3), x, rand(2)),
+                (J, wide, wide, 1.0, x, rand(2)),
+                (J, wide, wide, rand(2, 2), x, rand(3)),
+                (J, wide, wide, rand(2, 2), x, 1.0),
+            )
+            @test_throws DimensionMismatch BorderedLinearProblem(parts...)
+        end
+
+        # On a state that is not a vector, `J` acts on the state's own shape and is left to the
+        # algorithm. Bordering applies this 2 x 2 `J` to each column of the 2 x 2 state, while
+        # DirectBLS needs the 4 x 4 matrix of the whole map.
+        prob = BorderedLinearProblem(rand(2, 2) + 2I, rand(2, 2), rand(2, 2), 1.0, rand(2, 2), 1.0)
+        @test successful_retcode(solve(prob, BorderingBLS(KrylovJL_GMRES())))
+        @test_throws DimensionMismatch init(prob, DirectBLS())
     end
 end

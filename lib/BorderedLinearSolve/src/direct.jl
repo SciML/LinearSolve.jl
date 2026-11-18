@@ -53,7 +53,12 @@ end
 # Every entry of `matrix` is written, so it may hold anything before, factors included.
 function _assemble!(matrix::AbstractMatrix, prob::BorderedLinearProblem)
     n, m = length(prob.f), _border_width(prob.b)
-    copyto!(view(matrix, 1:n, 1:n), _as_matrix(prob.J))
+    J = _as_matrix(prob.J)
+    # The problem checks `J` only for a vector state. Whatever the state, assembly needs n x n.
+    size(J) == (n, n) || throw(
+        DimensionMismatch("J has size $(size(J)), expected ($n, $n) to match the state")
+    )
+    copyto!(view(matrix, 1:n, 1:n), J)
     for (i, bi) in enumerate(_border_parts(prob.b))
         copyto!(view(matrix, 1:n, n + i), vec(bi))
     end

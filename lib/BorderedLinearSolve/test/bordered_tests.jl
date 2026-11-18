@@ -12,17 +12,23 @@ function reference(J, b, c, d, f, g)
     return x[1:length(f)], x[end]
 end
 
-# Reading the last entry of a broken matrix throws, so a refresh that copies it fails partway.
+# Reading the last entry of a broken matrix throws `err`, so a refresh that copies it fails partway.
 # The matrix is mutable, so a test can change or break one the cache holds and repair it later.
 mutable struct BreakableMatrix <: AbstractMatrix{Float64}
     data::Matrix{Float64}
     broken::Bool
+    err::Exception
 end
+BreakableMatrix(data, broken) = BreakableMatrix(data, broken, ErrorException("read the last entry of a broken matrix"))
 Base.size(A::BreakableMatrix) = size(A.data)
 function Base.getindex(A::BreakableMatrix, i::Int, j::Int)
-    A.broken && (i, j) == size(A) && error("read the last entry of a broken matrix")
+    A.broken && (i, j) == size(A) && throw(A.err)
     return A.data[i, j]
 end
+
+# An exception with an identity of its own, so a test can check that the caller gets the very
+# object thrown.
+mutable struct Sentinel <: Exception end
 
 # A matrix-free `J` that scales row `i` of a state of any shape by `i`.
 struct RowScaling end
@@ -311,6 +317,30 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
             @test successful_retcode(sol)
             @test sol.v ≈ vref rtol = 1.0e-9
             @test sol.σ ≈ σref rtol = 1.0e-9
+        end
+    end
+
+    @testset "a failed update rethrows the exception its refresh raised" begin
+        # The update restores the old problem and rethrows. The caller must get the very object
+        # the refresh threw, not one from reading the old `J` or a wrapper around it.
+        n = 6
+        for inner in (LUFactorization(), GenericLUFactorization(), QRFactorization()), k in (0, 2), update in (:reinit, :prob)
+            J = rand(n, n) + n * I
+            b = rand(n); c = rand(n); d = 1.5; f = rand(n); g = 0.7
+            old = BreakableMatrix(J, false)
+            cache = init(BorderedLinearProblem(old, b, c, d, f, g), BorderingBLS(; inner, k))
+            solve!(cache)
+            # Reading the old `J` now throws an `ErrorException`, and reading the new one a `Sentinel`.
+            old.broken = true
+            broken = BreakableMatrix(J + I, true, Sentinel())
+            thrown = try
+                update === :reinit ? reinit!(cache; J = broken) :
+                    (cache.prob = BorderedLinearProblem(broken, b, c, d, f, g))
+                nothing
+            catch err
+                err
+            end
+            @test thrown === broken.err
         end
     end
 

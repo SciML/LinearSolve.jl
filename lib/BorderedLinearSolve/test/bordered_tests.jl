@@ -23,6 +23,10 @@ function Base.getindex(A::BreakableMatrix, i::Int, j::Int)
     return A.data[i, j]
 end
 
+# A matrix-free `J` that scales row `i` of a state of any shape by `i`.
+struct RowScaling end
+Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
+
 @testset "BorderedLinearSolve" begin
     Random.seed!(560)
 
@@ -331,6 +335,43 @@ end
             @test successful_retcode(sol)
             @test sol.v ≈ vref rtol = rtol
             @test sol.σ ≈ σref rtol = rtol
+        end
+    end
+
+    @testset "an update may reshape the state" begin
+        # A matrix-free `J` acts on states of one shape. Bordering kept its operator for the old
+        # shape when the length stayed the same: a wrong answer with a Success retcode.
+        algs = (
+            BorderingBLS(), BorderingBLS(; k = 2),
+            BorderingBLS(; inner = KrylovJL_GMRES()), BorderingBLS(; inner = KrylovJL_GMRES(), k = 2),
+        )
+        for alg in algs, update in (:reinit, :prob)
+            cache = init(BorderedLinearProblem(RowScaling(), rand(2, 3), rand(2, 3), 1.5, rand(2, 3), 0.7), alg)
+            solve!(cache)
+            b = rand(3, 2); c = rand(3, 2); f = rand(3, 2)
+            update === :reinit ? reinit!(cache; b, c, f) :
+                (cache.prob = BorderedLinearProblem(RowScaling(), b, c, 1.5, f, 0.7))
+            sol = solve!(cache)
+            vref, σref = reference(kron(I(2), Diagonal(1.0:3.0)), vec(b), vec(c), 1.5, vec(f), 0.7)
+            @test successful_retcode(sol)
+            @test size(sol.v) == (3, 2)
+            @test vec(sol.v) ≈ vref rtol = 1.0e-6
+            @test sol.σ ≈ σref rtol = 1.0e-6
+        end
+        # Assembly applies a matrix `J` to the flattened state, whatever its shape.
+        for alg in (DirectBLS(), DirectBLS(LUFactorization())), update in (:reinit, :prob)
+            J = rand(6, 6) + 6I
+            cache = init(BorderedLinearProblem(J, rand(2, 3), rand(2, 3), 1.5, rand(2, 3), 0.7), alg)
+            solve!(cache)
+            b = rand(3, 2); c = rand(3, 2); f = rand(3, 2)
+            update === :reinit ? reinit!(cache; b, c, f) :
+                (cache.prob = BorderedLinearProblem(J, b, c, 1.5, f, 0.7))
+            sol = solve!(cache)
+            vref, σref = reference(J, vec(b), vec(c), 1.5, vec(f), 0.7)
+            @test successful_retcode(sol)
+            @test size(sol.v) == (3, 2)
+            @test vec(sol.v) ≈ vref rtol = 1.0e-9
+            @test sol.σ ≈ σref rtol = 1.0e-9
         end
     end
 

@@ -23,8 +23,8 @@ Passing only `b`, `c`, `d`, `f` or `g` keeps the factorization.
 
 Assigning `cache.prob = prob` replaces the whole problem and always refactors.
 
-The new parts may change the state size; the cache then builds its buffers anew, as `init`
-does. An update that throws leaves the cache with its old problem, which the next `solve!`
+The new parts may change the state's size or shape. A new size builds the cache's buffers
+anew, as `init` does, and a new shape refactors. An update that throws leaves the cache with its old problem, which the next `solve!`
 refactors.
 """
 function SciMLBase.reinit!(
@@ -54,7 +54,8 @@ function _install!(cache, prob, refactor::Bool)
     old = getfield(cache, :prob)
     setfield!(cache, :prob, prob)
     try
-        _refresh!(cache, refactor)
+        # A matrix-free `J` acts on states of one shape, so a new shape refactors too.
+        _refresh!(cache, refactor || size(prob.f) != size(old.f))
     catch
         setfield!(cache, :prob, old)
         _refresh!(cache, true)

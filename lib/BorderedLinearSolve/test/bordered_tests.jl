@@ -1,6 +1,7 @@
 using BorderedLinearSolve
 using LinearAlgebra, SparseArrays, Random, Test
-using LinearSolve: LUFactorization, GenericLUFactorization, QRFactorization, KrylovJL_GMRES
+using LinearSolve: LUFactorization, GenericLUFactorization, QRFactorization, KrylovJL_GMRES,
+    LinearAliasSpecifier
 using SciMLOperators: FunctionOperator, MatrixOperator
 using SciMLBase: successful_retcode
 
@@ -331,11 +332,13 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
         # The update restores the old problem and rethrows. The caller must get the very object
         # the refresh threw, not one from reading the old `J` or a wrapper around it.
         n = 6
-        for inner in (LUFactorization(), GenericLUFactorization(), QRFactorization()), k in (0, 2), update in (:reinit, :prob)
+        inners = (LUFactorization(), GenericLUFactorization(), QRFactorization())
+        algs = Iterators.flatten((BorderingBLS(; inner, k = 0), BorderingBLS(; inner, k = 2), DirectBLS(; inner)) for inner in inners)
+        for alg in algs, update in (:reinit, :prob)
             J = rand(n, n) + n * I
             b = rand(n); c = rand(n); d = 1.5; f = rand(n); g = 0.7
             old = BreakableMatrix(J, false)
-            cache = init(BorderedLinearProblem(old, b, c, d, f, g), BorderingBLS(; inner, k))
+            cache = init(BorderedLinearProblem(old, b, c, d, f, g), alg)
             solve!(cache)
             # Reading the old `J` now throws an `ErrorException`, and reading the new one a `Sentinel`.
             old.broken = true
@@ -356,10 +359,12 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
         # before the inner cache took it. The next solve! reused the factors of `J` as it was
         # before the change: a wrong answer with a Success retcode.
         n = 6
-        for inner in (LUFactorization(), GenericLUFactorization(), QRFactorization()), k in (0, 2), update in (:reinit, :prob)
+        inners = (LUFactorization(), GenericLUFactorization(), QRFactorization())
+        algs = Iterators.flatten((BorderingBLS(; inner, k = 0), BorderingBLS(; inner, k = 2), DirectBLS(; inner)) for inner in inners)
+        for alg in algs, update in (:reinit, :prob)
             J = BreakableMatrix(rand(n, n) + n * I, false)
             b = rand(n); c = rand(n); d = 1.5; f = rand(n); g = 0.7
-            cache = init(BorderedLinearProblem(J, b, c, d, f, g), BorderingBLS(; inner, k))
+            cache = init(BorderedLinearProblem(J, b, c, d, f, g), alg)
             solve!(cache)
             view(J.data, diagind(J.data)) .+= 1
             J.broken = true
@@ -405,6 +410,48 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
             @test successful_retcode(sol)
             @test sol.v ≈ vref rtol = 1.0e-9
             @test sol.σ ≈ σref rtol = 1.0e-9
+        end
+    end
+
+    @testset "a failed update whose old J cannot be read leaves no stale factors" begin
+        # After its first refactor DirectBLS factors its assembled matrix in place, and an
+        # assembly that throws partway leaves half-written factors. If the old `J` threw too,
+        # they stayed marked current: a wrong answer with a Success retcode.
+        n = 6
+        inners = (LUFactorization(), GenericLUFactorization(), QRFactorization())
+        algs = Iterators.flatten((BorderingBLS(; inner, k = 0), BorderingBLS(; inner, k = 2), DirectBLS(; inner)) for inner in inners)
+        aliasing = (NamedTuple(), (; alias = LinearAliasSpecifier(alias_A = true)))
+        for alg in algs, kwargs in aliasing, update in (:reinit, :prob), next in (:solve, :rhs)
+            # Aliasing would hand an in-place factorization the caller's read-only `J`.
+            alg isa BorderingBLS && !isempty(kwargs) && continue
+            J = rand(n, n) + n * I
+            b = rand(n); c = rand(n); d = 1.5; f = rand(n); g = 0.7
+            old = BreakableMatrix(J, false)
+            cache = init(BorderedLinearProblem(old, b, c, d, f, g), alg; kwargs...)
+            solve!(cache)
+            reinit!(cache; J = old)
+            solve!(cache)
+            old.broken = true
+            broken = BreakableMatrix(J + I, true)
+            @test_throws ErrorException update === :reinit ? reinit!(cache; J = broken, f = rand(n)) :
+                (cache.prob = BorderedLinearProblem(broken, b, c, d, rand(n), g))
+            @test cache.prob.J === old
+            # Until the old `J` can be read again, a solve throws, and so does an update that keeps the factorization.
+            @test_throws ErrorException solve!(cache)
+            @test_throws ErrorException reinit!(cache; g = -0.3)
+            old.broken = false
+            if next === :rhs
+                g = -0.3
+                reinit!(cache; g)
+            end
+            sol = solve!(cache)
+            vref, σref = reference(J, b, c, d, f, g)
+            @test successful_retcode(sol)
+            @test sol.v ≈ vref rtol = 1.0e-9
+            @test sol.σ ≈ σref rtol = 1.0e-9
+            # Refactored, the cache keeps its factorization for a new right-hand side again.
+            reinit!(cache; f = rand(n))
+            @test !cache.inner.isfresh
         end
     end
 

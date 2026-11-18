@@ -26,19 +26,26 @@ end
 
 Holds the assembled bordered matrix, the stacked right-hand side, and the `LinearSolve`
 cache over them. The matrix is rewritten in full whenever `J` or the border changes,
-since a factorization done in place leaves it holding the factors.
+since a factorization done in place leaves it holding the factors. A new state size or
+border width builds all three anew.
 """
-mutable struct DirectCache{A, M, R, C, P}
+mutable struct DirectCache{A, M, R, C, P, K}
     alg::A
     matrix::M
     rhs::R
     inner::C
     prob::P
+    # The `init` keywords, kept to build the cache anew for a new state size or border width.
+    kwargs::K
     # Whether a refresh threw since the last one that finished; see `_sync!`.
     stale::Bool
 end
 
-function SciMLBase.init(prob::BorderedLinearProblem, alg::DirectBLS; kwargs...)
+SciMLBase.init(prob::BorderedLinearProblem, alg::DirectBLS; kwargs...) =
+    DirectCache(alg, _direct_parts(prob, alg, kwargs)..., prob, kwargs, false)
+
+# The assembled matrix and stacked right-hand side of `prob`, and the `LinearSolve` cache over them.
+function _direct_parts(prob::BorderedLinearProblem, alg::DirectBLS, kwargs)
     n, m = length(prob.f), _border_width(prob.b)
     matrix_type = promote_type(
         eltype(prob.J), map(eltype, _border_parts(prob.b))...,
@@ -46,8 +53,7 @@ function SciMLBase.init(prob::BorderedLinearProblem, alg::DirectBLS; kwargs...)
     )
     matrix = _assemble!(Matrix{matrix_type}(undef, n + m, n + m), prob)
     rhs = _stack_rhs!(Vector{promote_type(eltype(prob.f), eltype(prob.g))}(undef, n + m), prob)
-    inner = init(LinearProblem(matrix, rhs), alg.inner; kwargs...)
-    return DirectCache(alg, matrix, rhs, inner, prob, false)
+    return matrix, rhs, init(LinearProblem(matrix, rhs), alg.inner; kwargs...)
 end
 
 # Every entry of `matrix` is written, so it may hold anything before, factors included.
@@ -90,9 +96,15 @@ end
 # The border sits in the assembled matrix, so a new one refactors too.
 _refactors(::DirectCache, J, b, c, d) = !(isnothing(J) && isnothing(b) && isnothing(c) && isnothing(d))
 
-# The matrix-side refresh behind `reinit!` and `cache.prob = prob`.
+# The matrix-side refresh behind `reinit!` and `cache.prob = prob`. A new state size or border
+# width gets a new matrix, right-hand side and inner cache, built as at `init`.
 function _refresh!(cache::DirectCache, refactor::Bool)
-    refactor && (cache.inner.A = _assemble!(cache.matrix, cache.prob))
+    prob = cache.prob
+    if length(cache.rhs) != length(prob.f) + _border_width(prob.b)
+        cache.matrix, cache.rhs, cache.inner = _direct_parts(prob, cache.alg, cache.kwargs)
+    elseif refactor
+        cache.inner.A = _assemble!(cache.matrix, prob)
+    end
     return nothing
 end
 

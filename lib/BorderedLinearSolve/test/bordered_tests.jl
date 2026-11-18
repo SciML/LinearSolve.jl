@@ -402,28 +402,48 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
         end
     end
 
-    @testset "an update may change the state size" begin
-        # The inner cache kept its buffers for the old size, so the next solve! threw.
+    @testset "an update may change the state size or the border width" begin
+        # The caches kept their buffers for the old sizes. Bordering then threw at the next
+        # solve!, and DirectBLS rewrote only part of its old matrix and returned a wrong answer
+        # with a Success retcode.
         inners = (
             (nothing, 1.0e-9), (LUFactorization(), 1.0e-9), (GenericLUFactorization(), 1.0e-9),
             (QRFactorization(), 1.0e-9), (KrylovJL_GMRES(), 1.0e-6),
         )
-        for (inner, rtol) in inners, (n1, n2) in ((6, 3), (3, 6)), update in (:reinit, :prob)
-            J = rand(n1, n1) + n1 * I
-            prob = BorderedLinearProblem(J, rand(n1), rand(n1), 1.5, rand(n1), 0.7)
-            cache = init(prob, BorderingBLS(; inner, k = 2); reltol = 1.0e-10)
-            solve!(cache)
-            J2 = rand(n2, n2) + n2 * I
-            b = rand(n2); c = rand(n2); d = 0.9; f = rand(n2); g = -0.2
-            update === :reinit ? reinit!(cache; J = J2, b, c, d, f, g) :
-                (cache.prob = BorderedLinearProblem(J2, b, c, d, f, g))
-            # The new inner cache is built with the keywords given to `init`.
-            @test cache.inner.reltol == 1.0e-10
-            sol = solve!(cache)
-            vref, σref = reference(J2, b, c, d, f, g)
-            @test successful_retcode(sol)
-            @test sol.v ≈ vref rtol = rtol
-            @test sol.σ ≈ σref rtol = rtol
+        for (inner, rtol) in inners, alg in (BorderingBLS(; inner, k = 2), DirectBLS(; inner)), update in (:reinit, :prob)
+            for (n1, n2) in ((6, 3), (3, 6))
+                J = rand(n1, n1) + n1 * I
+                prob = BorderedLinearProblem(J, rand(n1), rand(n1), 1.5, rand(n1), 0.7)
+                cache = init(prob, alg; reltol = 1.0e-10)
+                solve!(cache)
+                J2 = rand(n2, n2) + n2 * I
+                b = rand(n2); c = rand(n2); d = 0.9; f = rand(n2); g = -0.2
+                update === :reinit ? reinit!(cache; J = J2, b, c, d, f, g) :
+                    (cache.prob = BorderedLinearProblem(J2, b, c, d, f, g))
+                # The new inner cache is built with the keywords given to `init`.
+                @test cache.inner.reltol == 1.0e-10
+                sol = solve!(cache)
+                vref, σref = reference(J2, b, c, d, f, g)
+                @test successful_retcode(sol)
+                @test sol.v ≈ vref rtol = rtol
+                @test sol.σ ≈ σref rtol = rtol
+            end
+
+            n = 5
+            J = rand(n, n) + n * I; f = rand(n)
+            border(m) = [rand(n) for _ in 1:m]
+            for (m1, m2) in ((2, 3), (3, 2))
+                cache = init(BorderedLinearProblem(J, border(m1), border(m1), rand(m1, m1), f, rand(m1)), alg)
+                solve!(cache)
+                b, c, d, g = border(m2), border(m2), rand(m2, m2), rand(m2)
+                update === :reinit ? reinit!(cache; b, c, d, g) :
+                    (cache.prob = BorderedLinearProblem(J, b, c, d, f, g))
+                sol = solve!(cache)
+                x = [J reduce(hcat, b); reduce(hcat, c)' d] \ vcat(f, g)
+                @test successful_retcode(sol)
+                @test sol.v ≈ x[1:n] rtol = rtol
+                @test sol.σ ≈ x[(n + 1):end] rtol = rtol
+            end
         end
     end
 

@@ -618,6 +618,8 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
             )
             @test_throws DimensionMismatch BorderedLinearProblem(parts...)
         end
+        # A tuple `g` has the right length but is not the vector bordering subtracts from.
+        @test_throws "expected a vector of length 2" BorderedLinearProblem(J, wide, wide, rand(2, 2), x, (1.0, 2.0))
 
         # On a state that is not a vector, `J` acts on the state's own shape and is left to the
         # algorithm. Bordering applies this 2 x 2 `J` to each column of the 2 x 2 state, while

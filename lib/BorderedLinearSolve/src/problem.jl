@@ -88,10 +88,10 @@ function _check_border_block(d, g, m)
         )
     else
         d isa AbstractMatrix && size(d) == (m, m) || throw(
-            DimensionMismatch("d is a $(summary(d)), expected $m x $m to match the border width")
+            DimensionMismatch("d is a $(summary(d)), expected a matrix of size ($m, $m) to match the border width")
         )
         g isa AbstractVector && length(g) == m || throw(
-            DimensionMismatch("g is a $(summary(g)), expected length $m to match the border width")
+            DimensionMismatch("g is a $(summary(g)), expected a vector of length $m to match the border width")
         )
     end
     return nothing

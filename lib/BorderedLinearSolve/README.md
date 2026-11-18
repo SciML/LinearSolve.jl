@@ -51,7 +51,7 @@ be `n x n`. On a state of another shape, `J` acts on that shape. A part that doe
 the state or the border width throws a `DimensionMismatch`.
 
 A border wider than 1 is given explicitly as a tuple of states, with `d` an `m x m`
-matrix and `g` of length `m`:
+matrix and `g` a vector of length `m`:
 
 ```julia
 prob = BorderedLinearProblem(J, (b1, b2), (c1, c2), d, f, g)

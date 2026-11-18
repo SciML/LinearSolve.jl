@@ -1,7 +1,7 @@
 using BorderedLinearSolve
 using LinearAlgebra, SparseArrays, Random, Test
 using LinearSolve: AbstractFactorization, LUFactorization, GenericLUFactorization, QRFactorization,
-    KrylovJL_GMRES, LinearAliasSpecifier
+    KrylovJL_GMRES, LinearAliasSpecifier, LinearSolveFunction
 using SciMLOperators: FunctionOperator, MatrixOperator
 using SciMLBase: successful_retcode
 
@@ -34,6 +34,19 @@ const INNERS = (
     (GenericLUFactorization(), 1.0e-9),
     (QRFactorization(), 1.0e-9),
     (KrylovJL_GMRES(), 1.0e-6),
+)
+
+# A backend that solves and then overwrites its right-hand side, as some in-place solvers do,
+# counting its calls in `OVERWRITES`. It stays out of `INNERS`: a `LinearSolveFunction` never
+# clears `isfresh`, which the `reinit!` tests check.
+const OVERWRITES = Ref(0)
+const OVERWRITING = LinearSolveFunction(
+    function (A, b, u, p, isfresh, Pl, Pr, cacheval; kwargs...)
+        OVERWRITES[] += 1
+        u .= A \ b
+        fill!(b, NaN)
+        return u
+    end
 )
 
 # Bordering without and with correction sweeps (which re-read the problem), and assembly.
@@ -98,6 +111,33 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
                 solve(BorderedLinearProblem(J, b, c, d, f, g), alg)
             end
             test_reference(sol, J, b, c, d, f, g; rtol)
+        end
+    end
+
+    @testset "a backend that overwrites its right-hand side spoils nothing" begin
+        # Bordering hands the inner solver `f` and each border part as right-hand sides, and
+        # each correction sweep hands it the residuals, re-read from `f`. Each is copied in
+        # first, or this backend would overwrite the caller's arrays and the sweeps would use
+        # the garbage. A zero tolerance makes BEC+k run every sweep.
+        states(x) = x isa Tuple ? x : (x,)
+        n = 6
+        algs = (
+            BorderingBLS(; inner = OVERWRITING), BorderingBLS(; inner = OVERWRITING, k = 2, tol = 0.0),
+            DirectBLS(; inner = OVERWRITING),
+        )
+        for alg in algs, m in (1, 2)
+            parts = random_parts(n, m)
+            cache = init(BorderedLinearProblem(parts...), alg)
+            for _ in 1:2
+                calls = OVERWRITES[]
+                sol = leaving_intact(() -> solve!(cache), parts.J, states(parts.b)..., states(parts.c)..., parts.f)
+                # Bordering solves for `f` and each border part in the first pass and in each sweep.
+                @test OVERWRITES[] - calls == (alg isa DirectBLS ? 1 : (1 + m) * (1 + alg.k))
+                test_reference(sol, parts...; rtol = 1.0e-9)
+                # A new right-hand side goes through `reinit!` and the same copies.
+                parts = merge(parts, (; f = rand(n)))
+                reinit!(cache; parts.f)
+            end
         end
     end
 

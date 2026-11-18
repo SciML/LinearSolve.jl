@@ -46,10 +46,12 @@ mutable struct BorderedCache{A, C, P, K}
     prob::P
     # The `init` keywords, kept to build a new inner cache for a new state size.
     kwargs::K
+    # Whether `inner` may not match `prob`, after a refresh that threw; see `_sync!`.
+    stale::Bool
 end
 
 SciMLBase.init(prob::BorderedLinearProblem, alg::BorderingBLS; kwargs...) =
-    BorderedCache(alg, _inner_cache(prob, alg, kwargs), prob, kwargs)
+    BorderedCache(alg, _inner_cache(prob, alg, kwargs), prob, kwargs, false)
 
 function _inner_cache(prob::BorderedLinearProblem, alg::BorderingBLS, kwargs)
     # A state that is not a vector is flattened for the inner solve only; see
@@ -123,6 +125,7 @@ _combine(Δ, σ::Number) = only(Δ) * σ
 _combine(Δ, σ::AbstractVector) = sum(Δ[i] * σ[i] for i in eachindex(Δ))
 
 function SciMLBase.solve!(cache::BorderedCache{<:BorderingBLS})
+    cache.stale && _sync!(cache, true)
     alg, prob = cache.alg, cache.prob
     v, σ, rc = _bec(cache, prob.f, prob.g)
 

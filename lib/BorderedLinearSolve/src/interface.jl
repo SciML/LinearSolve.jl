@@ -25,7 +25,7 @@ Assigning `cache.prob = prob` replaces the whole problem and always refactors.
 
 The new parts may change the state's size or shape. A new size builds the cache's buffers
 anew, as `init` does, and a new shape refactors. An update that throws leaves the cache with
-its old problem, which the next `solve!` refactors.
+its old problem, which the next `solve!` or update refactors from `J` as it is then.
 
 Neither way of updating may change the type of a part, since the cache is typed for its
 problem. A tuple border of another length, a wide border for a single one, or an `Int` for
@@ -52,21 +52,30 @@ function Base.setproperty!(cache::Union{BorderedCache, DirectCache}, name::Symbo
     return x
 end
 
-# Store `prob` in `cache` and refresh the cache for it. A refresh that throws may have
-# overwritten part of the old factorization, so the old problem goes back in and is
-# refreshed in full: a stored problem never meets a factorization of another.
+# Store `prob` in `cache` and refresh the cache for it. If the refresh throws, the old problem
+# goes back in, and the cache stays stale until a `solve!` or update refreshes it in full.
 function _install!(cache, prob::BorderedLinearProblem, refactor::Bool)
     _check_types(cache, prob)
     old = getfield(cache, :prob)
     setfield!(cache, :prob, prob)
     try
         # A matrix-free `J` acts on states of one shape, so a new shape refactors too.
-        _refresh!(cache, refactor || size(prob.f) != size(old.f))
+        _sync!(cache, refactor || size(prob.f) != size(old.f))
     catch
         setfield!(cache, :prob, old)
-        _refresh!(cache, true)
         rethrow()
     end
+    return nothing
+end
+
+# Refresh `cache` for its stored problem. A refresh that throws may leave factors of a `J`
+# that has since changed in place, so the cache is stale from the start of a refresh until
+# one finishes, and a stale cache refactors from `J` as it is at its next refresh.
+function _sync!(cache, refactor::Bool)
+    stale = getfield(cache, :stale)
+    setfield!(cache, :stale, true)
+    _refresh!(cache, refactor || stale)
+    setfield!(cache, :stale, false)
     return nothing
 end
 

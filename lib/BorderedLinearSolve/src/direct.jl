@@ -18,10 +18,12 @@ end
 mutable struct DirectCache{A, P}
     alg::A
     prob::P
+    # Whether a refresh threw since the last one that finished; see `_sync!`.
+    stale::Bool
 end
 
 SciMLBase.init(prob::BorderedLinearProblem, alg::DirectBLS; kwargs...) =
-    DirectCache(alg, prob)
+    DirectCache(alg, prob, false)
 
 function _assemble(prob::BorderedLinearProblem)
     m = _border_width(prob.b)
@@ -35,6 +37,7 @@ end
 _refresh!(::DirectCache, ::Bool) = nothing
 
 function SciMLBase.solve!(cache::DirectCache)
+    cache.stale && _sync!(cache, true)
     prob = cache.prob
     m = _border_width(prob.b)
     rhs = vcat(vec(prob.f), m == 1 ? [prob.g] : collect(prob.g))

@@ -13,7 +13,8 @@ function reference(J, b, c, d, f, g)
 end
 
 # Reading the last entry of a broken matrix throws, so a refresh that copies it fails partway.
-struct BreakableMatrix <: AbstractMatrix{Float64}
+# The matrix is mutable, so a test can change or break one the cache holds and repair it later.
+mutable struct BreakableMatrix <: AbstractMatrix{Float64}
     data::Matrix{Float64}
     broken::Bool
 end
@@ -310,6 +311,35 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
             @test successful_retcode(sol)
             @test sol.v ≈ vref rtol = 1.0e-9
             @test sol.σ ≈ σref rtol = 1.0e-9
+        end
+    end
+
+    @testset "a failed update leaves the cache to refactor from J as it is" begin
+        # After `J` changed in place, the refresh and then the restore read it, and both threw
+        # before the inner cache took it. The next solve! reused the factors of `J` as it was
+        # before the change: a wrong answer with a Success retcode.
+        n = 6
+        for inner in (LUFactorization(), GenericLUFactorization(), QRFactorization()), k in (0, 2), update in (:reinit, :prob)
+            J = BreakableMatrix(rand(n, n) + n * I, false)
+            b = rand(n); c = rand(n); d = 1.5; f = rand(n); g = 0.7
+            cache = init(BorderedLinearProblem(J, b, c, d, f, g), BorderingBLS(; inner, k))
+            solve!(cache)
+            view(J.data, diagind(J.data)) .+= 1
+            J.broken = true
+            @test_throws ErrorException update === :reinit ? reinit!(cache; J) :
+                (cache.prob = BorderedLinearProblem(J, b, c, d, f, g))
+            # Until `J` can be read again, a solve throws, and so does an update that keeps the factorization.
+            @test_throws ErrorException solve!(cache)
+            @test_throws ErrorException reinit!(cache; g = -0.3)
+            J.broken = false
+            sol = solve!(cache)
+            vref, σref = reference(J.data, b, c, d, f, g)
+            @test successful_retcode(sol)
+            @test sol.v ≈ vref rtol = 1.0e-9
+            @test sol.σ ≈ σref rtol = 1.0e-9
+            # Refactored, the cache keeps its factorization for a new right-hand side again.
+            reinit!(cache; f = rand(n))
+            @test !cache.inner.isfresh
         end
     end
 

@@ -46,10 +46,12 @@ sol.v, sol.σ
 here asks you to `vec` and `reshape` around the solver.
 
 `J` is only applied and solved against, so it can be a matrix or a matrix-free
-operator, and no assumption is made about its shape.
+operator. For a vector state of length `n`, a matrix or `SciMLOperators` operator `J` must
+be `n x n`. On a state of another shape, `J` acts on that shape. A part that does not match
+the state or the border width throws a `DimensionMismatch`.
 
 A border wider than 1 is given explicitly as a tuple of states, with `d` an `m x m`
-matrix and `g` of length `m`:
+matrix and `g` a vector of length `m`:
 
 ```julia
 prob = BorderedLinearProblem(J, (b1, b2), (c1, c2), d, f, g)
@@ -71,8 +73,23 @@ is the case the package is for:
 ```julia
 cache = init(prob, BorderingBLS(LUFactorization()))
 sol = solve!(cache)
-# ... update J in place, then solve! again, reusing the factorization
+# a new right-hand side reuses the factorization
+reinit!(cache; f = f2, g = g2)
+sol = solve!(cache)
+# after updating J in place, pass it so the next solve! refactors
+J .= J_next
+reinit!(cache; J)
+sol = solve!(cache)
 ```
+
+A cache cannot see an in-place change to `J` on its own: without `reinit!`, `solve!` keeps
+solving against the factorization of the old `J`. Assigning `cache.prob = prob` replaces
+the whole problem and always refactors.
+
+An update may change the size or shape of the state, but not the type of any part: the
+cache is typed for its problem. A tuple border of another length, or a wide border for a
+single one, throws an `ArgumentError` and leaves the cache as it was. Call `init` for such a
+problem, or give a border whose width will change as a vector of states.
 
 ## Algorithms
 

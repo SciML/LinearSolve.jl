@@ -37,20 +37,41 @@ BorderingBLS(inner) = BorderingBLS(; inner)
 
 Holds the `LinearSolve` cache for `J` across solves. Reusing it is the whole reason to
 prefer this over assembling the bordered matrix: the factorization or Krylov workspace
-built for `J` is kept, and `J` can be updated in place between outer steps.
+built for `J` is kept. After updating `J` in place between outer steps, pass it to
+[`reinit!`](@ref) so the next `solve!` refactors.
 """
-mutable struct BorderedCache{A, C, P}
+mutable struct BorderedCache{A, C, P, K}
     alg::A
     inner::C
     prob::P
+    # The `init` keywords, kept to build a new inner cache for a new state size.
+    kwargs::K
+    # Whether `inner` may not match `prob`, after a refresh that threw; see `_sync!`.
+    stale::Bool
 end
 
-function SciMLBase.init(prob::BorderedLinearProblem, alg::BorderingBLS; kwargs...)
+SciMLBase.init(prob::BorderedLinearProblem, alg::BorderingBLS; kwargs...) =
+    BorderedCache(alg, _inner_cache(prob, alg, kwargs), prob, kwargs, false)
+
+function _inner_cache(prob::BorderedLinearProblem, alg::BorderingBLS, kwargs)
     # A state that is not a vector is flattened for the inner solve only; see
     # flatten.jl. The bordering algebra below always works in the state's own shape.
     op = _flatten_operator(prob.J, prob.f)
-    inner = init(LinearProblem(op, _rhs_copy(_flatten(prob.f, prob.f))), alg.inner; kwargs...)
-    return BorderedCache(alg, inner, prob)
+    return init(LinearProblem(op, _rhs_copy(_flatten(prob.f, prob.f))), alg.inner; kwargs...)
+end
+
+# The refresh behind `reinit!` and `cache.prob = prob`. A new state size gets a new inner cache,
+# built as at `init`. Otherwise `refactor` hands the inner cache `J` again, copied unless
+# `alias_A` allows otherwise: most dense factorizations overwrite `A`, and BEC+k re-reads `J`.
+function _refresh!(cache::BorderedCache, refactor::Bool)
+    prob = cache.prob
+    if length(prob.f) != length(cache.inner.b)
+        cache.inner = _inner_cache(prob, cache.alg, cache.kwargs)
+    elseif refactor
+        op = _flatten_operator(prob.J, prob.f)
+        cache.inner.A = op isa AbstractMatrix && !cache.inner.alias_A ? copy(op) : op
+    end
+    return nothing
 end
 
 # The right-hand side is copied in. Some backends solve in place and overwrite `b`,
@@ -104,6 +125,7 @@ _combine(Δ, σ::Number) = only(Δ) * σ
 _combine(Δ, σ::AbstractVector) = sum(Δ[i] * σ[i] for i in eachindex(Δ))
 
 function SciMLBase.solve!(cache::BorderedCache{<:BorderingBLS})
+    cache.stale && _sync!(cache, true)
     alg, prob = cache.alg, cache.prob
     v, σ, rc = _bec(cache, prob.f, prob.g)
 
@@ -123,5 +145,6 @@ function SciMLBase.solve!(cache::BorderedCache{<:BorderingBLS})
 end
 
 _apply(J, v) = J * v
-_cdot_all(c, v) = _border_width(c) == 1 ? _cdot(c, v) : [_cdot(ci, v) for ci in _border_parts(c)]
+# A border of width one may be a single state, or a tuple or vector holding one.
+_cdot_all(c, v) = _border_width(c) == 1 ? _cdot(only(_border_parts(c)), v) : [_cdot(ci, v) for ci in _border_parts(c)]
 _dmul(d, σ) = d * σ

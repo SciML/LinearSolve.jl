@@ -178,6 +178,23 @@ function _adjoint_factorization_solve(
     return factorization === nothing ? nothing : factorization' \ b
 end
 
+function _adjoint_factorization_solve(alg::QRFactorization, cacheval, A, b)
+    return _qr_adjoint_solve(cacheval, b)
+end
+
+function _qr_adjoint_solve(F, b)
+    @static if Base.USE_GPL_LIBS
+        F isa SparseArrays.SPQR.QRSparse && return _spqr_adjoint_solve(F, b)
+    end
+    if F isa LinearAlgebra.QRPivoted && size(F, 1) < size(F, 2)
+        # A[:, p] = Q*R: the adjoint of the minimum-norm forward map is
+        # Q * pinv(R') * b[p]. Factoring R' avoids the unsupported wide-QR adjoint.
+        rhs = b isa AbstractVector ? b[F.p] : b[F.p, :]
+        return F.Q * (qr(adjoint(F.R), ColumnNorm()) \ rhs)
+    end
+    return adjoint(F) \ b
+end
+
 function _adjoint_factorization_solve(
         ::_NormalAdjointFactorizationReuse, alg, cacheval, A, b
     )

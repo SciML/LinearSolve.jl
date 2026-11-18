@@ -1356,10 +1356,13 @@ end
                 A = getproperty(cache.cacheval, $(Meta.quot(alg)))
                 aa_getrs!('C', A.factors, A.ipiv, copy(dy), A.info)
             end
+        elseif alg in Symbol.((DefaultAlgorithmChoice.QRFactorization, DefaultAlgorithmChoice.QRFactorizationPivoted))
+            quote
+                _qr_adjoint_solve(getproperty(cache.cacheval, $(Meta.quot(alg))), dy)
+            end
         elseif alg in Symbol.(
                 (
                     DefaultAlgorithmChoice.LUFactorization,
-                    DefaultAlgorithmChoice.QRFactorization,
                     DefaultAlgorithmChoice.KLUFactorization,
                     DefaultAlgorithmChoice.SupernodalLUFactorization,
                     DefaultAlgorithmChoice.LDLtFactorization,
@@ -1369,7 +1372,6 @@ end
                     DefaultAlgorithmChoice.SVDFactorization,
                     DefaultAlgorithmChoice.CholeskyFactorization,
                     DefaultAlgorithmChoice.NormalCholeskyFactorization,
-                    DefaultAlgorithmChoice.QRFactorizationPivoted,
                     DefaultAlgorithmChoice.SparseColumnPivotedQRFactorization,
                 )
             )

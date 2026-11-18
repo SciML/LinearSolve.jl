@@ -24,31 +24,43 @@ Passing only `b`, `c`, `d`, `f` or `g` keeps the factorization.
 Assigning `cache.prob = prob` replaces the whole problem and always refactors.
 
 The new parts may change the state's size or shape. A new size builds the cache's buffers
-anew, as `init` does, and a new shape refactors. An update that throws leaves the cache with
-its old problem, which the next `solve!` or update refactors from `J` as it is then.
+anew, as `init` does, and a new shape refactors.
+
+An update that throws, also one rejected before it starts, leaves the cache with its old
+problem. If the update would have refactored, or it began to refresh the cache, the next
+`solve!` or update refactors from the problem's arrays as they are then.
 
 Neither way of updating may change the type of a part, since the cache is typed for its
 problem. A tuple border of another length, a wide border for a single one, or an `Int` for
-a `Float64` throws an `ArgumentError` and leaves the cache as it was. Call `init` for such a
-problem instead, or give a border whose width will change as a vector of states.
+a `Float64` throws an `ArgumentError`. Call `init` for such a problem instead, or give a
+border whose width will change as a vector of states.
 """
 function SciMLBase.reinit!(
         cache::Union{BorderedCache, DirectCache};
         J = nothing, b = nothing, c = nothing, d = nothing, f = nothing, g = nothing
     )
+    refactor = !isnothing(J)
+    # A part passed in may have changed in place, so the factors are stale from here on,
+    # also if the new problem is rejected below.
+    refactor && setfield!(cache, :stale, true)
     old = getfield(cache, :prob)
     prob = BorderedLinearProblem(
         something(J, old.J), something(b, old.b), something(c, old.c),
         something(d, old.d), something(f, old.f), something(g, old.g)
     )
-    _install!(cache, prob, !isnothing(J))
+    _install!(cache, prob, refactor)
     return nothing
 end
 
 function Base.setproperty!(cache::Union{BorderedCache, DirectCache}, name::Symbol, x)
-    # A new problem may carry a new `J`, or the same one changed in place.
-    name === :prob ? _install!(cache, x, true) :
+    if name === :prob
+        # A new problem may carry a new `J`, or the same one changed in place, so the factors
+        # are stale from here on, also if `x` is rejected.
+        setfield!(cache, :stale, true)
+        _install!(cache, x, true)
+    else
         setfield!(cache, name, convert(fieldtype(typeof(cache), name), x))
+    end
     return x
 end
 

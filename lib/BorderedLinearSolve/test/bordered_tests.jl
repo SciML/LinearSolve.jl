@@ -343,6 +343,34 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
         end
     end
 
+    @testset "a rejected update that passes J leaves the cache to refactor" begin
+        # After `J` changed in place, an update that passed it but was rejected, for a part of
+        # another type or size, threw before marking the factors stale. The next solve! reused
+        # the factors of `J` from before the change: a wrong answer with a Success retcode.
+        n = 6
+        inners = (LUFactorization(), GenericLUFactorization(), QRFactorization())
+        algs = Iterators.flatten((BorderingBLS(; inner, k = 0), BorderingBLS(; inner, k = 2), DirectBLS(; inner)) for inner in inners)
+        for alg in algs, rejected in (:type, :size, :prob)
+            J = rand(n, n) + n * I
+            b = rand(n); c = rand(n); d = 1.5; f = rand(n); g = 0.7
+            cache = init(BorderedLinearProblem(J, b, c, d, f, g), alg)
+            solve!(cache)
+            view(J, diagind(J)) .+= 1
+            if rejected === :type
+                @test_throws ArgumentError reinit!(cache; J, d = 2)
+            elseif rejected === :size
+                @test_throws DimensionMismatch reinit!(cache; J, f = rand(n + 1))
+            else
+                @test_throws ArgumentError cache.prob = BorderedLinearProblem(J, b, c, 2, f, g)
+            end
+            sol = solve!(cache)
+            vref, σref = reference(J, b, c, d, f, g)
+            @test successful_retcode(sol)
+            @test sol.v ≈ vref rtol = 1.0e-9
+            @test sol.σ ≈ σref rtol = 1.0e-9
+        end
+    end
+
     @testset "an update may change the state size" begin
         # The inner cache kept its buffers for the old size, so the next solve! threw.
         inners = (
@@ -418,11 +446,13 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
             old, new = border(m1), border(m2)
             cache = init(BorderedLinearProblem(J, old.b, old.c, old.d, f, old.g), alg)
             sol = solve!(cache)
-            fields = map(name -> getfield(cache, name), fieldnames(typeof(cache)))
+            # A rejected update that would have refactored leaves the cache stale; see the testset above.
+            names = filter(!=(:stale), fieldnames(typeof(cache)))
+            fields = map(name -> getfield(cache, name), names)
             @test_throws ArgumentError update === :reinit ? reinit!(cache; new.b, new.c, new.d, new.g) :
                 (cache.prob = BorderedLinearProblem(J, new.b, new.c, new.d, f, new.g))
-            # Nothing changed: the cache holds the same objects and solves the old problem as before.
-            @test all(map(===, fields, map(name -> getfield(cache, name), fieldnames(typeof(cache)))))
+            # Nothing else changed: the cache holds the same objects and solves the old problem as before.
+            @test all(map(===, fields, map(name -> getfield(cache, name), names)))
             alg isa BorderingBLS && @test !cache.inner.isfresh
             sol2 = solve!(cache)
             @test sol2.v == sol.v

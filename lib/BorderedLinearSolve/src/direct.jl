@@ -32,7 +32,7 @@ function _assemble(prob::BorderedLinearProblem)
 end
 
 # Every solve! assembles and factors anew, so a new problem needs no refresh.
-_refresh!(::DirectCache) = nothing
+_refresh!(::DirectCache, ::Bool) = nothing
 
 function SciMLBase.solve!(cache::DirectCache)
     prob = cache.prob

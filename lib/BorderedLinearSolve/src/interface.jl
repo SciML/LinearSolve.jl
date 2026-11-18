@@ -22,6 +22,9 @@ without `reinit!`, `solve!` keeps solving against the factorization of the old `
 Passing only `b`, `c`, `d`, `f` or `g` keeps the factorization.
 
 Assigning `cache.prob = prob` replaces the whole problem and always refactors.
+
+An update that throws leaves the cache with its old problem, which the next `solve!`
+refactors.
 """
 function SciMLBase.reinit!(
         cache::Union{BorderedCache, DirectCache};
@@ -32,14 +35,29 @@ function SciMLBase.reinit!(
         something(J, old.J), something(b, old.b), something(c, old.c),
         something(d, old.d), something(f, old.f), something(g, old.g)
     )
-    setfield!(cache, :prob, prob)
-    isnothing(J) || _refresh!(cache)
+    _install!(cache, prob, !isnothing(J))
     return nothing
 end
 
 function Base.setproperty!(cache::Union{BorderedCache, DirectCache}, name::Symbol, x)
-    setfield!(cache, name, convert(fieldtype(typeof(cache), name), x))
+    converted = convert(fieldtype(typeof(cache), name), x)
     # A new problem may carry a new `J`, or the same one changed in place.
-    name === :prob && _refresh!(cache)
+    name === :prob ? _install!(cache, converted, true) : setfield!(cache, name, converted)
     return x
+end
+
+# Store `prob` in `cache` and refresh the cache for it. A refresh that throws may have
+# overwritten part of the old factorization, so the old problem goes back in and is
+# refreshed in full: a stored problem never meets a factorization of another.
+function _install!(cache, prob, refactor::Bool)
+    old = getfield(cache, :prob)
+    setfield!(cache, :prob, prob)
+    try
+        _refresh!(cache, refactor)
+    catch
+        setfield!(cache, :prob, old)
+        _refresh!(cache, true)
+        rethrow()
+    end
+    return nothing
 end

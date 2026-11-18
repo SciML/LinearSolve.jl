@@ -12,6 +12,17 @@ function reference(J, b, c, d, f, g)
     return x[1:length(f)], x[end]
 end
 
+# Reading the last entry of a broken matrix throws, so a refresh that copies it fails partway.
+struct BreakableMatrix <: AbstractMatrix{Float64}
+    data::Matrix{Float64}
+    broken::Bool
+end
+Base.size(A::BreakableMatrix) = size(A.data)
+function Base.getindex(A::BreakableMatrix, i::Int, j::Int)
+    A.broken && (i, j) == size(A) && error("read the last entry of a broken matrix")
+    return A.data[i, j]
+end
+
 @testset "BorderedLinearSolve" begin
     Random.seed!(560)
 
@@ -271,6 +282,28 @@ end
             sol = solve!(cache)
             @test J == J0
             vref, σref = reference(J0, b, c, d, f, g)
+            @test sol.v ≈ vref rtol = 1.0e-9
+            @test sol.σ ≈ σref rtol = 1.0e-9
+        end
+    end
+
+    @testset "a failed update leaves the cache solving the old problem" begin
+        # The new problem was stored before the refresh ran. When the refresh threw, the next
+        # solve! paired it with the old factorization: a wrong answer with a Success retcode.
+        n = 6
+        for inner in (LUFactorization(), GenericLUFactorization(), QRFactorization()), k in (0, 2), update in (:reinit, :prob)
+            J = rand(n, n) + n * I
+            b = rand(n); c = rand(n); d = 1.5; f = rand(n); g = 0.7
+            cache = init(BorderedLinearProblem(BreakableMatrix(J, false), b, c, d, f, g), BorderingBLS(; inner, k))
+            solve!(cache)
+            broken, f2 = BreakableMatrix(J + I, true), rand(n)
+            fail!() = update === :reinit ? reinit!(cache; J = broken, f = f2) :
+                (cache.prob = BorderedLinearProblem(broken, b, c, d, f2, g))
+            @test_throws ErrorException fail!()
+            @test !cache.prob.J.broken
+            sol = solve!(cache)
+            vref, σref = reference(J, b, c, d, f, g)
+            @test successful_retcode(sol)
             @test sol.v ≈ vref rtol = 1.0e-9
             @test sol.σ ≈ σref rtol = 1.0e-9
         end

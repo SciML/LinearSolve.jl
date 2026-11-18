@@ -57,7 +57,8 @@ end
 # The `J`-side refresh behind `reinit!` and `cache.prob = prob`. Unless `alias_A` allows it, the
 # inner cache gets a copy, as at `init`: most dense factorizations overwrite `A` on a refactor,
 # and the BEC+k residual re-reads `J`.
-function _refresh!(cache::BorderedCache)
+function _refresh!(cache::BorderedCache, refactor::Bool)
+    refactor || return nothing
     op = _flatten_operator(cache.prob.J, cache.prob.f)
     cache.inner.A = op isa AbstractMatrix && !cache.inner.alias_A ? copy(op) : op
     return nothing

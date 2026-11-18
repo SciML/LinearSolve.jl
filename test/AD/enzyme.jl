@@ -365,6 +365,19 @@ Enzyme.autodiff(Reverse, testls, Duplicated(A, dA2), Duplicated(b, db2), Duplica
     @test db ≈ expected rtol = 1.0e-12 atol = 1.0e-12
 end
 
+# the default solver's Cholesky, and its Bunch-Kaufman fallback for an indefinite `A`
+@testset "default Symmetric and Hermitian reverse" begin
+    P = Float64[4 1 0.5; 1 3 0.2; 0.5 0.2 2]
+    N = Float64[1 2 0; 2 1 0; 0 0 1]
+    b = Float64[1.0, 2.0, 3.0]
+    for S in (P, N), W in (Symmetric, Hermitian)
+        f(b) = sum(solve(LinearProblem(W(copy(S)), copy(b))).u)
+        db = zero(b)
+        Enzyme.autodiff(Reverse, Const(f), Active, Duplicated(copy(b), db))
+        @test db ≈ S \ ones(3)
+    end
+end
+
 # https://github.com/SciML/LinearSolve.jl/pull/935 — cover all of LinearAlgebra.jl
 # Each test confirms Enzyme reverse-mode runs on the wrapper type and returns
 # a finite, nontrivial gradient w.r.t. `b`.

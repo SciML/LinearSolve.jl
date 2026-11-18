@@ -6,11 +6,14 @@ using SciMLOperators: FunctionOperator, MatrixOperator
 using SciMLBase: successful_retcode
 
 # Reference: assemble the bordered matrix and solve it densely. Everything below is
-# checked against this rather than against another code path in the package.
+# checked against this rather than against another code path in the package. A wide
+# border is a tuple of states, with `d` an m x m matrix and `g` a vector.
 function reference(J, b, c, d, f, g)
-    M = [Matrix(J) reshape(b, :, 1); reshape(c, 1, :) fill(d, 1, 1)]
-    x = M \ vcat(f, g)
-    return x[1:length(f)], x[end]
+    columns(x) = reduce(hcat, [vec(xi) for xi in (x isa Tuple ? x : (x,))])
+    M = [Matrix(J) columns(b); columns(c)' (d isa Number ? fill(d, 1, 1) : d)]
+    x = M \ vcat(vec(f), g)
+    n = length(f)
+    return x[1:n], g isa Number ? x[end] : x[(n + 1):end]
 end
 
 # Test `sol` against the dense reference for the problem it solved.
@@ -46,6 +49,21 @@ function leaving_intact(step, inputs...)
     end
     return result
 end
+
+# The parts of a well-posed problem with state length `n` and border width `m`.
+function random_parts(n, m)
+    border() = m == 1 ? rand(n) : ntuple(_ -> rand(n), m)
+    return (;
+        J = rand(n, n) + n * I, b = border(), c = border(),
+        d = m == 1 ? 1.5 : rand(m, m) + m * I, f = rand(n), g = m == 1 ? 0.7 : rand(m),
+    )
+end
+
+# Change a part in place: the diagonal of a matrix, which keeps it well conditioned, every
+# entry of a vector, and the first state of a wide border.
+change!(x::AbstractMatrix) = (view(x, diagind(x)) .+= 3; x)
+change!(x::AbstractVector) = (x .= rand(length(x)); x)
+change!(x::Tuple) = (change!(first(x)); x)
 
 # Reading the last entry of a broken matrix throws `err`, so a refresh that copies it fails partway.
 # The matrix is mutable, so a test can change or break one the cache holds and repair it later.
@@ -96,41 +114,36 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
         @test !cache.inner.isfresh
     end
 
-    @testset "reinit! refactors for a new J and reuses the factorization for a new f and g" begin
-        # A cache cannot see a `J` changed in place, so `reinit!` has to say so. Without
-        # it the next solve ran against the old factorization and returned a wrong answer
-        # with a Success retcode.
+    @testset "reinit! refactors for exactly the parts in the factorization" begin
+        # A cache cannot see a part changed in place, so `reinit!` has to say so. Without it
+        # the next solve ran against the old factorization and returned a wrong answer with a
+        # Success retcode. Each part changes alone, so a cache that misses any one fails here.
+        # The border sits in DirectBLS's assembled matrix, and outside `J` for bordering. A
+        # wide border makes `d` and `g` arrays, which can change in place too.
         n = 12
-        for (inner, rtol) in INNERS, alg in bordered_algorithms(inner)
-            J = rand(n, n) + n * I
-            b = rand(n); c = rand(n); d = 1.5; f = rand(n); g = 0.7
-            cache = init(BorderedLinearProblem(J, b, c, d, f, g), alg)
-            leaving_intact(() -> solve!(cache), J, b, c, f)
+        for (inner, rtol) in INNERS, alg in bordered_algorithms(inner), m in (1, 2)
+            refactoring = alg isa DirectBLS ? (:J, :b, :c, :d) : (:J,)
+            for part in (:J, :b, :c, :d, :f, :g), in_place in (false, true)
+                in_place && m == 1 && part in (:d, :g) && continue
+                parts = random_parts(n, m)
+                cache = init(BorderedLinearProblem(parts...), alg)
+                leaving_intact(() -> solve!(cache), parts.J, parts.f)
 
-            f2, g2 = rand(n), -0.2
-            reinit!(cache; f = f2, g = g2)
-            @test !cache.inner.isfresh
-            sol = leaving_intact(() -> solve!(cache), J, b, c, f2)
-            test_reference(sol, J, b, c, d, f2, g2; rtol)
+                changed = NamedTuple{(part,)}((in_place ? change!(parts[part]) : random_parts(n, m)[part],))
+                reinit!(cache; changed...)
+                @test cache.inner.isfresh == (part in refactoring)
+                parts = merge(parts, changed)
+                sol = leaving_intact(() -> solve!(cache), parts.J, parts.f)
+                test_reference(sol, parts...; rtol)
+            end
 
-            view(J, diagind(J)) .+= 3
-            reinit!(cache; J)
+            parts = random_parts(n, m)
+            cache = init(BorderedLinearProblem(parts...), alg)
+            solve!(cache)
+            parts = random_parts(n, m)
+            cache.prob = BorderedLinearProblem(parts...)
             @test cache.inner.isfresh
-            sol = leaving_intact(() -> solve!(cache), J, b, c, f2)
-            test_reference(sol, J, b, c, d, f2, g2; rtol)
-
-            # The border sits in DirectBLS's assembled matrix, and outside J for bordering.
-            b3 = rand(n); c3 = rand(n); d3 = 0.9
-            reinit!(cache; b = b3, c = c3, d = d3)
-            @test cache.inner.isfresh == (alg isa DirectBLS)
-            sol = leaving_intact(() -> solve!(cache), J, b3, c3, f2)
-            test_reference(sol, J, b3, c3, d3, f2, g2; rtol)
-
-            J4 = J + 2I
-            cache.prob = BorderedLinearProblem(J4, b, c, d, f, g)
-            @test cache.inner.isfresh
-            sol = leaving_intact(() -> solve!(cache), J4, b, c, f)
-            test_reference(sol, J4, b, c, d, f, g; rtol)
+            test_reference(solve!(cache), parts...; rtol)
         end
     end
 
@@ -406,7 +419,7 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
                 (cache.prob = BorderedLinearProblem(J, b, c, 1.5, f, 0.7))
             sol = leaving_intact(() -> solve!(cache), b, c, f)
             @test size(sol.v) == (3, 2)
-            test_reference(sol, Jflat, vec(b), vec(c), 1.5, vec(f), 0.7; rtol)
+            test_reference(sol, Jflat, b, c, 1.5, f, 0.7; rtol)
         end
     end
 
@@ -414,20 +427,16 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
         # A cache's fields are typed at `init`. A tuple border of another length, or a wide
         # border for a single one, threw a `TypeError` from `setfield!` or a `MethodError`.
         n = 5
-        J = rand(n, n) + n * I; f = rand(n)
-        border(m) = m == 1 ?
-            (b = rand(n), c = rand(n), d = 1.5, g = 0.7) :
-            (b = ntuple(_ -> rand(n), m), c = ntuple(_ -> rand(n), m), d = rand(m, m) + m * I, g = rand(m))
         for (inner, _) in INNERS, alg in bordered_algorithms(inner), (m1, m2) in ((2, 3), (1, 2), (2, 1)),
                 update in (:reinit, :prob)
-            old, new = border(m1), border(m2)
-            cache = init(BorderedLinearProblem(J, old.b, old.c, old.d, f, old.g), alg)
+            old, new = random_parts(n, m1), random_parts(n, m2)
+            cache = init(BorderedLinearProblem(old...), alg)
             sol = solve!(cache)
             # A rejected update that would have refactored leaves the cache stale; see the testset above.
             names = filter(!=(:stale), fieldnames(typeof(cache)))
             fields = map(name -> getfield(cache, name), names)
             @test_throws ArgumentError update === :reinit ? reinit!(cache; new.b, new.c, new.d, new.g) :
-                (cache.prob = BorderedLinearProblem(J, new.b, new.c, new.d, f, new.g))
+                (cache.prob = BorderedLinearProblem(old.J, new.b, new.c, new.d, old.f, new.g))
             # Nothing else changed: the cache holds the same objects and solves the old problem as before.
             @test all(map(===, fields, map(name -> getfield(cache, name), names)))
             @test !cache.inner.isfresh
@@ -436,7 +445,7 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
             @test sol2.σ == sol.σ
         end
         # The error names the parts whose type changed and points to `init`.
-        cache = init(BorderedLinearProblem(J, rand(n), rand(n), 1.5, f, 0.7), BorderingBLS())
+        cache = init(BorderedLinearProblem(random_parts(n, 1)...), BorderingBLS())
         @test_throws ["d from Float64 to Int64", "call init"] reinit!(cache; d = 2)
     end
 

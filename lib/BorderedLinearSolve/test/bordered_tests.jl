@@ -375,6 +375,34 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
         end
     end
 
+    @testset "an update cannot change the type of a part" begin
+        # A cache's fields are typed at `init`. A tuple border of another length, or a wide
+        # border for a single one, threw a `TypeError` from `setfield!` or a `MethodError`.
+        n = 5
+        J = rand(n, n) + n * I; f = rand(n)
+        border(m) = m == 1 ?
+            (b = rand(n), c = rand(n), d = 1.5, g = 0.7) :
+            (b = ntuple(_ -> rand(n), m), c = ntuple(_ -> rand(n), m), d = rand(m, m) + m * I, g = rand(m))
+        algs = (BorderingBLS(LUFactorization()), BorderingBLS(; k = 2), DirectBLS())
+        for alg in algs, (m1, m2) in ((2, 3), (1, 2), (2, 1)), update in (:reinit, :prob)
+            old, new = border(m1), border(m2)
+            cache = init(BorderedLinearProblem(J, old.b, old.c, old.d, f, old.g), alg)
+            sol = solve!(cache)
+            fields = map(name -> getfield(cache, name), fieldnames(typeof(cache)))
+            @test_throws ArgumentError update === :reinit ? reinit!(cache; new.b, new.c, new.d, new.g) :
+                (cache.prob = BorderedLinearProblem(J, new.b, new.c, new.d, f, new.g))
+            # Nothing changed: the cache holds the same objects and solves the old problem as before.
+            @test all(map(===, fields, map(name -> getfield(cache, name), fieldnames(typeof(cache)))))
+            alg isa BorderingBLS && @test !cache.inner.isfresh
+            sol2 = solve!(cache)
+            @test sol2.v == sol.v
+            @test sol2.σ == sol.σ
+        end
+        # The error names the parts whose type changed and points to `init`.
+        cache = init(BorderedLinearProblem(J, rand(n), rand(n), 1.5, f, 0.7), BorderingBLS())
+        @test_throws ["d from Float64 to Int64", "call init"] reinit!(cache; d = 2)
+    end
+
     @testset "a state that is not a vector" begin
         # A 2D problem keeps its state as a matrix. Requiring a vector would push
         # `vec`/`reshape` onto the caller, so the state shape is preserved end to end

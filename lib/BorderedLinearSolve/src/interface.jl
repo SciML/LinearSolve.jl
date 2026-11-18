@@ -24,8 +24,13 @@ Passing only `b`, `c`, `d`, `f` or `g` keeps the factorization.
 Assigning `cache.prob = prob` replaces the whole problem and always refactors.
 
 The new parts may change the state's size or shape. A new size builds the cache's buffers
-anew, as `init` does, and a new shape refactors. An update that throws leaves the cache with its old problem, which the next `solve!`
-refactors.
+anew, as `init` does, and a new shape refactors. An update that throws leaves the cache with
+its old problem, which the next `solve!` refactors.
+
+Neither way of updating may change the type of a part, since the cache is typed for its
+problem. A tuple border of another length, a wide border for a single one, or an `Int` for
+a `Float64` throws an `ArgumentError` and leaves the cache as it was. Call `init` for such a
+problem instead, or give a border whose width will change as a vector of states.
 """
 function SciMLBase.reinit!(
         cache::Union{BorderedCache, DirectCache};
@@ -41,16 +46,17 @@ function SciMLBase.reinit!(
 end
 
 function Base.setproperty!(cache::Union{BorderedCache, DirectCache}, name::Symbol, x)
-    converted = convert(fieldtype(typeof(cache), name), x)
     # A new problem may carry a new `J`, or the same one changed in place.
-    name === :prob ? _install!(cache, converted, true) : setfield!(cache, name, converted)
+    name === :prob ? _install!(cache, x, true) :
+        setfield!(cache, name, convert(fieldtype(typeof(cache), name), x))
     return x
 end
 
 # Store `prob` in `cache` and refresh the cache for it. A refresh that throws may have
 # overwritten part of the old factorization, so the old problem goes back in and is
 # refreshed in full: a stored problem never meets a factorization of another.
-function _install!(cache, prob, refactor::Bool)
+function _install!(cache, prob::BorderedLinearProblem, refactor::Bool)
+    _check_types(cache, prob)
     old = getfield(cache, :prob)
     setfield!(cache, :prob, prob)
     try
@@ -62,4 +68,21 @@ function _install!(cache, prob, refactor::Bool)
         rethrow()
     end
     return nothing
+end
+
+# A cache's buffers are typed for the problem it was built for, so an update cannot change
+# the type of any part, such as the length of a tuple border.
+function _check_types(cache, prob::BorderedLinearProblem)
+    P = fieldtype(typeof(cache), :prob)
+    prob isa P && return nothing
+    changed = [
+        "$name from $(fieldtype(P, name)) to $(fieldtype(typeof(prob), name))"
+            for name in fieldnames(P) if fieldtype(P, name) != fieldtype(typeof(prob), name)
+    ]
+    throw(
+        ArgumentError(
+            "an update cannot change the type of a part of the problem, but this one changes " *
+                "$(join(changed, ", ")); call init with the new problem instead"
+        )
+    )
 end

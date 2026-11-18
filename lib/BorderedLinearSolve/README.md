@@ -84,6 +84,11 @@ A cache cannot see an in-place change to `J` on its own: without `reinit!`, `sol
 solving against the factorization of the old `J`. Assigning `cache.prob = prob` replaces
 the whole problem and always refactors.
 
+An update may change the size or shape of the state, but not the type of any part: the
+cache is typed for its problem. A tuple border of another length, or a wide border for a
+single one, throws an `ArgumentError` and leaves the cache as it was. Call `init` for such a
+problem, or give a border whose width will change as a vector of states.
+
 ## Algorithms
 
 | | |

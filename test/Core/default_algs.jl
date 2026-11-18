@@ -884,3 +884,24 @@ end
         @test norm(Matrix(A) * sol.u - rhs) / norm(rhs) < 1.0e-13
     end
 end
+
+@testset "default sparse LU survives in-place pattern changes of a saddle-point matrix" begin
+    # Large enough that the default picks the supernodal LU (n > 1000).
+    k = 30
+    T = spdiagm(-1 => -ones(k - 1), 0 => 2 * ones(k), 1 => -ones(k - 1))
+    K = kron(sparse(I, k, k), T) + kron(T, sparse(I, k, k)) + 0.1 * I
+    n = k * k
+    p = n ÷ 4
+    B = sparse(repeat(1:p, inner = 2), [mod1(4i + d, n) for i in 1:p for d in 0:1], 1.0, p, n)
+    A = [K B'; B spzeros(p, p)]
+    b = randn(size(A, 1))
+    cache = init(LinearProblem(A, b))
+    solve!(cache)
+    @test cache.cacheval.SupernodalLUFactorization isa LinearSolve.SupernodalLU.SupernodalLUFactor
+    nonzeros(A)[7] = 0.0
+    dropzeros!(A)
+    cache.A = A
+    sol = solve!(cache)
+    @test sol.retcode == ReturnCode.Success
+    @test norm(A * sol.u - b) < 1.0e-10 * norm(b)
+end

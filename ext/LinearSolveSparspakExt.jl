@@ -63,8 +63,7 @@ function SciMLBase.solve!(
         # iterations. Detect this via the `structure_changed` flag on the
         # SparseReduction state and fall back to a full sparspaklu in that case.
         skip_symbolic_reuse = if cache.cacheval isa LinearSolve.DefaultLinearSolverInit
-            red = cache.cacheval.sparse_reduction
-            red !== nothing && !red.cache_union && red.active && red.structure_changed
+            LinearSolve._reduction_changed(cache.cacheval.sparse_reduction)
         else
             false
         end

@@ -419,4 +419,44 @@ reduction(cache) = cache.cacheval.sparse_reduction
         cache.A = copy(A2)
         @test_throws ArgumentError solve!(cache)
     end
+
+    # https://github.com/SciML/LinearSolve.jl/issues/1354
+    @testset "sparse LU symbolic reuse survives a reduction pattern change" begin
+        function dense4(zero_positions)
+            A = sparse(Float64[4 1 1 1; 1 4 1 1; 1 1 4 1; 1 1 1 4])
+            for (i, j) in zero_positions
+                A[i, j] = 0.0
+            end
+            return A
+        end
+        # 4 stored zeros activates the reduction, 3 of them filling in switches it to
+        # per-solve dropzeros, and the last matrix moves a zero at equal nnz.
+        As = [
+            dense4([(1, 2), (2, 1), (3, 4), (4, 3)]),
+            dense4([(1, 2)]),
+            dense4([(2, 1)]),
+        ]
+        # the switch to per-solve dropzeros can itself shift the pattern at equal nnz
+        As_switch = [
+            dense4([(1, 2), (2, 1), (3, 4), (4, 3)]),
+            dense4([(1, 2), (1, 3), (1, 4), (2, 3)]),
+        ]
+        b = ones(4)
+        algs = Any[
+            KLUFactorization, PureKLUFactorization, SupernodalLUFactorization,
+        ]
+        Base.USE_GPL_LIBS && push!(algs, UMFPACKFactorization)
+        seqs = ["fill-in" => As, "switch" => As_switch]
+        for Alg in algs, check_pattern in (true, false), (seqname, seq) in seqs
+            @testset "$(nameof(Alg)) $seqname check_pattern = $check_pattern" begin
+                cache = init(LinearProblem(copy(seq[1]), b), Alg(; check_pattern))
+                for A in seq
+                    cache.A = copy(A)
+                    sol = solve!(cache)
+                    @test sol.retcode == ReturnCode.Success
+                    @test norm(A * sol.u - b) < 1.0e-10
+                end
+            end
+        end
+    end
 end

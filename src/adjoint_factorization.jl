@@ -76,6 +76,7 @@ for Alg in (
         DiagonalFactorization,
         PureUMFPACKFactorization,
         SupernodalLUFactorization,
+        SupernodalQRFactorization,
         SparspakFactorization,
         STRUMPACKFactorization,
         CudaOffloadLUFactorization,

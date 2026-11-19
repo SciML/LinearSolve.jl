@@ -60,6 +60,11 @@ const SCPQR = SparseColumnPivotedQR
 import AMD
 
 LinearSolve.issparsematrixcsc(A::AbstractSparseMatrixCSC) = true
+
+const _WrappedSparseMatrixCSC = Union{
+    Adjoint{<:Number, <:AbstractSparseMatrixCSC}, Transpose{<:Number, <:AbstractSparseMatrixCSC},
+}
+LinearSolve._is_wrapped_sparse(::_WrappedSparseMatrixCSC) = true
 LinearSolve.issparsematrix(A::AbstractSparseArray) = true
 LinearSolve.make_SparseMatrixCSC(A::SparseMatrixCSC) = A
 function LinearSolve.make_SparseMatrixCSC(A::AbstractSparseArray)
@@ -1461,6 +1466,47 @@ function LinearSolve.init_cacheval(
         assumptions::OperatorAssumptions
     )
     return nothing
+end
+
+# a 1x1 factor types the slot, as CHOLMOD rejects `A` in `init` when it isn't symmetric
+@static if Base.USE_GPL_LIBS
+    function LinearSolve.init_cacheval(
+            alg::CholeskyFactorization,
+            A::Union{
+                Adjoint{T, <:AbstractSparseMatrixCSC},
+                Transpose{T, <:AbstractSparseMatrixCSC},
+            }, b, u, Pl, Pr,
+            maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+            assumptions::OperatorAssumptions
+        ) where {T <: BLASELTYPES}
+        return cholesky(sparse(reshape([one(T)], 1, 1)))
+    end
+end
+
+# SPQR takes no pivot, so the slot is typed from the parent, for the element types SPQR supports
+function LinearSolve.init_cacheval(
+        alg::QRFactorization,
+        A::_WrappedSparseMatrixCSC, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions
+    )
+    P = parent(A)
+    return eltype(P) <: Union{Float64, ComplexF64} ?
+        ArrayInterface.qr_instance(P, alg.pivot) : nothing
+end
+
+# an unfactorized `LU` types the slot, as factorizing a wrapped sparse `A` here is O(n^3)
+function LinearSolve.init_cacheval(
+        alg::GenericLUFactorization,
+        A::_WrappedSparseMatrixCSC, b, u, Pl, Pr,
+        maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
+        assumptions::OperatorAssumptions
+    )
+    ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A)...))
+    fact = LinearAlgebra.LU{eltype(A), typeof(A), typeof(ipiv)}(
+        A, ipiv, zero(LinearAlgebra.BlasInt)
+    )
+    return _GenericLUFactorizationCache(fact, ipiv, nothing)
 end
 
 LinearSolve.PrecompileTools.@compile_workload begin

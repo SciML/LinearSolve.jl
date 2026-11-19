@@ -69,16 +69,26 @@ function _grid_dims(nprocs::Integer, nprow::Integer, npcol::Integer)
     error("could not determine a valid SuperLU_DIST process grid")
 end
 
-function _build_options(opt)
-    options = SuperLUDIST.Options()
+# SuperLUDIST v1.1 made Options parametric per index type while the Julia 1.10 LTS lane still resolves v1.0.0's plain alias.
+_default_options(::Type{I}) where {I} =
+    SuperLUDIST.Options isa UnionAll ? SuperLUDIST.Options{I}() : SuperLUDIST.Options()
+
+function _copy_options!(dst, src)
+    for name in propertynames(src)
+        setproperty!(dst, name, getproperty(src, name))
+    end
+    return dst
+end
+
+function _build_options(opt, ::Type{I}) where {I}
     if opt === nothing
-        return options
+        return _default_options(I)
     elseif opt isa NamedTuple
-        for (name, value) in pairs(opt)
-            setproperty!(options, name, value)
-        end
-        return options
+        return _copy_options!(_default_options(I), opt)
     elseif opt isa SuperLUDIST.Options
+        if SuperLUDIST.Options isa UnionAll && !(opt isa SuperLUDIST.Options{I})
+            return _copy_options!(_default_options(I), opt)
+        end
         return deepcopy(opt)
     else
         throw(
@@ -145,7 +155,7 @@ function _build_factorization(
     alg.threads === nothing || SuperLUDIST.superlu_set_num_threads(I, alg.threads)
     grid = SuperLUDIST.Grid{I}(nprow, npcol, comm)
     Aslu = SuperLUDIST.ReplicatedSuperMatrix(store, grid)
-    options = _build_options(alg.options)
+    options = _build_options(alg.options, I)
     x, factor = SuperLUDIST.pgssvx!(Aslu, copy(bmat); options = options)
     return x, factor, Ac
 end

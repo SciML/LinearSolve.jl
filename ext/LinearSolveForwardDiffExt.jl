@@ -841,9 +841,10 @@ function nodual_value(x::AbstractArray{<:Dual})
     return nodual_value!(similar(x, ForwardDiff.valtype(eltype(x))), x)
 end
 nodual_value!(out, x) = map!(nodual_value, out, x) # Update in-place
-# `Symmetric`/`Hermitian` reject `setindex!` off the diagonal, so fill the parent instead
+# `Symmetric`/`Hermitian` reject `setindex!` off the diagonal, so fill the parent instead,
+# reading `x` through its wrapper since its other triangle may be unassigned
 function nodual_value!(out::Union{Symmetric, Hermitian}, x::Union{Symmetric, Hermitian})
-    nodual_value!(parent(out), out.uplo == x.uplo ? parent(x) : x)
+    nodual_value!(parent(out), x)
     return out
 end
 nodual_value!(out::SparseMatrixCSC, x::SymHermSparseDual) = nodual_value!(out, SparseMatrixCSC(x))

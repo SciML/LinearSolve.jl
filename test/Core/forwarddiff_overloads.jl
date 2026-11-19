@@ -860,6 +860,17 @@ end
         end
         @test ForwardDiff.derivative(f, 0.0) ≈ ForwardDiff.derivative(t -> sum(W(P + 2t * E, u2) \ b), 0.0)
     end
+
+    # the other triangle is never assigned
+    for W in (Symmetric, Hermitian), uplo in (:U, :L)
+        function g(t)
+            A = Matrix{typeof(t)}(undef, 2, 2)
+            A[1, 1], A[2, 2] = 4 + t, 8 + 2t
+            uplo === :U ? (A[1, 2] = one(t)) : (A[2, 1] = one(t))
+            return sum(solve(LinearProblem(W(A, uplo), BigFloat[1, 2]), LUFactorization()).u)
+        end
+        @test ForwardDiff.derivative(g, big"0.0") ≈ -84 / big(961)
+    end
 end
 
 @testset "Sparse matrices" begin

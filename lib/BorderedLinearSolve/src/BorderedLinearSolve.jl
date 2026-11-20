@@ -24,7 +24,7 @@ See [`BorderedLinearProblem`](@ref), [`BorderingBLS`](@ref), [`DirectBLS`](@ref)
 """
 module BorderedLinearSolve
 
-using LinearAlgebra: LinearAlgebra, dot, logabsdet, lu, norm
+using LinearAlgebra: LinearAlgebra, SingularException, dot, logabsdet, lu, norm
 using LinearSolve: LinearSolve, LUFactorization, LinearProblem, init, solve!
 using SciMLBase: SciMLBase, ReturnCode, reinit!, solve
 using SciMLOperators: AbstractSciMLOperator, FunctionOperator

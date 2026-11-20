@@ -103,6 +103,7 @@ end
 `v` solves the state block and has the same shape as the state. `σ` solves the border
 block, a scalar for a width-1 border. `retcode` is the `ReturnCode` of the underlying
 `LinearSolve` solve, so a failure in the inner solver is visible rather than absorbed.
+[`BorderingBLS`](@ref) also fails when `σ` is not finite.
 """
 struct BorderedLinearSolution{Tv, Tσ}
     v::Tv

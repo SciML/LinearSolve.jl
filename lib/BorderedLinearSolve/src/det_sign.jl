@@ -2,8 +2,8 @@
     det_sign(cache)
 
 The sign of the determinant of the bordered matrix at the last `solve!`: `1` or `-1` for
-a real matrix, `det / abs(det)` for a complex one, and `0` for a singular one whose solve
-still succeeded.
+a real matrix, and `det / abs(det)` for a complex one. A zero pivot fails the solve, so
+it leaves no sign.
 
 Continuation uses it to keep its direction through a fold. There `det J` changes sign
 but the bordered determinant does not. [`BorderingBLS`](@ref) multiplies the sign of

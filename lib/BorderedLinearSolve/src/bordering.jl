@@ -16,6 +16,11 @@ where continuation is interesting, near a fold, so it is worth having, but each 
 costs another pass and the default of `0` skips it. A sweep is skipped early once the
 residual is below `tol`.
 
+The solve fails when an inner solve fails or `σ` is not finite. A zero pivot in the Schur
+complement `d - c'Δ` gives such a `σ`, as does one so small that `σ` overflows. As with
+`LUFactorization`, a singular `d - c'Δ` that rounding leaves with a small nonzero pivot
+still succeeds.
+
 Only `dot`, scaling and addition are used on the state, so the state can be any array,
 not just a vector.
 
@@ -112,14 +117,15 @@ function _bec(cache::BorderedCache, f, g)
 
     σ, schur_sign = _border_solve(prob, x1, Δ, g, cache.alg.det_sign)
     v = x1 - _combine(Δ, σ)
-    return v, σ, schur_sign, ok ? ReturnCode.Success : ReturnCode.Failure
+    # A zero pivot in the Schur complement leaves `σ` infinite or `NaN`, as does a tiny one.
+    return v, σ, schur_sign, ok && all(isfinite, σ) ? ReturnCode.Success : ReturnCode.Failure
 end
 
 # `c'x` over states of any shape.
 _cdot(c, x) = dot(c, x)
 
-# `σ`, and the sign of the determinant of the Schur complement `S = d - c'Δ` it solves with
-# where `signing` asks for it.
+# `σ`, and the sign of the determinant of the Schur complement `S = d - c'Δ` it solves
+# with where `signing` asks for it. A zero pivot in `S` gives a `σ` that is not finite.
 function _border_solve(prob, x1, Δ, g, signing::Bool)
     cs = _border_parts(prob.c)
     if _border_width(prob.b) == 1
@@ -132,10 +138,16 @@ function _border_solve(prob, x1, Δ, g, signing::Bool)
     m = length(cs)
     S = Array(prob.d) - [_cdot(cs[i], Δ[j]) for i in 1:m, j in 1:m]
     rhs = Array(g) - [_cdot(cs[i], x1) for i in 1:m]
-    signing || return S \ rhs, nothing
-    # `\` may solve a structured `S` without an LU; only the sign needs one.
-    factors = lu(S)
-    return factors \ rhs, last(logabsdet(factors))
+    try
+        # `\` may solve a structured `S` without an LU; only the sign needs one.
+        signing || return S \ rhs, nothing
+        factors = lu(S)
+        return factors \ rhs, last(logabsdet(factors))
+    catch err
+        err isa SingularException || rethrow()
+        # Where the width-1 division gives `Inf` or `NaN`, `\` and `lu` throw. Fail the same way.
+        return fill(float(promote_type(eltype(S), eltype(rhs)))(NaN), m), nothing
+    end
 end
 
 _combine(Δ, σ::Number) = only(Δ) * σ

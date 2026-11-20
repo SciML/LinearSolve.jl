@@ -609,15 +609,40 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
         end
     end
 
-    @testset "det_sign is zero for a singular Schur complement whose solve succeeds" begin
-        # With J = I and b = c = e1, d = 1 makes d - c'J⁻¹b = 0. Bordering divides by it and
-        # reports success, while DirectBLS fails to factor the singular matrix.
+    @testset "a singular Schur complement fails the solve" begin
+        # With J = I and borders e1 or (e1, e2), the Schur complement is d - I. Bordering reported
+        # success with an infinite σ for width 1, and threw a SingularException for width 2.
         n = 4
-        e1 = [1.0; zeros(n - 1)]
-        for alg in (BorderingBLS(; inner = LUFactorization(), det_sign = true), BorderingBLS(; inner = LUFactorization(), k = 2, det_sign = true))
-            cache = init(BorderedLinearProblem(Matrix(1.0I, n, n), e1, e1, 1.0, rand(n), 0.5), alg)
-            @test successful_retcode(solve!(cache))
-            @test det_sign(cache) == 0
+        for T in (Float32, Float64)
+            e1, e2 = T.(1:n .== 1), T.(1:n .== 2)
+            J, f = Matrix{T}(I, n, n), rand(T, n)
+            # S = 0, a symmetric singular S and a general singular S, which `\` solves three ways.
+            problems = [
+                BorderedLinearProblem(J, e1, e1, one(T), f, T(0.5));
+                [BorderedLinearProblem(J, (e1, e2), (e1, e2), T.(d), f, T[0.5, 0.5]) for d in ([1 0; 0 1], [2 2; 2 5], [3 4; 1 3])]
+            ]
+            for prob in problems
+                # A Krylov inner solve need not hit e1 exactly, so the factorizations alone give a singular S.
+                for (inner, _) in INNERS, k in (0, 2)
+                    inner isa Union{Nothing, AbstractFactorization} || continue
+                    @test !successful_retcode(solve(prob, BorderingBLS(; inner, k)))
+                end
+                @test !successful_retcode(solve(prob, DirectBLS(; inner = LUFactorization())))
+                for k in (0, 2)
+                    cache = init(prob, BorderingBLS(; inner = LUFactorization(), k, det_sign = true))
+                    @test !successful_retcode(solve!(cache))
+                    @test_throws "successful solve!" det_sign(cache)
+                end
+            end
+        end
+    end
+
+    @testset "a Schur complement rounded close to zero fails the solve" begin
+        # For these n, n * (1 / n) rounds below 1, so S = 1 - c'J⁻¹b is tiny where it should be 0.
+        # Bordering divided floatmax by it and reported success with an infinite σ.
+        for (T, n) in ((Float32, 41), (Float64, 49)), det_sign in (false, true), k in (0, 2)
+            prob = BorderedLinearProblem(fill(T(n), 1, 1), T[1], T[n], one(T), T[0], floatmax(T))
+            @test !successful_retcode(solve(prob, BorderingBLS(; inner = LUFactorization(), k, det_sign)))
         end
     end
 

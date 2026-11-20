@@ -1,17 +1,21 @@
 using BorderedLinearSolve
 using LinearAlgebra, SparseArrays, Random, Test
 using LinearSolve: AbstractFactorization, LUFactorization, GenericLUFactorization, QRFactorization,
-    KrylovJL_GMRES, LinearAliasSpecifier, LinearSolveFunction
+    KrylovJL_GMRES, LinearAliasSpecifier, LinearSolveFunction, NormalCholeskyFactorization
 using SciMLOperators: FunctionOperator, MatrixOperator
 using SciMLBase: successful_retcode
 
-# Reference: assemble the bordered matrix and solve it densely. Everything below is
-# checked against this rather than against another code path in the package. A wide
-# border is a tuple of states, with `d` an m x m matrix and `g` a vector.
-function reference(J, b, c, d, f, g)
+# The assembled bordered matrix. A wide border is a tuple of states, with `d` an m x m matrix.
+function assembled(J, b, c, d)
     columns(x) = reduce(hcat, [vec(xi) for xi in (x isa Tuple ? x : (x,))])
-    M = [Matrix(J) columns(b); columns(c)' (d isa Number ? fill(d, 1, 1) : d)]
-    x = M \ vcat(vec(f), g)
+    return [Matrix(J) columns(b); columns(c)' (d isa Number ? fill(d, 1, 1) : d)]
+end
+
+# Reference: assemble the bordered matrix and solve it densely. Everything below is
+# checked against this rather than against another code path in the package. With a wide
+# border, `g` is a vector.
+function reference(J, b, c, d, f, g)
+    x = assembled(J, b, c, d) \ vcat(vec(f), g)
     n = length(f)
     return x[1:n], g isa Number ? x[end] : x[(n + 1):end]
 end
@@ -50,7 +54,8 @@ const OVERWRITING = LinearSolveFunction(
 )
 
 # Bordering without and with correction sweeps (which re-read the problem), and assembly.
-bordered_algorithms(inner) = (BorderingBLS(; inner), BorderingBLS(; inner, k = 2), DirectBLS(; inner))
+bordered_algorithms(inner; det_sign = false) =
+    (BorderingBLS(; inner, det_sign), BorderingBLS(; inner, k = 2, det_sign), DirectBLS(; inner, det_sign))
 
 # Run `step()`, test that it leaves every array in `inputs` as it found it, and return its
 # result. A solve must not overwrite the caller's problem, which BEC+k also re-reads.
@@ -549,5 +554,145 @@ Base.:*(::RowScaling, x::AbstractArray) = axes(x, 1) .* x
         prob = BorderedLinearProblem(rand(2, 2) + 2I, rand(2, 2), rand(2, 2), 1.0, rand(2, 2), 1.0)
         @test successful_retcode(solve(prob, BorderingBLS(KrylovJL_GMRES())))
         @test_throws DimensionMismatch init(prob, DirectBLS())
+    end
+
+    @testset "det_sign is the sign of the assembled matrix's determinant" begin
+        # Random matrices without a dominant diagonal, so both signs come up.
+        n = 6
+        for element in (Float32, Float64, ComplexF64), m in (1, 2), alg in bordered_algorithms(LUFactorization(); det_sign = true)
+            signs = map(1:16) do seed
+                rng = Xoshiro(seed)
+                state() = randn(rng, element, n)
+                border() = m == 1 ? state() : ntuple(_ -> state(), m)
+                J, b, c = randn(rng, element, n, n), border(), border()
+                d = m == 1 ? randn(rng, element) : randn(rng, element, m, m)
+                g = m == 1 ? randn(rng, element) : randn(rng, element, m)
+                cache = init(BorderedLinearProblem(J, b, c, d, state(), g), alg)
+                @test successful_retcode(solve!(cache))
+                @test det_sign(cache) ≈ sign(det(assembled(J, b, c, d))) rtol = sqrt(eps(real(element)))
+                @test det_sign(cache) isa element
+                det_sign(cache)
+            end
+            element <: Real && @test sort(unique(signs)) == [-1, 1]
+        end
+        # A complex border on a real J makes the Schur complement complex. Correction sweeps
+        # would hand the real inner cache a complex right-hand side, so they stay out.
+        rng = Xoshiro(0)
+        J, b, c = randn(rng, n, n), randn(rng, n), randn(rng, ComplexF64, n)
+        for alg in (BorderingBLS(; inner = LUFactorization(), det_sign = true), DirectBLS(; inner = LUFactorization(), det_sign = true))
+            cache = init(BorderedLinearProblem(J, b, c, 0.5, randn(rng, n), 1.0 + 0im), alg)
+            @test successful_retcode(solve!(cache))
+            @test det_sign(cache) ≈ sign(det(assembled(J, b, c, 0.5)))
+            @test det_sign(cache) isa ComplexF64
+        end
+        # A sparse J's LU, UMFPACK's under bordering, has a determinant too.
+        n = 60
+        J = spdiagm(-1 => -ones(n - 1), 0 => 4ones(n), 1 => -ones(n - 1))
+        b, c, d = rand(n), rand(n), -1.0e3
+        for alg in bordered_algorithms(LUFactorization(); det_sign = true)
+            cache = init(BorderedLinearProblem(J, b, c, d, rand(n), 0.25), alg)
+            solve!(cache)
+            @test det_sign(cache) == sign(det(assembled(J, b, c, d))) == -1
+        end
+    end
+
+    @testset "det_sign keeps its sign through a fold of J" begin
+        # J = diag(t, 1, ...) is singular at t = 0, where det J = t and the Schur complement
+        # -1/t both change sign. The bordered determinant stays -1 on both sides.
+        n = 4
+        for element in (Float32, Float64), alg in bordered_algorithms(LUFactorization(); det_sign = true), t in (1.0e-3, -1.0e-3)
+            e1 = [one(element); zeros(element, n - 1)]
+            J = Matrix(Diagonal([element(t); ones(element, n - 1)]))
+            cache = init(BorderedLinearProblem(J, e1, e1, zero(element), ones(element, n), one(element)), alg)
+            @test successful_retcode(solve!(cache))
+            @test det_sign(cache) == -1
+        end
+    end
+
+    @testset "det_sign is zero for a singular Schur complement whose solve succeeds" begin
+        # With J = I and b = c = e1, d = 1 makes d - c'J⁻¹b = 0. Bordering divides by it and
+        # reports success, while DirectBLS fails to factor the singular matrix.
+        n = 4
+        e1 = [1.0; zeros(n - 1)]
+        for alg in (BorderingBLS(; inner = LUFactorization(), det_sign = true), BorderingBLS(; inner = LUFactorization(), k = 2, det_sign = true))
+            cache = init(BorderedLinearProblem(Matrix(1.0I, n, n), e1, e1, 1.0, rand(n), 0.5), alg)
+            @test successful_retcode(solve!(cache))
+            @test det_sign(cache) == 0
+        end
+    end
+
+    @testset "det_sign needs a successful solve! since the last update" begin
+        for alg in bordered_algorithms(LUFactorization(); det_sign = true), m in (1, 2)
+            parts = random_parts(5, m)
+            cache = init(BorderedLinearProblem(parts...), alg)
+            @test_throws "successful solve!" det_sign(cache)
+            solve!(cache)
+            @test det_sign(cache) == sign(det(assembled(parts.J, parts.b, parts.c, parts.d)))
+            # A rejected update changes nothing, so the sign of the last solve stays.
+            @test_throws ArgumentError reinit!(cache; d = m == 1 ? 2 : [2 0; 0 2])
+            @test det_sign(cache) == sign(det(assembled(parts.J, parts.b, parts.c, parts.d)))
+            reinit!(cache; f = rand(5))
+            @test_throws "successful solve!" det_sign(cache)
+            solve!(cache)
+            cache.prob = BorderedLinearProblem(parts...)
+            @test_throws "successful solve!" det_sign(cache)
+            # A singular J fails its LU, and a solve that fails forgets the sign of the last one.
+            solve!(cache)
+            reinit!(cache; J = zeros(5, 5))
+            @test !successful_retcode(solve!(cache))
+            @test_throws "successful solve!" det_sign(cache)
+        end
+    end
+
+    @testset "a solve! that throws leaves no sign" begin
+        # Bordering's correction sweeps read J, and DirectBLS reads the state, after the factors
+        # are in place. A broken one throws there, partway through the solve.
+        n = 4
+        J = BreakableMatrix(rand(n, n) + n * I, false)
+        sweeping = BorderedLinearProblem(J, rand(n), rand(n), 1.5, rand(n), 0.7)
+        f = BreakableMatrix(rand(2, 2), false)
+        assembling = BorderedLinearProblem(rand(n, n) + n * I, rand(2, 2), rand(2, 2), 1.5, f, 0.7)
+        for (prob, alg, part) in (
+                (sweeping, BorderingBLS(; inner = LUFactorization(), k = 2, det_sign = true), J),
+                (assembling, DirectBLS(; inner = LUFactorization(), det_sign = true), f),
+            )
+            part.broken = false
+            cache = init(prob, alg)
+            @test successful_retcode(solve!(cache))
+            det_sign(cache)
+            part.broken = true
+            @test_throws part.err solve!(cache)
+            @test_throws "successful solve!" det_sign(cache)
+        end
+    end
+
+    @testset "det_sign is read at the solve, before aliased factors can change" begin
+        # With `alias_A`, LU factors J in place, so the factors live in the caller's array.
+        n = 5
+        for alg in bordered_algorithms(LUFactorization(); det_sign = true)
+            parts = random_parts(n, 1)
+            cache = init(BorderedLinearProblem(parts...), alg; alias = LinearAliasSpecifier(alias_A = true))
+            expected = sign(det(assembled(parts.J, parts.b, parts.c, parts.d)))
+            @test successful_retcode(solve!(cache))
+            # Negating every factor flips the sign of the product of the 5 pivots of U.
+            parts.J .*= -1
+            @test det_sign(cache) == expected
+        end
+    end
+
+    @testset "det_sign = true needs inner = LUFactorization(), and det_sign needs det_sign = true" begin
+        # A normal-equation solver keeps factors of A'A, whose determinant is never negative.
+        prob = BorderedLinearProblem(random_parts(5, 1)...)
+        for inner in (first.(INNERS)..., NormalCholeskyFactorization())
+            for alg in bordered_algorithms(inner; det_sign = true)
+                inner isa LUFactorization || @test_throws "det_sign = true needs inner = LUFactorization()" init(prob, alg)
+            end
+            # Without the option, every algorithm solves as before and keeps no sign.
+            for alg in bordered_algorithms(inner)
+                cache = init(prob, alg)
+                @test successful_retcode(solve!(cache))
+                @test_throws "built with det_sign = true" det_sign(cache)
+            end
+        end
     end
 end

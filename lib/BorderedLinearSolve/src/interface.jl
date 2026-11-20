@@ -73,6 +73,8 @@ end
 # goes back in, and the cache stays stale until a `solve!` or update refreshes it in full.
 function _install!(cache, prob::BorderedLinearProblem, refactor::Bool)
     _check_types(cache, prob)
+    # The determinant sign belongs to the old problem.
+    setfield!(cache, :determinant_sign, nothing)
     old = getfield(cache, :prob)
     setfield!(cache, :prob, prob)
     try

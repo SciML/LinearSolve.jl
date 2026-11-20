@@ -1,5 +1,5 @@
 """
-    BorderingBLS(; inner = nothing, k = 0, tol = 1e-12)
+    BorderingBLS(; inner = nothing, k = 0, tol = 1e-12, det_sign = false)
 
 Block elimination. Solves `J x₁ = f` and `J Δᵢ = bᵢ`, then
 
@@ -19,6 +19,9 @@ residual is below `tol`.
 Only `dot`, scaling and addition are used on the state, so the state can be any array,
 not just a vector.
 
+With `det_sign = true`, each successful `solve!` also keeps the sign of the bordered
+determinant for [`det_sign`](@ref). `inner` must then be `LUFactorization()`.
+
 # Reference
 
 Govaerts, W. "Stable Solvers and Block Elimination for Bordered Systems." SIAM Journal
@@ -28,6 +31,7 @@ Base.@kwdef struct BorderingBLS{S, T <: Real}
     inner::S = nothing
     k::Int = 0
     tol::T = 1.0e-12
+    det_sign::Bool = false
 end
 
 BorderingBLS(inner) = BorderingBLS(; inner)
@@ -40,7 +44,7 @@ prefer this over assembling the bordered matrix: the factorization or Krylov wor
 built for `J` is kept. After updating `J` in place between outer steps, pass it to
 [`reinit!`](@ref) so the next `solve!` refactors.
 """
-mutable struct BorderedCache{A, C, P, K}
+mutable struct BorderedCache{A, C, P, K, T}
     alg::A
     inner::C
     prob::P
@@ -48,10 +52,17 @@ mutable struct BorderedCache{A, C, P, K}
     kwargs::K
     # Whether `inner` may not match `prob`, after a refresh that threw; see `_sync!`.
     stale::Bool
+    # What `det_sign` returns: the sign from the last `solve!`, or `nothing` if none is held.
+    determinant_sign::Union{Nothing, T}
 end
 
-SciMLBase.init(prob::BorderedLinearProblem, alg::BorderingBLS; kwargs...) =
-    BorderedCache(alg, _inner_cache(prob, alg, kwargs), prob, kwargs, false)
+function SciMLBase.init(prob::BorderedLinearProblem, alg::BorderingBLS; kwargs...)
+    _check_signing(alg)
+    inner = _inner_cache(prob, alg, kwargs)
+    # The sign of `det J` takes the type of `J`, and the Schur complement also that of `c` and `d`.
+    T = float(promote_type(eltype(inner.A), eltype(inner.u), eltype(prob.d), map(eltype, _border_parts(prob.c))...))
+    return BorderedCache{typeof(alg), typeof(inner), typeof(prob), typeof(kwargs), T}(alg, inner, prob, kwargs, false, nothing)
+end
 
 function _inner_cache(prob::BorderedLinearProblem, alg::BorderingBLS, kwargs)
     # A state that is not a vector is flattened for the inner solve only; see
@@ -99,35 +110,43 @@ function _bec(cache::BorderedCache, f, g)
         δ
     end
 
-    σ = _border_solve(prob, x1, Δ, g)
+    σ, schur_sign = _border_solve(prob, x1, Δ, g, cache.alg.det_sign)
     v = x1 - _combine(Δ, σ)
-    return v, σ, ok ? ReturnCode.Success : ReturnCode.Failure
+    return v, σ, schur_sign, ok ? ReturnCode.Success : ReturnCode.Failure
 end
 
 # `c'x` over states of any shape.
 _cdot(c, x) = dot(c, x)
 
-function _border_solve(prob, x1, Δ, g)
+# `σ`, and the sign of the determinant of the Schur complement `S = d - c'Δ` it solves with
+# where `signing` asks for it.
+function _border_solve(prob, x1, Δ, g, signing::Bool)
     cs = _border_parts(prob.c)
     if _border_width(prob.b) == 1
         # Scalar division, which stays on whatever device the state lives on.
-        return (g - _cdot(only(cs), x1)) / (prob.d - _cdot(only(cs), only(Δ)))
+        S = prob.d - _cdot(only(cs), only(Δ))
+        return (g - _cdot(only(cs), x1)) / S, sign(S)
     end
     # A dense m x m solve. `m` is small by assumption, and doing it on the host keeps
     # it off a GPU `\`, whose pivoting would scalar-index at these sizes.
     m = length(cs)
     S = Array(prob.d) - [_cdot(cs[i], Δ[j]) for i in 1:m, j in 1:m]
     rhs = Array(g) - [_cdot(cs[i], x1) for i in 1:m]
-    return S \ rhs
+    signing || return S \ rhs, nothing
+    # `\` may solve a structured `S` without an LU; only the sign needs one.
+    factors = lu(S)
+    return factors \ rhs, last(logabsdet(factors))
 end
 
 _combine(Δ, σ::Number) = only(Δ) * σ
 _combine(Δ, σ::AbstractVector) = sum(Δ[i] * σ[i] for i in eachindex(Δ))
 
 function SciMLBase.solve!(cache::BorderedCache{<:BorderingBLS})
+    cache.determinant_sign = nothing
     cache.stale && _sync!(cache, true)
     alg, prob = cache.alg, cache.prob
-    v, σ, rc = _bec(cache, prob.f, prob.g)
+    # The correction sweeps solve with the same `S`, so the first pass gives its sign.
+    v, σ, schur_sign, rc = _bec(cache, prob.f, prob.g)
 
     for _ in 1:(alg.k)
         rf = prob.f - _apply(prob.J, v) - _combine(_border_parts(prob.b), σ)
@@ -135,12 +154,15 @@ function SciMLBase.solve!(cache::BorderedCache{<:BorderingBLS})
         if max(norm(rf), norm(rg)) <= alg.tol
             break
         end
-        dv, dσ, rc2 = _bec(cache, rf, rg)
+        dv, dσ, _, rc2 = _bec(cache, rf, rg)
         v = v + dv
         σ = σ + dσ
         SciMLBase.successful_retcode(rc2) || (rc = ReturnCode.Failure)
     end
 
+    if alg.det_sign && SciMLBase.successful_retcode(rc)
+        cache.determinant_sign = _lu_sign(cache.inner) * schur_sign
+    end
     return BorderedLinearSolution(v, σ, rc)
 end
 

@@ -1,5 +1,5 @@
 """
-    DirectBLS(; inner = nothing)
+    DirectBLS(; inner = nothing, det_sign = false)
 
 Assemble the full bordered matrix and hand it to `LinearSolve`.
 
@@ -16,9 +16,13 @@ inner solves.
 
 Assembling requires a `J` that is an actual matrix and a state that can be flattened,
 so unlike [`BorderingBLS`](@ref) this is not available for a matrix-free `J`.
+
+With `det_sign = true`, each successful `solve!` also keeps the sign of the bordered
+determinant for [`det_sign`](@ref). `inner` must then be `LUFactorization()`.
 """
 Base.@kwdef struct DirectBLS{S}
     inner::S = nothing
+    det_sign::Bool = false
 end
 
 """
@@ -29,7 +33,7 @@ cache over them. The matrix is rewritten in full whenever `J` or the border chan
 since a factorization done in place leaves it holding the factors. A new state size or
 border width builds all three anew.
 """
-mutable struct DirectCache{A, M, R, C, P, K}
+mutable struct DirectCache{A, M, R, C, P, K, T}
     alg::A
     matrix::M
     rhs::R
@@ -39,10 +43,17 @@ mutable struct DirectCache{A, M, R, C, P, K}
     kwargs::K
     # Whether a refresh threw since the last one that finished; see `_sync!`.
     stale::Bool
+    # What `det_sign` returns: the sign from the last `solve!`, or `nothing` if none is held.
+    determinant_sign::Union{Nothing, T}
 end
 
-SciMLBase.init(prob::BorderedLinearProblem, alg::DirectBLS; kwargs...) =
-    DirectCache(alg, _direct_parts(prob, alg, kwargs)..., prob, kwargs, false)
+function SciMLBase.init(prob::BorderedLinearProblem, alg::DirectBLS; kwargs...)
+    _check_signing(alg)
+    matrix, rhs, inner = _direct_parts(prob, alg, kwargs)
+    return DirectCache{typeof.((alg, matrix, rhs, inner, prob, kwargs))..., float(eltype(matrix))}(
+        alg, matrix, rhs, inner, prob, kwargs, false, nothing
+    )
+end
 
 # The assembled matrix and stacked right-hand side of `prob`, and the `LinearSolve` cache over them.
 function _direct_parts(prob::BorderedLinearProblem, alg::DirectBLS, kwargs)
@@ -109,11 +120,15 @@ function _refresh!(cache::DirectCache, refactor::Bool)
 end
 
 function SciMLBase.solve!(cache::DirectCache)
+    cache.determinant_sign = nothing
     cache.stale && _sync!(cache, true)
     prob = cache.prob
     # Some backends solve in place and overwrite `b`, so it is restacked for every solve.
     cache.inner.b = _stack_rhs!(cache.rhs, prob)
     sol = solve!(cache.inner)
+    if cache.alg.det_sign && SciMLBase.successful_retcode(sol.retcode)
+        cache.determinant_sign = _lu_sign(cache.inner)
+    end
     n, m = length(prob.f), _border_width(prob.b)
     # Give `v` the shape of the state back, so a 2D state comes out 2D.
     v = reshape(sol.u[1:n], size(prob.f))

@@ -32,10 +32,21 @@ sol = solve(prob, BorderingBLS(LUFactorization()))
 [J b; c' 1.0] * [sol.v; sol.σ] ≈ [f; 2.0]
 ```
 
+Continuation keeps its direction through a fold with the sign of the bordered matrix's
+determinant. With `det_sign = true`, each solve reads it from the LU factors, so it costs
+no further solve. `BorderingBLS` takes the sign of `det J` times that of the Schur complement.
+
+```@example bordered
+cache = init(prob, BorderingBLS(; inner = LUFactorization(), det_sign = true))
+solve!(cache)
+det_sign(cache) == sign(det([J b; c' 1.0]))
+```
+
 ```@docs
 BorderedLinearSolve.BorderedLinearSolve
 BorderedLinearProblem
 solve(::BorderedLinearProblem, ::Any)
 BorderingBLS
 DirectBLS
+det_sign
 ```

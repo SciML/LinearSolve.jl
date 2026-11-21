@@ -1,5 +1,6 @@
 using LinearSolve, LinearAlgebra, SparseArrays, StaticArrays, Test
 using RecursiveFactorization, Sparspak
+using SciMLOperators: WOperator
 using Random
 
 Random.seed!(1234)
@@ -175,7 +176,7 @@ end
     @test occursin("KrylovJL", err.msg)
 end
 
-@testset "Factorizations with a vector-only back-solve reject a matrix b" begin
+@testset "Factorizations with a vector-only solve reject a matrix b" begin
     A = rand(n, n) + n * I
     B = rand(n, k)
     for (alg, M) in (
@@ -183,10 +184,17 @@ end
             (SparspakFactorization(), sparse(A)),
             (LHLFactorization(), A),
         )
-        @test_throws "$(nameof(typeof(alg))) supports only vector" solve(
+        @test_throws "$(nameof(typeof(alg))) supports only vector" init(
             LinearProblem(M, B), alg
         )
     end
+    # The default algorithm picks LHL for a `WOperator`.
+    W = WOperator{true}(I, 1.0, Matrix(2.0I, 32, 32), zeros(32))
+    @test_throws "LHLFactorization supports only vector" init(LinearProblem(W, rand(32, k)))
+    # A non-square `A` is reported first.
+    @test_throws "requires a square" init(
+        LinearProblem(rand(n + 1, n), rand(n + 1, k)), ButterflyFactorization()
+    )
 end
 
 @testset "Static arrays" begin

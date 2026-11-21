@@ -577,6 +577,8 @@ function ButterflyFactorization(; thread = Val(true), throwerror = true)
     return ButterflyFactorization(thread; throwerror)
 end
 
+_check_batched_rhs_support(alg::ButterflyFactorization, ::AbstractMatrix) = _throw_vector_rhs_only(alg)
+
 
 # There's no options like pivot here.
 # But I'm not sure it makes sense as a GenericFactorization

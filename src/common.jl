@@ -598,10 +598,23 @@ end
 
 Throw an informative `ArgumentError` at `init` time when a matrix (batched)
 right-hand side `b` is used with an algorithm that only supports vector `b`
-(Krylov subspace / iterative methods). Factorization-based algorithms support
+(iterative methods without a block variant, and the factorizations whose
+solve takes a single vector). Other factorization-based algorithms support
 matrix `b` and pass through the generic no-op fallback.
 """
 _check_batched_rhs_support(alg, b) = nothing
+
+# For the factorizations whose solve takes a single vector. Each adds a
+# `_check_batched_rhs_support` method next to its definition.
+function _throw_vector_rhs_only(alg)
+    throw(
+        ArgumentError(
+            "$(nameof(typeof(alg))) supports only vector right-hand sides. Most " *
+                "other factorizations accept a batched (matrix) `b`. Otherwise solve " *
+                "column-by-column."
+        )
+    )
+end
 function _check_batched_rhs_support(alg::AbstractKrylovSubspaceMethod, b::AbstractMatrix)
     throw(
         ArgumentError(
@@ -614,6 +627,9 @@ function _check_batched_rhs_support(alg::AbstractKrylovSubspaceMethod, b::Abstra
     )
 end
 function _check_batched_rhs_support(alg::DefaultLinearSolver, b::AbstractMatrix)
+    # LHL is the default for a split `WOperator`.
+    alg.alg === DefaultAlgorithmChoice.LHLFactorization &&
+        _throw_vector_rhs_only(LHLFactorization())
     # KrylovJL_GMRES is fine: it dispatches to Krylov.jl's block GMRES for
     # matrix b. CRAIGMR/LSMR (least-squares operator defaults) have no block
     # variants.
@@ -846,8 +862,9 @@ function __init(
         copy(b)
     end
 
-    _check_batched_rhs_support(alg, b)
+    # `A` first: the advice for a matrix `b` assumes a square system.
     _check_square_A_support(alg, A)
+    _check_batched_rhs_support(alg, b)
 
     u0_ = u0 !== nothing ? u0 : __init_u0_from_Ab(A, b)
 

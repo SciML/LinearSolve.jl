@@ -154,5 +154,13 @@ using Test
         sol_B = solve(LinearProblem(A, B), STRUMPACKFactorization())
         @test sol_B.retcode == ReturnCode.Success
         @test A * sol_B.u ≈ B atol = 1.0e-10 rtol = 1.0e-10
+
+        # STRUMPACK's Krylov solvers take a single right-hand side.
+        for krylov in ("pgmres", "gmres", "pbicgstab", "bicgstab")
+            alg_krylov = STRUMPACKFactorization(options = ["--sp_Krylov_solver", krylov])
+            @test A * solve(prob, alg_krylov).u ≈ b rtol = 1.0e-5
+            @test A * solve(LinearProblem(A, B[:, 1:1]), alg_krylov).u ≈ B[:, 1:1] rtol = 1.0e-5
+            @test_throws ArgumentError solve(LinearProblem(A, B), alg_krylov)
+        end
     end
 end

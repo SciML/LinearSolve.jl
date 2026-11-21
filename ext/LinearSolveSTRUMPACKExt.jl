@@ -14,6 +14,9 @@ const STRUMPACK_ZERO_PIVOT = Cint(3)
 const STRUMPACK_NO_CONVERGENCE = Cint(4)
 const STRUMPACK_INACCURATE_INERTIA = Cint(5)
 
+# The last `STRUMPACK_KRYLOV_SOLVER` that takes a matrix `b`: the Krylov methods follow it.
+const STRUMPACK_REFINE = Cint(2)
+
 const STRUMPACK_DOUBLE = Cint(1)
 const STRUMPACK_MT = Cint(0)
 
@@ -237,6 +240,16 @@ function SciMLBase.solve!(
     end
 
     _ensure_initialized!(scache, alg)
+
+    if size(cache.b, 2) > 1 && _strumpack_option(scache, :STRUMPACK_Krylov_solver) > STRUMPACK_REFINE
+        throw(
+            ArgumentError(
+                "STRUMPACK's Krylov solvers take a single right-hand side. For a batched " *
+                    "(matrix) `b`, set `--sp_Krylov_solver` to `auto`, `direct` or " *
+                    "`refinement`, or solve column-by-column."
+            )
+        )
+    end
 
     if cache.isfresh
         scache.rowptr, scache.colind, scache.nzval = _csc_to_csr_0based(A)

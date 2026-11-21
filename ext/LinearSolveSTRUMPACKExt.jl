@@ -100,7 +100,8 @@ function _set_runtime_options!(cache::STRUMPACKCache, alg::LinearSolve.STRUMPACK
     empty!(cache.option_storage)
     empty!(cache.option_ptrs)
 
-    for opt in alg.options
+    # STRUMPACK parses the options as a command line: the first entry is the program name.
+    for opt in ["LinearSolve"; alg.options]
         bytes = Vector{UInt8}(codeunits(opt))
         push!(bytes, 0x00)
         push!(cache.option_storage, bytes)
@@ -128,7 +129,23 @@ function _ensure_initialized!(cache::STRUMPACKCache, alg::LinearSolve.STRUMPACKF
         argv,
         Cint(0)
     )
+    # `STRUMPACK_init_mt` only stores the options.
+    ccall(
+        _strumpack_fptr(:STRUMPACK_set_from_options),
+        Cvoid,
+        (STRUMPACKSparseSolver,),
+        cache.solver[]
+    )
     return
+end
+
+# The value of one of STRUMPACK's option getters: an integer or enum, such as
+# `:STRUMPACK_maxit`, or a tolerance, such as `:STRUMPACK_rel_tol`.
+function _strumpack_option(cache::STRUMPACKCache, getter::Symbol)
+    return ccall(_strumpack_fptr(getter), Cint, (STRUMPACKSparseSolver,), cache.solver[])
+end
+function _strumpack_tolerance(cache::STRUMPACKCache, getter::Symbol)
+    return ccall(_strumpack_fptr(getter), Cdouble, (STRUMPACKSparseSolver,), cache.solver[])
 end
 
 function _csc_to_csr_0based(A::AbstractSparseMatrixCSC)

@@ -149,5 +149,10 @@ using Test
         @test option(:STRUMPACK_compression_leaf_size) == 128
         @test option(:STRUMPACK_reordering_method) == 5     # rcm
         @test option(:STRUMPACK_matching) == 0
+
+        B = [1.0 4.0; -2.0 5.0; 3.0 6.0]
+        sol_B = solve(LinearProblem(A, B), STRUMPACKFactorization())
+        @test sol_B.retcode == ReturnCode.Success
+        @test A * sol_B.u ≈ B atol = 1.0e-10 rtol = 1.0e-10
     end
 end

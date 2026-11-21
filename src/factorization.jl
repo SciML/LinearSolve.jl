@@ -2474,7 +2474,7 @@ square real sparse matrices (`AbstractSparseMatrixCSC{<:AbstractFloat}`), solvin
 
 ## Keyword Arguments
 
-  - `use_initial_guess`: passed as the `use_initial_guess` flag of `STRUMPACK_solve`,
+  - `use_initial_guess`: passed as the `use_initial_guess` flag of `STRUMPACK_matsolve`,
     so that the current contents of `cache.u` are used as the starting guess for
     STRUMPACK's iterative refinement / iterative solve. Defaults to `false`.
   - `options`: STRUMPACK runtime options, given as a flat `Vector{String}` of

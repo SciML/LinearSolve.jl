@@ -275,13 +275,17 @@ function SciMLBase.solve!(
     bvec = Float64.(cache.b)
     xvec = Float64.(cache.u)
 
+    # `STRUMPACK_solve` takes a single right-hand side.
     info = ccall(
-        _strumpack_fptr(:STRUMPACK_solve),
+        _strumpack_fptr(:STRUMPACK_matsolve),
         Cint,
-        (STRUMPACKSparseSolver, Ref{Cdouble}, Ref{Cdouble}, Cint),
+        (STRUMPACKSparseSolver, Cint, Ref{Cdouble}, Cint, Ref{Cdouble}, Cint, Cint),
         scache.solver[],
+        size(bvec, 2),
         bvec,
+        size(bvec, 1),
         xvec,
+        size(xvec, 1),
         Cint(alg.use_initial_guess)
     )
 

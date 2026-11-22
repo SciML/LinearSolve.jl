@@ -140,6 +140,20 @@ end
         @test SNLU.solve(F, b; refine = refine) == x0
     end
 
+    # The first step is accepted and the second is worse: the first must be kept.
+    A = sparse([2.0^24 -2.0^8; 1 -16])
+    b = [-2.0^-4, 0]
+    F = SNLU.snlu(
+        A; ordering = :natural, matching = false, relax = false, maxsuper = 1,
+        eps_pivot = 2.0^-20, check = false
+    )
+    x0 = SNLU.solve(F, b; refine = 0)
+    x1 = SNLU.solve(F, b; refine = 1)
+    x2 = x1 + SNLU.solve(F, mul!(copy(b), A, x1, -1, 1); refine = 0)
+    @test SNLU.nperturbed(F) > 0 && res(A, b, x1) < res(A, b, x0) / 2
+    @test !(res(A, b, x2) < res(A, b, x1))
+    @test SNLU.solve(F, b; refine = 3) == x1
+
     # Weak random diagonal -> perturbed pivots; refinement still converges.
     function weakdiag(seed; N = 30)
         rng = StableRNG(seed)
@@ -159,6 +173,21 @@ end
     x = similar(b)
     SNLU.solve!(x, F, b; refine = 3)
     @test (@allocated SNLU.solve!(x, F, b; refine = 3)) == 0
+end
+
+@testset "a stalled refinement cannot hide inaccurate rows" begin
+    # Two perturbed pivots leave rows 1 and 2 wrong and refinement makes them worse. The
+    # large b[3], in a row they don't touch, keeps the norm of the residual under the limit.
+    n, d = 1001, 1.0e-8
+    A = spdiagm(0 => [d / 8; d / 8; ones(n - 2)])
+    A[2, 1] = 7d / 8
+    b = [1.0; -1.0; 2.0e6; zeros(n - 3)]
+    x_exact = [8 / d; -64 / d; 2.0e6; zeros(n - 3)]
+    sol = solve(LinearProblem(A, b), SupernodalLUFactorization())
+    @test sol.retcode == ReturnCode.Infeasible
+    sol = solve(LinearProblem(A, b))                          # default solver falls back to QR
+    @test sol.retcode == ReturnCode.Success
+    @test norm(sol.u - x_exact) / norm(x_exact) <= 1.0e-12
 end
 
 @testset "residual check does not allocate a work vector" begin

@@ -69,7 +69,7 @@ function _grid_dims(nprocs::Integer, nprow::Integer, npcol::Integer)
     error("could not determine a valid SuperLU_DIST process grid")
 end
 
-# SuperLUDIST v1.1 made Options parametric per index type while the Julia 1.10 LTS lane still resolves v1.0.0's plain alias.
+# SuperLUDIST 1.0 uses one options type for both index widths.
 _default_options(::Type{I}) where {I} =
     SuperLUDIST.Options isa UnionAll ? SuperLUDIST.Options{I}() : SuperLUDIST.Options()
 

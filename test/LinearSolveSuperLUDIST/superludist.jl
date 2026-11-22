@@ -53,6 +53,75 @@ end
     SuperLUDISTExt.cleanup_superludist_cache!(cache)
 end
 
+@testset "SuperLUDISTFactorization options" begin
+    A = sparse(
+        [
+            4.0 1.0 0.0
+            2.0 3.0 1.0
+            0.0 1.0 2.0
+        ]
+    )
+    A2 = sparse(
+        [
+            5.0 1.0 0.0
+            2.0 4.0 1.0
+            0.0 1.0 3.0
+        ]
+    )
+    b = [1.0, 2.0, 3.0]
+    index_types = SuperLUDIST.Options isa UnionAll ? (Int32, Int64) : (Int32,)
+
+    options_variants = Any[
+        (; PrintStat = SuperLUDIST.Common.NO),
+        SuperLUDIST.Options(; PrintStat = SuperLUDIST.Common.NO),
+    ]
+    for I in index_types
+        push!(
+            options_variants,
+            SuperLUDIST.Options isa UnionAll ?
+                SuperLUDIST.Options{I}(; PrintStat = SuperLUDIST.Common.NO) :
+                SuperLUDIST.Options(; PrintStat = SuperLUDIST.Common.NO)
+        )
+    end
+
+    for options in options_variants
+        alg = SuperLUDISTFactorization(; comm = MPI.COMM_SELF, options)
+        cache = init(LinearProblem(A, b), alg)
+        sol = solve!(cache)
+        @test sol.retcode == ReturnCode.Success
+        @test residual_ok(A, sol.u, b)
+
+        cache.A = A2
+        sol = solve!(cache)
+        @test sol.retcode == ReturnCode.Success
+        @test residual_ok(A2, sol.u, b)
+        SuperLUDISTExt.cleanup_superludist_cache!(cache)
+    end
+
+    for I in index_types
+        prebuilt = SuperLUDIST.Options isa UnionAll ?
+            SuperLUDIST.Options{I}(; PrintStat = SuperLUDIST.Common.NO) :
+            SuperLUDIST.Options(; PrintStat = SuperLUDIST.Common.NO)
+        for J in index_types
+            built = SuperLUDISTExt._build_options(prebuilt, J)
+            @test built !== prebuilt
+            @test built.PrintStat == SuperLUDIST.Common.NO
+            SuperLUDIST.Options isa UnionAll && @test built isa SuperLUDIST.Options{J}
+        end
+    end
+end
+
+if SuperLUDIST.Options isa UnionAll
+    @testset "SuperLUDISTFactorization reports out-of-range options" begin
+        A = sparse([4.0 1.0; 2.0 3.0])
+        b = [1.0, 2.0]
+        options = SuperLUDIST.Options{Int64}(; superlu_max_buffer_size = Int64(typemax(Int32)) + 1)
+        alg = SuperLUDISTFactorization(; comm = MPI.COMM_SELF, options)
+        sol = @test_logs (:warn, r"superlu_max_buffer_size.*2147483648.*Int32") solve(LinearProblem(A, b), alg)
+        @test sol.retcode == ReturnCode.Failure
+    end
+end
+
 @testset "SuperLUDISTFactorization rejects unsupported complex inputs" begin
     A = sparse(
         ComplexF64[

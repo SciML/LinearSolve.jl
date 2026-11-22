@@ -111,6 +111,17 @@ end
     end
 end
 
+if SuperLUDIST.Options isa UnionAll
+    @testset "SuperLUDISTFactorization reports out-of-range options" begin
+        A = sparse([4.0 1.0; 2.0 3.0])
+        b = [1.0, 2.0]
+        options = SuperLUDIST.Options{Int64}(; superlu_max_buffer_size = Int64(typemax(Int32)) + 1)
+        alg = SuperLUDISTFactorization(; comm = MPI.COMM_SELF, options)
+        sol = @test_logs (:warn, r"superlu_max_buffer_size.*2147483648.*Int32") solve(LinearProblem(A, b), alg)
+        @test sol.retcode == ReturnCode.Failure
+    end
+end
+
 @testset "SuperLUDISTFactorization rejects unsupported complex inputs" begin
     A = sparse(
         ComplexF64[

@@ -75,7 +75,14 @@ _default_options(::Type{I}) where {I} =
 
 function _copy_options!(dst, src)
     for name in propertynames(src)
-        setproperty!(dst, name, getproperty(src, name))
+        value = getproperty(src, name)
+        try
+            setproperty!(dst, name, value)
+        catch err
+            err isa InexactError || rethrow()
+            field_type = typeof(getproperty(dst, name))
+            throw(ArgumentError("SuperLUDIST option $name = $value cannot be represented as $field_type"))
+        end
     end
     return dst
 end

@@ -1,6 +1,7 @@
 using LinearAlgebra, LinearSolve, Random
 using Test
 using RecursiveFactorization
+using StaticArrays
 
 # `ButterflyFactorization` randomizes the matrix before factorizing, drawing from the
 # global RNG, and the right hand sides below are random too, so seed for reproducibility.
@@ -89,7 +90,23 @@ end
 @testset "Padding as in RecursiveFactorization: n = $n" for n in (5, 6, 7)
     pad! = Base.get_extension(LinearSolve, :LinearSolveRecursiveFactorizationExt).pad!
     A = rand(n, n)
-    @test pad!(rand(8, 8), A) == RecursiveFactorization.pad!(A)
+    expected = Matrix{Float64}(I, 8, 8)
+    expected[1:n, 1:n] .= A
+    @test pad!(rand(8, 8), A) == expected
+end
+
+@testset "Solution destination" begin
+    A = 1.0e-40 * Matrix{Float64}(I, 8, 8)
+    sol = solve(LinearProblem(A, ones(Float32, 8)), ButterflyFactorization())
+    @test sol.u ≈ fill(1.0e40, 8)
+
+    cache = init(LinearProblem(Matrix{Float64}(I, 8, 8), ones(8)), ButterflyFactorization())
+    solve!(cache)
+    reinit!(cache; A = Matrix{Float64}(I, 12, 12), b = ones(12))
+    @test solve!(cache).u ≈ ones(12)
+
+    prob = LinearProblem(Matrix{Float64}(I, 8, 8), ones(8); u0 = zero(SVector{8, Float64}))
+    @test solve(prob, ButterflyFactorization()).u ≈ ones(8)
 end
 
 # `n = 102` is padded to 104. A new workspace would allocate several matrices.

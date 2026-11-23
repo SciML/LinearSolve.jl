@@ -231,10 +231,8 @@ function SciMLBase.solve!(
     if cache.isfresh
         @assert M == N "A must be square"
         if workspace.n != M
-            # A new size needs a new workspace.
             workspace = RecursiveFactorization.🦋workspace(copy(cache_A), copy(cache_b))
         end
-        # Factorize a copy in the workspace. `cache.A` is not overwritten.
         A = pad!(workspace.A, cache_A)
         RecursiveFactorization.🦋mul!(A, workspace.ws)
         F = RecursiveFactorization.lu!(A, Val(false), thread)
@@ -243,7 +241,7 @@ function SciMLBase.solve!(
     end
 
     workspace, F = cache.cacheval
-    (; b, U, V, tmp) = workspace
+    (; b, U, V, tmp, out) = workspace
     b[1:M] .= cache_b
     b[(M + 1):end] .= 0
     mul!(tmp, U', b)
@@ -252,8 +250,13 @@ function SciMLBase.solve!(
     TriangularSolve.ldiv!(F, tmp, thread)
 
     mul!(b, V, tmp)
-    cache.u .= @view b[1:M]
-    return SciMLBase.build_linear_solution(alg, cache.u, nothing, nothing)
+    out .= @view b[1:M]
+    u = if cache.u isa Array && size(cache.u) == size(out) && eltype(cache.u) == eltype(out)
+        copyto!(cache.u, out)
+    else
+        out
+    end
+    return SciMLBase.build_linear_solution(alg, u, nothing, nothing)
 end
 
 function LinearSolve.init_cacheval(

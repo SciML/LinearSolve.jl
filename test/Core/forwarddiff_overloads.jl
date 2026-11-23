@@ -432,6 +432,10 @@ prob = LinearProblem(sparse(A), b)
         ForwardDiff.jacobian(p -> (p[1] .* Matrix(As)) \ rhs, [2.0])
     @test ForwardDiff.jacobian(only_b, [3.0]) ≈
         ForwardDiff.jacobian(p -> Matrix(As) \ (p[1] .* rhs), [3.0])
+    for b in ([typemax(Int), -2, 3], 1.0:3.0)
+        f(p) = solve(LinearProblem(p[1] .* As, b), alg).u
+        @test ForwardDiff.jacobian(f, [2.0]) ≈ reshape(-(Matrix(As) \ b) / 4, :, 1)
+    end
 end
 
 # Test that solve still works correctly with GenericLUFactorization

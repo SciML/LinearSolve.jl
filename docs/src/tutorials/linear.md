@@ -51,10 +51,19 @@ sol.u ≈ A \ B
 ```
 
 This works with the caching interface as well (`cache.b = B2; solve!(cache)`
-re-solves all columns against the cached factorization). Batched right-hand
-sides are only supported by factorization-based algorithms; iterative (Krylov)
-methods such as `LS.KrylovJL_GMRES()` accept only vector `b` and throw an
-informative error for matrix `B` — solve column-by-column instead in that case.
+re-solves all columns against the cached factorization).
+
+Most factorization-based algorithms accept a matrix `B`. So do two of the
+iterative methods, `LS.KrylovJL_GMRES()` and `LS.KrylovJL_MINRES()`, which use
+the block GMRES and block MINRES of Krylov.jl:
+
+```@example linsys1
+sol = LS.solve(prob, LS.KrylovJL_GMRES())
+size(sol.u)
+```
+
+The other iterative methods accept only a vector `b` and throw an informative
+error for a matrix `B`. Solve column by column in that case.
 
 ## Sparse and Structured Matrices
 

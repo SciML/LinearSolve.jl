@@ -2,7 +2,7 @@
 
 julia_version = "1.13.4"
 manifest_format = "2.1"
-project_hash = "7eb444bea24a482aa2816dd18ee3c139f7601224"
+project_hash = "e961f3d6e5695660aaf61cff7237006d59b3b168"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -727,10 +727,10 @@ version = "2.24.0"
     SPIRV_LLVM_Translator_jll = "4a5d46fc-d8cf-5151-a261-86b458210efb"
 
 [[deps.GPUToolbox]]
-git-tree-sha1 = "5d825bab8a72d96e350e47e30616cf6a4b02fb49"
+git-tree-sha1 = "c3bd8bfb62b4d9d6d23b33bb9b2f37fcb40cffea"
 registries = "General"
 uuid = "096a3bc2-3ced-46d0-87f4-dd12716f4bfc"
-version = "3.6.0"
+version = "3.7.0"
 
 [[deps.GR]]
 deps = ["Artifacts", "Base64", "DelimitedFiles", "Downloads", "GR_jll", "JSON", "Libdl", "LinearAlgebra", "Preferences", "Printf", "Qt6Wayland_jll", "Random", "Serialization", "Sockets", "TOML", "Tar", "Test", "p7zip_jll"]
@@ -955,10 +955,10 @@ version = "1.12.0"
 
 [[deps.KernelAbstractions]]
 deps = ["Adapt", "Atomix", "GPUCompiler", "GPUToolbox", "KernelInterface", "LLVM", "MacroTools", "PrecompileTools", "Printf", "Random", "Random123", "RandomNumbers", "SPIRVIntrinsics", "SPIRV_LLVM_Backend_jll", "SPIRV_Tools_jll", "StaticArraysCore", "ThreadTeams", "UnsafeAtomics", "pocl_standalone_jll"]
-git-tree-sha1 = "33ee3c9dc4b275a979c8b1ce90b912d70be35ea7"
+git-tree-sha1 = "737d16154be7fc32fa7209b574a3a96cd075e3e5"
 registries = "General"
 uuid = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
-version = "0.10.8"
+version = "0.10.9"
 
     [deps.KernelAbstractions.extensions]
     AMDGPUExt = "AMDGPU"
@@ -1214,7 +1214,7 @@ version = "1.13.0"
 
 [[deps.LinearSolve]]
 deps = ["AMD", "ArrayInterface", "ConcreteStructs", "DocStringExtensions", "EnumX", "GPUArraysCore", "InteractiveUtils", "Krylov", "LHLFactorization", "Libdl", "LinearAlgebra", "MKL_jll", "Markdown", "OpenBLAS_jll", "PrecompileTools", "Preferences", "PureKLU", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLLogging", "SciMLOperators", "SciMLStructures", "Setfield", "SparseArrays", "SparseColumnPivotedQR", "SpecializedDeepcopy", "StaticArraysCore"]
-path = "/home/runner/work/LinearSolve.jl/LinearSolve.jl"
+path = "/home/runner/_work/LinearSolve.jl/LinearSolve.jl"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 version = "5.19.0"
 
@@ -1930,10 +1930,10 @@ version = "1.6.1"
 
 [[deps.SPIRV_LLVM_Backend_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Zlib_jll"]
-git-tree-sha1 = "b277c67df09ba43963be35adc4acf6b6262a9066"
+git-tree-sha1 = "e4d91aaabaaa422e8aba886f99d4243a7a1f5c4d"
 registries = "General"
 uuid = "4376b9bf-cff8-51b6-bb48-39421dff0d0c"
-version = "23.1.4+5"
+version = "23.1.4+6"
 
 [[deps.SPIRV_Tools_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]

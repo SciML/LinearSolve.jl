@@ -63,22 +63,14 @@ function update_cacheval!(cache, cacheval::DefaultLinearSolverInit, name::Symbol
 end
 
 @generated function __setfield!(cache::DefaultLinearSolverInit, alg::DefaultLinearSolver, v)
-    ex = :()
+    ex = :(error("Algorithm Choice not Allowed"))
     for alg in first.(EnumX.symbol_map(DefaultAlgorithmChoice.T))
-        newex = quote
-            setfield!(cache, $(Meta.quot(alg)), v)
-        end
+        # A field that can't hold `v` would only throw, and `--trim=safe` can't compile that call.
+        hasfield(cache, alg) && v <: fieldtype(cache, alg) || continue
         alg_enum = getproperty(LinearSolve.DefaultAlgorithmChoice, alg)
-        ex = if ex == :()
-            Expr(
-                :elseif, :(alg.alg == $(alg_enum)), newex,
-                :(error("Algorithm Choice not Allowed"))
-            )
-        else
-            Expr(:elseif, :(alg.alg == $(alg_enum)), newex, ex)
-        end
+        ex = :(alg.alg == $(alg_enum) ? setfield!(cache, $(Meta.quot(alg)), v) : $ex)
     end
-    return ex = Expr(:if, ex.args...)
+    return ex
 end
 
 # Handle special case of Column-pivoted QR fallback for LU

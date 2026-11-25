@@ -96,7 +96,8 @@ function _check_residual_safety(
     tol = cache.abstol + cache.reltol * b_norm
     if res_norm > tol
         @SciMLMessage(cache.verbose, :residual_safety) do
-            return "Residual safety check failed: ‖A*x - b‖ = $(res_norm), tol = $(tol) (abstol = $(cache.abstol), reltol = $(cache.reltol), ‖b‖ = $(b_norm), ratio = $(res_norm / tol))"
+            # Only `String`s are interpolated, so `--trim=safe` can compile the message.
+            return "Residual safety check failed: ‖A*x - b‖ = $(string(res_norm)), tol = $(string(tol)) (abstol = $(string(cache.abstol)), reltol = $(string(cache.reltol)), ‖b‖ = $(string(b_norm)), ratio = $(string(res_norm / tol)))"
         end
         return SciMLBase.build_linear_solution(
             alg, y, resid, nothing;

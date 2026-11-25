@@ -577,6 +577,9 @@ function ButterflyFactorization(; thread = Val(true), throwerror = true)
     return ButterflyFactorization(thread; throwerror)
 end
 
+# `solve!` factorizes a copy and does not overwrite `A`, so `init` need not copy it.
+default_alias_A(::ButterflyFactorization, ::Any, ::Any) = true
+
 
 # There's no options like pivot here.
 # But I'm not sure it makes sense as a GenericFactorization

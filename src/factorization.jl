@@ -2458,6 +2458,8 @@ struct SparspakFactorization <: AbstractSparseFactorization
     end
 end
 
+_check_batched_rhs_support(alg::SparspakFactorization, ::AbstractMatrix) = _throw_vector_rhs_only(alg)
+
 """
     STRUMPACKFactorization(; use_initial_guess = false, options = String[],
                            compression = nothing, rel_tol = nothing, abs_tol = nothing,

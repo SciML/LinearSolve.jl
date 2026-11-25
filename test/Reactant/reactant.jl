@@ -81,7 +81,7 @@ end
 
 @testset "forward derivative with respect to the right-hand side" begin
     derivative(A, b, db) = only(
-        Enzyme.autodiff(Forward, triangular_solution, Const(A), Duplicated(b, db))
+        Enzyme.autodiff(Forward, triangular_solution, Duplicated, Const(A), Duplicated(b, db))
     )
     db = Float32[1, 0]
     @test Array(@jit derivative(A_reactant, b_reactant, Reactant.to_rarray(db))) ≈

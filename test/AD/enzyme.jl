@@ -1,5 +1,5 @@
 using Enzyme, ForwardDiff
-using LinearSolve, LinearAlgebra, Test
+using LinearSolve, LinearAlgebra, SparseArrays, Test
 using FiniteDiff, RecursiveFactorization
 
 n = 4
@@ -650,6 +650,21 @@ end
     )
     @test dA2 ≈ grad_A rtol = 1.0e-8
     @test db2 ≈ grad_b rtol = 1.0e-8
+end
+
+# https://github.com/SciML/LinearSolve.jl/issues/1363
+@testset "constant sparse A under plain Reverse" begin
+    A = sprand(10, 10, 0.3) + 10I
+    b = rand(10)
+    f(A, b, alg) = sum(solve(LinearProblem(A, b), alg).u)
+    for alg in (
+            KLUFactorization(), UMFPACKFactorization(), LUFactorization(),
+            KrylovJL_GMRES(), nothing,
+        )
+        db = zeros(10)
+        Enzyme.autodiff(Reverse, f, Active, Const(A), Duplicated(copy(b), db), Const(alg))
+        @test db ≈ Matrix(A)' \ ones(10) rtol = 1.0e-6
+    end
 end
 
 @testset "the returned solution is the differentiable one (#766)" begin

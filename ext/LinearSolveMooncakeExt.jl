@@ -35,11 +35,6 @@ end
 @from_chainrules MinimalCtx Tuple{typeof(init), LinearProblem, Nothing} true ReverseMode
 
 # rrules for solve!
-# NOTE - Avoid Mooncake.prepare_gradient_cache, only use Mooncake.prepare_pullback_cache (and therefore Mooncake.value_and_pullback!!)
-# calling Mooncake.prepare_gradient_cache for functions with solve! will activate unsupported Adjoint case exception for below rrules
-# This is because in Mooncake.prepare_gradient_cache we reset stacks + state by passing in zero gradient in the reverse pass once.
-# However, if one has a valid cache then they can directly use Mooncake.value_and_gradient!!.
-
 @is_primitive MinimalCtx Tuple{typeof(SciMLBase.solve!), LinearCache, SciMLLinearSolveAlgorithm, Vararg}
 @is_primitive MinimalCtx Tuple{typeof(SciMLBase.solve!), LinearCache, Nothing, Vararg}
 
@@ -93,6 +88,11 @@ function Mooncake.rrule!!(
     function solve!_adjoint(::NoRData)
         ∂∅ = NoRData()
         ∂u = sol.dx.data.u
+        # A zero cotangent, as `prepare_gradient_cache` or an adjoint ODE solve passes, has
+        # nothing to propagate. One that reached `cache.u` instead still errors below.
+        if iszero(∂u) && iszero(fdata(_cache.dx).fields.u)
+            return (∂∅, rdata(_cache.dx), ∂∅, ntuple(_ -> ∂∅, length(args))...)
+        end
 
         if sensealg.linsolve === missing
             # Same route as `solve!(cache; adjoint = true)`. `A_` is the copy preserved

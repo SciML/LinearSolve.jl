@@ -256,7 +256,7 @@ end
 # Fundamental supernodes: column j extends the current supernode iff j-1 is
 # its only child in the etree and struct(j-1) = {j} ∪ struct(j).
 function fundamental_supernodes(
-        parent::Vector{Int}, colstruct::Vector{Vector{Int}}, n::Int
+        parent::Vector{Int}, colstruct::AbstractVector, n::Int
     )
     nchild = zeros(Int, n)
     @inbounds for j in 1:n
@@ -279,7 +279,7 @@ end
 # zeros.  For such adjacent parent merges the merged update-row set is exactly
 # the parent's update-row set, which keeps the bookkeeping O(1) per attempt.
 function amalgamate(
-        sstart::Vector{Int}, colstruct::Vector{Vector{Int}},
+        sstart::Vector{Int}, colstruct::AbstractVector,
         parent::Vector{Int}, n::Int;
         nrelax0::Int = 8, nrelax1::Int = 32, nrelax2::Int = 96,
         zrelax0::Float64 = 0.8, zrelax1::Float64 = 0.2, zrelax2::Float64 = 0.05,

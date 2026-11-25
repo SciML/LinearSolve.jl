@@ -173,6 +173,9 @@ res = A \ b
             Matrix(A_sparse) \ b_sparse
         # The sparse non-square default itself must not be rejected either.
         @test !LinearSolve.needs_square_A(SparseColumnPivotedQRFactorization())
+        @test !LinearSolve.needs_square_A(SupernodalQRFactorization())
+        @test solve(LinearProblem(copy(A_sparse), copy(b_sparse)), SupernodalQRFactorization()).u ≈
+            Matrix(A_sparse) \ b_sparse
     end
 
     @testset "square problems are unaffected" begin

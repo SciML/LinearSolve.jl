@@ -404,8 +404,10 @@ end
 # The special handling for GenericLUFactorization is now done in solve! instead.
 # This ensures init always returns DualLinearCache for type stability.
 
-# Opt out for SparspakFactorization (sparse solvers can't handle Duals in the same way)
-function SciMLBase.init(prob::DualAbstractLinearProblem, alg::SparspakFactorization, args...; kwargs...)
+# SparspakFactorization factorizes and solves in Dual arithmetic itself, which needs
+# Duals in both `A` and `b`: a `DualLinearProblem`. The other two members of
+# `DualAbstractLinearProblem`, Duals in `A` only or in `b` only, take the Dual cache.
+function SciMLBase.init(prob::DualLinearProblem, alg::SparspakFactorization, args...; kwargs...)
     return __init(prob, alg, args...; kwargs...)
 end
 
@@ -481,6 +483,10 @@ function __dual_init(
     new_A = nodual_value(A)
     new_b = nodual_value(b)
     new_u0 = nodual_value(u0)
+
+    if alg isa SparspakFactorization
+        new_b = copyto!(similar(new_b, promote_type(eltype(new_A), eltype(new_b))), new_b)
+    end
 
     ∂_A = partial_vals(A)
     ∂_b = partial_vals(b)
@@ -568,7 +574,7 @@ function __dual_init(
         partials_scratch_flat,
         similar(non_partial_cache.u),  # Use u's size, not b's size
         similar(non_partial_cache.u),  # primal_u_cache
-        similar(new_b),                # primal_b_cache
+        similar(non_partial_cache.b),  # primal_b_cache
         true,  # Cache is initially valid
         true,
         A,

@@ -14,6 +14,9 @@ const STRUMPACK_ZERO_PIVOT = Cint(3)
 const STRUMPACK_NO_CONVERGENCE = Cint(4)
 const STRUMPACK_INACCURATE_INERTIA = Cint(5)
 
+# The last `STRUMPACK_KRYLOV_SOLVER` that takes a matrix `b`: the Krylov methods follow it.
+const STRUMPACK_REFINE = Cint(2)
+
 const STRUMPACK_DOUBLE = Cint(1)
 const STRUMPACK_MT = Cint(0)
 
@@ -100,7 +103,8 @@ function _set_runtime_options!(cache::STRUMPACKCache, alg::LinearSolve.STRUMPACK
     empty!(cache.option_storage)
     empty!(cache.option_ptrs)
 
-    for opt in alg.options
+    # STRUMPACK parses the options as a command line: the first entry is the program name.
+    for opt in ["LinearSolve"; alg.options]
         bytes = Vector{UInt8}(codeunits(opt))
         push!(bytes, 0x00)
         push!(cache.option_storage, bytes)
@@ -128,7 +132,23 @@ function _ensure_initialized!(cache::STRUMPACKCache, alg::LinearSolve.STRUMPACKF
         argv,
         Cint(0)
     )
+    # `STRUMPACK_init_mt` only stores the options.
+    ccall(
+        _strumpack_fptr(:STRUMPACK_set_from_options),
+        Cvoid,
+        (STRUMPACKSparseSolver,),
+        cache.solver[]
+    )
     return
+end
+
+# The value of one of STRUMPACK's option getters: an integer or enum, such as
+# `:STRUMPACK_maxit`, or a tolerance, such as `:STRUMPACK_rel_tol`.
+function _strumpack_option(cache::STRUMPACKCache, getter::Symbol)
+    return ccall(_strumpack_fptr(getter), Cint, (STRUMPACKSparseSolver,), cache.solver[])
+end
+function _strumpack_tolerance(cache::STRUMPACKCache, getter::Symbol)
+    return ccall(_strumpack_fptr(getter), Cdouble, (STRUMPACKSparseSolver,), cache.solver[])
 end
 
 function _csc_to_csr_0based(A::AbstractSparseMatrixCSC)
@@ -221,6 +241,16 @@ function SciMLBase.solve!(
 
     _ensure_initialized!(scache, alg)
 
+    if size(cache.b, 2) > 1 && _strumpack_option(scache, :STRUMPACK_Krylov_solver) > STRUMPACK_REFINE
+        throw(
+            ArgumentError(
+                "STRUMPACK's Krylov solvers take a single right-hand side. For a batched " *
+                    "(matrix) `b`, set `--sp_Krylov_solver` to `auto`, `direct` or " *
+                    "`refinement`, or solve column-by-column."
+            )
+        )
+    end
+
     if cache.isfresh
         scache.rowptr, scache.colind, scache.nzval = _csc_to_csr_0based(A)
         nref = Ref{Cint}(Cint(size(A, 1)))
@@ -258,13 +288,17 @@ function SciMLBase.solve!(
     bvec = Float64.(cache.b)
     xvec = Float64.(cache.u)
 
+    # `STRUMPACK_solve` takes a single right-hand side.
     info = ccall(
-        _strumpack_fptr(:STRUMPACK_solve),
+        _strumpack_fptr(:STRUMPACK_matsolve),
         Cint,
-        (STRUMPACKSparseSolver, Ref{Cdouble}, Ref{Cdouble}, Cint),
+        (STRUMPACKSparseSolver, Cint, Ref{Cdouble}, Cint, Ref{Cdouble}, Cint, Cint),
         scache.solver[],
+        size(bvec, 2),
         bvec,
+        size(bvec, 1),
         xvec,
+        size(xvec, 1),
         Cint(alg.use_initial_guess)
     )
 

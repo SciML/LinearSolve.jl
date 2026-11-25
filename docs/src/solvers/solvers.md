@@ -415,10 +415,10 @@ The following convenience keywords map to STRUMPACK runtime options:
 - `compression` -> `--sp_compression`
 - `rel_tol` -> `--sp_rel_tol`
 - `abs_tol` -> `--sp_abs_tol`
-- `max_rank` -> `--sp_max_rank`
-- `leaf_size` -> `--sp_leaf_size`
+- `max_rank` -> `--hss_max_rank` and `--blr_max_rank`
+- `leaf_size` -> `--sp_compression_leaf_size`
 - `reordering` -> `--sp_reordering_method`
-- `matching` -> `--sp_enable_matching`
+- `matching` -> `--sp_matching`
 
 You can also pass raw STRUMPACK flags via `options = ["--flag", "value", ...]`.
 

@@ -2474,7 +2474,7 @@ square real sparse matrices (`AbstractSparseMatrixCSC{<:AbstractFloat}`), solvin
 
 ## Keyword Arguments
 
-  - `use_initial_guess`: passed as the `use_initial_guess` flag of `STRUMPACK_solve`,
+  - `use_initial_guess`: passed as the `use_initial_guess` flag of `STRUMPACK_matsolve`,
     so that the current contents of `cache.u` are used as the starting guess for
     STRUMPACK's iterative refinement / iterative solve. Defaults to `false`.
   - `options`: STRUMPACK runtime options, given as a flat `Vector{String}` of
@@ -2491,10 +2491,11 @@ and are appended to `options` as STRUMPACK-style runtime options (each defaults 
 - `compression` -> `--sp_compression`
 - `rel_tol` -> `--sp_rel_tol` (must be non-negative)
 - `abs_tol` -> `--sp_abs_tol` (must be non-negative)
-- `max_rank` -> `--sp_max_rank` (integer, at least 1)
-- `leaf_size` -> `--sp_leaf_size` (integer, at least 1)
+- `max_rank` -> `--hss_max_rank` and `--blr_max_rank` (integer, at least 1)
+- `leaf_size` -> `--sp_compression_leaf_size` (integer, at least 1)
 - `reordering` -> `--sp_reordering_method`
-- `matching` -> `--sp_enable_matching` (a `Bool`, written as `1`/`0`)
+- `matching` -> `--sp_matching` (a `Bool`: `true` is job `5`, STRUMPACK's default,
+  `false` is job `0`, no matching)
 
 !!! note
 
@@ -2539,12 +2540,14 @@ struct STRUMPACKFactorization <: AbstractSparseFactorization
             compression !== nothing && _push_opt_pair!(runtime_options, "--sp_compression", compression)
             rel_tol !== nothing && _push_opt_pair!(runtime_options, "--sp_rel_tol", rel_tol)
             abs_tol !== nothing && _push_opt_pair!(runtime_options, "--sp_abs_tol", abs_tol)
-            max_rank !== nothing && _push_opt_pair!(runtime_options, "--sp_max_rank", Int(max_rank))
-            leaf_size !== nothing && _push_opt_pair!(runtime_options, "--sp_leaf_size", Int(leaf_size))
+            max_rank !== nothing && _push_opt_pair!(runtime_options, "--hss_max_rank", Int(max_rank))
+            max_rank !== nothing && _push_opt_pair!(runtime_options, "--blr_max_rank", Int(max_rank))
+            leaf_size !== nothing &&
+                _push_opt_pair!(runtime_options, "--sp_compression_leaf_size", Int(leaf_size))
             reordering !== nothing &&
                 _push_opt_pair!(runtime_options, "--sp_reordering_method", reordering)
             matching !== nothing &&
-                _push_opt_pair!(runtime_options, "--sp_enable_matching", matching ? 1 : 0)
+                _push_opt_pair!(runtime_options, "--sp_matching", matching ? 5 : 0)
 
             new(use_initial_guess, runtime_options)
         end

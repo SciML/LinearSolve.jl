@@ -28,10 +28,11 @@ using Test
             "--sp_compression", "hss",
             "--sp_rel_tol", "0.0001",
             "--sp_abs_tol", "1.0e-10",
-            "--sp_max_rank", "64",
-            "--sp_leaf_size", "128",
+            "--hss_max_rank", "64",
+            "--blr_max_rank", "64",
+            "--sp_compression_leaf_size", "128",
             "--sp_reordering_method", "metis",
-            "--sp_enable_matching", "1",
+            "--sp_matching", "5",
         ]
 
         @test_throws "`rel_tol` must be non-negative" STRUMPACKFactorization(
@@ -83,10 +84,11 @@ using Test
             "--sp_compression", "hss",
             "--sp_rel_tol", "0.0001",
             "--sp_abs_tol", "1.0e-10",
-            "--sp_max_rank", "64",
-            "--sp_leaf_size", "128",
+            "--hss_max_rank", "64",
+            "--blr_max_rank", "64",
+            "--sp_compression_leaf_size", "128",
             "--sp_reordering_method", "metis",
-            "--sp_enable_matching", "1",
+            "--sp_matching", "5",
         ]
 
         @test_throws "`rel_tol` must be non-negative" STRUMPACKFactorization(
@@ -117,5 +119,48 @@ using Test
         sol_guess = solve(prob_guess, STRUMPACKFactorization(use_initial_guess = true))
         @test sol_guess.retcode == ReturnCode.Success
         @test A * sol_guess.u ≈ b atol = 1.0e-10 rtol = 1.0e-10
+
+        # The options take effect: one GMRES iteration does not solve the system.
+        alg_gmres = STRUMPACKFactorization(
+            options = ["--sp_Krylov_solver", "gmres", "--sp_maxit", "1"]
+        )
+        @test !isapprox(A * solve(prob, alg_gmres).u, b; rtol = 1.0e-3)
+
+        # The options reach the solver: its getters return them.
+        alg_set = STRUMPACKFactorization(
+            options = ["--sp_maxit", "7"],
+            compression = "hss",
+            rel_tol = 1.0e-4,
+            abs_tol = 1.0e-9,
+            max_rank = 64,
+            leaf_size = 128,
+            reordering = "rcm",
+            matching = false
+        )
+        cache_set = init(prob, alg_set)
+        @test solve!(cache_set).retcode == ReturnCode.Success
+        option(getter) = ext._strumpack_option(cache_set.cacheval, getter)
+        tolerance(getter) = ext._strumpack_tolerance(cache_set.cacheval, getter)
+        @test option(:STRUMPACK_maxit) == 7
+        @test tolerance(:STRUMPACK_rel_tol) ≈ 1.0e-4
+        @test tolerance(:STRUMPACK_abs_tol) ≈ 1.0e-9
+        @test option(:STRUMPACK_compression) == 1           # hss
+        @test option(:STRUMPACK_HSS_max_rank) == 64
+        @test option(:STRUMPACK_compression_leaf_size) == 128
+        @test option(:STRUMPACK_reordering_method) == 5     # rcm
+        @test option(:STRUMPACK_matching) == 0
+
+        B = [1.0 4.0; -2.0 5.0; 3.0 6.0]
+        sol_B = solve(LinearProblem(A, B), STRUMPACKFactorization())
+        @test sol_B.retcode == ReturnCode.Success
+        @test A * sol_B.u ≈ B atol = 1.0e-10 rtol = 1.0e-10
+
+        # STRUMPACK's Krylov solvers take a single right-hand side.
+        for krylov in ("pgmres", "gmres", "pbicgstab", "bicgstab")
+            alg_krylov = STRUMPACKFactorization(options = ["--sp_Krylov_solver", krylov])
+            @test A * solve(prob, alg_krylov).u ≈ b rtol = 1.0e-5
+            @test A * solve(LinearProblem(A, B[:, 1:1]), alg_krylov).u ≈ B[:, 1:1] rtol = 1.0e-5
+            @test_throws ArgumentError solve(LinearProblem(A, B), alg_krylov)
+        end
     end
 end

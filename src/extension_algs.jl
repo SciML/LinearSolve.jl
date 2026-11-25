@@ -618,6 +618,7 @@ struct FastLUFactorization <: AbstractDenseFactorization end
 
 """
     FastQRFactorization()
+    FastQRFactorization(ColumnNorm())
     FastQRFactorization(pivot, blocksize)
 
 A high-performance QR factorization using the FastLapackInterface.jl package.
@@ -656,7 +657,7 @@ using FastLapackInterface, LinearAlgebra
 # QR without pivoting, block size 36
 alg1 = FastQRFactorization()
 # QR with column pivoting
-alg2 = FastQRFactorization(ColumnNorm(), 36)
+alg2 = FastQRFactorization(ColumnNorm())
 # Custom block size
 alg3 = FastQRFactorization(NoPivot(), 64)
 ```
@@ -669,6 +670,8 @@ end
 # is 36 or 16 better here? LinearAlgebra and FastLapackInterface use 36,
 # but QRFactorization uses 16.
 FastQRFactorization() = FastQRFactorization(NoPivot(), 36)
+# Column pivoting does not use the block size.
+FastQRFactorization(pivot::ColumnNorm) = FastQRFactorization(pivot, 0)
 
 """
 ```julia

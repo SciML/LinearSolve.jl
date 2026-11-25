@@ -6,7 +6,7 @@ using SciMLBase: SciMLBase
 using LinearAlgebra: LinearAlgebra, ColumnNorm, LAPACK, NoPivot, ldiv!
 using ArrayInterface: ArrayInterface
 using Setfield: @set!
-using FastLapackInterface: FastLapackInterface, LUWs, QRWYWs
+using FastLapackInterface: FastLapackInterface, LUWs, QRPivotedWs, QRWYWs
 
 struct WorkspaceAndFactors{W, F}
     workspace::W
@@ -66,10 +66,10 @@ function LinearSolve.init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    ws = QRpWs(A)
+    ws = QRPivotedWs(A)
     return WorkspaceAndFactors(
         ws,
-        ArrayInterface.qr_instance(convert(AbstractMatrix, A))
+        ArrayInterface.qr_instance(convert(AbstractMatrix, A), ColumnNorm())
     )
 end
 

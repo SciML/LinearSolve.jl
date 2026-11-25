@@ -1,7 +1,7 @@
 using Zygote, ForwardDiff
 using LinearSolve, LinearAlgebra, Test
 using FiniteDiff, RecursiveFactorization
-using InteractiveUtils, Random, SparseArrays
+using InteractiveUtils, Random, SparseArrays, StaticArrays
 import CliqueTrees
 
 struct UnregisteredFactorization <: LinearSolve.AbstractFactorization end
@@ -96,6 +96,16 @@ end
         @test adjoint_solution ≈ tall_A * ((adjoint(tall_A) * tall_A) \ tall_adjoint_rhs)
         @test adjoint(tall_A) * adjoint_solution ≈ tall_adjoint_rhs
     end
+
+    cache = init(
+        LinearProblem(copy(tall_A), copy(tall_b)),
+        LinearSolve.DefaultLinearSolver(
+            LinearSolve.DefaultAlgorithmChoice.NormalCholeskyFactorization
+        )
+    )
+    solve!(cache)
+    @test LinearSolve._adjoint_solve(cache, tall_adjoint_rhs) ≈
+        tall_A * ((adjoint(tall_A) * tall_A) \ tall_adjoint_rhs)
 
     sparse_A = sparse(A_local)
     sparse_alg = SparseColumnPivotedQRFactorization()
@@ -490,6 +500,44 @@ end
         cache = init(LinearProblem(A, bvec), LUFactorization())
         solve!(cache)
         @test solve!(cache; adjoint = true).u ≈ adjoint(A) \ bvec
+    end
+
+    # https://github.com/SciML/LinearSolve.jl/issues/1309
+    # Reverse mode used the square-system formula `-lambda x'` for every shape, dropping
+    # the term a pseudoinverse solve carries, so it disagreed with forward mode.
+    @testset "reverse-mode gradients for a non-square A" begin
+        Random.seed!(1309)
+        for (rows, cols) in ((9, 4), (4, 9))
+            A = randn(rows, cols)
+            bvec = randn(rows)
+            reference = ForwardDiff.gradient(
+                Av -> sum(reshape(Av, rows, cols) \ bvec), vec(A)
+            )
+            algs = rows > cols ?
+                (
+                    SVDFactorization(), QRFactorization(), NormalCholeskyFactorization(),
+                    KrylovJL_LSMR(), nothing,
+                ) :
+                (SVDFactorization(), KrylovJL_LSMR())
+            for alg in algs
+                g(Av) = sum(
+                    (
+                        alg === nothing ?
+                            solve(LinearProblem(reshape(Av, rows, cols), bvec)) :
+                            solve(LinearProblem(reshape(Av, rows, cols), bvec), alg)
+                    ).u
+                )
+                @test Zygote.gradient(g, vec(A))[1] ≈ reference rtol = 1.0e-6
+            end
+        end
+
+        # a static `A` has an immutable cotangent; varying A[3, 1] to t gives
+        # sum(x) = (1 + 3t) / (1 + t^2) + 2, whose derivative at t = 0.5 is 4/5
+        As = @SMatrix [1.0 0.0; 0.0 1.0; 0.5 0.0]
+        bs = @SVector [1.0, 2.0, 3.0]
+        for alg in (NormalCholeskyFactorization(), KrylovJL_LSMR())
+            @test Zygote.gradient(X -> sum(solve(LinearProblem(X, bs), alg).u), As)[1][3, 1] ≈ 0.8 rtol = 1.0e-6
+        end
     end
 
     # https://github.com/SciML/LinearSolve.jl/issues/1302

@@ -99,15 +99,33 @@ end
     end
 
     for I in index_types
-        prebuilt = SuperLUDIST.Options isa UnionAll ?
-            SuperLUDIST.Options{I}(; PrintStat = SuperLUDIST.Common.NO) :
-            SuperLUDIST.Options(; PrintStat = SuperLUDIST.Common.NO)
+        option_type = SuperLUDIST.Options isa UnionAll ?
+            SuperLUDIST.Options{I} : SuperLUDIST.Options
+        @test SuperLUDISTExt._build_options(nothing, I) isa option_type
+
+        overrides = (; PrintStat = SuperLUDIST.Common.NO)
+        configured = SuperLUDISTExt._build_options(overrides, I)
+        @test configured isa option_type
+        @test configured.PrintStat == overrides.PrintStat
+
+        prebuilt = option_type(; PrintStat = SuperLUDIST.Common.NO)
         for J in index_types
             built = SuperLUDISTExt._build_options(prebuilt, J)
             @test built !== prebuilt
             @test built.PrintStat == SuperLUDIST.Common.NO
             SuperLUDIST.Options isa UnionAll && @test built isa SuperLUDIST.Options{J}
         end
+    end
+end
+
+if SuperLUDIST.Options isa UnionAll
+    @testset "SuperLUDISTFactorization reports out-of-range options" begin
+        A = sparse([4.0 1.0; 2.0 3.0])
+        b = [1.0, 2.0]
+        options = SuperLUDIST.Options{Int64}(; superlu_max_buffer_size = Int64(typemax(Int32)) + 1)
+        alg = SuperLUDISTFactorization(; comm = MPI.COMM_SELF, options)
+        sol = @test_logs (:warn, r"superlu_max_buffer_size.*2147483648.*Int32") solve(LinearProblem(A, b), alg)
+        @test sol.retcode == ReturnCode.Failure
     end
 end
 

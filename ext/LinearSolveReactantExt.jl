@@ -7,28 +7,31 @@ using SciMLBase: SciMLBase, LinearProblem, LinearSolution, ReturnCode
 
 Reactant._parent_type(::Type{T}) where {T <: LinearSolution} = T
 
+algorithm_name(alg) = isnothing(alg) ? "the default algorithm" : nameof(typeof(alg))
+
 function solve_route(prob, inputs, args, kwargs)
     alg = isempty(args) ? nothing : first(args)
     if prob.A isa Union{UnitLowerTriangular, UnitUpperTriangular}
+        # Promotion checks for real, at-least-single precision without unwrapping a traced scalar.
+        T = eltype(prob.A)
         if alg isa DirectLdiv! && length(args) == 1 && isempty(kwargs) &&
                 isempty(prob.kwargs) && prob.u0 === nothing &&
-                parent(prob.A) isa Reactant.TracedRArray{<:Union{Float32, Float64}, 2} &&
-                prob.b isa Reactant.TracedRArray && ndims(prob.b) in (1, 2) &&
-                eltype(prob.A) === eltype(prob.b)
+                parent(prob.A) isa DenseMatrix && prob.b isa DenseVecOrMat &&
+                T === eltype(prob.b) && T === promote_type(real(T), Float32)
             return :triangular
         end
         throw(
             ArgumentError(
-                "Reactant cannot lower $alg for a unit-triangular matrix with these operands or options. " *
+                "Reactant cannot lower $(algorithm_name(alg)) for a unit-triangular matrix with these operands or options. " *
                     "Use DirectLdiv!() with matching Float32 or Float64 dense traced arrays, " *
                     "a vector or matrix right-hand side, and default solve options."
             )
         )
     end
-    if !all(x -> x isa Union{Reactant.TracedRArray, Reactant.TracedRNumber}, inputs)
+    if !applicable(Reactant.Ops.julia_callback, identity, (), inputs...)
         throw(
             ArgumentError(
-                "Reactant cannot lower $alg with A::$(typeof(prob.A)) and b::$(typeof(prob.b)). " *
+                "Reactant cannot lower $(algorithm_name(alg)) with A::$(typeof(prob.A)) and b::$(typeof(prob.b)). " *
                     "The Julia callback requires dense traced buffers for A, b, and any initial guess."
             )
         )

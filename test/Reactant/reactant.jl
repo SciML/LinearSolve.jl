@@ -90,9 +90,13 @@ end
 
 @testset "unsupported unit-triangular request" begin
     other_alg(A, b) = solve(LinearProblem(UnitUpperTriangular(A), b), QRFactorization())
-    @test_throws "QRFactorization" @jit other_alg(A_reactant, b_reactant)
+    @test_throws "Reactant cannot lower QRFactorization" @jit other_alg(A_reactant, b_reactant)
     with_guess(A, b) = solve(LinearProblem(UnitLowerTriangular(A), b; u0 = b), DirectLdiv!())
     @test_throws "default solve options" @jit with_guess(A_reactant, b_reactant)
+    for T in (Int32, ComplexF32)
+        operands = (Reactant.to_rarray(T.(A)), Reactant.to_rarray(T.(b)))
+        @test_throws "matching Float32 or Float64" @jit triangular_solution(operands...)
+    end
 end
 
 @testset "unsupported callback representation" begin

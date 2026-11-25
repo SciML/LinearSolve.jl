@@ -22,7 +22,12 @@ structure and never inferred from an array's shape, since a state can itself be 
 matrix and the two cannot be told apart otherwise.
 
 `J` is only ever applied and solved against, so it can be a matrix or a matrix-free
-operator; no assumption is made about its shape.
+operator. For a vector state of length `n`, a matrix or `SciMLOperators` operator `J` must
+be `n x n`. On a state of another shape, `J` acts on that shape, and its size is left to
+the algorithm.
+
+Every part is checked against the state and the border width, and a mismatch throws a
+`DimensionMismatch`.
 """
 struct BorderedLinearProblem{TJ, Tb, Tc, Td, Tf, Tg}
     J::TJ
@@ -37,6 +42,13 @@ struct BorderedLinearProblem{TJ, Tb, Tc, Td, Tf, Tg}
         mb == mc || throw(
             DimensionMismatch("b has border width $mb but c has $mc")
         )
+        # A vector state goes to `LinearSolve` with `J` as it is, so there `J` must be n x n.
+        n = length(f)
+        if f isa AbstractVector && J isa Union{AbstractMatrix, AbstractSciMLOperator}
+            size(J) == (n, n) || throw(
+                DimensionMismatch("J has size $(size(J)), expected ($n, $n) to match the state")
+            )
+        end
         # Compare against the state rather than against `size(J, 1)`: `J` may be
         # matrix-free, and the state may have any shape.
         for (name, x) in (("b", b), ("c", c))
@@ -48,7 +60,7 @@ struct BorderedLinearProblem{TJ, Tb, Tc, Td, Tf, Tg}
                 )
             end
         end
-        _check_border_rhs(g, mb)
+        _check_border_block(d, g, mb)
         return new{
             typeof(J), typeof(b), typeof(c), typeof(d), typeof(f), typeof(g),
         }(J, b, c, d, f, g)
@@ -65,10 +77,25 @@ _border_parts(b) = (b,)
 _border_parts(b::Tuple) = b
 _border_parts(b::AbstractVector{<:AbstractArray}) = b
 
-_check_border_rhs(g, m) =
-    m == 1 || length(g) == m || throw(
-    DimensionMismatch("g has length $(length(g)), expected $m to match the border width")
-)
+# `d` and `g` are scalars for a width-1 border, else an `m x m` matrix and a length-`m` vector.
+function _check_border_block(d, g, m)
+    if m == 1
+        d isa Number || throw(
+            DimensionMismatch("d is a $(summary(d)), expected a scalar for a width-1 border")
+        )
+        g isa Number || throw(
+            DimensionMismatch("g is a $(summary(g)), expected a scalar for a width-1 border")
+        )
+    else
+        d isa AbstractMatrix && size(d) == (m, m) || throw(
+            DimensionMismatch("d is a $(summary(d)), expected a matrix of size ($m, $m) to match the border width")
+        )
+        g isa AbstractVector && length(g) == m || throw(
+            DimensionMismatch("g is a $(summary(g)), expected a vector of length $m to match the border width")
+        )
+    end
+    return nothing
+end
 
 """
     BorderedLinearSolution(v, σ, retcode)

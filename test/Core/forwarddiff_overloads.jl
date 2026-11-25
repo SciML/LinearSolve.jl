@@ -846,6 +846,33 @@ end
     end
 end
 
+# https://github.com/SciML/LinearSolve.jl/issues/1368
+@testset "Symmetric and Hermitian matrices of duals" begin
+    P = rand(6, 6) + 6I  # not symmetric, so the two triangles give different matrices
+    E = rand(6, 6)
+    b = rand(6)
+    for S in (identity, sparse), W in (Symmetric, Hermitian), (u1, u2) in ((:U, :L), (:L, :U)),
+            alg in (nothing, LUFactorization())
+        function f(t)
+            cache = init(LinearProblem(W(S(P + t * E), u1), b), alg)
+            cache.A = W(S(P + 2t * E), u2)
+            return sum(solve!(cache).u)
+        end
+        @test ForwardDiff.derivative(f, 0.0) ≈ ForwardDiff.derivative(t -> sum(W(P + 2t * E, u2) \ b), 0.0)
+    end
+
+    # the other triangle is never assigned
+    for W in (Symmetric, Hermitian), uplo in (:U, :L)
+        function g(t)
+            A = Matrix{typeof(t)}(undef, 2, 2)
+            A[1, 1], A[2, 2] = 4 + t, 8 + 2t
+            uplo === :U ? (A[1, 2] = one(t)) : (A[2, 1] = one(t))
+            return sum(solve(LinearProblem(W(A, uplo), BigFloat[1, 2]), LUFactorization()).u)
+        end
+        @test ForwardDiff.derivative(g, big"0.0") ≈ -84 / big(961)
+    end
+end
+
 @testset "Sparse matrices" begin
     # Case 1: same number of nonzeros, same sparsity pattern, updated values
     A1 = sparse([1, 2], [1, 2], [ForwardDiff.Dual(1.0, 10.0, 11.0), ForwardDiff.Dual(2.0, 20.0, 21.0)], 2, 2)

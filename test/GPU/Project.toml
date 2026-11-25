@@ -1,9 +1,11 @@
 [deps]
 BlockDiagonals = "0a1fb500-61f7-11e9-3c65-f5ef3456f9f0"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 CUDACore = "bd0ed864-bdfe-4181-a5ed-ce625a5fdea2"
 CUDSS = "45b445bb-4962-46a0-9369-b4df9d0f772e"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
+Reactant = "3c362404-f566-11ee-1572-e11a4b42c853"
 SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
 SciMLTesting = "09d9d899-5365-40a9-917a-5f67fddea283"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
@@ -17,9 +19,11 @@ LinearSolve = {path = "../.."}
 
 [compat]
 BlockDiagonals = "0.2"
+CUDA = "6"
 CUDSS = "0.7"
 LinearAlgebra = "1.10"
 LinearSolve = "5"
+Reactant = "0.2.280"
 SafeTestsets = "0.1, 1"
 SciMLTesting = "2.8"
 SparseArrays = "1.10"

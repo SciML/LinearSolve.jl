@@ -165,7 +165,8 @@ else
             # former bespoke GPU.yml workflow). LinearSolveCUDA kept as an alias.
             "GPU" => (;
                 env = joinpath(@__DIR__, "GPU"), body = function ()
-                    return @time @safetestset "CUDA" include("GPU/cuda.jl")
+                    @time @safetestset "CUDA" include("GPU/cuda.jl")
+                    return @time @safetestset "Reactant CUDA callback" include("GPU/reactant.jl")
                 end
             ),
             "LinearSolvePardiso" => (;

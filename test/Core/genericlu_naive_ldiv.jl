@@ -1,4 +1,4 @@
-using LinearSolve, LinearAlgebra, Test, Random
+using LinearSolve, LinearAlgebra, Test, Random, OffsetArrays
 
 Random.seed!(1145)
 
@@ -209,4 +209,40 @@ end
     ) === which(
         LinearSolve._smart_lu_ldiv!, Tuple{Matrix{BigFloat}, luB, Matrix{BigFloat}}
     )
+end
+
+@testset "GenericLU / default reject OffsetArray u0" begin
+    n = 10
+    A = rand(n, n) + n * I
+    b = rand(n)
+    u0 = OffsetArray(zeros(n), 0:(n - 1))
+    for alg in (nothing, GenericLUFactorization())
+        @test_throws ArgumentError solve(LinearProblem(A, b; u0 = u0), alg)
+    end
+end
+
+@testset "GenericLU / default accept OffsetArray b" begin
+    n = 10
+    A = rand(n, n) + n * I
+    b = rand(n)
+    b_off = OffsetArray(copy(b), 0:(n - 1))
+    xref = A \ b
+    for alg in (nothing, GenericLUFactorization())
+        sol = solve(LinearProblem(A, b_off), alg)
+        @test sol.u ≈ xref rtol = 1.0e-12
+    end
+end
+
+@testset "GenericLU rejects wrong-length cache.b" begin
+    n = 10
+    A = rand(n, n) + n * I
+    b = rand(n)
+    cache = init(LinearProblem(A, b), GenericLUFactorization())
+    solve!(cache)
+    cache.b = rand(n - 2)
+    @test_throws DimensionMismatch solve!(cache)
+    cache = init(LinearProblem(copy(A), copy(b)), GenericLUFactorization())
+    solve!(cache)
+    cache.b = rand(n + 2)
+    @test_throws DimensionMismatch solve!(cache)
 end

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Automatic Algorithm Selection with LinearSolveAutotune · LinearSolve.jl</title><meta name="title" content="Automatic Algorithm Selection with LinearSolveAutotune · LinearSolve.jl"/><meta property="og:title" content="Automatic Algorithm Selection with LinearSolveAutotune · LinearSolve.jl"/><meta property="twitter:title" content="Automatic Algorithm Selection with LinearSolveAutotune · LinearSolve.jl"/><meta name="description" content="Documentation for LinearSolve.jl."/><meta property="og:description" content="Documentation for LinearSolve.jl."/><meta property="twitter:description" content="Documentation for LinearSolve.jl."/><meta property="og:url" content="https://docs.sciml.ai/LinearSolve/stable/tutorials/autotune/"/><meta property="twitter:url" content="https://docs.sciml.ai/LinearSolve/stable/tutorials/autotune/"/><link rel="canonical" href="https://docs.sciml.ai/LinearSolve/stable/tutorials/autotune/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.png" alt="LinearSolve.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">LinearSolve.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">LinearSolve.jl: High-Performance Unified Linear Solvers</a></li><li><a class="tocitem" href="../linear/">Getting Started with Solving Linear Systems in Julia</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../caching_interface/">Linear Solve with Caching Interface</a></li><li><a class="tocitem" href="../accelerating_choices/">Accelerating your Linear Solves</a></li><li><a class="tocitem" href="../gpu/">GPU-Accelerated Linear Solving in Julia</a></li><li class="is-active"><a class="tocitem" href>Automatic Algorithm Selection with LinearSolveAutotune</a><ul class="internal"><li><a class="tocitem" href="#Quick-Start"><span>Quick Start</span></a></li><li><a class="tocitem" href="#Understanding-the-Results"><span>Understanding the Results</span></a></li><li><a class="tocitem" href="#Customizing-the-Autotune-Process"><span>Customizing the Autotune Process</span></a></li><li><a class="tocitem" href="#GPU-Systems"><span>GPU Systems</span></a></li><li><a class="tocitem" href="#Sharing-Results-with-the-Community"><span>Sharing Results with the Community</span></a></li><li><a class="tocitem" href="#Working-with-Results"><span>Working with Results</span></a></li><li><a class="tocitem" href="#Advanced-Usage"><span>Advanced Usage</span></a></li><li><a class="tocitem" href="#Algorithm-Selection-Analysis"><span>Algorithm Selection Analysis</span></a></li><li><a class="tocitem" href="#Preferences-Integration"><span>Preferences Integration</span></a></li><li><a class="tocitem" href="#Troubleshooting"><span>Troubleshooting</span></a></li><li><a class="tocitem" href="#Summary"><span>Summary</span></a></li></ul></li></ul></li><li><span class="tocitem">Basics</span><ul><li><a class="tocitem" href="../../basics/LinearProblem/">Linear Problems</a></li><li><a class="tocitem" href="../../basics/algorithm_selection/">Algorithm Selection Guide</a></li><li><a class="tocitem" href="../../basics/common_solver_opts/">Common Solver Options (Keyword Arguments for Solve)</a></li><li><a class="tocitem" href="../../basics/OperatorAssumptions/">Linear Solve Operator Assumptions</a></li><li><a class="tocitem" href="../../basics/Preconditioners/">Preconditioners</a></li><li><a class="tocitem" href="../../basics/FAQ/">Frequently Asked Questions</a></li></ul></li><li><span class="tocitem">Solvers</span><ul><li><a class="tocitem" href="../../solvers/solvers/">Linear System Solvers</a></li></ul></li><li><span class="tocitem">Advanced</span><ul><li><a class="tocitem" href="../../advanced/developing/">Developing New Linear Solvers</a></li><li><a class="tocitem" href="../../advanced/custom/">Passing in a Custom Linear Solver</a></li><li><a class="tocitem" href="../../advanced/internal_api/">Internal API Documentation</a></li></ul></li><li><a class="tocitem" href="../../release_notes/">Release Notes</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href>Automatic Algorithm Selection with LinearSolveAutotune</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Automatic Algorithm Selection with LinearSolveAutotune</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/SciML/LinearSolve.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/SciML/LinearSolve.jl/blob/main/docs/src/tutorials/autotune.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Automatic-Algorithm-Selection-with-LinearSolveAutotune"><a class="docs-heading-anchor" href="#Automatic-Algorithm-Selection-with-LinearSolveAutotune">Automatic Algorithm Selection with LinearSolveAutotune</a><a id="Automatic-Algorithm-Selection-with-LinearSolveAutotune-1"></a><a class="docs-heading-anchor-permalink" href="#Automatic-Algorithm-Selection-with-LinearSolveAutotune" title="Permalink"></a></h1><p>LinearSolve.jl includes an automatic tuning system that benchmarks all available linear algebra algorithms on your specific hardware and automatically selects optimal algorithms for different problem sizes and data types. This tutorial will show you how to use the <code>LinearSolveAutotune</code> sublibrary to optimize your linear solve performance.</p><p>The autotuning system provides comprehensive benchmarking and automatic algorithm selection optimization for your specific hardware.</p><h2 id="Quick-Start"><a class="docs-heading-anchor" href="#Quick-Start">Quick Start</a><a id="Quick-Start-1"></a><a class="docs-heading-anchor-permalink" href="#Quick-Start" title="Permalink"></a></h2><p>The simplest way to use the autotuner is to run it with default settings:</p><pre><code class="language-julia hljs">using LinearSolve
+using LinearSolveAutotune
+
+# Run autotune with default settings
+results = autotune_setup()
+
+# View the results
+display(results)
+
+# Generate performance plots
+plot(results)
+
+# Share results with the community (optional, requires GitHub authentication)
+share_results(results)</code></pre><p>This will:</p><ul><li>Benchmark algorithms for <code>Float64</code> matrices by default</li><li>Test matrix sizes from tiny (5×5) through large (1000×1000) </li><li>Display a summary of algorithm performance</li><li>Return an <code>AutotuneResults</code> object containing all benchmark data</li></ul><h2 id="Understanding-the-Results"><a class="docs-heading-anchor" href="#Understanding-the-Results">Understanding the Results</a><a id="Understanding-the-Results-1"></a><a class="docs-heading-anchor-permalink" href="#Understanding-the-Results" title="Permalink"></a></h2><p>The <code>autotune_setup()</code> function returns an <code>AutotuneResults</code> object containing:</p><ul><li><code>results_df</code>: A DataFrame with detailed benchmark results</li><li><code>sysinfo</code>: System information dictionary</li></ul><p>You can explore the results in several ways:</p><pre><code class="language-julia hljs"># Get the results
+results = autotune_setup()
+
+# Display a formatted summary
+display(results)
+
+# Access the raw benchmark data
+df = results.results_df
+
+# View system information
+sysinfo = results.sysinfo
+
+# Generate performance plots
+plot(results)
+
+# Filter to see successful benchmarks only
+using DataFrames
+successful = filter(row -&gt; row.success, df)</code></pre><h2 id="Customizing-the-Autotune-Process"><a class="docs-heading-anchor" href="#Customizing-the-Autotune-Process">Customizing the Autotune Process</a><a id="Customizing-the-Autotune-Process-1"></a><a class="docs-heading-anchor-permalink" href="#Customizing-the-Autotune-Process" title="Permalink"></a></h2><h3 id="Size-Categories"><a class="docs-heading-anchor" href="#Size-Categories">Size Categories</a><a id="Size-Categories-1"></a><a class="docs-heading-anchor-permalink" href="#Size-Categories" title="Permalink"></a></h3><p>Control which matrix size ranges to test:</p><pre><code class="language-julia hljs"># Available size categories:
+# :tiny   - 5×5 to 20×20 (very small problems)
+# :small  - 20×20 to 100×100 (small problems)  
+# :medium - 100×100 to 300×300 (typical problems)
+# :large  - 300×300 to 1000×1000 (larger problems)
+# :big    - 1000×1000 to 15000×15000 (GPU/HPC scale, capped at 15000 for stability)
+
+# Default: test tiny through large
+results = autotune_setup()  # uses [:tiny, :small, :medium, :large]
+
+# Test only medium and large sizes
+results = autotune_setup(sizes = [:medium, :large])
+
+# Include huge matrices (for GPU systems)
+results = autotune_setup(sizes = [:large, :big])
+
+# Test all size categories
+results = autotune_setup(sizes = [:tiny, :small, :medium, :large, :big])</code></pre><h3 id="Element-Types"><a class="docs-heading-anchor" href="#Element-Types">Element Types</a><a id="Element-Types-1"></a><a class="docs-heading-anchor-permalink" href="#Element-Types" title="Permalink"></a></h3><p>Specify which numeric types to benchmark:</p><pre><code class="language-julia hljs"># Default: Float64 only
+results = autotune_setup()  # equivalent to eltypes = (Float64,)
+
+# Test standard floating point types
+results = autotune_setup(eltypes = (Float32, Float64))
+
+# Include complex numbers
+results = autotune_setup(eltypes = (Float64, ComplexF64))
+
+# Test all standard BLAS types
+results = autotune_setup(eltypes = (Float32, Float64, ComplexF32, ComplexF64))
+
+# Test arbitrary precision (excludes some BLAS algorithms)
+results = autotune_setup(eltypes = (BigFloat,), skip_missing_algs = true)</code></pre><h3 id="Benchmark-Quality-vs-Speed"><a class="docs-heading-anchor" href="#Benchmark-Quality-vs-Speed">Benchmark Quality vs Speed</a><a id="Benchmark-Quality-vs-Speed-1"></a><a class="docs-heading-anchor-permalink" href="#Benchmark-Quality-vs-Speed" title="Permalink"></a></h3><p>Adjust the thoroughness of benchmarking:</p><pre><code class="language-julia hljs"># Quick benchmark (fewer samples, less time per test)
+results = autotune_setup(samples = 1, seconds = 0.1)
+
+# Default benchmark (balanced)
+results = autotune_setup(samples = 5, seconds = 0.5)
+
+# Thorough benchmark (more samples, more time per test)
+results = autotune_setup(samples = 10, seconds = 2.0)
+
+# Production-quality benchmark for final tuning
+results = autotune_setup(
+    samples = 20,
+    seconds = 5.0,
+    sizes = [:small, :medium, :large],
+    eltypes = (Float32, Float64, ComplexF32, ComplexF64)
+)</code></pre><h3 id="Time-Limits-for-Algorithm-Tests"><a class="docs-heading-anchor" href="#Time-Limits-for-Algorithm-Tests">Time Limits for Algorithm Tests</a><a id="Time-Limits-for-Algorithm-Tests-1"></a><a class="docs-heading-anchor-permalink" href="#Time-Limits-for-Algorithm-Tests" title="Permalink"></a></h3><p>Control the maximum time allowed for each algorithm test (including accuracy check):</p><pre><code class="language-julia hljs"># Default: 100 seconds maximum per algorithm test
+results = autotune_setup()  # maxtime = 100.0
+
+# Quick timeout for fast exploration
+results = autotune_setup(maxtime = 10.0)
+
+# Extended timeout for slow algorithms or large matrices
+results = autotune_setup(
+    maxtime = 300.0,  # 5 minutes per test
+    sizes = [:large, :big]
+)
+
+# Conservative timeout for production benchmarking
+results = autotune_setup(
+    maxtime = 200.0,
+    samples = 10,
+    seconds = 2.0
+)</code></pre><p>When an algorithm exceeds the <code>maxtime</code> limit:</p><ul><li>The test is skipped to prevent hanging</li><li>The result is recorded as <code>NaN</code> in the benchmark data</li><li>A warning is displayed indicating the timeout</li><li><strong>The algorithm is automatically excluded from all larger matrix sizes</strong> to save time</li><li>The benchmark continues with the next algorithm</li></ul><p>This intelligent timeout handling ensures that slow algorithms don&#39;t waste time on progressively larger matrices once they&#39;ve proven too slow on smaller ones.</p><h3 id="Missing-Algorithm-Handling"><a class="docs-heading-anchor" href="#Missing-Algorithm-Handling">Missing Algorithm Handling</a><a id="Missing-Algorithm-Handling-1"></a><a class="docs-heading-anchor-permalink" href="#Missing-Algorithm-Handling" title="Permalink"></a></h3><p>By default, autotune expects all algorithms to be available to ensure complete benchmarking. You can relax this requirement:</p><pre><code class="language-julia hljs"># Default: error if expected algorithms are missing
+results = autotune_setup()  # Will error if RFLUFactorization is missing
+
+# Allow missing algorithms (useful for incomplete setups)
+results = autotune_setup(skip_missing_algs = true)  # Will warn instead of error</code></pre><h3 id="Preferences-Setting"><a class="docs-heading-anchor" href="#Preferences-Setting">Preferences Setting</a><a id="Preferences-Setting-1"></a><a class="docs-heading-anchor-permalink" href="#Preferences-Setting" title="Permalink"></a></h3><p>Control whether the autotuner updates LinearSolve preferences:</p><pre><code class="language-julia hljs"># Default: set preferences based on benchmark results
+results = autotune_setup(set_preferences = true)
+
+# Benchmark only, don&#39;t change preferences
+results = autotune_setup(set_preferences = false)</code></pre><h2 id="GPU-Systems"><a class="docs-heading-anchor" href="#GPU-Systems">GPU Systems</a><a id="GPU-Systems-1"></a><a class="docs-heading-anchor-permalink" href="#GPU-Systems" title="Permalink"></a></h2><p>On systems with CUDA or Metal GPU support, the autotuner will automatically detect and benchmark GPU algorithms:</p><pre><code class="language-julia hljs"># Enable large matrix testing for GPUs
+results = autotune_setup(
+    sizes = [:large, :big],
+    samples = 3,
+    seconds = 1.0
+)</code></pre><p>GPU algorithms tested (when available):</p><ul><li><strong>CudaOffloadFactorization</strong>: CUDA GPU acceleration</li><li><strong>MetalLUFactorization</strong>: Apple Metal GPU acceleration</li></ul><h2 id="Sharing-Results-with-the-Community"><a class="docs-heading-anchor" href="#Sharing-Results-with-the-Community">Sharing Results with the Community</a><a id="Sharing-Results-with-the-Community-1"></a><a class="docs-heading-anchor-permalink" href="#Sharing-Results-with-the-Community" title="Permalink"></a></h2><p>The autotuner includes a telemetry feature that allows you to share your benchmark results with the LinearSolve.jl community. This helps improve algorithm selection across different hardware configurations.</p><h3 id="Automatic-Authentication"><a class="docs-heading-anchor" href="#Automatic-Authentication">Automatic Authentication</a><a id="Automatic-Authentication-1"></a><a class="docs-heading-anchor-permalink" href="#Automatic-Authentication" title="Permalink"></a></h3><p><strong>New in v2.0+</strong>: LinearSolveAutotune now includes automatic authentication support! If you&#39;re not already authenticated, the system will offer to help you set up GitHub authentication when you run <code>share_results()</code>.</p><pre><code class="language-julia hljs"># Run benchmarks
+results = autotune_setup()
+
+# Share with the community - will prompt for authentication if needed
+share_results(results)</code></pre><p>If you&#39;re not authenticated, you&#39;ll see:</p><pre><code class="nohighlight hljs">🔐 GitHub authentication not found.
+   To share results with the community, authentication is required.
+
+Would you like to authenticate with GitHub now? (y/n)
+&gt; </code></pre><p>Simply type <code>y</code> and follow the prompts to authenticate directly from Julia!</p><h3 id="Manual-Authentication-Setup"><a class="docs-heading-anchor" href="#Manual-Authentication-Setup">Manual Authentication Setup</a><a id="Manual-Authentication-Setup-1"></a><a class="docs-heading-anchor-permalink" href="#Manual-Authentication-Setup" title="Permalink"></a></h3><p>You can also set up authentication manually before sharing:</p><h4 id="Method-1:-GitHub-CLI-(Recommended)"><a class="docs-heading-anchor" href="#Method-1:-GitHub-CLI-(Recommended)">Method 1: GitHub CLI (Recommended)</a><a id="Method-1:-GitHub-CLI-(Recommended)-1"></a><a class="docs-heading-anchor-permalink" href="#Method-1:-GitHub-CLI-(Recommended)" title="Permalink"></a></h4><p>The GitHub CLI is the easiest way to authenticate. LinearSolveAutotune will automatically use the GitHub CLI if it&#39;s installed, or fall back to a bundled version if not.</p><ol><li><p><strong>Install GitHub CLI (Optional)</strong></p><ul><li>macOS: <code>brew install gh</code></li><li>Windows: <code>winget install --id GitHub.cli</code></li><li>Linux: See <a href="https://cli.github.com/manual/installation">cli.github.com</a></li></ul><p>Note: If you don&#39;t have gh installed, LinearSolveAutotune includes a bundled version via <code>gh_cli_jll</code> that will be used automatically!</p></li><li><p><strong>Authenticate</strong></p><pre><code class="language-bash hljs">gh auth login</code></pre><p>Follow the prompts to authenticate with your GitHub account.</p></li><li><p><strong>Verify authentication</strong></p><pre><code class="language-bash hljs">gh auth status</code></pre></li></ol><h4 id="Method-2:-GitHub-Personal-Access-Token"><a class="docs-heading-anchor" href="#Method-2:-GitHub-Personal-Access-Token">Method 2: GitHub Personal Access Token</a><a id="Method-2:-GitHub-Personal-Access-Token-1"></a><a class="docs-heading-anchor-permalink" href="#Method-2:-GitHub-Personal-Access-Token" title="Permalink"></a></h4><ol><li>Go to <a href="https://github.com/settings/tokens/new">GitHub Settings &gt; Tokens</a></li><li>Add description: &quot;LinearSolve.jl Telemetry&quot;</li><li>Select scope: <code>public_repo</code> (for commenting on issues)</li><li>Click &quot;Generate token&quot; and copy it</li><li>In Julia:<pre><code class="language-julia hljs">ENV[&quot;GITHUB_TOKEN&quot;] = &quot;your_token_here&quot;</code></pre></li></ol><h3 id="Sharing-Your-Results"><a class="docs-heading-anchor" href="#Sharing-Your-Results">Sharing Your Results</a><a id="Sharing-Your-Results-1"></a><a class="docs-heading-anchor-permalink" href="#Sharing-Your-Results" title="Permalink"></a></h3><p>Once authenticated (either automatically or manually), sharing is simple:</p><pre><code class="language-julia hljs"># Run benchmarks
+results = autotune_setup()
+
+# Share with the community (with automatic authentication prompt)
+share_results(results)
+
+# Or skip the authentication prompt if not authenticated
+share_results(results; auto_login = false)</code></pre><p>This will:</p><ol><li>Check for existing GitHub authentication</li><li>Offer to set up authentication if needed (unless <code>auto_login = false</code>)</li><li>Format your benchmark results as a markdown report</li><li>Post the results as a comment to the <a href="https://github.com/SciML/LinearSolve.jl/issues/725">community benchmark collection issue</a></li><li>Save results locally if authentication is unavailable</li></ol><h3 id="No-GitHub-CLI-Required!"><a class="docs-heading-anchor" href="#No-GitHub-CLI-Required!">No GitHub CLI Required!</a><a id="No-GitHub-CLI-Required!-1"></a><a class="docs-heading-anchor-permalink" href="#No-GitHub-CLI-Required!" title="Permalink"></a></h3><p>LinearSolveAutotune now includes <code>gh_cli_jll</code>, which provides a bundled version of the GitHub CLI. This means:</p><ul><li>You don&#39;t need to install gh separately</li><li>Authentication works on all platforms</li><li>The system automatically uses your existing gh installation if available, or falls back to the bundled version</li></ul><div class="admonition is-info" id="Privacy-Note-21f42ca5b3bd043c"><header class="admonition-header">Privacy Note<a class="admonition-anchor" href="#Privacy-Note-21f42ca5b3bd043c" title="Permalink"></a></header><div class="admonition-body"><ul><li>Sharing is completely optional</li><li>Only benchmark performance data and system specifications are shared</li><li>No personal information is collected</li><li>All shared data is publicly visible on GitHub</li><li>If authentication fails or is skipped, results are saved locally for manual sharing</li></ul></div></div><h2 id="Working-with-Results"><a class="docs-heading-anchor" href="#Working-with-Results">Working with Results</a><a id="Working-with-Results-1"></a><a class="docs-heading-anchor-permalink" href="#Working-with-Results" title="Permalink"></a></h2><h3 id="Examining-Performance-Data"><a class="docs-heading-anchor" href="#Examining-Performance-Data">Examining Performance Data</a><a id="Examining-Performance-Data-1"></a><a class="docs-heading-anchor-permalink" href="#Examining-Performance-Data" title="Permalink"></a></h3><pre><code class="language-julia hljs">using DataFrames
+using Statistics
+
+results = autotune_setup()
+
+# Access the raw DataFrame
+df = results.results_df
+
+# Filter successful results
+successful = filter(row -&gt; row.success, df)
+
+# Summary by algorithm
+summary = combine(groupby(successful, [:algorithm, :eltype]), 
+                 :gflops =&gt; mean =&gt; :avg_gflops,
+                 :gflops =&gt; maximum =&gt; :max_gflops)
+sort!(summary, :avg_gflops, rev=true)
+println(summary)
+
+# Best algorithm for each size category
+by_size = combine(groupby(successful, [:size_category, :eltype])) do group
+    best_row = argmax(group.gflops)
+    return (algorithm = group.algorithm[best_row],
+            gflops = group.gflops[best_row])
+end
+println(by_size)</code></pre><h3 id="Performance-Visualization"><a class="docs-heading-anchor" href="#Performance-Visualization">Performance Visualization</a><a id="Performance-Visualization-1"></a><a class="docs-heading-anchor-permalink" href="#Performance-Visualization" title="Permalink"></a></h3><p>Generate and save performance plots:</p><pre><code class="language-julia hljs">results = autotune_setup()
+
+# Generate plots (returns a combined plot)
+p = plot(results)
+display(p)
+
+# Save the plot
+using Plots
+savefig(p, &quot;benchmark_results.png&quot;)</code></pre><h3 id="Accessing-System-Information"><a class="docs-heading-anchor" href="#Accessing-System-Information">Accessing System Information</a><a id="Accessing-System-Information-1"></a><a class="docs-heading-anchor-permalink" href="#Accessing-System-Information" title="Permalink"></a></h3><pre><code class="language-julia hljs">results = autotune_setup()
+
+# System information is stored in the results
+sysinfo = results.sysinfo
+println(&quot;CPU: &quot;, sysinfo[&quot;cpu_name&quot;])
+println(&quot;Cores: &quot;, sysinfo[&quot;num_cores&quot;])
+println(&quot;Julia: &quot;, sysinfo[&quot;julia_version&quot;])
+println(&quot;OS: &quot;, sysinfo[&quot;os&quot;])</code></pre><h2 id="Advanced-Usage"><a class="docs-heading-anchor" href="#Advanced-Usage">Advanced Usage</a><a id="Advanced-Usage-1"></a><a class="docs-heading-anchor-permalink" href="#Advanced-Usage" title="Permalink"></a></h2><h3 id="Custom-Benchmark-Pipeline"><a class="docs-heading-anchor" href="#Custom-Benchmark-Pipeline">Custom Benchmark Pipeline</a><a id="Custom-Benchmark-Pipeline-1"></a><a class="docs-heading-anchor-permalink" href="#Custom-Benchmark-Pipeline" title="Permalink"></a></h3><p>For complete control over the benchmarking process:</p><pre><code class="language-julia hljs"># Step 1: Run benchmarks without plotting or sharing
+results = autotune_setup(
+    sizes = [:medium, :large],
+    eltypes = (Float64, ComplexF64),
+    set_preferences = false,  # Don&#39;t change preferences yet
+    samples = 10,
+    seconds = 1.0
+)
+
+# Step 2: Analyze results
+df = results.results_df
+# ... perform custom analysis ...
+
+# Step 3: Generate plots
+p = plot(results)
+savefig(p, &quot;my_benchmarks.png&quot;)
+
+# Step 4: Optionally share results
+share_results(results)</code></pre><h3 id="Batch-Testing-Multiple-Configurations"><a class="docs-heading-anchor" href="#Batch-Testing-Multiple-Configurations">Batch Testing Multiple Configurations</a><a id="Batch-Testing-Multiple-Configurations-1"></a><a class="docs-heading-anchor-permalink" href="#Batch-Testing-Multiple-Configurations" title="Permalink"></a></h3><pre><code class="language-julia hljs"># Test different element types separately
+configs = [
+    (eltypes = (Float32,), name = &quot;float32&quot;),
+    (eltypes = (Float64,), name = &quot;float64&quot;),
+    (eltypes = (ComplexF64,), name = &quot;complex64&quot;)
+]
+
+all_results = Dict()
+for config in configs
+    println(&quot;Testing $(config.name)...&quot;)
+    results = autotune_setup(
+        eltypes = config.eltypes,
+        sizes = [:small, :medium],
+        samples = 3
+    )
+    all_results[config.name] = results
+end</code></pre><h2 id="Algorithm-Selection-Analysis"><a class="docs-heading-anchor" href="#Algorithm-Selection-Analysis">Algorithm Selection Analysis</a><a id="Algorithm-Selection-Analysis-1"></a><a class="docs-heading-anchor-permalink" href="#Algorithm-Selection-Analysis" title="Permalink"></a></h2><p>You can analyze what algorithms are currently being chosen for different matrix sizes:</p><pre><code class="language-julia hljs">using LinearSolve
+
+# Show current algorithm choices and preferences
+show_algorithm_choices()</code></pre><p>This displays:</p><ul><li>Current autotune preferences for all element types (if any are set)</li><li>Algorithm choices for all element types across representative sizes in each category  </li><li>Comprehensive element type behavior (Float32, Float64, ComplexF32, ComplexF64)</li><li>System information (MKL, Apple Accelerate, RecursiveFactorization status)</li></ul><p>The output shows a clear table format:</p><pre><code class="nohighlight hljs">📊 Default Algorithm Choices:
+Size       Category    Float32            Float64            ComplexF32         ComplexF64
+8×8        tiny        GenericLUFactorization GenericLUFactorization GenericLUFactorization GenericLUFactorization
+200×200    medium      MKLLUFactorization MKLLUFactorization MKLLUFactorization MKLLUFactorization</code></pre><h2 id="Preferences-Integration"><a class="docs-heading-anchor" href="#Preferences-Integration">Preferences Integration</a><a id="Preferences-Integration-1"></a><a class="docs-heading-anchor-permalink" href="#Preferences-Integration" title="Permalink"></a></h2><p>The autotuner sets preferences that LinearSolve.jl uses for automatic algorithm selection:</p><pre><code class="language-julia hljs">using LinearSolveAutotune
+
+# Run autotune and set preferences
+results = autotune_setup(set_preferences = true)
+
+# View what algorithms are now being chosen
+using LinearSolve
+show_algorithm_choices()
+
+# View current preferences
+LinearSolveAutotune.show_current_preferences()
+
+# Clear all autotune preferences if needed
+LinearSolveAutotune.clear_algorithm_preferences()</code></pre><p>After running autotune with <code>set_preferences = true</code>, LinearSolve.jl will automatically use the fastest algorithms found for each matrix size and element type, with intelligent fallbacks when extensions are not available.</p><h2 id="Troubleshooting"><a class="docs-heading-anchor" href="#Troubleshooting">Troubleshooting</a><a id="Troubleshooting-1"></a><a class="docs-heading-anchor-permalink" href="#Troubleshooting" title="Permalink"></a></h2><h3 id="Common-Issues"><a class="docs-heading-anchor" href="#Common-Issues">Common Issues</a><a id="Common-Issues-1"></a><a class="docs-heading-anchor-permalink" href="#Common-Issues" title="Permalink"></a></h3><ol><li><p><strong>Missing algorithms error</strong></p><pre><code class="language-julia hljs"># If you get errors about missing algorithms:
+results = autotune_setup(skip_missing_algs = true)</code></pre></li><li><p><strong>GitHub authentication fails</strong></p><ul><li>Ensure gh CLI is installed and authenticated: <code>gh auth status</code></li><li>Or set a valid GitHub token: <code>ENV[&quot;GITHUB_TOKEN&quot;] = &quot;your_token&quot;</code></li><li>Results will be saved locally if authentication fails</li></ul></li><li><p><strong>Out of memory on large matrices</strong></p><pre><code class="language-julia hljs"># Use smaller size categories
+results = autotune_setup(sizes = [:tiny, :small, :medium])</code></pre></li><li><p><strong>Benchmarks taking too long</strong></p><pre><code class="language-julia hljs"># Reduce samples and time per benchmark
+results = autotune_setup(samples = 1, seconds = 0.1)</code></pre></li></ol><h2 id="Summary"><a class="docs-heading-anchor" href="#Summary">Summary</a><a id="Summary-1"></a><a class="docs-heading-anchor-permalink" href="#Summary" title="Permalink"></a></h2><p>LinearSolveAutotune provides a comprehensive system for benchmarking and optimizing LinearSolve.jl performance on your specific hardware. Key features include:</p><ul><li>Flexible size categories from tiny to GPU-scale matrices</li><li>Support for all standard numeric types</li><li>Automatic GPU algorithm detection</li><li>Community result sharing via GitHub</li><li>Performance visualization</li><li>Preference setting for automatic algorithm selection (in development)</li></ul><p>By running autotune and optionally sharing your results, you help improve LinearSolve.jl&#39;s performance for everyone in the Julia community.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../gpu/">« GPU-Accelerated Linear Solving in Julia</a><a class="docs-footer-nextpage" href="../../basics/LinearProblem/">Linear Problems »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Thursday 18 September 2025 00:58">Thursday 18 September 2025</span>. Using Julia version 1.11.7.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Solving Block Diagonal Systems · LinearSolve.jl</title><meta name="title" content="Solving Block Diagonal Systems · LinearSolve.jl"/><meta property="og:title" content="Solving Block Diagonal Systems · LinearSolve.jl"/><meta property="twitter:title" content="Solving Block Diagonal Systems · LinearSolve.jl"/><meta name="description" content="Documentation for LinearSolve.jl."/><meta property="og:description" content="Documentation for LinearSolve.jl."/><meta property="twitter:description" content="Documentation for LinearSolve.jl."/><meta property="og:url" content="https://docs.sciml.ai/LinearSolve/stable/tutorials/block_diagonal/"/><meta property="twitter:url" content="https://docs.sciml.ai/LinearSolve/stable/tutorials/block_diagonal/"/><link rel="canonical" href="https://docs.sciml.ai/LinearSolve/stable/tutorials/block_diagonal/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.png" alt="LinearSolve.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">LinearSolve.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">LinearSolve.jl: High-Performance Unified Linear Solvers</a></li><li><a class="tocitem" href="../linear/">Getting Started with Solving Linear Systems in Julia</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../caching_interface/">Linear Solve with Caching Interface</a></li><li><a class="tocitem" href="../hypre_mpi/">Solving Linear Systems with HYPRE and MPI</a></li><li><a class="tocitem" href="../partitionedsolvers/">Solving Linear Systems with PartitionedSolvers.jl</a></li><li><a class="tocitem" href="../petsc_mpi/">Solving Linear Systems with PETSc and MPI</a></li><li><a class="tocitem" href="../accelerating_choices/">Accelerating your Linear Solves</a></li><li><a class="tocitem" href="../static_arrays/">Solving with StaticArrays</a></li><li class="is-active"><a class="tocitem" href>Solving Block Diagonal Systems</a><ul class="internal"><li><a class="tocitem" href="#Setting-Up-the-Problem"><span>Setting Up the Problem</span></a></li><li><a class="tocitem" href="#Which-Solvers-Work"><span>Which Solvers Work</span></a></li><li><a class="tocitem" href="#Blockwise-Factorization"><span>Blockwise Factorization</span></a></li><li><a class="tocitem" href="#The-SimpleGMRES-Specialization"><span>The <code>SimpleGMRES</code> Specialization</span></a></li><li><a class="tocitem" href="#Reusing-the-Factorization"><span>Reusing the Factorization</span></a></li></ul></li><li><a class="tocitem" href="../gpu/">GPU-Accelerated Linear Solving in Julia</a></li><li><a class="tocitem" href="../autotune/">Automatic Algorithm Selection with LinearSolveAutotune</a></li><li><a class="tocitem" href="../eigenvalue/">Getting Started with Solving Eigenvalue Problems in Julia</a></li><li><a class="tocitem" href="../shifted_systems/">Repeated Solves of a Shifted System</a></li></ul></li><li><span class="tocitem">Basics</span><ul><li><a class="tocitem" href="../../basics/LinearProblem/">Linear Problems</a></li><li><a class="tocitem" href="../../basics/EigenvalueProblem/">Eigenvalue Problems</a></li><li><a class="tocitem" href="../../basics/algorithm_selection/">Algorithm Selection Guide</a></li><li><a class="tocitem" href="../../basics/common_solver_opts/">Common Solver Options (Keyword Arguments for Solve)</a></li><li><a class="tocitem" href="../../basics/OperatorAssumptions/">Linear Solve Operator Assumptions</a></li><li><a class="tocitem" href="../../basics/Preconditioners/">Preconditioners</a></li><li><a class="tocitem" href="../../basics/FAQ/">Frequently Asked Questions</a></li></ul></li><li><span class="tocitem">Solvers</span><ul><li><a class="tocitem" href="../../solvers/solvers/">Linear System Solvers</a></li><li><a class="tocitem" href="../../solvers/eigenvalue_solvers/">Eigenvalue Problem Solvers</a></li></ul></li><li><span class="tocitem">Advanced</span><ul><li><a class="tocitem" href="../../advanced/algorithm_interface/">Linear Solver Algorithm Interface</a></li><li><a class="tocitem" href="../../advanced/developing/">Developing New Linear Solvers</a></li><li><a class="tocitem" href="../../advanced/custom/">Passing in a Custom Linear Solver</a></li><li><a class="tocitem" href="../../advanced/internal_api/">Internal API Documentation</a></li></ul></li><li><a class="tocitem" href="../../release_notes/">Release Notes</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href>Solving Block Diagonal Systems</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Solving Block Diagonal Systems</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/SciML/LinearSolve.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/SciML/LinearSolve.jl/blob/main/docs/src/tutorials/block_diagonal.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Solving-Block-Diagonal-Systems"><a class="docs-heading-anchor" href="#Solving-Block-Diagonal-Systems">Solving Block Diagonal Systems</a><a id="Solving-Block-Diagonal-Systems-1"></a><a class="docs-heading-anchor-permalink" href="#Solving-Block-Diagonal-Systems" title="Permalink"></a></h1><p>A block diagonal matrix is one whose nonzeros sit entirely in square blocks along the diagonal, so the system it defines is really a batch of smaller, independent systems stacked together:</p><p class="math-container">\[\begin{bmatrix} A_1 &amp; &amp; \\ &amp; A_2 &amp; \\ &amp; &amp; A_3 \end{bmatrix}
+\begin{bmatrix} u_1 \\ u_2 \\ u_3 \end{bmatrix} =
+\begin{bmatrix} b_1 \\ b_2 \\ b_3 \end{bmatrix}\]</p><p>These show up whenever a problem decouples into independent subsystems: per-element systems in a finite element assembly, per-sample systems in a batched inverse problem, or the diagonal approximation of a larger operator.</p><p><a href="https://github.com/JuliaArrays/BlockDiagonals.jl">BlockDiagonals.jl</a> provides a <code>BlockDiagonal</code> type that stores only the blocks, and LinearSolve.jl accepts it directly as the <code>A</code> of a <code>LinearProblem</code>.</p><h2 id="Setting-Up-the-Problem"><a class="docs-heading-anchor" href="#Setting-Up-the-Problem">Setting Up the Problem</a><a id="Setting-Up-the-Problem-1"></a><a class="docs-heading-anchor-permalink" href="#Setting-Up-the-Problem" title="Permalink"></a></h2><pre><code class="language-julia hljs">import LinearSolve as LS
+import LinearAlgebra as LA
+using BlockDiagonals
+
+blocks = [rand(3, 3) + 3LA.I for _ in 1:4]
+A = BlockDiagonal(blocks)
+b = rand(size(A, 1))
+
+prob = LS.LinearProblem(A, b)
+sol = LS.solve(prob)
+sol.u</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">12-element Vector{Float64}:
+  0.005549684258870622
+  0.26026340562493644
+  0.0954559730460932
+  0.017068365894804066
+  0.23815630313033664
+  0.24121215112630986
+  0.17828540170753057
+  0.04488211494776254
+  0.057226135600886525
+  0.18919724581430408
+  0.031164411479958548
+ -0.029510591953827246</code></pre><p>The blocks do not have to be the same size:</p><pre><code class="language-julia hljs">A_mixed = BlockDiagonal([rand(n, n) + n * LA.I for n in (2, 3, 4)])
+b_mixed = rand(size(A_mixed, 1))
+
+LS.solve(LS.LinearProblem(A_mixed, b_mixed)).u</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">9-element Vector{Float64}:
+  0.08726276411197881
+  0.26215857093870476
+  0.14215910723855193
+  0.21327735087586522
+ -0.03592206932452073
+  0.043849165373149444
+  0.11897030515654412
+  0.025759827518644005
+ -0.010171305494496184</code></pre><h2 id="Which-Solvers-Work"><a class="docs-heading-anchor" href="#Which-Solvers-Work">Which Solvers Work</a><a id="Which-Solvers-Work-1"></a><a class="docs-heading-anchor-permalink" href="#Which-Solvers-Work" title="Permalink"></a></h2><p>All of the standard dense algorithms accept a <code>BlockDiagonal</code>:</p><pre><code class="language-julia hljs">u_ref = Matrix(A) \ b
+
+for alg in (LS.LUFactorization(), LS.GenericFactorization(),
+        LS.QRFactorization(LA.NoPivot()), LS.SimpleGMRES(), LS.KrylovJL_GMRES())
+    u = LS.solve(LS.LinearProblem(A, b), alg).u
+    println(rpad(nameof(typeof(alg)), 22), &quot; residual = &quot;,
+        LA.norm(Matrix(A) * u - b))
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">LUFactorization        residual = 1.7802692113082912e-16
+GenericFactorization   residual = 2.0980833227353187e-16
+QRFactorization        residual = 6.335327934766281e-16
+SimpleGMRES            residual = 5.474255194514172e-16
+KrylovJL               residual = 2.921705658337105e-8</code></pre><p>Sparse-only algorithms such as <code>UMFPACKFactorization</code> and <code>KLUFactorization</code> expect a <code>SparseMatrixCSC</code>, so convert with <code>sparse(A)</code> first if you want those.</p><h2 id="Blockwise-Factorization"><a class="docs-heading-anchor" href="#Blockwise-Factorization">Blockwise Factorization</a><a id="Blockwise-Factorization-1"></a><a class="docs-heading-anchor-permalink" href="#Blockwise-Factorization" title="Permalink"></a></h2><p><code>LUFactorization</code> and <code>QRFactorization</code> do not treat the matrix as a dense <code>N x N</code> system. Because the blocks are independent, each one is factorized on its own, which turns <code>O(N^3)</code> work into <code>O(\sum m_i^3)</code> and lets every per-block call land on BLAS. For <code>k</code> blocks of size <code>m</code> that is roughly a factor of <code>k^2</code> less arithmetic.</p><p>The cache stores the per-block factorizations rather than one big dense one:</p><pre><code class="language-julia hljs">cache_lu = LS.init(LS.LinearProblem(A, b), LS.LUFactorization())
+LS.solve!(cache_lu)
+
+(n_block_factorizations = length(cache_lu.cacheval.facts),
+    block_factorization = nameof(typeof(first(cache_lu.cacheval.facts))))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(n_block_factorizations = 4, block_factorization = :LU)</code></pre><p>Two cases deliberately keep the generic dense path, because they are not a batch of independent square systems or need machinery the blockwise path does not carry:</p><ul><li>blocks that are not square, which can still add up to a square matrix but do not decompose into independent subsystems, and</li><li><code>LUFactorization(residualsafety = true)</code>, which uses the a-posteriori residual check of the standard LU solve.</li></ul><p>Both still give correct answers, just without the structural speedup.</p><h2 id="The-SimpleGMRES-Specialization"><a class="docs-heading-anchor" href="#The-SimpleGMRES-Specialization">The <code>SimpleGMRES</code> Specialization</a><a id="The-SimpleGMRES-Specialization-1"></a><a class="docs-heading-anchor-permalink" href="#The-SimpleGMRES-Specialization" title="Permalink"></a></h2><p>The iterative side has its own specialization. When every block is the same size, <a href="../../solvers/solvers/#LinearSolve.SimpleGMRES"><code>SimpleGMRES</code></a> solves the batch of subsystems together instead of running one Krylov iteration over the whole stacked system. LinearSolve.jl detects this automatically when the extension is loaded, so no keyword is needed:</p><pre><code class="language-julia hljs">cache_uniform = LS.init(LS.LinearProblem(A, b), LS.SimpleGMRES())
+LS.solve!(cache_uniform).u</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">12-element Vector{Float64}:
+  0.005549684258870625
+  0.26026340562493633
+  0.0954559730460932
+  0.017068365894804104
+  0.23815630313033667
+  0.24121215112630992
+  0.17828540170753057
+  0.044882114947762536
+  0.05722613560088657
+  0.18919724581430405
+  0.031164411479958538
+ -0.029510591953827256</code></pre><p>You can see the specialization in the cache that <code>init</code> builds. The first type parameter of the cache records whether the batched path was selected, and the <code>blocksize</code> field records the detected block size:</p><pre><code class="language-julia hljs">cache_mixed = LS.init(LS.LinearProblem(A_mixed, b_mixed), LS.SimpleGMRES())
+
+(uniform_blocksize = cache_uniform.cacheval.blocksize,
+    mixed_blocksize = cache_mixed.cacheval.blocksize)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(uniform_blocksize = 3, mixed_blocksize = 0)</code></pre><p>The uniform case reports the block size it found, while the mixed case reports <code>0</code>, meaning it fell back to the generic path. Both give the right answer; only the uniform case gets the batched treatment.</p><p>If your matrix is stored as a plain dense <code>Matrix</code> but you know it is block diagonal with uniform blocks, you can request the same specialization explicitly with the <code>blocksize</code> keyword:</p><pre><code class="language-julia hljs">LS.solve(LS.LinearProblem(Matrix(A), b), LS.SimpleGMRES(; blocksize = 3)).u</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">12-element Vector{Float64}:
+  0.005549684258870647
+  0.2602634056249364
+  0.09545597304609324
+  0.017068365894804104
+  0.23815630313033667
+  0.24121215112630995
+  0.17828540170753057
+  0.044882114947762536
+  0.05722613560088657
+  0.18919724581430408
+  0.031164411479958538
+ -0.029510591953827246</code></pre><h2 id="Reusing-the-Factorization"><a class="docs-heading-anchor" href="#Reusing-the-Factorization">Reusing the Factorization</a><a id="Reusing-the-Factorization-1"></a><a class="docs-heading-anchor-permalink" href="#Reusing-the-Factorization" title="Permalink"></a></h2><p>The <a href="../caching_interface/#Linear-Solve-with-Caching-Interface">caching interface</a> works with <code>BlockDiagonal</code> exactly as it does for any other matrix, which matters when the same block structure is solved against many right hand sides:</p><pre><code class="language-julia hljs">cache = LS.init(LS.LinearProblem(A, b), LS.QRFactorization(LA.NoPivot()))
+sol1 = LS.solve!(cache)
+
+cache.b = rand(size(A, 1))
+sol2 = LS.solve!(cache)
+
+sol2.u</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">12-element Vector{Float64}:
+ -0.029413944761025577
+  0.21624446508416084
+  0.155238667234071
+  0.18740174086053224
+  0.07420585289084355
+  0.13336410904406262
+  0.07977449281313585
+  0.08403944448845235
+  0.0979036695981864
+  0.14256571251918468
+  0.13785167215535976
+  0.14321393206762661</code></pre><p>The second solve reuses the stored per-block factorizations and only applies them to the new right hand side.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../static_arrays/">« Solving with StaticArrays</a><a class="docs-footer-nextpage" href="../gpu/">GPU-Accelerated Linear Solving in Julia »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Tuesday 18 August 2026 22:40">Tuesday 18 August 2026</span>. Using Julia version 1.12.7.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

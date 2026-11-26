@@ -8,6 +8,8 @@ using Test
 # Reactant only wraps when its CUDA extension is loaded; this env has no CUDA.jl.
 Reactant.set_default_backend("cpu")
 
+include("triangular_solution.jl")
+
 function solve_once(A, b)
     return solve(LinearProblem(A, b)).u
 end
@@ -75,10 +77,6 @@ end
     end
 end
 
-function triangular_solution(A, b)
-    return solve(LinearProblem(UnitLowerTriangular(A), b), DirectLdiv!()).u
-end
-
 @testset "forward derivative with respect to the right-hand side" begin
     derivative(A, b, db) = only(
         Enzyme.autodiff(Forward, triangular_solution, Duplicated, Const(A), Duplicated(b, db))
@@ -93,6 +91,8 @@ end
     @test_throws "Reactant cannot lower QRFactorization" @jit other_alg(A_reactant, b_reactant)
     with_guess(A, b) = solve(LinearProblem(UnitLowerTriangular(A), b; u0 = b), DirectLdiv!())
     @test_throws "default solve options" @jit with_guess(A_reactant, b_reactant)
+    with_literal_matrix(b) = triangular_solution(Float32[0 2; 3 0], b)
+    @test_throws "dense traced arrays" @jit with_literal_matrix(b_reactant)
     for T in (Int32, ComplexF32)
         operands = (Reactant.to_rarray(T.(A)), Reactant.to_rarray(T.(b)))
         @test_throws "matching Float32 or Float64" @jit triangular_solution(operands...)

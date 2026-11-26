@@ -82,8 +82,9 @@ end
         Enzyme.autodiff(Forward, triangular_solution, Duplicated, Const(A), Duplicated(b, db))
     )
     db = Float32[1, 0]
-    @test Array(@jit derivative(A_reactant, b_reactant, Reactant.to_rarray(db))) ≈
-        UnitLowerTriangular(A) \ db
+    result = Array(@jit derivative(A_reactant, b_reactant, Reactant.to_rarray(db)))
+    @test result ≈ UnitLowerTriangular(A) \ db
+    @test result == Float32[1, -2]
 end
 
 @testset "unsupported unit-triangular request" begin

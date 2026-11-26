@@ -21,3 +21,43 @@ jobs:
   tests:
     uses: "SciML/.github/.github/workflows/grouped-tests.yml@v1"
     secrets: "inherit"
+
+  reactant-minimum:
+    name: Reactant minimum versions
+    runs-on: ubuntu-latest
+    env:
+      JULIA_NUM_THREADS: '2'
+      JULIA_NUM_PRECOMPILE_TASKS: '1'
+      JULIA_PKG_PRECOMPILE_AUTO: '0'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1.12.4'
+      - name: Full Reactant suite at the test project minimum
+        run: |
+          julia --project=test/Reactant -e '
+            using Pkg
+            Pkg.add(PackageSpec(name = "Reactant", version = v"0.2.309"))
+            using Reactant, Test
+            @show VERSION pkgversion(Reactant)
+            @assert pkgversion(Reactant) == v"0.2.309"
+            @testset "Reactant JIT" include("test/Reactant/reactant.jl")
+          '
+      - name: Native solution array at the weak dependency minimum
+        run: |
+          julia -e '
+            using Pkg
+            Pkg.activate(; temp = true)
+            Pkg.develop(path = pwd())
+            Pkg.add([
+                PackageSpec(name = "Reactant", version = v"0.2.230"),
+                PackageSpec(name = "LinearAlgebra"),
+                PackageSpec(name = "Test"),
+            ])
+            using Reactant
+            @show VERSION pkgversion(Reactant)
+            @assert pkgversion(Reactant) == v"0.2.230"
+            Reactant.set_default_backend("cpu")
+            include("test/Reactant/triangular_solution.jl")
+          '

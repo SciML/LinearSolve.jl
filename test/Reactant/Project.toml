@@ -12,6 +12,6 @@ LinearSolve = {path = "../.."}
 Enzyme = "0.13"
 LinearAlgebra = "1.10"
 LinearSolve = "5"
-Reactant = "0.2.280"
+Reactant = "0.2.309"
 Test = "1.10"
 julia = "1.10"

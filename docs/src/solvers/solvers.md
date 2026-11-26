@@ -223,6 +223,28 @@ LinearSolveFunction
 LinearSolveAdjoint
 ```
 
+#### Unit-triangular solves with Reactant
+
+Inside `Reactant.@jit`, an explicit `DirectLdiv!()` on a
+`UnitLowerTriangular(A)` or `UnitUpperTriangular(A)` uses XLA's triangular solve.
+Pass the matrix and the vector or matrix right-hand side as dense traced arrays
+with matching `Float32` or `Float64` elements. Materialize transposes and views
+with `copy` inside the compiled function, then wrap the matrix there. This route
+supports the one-shot call with the default solve options and no initial guess.
+
+With Reactant 0.2.230 on Julia 1.12, return the solution array `.u` from the
+compiled function. Use Reactant 0.2.309 to return the full `LinearSolution` or to
+differentiate in forward mode with respect to the right-hand side. The implicit
+unit diagonal makes the matrix nonsingular, so the full solution reports
+`ReturnCode.Success`.
+
+Dense LU and QR requests use the selected LinearSolve implementation through
+Reactant's Julia callback. The callback supports one device on CPU or CUDA and
+requires CUDA.jl on CUDA. The same version guidance applies to the callback's
+return value. With Reactant 0.2.309, the full `LinearSolution` reports
+`ReturnCode.Success` even when the inner solve fails. Differentiation through
+the callback is unsupported.
+
 #### Low-rank updates of a factorized matrix
 
 A rank-`k` change to a matrix does not need a fresh factorization of it.

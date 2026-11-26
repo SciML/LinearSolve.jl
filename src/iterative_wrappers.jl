@@ -466,8 +466,6 @@ function init_cacheval(
         end
     end
 
-    solver.x = u
-
     return solver
 end
 
@@ -529,7 +527,6 @@ function init_cacheval(
         KS(constructor)
     end
 
-    solver.x = u
     return solver
 end
 
@@ -669,7 +666,7 @@ end
 function _krylov_can_reuse_workspace(cacheval, alg::KrylovJL, A, b, u)
     KS = get_KrylovJL_solver(alg.KrylovAlg)
     return cacheval isa KS && cacheval.m == size(A, 1) && cacheval.n == size(A, 2) &&
-        typeof(cacheval.x) === typeof(u) && !_krylov_pending_warm_start(cacheval) &&
+        typeof(cacheval.x) === typeof(b) && !_krylov_pending_warm_start(cacheval) &&
         _krylov_workspace_matches_memory_window(cacheval, alg, A)
 end
 
@@ -692,9 +689,6 @@ function _krylov_can_reuse_workspace(cacheval, alg::KrylovJL, A, b::AbstractMatr
         cacheval.p == size(b, 2) && typeof(cacheval.X) === typeof(u)
 end
 
-_krylov_rebind_solution!(cacheval, u) = (cacheval.x = u)
-_krylov_rebind_solution!(cacheval::Krylov.BlockKrylovWorkspace, u) = nothing
-
 _krylov_pending_warm_start(cacheval) = hasfield(typeof(cacheval), :warm_start) && cacheval.warm_start
 
 function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
@@ -705,11 +699,9 @@ function SciMLBase.solve!(cache::LinearCache, alg::KrylovJL; kwargs...)
         cache.precsisfresh = false
     end
     if cache.isfresh || _krylov_pending_warm_start(cache.cacheval)
-        if _krylov_can_reuse_workspace(
+        if !_krylov_can_reuse_workspace(
                 cache.cacheval, alg, cache.A, cache.b, cache.u
             )
-            _krylov_rebind_solution!(cache.cacheval, cache.u)
-        else
             cache.cacheval = init_cacheval(
                 alg, cache.A, cache.b, cache.u, cache.Pl, cache.Pr,
                 cache.maxiters, cache.abstol, cache.reltol, cache.verbose,

@@ -128,6 +128,111 @@ end
     end
 end
 
+@testset "KrylovJL vector output overlapping RHS" begin
+    rng = MersenneTwister(1393)
+    n = 12
+    R = randn(rng, n, n)
+    A = R' * R + n * I
+    S = A' * A
+    rhs = randn(rng, n) .+ 1.0
+
+    cases = (
+        ("GMRES", KrylovJL_GMRES(), A),
+        ("MINRES", KrylovJL_MINRES(), S),
+        ("CG", KrylovJL_CG(), S),
+        ("FGMRES", KrylovJL_FGMRES(), A),
+        ("BICGSTAB", KrylovJL_BICGSTAB(), A),
+        ("LSMR", KrylovJL_LSMR(), A),
+        ("CRAIGMR", KrylovJL_CRAIGMR(), A),
+        ("MINARES", KrylovJL_MINARES(), S),
+        ("GMRES WarmStart.Previous", KrylovJL_GMRES(warm_start = LinearSolve.WarmStart.Previous), A),
+        ("GMRES WarmStart.Hegedus", KrylovJL_GMRES(warm_start = LinearSolve.WarmStart.Hegedus), A),
+    )
+
+    solve_kwargs = (; abstol = 1.0e-10, reltol = 1.0e-10, maxiters = 4n)
+
+    for (name, alg, M) in cases
+        expected = M \ rhs
+        @testset "$name" begin
+            bb = copy(rhs)
+            sol = solve(LinearProblem(M, bb; u0 = bb), alg; solve_kwargs...)
+            @test sol.retcode == ReturnCode.Success
+            @test sol.u === bb
+            @test sol.u ≈ expected rtol = 1.0e-6
+
+            for overlap in (:same, :view, :partial)
+                buf = zeros(2n)
+                b = overlap === :partial ? view(buf, 1:n) : copy(rhs)
+                u = if overlap === :same
+                    b
+                elseif overlap === :view
+                    view(b, :)
+                else
+                    view(buf, 4:(n + 3))
+                end
+                b .= rhs
+                cache = init(LinearProblem(M, b; u0 = u), alg; solve_kwargs...)
+                ws = nothing
+                for step in 1:2
+                    b .= rhs
+                    cache.A = copy(M)
+                    sol_c = solve!(cache)
+                    @test sol_c.retcode == ReturnCode.Success
+                    @test sol_c.u ≈ expected rtol = 1.0e-6
+                    if overlap !== :partial
+                        if step == 1
+                            ws = cache.cacheval
+                        else
+                            @test cache.cacheval === ws
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    @testset "Post-init aliasing without isfresh" begin
+        for alg in (KrylovJL_GMRES(), KrylovJL_CG())
+            M = alg.KrylovAlg === Krylov.cg! ? S : A
+            expected = M \ rhs
+            cache = init(LinearProblem(M, copy(rhs); u0 = zeros(n)), alg; solve_kwargs...)
+            @test solve!(cache).u ≈ expected rtol = 1.0e-6
+
+            cache.u .= rhs
+            cache.b = cache.u
+            @test !cache.isfresh
+            sol1 = solve!(cache)
+            @test sol1.retcode == ReturnCode.Success
+            @test sol1.u ≈ expected rtol = 1.0e-6
+
+            cache.u .= rhs
+            reinit!(cache; b = cache.u)
+            @test !cache.isfresh
+            sol2 = solve!(cache)
+            @test sol2.retcode == ReturnCode.Success
+            @test sol2.u ≈ expected rtol = 1.0e-6
+        end
+    end
+
+    @testset "ArrayPartition and operator default" begin
+        bp = ArrayPartition(copy(rhs[1:6]), copy(rhs[7:12]))
+        sol_ap = solve(LinearProblem(A, bp; u0 = bp), KrylovJL_GMRES(); solve_kwargs...)
+        @test sol_ap.retcode == ReturnCode.Success
+        @test sol_ap.u === bp
+        @test Vector(sol_ap.u) ≈ A \ rhs rtol = 1.0e-6
+
+        bb = copy(rhs)
+        op = FunctionOperator((w, v, u, p, t) -> mul!(w, A, v), zeros(n); isinplace = true)
+        sol_op = solve(
+            LinearProblem(op, bb; u0 = bb);
+            alias = LinearAliasSpecifier(alias_b = true), solve_kwargs...
+        )
+        @test sol_op.retcode == ReturnCode.Success
+        @test sol_op.u === bb
+        @test sol_op.u ≈ A \ rhs rtol = 1.0e-6
+    end
+end
+
 @testset "KrylovJL decreased subspace memory" begin
     rng = MersenneTwister(1378)
     n = 80

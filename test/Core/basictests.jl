@@ -185,6 +185,67 @@ end
         X = sprand(n, n, 0.8)
         cache.A = X
         @test X * solve!(cache) ≈ b1
+
+        @testset "KLU Float32 / ComplexF32 and unsupported input (#1376)" begin
+            rng = Random.MersenneTwister(1376)
+            index_types = Sys.WORD_SIZE == 64 ? (Int32, Int64) : (Int32,)
+            for T in (Float32, ComplexF32, Float16, ComplexF16), Ti in index_types
+                As = SparseMatrixCSC{T, Ti}(sparse(T.(sprand(rng, 20, 20, 0.2) + 10I)))
+                bs = rand(rng, T, 20)
+                sol = solve(LinearProblem(As, bs), KLUFactorization())
+                @test SciMLBase.successful_retcode(sol.retcode)
+                @test eltype(sol.u) === T
+                @test norm(As * sol.u - bs) / norm(bs) < sqrt(eps(real(T))) * 10
+
+                cache_t = init(LinearProblem(As, bs), KLUFactorization())
+                sol1 = solve!(cache_t)
+                @test eltype(sol1.u) === T
+                As2 = copy(As)
+                As2.nzval .*= T(2)
+                cache_t.A = As2
+                sol2 = solve!(cache_t)
+                @test SciMLBase.successful_retcode(sol2.retcode)
+                @test norm(As2 * sol2.u - bs) / norm(bs) < sqrt(eps(real(T))) * 10
+            end
+
+            A32 = sparse(Float32.(sprand(rng, 20, 20, 0.2) + 10I))
+            B32 = rand(rng, Float32, 20, 3)
+            sol_batch = solve(LinearProblem(A32, B32), KLUFactorization())
+            @test SciMLBase.successful_retcode(sol_batch.retcode)
+            @test eltype(sol_batch.u) === Float32
+            @test norm(A32 * sol_batch.u - B32) / norm(B32) < 1.0f-4
+
+            b32 = rand(rng, Float32, 20)
+            sol_noreuse = solve(
+                LinearProblem(A32, b32), KLUFactorization(; reuse_symbolic = false)
+            )
+            @test SciMLBase.successful_retcode(sol_noreuse.retcode)
+            @test eltype(sol_noreuse.u) === Float32
+            @test norm(A32 * sol_noreuse.u - b32) / norm(b32) < 1.0f-4
+
+            sol_op = solve(LinearProblem(MatrixOperator(A32), b32), KLUFactorization())
+            @test SciMLBase.successful_retcode(sol_op.retcode)
+            @test eltype(sol_op.u) === Float32
+            @test sol_op.u ≈ sol_noreuse.u
+
+            A64 = Float64.(A32)
+            sol_mixed = solve(LinearProblem(A64, b32), KLUFactorization())
+            @test SciMLBase.successful_retcode(sol_mixed.retcode)
+            @test eltype(sol_mixed.u) === Float32
+            @test norm(A64 * sol_mixed.u - b32) / norm(b32) < 1.0f-4
+
+            A32_sing = sparse(Float32[1 1; 1 1])
+            b32_sing = Float32[1, 2]
+            @test solve(LinearProblem(A32_sing, b32_sing), KLUFactorization()).retcode ===
+                ReturnCode.Infeasible
+
+            A_bf = sparse(BigFloat.(sprand(rng, 10, 10, 0.3) + 10I))
+            b_bf = rand(rng, BigFloat, 10)
+            @test_throws ArgumentError init(LinearProblem(A_bf, b_bf), KLUFactorization())
+            @test_throws ArgumentError init(
+                LinearProblem(rand(4, 4) + 10I, rand(4)), KLUFactorization()
+            )
+        end
     end
 
     @testset "KLU factor parts" begin

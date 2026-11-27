@@ -159,22 +159,28 @@ end
 @testset "warm start temporaries do not allocate per solve" begin
     solve_bytes(cache) = @allocated solve!(cache)
     precs = (A, p) -> (Diagonal(Vector(diag(A))), I)
+    # close enough to `b2` for the Hegedüs guess to be accepted
+    b3 = b2 .+ 0.1 .* cos.(1:n)
     @testset "$constructor $mode" for constructor in (KrylovJL_GMRES, KrylovJL_FGMRES),
             mode in (WarmStart.Previous, WarmStart.Hegedus)
 
         cache = init(
-            LinearProblem(A1, copy(b1)), constructor(; precs, warm_start = mode);
+            LinearProblem(A1, copy(b2)), constructor(; precs, warm_start = mode);
             abstol = tol, reltol = tol
         )
         solve!(cache)
-        for b in (b2, b1)
+        for b in (b3, b2)
             cache.b = b
             solve!(cache)
         end
-        cache.b = b2
+        cache.b = b3
+        guess = cache.cacheval.Δx
+        fill!(guess, NaN)
         # a single temporary of `b`'s size would exceed this
-        @test solve_bytes(cache) < sizeof(b2)
-        @test norm(A1 * cache.u - b2) < 1.0e-6
+        @test solve_bytes(cache) < sizeof(b3)
+        # overwritten only if this solve was warm started
+        @test length(guess) == n && all(isfinite, guess)
+        @test norm(A1 * cache.u - b3) < 1.0e-6
     end
 end
 

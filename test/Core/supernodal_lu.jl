@@ -403,3 +403,64 @@ end
     @test berr(A2, reused.u, b) <= 10 * berr(A2, fresh.u, b) + 1.0e-18
     @test berr(A2, reused.u, b) < n * eps(Float64)
 end
+
+@testset "in-place pattern edits of the caller's matrix are not mistaken for reuse" begin
+    # Saddle-point [K B'; B 0]: the factor must not share its recorded pattern with a
+    # matrix the caller later edits in place.
+    k = 12
+    T = spdiagm(-1 => -ones(k - 1), 0 => 2 * ones(k), 1 => -ones(k - 1))
+    K = kron(sparse(I, k, k), T) + kron(T, sparse(I, k, k)) + 0.1 * I
+    n = k * k
+    p = n ÷ 4
+    B = sparse(repeat(1:p, inner = 2), [mod1(4i + d, n) for i in 1:p for d in 0:1], 1.0, p, n)
+    A0 = [K B'; B spzeros(p, p)]
+    b = randn(size(A0, 1))
+    alg = SupernodalLUFactorization()
+    A_small = copy(A0)
+    A_small[1, 2] = 0.0
+    A_small[2, 1] = 0.0
+    dropzeros!(A_small)
+
+    for (edit!, dnnz) in (
+            (A -> (nonzeros(A)[7] = 0.0; dropzeros!(A)), -1),
+            (A -> (A[2, size(A, 2)] = 2.0), 1),
+            # drop one entry and insert another: only the structural comparison sees it
+            (A -> (nonzeros(A)[7] = 0.0; dropzeros!(A); A[2, size(A, 2)] = 2.0), 0),
+            # an in-place copy of a matrix with a smaller stored pattern, as a Newton
+            # matrix refreshed from a Jacobian does
+            (A -> copyto!(A, A_small), -2),
+        )
+        A = copy(A0)
+        cache = init(LinearProblem(A, b), alg)
+        solve!(cache)
+        F = cache.cacheval
+        edit!(A)
+        @test nnz(A) == nnz(A0) + dnnz
+        cache.A = A
+        sol = solve!(cache)
+        @test cache.cacheval !== F
+        @test sol.retcode == ReturnCode.Success
+        @test norm(A * sol.u - b) < 1.0e-10 * norm(b)
+    end
+
+    # same stored pattern, new values still takes the numeric-only path
+    A = copy(A0)
+    cache = init(LinearProblem(A, b), alg)
+    solve!(cache)
+    F = cache.cacheval
+    nonzeros(A) .*= 1.5
+    cache.A = A
+    sol = solve!(cache)
+    @test cache.cacheval === F
+    @test norm(A * sol.u - b) < 1.0e-10 * norm(b)
+end
+
+@testset "unchecked pattern reuse is validated against the supplied matrix" begin
+    # `check_pattern = false` with a different pattern of the same `nnz` factors the wrong
+    # matrix; the residual check on the perturbed factor has to catch that.
+    alg = SupernodalLUFactorization(check_pattern = false, matching = false)
+    cache = init(LinearProblem(sparse([1, 2], [1, 2], [1.0, 1.0e-10]), [1.0, 0.0]), alg)
+    solve!(cache)
+    cache.A = sparse([2, 2], [1, 2], [1.0, 1.0e-10], 2, 2)
+    @test solve!(cache).retcode == ReturnCode.Infeasible
+end

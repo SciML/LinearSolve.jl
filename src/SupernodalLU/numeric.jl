@@ -55,6 +55,10 @@ mutable struct SupernodalLUFactor{Tv, Ti <: Integer}
     anorm::Float64                   # ‖M‖_max (NaN for non-Float64-convertible Tv)
     eps_pivot::Float64
     A::SparseMatrixCSC{Tv, Ti}       # original matrix (iterative refinement)
+    # Copies of the analyzed pattern: `A` shares the caller's arrays, which the
+    # caller may edit in place, so it cannot say what the analysis was built on.
+    Acolptr::Vector{Ti}
+    Arowval::Vector{Ti}
     work::Vector{Tv}                 # solve workspace (length n)
     gbuf::Vector{Tv}                 # gemv/gemm scratch
     # MC64 matching + scaling preprocessing (identity when disabled): the

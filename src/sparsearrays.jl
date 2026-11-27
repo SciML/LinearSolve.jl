@@ -911,8 +911,7 @@ end
 function LinearSolve.pattern_changed(
         F::SNLU.SupernodalLUFactor, A::SparseArrays.AbstractSparseMatrixCSC
     )
-    Aold = F.A
-    return getcolptr(Aold) != getcolptr(A) || rowvals(Aold) != rowvals(A)
+    return F.Acolptr != getcolptr(A) || F.Arowval != rowvals(A)
 end
 
 # `‖Ay - b‖ / (‖A‖₁‖y‖ + ‖b‖)`, reusing the factor-owned residual buffer so the check
@@ -936,7 +935,7 @@ function SciMLBase.solve!(
     if cache.isfresh
         cacheval = LinearSolve.@get_cacheval(cache, :SupernodalLUFactorization)
         if alg.reuse_symbolic && size(cacheval) == size(As) &&
-                nnz(cacheval.A) == nnz(As) &&
+                length(cacheval.Vpos) == nnz(As) &&
                 !(alg.check_pattern && pattern_changed(cacheval, As))
             # numeric-only refactorization: reuses the analysis, matching, and
             # all numeric storage (allocation-free)

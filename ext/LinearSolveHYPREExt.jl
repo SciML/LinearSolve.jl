@@ -20,6 +20,8 @@ mutable struct HYPRECache
     isfresh_A::Bool
     isfresh_b::Bool
     isfresh_u::Bool
+    # Caller/global dimensions; the HYPRE wrappers themselves may hold local ranges.
+    problem_size::Tuple{Int, Int}
 end
 
 function LinearSolve.update_tolerances_internal!(cache, alg::HYPREAlgorithm, abstol, reltol)
@@ -38,7 +40,7 @@ function LinearSolve.init_cacheval(
         abstol, reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
     )
-    return HYPRECache(nothing, nothing, nothing, nothing, true, true, true)
+    return HYPRECache(nothing, nothing, nothing, nothing, true, true, true, (0, 0))
 end
 
 function local_row_partition(nrows::Integer, comm::MPI.Comm)
@@ -88,25 +90,116 @@ function auto_hypre_vector(alg::HYPREAlgorithm, b)
     return HYPREVector(alg.comm, blocal, ilower, iupper)
 end
 
+# HYPRE's array-like wrappers expose index ranges rather than `size`.
+LinearSolve._problem_size(A::HYPREMatrix) = (
+    Int(A.iupper - A.ilower + 1), Int(A.jupper - A.jlower + 1),
+)
+LinearSolve._problem_rows(A::HYPREMatrix) = first(LinearSolve._problem_size(A))
+LinearSolve._problem_rows(b::HYPREVector) = Int(b.iupper - b.ilower + 1)
+
 # Overload set_(A|b|u) in order to keep track of "isfresh" for all of them
 const LinearCacheHYPRE = LinearCache{<:Any, <:Any, <:Any, <:Any, <:Any, HYPRECache}
 
-function Base.setproperty!(cache::LinearCacheHYPRE, name::Symbol, x)
+LinearSolve._cache_problem_size(cache::LinearCacheHYPRE) =
+    getfield(getfield(cache, :cacheval), :problem_size)
+function LinearSolve._set_cache_problem_size!(cache::LinearCacheHYPRE, size)
+    return setfield!(getfield(cache, :cacheval), :problem_size, size)
+end
+
+_hypre_matrix_layout(A::HYPREMatrix) =
+    (A.comm, A.ilower, A.iupper, A.jlower, A.jupper)
+_hypre_vector_layout(b::HYPREVector) = (b.comm, b.ilower, b.iupper)
+
+function _check_hypre_cache_assignment_size(cache::LinearCacheHYPRE, name::Symbol, x)
+    # A distributed HYPRE wrapper only knows its local range. Reassigning the
+    # existing wrapper (or another with the same local layout) is valid, but it
+    # must not overwrite the caller/global problem size tracked in the cacheval.
+    if name === :A && x isa HYPREMatrix
+        old_A = getfield(cache, :A)
+        _hypre_matrix_layout(x) == _hypre_matrix_layout(old_A) || throw(
+            DimensionMismatch("`cache.A` must keep the current HYPRE matrix layout.")
+        )
+        getfield(cache, :resize_state) == 0 && return nothing
+    elseif name === :b && x isa HYPREVector
+        old_b = getfield(cache, :b)
+        _hypre_vector_layout(x) == _hypre_vector_layout(old_b) || throw(
+            DimensionMismatch("`cache.b` must keep the current HYPRE vector layout.")
+        )
+        getfield(cache, :resize_state) == 0 && return nothing
+    end
+    return LinearSolve._check_cache_assignment_size(cache, name, x)
+end
+
+function LinearSolve._check_reinit_problem_sizes(cache::LinearCacheHYPRE, A, b)
+    if A isa HYPREMatrix
+        _check_hypre_cache_assignment_size(cache, :A, A)
+        if b isa HYPREVector
+            _check_hypre_cache_assignment_size(cache, :b, b)
+        else
+            expected = first(LinearSolve._cache_problem_size(cache))
+            actual = LinearSolve._problem_rows(b)
+            actual == expected || throw(
+                DimensionMismatch("`b` must have $expected global rows, got $actual.")
+            )
+        end
+    elseif b isa HYPREVector
+        expected_size = LinearSolve._cache_problem_size(cache)
+        actual_size = LinearSolve._problem_size(A)
+        actual_size == expected_size || throw(
+            DimensionMismatch("`A` must have size $expected_size, got $actual_size.")
+        )
+        _check_hypre_cache_assignment_size(cache, :b, b)
+    else
+        LinearSolve._check_linear_problem_sizes(A, b)
+    end
+    return nothing
+end
+
+LinearSolve._reinit_problem_rows(cache::LinearCacheHYPRE, A::HYPREMatrix) =
+    first(LinearSolve._cache_problem_size(cache))
+LinearSolve._check_reinit_b_size(cache::LinearCacheHYPRE, b) =
+    _check_hypre_cache_assignment_size(cache, :b, b)
+
+function LinearSolve._prepare_cache_assignment(
+        cache::LinearCacheHYPRE, name::Symbol, x
+    )
+    if name === :A
+        return auto_hypre_matrix(cache.alg, x)
+    elseif name === :b || name === :u
+        return auto_hypre_vector(cache.alg, x)
+    end
+    return LinearSolve._convert_cache_field(cache, name, x)
+end
+
+function LinearSolve._setproperty!(
+        cache::LinearCacheHYPRE, name::Symbol, x, original_x, check_size::Bool
+    )
+    check_size && _check_hypre_cache_assignment_size(cache, name, original_x)
+    x = LinearSolve._prepare_cache_assignment(cache, name, x)
     if name === :A
         cache.cacheval.isfresh_A = true
         setfield!(cache, :isfresh, true)
-        return setfield!(cache, name, auto_hypre_matrix(cache.alg, x))
-    elseif name == :b
+        result = setfield!(cache, name, x)
+        new_problem_size = original_x isa HYPREMatrix ?
+            LinearSolve._cache_problem_size(cache) : LinearSolve._problem_size(original_x)
+        LinearSolve._complete_cache_resize!(cache, name, original_x, new_problem_size)
+        return result
+    elseif name === :b
         cache.cacheval.isfresh_b = true
         setfield!(cache, :isfresh, true)
-        return setfield!(cache, name, auto_hypre_vector(cache.alg, x))
-    elseif name == :u
+        result = setfield!(cache, name, x)
+        LinearSolve._complete_cache_resize!(cache, name, original_x, nothing)
+        return result
+    elseif name === :u
         cache.cacheval.isfresh_u = true
         setfield!(cache, :isfresh, true)
-        return setfield!(cache, name, auto_hypre_vector(cache.alg, x))
+        return setfield!(cache, name, x)
     end
     return setfield!(cache, name, x)
 end
+
+Base.setproperty!(cache::LinearCacheHYPRE, name::Symbol, x) =
+    LinearSolve._setproperty!(cache, name, x, x, true)
 
 # Note:
 # SciMLBase.init is overloaded here instead of just LinearSolve.init_cacheval for two
@@ -139,6 +232,8 @@ function SciMLBase.init(
         kwargs...
     )
     (; A, b, u0, p) = prob
+    LinearSolve._check_linear_problem_sizes(A, b)
+    problem_size = LinearSolve._problem_size(A)
 
     if haskey(kwargs, :alias_A) || haskey(kwargs, :alias_b)
         aliases = LinearAliasSpecifier()
@@ -213,6 +308,7 @@ function SciMLBase.init(
         alg, A, b, u0, Pl, Pr, maxiters, abstol, reltol, init_cache_verb,
         assumptions
     )
+    setfield!(cacheval, :problem_size, problem_size)
     Tc = typeof(cacheval)
     isfresh = true
     precsisfresh = false
@@ -222,7 +318,7 @@ function SciMLBase.init(
         typeof(__issquare(assumptions)), typeof(sensealg), Nothing,
     }(
         A, b, u0, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
-        maxiters, verb_spec, assumptions, sensealg, nothing, alias_A
+        maxiters, verb_spec, assumptions, sensealg, nothing, alias_A, 0
     )
     return cache
 end

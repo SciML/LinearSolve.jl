@@ -1,5 +1,6 @@
 using LinearSolve, LinearAlgebra, SparseArrays, Test
 using LinearSolve.Krylov
+using RecursiveArrayTools, SciMLOperators
 
 n = 100
 A1 = spdiagm(
@@ -175,4 +176,34 @@ end
         @test solve_bytes(cache) < sizeof(b2)
         @test norm(A1 * cache.u - b2) < 1.0e-6
     end
+end
+
+@testset "partitioned right-hand side whose layout changes" begin
+    function copy_flat!(w, v, u, p, t)
+        for i in 1:5
+            w[i] = v[i]
+        end
+        return w
+    end
+    split_at(x, k) = ArrayPartition(fill(x, k), fill(x, 5 - k))
+    proto = split_at(1.0, 2)
+    A = FunctionOperator(copy_flat!, proto, proto; isinplace = true, islinear = true)
+    @testset "$mode" for mode in (WarmStart.Previous, WarmStart.Hegedus)
+        cache = init(LinearProblem(A, split_at(1.0, 2)), KrylovJL_GMRES(warm_start = mode))
+        solve!(cache)
+        cache.b = split_at(2.0, 3)
+        @test collect(solve!(cache).u) ≈ fill(2.0, 5)
+    end
+end
+
+@testset "partitioned right-hand side: unused temporaries are not allocated" begin
+    solve_bytes(cache) = @allocated solve!(cache)
+    b = ArrayPartition(ones(1000), ones(1000))
+    A = FunctionOperator((w, v, u, p, t) -> (w .= 2 .* v), b, b; isinplace = true, islinear = true)
+    cache = init(LinearProblem(A, b), KrylovJL_GMRES(warm_start = WarmStart.Previous))
+    solve!(cache)
+    solve!(cache)
+    # one partition's worth of bytes
+    @test solve_bytes(cache) < sizeof(b.x[1])
+    @test collect(cache.u) ≈ fill(0.5, 2000)
 end

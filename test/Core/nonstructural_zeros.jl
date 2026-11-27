@@ -368,6 +368,83 @@ reduction(cache) = cache.cacheval.sparse_reduction
             @test red(cache).active && red(cache).cache_union
             @test red(cache).nstart_zeros == count(iszero, nonzeros(filled))
             @test red(cache).reduced_nnz < nnz(filled)
+
+            # a first filled matrix with no zeros also decides: it clears `pending` and
+            # leaves the reduction off
+            no_zeros = copy(mats[1])
+            nonzeros(no_zeros) .= 1.5
+            c2 = alg === nothing ? init(LinearProblem(copy(proto), copy(b))) :
+                init(LinearProblem(copy(proto), copy(b)), alg)
+            @test red(c2).pending
+            c2.A = copy(no_zeros)
+            sol2 = solve!(c2)
+            @test sol2.retcode == ReturnCode.Success
+            @test sol2.u ≈ Matrix(no_zeros) \ b rtol = 1.0e-8
+            @test !red(c2).pending
+            @test !red(c2).active
+        end
+    end
+
+    @testset "per-solve dropzeros re-analyzes a moved zero with check_pattern = false" begin
+        # `check_pattern = false` promises that the *caller's* stored pattern is fixed. The
+        # per-solve reduction can still move a zero to another stored position at equal
+        # nnz, so the reduced operand's pattern changes. The solver must redo the symbolic
+        # analysis for that change, or it factorizes the new values on the old pattern and
+        # returns a wrong answer with `Success`.
+        n = 5
+        I_ut = Int[]
+        J_ut = Int[]
+        for j in 1:n, i in 1:j
+            push!(I_ut, i)
+            push!(J_ut, j)
+        end
+        P = sparse(I_ut, J_ut, ones(length(I_ut)), n, n)   # all-one prototype
+        m1 = copy(P)                                       # diagonal only
+        nonzeros(m1) .= 0.0
+        for i in 1:n
+            m1[i, i] = 4.0
+        end
+        m2 = copy(m1)                                      # 7 off-diagonals come back
+        for (i, j) in ((1, 2), (1, 3), (2, 3), (1, 4), (2, 4), (1, 5), (2, 5))
+            m2[i, j] = 1.0
+        end
+        m3 = copy(m2)                                      # move a one: (2,4) -> (3,4)
+        m3[2, 4] = 0.0
+        m3[3, 4] = 1.0
+        m4 = copy(m3)                                      # same zeros, new values
+        nonzeros(m4) .*= 2.0
+        seq = (m1, m2, m3, m4)
+        for M in seq
+            @test SparseArrays.getcolptr(M) == SparseArrays.getcolptr(P)
+            @test rowvals(M) == rowvals(P)
+        end
+        x = collect(1.0:n)
+
+        algs = Any[
+            PureKLUFactorization(check_pattern = false),
+            KLUFactorization(check_pattern = false),
+            SupernodalLUFactorization(check_pattern = false),
+        ]
+        Base.USE_GPL_LIBS && push!(algs, UMFPACKFactorization(check_pattern = false))
+        for alg in algs
+            cache = init(LinearProblem(copy(P), P * x), alg)
+            red = cache.sparse_reduction
+            reduced_rows = Vector{Int}[]
+            for M in seq
+                cache.A = copy(M)
+                cache.b = M * x
+                sol = solve!(cache)
+                @test sol.retcode == ReturnCode.Success
+                @test norm(M * sol.u - M * x, Inf) / norm(M * x, Inf) <= 128eps(Float64)
+                push!(reduced_rows, copy(rowvals(red.reduced)))
+            end
+            @test red.active && !red.cache_union
+            # m2 -> m3: equal nnz, different reduced rows -> a structure change
+            @test length(reduced_rows[3]) == length(reduced_rows[2])
+            @test reduced_rows[3] != reduced_rows[2]
+            # m3 -> m4: same zeros -> no structure change, so the analysis is reused
+            @test reduced_rows[4] == reduced_rows[3]
+            @test !red.structure_changed
         end
     end
 

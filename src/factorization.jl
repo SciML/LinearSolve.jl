@@ -1816,6 +1816,10 @@ patterns with “more structure”.
     pattern checks entirely by setting `check_pattern = false`. Note that this may error
     if the sparsity pattern does change unexpectedly.
 
+    `check_pattern = false` skips only the check of the caller's pattern. When a
+    `nonstructural_zeros` reduction is active, the solver still redoes the analysis
+    if its own zero dropping changes the pattern of the factorized operand.
+
 ## UMFPACK control settings
 
 `control` overrides entries of UMFPACK's control vector, given as a `NamedTuple`
@@ -1901,6 +1905,10 @@ factorization is recomputed with new pivots while retaining the symbolic analysi
     unnecessary recomputation. To further reduce computational overhead, you can disable
     pattern checks entirely by setting `check_pattern = false`. Note that this may error
     if the sparsity pattern does change unexpectedly.
+
+    `check_pattern = false` skips only the check of the caller's pattern. When a
+    `nonstructural_zeros` reduction is active, the solver still redoes the analysis
+    if its own zero dropping changes the pattern of the factorized operand.
 """
 Base.@kwdef struct KLUFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool = true
@@ -1933,6 +1941,10 @@ requested explicitly.
     factorization is cached. If the sparsity pattern of `A` may change between solves,
     set `reuse_symbolic = false`. To skip the pattern check entirely (which errors if the
     pattern unexpectedly changes), set `check_pattern = false`.
+
+    `check_pattern = false` skips only the check of the caller's pattern. When a
+    `nonstructural_zeros` reduction is active, the solver still redoes the analysis
+    if its own zero dropping changes the pattern of the factorized operand.
 
     Numerical pivots are selected again when the reciprocal pivot growth of the
     refactorization reports the old ones unstable. Symbolic analysis and numeric
@@ -2050,8 +2062,9 @@ RecursiveFactorization/TriangularSolve automatically.
   - `reuse_symbolic`: reuse the cached symbolic analysis (and all numeric
     storage) across solves when the sparsity pattern is unchanged. Defaults
     to `true`.
-  - `check_pattern`: check whether the sparsity pattern changed before
-    reusing the analysis. Defaults to `true`.
+  - `check_pattern`: check whether the caller's sparsity pattern changed before
+    reusing the analysis. Defaults to `true`. A pattern change from an active
+    `nonstructural_zeros` reduction always triggers a new analysis.
   - `ordering`: fill-reducing ordering, `:amd` (default), `:nd`
     (pure-Julia nested dissection — best for large 3D meshes), or
     `:natural`.

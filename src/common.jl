@@ -99,6 +99,10 @@ EnumX.@enumx NonstructuralZeros begin
     mode and switching to per-solve `dropzeros` if the zeros prove non-persistent
     (more than `LinearSolve.NONPERSISTENT_ZERO_FRACTION` of the starting zeros
     activate).
+
+    If the starting matrix has stored values and they are all zero or all one (an
+    unfilled sparsity prototype), detection waits for the first solve whose matrix
+    has stored values that are neither all zero nor all one.
     """
     Auto
     """
@@ -170,6 +174,8 @@ sol = solve!(cache)
 
       + `NonstructuralZeros.Auto` (default): detect from the starting matrix and
         adapt (cached union, falling back to per-solve dropzeros if non-persistent).
+        An all-zero or all-one starting matrix defers detection to the first solve
+        with other stored values.
       + `NonstructuralZeros.None`: none worth dropping; never reduce (bit-identical).
       + `NonstructuralZeros.Persistent`: present at stable positions; cached-union
         reduction.

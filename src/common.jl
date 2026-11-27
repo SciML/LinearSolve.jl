@@ -660,6 +660,8 @@ function _check_square_A_support(alg::SciMLLinearSolveAlgorithm, A)
     return nothing
 end
 
+_check_cacheval_support(alg, cacheval, A) = nothing
+
 # A right-hand side that implements the SciMLStructures interface but is not an
 # array cannot go through `__init` at all: it has no `eltype`, `length` or `similar`,
 # so the `abstol`/`reltol`/`maxiters` defaults below have nothing to work from, and it
@@ -904,6 +906,7 @@ function __init(
             assumptions
         )
     end
+    _check_cacheval_support(alg, cacheval, A)
     isfresh = true
     precsisfresh = false
     Tc = typeof(cacheval)

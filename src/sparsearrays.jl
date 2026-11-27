@@ -487,51 +487,52 @@ const PREALLOCATED_KLU = KLU.KLUFactorization(
     )
 )
 
+# KLU supports Float64 and ComplexF64 natively, and promotes narrower IEEE floats
+# losslessly into those two factor types.
+const _KLU_REAL_ELTYPES = Union{Float16, Float32, Float64}
+const _KLU_COMPLEX_ELTYPES = Union{ComplexF16, ComplexF32, ComplexF64}
+
 function LinearSolve.init_cacheval(
-        alg::KLUFactorization, A::AbstractSparseArray{Float64, Int64}, b, u, Pl, Pr,
+        alg::KLUFactorization, A::AbstractSparseArray{T, Ti}, b, u, Pl, Pr,
         maxiters::Int, abstol,
         reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
-    )
-    return PREALLOCATED_KLU
+    ) where {T <: _KLU_REAL_ELTYPES, Ti <: KLU.KLUITypes}
+    if A isa LinearSolve.GPUArraysCore.AnyGPUArray
+        return nothing
+    elseif Ti === Int
+        return PREALLOCATED_KLU
+    else
+        return KLU.KLUFactorization(
+            SparseMatrixCSC{Float64, Ti}(
+                0, 0, [one(Ti)], Ti[], Float64[]
+            )
+        )
+    end
 end
 
-# KLU supports Float64 and ComplexF64 (KLUTypes)
 function LinearSolve.init_cacheval(
-        alg::KLUFactorization, A::AbstractSparseArray{T, Int64}, b, u, Pl, Pr,
+        alg::KLUFactorization, A::AbstractSparseArray{T, Ti}, b, u, Pl, Pr,
         maxiters::Int, abstol,
         reltol,
         verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
-    ) where {T <: KLU.KLUTypes}
+    ) where {T <: _KLU_COMPLEX_ELTYPES, Ti <: KLU.KLUITypes}
+    A isa LinearSolve.GPUArraysCore.AnyGPUArray && return nothing
     return KLU.KLUFactorization(
-        SparseMatrixCSC{T, Int64}(
-            0, 0, [Int64(1)], Int64[], T[]
+        SparseMatrixCSC{ComplexF64, Ti}(
+            0, 0, [one(Ti)], Ti[], ComplexF64[]
         )
     )
 end
 
-function LinearSolve.init_cacheval(
-        alg::KLUFactorization, A::AbstractSparseArray{Float64, Int32}, b, u, Pl, Pr,
-        maxiters::Int, abstol,
-        reltol,
-        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
-    )
-    return KLU.KLUFactorization(
-        SparseMatrixCSC{Float64, Int32}(
-            0, 0, [Int32(1)], Int32[], Float64[]
-        )
-    )
-end
-
-function LinearSolve.init_cacheval(
-        alg::KLUFactorization, A::AbstractSparseArray{T, Int32}, b, u, Pl, Pr,
-        maxiters::Int, abstol,
-        reltol,
-        verbose::Union{LinearVerbosity, Bool}, assumptions::OperatorAssumptions
-    ) where {T <: KLU.KLUTypes}
-    return KLU.KLUFactorization(
-        SparseMatrixCSC{T, Int32}(
-            0, 0, [Int32(1)], Int32[], T[]
+function LinearSolve._check_cacheval_support(alg::KLUFactorization, ::Nothing, A)
+    throw(
+        ArgumentError(
+            "KLUFactorization only supports sparse CSC matrices with Float16, Float32, " *
+                "Float64, ComplexF16, ComplexF32, or ComplexF64 elements and Int32 or " *
+                "Int64 indices, got $(typeof(A)). Use `PureKLUFactorization()` for " *
+                "generic element or index types on sparse matrices, or `solve(prob)` to " *
+                "select a compatible algorithm automatically."
         )
     )
 end
@@ -598,6 +599,19 @@ function LinearSolve.init_cacheval(
     end
 end
 
+function _klu_ldiv!(u, F::KLU.AbstractKLUFactorization{Tv}, b) where {Tv}
+    if (u isa StridedVecOrMat{Tv} || (Tv <: Real && u isa StridedVecOrMat{ComplexF64})) &&
+            b isa StridedVecOrMat
+        return ldiv!(u, F, b)
+    end
+    Tbuf = (Tv <: Complex || eltype(b) <: Complex) ? ComplexF64 : Tv
+    buf = similar(b, Tbuf)
+    copyto!(buf, b)
+    ldiv!(F, buf)
+    copyto!(u, buf)
+    return u
+end
+
 function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization; kwargs...)
     A = cache.A
     # Drop persistent nonstructural zeros when the assumption requests it; a no-op
@@ -607,7 +621,8 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
     if cache.isfresh
         cacheval = LinearSolve.@get_cacheval(cache, :KLUFactorization)
         if alg.reuse_symbolic
-            if length(cacheval.nzval) != length(nonzeros(A)) || alg.check_pattern && pattern_changed(cacheval, A)
+            if cacheval._symbolic == C_NULL || length(cacheval.nzval) != length(nonzeros(A)) ||
+                    alg.check_pattern && pattern_changed(cacheval, A)
                 fact = KLU.klu(
                     LinearSolve.make_SparseMatrixCSC(A),
                     check = false
@@ -637,7 +652,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
     end
     F = LinearSolve.@get_cacheval(cache, :KLUFactorization)
     return if F.common.status == KLU.KLU_OK
-        y = ldiv!(cache.u, F, cache.b)
+        y = _klu_ldiv!(cache.u, F, cache.b)
         if all(isfinite, y)
             SciMLBase.build_linear_solution(
                 alg, y, nothing, nothing; retcode = ReturnCode.Success

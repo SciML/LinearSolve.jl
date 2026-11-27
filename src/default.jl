@@ -610,6 +610,7 @@ function SciMLBase.solve!(
         kwargs...
     )
     (; A, b) = cache
+    _check_problem_dimensions(A, b, cache.u)
     return SciMLBase.solve!(cache, defaultalg(A, b, assump), args...; kwargs...)
 end
 

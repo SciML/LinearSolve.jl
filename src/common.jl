@@ -660,6 +660,90 @@ function _check_square_A_support(alg::SciMLLinearSolveAlgorithm, A)
     return nothing
 end
 
+@noinline function _throw_nonmatrix_A(A)
+    throw(DimensionMismatch("Operator `A` must be 2-dimensional, got size $(size(A))."))
+end
+@noinline function _throw_b_length_mismatch(m::Int, n::Int, len::Int)
+    throw(DimensionMismatch("Right-hand side `b` has length $len, expected $m to match `size(A, 1)` ($m×$n)."))
+end
+@noinline function _throw_b_rows_mismatch(m::Int, n::Int, rows::Int)
+    throw(DimensionMismatch("Right-hand side `b` has $rows rows, expected $m to match `size(A, 1)` ($m×$n)."))
+end
+@noinline function _throw_b_ndims_mismatch(b)
+    throw(DimensionMismatch("Right-hand side `b` must be a vector or matrix, got $(ndims(b))-dimensional array of size $(size(b))."))
+end
+@noinline function _throw_u_vec_for_mat_b(n::Int, b, u)
+    throw(DimensionMismatch("Solution `u` is a vector of length $(length(u)), expected a matrix of size ($n, $(size(b, 2))) to match batched `b`."))
+end
+@noinline function _throw_u_length_mismatch(m::Int, n::Int, len::Int)
+    throw(DimensionMismatch("Solution `u` has length $len, expected $n to match `size(A, 2)` ($m×$n)."))
+end
+@noinline function _throw_u_matrix_mismatch(m::Int, n::Int, b, u)
+    throw(DimensionMismatch("Solution `u` has size $(size(u)), expected ($n, $(size(b, 2))) to match `A` ($m×$n) and `b` ($(size(b, 1))×$(size(b, 2)))."))
+end
+@noinline function _throw_u_mat_for_vec_b(n::Int, u)
+    throw(DimensionMismatch("Solution `u` is a matrix of size $(size(u)), expected a vector of length $n to match vector `b`."))
+end
+@noinline function _throw_u_rows_mismatch(m::Int, n::Int, rows::Int)
+    throw(DimensionMismatch("Solution `u` has $rows rows, expected $n to match `size(A, 2)` ($m×$n)."))
+end
+@noinline function _throw_u_ndims_mismatch(u)
+    throw(DimensionMismatch("Solution `u` must be a vector or matrix, got $(ndims(u))-dimensional array of size $(size(u))."))
+end
+
+@inline _operator_size(A::AbstractMatrix) = size(A)
+@inline _operator_size(A::AbstractArray) = _throw_nonmatrix_A(A)
+@inline _operator_size(A::LinearAlgebra.Factorization) = size(A)
+@inline function _operator_size(A::AbstractSciMLOperator)
+    s = size(A)
+    length(s) == 2 && return s
+    length(s) == 0 && return nothing
+    return _throw_nonmatrix_A(A)
+end
+@inline _operator_size(::Union{Number, UniformScaling}) = nothing
+@inline function _operator_size(A)
+    applicable(size, A) || return nothing
+    s = size(A)
+    return length(s) == 2 ? s : nothing
+end
+
+"""
+    _check_problem_dimensions(A, b, u)
+
+Validate that the operator `A`, right-hand side `b`, and solution container `u`
+(when `u !== nothing`) have mutually compatible dimensions, throwing a
+`DimensionMismatch` otherwise.
+"""
+@inline function _check_problem_dimensions(A, b, u)
+    sA = _operator_size(A)
+    sA === nothing && return nothing
+    m, n = sA
+    if b isa AbstractVector
+        length(b) == m || _throw_b_length_mismatch(m, n, length(b))
+    elseif b isa AbstractMatrix
+        size(b, 1) == m || _throw_b_rows_mismatch(m, n, size(b, 1))
+    elseif b isa AbstractArray
+        _throw_b_ndims_mismatch(b)
+    end
+    u === nothing && return nothing
+    if u isa AbstractVector
+        b isa AbstractMatrix && _throw_u_vec_for_mat_b(n, b, u)
+        length(u) == n || _throw_u_length_mismatch(m, n, length(u))
+    elseif u isa AbstractMatrix
+        if b isa AbstractMatrix
+            (size(u, 1) == n && size(u, 2) == size(b, 2)) ||
+                _throw_u_matrix_mismatch(m, n, b, u)
+        elseif b isa AbstractArray
+            _throw_u_mat_for_vec_b(n, u)
+        else
+            size(u, 1) == n || _throw_u_rows_mismatch(m, n, size(u, 1))
+        end
+    elseif u isa AbstractArray
+        _throw_u_ndims_mismatch(u)
+    end
+    return nothing
+end
+
 # A right-hand side that implements the SciMLStructures interface but is not an
 # array cannot go through `__init` at all: it has no `eltype`, `length` or `similar`,
 # so the `abstol`/`reltol`/`maxiters` defaults below have nothing to work from, and it
@@ -761,6 +845,7 @@ function __init(
     )
     (; A, b, u0, p) = prob
     _check_matrix_support(A)
+    _check_problem_dimensions(A, b, u0)
 
     # Integer-eltype problems are solved as their float (or joint-promoted)
     # counterparts, matching `\`; see `__promote_int_arrays`. This happens before
@@ -943,6 +1028,7 @@ function SciMLBase.reinit!(
     b = isnothing(b) ? cache.b : b
     u = isnothing(u) ? cache.u : u
     p = isnothing(p) ? cache.p : p
+    _check_problem_dimensions(A, b, u)
     Pl = cache.Pl
     Pr = cache.Pr
 
@@ -1011,6 +1097,7 @@ solution is written into `cache.u` as usual.
 @inline function SciMLBase.solve!(
         cache::LinearCache, args...; adjoint::Bool = false, kwargs...
     )
+    _check_problem_dimensions(cache.A, cache.b, cache.u)
     adjoint && return _solve_adjoint!(cache, args...; kwargs...)
     return solve!(cache, cache.alg, args...; kwargs...)
 end
@@ -1096,6 +1183,7 @@ function SciMLBase.solve(
         prob::StaticLinearProblem,
         alg::Nothing, args...; kwargs...
     )
+    _check_problem_dimensions(prob.A, prob.b, prob.u0)
     u = __static_default_ldiv(prob.A, prob.b)
     return SciMLBase.build_linear_solution(
         alg, u, nothing, nothing; retcode = ReturnCode.Success
@@ -1106,6 +1194,7 @@ function SciMLBase.solve(
         prob::StaticLinearProblem,
         alg::SciMLLinearSolveAlgorithm, args...; kwargs...
     )
+    _check_problem_dimensions(prob.A, prob.b, prob.u0)
     if alg === nothing || alg isa DirectLdiv!
         u = prob.A \ prob.b
     elseif alg isa LUFactorization

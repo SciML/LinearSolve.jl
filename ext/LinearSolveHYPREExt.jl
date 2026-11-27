@@ -198,6 +198,7 @@ function SciMLBase.init(
     end
 
     # Auto-construction of HYPREMatrix/HYPREVector touches MPI inside HYPRE.jl.
+    LinearSolve._check_problem_dimensions(A, b, u0)
     ensure_hypre_initialized(A, b, u0)
     A = auto_hypre_matrix(alg, A)
     b = auto_hypre_vector(alg, b)

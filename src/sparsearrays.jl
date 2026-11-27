@@ -368,6 +368,10 @@ end
         front_alloc_init = JL_UMFPACK_FRONT_ALLOC_INIT,
         droptol = JL_UMFPACK_DROPTOL,
         irstep = JL_UMFPACK_IRSTEP,
+        # One-based slots of SuiteSparse's zero-based `UMFPACK_PIVOT_TOLERANCE`
+        # (3) and `UMFPACK_STRATEGY` (5), neither of which is public in Julia.
+        pivot_tolerance = 4,
+        strategy = 6,
     )
 
     # UMFPACK's control vector for `alg`, or `nothing` when it asks for no

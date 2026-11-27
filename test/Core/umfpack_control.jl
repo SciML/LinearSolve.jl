@@ -98,6 +98,58 @@ using LinearSolve, SparseArrays, LinearAlgebra, Test, Random
             @test control[JL_UMFPACK_PRL] == 1
         end
 
+        # `pivot_tolerance` and `strategy` have no `JL_UMFPACK_*` alias on every
+        # supported Julia. Their one-based slots are 4 and 6.
+        @testset "$setting reaches only its own control slot" for (setting, value, slot) in
+            ((:pivot_tolerance, 1.0, 4), (:strategy, 3, 6))
+
+            cache = init(
+                LinearProblem(copy(A), copy(b)),
+                UMFPACKFactorization(control = NamedTuple{(setting,)}((value,)))
+            )
+            sol = solve!(cache)
+            @test SciMLBase.successful_retcode(sol)
+            control = cache_control(cache)
+            reference = get_umfpack_control(Float64, Int)
+            @test control[slot] == value
+            @test findall(.!isequal.(control, reference)) == [slot]
+        end
+
+        # A saddle-point matrix [K B'; B 0] with a weakly scaled constraint block
+        # loses digits under UMFPACK's default threshold pivoting. The residual
+        # alone does not constrain the pressure block, so its error against the
+        # known solution is checked too. The coefficients are dyadic so that the
+        # manufactured right-hand side is exact in Float64.
+        @testset "pivot_tolerance improves accuracy on a saddle-point matrix" begin
+            m = 50
+            T = spdiagm(-1 => -ones(m - 1), 0 => 2ones(m), 1 => -ones(m - 1))
+            L = kron(sparse(I, m, m), T) + kron(T, sparse(I, m, m))
+            nu = size(L, 1)
+            K = blockdiag(L + 2.0^-7 * I, L + 2.0^-7 * I)
+            D = spdiagm(-1 => -ones(nu - 1), 1 => ones(nu - 1))
+            B = 2.0^-20 * [D D'][1:2:end, :]
+            np = size(B, 1)
+            S = [K B'; B spzeros(np, np)]
+            exact = ones(2nu + np)
+            rhs = S * exact
+            pressure = (2nu + 1):(2nu + np)
+            function errors(alg)
+                sol = solve(LinearProblem(copy(S), copy(rhs)), alg)
+                @test SciMLBase.successful_retcode(sol)
+                return (
+                    residual = norm(S * sol.u - rhs) / norm(rhs),
+                    pressure = norm(sol.u[pressure] - exact[pressure]) / norm(exact[pressure]),
+                )
+            end
+            default = errors(UMFPACKFactorization())
+            pivoted = errors(UMFPACKFactorization(control = (; pivot_tolerance = 1.0)))
+            @test pivoted.residual < 1.0e-13
+            @test 100 * pivoted.residual < default.residual
+            @test pivoted.pressure < default.pressure
+            symmetric = errors(UMFPACKFactorization(control = (; strategy = 3)))
+            @test symmetric.residual < 1.0e-12
+        end
+
         @testset "unnamed entries keep SparseArrays' defaults" begin
             reference = get_umfpack_control(Float64, Int)
             cache = init(

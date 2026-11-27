@@ -1798,14 +1798,14 @@ end
 # accepts, mapped to their index by `_UMFPACK_CONTROL_INDEX` in `src/sparsearrays.jl`.
 # Names follow SuiteSparse's own (`UMFPACK_IRSTEP` -> `irstep`), so the UMFPACK
 # User Guide reads across directly.
-# `pivot_tolerance` is deliberately absent: SparseArrays only grew
-# `JL_UMFPACK_PIVOT_TOLERANCE` after the version the Julia LTS ships, so
-# accepting it would give an API that exists on release and not on LTS. It can
-# be added once the LTS carries it.
+# `pivot_tolerance` and `strategy` are indexed by their SuiteSparse ABI slot,
+# since SparseArrays has no `JL_UMFPACK_*` alias for `strategy` and only grew
+# the one for `pivot_tolerance` after the Julia LTS.
 const UMFPACK_CONTROL_KEYS = (
     :prl, :dense_row, :dense_col, :block_size, :ordering,
     :fixq, :amd_dense, :aggressive, :singletons, :alloc_init,
     :sym_pivot_tolerance, :scale, :front_alloc_init, :droptol, :irstep,
+    :pivot_tolerance, :strategy,
 )
 
 """
@@ -1850,6 +1850,17 @@ factorization itself, for instance a looser pivot threshold:
 
 ```julia
 solve(prob, UMFPACKFactorization(control = (; sym_pivot_tolerance = 0.01)))
+```
+
+`pivot_tolerance` defaults to `0.1`. A value of `1.0` requests partial pivoting
+under the unsymmetric strategy. The symmetric strategy uses
+`sym_pivot_tolerance` for its preference for diagonal pivots. `strategy` takes
+UMFPACK's numeric value: `0` auto, `1` unsymmetric, `3` symmetric. These are
+controls that can reduce residuals on some saddle-point systems `[K B'; B 0]`:
+
+```julia
+solve(prob, UMFPACKFactorization(control = (; strategy = 3, irstep = 2)))
+solve(prob, UMFPACKFactorization(control = (; pivot_tolerance = 1.0)))
 ```
 """
 struct UMFPACKFactorization{C <: NamedTuple} <: AbstractSparseFactorization

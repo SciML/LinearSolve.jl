@@ -245,6 +245,71 @@ end
         @test rowperm(1.0) == [2, 1] # above threshold: pivot on largest entry
     end
 
+    @testset "KLU row scaling option: $alg" for alg in (KLUFactorization, PureKLUFactorization)
+        @test alg().scale == 2 # default value
+        @test_throws "must be 0 (none), 1 (sum), or 2 (max), got 3" alg(scale = 3)
+        @test_throws "must be 0 (none), 1 (sum), or 2 (max), got -1" alg(scale = -1)
+
+        # Row 1 holds an entry 1e6 times larger than A[1, 1]. Row scaling makes the
+        # scaled A[1, 1] fall below `tol` times the scaled A[2, 1], so KLU pivots on
+        # row 2; without scaling it keeps the diagonal pivot. `Rs`, `RsB`, and `RsC`
+        # hold the row scale factors of A, B, and C in pivot order.
+        expected = [1.0, 2.0]
+        for (scale, p, Rs, RsB, RsC) in (
+                (0, [1, 2], [1.0, 1.0], [1.0, 1.0], [1.0, 1.0]),
+                (1, [2, 1], [1.5, 1000001.0], [3.5, 1000002.0], [1000001.0, 0.5]),
+                (2, [2, 1], [1.0, 1.0e6], [3.0, 1.0e6], [1.0e6, 0.5]),
+            )
+            A = sparse([1.0 1.0e6; 0.5 1.0])
+            cache = SciMLBase.init(LinearProblem(A, A * expected), alg(; scale))
+            @test solve!(cache).u ≈ expected
+            @test cache.cacheval.common.scale == scale
+            @test cache.cacheval.p == p
+            @test cache.cacheval.Rs == Rs
+
+            # The refactorization with the reused pivots applies the same scaling.
+            B = sparse([2.0 1.0e6; 0.5 3.0])
+            cache.A = B
+            cache.b = B * expected
+            @test solve!(cache).u ≈ expected
+            @test cache.cacheval.common.scale == scale
+            @test cache.cacheval.p == p
+            @test cache.cacheval.Rs == RsB
+
+            # A pattern change triggers a fresh factorization with the same scaling.
+            # The zero in C[2, 2] forces the pivot order, independent of scaling.
+            C = sparse([1.0 1.0e6; 0.5 0.0])
+            cache.A = C
+            cache.b = C * expected
+            @test solve!(cache).u ≈ expected
+            @test cache.cacheval.common.scale == scale
+            @test cache.cacheval.p == [1, 2]
+            @test cache.cacheval.Rs == RsC
+        end
+    end
+
+    @testset "KLU positional constructors" begin
+        @test KLUFactorization(false, true) == KLUFactorization(;
+            reuse_symbolic = false, check_pattern = true
+        )
+        @test KLUFactorization(false, true).scale == 2
+        @test PureKLUFactorization(false, true, false, nothing, 0.125) ==
+            PureKLUFactorization(;
+            reuse_symbolic = false, check_pattern = true, use_fma = false,
+            fully_preallocated = nothing, tol = 0.125
+        )
+        @test PureKLUFactorization(false, true, false, nothing, 0.125).scale == 2
+    end
+
+    @testset "KLU.klu row scaling validation: $T" for T in (Float64, ComplexF64)
+        A = sparse(T[2 1; 1 3])
+        for scale in (0, 1, 2)
+            @test LinearSolve.KLU.klu(A; scale).common.scale == scale
+        end
+        @test_throws "must be 0 (none), 1 (sum), or 2 (max), got 3" LinearSolve.KLU.klu(A; scale = 3)
+        @test_throws "must be 0 (none), 1 (sum), or 2 (max), got -1" LinearSolve.KLU.klu(A; scale = -1)
+    end
+
     @testset "RFLUFactorization multi-RHS" begin
         # The extension routes matrix right-hand sides through TriangularSolve;
         # results must match the stdlib path exactly in behaviour.

@@ -610,7 +610,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
             if length(cacheval.nzval) != length(nonzeros(A)) || alg.check_pattern && pattern_changed(cacheval, A)
                 fact = KLU.klu(
                     LinearSolve.make_SparseMatrixCSC(A),
-                    check = false
+                    check = false, scale = alg.scale
                 )
             else
                 fact = KLU.klu!(cacheval, nonzeros(A), check = false)
@@ -629,7 +629,7 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
             # https://github.com/SciML/LinearSolve.jl/issues/991.
             fact = KLU.klu(
                 LinearSolve.make_SparseMatrixCSC(A),
-                check = false
+                check = false, scale = alg.scale
             )
         end
         cache.cacheval = fact
@@ -790,7 +790,7 @@ function SciMLBase.solve!(
                         nonzeros(A)
                     ),
                     check = false, use_fma = alg.use_fma, tol = alg.tol,
-                    fully_preallocated = alg.fully_preallocated
+                    fully_preallocated = alg.fully_preallocated, scale = alg.scale
                 )
             else
                 fact = PureKLU.klu!(cacheval, nonzeros(A); check = false)
@@ -810,7 +810,7 @@ function SciMLBase.solve!(
                     nonzeros(A)
                 ),
                 check = false, use_fma = alg.use_fma, tol = alg.tol,
-                fully_preallocated = alg.fully_preallocated
+                fully_preallocated = alg.fully_preallocated, scale = alg.scale
             )
         end
         cache.cacheval = fact

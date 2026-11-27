@@ -35,6 +35,25 @@ this is only recommended for Float32 matrices. Choose `CudaOffloadLUFactorizatio
 performance on well-conditioned problems, or `CudaOffloadQRFactorization` for better numerical 
 stability on ill-conditioned problems.
 
+#### Certified Square Systems
+
+Use `CertifiedLUQR()` when a least-squares approximation must be distinguished
+from a solution of `A*x = b`. It accepts LU only after relative pivot and residual
+checks, then falls back to column-pivoted QR. Both paths require
+`norm(A*x - b) <= reltol * (norm(A)*norm(x) + norm(b))` for `ReturnCode.Success`.
+An inconsistent system returns `ReturnCode.Infeasible`.
+
+For a rank-deficient consistent system, the default gives the minimum-norm
+solution. `CertifiedLUQR(reference = :u0)` instead minimizes the change from the
+problem's `u0`, saved at initialization. `pivot_tol` and `rank_tol` configure
+the relative LU pivot and QR rank thresholds. Read `sol.stats.numerical_rank`
+and `sol.stats.relative_residual` for diagnostics. This algorithm supports
+square strided CPU floating-point matrices and vector right-hand sides.
+
+```@docs
+CertifiedLUQR
+```
+
 #### Non-Square and Least-Squares Systems
 
 A non-square `A` is solved in the least-squares (tall `A`) or minimum-norm

@@ -480,6 +480,7 @@ include("common.jl")
 include("interface.jl")
 include("extension_algs.jl")
 include("factorization.jl")
+include("certified_luqr.jl")
 include("slate.jl")
 include("appleaccelerate.jl")
 include("mkl.jl")
@@ -812,6 +813,7 @@ PrecompileTools.@compile_workload begin
 end
 
 export LUFactorization, SVDFactorization, QRFactorization, GenericFactorization,
+    CertifiedLUQR,
     LowRankUpdatedMatrix,
     GenericLUFactorization, GESVFactorization, SimpleLUFactorization,
     RFLUFactorization, ButterflyFactorization,

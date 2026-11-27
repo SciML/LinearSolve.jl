@@ -139,7 +139,8 @@ using LinearSolve, LinearAlgebra, Test
         sol = solve!(cache)
         @test sol.retcode == ReturnCode.Success
 
-        # Set A to a new larger matrix
+        # Announce the new problem size, then set A to a new larger matrix.
+        resize!(cache, 5)
         A_new = rand(5, 5) + 5I
         b_new = rand(5)
         cache.A = A_new

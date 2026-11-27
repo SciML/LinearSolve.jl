@@ -258,6 +258,7 @@ calling the constructor directly.
   - `sensealg::S`: Sensitivity algorithm associated with the solve.
   - `sparse_reduction::Tred`: State for persistent sparse-pattern reduction, or `nothing`.
   - `alias_A::Bool`: Whether the caller permits replacing or mutating `A`.
+  - `resize_to::Union{Nothing, Int}`: Problem dimension announced by `resize!`, or `nothing`.
 
 # Interface rules
 
@@ -303,6 +304,42 @@ mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, Tlv <: Linear
     # never `nothing`). `true` means the user permitted overwriting `A`, which
     # also permits in-place refactorization (e.g. `lu!(A)`) after `cache.A = X`.
     alias_A::Bool
+    # Set by `resize!` until both A and b have been replaced at the announced
+    # dimension. This keeps an explicit resize distinguishable from an ordinary
+    # mismatched assignment without resizing or replacing the caller's arrays.
+    resize_to::Union{Nothing, Int}
+end
+
+@inline function _check_cache_assignment_size(cache::LinearCache, name::Symbol, x)
+    if name === :A
+        resize_to = getfield(cache, :resize_to)
+        expected_size = resize_to === nothing ?
+            size(getfield(cache, :A)) : (resize_to, resize_to)
+        size(x) == expected_size || throw(
+            DimensionMismatch(
+                "`cache.A` must have size $expected_size to match the problem, got $(size(x))."
+            )
+        )
+    elseif name === :b
+        resize_to = getfield(cache, :resize_to)
+        expected_rows = resize_to === nothing ? size(getfield(cache, :A), 1) : resize_to
+        size(x, 1) == expected_rows || throw(
+            DimensionMismatch(
+                "`cache.b` must have $expected_rows rows to match `A`, got $(size(x, 1))."
+            )
+        )
+    end
+    return nothing
+end
+
+@inline function _complete_cache_resize!(cache::LinearCache)
+    resize_to = getfield(cache, :resize_to)
+    if resize_to !== nothing &&
+            size(getfield(cache, :A)) == (resize_to, resize_to) &&
+            size(getfield(cache, :b), 1) == resize_to
+        setfield!(cache, :resize_to, nothing)
+    end
+    return cache
 end
 
 # `@inline` is load-bearing: `name` must constant-propagate into the body so the
@@ -311,6 +348,10 @@ end
 # dynamic calls and allocate, breaking the 0-byte ceilings in
 # test/Core/lu_refactorization.jl on the default-algorithm paths.
 @inline function Base.setproperty!(cache::LinearCache, name::Symbol, x)
+    # Reject incompatible dimensions before conversion, freshness changes, or
+    # algorithm cache updates so a failed assignment leaves the cache untouched.
+    _check_cache_assignment_size(cache, name, x)
+
     # Default `setproperty!` semantics convert to the field's declared type; this
     # override must do the same, or an update whose eltype differs from the cache's
     # (an integer `cache.b = [1, 0, ...]` after the init-time integer-to-float
@@ -346,11 +387,16 @@ end
         return __setfield!(cache.cacheval, cache.alg, x)
         # return setfield!(cache.cacheval, Symbol(cache.alg.alg), x)
     end
-    return setfield!(cache, name, x)
+    result = setfield!(cache, name, x)
+    if name === :A || name === :b
+        _complete_cache_resize!(cache)
+    end
+    return result
 end
 
 function Base.resize!(cache::LinearCache, i::Int)
     resize_cacheval!(cache, cache.cacheval, i)
+    setfield!(cache, :resize_to, i)
     setfield!(cache, :isfresh, true)
     return cache
 end
@@ -593,6 +639,17 @@ function __init_u0_from_Ab(
     return zeros(SMatrix{S2, S2b, Tb})
 end
 
+function _check_linear_problem_sizes(A, b)
+    nrows_A = size(A, 1)
+    nrows_b = size(b, 1)
+    nrows_A == nrows_b || throw(
+        DimensionMismatch(
+            "`A` has $nrows_A rows, but `b` has $nrows_b rows."
+        )
+    )
+    return nothing
+end
+
 """
     _check_batched_rhs_support(alg, b)
 
@@ -760,6 +817,7 @@ function __init(
         kwargs...
     )
     (; A, b, u0, p) = prob
+    _check_linear_problem_sizes(A, b)
     _check_matrix_support(A)
 
     # Integer-eltype problems are solved as their float (or joint-promoted)
@@ -919,7 +977,7 @@ function __init(
         typeof(sensealg), typeof(sparse_reduction),
     }(
         A, b, u0_, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
-        maxiters, verbose_spec, assumptions, sensealg, sparse_reduction, alias_A
+        maxiters, verbose_spec, assumptions, sensealg, sparse_reduction, alias_A, nothing
     )
     return cache
 end
@@ -971,8 +1029,10 @@ function SciMLBase.solve(
     # `_is_structure_rhs`.
     if _is_structure_rhs(prob.b)
         buffer, = SciMLStructures.canonicalize(SciMLStructures.Tunable(), prob.b)
+        _check_linear_problem_sizes(prob.A, buffer)
         return solve(prob, defaultalg(prob.A, buffer, assump), args...; kwargs...)
     end
+    _check_linear_problem_sizes(prob.A, prob.b)
     # Promote integer-eltype problems before choosing the algorithm, so the choice
     # and the cache agree on the types; see `__promote_int_problem`.
     prob = __promote_int_problem(prob, nothing)

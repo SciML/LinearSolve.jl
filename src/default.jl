@@ -1265,6 +1265,11 @@ end
                 _reuse_sparse_qr_fallback(cache, alg)
             end
         else
+            # `isfresh` can be set without assigning `cache.A` (in-place edits of
+            # `A`), so a refactorization has to drop an earlier fallback here.
+            if cache.cacheval isa DefaultLinearSolverInit
+                cache.cacheval.fell_back_to_qr = false
+            end
             $alg_dispatch
         end
     end

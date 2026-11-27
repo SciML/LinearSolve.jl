@@ -588,6 +588,12 @@ for Tv in KLUValueTypes, Ti in KLUIndexTypes
     end
 end
 
+function check_scale(scale)
+    scale in (0, 1, 2) ||
+        throw(ArgumentError("KLU row scaling `scale` must be 0 (none), 1 (sum), or 2 (max), got $scale"))
+    return scale
+end
+
 """
     klu_factor!(K::KLUFactorization; check=true, allowsingular=false) -> K::KLUFactorization
 
@@ -644,7 +650,8 @@ The relation between `K` and `A` is
   - `allowsingular::Bool`: If `true` (default `false`) allow the factorization to proceed even if the matrix is singular. Note that this will allow for
     silent divide by zero errors in subsequent `solve!` or `ldiv!` calls if singularity is not checked by the user with `klu.common.status == KLU.KLU_SINGULAR`
   - `scale::Integer`: Row scaling before pivoting, stored in `K.common.scale`: `2` (default) divides each row by its maximum absolute entry,
-    `1` by the sum of its absolute entries, and `0` disables scaling. [`klu!`](@ref) reuses it.
+    `1` by the sum of its absolute entries, and `0` disables scaling. [`klu!`](@ref) reuses it. Other values throw an `ArgumentError`.
+    Without scaling, entries close to `floatmax(Float64)` can overflow during the factorization.
 
 !!! note
 
@@ -659,6 +666,7 @@ function klu(
         n, colptr::Vector{Ti}, rowval::Vector{Ti}, nzval::Vector{Tv}; check = true,
         allowsingular = false, scale::Integer = 2
     ) where {Ti <: KLUITypes, Tv <: AbstractFloat}
+    check_scale(scale)
     if Tv != Float64
         nzval = convert(Vector{Float64}, nzval)
     end
@@ -671,6 +679,7 @@ function klu(
         n, colptr::Vector{Ti}, rowval::Vector{Ti}, nzval::Vector{Tv}; check = true,
         allowsingular = false, scale::Integer = 2
     ) where {Ti <: KLUITypes, Tv <: Complex}
+    check_scale(scale)
     if Tv != ComplexF64
         nzval = convert(Vector{ComplexF64}, nzval)
     end

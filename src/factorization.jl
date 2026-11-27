@@ -1918,7 +1918,8 @@ factorization is recomputed with new pivots while retaining the symbolic analysi
     Pivots are selected, and the reciprocal pivot growth that triggers re-pivoting is
     computed, on the scaled matrix. When the row magnitudes differ by many orders of
     magnitude, row scaling can lead to pivots that make the solution inaccurate;
-    `scale = 0` avoids this. Defaults to `2`.
+    `scale = 0` avoids this. Without scaling, entries close to `floatmax(Float64)`
+    can overflow during the factorization. Defaults to `2`.
 """
 Base.@kwdef struct KLUFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool = true
@@ -1928,6 +1929,9 @@ Base.@kwdef struct KLUFactorization <: AbstractSparseFactorization
         return new(reuse_symbolic, check_pattern, _check_klu_scale(scale))
     end
 end
+
+KLUFactorization(reuse_symbolic, check_pattern) =
+    KLUFactorization(reuse_symbolic, check_pattern, 2)
 
 function init_cacheval(
         alg::KLUFactorization,
@@ -1975,7 +1979,8 @@ requested explicitly.
     diagonal. Applies to initial and subsequent numerical factorizations. Defaults to `0.001`.
   - `scale`: row scaling applied before pivoting, as in [`KLUFactorization`](@ref): `2`
     divides each row by its maximum absolute entry, `1` by the sum of its absolute entries,
-    and `0` disables scaling. Defaults to `2`.
+    and `0` disables scaling. Without scaling, entries close to `floatmax(Float64)` can
+    overflow during the factorization. Defaults to `2`.
 """
 Base.@kwdef struct PureKLUFactorization <: AbstractSparseFactorization
     reuse_symbolic::Bool = true
@@ -1992,6 +1997,12 @@ Base.@kwdef struct PureKLUFactorization <: AbstractSparseFactorization
             _check_klu_scale(scale)
         )
     end
+end
+
+function PureKLUFactorization(reuse_symbolic, check_pattern, use_fma, fully_preallocated, tol)
+    return PureKLUFactorization(
+        reuse_symbolic, check_pattern, use_fma, fully_preallocated, tol, 2
+    )
 end
 
 function init_cacheval(

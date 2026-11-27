@@ -154,3 +154,25 @@ end
     sol = solve!(cache)
     @test norm(A1 * sol.u - b1) < 1.0e-6
 end
+
+@testset "warm start temporaries do not allocate per solve" begin
+    solve_bytes(cache) = @allocated solve!(cache)
+    precs = (A, p) -> (Diagonal(Vector(diag(A))), I)
+    @testset "$constructor $mode" for constructor in (KrylovJL_GMRES, KrylovJL_FGMRES),
+            mode in (WarmStart.Previous, WarmStart.Hegedus)
+
+        cache = init(
+            LinearProblem(A1, copy(b1)), constructor(; precs, warm_start = mode);
+            abstol = tol, reltol = tol
+        )
+        solve!(cache)
+        for b in (b2, b1)
+            cache.b = b
+            solve!(cache)
+        end
+        cache.b = b2
+        # a single temporary of `b`'s size would exceed this
+        @test solve_bytes(cache) < sizeof(b2)
+        @test norm(A1 * cache.u - b2) < 1.0e-6
+    end
+end

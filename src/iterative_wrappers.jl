@@ -576,6 +576,13 @@ const _WARM_STARTABLE_WORKSPACES = Union{Krylov.GmresWorkspace, Krylov.FgmresWor
 const _HEGEDUS_MAX_RESIDUAL_RATIO = 0.5
 const _HEGEDUS_MIN_COSINE = sqrt(1 - _HEGEDUS_MAX_RESIDUAL_RATIO^2)
 
+# `workspace.w` is overwritten by `krylov_solve!` before it is read, so it is free to
+# hold temporaries until then. Only dense arrays are fully described by type and length.
+function _krylov_scratch(workspace, b)
+    w = workspace.w
+    return b isa DenseVector && typeof(w) === typeof(b) && length(w) == length(b) ? w : similar(b)
+end
+
 """
     _krylov_warm_start!(workspace, cache, mode, M, atol, rtol) -> (atol, rtol)
 
@@ -593,8 +600,9 @@ function _krylov_warm_start!(workspace, cache, mode::WarmStart.T, M, atol, rtol)
     (u isa AbstractVector && eltype(u) <: Number) || return atol, rtol
     unorm = norm(u)
     (iszero(unorm) || !isfinite(unorm)) && return atol, rtol
+    scratch = _krylov_scratch(workspace, cache.b)
     if mode == WarmStart.Hegedus
-        Au = mul!(similar(cache.b), cache.A, u)
+        Au = mul!(scratch, cache.A, u)
         d = real(dot(Au, Au))
         (iszero(d) || !isfinite(d)) && return atol, rtol
         Aub = dot(Au, cache.b)
@@ -602,11 +610,11 @@ function _krylov_warm_start!(workspace, cache, mode::WarmStart.T, M, atol, rtol)
         bnorm = norm(cache.b)
         (iszero(bnorm) || !isfinite(bnorm)) && return atol, rtol
         abs(Aub) < _HEGEDUS_MIN_COSINE * sqrt(d) * bnorm && return atol, rtol
-        Krylov.warm_start!(workspace, (Aub / d) .* u)
-        bnorm = M === I ? bnorm : norm(ldiv!(similar(cache.b), M, cache.b))
+        Krylov.warm_start!(workspace, scratch .= (Aub / d) .* u)
+        bnorm = M === I ? bnorm : norm(ldiv!(scratch, M, cache.b))
     else
         Krylov.warm_start!(workspace, u)
-        bnorm = M === I ? norm(cache.b) : norm(ldiv!(similar(cache.b), M, cache.b))
+        bnorm = M === I ? norm(cache.b) : norm(ldiv!(scratch, M, cache.b))
     end
     return atol + rtol * bnorm, zero(rtol)
 end

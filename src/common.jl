@@ -1118,7 +1118,10 @@ function SciMLBase.solve(
     )
     if alg === nothing || alg isa DirectLdiv!
         u = prob.A \ prob.b
-    elseif alg isa LUFactorization && alg.pivot isa RowMaximum && !alg.residualsafety
+    elseif alg isa LUFactorization && (
+            (prob.A isa SMatrix && prob.b isa Union{SMatrix, SVector}) ||
+                (alg.pivot isa RowMaximum && !alg.residualsafety)
+        )
         F = lu(prob.A, check = false)
         if !LinearAlgebra.issuccess(F)
             # Match dense `LUFactorization` on singular input: report Failure

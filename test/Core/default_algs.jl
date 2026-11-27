@@ -884,3 +884,49 @@ end
         @test norm(Matrix(A) * sol.u - rhs) / norm(rhs) < 1.0e-13
     end
 end
+
+@testset "QR fallback and QRFactorization for non-BLAS float types" begin
+    @testset "default QR fallback on singular $T matrix" for T in (BigFloat, Complex{BigFloat})
+        A = T[1 2; 2 4]
+        b1 = T[1, 2]
+        b2 = T[3, 6]
+        ref1 = qr(A, ColumnNorm()) \ b1
+        ref2 = qr(A, ColumnNorm()) \ b2
+
+        cache = init(LinearProblem(copy(A), copy(b1)))
+        sol1 = solve!(cache)
+        @test sol1.retcode === ReturnCode.Success
+        @test cache.cacheval.fell_back_to_qr
+        @test sol1.u ≈ ref1
+
+        cache.b = copy(b2)
+        sol2 = solve!(cache)
+        @test sol2.retcode === ReturnCode.Success
+        @test sol2.u ≈ ref2
+    end
+
+    @testset "QRFactorization on $T" for T in (Float16, ComplexF16, BigFloat, Complex{BigFloat})
+        A = T[4 1; 1 3]
+        b = T[1, 2]
+        for piv in (NoPivot(), ColumnNorm()), inplace in (true, false)
+            alg = QRFactorization(piv, inplace)
+            ref = qr(A, piv) \ b
+            sol = solve(LinearProblem(copy(A), copy(b)), alg)
+            @test sol.retcode === ReturnCode.Success
+            @test sol.u ≈ ref
+        end
+
+        Av = view(T[4 1 0; 1 3 0; 0 0 1], 1:2, 1:2)
+        for piv in (NoPivot(), ColumnNorm())
+            solv = solve(LinearProblem(copy(Av), copy(b)), QRFactorization(piv))
+            @test solv.retcode === ReturnCode.Success
+            @test solv.u ≈ qr(Av, piv) \ b
+        end
+
+        Atall = T[4 1; 1 3; 2 1]
+        btall = T[1, 2, 3]
+        sol_ns = solve(LinearProblem(copy(Atall), copy(btall)))
+        @test sol_ns.retcode === ReturnCode.Success
+        @test sol_ns.u ≈ qr(Atall, NoPivot()) \ btall
+    end
+end

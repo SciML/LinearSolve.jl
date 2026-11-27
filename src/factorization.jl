@@ -1059,12 +1059,24 @@ function init_cacheval(
         assumptions::OperatorAssumptions
     )
     A_ = convert(AbstractMatrix, A)
-    # Matches the wide GPU branch of `do_factorization`: the slot has to be typed for
-    # what will be stored in it, not for a plain `QR`.
-    if A_ isa GPUArraysCore.AnyGPUArray && !is_cusparse(A_) && is_underdetermined(A_)
-        return MinNormQR(qr(copy(transpose(A_))))
+    if A_ isa GPUArraysCore.AnyGPUArray
+        # Matches the wide GPU branch of `do_factorization`: the slot has to be typed for
+        # what will be stored in it, not for a plain `QR`.
+        !is_cusparse(A_) && is_underdetermined(A_) &&
+            return MinNormQR(qr(copy(transpose(A_))))
+        # GPU `qr` (e.g. cuSOLVER) does not accept a pivoting strategy.
+        return qr(A_)
     end
-    return ArrayInterface.qr_instance(A_, alg.pivot)
+    A_ isa StaticArray && return qr(A_, alg.pivot)
+    S = similar(A_, 0, 0)
+    if issparsematrix(S)
+        # SPQR does not accept a pivoting strategy and fails on 0x0 matrices.
+        Base.USE_GPL_LIBS && issparsematrixcsc(S) &&
+            eltype(A_) <: Union{Float64, ComplexF64} &&
+            return qr(similar(A_, 1, 1))
+        return nothing
+    end
+    return qr(S, alg.pivot)
 end
 
 function init_cacheval(

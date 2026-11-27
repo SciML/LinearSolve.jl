@@ -332,7 +332,7 @@ _set_cache_problem_size!(cache::LinearCache, size) = cache
     return x isa FT ? x : convert(FT, x)
 end
 
-_prepare_cache_assignment(cache::LinearCache, name::Symbol, x) =
+@inline _prepare_cache_assignment(cache::LinearCache, name::Symbol, x) =
     _convert_cache_field(cache, name, x)
 
 @inline function _check_cache_assignment_size(cache::LinearCache, name::Symbol, x)

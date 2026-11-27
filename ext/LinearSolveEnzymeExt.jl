@@ -727,12 +727,7 @@ function EnzymeRules.augmented_primal(
         end
         for (dcache, dx) in zip(dcaches, dxs)
             if field === :A || field === :b
-                # A resizing primal assignment announces the new dimensions. Keep
-                # the shadow's validation/bookkeeping in sync before assigning dx.
-                LinearSolve._set_cache_problem_size!(
-                    dcache, LinearSolve._cache_problem_size(cache.val)
-                )
-                setfield!(dcache, :resize_state, getfield(cache.val, :resize_state))
+                setfield!(dcache, :resize_state, old_resize_state)
             end
             func.val(dcache, field, dx)
         end

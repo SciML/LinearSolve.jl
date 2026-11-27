@@ -180,3 +180,147 @@ end
     @test SciMLBase.successful_retcode(solns.retcode)
     @test solns.u ≈ Matrix(Ans) \ Vector(bns)
 end
+
+@testset "MMatrix/MVector" begin
+    A0 = [
+        4.0 1.0 0.0 2.0
+        1.0 5.0 1.0 0.0
+        0.0 1.0 6.0 1.0
+        2.0 0.0 1.0 7.0
+    ]
+    MA = MMatrix{4, 4}(A0)
+    mb = MVector{4}([1.0, 2.0, 3.0, 4.0])
+    mb2 = MVector{4}([4.0, 3.0, 2.0, 1.0])
+    prob = LinearProblem(MA, mb)
+
+    @test LinearSolve.defaultalg(MA, mb, LinearSolve.OperatorAssumptions(true)) isa
+        LUFactorization
+    @test LinearSolve.defaultalg(
+        MMatrix{3, 2}(ones(3, 2)), MVector{3}(ones(3)),
+        LinearSolve.OperatorAssumptions(false)
+    ) isa SVDFactorization
+
+    for alg in (DirectLdiv!(), GESVFactorization())
+        s = solve(prob, alg)
+        @test s.u isa MVector{4, Float64}
+        @test s.retcode == ReturnCode.Success
+        @test s.u ≈ A0 \ Vector(mb)
+    end
+
+    for alg in (
+            nothing,
+            LUFactorization(),
+            LUFactorization(; pivot = NoPivot()),
+            LUFactorization(; residualsafety = true),
+            GenericLUFactorization(),
+            GenericLUFactorization(NoPivot()),
+            QRFactorization(),
+            QRFactorization(ColumnNorm()),
+            CholeskyFactorization(),
+            NormalCholeskyFactorization(),
+            SVDFactorization(),
+            KrylovJL_GMRES(),
+        )
+        s = solve(prob, alg)
+        @test s.u isa MVector{4, Float64}
+        @test SciMLBase.successful_retcode(s.retcode)
+        @test norm(A0 * Vector(s.u) - Vector(mb)) < 1.0e-10
+
+        cache = init(LinearProblem(copy(MA), copy(mb)), alg)
+        sc = solve!(cache)
+        @test sc.u isa MVector{4, Float64}
+        @test SciMLBase.successful_retcode(sc.retcode)
+        @test norm(A0 * Vector(sc.u) - Vector(mb)) < 1.0e-10
+
+        cache.b = copy(mb2)
+        sc2 = solve!(cache)
+        @test sc2.u isa MVector{4, Float64}
+        @test norm(A0 * Vector(sc2.u) - Vector(mb2)) < 1.0e-10
+    end
+
+    # Batched MMatrix RHS
+    MB = MMatrix{4, 2}([1.0 0.5; 2.0 1.5; 3.0 2.5; 4.0 3.5])
+    for alg in (
+            nothing, LUFactorization(), GenericLUFactorization(),
+            QRFactorization(), SVDFactorization(),
+        )
+        sb = solve(LinearProblem(MA, MB), alg)
+        @test sb.u isa MMatrix{4, 2, Float64}
+        @test norm(A0 * Matrix(sb.u) - Matrix(MB)) < 1.0e-10
+
+        cb = init(LinearProblem(copy(MA), copy(MB)), alg)
+        sb2 = solve!(cb)
+        @test sb2.u isa MMatrix{4, 2, Float64}
+        @test norm(A0 * Matrix(sb2.u) - Matrix(MB)) < 1.0e-10
+    end
+
+    # Singular MMatrix: default rescues via SVD; LU/GenericLU/GESV report Failure
+    Asing4 = MMatrix{4, 4}(
+        [1.0 2.0 3.0 4.0; 2.0 4.0 6.0 8.0; 0.0 0.0 1.0 0.0; 0.0 0.0 0.0 1.0]
+    )
+    sol_sing = solve(LinearProblem(Asing4, mb))
+    @test SciMLBase.successful_retcode(sol_sing.retcode)
+    @test sol_sing.u isa MVector{4, Float64}
+    @test all(isfinite, sol_sing.u)
+    @test sol_sing.u ≈ pinv(Matrix(Asing4)) * Vector(mb)
+
+    for alg in (LUFactorization(), GenericLUFactorization(), GESVFactorization())
+        sole = solve(LinearProblem(Asing4, mb), alg)
+        @test sole.retcode == ReturnCode.Failure
+        @test sole.u isa MVector{4, Float64}
+        @test all(isfinite, sole.u)
+    end
+
+    # Non-square MMatrix
+    for (m, n) in ((3, 2), (2, 3))
+        Ans_m = MMatrix{m, n}(reshape(Float64.(1:(m * n)), m, n))
+        bns_m = MVector{m}(Float64.(1:m))
+        solns_m = solve(LinearProblem(Ans_m, bns_m))
+        @test SciMLBase.successful_retcode(solns_m.retcode)
+        @test solns_m.u isa MVector{n, Float64}
+        @test solns_m.u ≈ pinv(Matrix(Ans_m)) * Vector(bns_m)
+
+        cns_m = init(LinearProblem(copy(Ans_m), copy(bns_m)))
+        solns_mc = solve!(cns_m)
+        @test solns_mc.u isa MVector{n, Float64}
+        @test solns_mc.u ≈ pinv(Matrix(Ans_m)) * Vector(bns_m)
+    end
+
+    # Integer, Float32, and ComplexF64 MMatrix/MVector
+    MAi = MMatrix{2, 2}([2 1; 1 3])
+    mbi = MVector{2}([1, 2])
+    for alg in (nothing, LUFactorization(), GenericLUFactorization())
+        si = solve(LinearProblem(MAi, mbi), alg)
+        @test si.u isa MVector{2, Float64}
+        @test si.u ≈ [0.2, 0.6]
+    end
+    for T in (Float32, ComplexF64)
+        MAT = MMatrix{4, 4, T}(A0)
+        mbT = MVector{4, T}(mb)
+        for alg in (nothing, LUFactorization(), GenericLUFactorization())
+            sT = solve(LinearProblem(MAT, mbT), alg)
+            @test sT.u isa MVector{4, T}
+            @test norm(MAT * sT.u - mbT) < (T === Float32 ? 1.0f-5 : 1.0e-11)
+        end
+    end
+
+    # alias_A = false preserves MA; alias_A = true solves in place; SMatrix + GenericLU works
+    for alg in (LUFactorization(), GenericLUFactorization())
+        MA_keep = copy(MA)
+        ck = init(LinearProblem(MA_keep, copy(mb)), alg)
+        @test solve!(ck).u ≈ A0 \ Vector(mb)
+        @test MA_keep == MA
+
+        MA_mut = copy(MA)
+        cm = init(
+            LinearProblem(MA_mut, copy(mb)), alg;
+            alias = LinearAliasSpecifier(alias_A = true)
+        )
+        @test solve!(cm).u ≈ A0 \ Vector(mb)
+    end
+    SA = SMatrix{4, 4}(A0)
+    sb_s = SVector{4}(mb)
+    sg = solve(LinearProblem(SA, sb_s), GenericLUFactorization())
+    @test sg.u isa SVector{4, Float64}
+    @test sg.u ≈ SA \ sb_s
+end

@@ -50,7 +50,7 @@ using Libdl: Libdl
 import InteractiveUtils
 import RecursiveArrayTools
 
-import StaticArraysCore: StaticArray, SVector, SMatrix
+import StaticArraysCore: StaticArray, SVector, SMatrix, MVector, MMatrix
 
 using LinearAlgebra.LAPACK: chkfinite, chkstride1,
     @blasfunc, chkargsok

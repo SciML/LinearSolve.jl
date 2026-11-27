@@ -582,15 +582,25 @@ function __init_u0_from_Ab(A, b::AbstractMatrix)
     return u0
 end
 __init_u0_from_Ab(::SMatrix{S1, S2}, b) where {S1, S2} = zeros(SVector{S2, eltype(b)})
+__init_u0_from_Ab(::MMatrix{S1, S2}, b) where {S1, S2} = zeros(MVector{S2, eltype(b)})
+__init_u0_from_Ab(::SMatrix{S1, S2}, b::MVector) where {S1, S2} = zeros(MVector{S2, eltype(b)})
+__init_u0_from_Ab(::MMatrix{S1, S2}, b::SVector) where {S1, S2} = zeros(SVector{S2, eltype(b)})
 function __init_u0_from_Ab(::SMatrix{S1, S2}, b::AbstractMatrix) where {S1, S2}
+    return _init_static_mat_u0(Val(S2), b)
+end
+function __init_u0_from_Ab(::MMatrix{S1, S2}, b::AbstractMatrix) where {S1, S2}
+    return _init_static_mat_u0(Val(S2), b)
+end
+function _init_static_mat_u0(::Val{S2}, b::AbstractMatrix) where {S2}
     u0 = similar(b, S2, size(b, 2))
     fill!(u0, false)
     return u0
 end
-function __init_u0_from_Ab(
-        ::SMatrix{S1, S2}, ::SMatrix{S1b, S2b, Tb}
-    ) where {S1, S2, S1b, S2b, Tb}
+function _init_static_mat_u0(::Val{S2}, ::SMatrix{S1b, S2b, Tb}) where {S2, S1b, S2b, Tb}
     return zeros(SMatrix{S2, S2b, Tb})
+end
+function _init_static_mat_u0(::Val{S2}, ::MMatrix{S1b, S2b, Tb}) where {S2, S1b, S2b, Tb}
+    return zeros(MMatrix{S2, S2b, Tb})
 end
 
 """
@@ -1027,8 +1037,8 @@ end
 
 # Special Case for StaticArrays
 const StaticLinearProblem = LinearProblem{
-    uType, iip, <:SMatrix,
-    <:Union{<:SMatrix, <:SVector},
+    uType, iip, <:Union{<:SMatrix, <:MMatrix},
+    <:Union{<:SMatrix, <:SVector, <:MMatrix, <:MVector},
 } where {uType, iip}
 
 function SciMLBase.solve(prob::StaticLinearProblem, args...; kwargs...)
@@ -1044,7 +1054,7 @@ the dense default's LU -> pivoted-QR `safetyfallback`. SVD is used instead of
 QR because `qr(::SMatrix) \\ b` least-squares is not defined in StaticArrays
 (see `defaultalg(::SMatrix)`).
 """
-function __static_default_ldiv(A::SMatrix{N, N}, b) where {N}
+function __static_default_ldiv(A::Union{SMatrix{N, N}, MMatrix{N, N}}, b) where {N}
     # StaticArrays' square `\` uses direct inverse formulas for N <= 3 (never
     # throws; singular input silently yields Inf/NaN) and `lu(A) \ b` with
     # `check = true` (throws SingularException) for larger sizes. Keep `A \ b`
@@ -1072,7 +1082,7 @@ function __static_default_ldiv(A::SMatrix{N, N}, b) where {N}
 end
 __static_default_ldiv(A, b) = A \ b
 
-function __static_gesv_ldiv(A::SMatrix{N, N}, b) where {N}
+function __static_gesv_ldiv(A::Union{SMatrix{N, N}, MMatrix{N, N}}, b) where {N}
     if N <= 3
         u = A \ b
         ok = all(isfinite, u) || LinearAlgebra.issuccess(lu(A, check = false))
@@ -1108,7 +1118,10 @@ function SciMLBase.solve(
     )
     if alg === nothing || alg isa DirectLdiv!
         u = prob.A \ prob.b
-    elseif alg isa LUFactorization
+    elseif alg isa LUFactorization && (
+            (prob.A isa SMatrix && prob.b isa Union{SMatrix, SVector}) ||
+                (alg.pivot isa RowMaximum && !alg.residualsafety)
+        )
         F = lu(prob.A, check = false)
         if !LinearAlgebra.issuccess(F)
             # Match dense `LUFactorization` on singular input: report Failure
@@ -1133,7 +1146,7 @@ function SciMLBase.solve(
                 alg, u, nothing, nothing; retcode = ReturnCode.Failure
             )
         end
-    elseif alg isa QRFactorization
+    elseif alg isa QRFactorization && prob.A isa SMatrix
         u = qr(prob.A) \ prob.b
     elseif alg isa CholeskyFactorization
         u = cholesky(prob.A) \ prob.b

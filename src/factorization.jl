@@ -175,8 +175,18 @@ function LinearAlgebra.ldiv!(x::AbstractVector, F::MinNormQR, b::AbstractVector)
 end
 
 _ldiv!(x, A, b::SVector) = (x .= A \ b)
-_ldiv!(::SVector, A, b::SVector) = (A \ b)
-_ldiv!(::SVector, A, b) = (A \ b)
+_ldiv!(::SVector, A, b::SVector) = SVector{length(b)}(A \ b)
+_ldiv!(::SVector, A, b) = SVector{length(b)}(A \ b)
+
+# `ArrayInterface.lu_instance` returns `StaticArrays.LU` for mutable static
+# arrays (`MMatrix`, `SizedMatrix`), while in-place `lu!` and `generic_lufact!`
+# return `LinearAlgebra.LU{T, typeof(A), Vector{BlasInt}}`. Allocate a matching
+# `LinearAlgebra.LU` buffer so `cache.cacheval` has the right concrete type.
+function _mutable_static_lu_instance(A, ipiv)
+    A_buf = similar(A)
+    A_buf = A_buf isa typeof(A) ? A_buf : copy(A)
+    return LinearAlgebra.LU(A_buf, ipiv, zero(LinearAlgebra.BlasInt))
+end
 
 function _direct_lu_factorize! end
 function _direct_lu_solve! end
@@ -214,11 +224,14 @@ function LinearSolve.init_cacheval(
     # `Vector{BlasInt}` pivot; rebuild the instance with it so the cacheval slot
     # type matches for dense CPU arrays whose container isn't `Base.Array`
     # (e.g. `FixedSizeArray`), whose `lu_instance` pivot would otherwise differ.
-    luinst = ArrayInterface.lu_instance(convert(AbstractMatrix, A))
-    # `lu_instance` may return a non-`LinearAlgebra.LU` (e.g. `StaticArrays.LU`
-    # for a `SizedMatrix`, with fields `L`/`U`/`p` rather than `factors`/`info`);
-    # those already carry a `Vector` pivot, so use them as-is.
-    luinst isa LinearAlgebra.LU || return luinst, ipiv
+    A_ = convert(AbstractMatrix, A)
+    luinst = ArrayInterface.lu_instance(A_)
+    if !(luinst isa LinearAlgebra.LU)
+        if ArrayInterface.can_setindex(typeof(A_))
+            return _mutable_static_lu_instance(A_, ipiv), ipiv
+        end
+        return luinst, ipiv
+    end
     return LinearAlgebra.LU(luinst.factors, ipiv, luinst.info), ipiv
 end
 
@@ -361,17 +374,21 @@ end
 
 function _generic_lu_solve!(cacheval, A, u, b, pivot, isfresh::Bool)
     if isfresh
-        fact = _generic_lufact!(
-            A, pivot, cacheval.ipiv, cacheval.workspace; check = false
-        )
+        fact = ArrayInterface.can_setindex(typeof(A)) ?
+            _generic_lufact!(
+                A, pivot, cacheval.ipiv, cacheval.workspace; check = false
+            ) :
+            lu(A; check = false)
         cacheval.fact = fact
         LinearAlgebra.issuccess(fact) || return false
     end
-    fact = cacheval.fact
-    if fact isa LinearAlgebra.LU
-        _generic_lu_ldiv!(u, fact, b)
-    else
-        ldiv!(u, fact, b)
+    if ArrayInterface.can_setindex(typeof(u))
+        fact = cacheval.fact
+        if fact isa LinearAlgebra.LU
+            _generic_lu_ldiv!(u, fact, b)
+        else
+            _ldiv!(u, fact, b)
+        end
     end
     return true
 end
@@ -542,6 +559,7 @@ end
 # No size cutoff here, ever: choosing `GenericLUFactorization` is choosing the
 # generic back-solve; the size-aware path is `_smart_lu_ldiv!` below.
 function _generic_lu_ldiv!(x, F::LU, b)
+    ArrayInterface.can_setindex(typeof(x)) || return _ldiv!(x, F, b)
     if x !== b
         copyto!(x, b)
     end
@@ -649,7 +667,7 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
                     else
                         fact = lu!(A, pivot; check = false)
                     end
-                elseif A isa StridedMatrix &&
+                elseif (A isa StridedMatrix || A isa StaticArray) &&
                         pivot isa Union{RowMaximum, NoPivot, RowNonZero} &&
                         _lu_cacheval_ipiv_matches(cacheval, A)
                     # `lu!` on a strided matrix outside the LAPACK fast path runs
@@ -669,6 +687,15 @@ function SciMLBase.solve!(cache::LinearCache, alg::LUFactorization; kwargs...)
                     # buffers can be overwritten in place of `lu`'s fresh copy.
                     copyto!(cacheval.factors, A)
                     fact = _lu_reusing_ipiv!(cacheval.factors, cacheval.ipiv)
+                elseif A isa StaticArray && ArrayInterface.can_setindex(typeof(A))
+                    if _lu_cacheval_ipiv_matches(cacheval, A) &&
+                            cacheval.factors isa typeof(A) &&
+                            size(cacheval.factors) == size(A) && cacheval.factors !== A
+                        copyto!(cacheval.factors, A)
+                        fact = generic_lufact!(cacheval.factors, pivot, cacheval.ipiv; check = false)
+                    else
+                        fact = lu!(copy(A), pivot; check = false)
+                    end
                 else
                     fact = lu(A, check = false)
                 end
@@ -736,12 +763,12 @@ function init_cacheval(
     # `lu_instance` may type its pivot after `A`'s container, so rebuild stdlib
     # `LU` instances with the cache-owned `Vector{BlasInt}` pivot.
     luinst = ArrayInterface.lu_instance(A)
-    # `lu_instance` may return a non-`LinearAlgebra.LU` (e.g. `StaticArrays.LU`
-    # for a `SizedMatrix`, with fields `L`/`U`/`p` rather than `factors`/`info`);
-    # those already carry a `Vector` pivot, so use them as-is.
     workspace = _generic_lu_workspace(A, alg.pivot)
-    luinst isa LinearAlgebra.LU ||
-        return _GenericLUFactorizationCache(luinst, ipiv, workspace)
+    if !(luinst isa LinearAlgebra.LU)
+        fact = ArrayInterface.can_setindex(typeof(A)) ?
+            _mutable_static_lu_instance(A, ipiv) : luinst
+        return _GenericLUFactorizationCache(fact, ipiv, workspace)
+    end
     fact = LinearAlgebra.LU(luinst.factors, ipiv, luinst.info)
     return _GenericLUFactorizationCache(fact, ipiv, workspace)
 end
@@ -774,7 +801,8 @@ function SciMLBase.solve!(
         )
     end
     cache.isfresh = false
-    y = cache.u
+    y = ArrayInterface.can_setindex(typeof(cache.u)) ? cache.u :
+        _ldiv!(cache.u, cacheval.fact, cache.b)
 
     if check_safety
         failed = _check_residual_safety(cache, alg, A_original, y)
@@ -789,7 +817,13 @@ function init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
-    return ArrayInterface.lu_instance(convert(AbstractMatrix, A))
+    A_ = convert(AbstractMatrix, A)
+    luinst = ArrayInterface.lu_instance(A_)
+    if !(luinst isa LinearAlgebra.LU) && ArrayInterface.can_setindex(typeof(A_))
+        ipiv = Vector{LinearAlgebra.BlasInt}(undef, min(size(A_)...))
+        return _mutable_static_lu_instance(A_, ipiv)
+    end
+    return luinst
 end
 
 function init_cacheval(
@@ -1064,6 +1098,9 @@ function init_cacheval(
     if A_ isa GPUArraysCore.AnyGPUArray && !is_cusparse(A_) && is_underdetermined(A_)
         return MinNormQR(qr(copy(transpose(A_))))
     end
+    if A_ isa StaticArray && ArrayInterface.can_setindex(typeof(A_)) && alg.inplace
+        return qr!(copy(A_), alg.pivot)
+    end
     return ArrayInterface.qr_instance(A_, alg.pivot)
 end
 
@@ -1197,6 +1234,8 @@ function init_cacheval(
         nothing
     elseif LinearSolve.is_cusparse_csr(A) && !LinearSolve.cudss_loaded(A)
         nothing
+    elseif A isa StaticArray && ArrayInterface.can_setindex(typeof(A))
+        cholesky!(copy(convert(AbstractMatrix, A)), _normalize_pivot(alg.pivot); check = false)
     else
         ArrayInterface.cholesky_instance(convert(AbstractMatrix, A), _normalize_pivot(alg.pivot))
     end
@@ -1218,6 +1257,11 @@ function init_cacheval(
         maxiters::Int, abstol, reltol, verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
     )
+    if A isa StaticArray && ArrayInterface.can_setindex(typeof(A))
+        return cholesky!(
+            copy(convert(AbstractMatrix, A)), _normalize_pivot(alg.pivot); check = false
+        )
+    end
     return nothing
 end
 
@@ -1303,14 +1347,14 @@ SVDFactorization() = SVDFactorization(false, nothing)
 
 function do_factorization(alg::SVDFactorization, A, b, u)
     A = convert(AbstractMatrix, A)
-    return if ArrayInterface.can_setindex(typeof(A))
+    return if !(A isa StaticArray) && ArrayInterface.can_setindex(typeof(A))
         if alg.alg === nothing
             return svd!(A; full = alg.full)
         else
             return svd!(A; full = alg.full, alg = alg.alg)
         end
     else
-        if alg.alg === nothing
+        if alg.alg === nothing || A isa StaticArray
             return svd(A; full = alg.full)
         else
             return svd(A; full = alg.full, alg = alg.alg)
@@ -1319,7 +1363,7 @@ function do_factorization(alg::SVDFactorization, A, b, u)
 end
 
 function init_cacheval(
-        alg::SVDFactorization, A::Union{Matrix, SMatrix}, b, u, Pl, Pr,
+        alg::SVDFactorization, A::Union{Matrix, StaticArray}, b, u, Pl, Pr,
         maxiters::Int, abstol, reltol,
         verbose::Union{LinearVerbosity, Bool},
         assumptions::OperatorAssumptions
@@ -2705,6 +2749,12 @@ defaultalg_symbol(::Type{<:GenericFactorization{typeof(ldlt!)}}) = :LDLtFactoriz
 
 defaultalg_symbol(::Type{<:QRFactorization{ColumnNorm}}) = :QRFactorizationPivoted
 
+_factorization_ldiv!(alg, u, F, b) = _ldiv!(u, F, b)
+_factorization_ldiv!(::SVDFactorization, u, F::LinearAlgebra.SVD, b) = _ldiv!(u, F, b)
+function _factorization_ldiv!(::SVDFactorization, u, F, b)
+    return ArrayInterface.can_setindex(typeof(u)) ? copyto!(u, F \ b) : (F \ b)
+end
+
 @generated function SciMLBase.solve!(
         cache::LinearCache, alg::AbstractFactorization;
         kwargs...
@@ -2737,8 +2787,8 @@ defaultalg_symbol(::Type{<:QRFactorization{ColumnNorm}}) = :QRFactorizationPivot
             cache.isfresh = false
         end
 
-        y = _ldiv!(
-            cache.u, @get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
+        y = _factorization_ldiv!(
+            alg, cache.u, @get_cacheval(cache, $(Meta.quot(defaultalg_symbol(alg)))),
             cache.b
         )
 

@@ -9,7 +9,7 @@ const HAS_EXTENSIONS = true
 
 # Note on the dependency direction: LinearSolve is an "inverted-leaf" monorepo.
 # The root LinearSolve package does NOT depend on its lib/* sublibraries;
-# instead each sublibrary (LinearSolveAutotune, LinearSolvePyAMG) depends on the
+# instead each sublibrary (LinearSolveAutotune, LinearSolvePyAMG, BorderedLinearSolve) depends on the
 # root LinearSolve via its own [sources] entry. That is why the root Project.toml
 # has no [sources] section pointing at lib/* (the sublibs are not root deps).
 lib_dir = joinpath(dirname(@__DIR__), "lib")
@@ -77,6 +77,7 @@ else
             @time @safetestset "Re-solve" include("Core/resolve.jl")
             @time @safetestset "SupernodalLU internals" include("Core/supernodal_lu.jl")
             @time @safetestset "Krylov warm start" include("Core/warm_start.jl")
+            @time @safetestset "Krylov workspace reuse" include("Core/krylov_workspace_reuse.jl")
             @time @safetestset "Zero Initialization Tests" include("Core/zeroinittests.jl")
             @time @safetestset "Non-Square Tests" include("Core/nonsquare.jl")
             @time @safetestset "SparseVector b Tests" include("Core/sparse_vector.jl")

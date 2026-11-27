@@ -217,7 +217,7 @@ function _lhl_sync!(c::LHLCache, A, alg::LHLFactorization, isfresh::Bool)
     if fresh_reduction
         J = _lhl_jacobian(A)
         _lhl_do_reduce!(ws, J, alg)
-        c.jac = J
+        c.jac === J || (c.jac = J)
         _lhl_claim!(A)
     end
     if fresh_reduction || ws.σ != σ || ws.τ != τ
@@ -284,6 +284,9 @@ function _update_gamma!(cache::LinearCache, c::LHLCache, A::WOperator)
         return cache
     end
     σ, τ = _lhl_shift_pair(A)
-    _lhl_load_shift!(c.ws, σ, τ)
+    ws = c.ws
+    if ws.σ != σ || ws.τ != τ
+        _lhl_load_shift!(ws, σ, τ)
+    end
     return cache
 end

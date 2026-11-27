@@ -1524,7 +1524,7 @@ sol = solve(LinearProblem(A, b), BLISLUFactorization())
 `LinearSolveAutotune` can also select BLIS for the default algorithm on hardware where it
 benchmarks fastest, in which case `solve(prob)` uses it without naming it explicitly.
 """
-struct BLISLUFactorization <: AbstractFactorization
+struct BLISLUFactorization <: AbstractDenseFactorization
     residualsafety::Bool
     function BLISLUFactorization(; throwerror = true, residualsafety::Bool = false)
         ext = Base.get_extension(@__MODULE__, :LinearSolveBLISExt)
@@ -1988,7 +1988,10 @@ sides.
     left as `0`, a near-square grid is chosen automatically from the
     communicator size.
   - `options`: either `nothing`, a `NamedTuple` of `SuperLUDIST.Options` field
-    updates, or a prebuilt `SuperLUDIST.Options` object.
+    updates, or a prebuilt `SuperLUDIST.Options` object. Option values must be
+    representable in the field types of the selected SuperLU_DIST backend. The
+    solver uses `Int32` indices when the matrix dimensions and `nnz(A) + 1` fit
+    in `Int32`, and `Int64` indices otherwise.
   - `threads`: optional OpenMP thread count passed through
     `SuperLUDIST.superlu_set_num_threads`.
 

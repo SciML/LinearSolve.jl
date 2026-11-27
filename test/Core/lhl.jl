@@ -32,6 +32,33 @@ end
     end
 end
 
+@testset "update_gamma! skips the reshift when γ is unchanged" begin
+    # Regression for the hot path: `update_gamma!` used to re-form `σI + τH` on every call,
+    # even when γ (and so σ, τ) had not moved. Repeating a γ must still solve correctly, and
+    # a later γ change must still be picked up.
+    n = 50
+    J = randn(MersenneTwister(50), n, n)
+    b = randn(MersenneTwister(51), n)
+    cache = init(LinearProblem(wop(J, 0.3), b), LHLFactorization())
+    solve!(cache)
+    for γ in (0.3, 0.3, 0.9, 0.9, 0.9, 0.05, 0.05)
+        update_gamma!(cache, γ)
+        u = copy(solve!(cache).u)
+        @test u ≈ dense(J, γ) \ b rtol = 1.0e-9
+        @test u ≈ solve(LinearProblem(wop(J, γ), b), LHLFactorization()).u rtol = 1.0e-9
+    end
+
+    Js = sparse([1, 2, 2, 3, 1], [1, 2, 3, 3, 3], [1.5, 2.0, 0.7, 1.1, 0.3], 3, 3)
+    bs = randn(MersenneTwister(52), 3)
+    scache = init(LinearProblem(wop(Js, 0.4; u = zeros(3)), bs), LHLFactorization())
+    solve!(scache)
+    for γ in (0.4, 0.4, 1.2, 1.2, 0.02)
+        update_gamma!(scache, γ)
+        u = copy(solve!(scache).u)
+        @test u ≈ dense(Js, γ) \ bs rtol = 1.0e-9
+    end
+end
+
 @testset "mark_jacobian_updated! forces a new reduction" begin
     n = 50
     J = randn(MersenneTwister(7), n, n)
@@ -476,4 +503,30 @@ end
     Wc = WOperator{true}(I, γc, Js, zeros(ComplexF64, ns))
     bc = randn(MersenneTwister(7), ComplexF64, ns)
     @test solve(LinearProblem(Wc, bc), LHLFactorization()).u ≈ (Js - I / γc) \ bc rtol = 1.0e-8
+end
+
+@testset "sparse WOperator update step is allocation-free" begin
+    m = 20
+    Tm = spdiagm(-1 => -ones(m - 1), 0 => 4ones(m), 1 => -ones(m - 1))
+    Sm = spdiagm(-1 => -ones(m - 1), 1 => -ones(m - 1))
+    Js = kron(sparse(I, m, m), Tm) + kron(Sm, sparse(I, m, m))
+    n = size(Js, 1)
+    b = randn(MersenneTwister(5), n)
+    W = wop(Js, 0.1; u = zeros(n))
+    cache = init(LinearProblem(W, b), LHLFactorization(; refine = 0))
+    solve!(cache)
+    ref = copy(cache.u)
+    for _ in 1:3
+        mark_jacobian_updated!(W)
+        solve!(cache)
+    end
+    @test copy(cache.u) == ref
+    # The update must add no allocations over a warmed plain re-solve: the
+    # `Union{Nothing,JT}` identity field boxes the immutable sparse matrix on
+    # an unconditional store. Relative bound because Julia 1.10's plain
+    # re-solve allocates 48 B of its own.
+    plain = @allocated solve!(cache)
+    mark_jacobian_updated!(W)
+    @test (@allocated solve!(cache)) == plain
+    @test copy(cache.u) == ref
 end

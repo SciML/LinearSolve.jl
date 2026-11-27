@@ -884,3 +884,80 @@ end
         @test norm(Matrix(A) * sol.u - rhs) / norm(rhs) < 1.0e-13
     end
 end
+
+@testset "QR fallback survives a cache update that leaves A alone" begin
+    reinit! = LinearSolve.SciMLBase.reinit!
+    # rank deficient; the in-place LU "succeeds" and the residual check triggers the fallback
+    S = [1.0 2 3 4; 1 2 3 4; 2 1 5 3; 7 1 1 2]
+    S2 = [2.0 1 0 1; 2 1 0 1; 1 3 1 0; 0 1 4 1]
+    N = S + 3I
+    b = S * [1.0, 2, 3, 4]
+    b2 = S * [4.0, 3, 2, 1]
+    solves(cache, A, rhs) = solve!(cache).u ≈ pinv(A) * rhs
+    function fallen_back()
+        cache = init(LinearProblem(copy(S), copy(b), 1.0))
+        @test solves(cache, S, b)
+        @test cache.cacheval.fell_back_to_qr
+        return cache
+    end
+
+    for (update!, rhs) in (
+            (c -> (c.b = copy(b2)), b2),
+            (c -> reinit!(c; b = copy(b2)), b2),
+            (c -> reinit!(c; p = 2.0), b),
+            (c -> reinit!(c; u = zeros(4)), b),
+            (c -> reinit!(c), b),
+        )
+        cache = fallen_back()
+        update!(cache)
+        @test solves(cache, S, rhs)
+        @test cache.cacheval.fell_back_to_qr
+        @test solve!(cache; adjoint = true).u ≈ pinv(S') * rhs
+    end
+
+    set_A!(c, A) = (c.A = copy(A))
+    reinit_A!(c, A) = reinit!(c; A = copy(A))
+    set_b!(c, rhs) = (c.b = copy(rhs))
+    reinit_b!(c, rhs) = reinit!(c; b = copy(rhs))
+    function edit_A!(c, A)
+        c.A .= A
+        return c.isfresh = true # documented alternative to `cache.A = cache.A`
+    end
+    for (new_A!, new_b!) in ((set_A!, set_b!), (reinit_A!, reinit_b!), (edit_A!, set_b!))
+        for (A, singular) in ((N, false), (S2, true))
+            cache = fallen_back()
+            new_A!(cache, A)
+            @test solves(cache, A, b)
+            @test cache.cacheval.fell_back_to_qr == singular
+            new_b!(cache, b2)
+            @test solves(cache, A, b2)
+        end
+    end
+
+    # sparse LU leaves A alone, so only the refactorization was wasted here
+    As = sparse([1.0 0 0; 0 1 0; 0 0 0])
+    cache = init(LinearProblem(As, [1.0, 2, 0]))
+    solve!(cache)
+    @test cache.cacheval.fell_back_to_qr
+    reinit!(cache; b = [3.0, 4, 0])
+    @test cache.cacheval.fell_back_to_qr
+    @test solve!(cache).u ≈ [3.0, 4, 0]
+end
+
+@testset "reinit! with p rebuilds preconditioners from precs" begin
+    reinit! = LinearSolve.SciMLBase.reinit!
+    built = Float64[]
+    precs = (A, p) -> (push!(built, p); (Diagonal(fill(p, size(A, 1))), I))
+    A = [4.0 1; 1 3]
+    cache = init(LinearProblem(A, [1.0, 2], 1.0), KrylovJL_GMRES(; precs))
+    solve!(cache)
+    reinit!(cache; b = [2.0, 1])
+    solve!(cache)
+    @test built == [1.0]
+    reinit!(cache; p = 2.0)
+    @test solve!(cache).u ≈ A \ [2.0, 1]
+    @test built == [1.0, 2.0]
+    reinit!(cache; p = 3.0, reuse_precs = true)
+    solve!(cache)
+    @test built == [1.0, 2.0]
+end

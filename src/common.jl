@@ -934,7 +934,8 @@ function SciMLBase.reinit!(
     )
     (; alg, cacheval, abstol, reltol, maxiters, verbose, assumptions, sensealg) = cache
 
-    isfresh = !isnothing(A)
+    A_changed = !isnothing(A)
+    isfresh = A_changed
     precsisfresh = !reuse_precs && (isfresh || !isnothing(p))
     isfresh |= cache.isfresh
     precsisfresh |= cache.precsisfresh
@@ -946,7 +947,9 @@ function SciMLBase.reinit!(
     Pl = cache.Pl
     Pr = cache.Pr
 
-    cache.A = A
+    # Assigning `A` discards the factorization state (including the default
+    # solver's QR fallback), so only do it for a new `A`.
+    A_changed && (cache.A = A)
     cache.b = b
     cache.u = u
     cache.p = p

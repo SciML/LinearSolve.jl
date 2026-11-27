@@ -681,9 +681,22 @@ function _solve_direct_dual!(
     )
 end
 
+@noinline function _throw_dual_cache_dim_mismatch(field::Symbol, expected, got)
+    throw(DimensionMismatch("Cannot update `DualLinearCache.$field`: got size $got, expected $expected."))
+end
+
+@inline function _check_dual_field_size(inner, field::Symbol, val)
+    if val isa AbstractArray && inner isa AbstractArray && size(val) != size(inner)
+        _throw_dual_cache_dim_mismatch(field, size(inner), size(val))
+    end
+    return nothing
+end
+
 function setA!(dc::DualLinearCache, A)
+    A_inner = getproperty(dc.linear_cache, :A)
+    _check_dual_field_size(A_inner, :A, A)
     # Put the Dual-stripped versions in the LinearCache
-    prop = nodual_value!(getproperty(dc.linear_cache, :A), A) # Update in-place
+    prop = nodual_value!(A_inner, A) # Update in-place
     setproperty!(dc.linear_cache, :A, prop) # Does additional invalidation logic etc.
 
     # Update partials only when A actually carries Duals; otherwise there is
@@ -702,8 +715,10 @@ function setA!(dc::DualLinearCache, A)
     return setfield!(dc, :A_partials_valid, false)
 end
 function setb!(dc::DualLinearCache, b)
+    b_inner = getproperty(dc.linear_cache, :b)
+    _check_dual_field_size(b_inner, :b, b)
     # Put the Dual-stripped versions in the LinearCache
-    prop = nodual_value!(getproperty(dc.linear_cache, :b), b) # Update in-place
+    prop = nodual_value!(b_inner, b) # Update in-place
     setproperty!(dc.linear_cache, :b, prop) # Does additional invalidation logic etc.
 
     # Update partials only when b actually carries Duals; otherwise there is
@@ -716,8 +731,10 @@ function setb!(dc::DualLinearCache, b)
     return setfield!(dc, :b_partials_valid, false)
 end
 function setu!(dc::DualLinearCache{DT}, u) where {DT}
+    u_inner = getproperty(dc.linear_cache, :u)
+    _check_dual_field_size(u_inner, :u, u)
     # Put the Dual-stripped versions in the LinearCache
-    prop = nodual_value!(getproperty(dc.linear_cache, :u), u) # Update in-place
+    prop = nodual_value!(u_inner, u) # Update in-place
     setproperty!(dc.linear_cache, :u, prop) # Does additional invalidation logic etc.
 
     if get_dual_type(u) === nothing
@@ -751,6 +768,10 @@ function SciMLBase.reinit!(
         p = nothing,
         reuse_precs = false
     )
+    isnothing(A) || _check_dual_field_size(getproperty(cache.linear_cache, :A), :A, A)
+    isnothing(b) || _check_dual_field_size(getproperty(cache.linear_cache, :b), :b, b)
+    isnothing(u) || _check_dual_field_size(getproperty(cache.linear_cache, :u), :u, u)
+
     if !isnothing(A)
         setA!(cache, A)
     end

@@ -897,7 +897,8 @@ end
     b = randn(size(A, 1))
     cache = init(LinearProblem(A, b))
     solve!(cache)
-    @test cache.cacheval.SupernodalLUFactorization isa LinearSolve.SupernodalLU.SupernodalLUFactor
+    @test cache.alg.alg === LinearSolve.DefaultAlgorithmChoice.SupernodalLUFactorization
+    @test size(cache.cacheval.SupernodalLUFactorization) == size(A)
     nonzeros(A)[7] = 0.0
     dropzeros!(A)
     cache.A = A

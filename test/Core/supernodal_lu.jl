@@ -421,19 +421,24 @@ end
     A_small[2, 1] = 0.0
     dropzeros!(A_small)
 
-    for edit! in (
-            A -> (nonzeros(A)[7] = 0.0; dropzeros!(A)),
-            A -> (A[1, size(A, 2)] = 2.0),
+    for (edit!, dnnz) in (
+            (A -> (nonzeros(A)[7] = 0.0; dropzeros!(A)), -1),
+            (A -> (A[2, size(A, 2)] = 2.0), 1),
+            # drop one entry and insert another: only the structural comparison sees it
+            (A -> (nonzeros(A)[7] = 0.0; dropzeros!(A); A[2, size(A, 2)] = 2.0), 0),
             # an in-place copy of a matrix with a smaller stored pattern, as a Newton
             # matrix refreshed from a Jacobian does
-            A -> copyto!(A, A_small),
+            (A -> copyto!(A, A_small), -2),
         )
         A = copy(A0)
         cache = init(LinearProblem(A, b), alg)
         solve!(cache)
+        F = cache.cacheval
         edit!(A)
+        @test nnz(A) == nnz(A0) + dnnz
         cache.A = A
         sol = solve!(cache)
+        @test cache.cacheval !== F
         @test sol.retcode == ReturnCode.Success
         @test norm(A * sol.u - b) < 1.0e-10 * norm(b)
     end
@@ -450,23 +455,12 @@ end
     @test norm(A * sol.u - b) < 1.0e-10 * norm(b)
 end
 
-# DFG channel Newton matrix (16430 unknowns) from the FiniteElementMethod station, whose
-# stored pattern is smaller than the Jacobian prototype the cache was analyzed on.  Not
-# committed (10 MB): set LINEARSOLVE_DFG_W_FIXTURE to the serialized `W_first_fail.jls`.
-if haskey(ENV, "LINEARSOLVE_DFG_W_FIXTURE")
-    @testset "DFG Newton matrix shrinking in place" begin
-        using Serialization
-        d = deserialize(ENV["LINEARSOLVE_DFG_W_FIXTURE"])
-        W = SparseMatrixCSC(d.m, d.n, d.colptr, d.rowval, d.nzval)
-        rng = MersenneTwister(2)
-        extra = rand(rng, 1:d.n, 60000)
-        wi, wj, wv = findnz(W)
-        A = sparse([wi; extra], [wj; rand(rng, 1:d.n, 60000)], [wv; zeros(60000)], d.n, d.n)
-        b = randn(rng, d.n)
-        cache = init(LinearProblem(A, b), SupernodalLUFactorization())
-        solve!(cache)
-        copyto!(A, W)
-        cache.A = A
-        @test solve!(cache) isa LinearSolve.SciMLBase.LinearSolution
-    end
+@testset "unchecked pattern reuse is validated against the supplied matrix" begin
+    # `check_pattern = false` with a different pattern of the same `nnz` factors the wrong
+    # matrix; the residual check on the perturbed factor has to catch that.
+    alg = SupernodalLUFactorization(check_pattern = false, matching = false)
+    cache = init(LinearProblem(sparse([1, 2], [1, 2], [1.0, 1.0e-10]), [1.0, 0.0]), alg)
+    solve!(cache)
+    cache.A = sparse([2, 2], [1, 2], [1.0, 1.0e-10], 2, 2)
+    @test solve!(cache).retcode == ReturnCode.Infeasible
 end

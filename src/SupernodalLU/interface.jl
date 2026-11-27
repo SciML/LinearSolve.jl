@@ -176,12 +176,6 @@ function _snlu_build(
     )
 end
 
-# `F.A` records the pattern the factor was analyzed on, so it must not share the
-# `colptr`/`rowval` arrays of the caller's matrix: a caller that edits its matrix in
-# place would otherwise change the recorded pattern along with the matrix.
-_own_pattern(A::SparseMatrixCSC) =
-    SparseMatrixCSC(size(A, 1), size(A, 2), copy(getcolptr(A)), copy(rowvals(A)), nonzeros(A))
-
 function _snlu_assemble(
         sym::SymbolicAnalysis, A::SparseMatrixCSC{Tv, Ti},
         M::SparseMatrixCSC{Tv, Ti}, ms::Union{MatchScale, Nothing},
@@ -194,7 +188,8 @@ function _snlu_assemble(
     bcaches, bcacheidx = _dense_block_caches(Tv, sym, dense_alg, dense_threshold)
     F = SupernodalLUFactor{Tv, Ti}(
         sym, W, Z, collect(1:n), collect(1:n), rowsfac, 0, NaN, eps_pivot,
-        _own_pattern(A), Vector{Tv}(undef, n), Vector{Tv}(undef, 64),
+        A, copy(getcolptr(A)), copy(rowvals(A)),
+        Vector{Tv}(undef, n), Vector{Tv}(undef, 64),
         ms === nothing ? collect(1:n) : ms.rowperm,
         ms === nothing ? ones(n) : ms.r,
         ms === nothing ? ones(n) : ms.c,
@@ -227,7 +222,7 @@ function snlu!(F::SupernodalLUFactor{Tv}, A::SparseMatrixCSC{Tv}) where {Tv}
     if nnz(A) != length(F.Vpos)
         throw(ArgumentError("snlu! requires the same sparsity pattern as the analyzed matrix"))
     end
-    F.A = SparseMatrixCSC(size(A, 1), size(A, 2), getcolptr(F.A), rowvals(F.A), nonzeros(A))
+    F.A = A
     _load_values!(F, A)
     return _factor_core!(F)
 end

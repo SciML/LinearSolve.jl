@@ -59,6 +59,12 @@ flatten(x) = first(SS.canonicalize(SS.Tunable(), x))
         cos.([0.1i + 0.33j for i in 1:n, j in 1:m])
     )
     p = params()
+    short_params() = Parameters(
+        [SubproblemParameters(0.1i, 0.2i, 0.3i) for i in 1:(n - 1)], zeros(n - 1, m)
+    )
+    long_params() = Parameters(
+        [SubproblemParameters(0.1i, 0.2i, 0.3i) for i in 1:(n + 1)], zeros(n + 1, m)
+    )
     N = length(flatten(p))
     A = rand(N, N) + N * I
     reference = A \ flatten(p)
@@ -111,6 +117,26 @@ flatten(x) = first(SS.canonicalize(SS.Tunable(), x))
         # Forwarded from the inner flat cache.
         @test cache.maxiters == N
         @test cache.abstol isa Real
+    end
+
+    @testset "dimension mismatches are rejected without changing the cache" begin
+        for bad in (short_params(), long_params())
+            @test_throws DimensionMismatch solve(LinearProblem(A, bad))
+            @test_throws DimensionMismatch init(LinearProblem(A, bad), LUFactorization())
+        end
+
+        cache = init(LinearProblem(A, params()), LUFactorization())
+        old_b = cache.b
+        old_buffer = cache.cache.b
+        old_repack = cache.repack
+        old_A = cache.A
+        @test_throws DimensionMismatch (cache.b = short_params())
+        @test cache.b === old_b
+        @test cache.cache.b === old_buffer
+        @test cache.repack === old_repack
+        @test_throws DimensionMismatch (cache.A = rand(N + 1, N + 1))
+        @test cache.A === old_A
+        @test flatten(solve!(cache).u) ≈ reference
     end
 
     # Array right-hand sides must not be diverted through this path.

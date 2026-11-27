@@ -139,7 +139,8 @@ using LinearSolve, LinearAlgebra, Test
         sol = solve!(cache)
         @test sol.retcode == ReturnCode.Success
 
-        # Set A to a new larger matrix
+        # Announce the new problem size, then set A to a new larger matrix.
+        resize!(cache, 5)
         A_new = rand(5, 5) + 5I
         b_new = rand(5)
         cache.A = A_new
@@ -206,6 +207,23 @@ using LinearSolve, LinearAlgebra, Test
             cache = init(LinearProblem(A, b), alg)
             @test solve!(cache).u ≈ [0.2, 0.4, 3.0]
             @test length(resize!(cache.u, 4)) == 4
+        end
+    end
+
+    @testset "rectangular problem after resize!" begin
+        for alg in (QRFactorization(ColumnNorm()), SVDFactorization()), (m, n) in ((12, 8), (8, 12))
+            cache = init(
+                LinearProblem(rand(10, 10) + 10I, rand(10)), alg
+            )
+            resize!(cache, m)
+            A_new = rand(m, n)
+            A_new[diagind(A_new)] .+= m
+            b_new = rand(m)
+            expected = A_new \ b_new
+            cache.A = A_new
+            cache.b = b_new
+            cache.u = zeros(n)
+            @test solve!(cache).u ≈ expected
         end
     end
 end

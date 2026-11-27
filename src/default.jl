@@ -596,6 +596,9 @@ function SciMLBase.init(
         assumptions = OperatorAssumptions(issquare(prob.A)),
         kwargs...
     )
+    # Validate before default algorithm selection, which may inspect b's size.
+    # Structured right-hand sides are checked after canonicalization instead.
+    _is_structure_rhs(prob.b) || _check_linear_problem_sizes(prob.A, prob.b)
     # Promote integer-eltype problems before choosing the algorithm, so the choice
     # and the cache agree on the types; see `__promote_int_problem` in common.jl.
     prob = __promote_int_problem(prob, nothing)

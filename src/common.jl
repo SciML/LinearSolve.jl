@@ -258,6 +258,7 @@ calling the constructor directly.
   - `sensealg::S`: Sensitivity algorithm associated with the solve.
   - `sparse_reduction::Tred`: State for persistent sparse-pattern reduction, or `nothing`.
   - `alias_A::Bool`: Whether the caller permits replacing or mutating `A`.
+  - `resize_state::Int`: Encoded announced row count and `A`/`b` reassignment flags, or `0` for none.
 
 # Interface rules
 
@@ -303,6 +304,94 @@ mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, Tlv <: Linear
     # never `nothing`). `true` means the user permitted overwriting `A`, which
     # also permits in-place refactorization (e.g. `lu!(A)`) after `cache.A = X`.
     alias_A::Bool
+    # Set by `resize!` until both A and b have been replaced at the announced row
+    # count. The flags allow either assignment order without inspecting converted
+    # (possibly local-only) cache storage.
+    resize_state::Int
+end
+
+# Extensions whose array-like objects do not implement the Base size interface
+# can overload these two helpers (for example, HYPREMatrix/HYPREVector).
+@inline _problem_size(x) = size(x)
+@inline _problem_rows(x) = size(x, 1)
+
+# Extensions that replace A with an object exposing only local dimensions can
+# store the caller/global size in their cacheval and overload these hooks.
+_cache_problem_size(cache::LinearCache) = _problem_size(getfield(cache, :A))
+_set_cache_problem_size!(cache::LinearCache, size) = cache
+
+# Keep resize bookkeeping isbits and compact: 0 means no pending resize;
+# otherwise the row count plus two low flag bits are encoded in one Int.
+@inline _resize_rows(state::Int) = state == 0 ? nothing : (state >> 2) - 1
+@inline _encode_resize_state(nrows::Int, A_set::Bool, b_set::Bool) =
+    4 * (nrows + 1) + (A_set ? 1 : 0) + (b_set ? 2 : 0)
+
+@inline function _convert_cache_field(cache::LinearCache, name::Symbol, x)
+    name === :cacheval && return x
+    FT = fieldtype(typeof(cache), name)
+    return x isa FT ? x : convert(FT, x)
+end
+
+@inline _prepare_cache_assignment(cache::LinearCache, name::Symbol, x) =
+    _convert_cache_field(cache, name, x)
+
+@inline function _check_cache_assignment_size(cache::LinearCache, name::Symbol, x)
+    resize_rows = _resize_rows(getfield(cache, :resize_state))
+    if name === :A
+        if resize_rows === nothing
+            expected_size = _cache_problem_size(cache)
+            _problem_size(x) == expected_size || throw(
+                DimensionMismatch(
+                    "`cache.A` must have size $expected_size to match the problem, got $(_problem_size(x))."
+                )
+            )
+        else
+            expected_rows = resize_rows
+            _problem_rows(x) == expected_rows || throw(
+                DimensionMismatch(
+                    "`cache.A` must have $expected_rows rows after resize!, got $(_problem_rows(x))."
+                )
+            )
+        end
+    elseif name === :b
+        expected_rows = resize_rows === nothing ?
+            first(_cache_problem_size(cache)) : resize_rows
+        _problem_rows(x) == expected_rows || throw(
+            DimensionMismatch(
+                "`cache.b` must have $expected_rows rows to match `A`, got $(_problem_rows(x))."
+            )
+        )
+    end
+    return nothing
+end
+
+_check_reinit_problem_sizes(cache::LinearCache, A, b) = _check_linear_problem_sizes(A, b)
+_reinit_problem_rows(cache::LinearCache, A) = _problem_rows(A)
+_check_reinit_b_size(cache::LinearCache, b) = _check_cache_assignment_size(cache, :b, b)
+
+@inline function _complete_cache_resize!(cache::LinearCache, name::Symbol, x)
+    return _complete_cache_resize!(cache, name, x, _problem_size(x))
+end
+
+@inline function _complete_cache_resize!(
+        cache::LinearCache, name::Symbol, x, new_problem_size
+    )
+    if name === :A
+        old_problem_size = _cache_problem_size(cache)
+        new_problem_size == old_problem_size ||
+            _set_cache_problem_size!(cache, new_problem_size)
+    end
+    resize_state = getfield(cache, :resize_state)
+    if resize_state != 0
+        nrows = (resize_state >> 2) - 1
+        A_set = (resize_state & 1) != 0 || name === :A
+        b_set = (resize_state & 2) != 0 || name === :b
+        setfield!(
+            cache, :resize_state,
+            A_set && b_set ? 0 : _encode_resize_state(nrows, A_set, b_set)
+        )
+    end
+    return cache
 end
 
 # `@inline` is load-bearing: `name` must constant-propagate into the body so the
@@ -310,23 +399,15 @@ end
 # loop's `cache.isfresh = false`-style assignments inside `solve!` degrade to
 # dynamic calls and allocate, breaking the 0-byte ceilings in
 # test/Core/lu_refactorization.jl on the default-algorithm paths.
-@inline function Base.setproperty!(cache::LinearCache, name::Symbol, x)
-    # Default `setproperty!` semantics convert to the field's declared type; this
-    # override must do the same, or an update whose eltype differs from the cache's
-    # (an integer `cache.b = [1, 0, ...]` after the init-time integer-to-float
-    # promotion, or Float32 data into a Float64 cache) throws a raw `TypeError`
-    # from `setfield!`. The `isa` guard keeps the matching-type hot path (e.g. the
-    # warm `cache.A = Awork` refactorization loop, which asserts 0 allocations)
-    # from ever reaching `convert`: an already-matching `x` passes through
-    # untouched even if constant propagation of `name` fails, so the `===` alias
-    # check in the `:A` branch below still sees the caller's object. `:cacheval`
-    # is exempt: for the default solver it stores into a slot of the cacheval
-    # rather than the field itself, so the field's type is not the right
-    # conversion target.
-    if name !== :cacheval
-        FT = fieldtype(typeof(cache), name)
-        x isa FT || (x = convert(FT, x))
-    end
+Base.@constprop :aggressive
+@inline function _setproperty!(
+        cache::LinearCache, name::Symbol, x, original_x, check_size::Bool
+    )
+    # Reject incompatible dimensions before conversion, freshness changes, or
+    # algorithm cache updates so a failed assignment leaves the cache untouched.
+    check_size && _check_cache_assignment_size(cache, name, original_x)
+    x = _prepare_cache_assignment(cache, name, x)
+
     if name === :A
         setfield!(cache, :isfresh, true)
         setfield!(cache, :precsisfresh, true)
@@ -346,11 +427,44 @@ end
         return __setfield!(cache.cacheval, cache.alg, x)
         # return setfield!(cache.cacheval, Symbol(cache.alg.alg), x)
     end
-    return setfield!(cache, name, x)
+    result = setfield!(cache, name, x)
+    if name === :A || name === :b
+        _complete_cache_resize!(cache, name, original_x)
+    end
+    return result
+end
+
+# Keep the public hot path as a direct, constant-propagating body. Routing it
+# through the prepared-assignment helper used by `reinit!` prevents Julia from
+# eliding the LinearSolution wrapper in warm standalone LU solves.
+@inline function Base.setproperty!(cache::LinearCache, name::Symbol, x)
+    _check_cache_assignment_size(cache, name, x)
+    x = _convert_cache_field(cache, name, x)
+    if name === :A
+        setfield!(cache, :isfresh, true)
+        setfield!(cache, :precsisfresh, true)
+        if cache.cacheval isa DefaultLinearSolverInit
+            cache.cacheval.fell_back_to_qr = false
+        end
+        update_cacheval!(cache, :A, x)
+    elseif name === :p
+        setfield!(cache, :precsisfresh, true)
+    elseif name === :b
+        update_cacheval!(cache, :b, x)
+    elseif name === :cacheval && cache.alg isa DefaultLinearSolver
+        @assert cache.cacheval isa DefaultLinearSolverInit
+        return __setfield!(cache.cacheval, cache.alg, x)
+    end
+    result = setfield!(cache, name, x)
+    if name === :A || name === :b
+        _complete_cache_resize!(cache, name, x)
+    end
+    return result
 end
 
 function Base.resize!(cache::LinearCache, i::Int)
     resize_cacheval!(cache, cache.cacheval, i)
+    setfield!(cache, :resize_state, _encode_resize_state(i, false, false))
     setfield!(cache, :isfresh, true)
     return cache
 end
@@ -593,6 +707,17 @@ function __init_u0_from_Ab(
     return zeros(SMatrix{S2, S2b, Tb})
 end
 
+function _check_linear_problem_sizes(A, b)
+    nrows_A = _problem_rows(A)
+    nrows_b = _problem_rows(b)
+    nrows_A == nrows_b || throw(
+        DimensionMismatch(
+            "`A` has $nrows_A rows, but `b` has $nrows_b rows."
+        )
+    )
+    return nothing
+end
+
 """
     _check_batched_rhs_support(alg, b)
 
@@ -760,6 +885,7 @@ function __init(
         kwargs...
     )
     (; A, b, u0, p) = prob
+    _check_linear_problem_sizes(A, b)
     _check_matrix_support(A)
 
     # Integer-eltype problems are solved as their float (or joint-promoted)
@@ -919,7 +1045,8 @@ function __init(
         typeof(sensealg), typeof(sparse_reduction),
     }(
         A, b, u0_, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
-        maxiters, verbose_spec, assumptions, sensealg, sparse_reduction, alias_A
+        maxiters, verbose_spec, assumptions, sensealg, sparse_reduction, alias_A,
+        0
     )
     return cache
 end
@@ -934,7 +1061,8 @@ function SciMLBase.reinit!(
     )
     (; alg, cacheval, abstol, reltol, maxiters, verbose, assumptions, sensealg) = cache
 
-    isfresh = !isnothing(A)
+    A_changed = !isnothing(A)
+    isfresh = A_changed
     precsisfresh = !reuse_precs && (isfresh || !isnothing(p))
     isfresh |= cache.isfresh
     precsisfresh |= cache.precsisfresh
@@ -946,12 +1074,31 @@ function SciMLBase.reinit!(
     Pl = cache.Pl
     Pr = cache.Pr
 
-    cache.A = A
-    cache.b = b
-    cache.u = u
-    cache.p = p
-    cache.Pl = Pl
-    cache.Pr = Pr
+    # `reinit!` is an explicit problem replacement, so it may change dimensions.
+    # Validate and prepare every value before mutating anything: a failed b/u
+    # conversion or extension wrapping must not leave a replacement A installed.
+    if A_changed
+        _check_reinit_problem_sizes(cache, A, b)
+        new_rows = _reinit_problem_rows(cache, A)
+    else
+        _check_reinit_b_size(cache, b)
+        new_rows = first(_cache_problem_size(cache))
+    end
+    A_prepared = _prepare_cache_assignment(cache, :A, A)
+    b_prepared = _prepare_cache_assignment(cache, :b, b)
+    u_prepared = _prepare_cache_assignment(cache, :u, u)
+    p_prepared = _prepare_cache_assignment(cache, :p, p)
+    Pl_prepared = _prepare_cache_assignment(cache, :Pl, Pl)
+    Pr_prepared = _prepare_cache_assignment(cache, :Pr, Pr)
+    A_changed &&
+        setfield!(cache, :resize_state, _encode_resize_state(new_rows, false, false))
+
+    _setproperty!(cache, :A, A_prepared, A, false)
+    _setproperty!(cache, :b, b_prepared, b, false)
+    _setproperty!(cache, :u, u_prepared, u, false)
+    _setproperty!(cache, :p, p_prepared, p, false)
+    _setproperty!(cache, :Pl, Pl_prepared, Pl, false)
+    _setproperty!(cache, :Pr, Pr_prepared, Pr, false)
     cache.isfresh = isfresh
     cache.precsisfresh = precsisfresh
     return nothing
@@ -971,8 +1118,10 @@ function SciMLBase.solve(
     # `_is_structure_rhs`.
     if _is_structure_rhs(prob.b)
         buffer, = SciMLStructures.canonicalize(SciMLStructures.Tunable(), prob.b)
+        _check_linear_problem_sizes(prob.A, buffer)
         return solve(prob, defaultalg(prob.A, buffer, assump), args...; kwargs...)
     end
+    _check_linear_problem_sizes(prob.A, prob.b)
     # Promote integer-eltype problems before choosing the algorithm, so the choice
     # and the cache agree on the types; see `__promote_int_problem`.
     prob = __promote_int_problem(prob, nothing)
@@ -1096,6 +1245,7 @@ function SciMLBase.solve(
         prob::StaticLinearProblem,
         alg::Nothing, args...; kwargs...
     )
+    _check_linear_problem_sizes(prob.A, prob.b)
     u = __static_default_ldiv(prob.A, prob.b)
     return SciMLBase.build_linear_solution(
         alg, u, nothing, nothing; retcode = ReturnCode.Success
@@ -1106,6 +1256,7 @@ function SciMLBase.solve(
         prob::StaticLinearProblem,
         alg::SciMLLinearSolveAlgorithm, args...; kwargs...
     )
+    _check_linear_problem_sizes(prob.A, prob.b)
     if alg === nothing || alg isa DirectLdiv!
         u = prob.A \ prob.b
     elseif alg isa LUFactorization

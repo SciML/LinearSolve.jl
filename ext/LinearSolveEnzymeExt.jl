@@ -710,6 +710,7 @@ function EnzymeRules.augmented_primal(
     # Assigning any of these also flips the staleness flags, so they rewind together.
     old_isfresh = getfield(cache.val, :isfresh)
     old_precsisfresh = getfield(cache.val, :precsisfresh)
+    old_resize_state = getfield(cache.val, :resize_state)
     # A new `A` is what invalidates the factorization, and the next `solve!` builds the
     # replacement over the same cacheval, so this is the assignment that has to copy.
     old_cacheval = field === :A ? deepcopy(getfield(cache.val, :cacheval)) : nothing
@@ -725,11 +726,14 @@ function EnzymeRules.augmented_primal(
             x.dval
         end
         for (dcache, dx) in zip(dcaches, dxs)
+            if field === :A || field === :b
+                setfield!(dcache, :resize_state, old_resize_state)
+            end
             func.val(dcache, field, dx)
         end
     end
 
-    tape = (field, old, old_isfresh, old_precsisfresh, old_cacheval)
+    tape = (field, old, old_isfresh, old_precsisfresh, old_cacheval, old_resize_state)
     primal = EnzymeRules.needs_primal(config) ? x.val : nothing
     return EnzymeRules.AugmentedReturn(primal, nothing, tape)
 end
@@ -739,13 +743,14 @@ function EnzymeRules.reverse(
         cache::EnzymeCore.Annotation{<:LinearSolve.LinearCache},
         name::Const{Symbol}, x::EnzymeCore.Annotation
     ) where {RT}
-    field, old, old_isfresh, old_precsisfresh, old_cacheval = tape
+    field, old, old_isfresh, old_precsisfresh, old_cacheval, old_resize_state = tape
     # `setfield!` rather than `setproperty!`: this is a rewind, so it must not re-run the
     # bookkeeping that the forward assignment already did.
     setfield!(cache.val, field, old)
     setfield!(cache.val, :isfresh, old_isfresh)
     setfield!(cache.val, :precsisfresh, old_precsisfresh)
     old_cacheval === nothing || setfield!(cache.val, :cacheval, old_cacheval)
+    setfield!(cache.val, :resize_state, old_resize_state)
     return (nothing, nothing, nothing)
 end
 

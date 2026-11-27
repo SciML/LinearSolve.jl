@@ -246,6 +246,42 @@ test_update_tolerances()
 @test LinearSolve.needs_concrete_A(HYPREAlgorithm(HYPRE.BoomerAMG))
 @test isempty(LinearSolve.algorithm_interface_issues(HYPREAlgorithm(HYPRE.PCG)))
 
+@testset "dimension validation" begin
+    alg = HYPREAlgorithm(HYPRE.PCG)
+    A = sparse(rand(10, 10) + 10I)
+    b = rand(10)
+    @test_throws DimensionMismatch init(LinearProblem(A, rand(9)), alg)
+    @test_throws DimensionMismatch init(LinearProblem(A, rand(11)), alg)
+    @test_throws DimensionMismatch init(
+        LinearProblem(HYPREMatrix(A), HYPREVector(rand(9))), alg
+    )
+
+    cache = init(LinearProblem(A, b), alg)
+    old_A, old_b = cache.A, cache.b
+    old_isfresh = cache.isfresh
+    @test_throws DimensionMismatch (cache.b = rand(9))
+    @test_throws DimensionMismatch (cache.A = sparse(rand(12, 12)))
+    @test cache.A === old_A
+    @test cache.b === old_b
+    @test cache.isfresh === old_isfresh
+    @test_throws DimensionMismatch reinit!(cache; A = sparse(rand(12, 12)), b = b)
+    @test cache.A === old_A
+    @test cache.b === old_b
+
+    reinit!(cache; A = sparse(rand(12, 12) + 12I), b = rand(12), u = zeros(12))
+    @test LinearSolve._problem_size(cache.A) == (12, 12)
+    @test LinearSolve._problem_rows(cache.b) == 12
+    @test LinearSolve._problem_rows(cache.u) == 12
+
+    resize!(cache, 12)
+    cache.b = rand(12)
+    cache.A = sparse(rand(12, 12) + 12I)
+    cache.u = zeros(12)
+    @test LinearSolve._problem_size(cache.A) == (12, 12)
+    @test LinearSolve._problem_rows(cache.b) == 12
+    @test LinearSolve._problem_rows(cache.u) == 12
+end
+
 # Test MPI execution
 # Pass the active project explicitly: the group env (test/hypre) is activated
 # in-process by Pkg.activate, which child processes do not inherit — without

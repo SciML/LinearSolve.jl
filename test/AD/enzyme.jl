@@ -677,3 +677,34 @@ end
     @test Enzyme.gradient(Enzyme.Reverse, via_sol, 0.3)[1] ≈ -100 / 0.3^2 rtol = 1.0e-6
     @test_throws ErrorException Enzyme.gradient(Enzyme.Reverse, via_cache, 0.3)
 end
+
+@testset "resizing cache assignments keep Enzyme shadows and rewind state in sync" begin
+    function resized_cache_solve(A, b, ::Val{A_first}) where {A_first}
+        cache = init(LinearProblem(zeros(2, 2), zeros(2)), LUFactorization())
+        resize!(cache, 3)
+        if A_first
+            cache.A = A
+            cache.b = b
+        else
+            cache.b = b
+            cache.A = A
+        end
+        cache.u = zeros(3)
+        return sum(solve!(cache).u)
+    end
+
+    A = [4.0 1.0 0.0; 1.0 3.0 1.0; 0.0 1.0 2.0]
+    b = [1.0, 2.0, 3.0]
+    grad_b = A' \ ones(3)
+    grad_A = -grad_b * (A \ b)'
+    for order in (Val(true), Val(false))
+        dA = zeros(size(A))
+        db = zeros(size(b))
+        Enzyme.autodiff(
+            Enzyme.Reverse, resized_cache_solve, Duplicated(A, dA), Duplicated(b, db),
+            Const(order)
+        )
+        @test dA ≈ grad_A rtol = 1.0e-10 atol = 1.0e-12
+        @test db ≈ grad_b rtol = 1.0e-10 atol = 1.0e-12
+    end
+end

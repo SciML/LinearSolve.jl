@@ -80,6 +80,7 @@ else
             @time @safetestset "Krylov workspace reuse" include("Core/krylov_workspace_reuse.jl")
             @time @safetestset "Zero Initialization Tests" include("Core/zeroinittests.jl")
             @time @safetestset "Non-Square Tests" include("Core/nonsquare.jl")
+            @time @safetestset "Problem and Cache Dimensions" include("Core/problem_sizes.jl")
             @time @safetestset "SparseVector b Tests" include("Core/sparse_vector.jl")
             @time @safetestset "ArrayPartition" include("Core/arraypartition.jl")
             @time @safetestset "SciMLStructures RHS" include("Core/scimlstructures_rhs.jl")

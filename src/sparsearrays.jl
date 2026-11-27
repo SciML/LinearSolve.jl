@@ -413,7 +413,11 @@ end
             cacheval = LinearSolve.@get_cacheval(cache, :UMFPACKFactorization)
             if alg.reuse_symbolic
                 # Caches the symbolic factorization: https://github.com/JuliaLang/julia/pull/33738
-                if length(cacheval.nzval) != length(nonzeros(A)) || alg.check_pattern && pattern_changed(cacheval, A)
+                # The reduction can change the operand's pattern behind a fixed caller
+                # pattern, which `check_pattern = false` does not cover.
+                if length(cacheval.nzval) != length(nonzeros(A)) ||
+                        _reduced_structure_changed(cache.sparse_reduction) ||
+                        alg.check_pattern && pattern_changed(cacheval, A)
                     fact = _umfpack_lu(
                         alg,
                         SparseMatrixCSC(
@@ -607,7 +611,11 @@ function SciMLBase.solve!(cache::LinearSolve.LinearCache, alg::KLUFactorization;
     if cache.isfresh
         cacheval = LinearSolve.@get_cacheval(cache, :KLUFactorization)
         if alg.reuse_symbolic
-            if length(cacheval.nzval) != length(nonzeros(A)) || alg.check_pattern && pattern_changed(cacheval, A)
+            # The reduction can change the operand's pattern behind a fixed caller
+            # pattern, which `check_pattern = false` does not cover.
+            if length(cacheval.nzval) != length(nonzeros(A)) ||
+                    _reduced_structure_changed(cache.sparse_reduction) ||
+                    alg.check_pattern && pattern_changed(cacheval, A)
                 fact = KLU.klu(
                     LinearSolve.make_SparseMatrixCSC(A),
                     check = false
@@ -782,7 +790,10 @@ function SciMLBase.solve!(
         # (the default's KLU choice resolves to PureKLU), so it reads that field.
         cacheval = LinearSolve.@get_cacheval(cache, :KLUFactorization)
         if alg.reuse_symbolic
+            # The reduction can change the operand's pattern behind a fixed caller
+            # pattern, which `check_pattern = false` does not cover.
             if length(cacheval.nzval) != length(nonzeros(A)) ||
+                    _reduced_structure_changed(cache.sparse_reduction) ||
                     alg.check_pattern && pattern_changed(cacheval, A)
                 fact = PureKLU.klu(
                     SparseMatrixCSC(
@@ -935,8 +946,11 @@ function SciMLBase.solve!(
     As = SparseMatrixCSC(size(A)..., getcolptr(A), rowvals(A), nonzeros(A))
     if cache.isfresh
         cacheval = LinearSolve.@get_cacheval(cache, :SupernodalLUFactorization)
+        # The reduction can change the operand's pattern behind a fixed caller pattern,
+        # which `check_pattern = false` does not cover.
         if alg.reuse_symbolic && size(cacheval) == size(As) &&
                 nnz(cacheval.A) == nnz(As) &&
+                !_reduced_structure_changed(cache.sparse_reduction) &&
                 !(alg.check_pattern && pattern_changed(cacheval, As))
             # numeric-only refactorization: reuses the analysis, matching, and
             # all numeric storage (allocation-free)
@@ -1497,11 +1511,14 @@ end
 mutable struct SparseReduction{Tv, Ti}
     active::Bool
     # `Auto` only: the activation decision is deferred until the first solve whose matrix
-    # carries a nonzero. A cache is commonly initialized from a *prototype* — the intended
-    # sparsity pattern with values not filled in yet (all zero) — which says nothing about
-    # nonstructural zeros. Taking it at face value activates the reduction on an all-zero
-    # mask, and the first real solve then bloats the union and degrades to per-solve
-    # dropzeros for the rest of the run. Deciding on the first filled matrix sees real values.
+    # has stored values that are neither all zero nor all one. A cache is commonly
+    # initialized from a *prototype* — the intended sparsity pattern with values not
+    # filled in yet (all zero, or all one as OrdinaryDiffEq fills its J/W prototypes) —
+    # which says nothing about nonstructural zeros. Taking an all-zero prototype at face
+    # value activates the reduction on an all-zero mask, and the first real solve then
+    # bloats the union and degrades to per-solve dropzeros for the rest of the run; an
+    # all-one prototype shows no zeros and never activates. Deciding on the first filled
+    # matrix sees real values.
     pending::Bool
     cache_union::Bool             # true: union caching; false: per-solve dropzeros
     auto::Bool                    # may switch union -> per-solve on bloat
@@ -1513,12 +1530,12 @@ mutable struct SparseReduction{Tv, Ti}
     reduced::SparseMatrixCSC{Tv, Ti}
     nanalyze::Int
     nrefactor::Int
-    # Tracks whether the most recent per-solve dropzeros changed the structure
-    # of `reduced` (i.e. nnz changed). Set to `false` after the first per-solve
-    # dropzeros call so the first call never triggers a false "changed" signal.
-    # Used by the DefaultLinearSolver to decide whether to invalidate cached
-    # symbolic factorizations (Sparspak, KLU) whose symbolic reuse is only valid
-    # when the matrix structure is stable across calls.
+    # Tracks whether the most recent per-solve dropzeros changed the stored pattern
+    # (`colptr`/`rowval`) of `reduced` relative to the operand of the previous solve.
+    # A zero that moves to another stored position changes the pattern at equal nnz, so
+    # the full pattern is compared, not only the count. Consumers whose symbolic reuse is
+    # only valid on a stable structure (Sparspak in the default solver; the standalone
+    # sparse LUs via `_reduced_structure_changed`) redo the analysis when it is set.
     reduced_nnz::Int
     structure_changed::Bool
 end
@@ -1559,9 +1576,9 @@ function LinearSolve.init_sparse_reduction(
     NZ = LinearSolve.NonstructuralZeros
     nz = nonzeros(A)
     auto = nsz == NZ.Auto
-    # An all-zero starting matrix is a prototype whose values are not filled in yet: its zero
-    # fraction carries no information, so defer the `Auto` decision to the first filled solve.
-    pending = auto && !isempty(nz) && all(iszero, nz)
+    # An all-zero or all-one starting matrix is a prototype whose values are not filled in yet:
+    # its zero fraction carries no information, so defer the `Auto` decision to the first filled solve.
+    pending = auto && !isempty(nz) && (all(iszero, nz) || all(isone, nz))
     active = if nsz == NZ.Persistent || nsz == NZ.Present
         true
     elseif nsz == NZ.None || pending
@@ -1591,11 +1608,11 @@ function LinearSolve.init_sparse_reduction(
 end
 
 # Resolve a deferred `Auto` activation (see `SparseReduction.pending`) against the first
-# matrix that carries values. A still-all-zero matrix remains uninformative, so keep waiting;
-# there is nothing worth reducing in it either way.
+# matrix that carries values. A still-all-zero or still-all-one matrix remains
+# uninformative, so keep waiting; there is nothing worth reducing in it either way.
 function _resolve_pending!(red::SparseReduction, A)
     nz = nonzeros(A)
-    (isempty(nz) || all(iszero, nz)) && return red
+    (isempty(nz) || all(iszero, nz) || all(isone, nz)) && return red
     red.pending = false
     count(iszero, nz) / length(nz) >=
         LinearSolve.PERSISTENT_ZERO_FRACTION_THRESHOLD || return red
@@ -1613,9 +1630,31 @@ function _resolve_pending!(red::SparseReduction, A)
     return red
 end
 
+# Whether two CSC matrices store entries at the same positions.
+function _same_stored_pattern(A, B)
+    getcolptr(A) == getcolptr(B) || return false
+    n = nnz(A)
+    return view(rowvals(A), 1:n) == view(rowvals(B), 1:n)
+end
+
+# Whether the reduction handed the factorization an operand whose stored pattern differs
+# from the operand of the previous solve. In per-solve dropzeros mode a zero can move to
+# another stored position at equal nnz while the caller's own pattern stays fixed.
+# `check_pattern = false` is a promise about the caller's pattern only, so it does not
+# cover this change: a solver that reuses its symbolic factorization must redo it when
+# this is true. Union caching changes the reduced pattern only by growth (or by
+# activation/deactivation), which always changes nnz, so the nnz guard covers it.
+_reduced_structure_changed(::Nothing) = false
+function _reduced_structure_changed(red::SparseReduction)
+    return red.active && !red.cache_union && red.structure_changed
+end
+
 function LinearSolve.reduce_operand!(red::SparseReduction, A)
     red.pending && _resolve_pending!(red, A)
     red.active || return A
+    # The operand handed to the factorization on the previous solve, to detect a change
+    # of the reduced pattern below.
+    prev_reduced = red.reduced
     nz = nonzeros(A)
     # A change in the stored pattern breaks union caching: `mask`/`keep` index into the
     # starting matrix's positions, and `_persistent_reduced` lays the kept values out on
@@ -1639,12 +1678,13 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
     if !red.cache_union
         new_reduced = specialized_deepcopy(LinearSolve.make_SparseMatrixCSC(A))
         dropzeros!(new_reduced)
-        new_nnz = nnz(new_reduced)
-        # `pattern_changed` is load-bearing: a pattern change whose post-dropzeros nnz
-        # happens to match the previous one is still a structure change to the consumers
-        # of this flag.
-        red.structure_changed = pattern_changed || new_nnz != red.reduced_nnz
-        red.reduced_nnz = new_nnz
+        # Compare the whole reduced pattern, not only nnz: with a fixed caller pattern, a
+        # zero that moves to another stored position keeps nnz but changes the structure
+        # a cached symbolic factorization was built for. `pattern_changed` is kept as a
+        # short-circuit: a changed caller pattern is a structure change to the consumers.
+        red.structure_changed = pattern_changed ||
+            !_same_stored_pattern(new_reduced, prev_reduced)
+        red.reduced_nnz = nnz(new_reduced)
         red.reduced = new_reduced
         red.nrefactor += 1
         return red.reduced
@@ -1680,10 +1720,11 @@ function LinearSolve.reduce_operand!(red::SparseReduction, A)
             red.cache_union = false
             red.reduced = specialized_deepcopy(LinearSolve.make_SparseMatrixCSC(A))
             dropzeros!(red.reduced)
-            # First per-solve reduction after switching from union caching.
-            # No "previous" per-solve result, so no structure change yet.
+            # First per-solve reduction after switching from union caching: compare with
+            # the union operand of the previous solve. The two can have equal nnz but
+            # different positions (this matrix's nonzeros left the old union).
             red.reduced_nnz = nnz(red.reduced)
-            red.structure_changed = false
+            red.structure_changed = !_same_stored_pattern(red.reduced, prev_reduced)
         end
     else
         rnz = nonzeros(red.reduced)

@@ -1798,9 +1798,9 @@ end
 # accepts, mapped to their index by `_UMFPACK_CONTROL_INDEX` in `src/sparsearrays.jl`.
 # Names follow SuiteSparse's own (`UMFPACK_IRSTEP` -> `irstep`), so the UMFPACK
 # User Guide reads across directly.
-# `pivot_tolerance` and `strategy` take their index from SuiteSparse's C-level
-# constants, since SparseArrays has no `JL_UMFPACK_*` alias for `strategy` and
-# only grew the one for `pivot_tolerance` after the Julia LTS.
+# `pivot_tolerance` and `strategy` are indexed by their SuiteSparse ABI slot,
+# since SparseArrays has no `JL_UMFPACK_*` alias for `strategy` and only grew
+# the one for `pivot_tolerance` after the Julia LTS.
 const UMFPACK_CONTROL_KEYS = (
     :prl, :dense_row, :dense_col, :block_size, :ordering,
     :fixq, :amd_dense, :aggressive, :singletons, :alloc_init,
@@ -1852,11 +1852,11 @@ factorization itself, for instance a looser pivot threshold:
 solve(prob, UMFPACKFactorization(control = (; sym_pivot_tolerance = 0.01)))
 ```
 
-`pivot_tolerance` is UMFPACK's relative pivot tolerance (default `0.1`; `1.0`
-is partial pivoting) and `strategy` selects its pivoting strategy by UMFPACK's
-numeric value: `0` auto, `1` unsymmetric, `3` symmetric. Saddle-point matrices
-such as `[K B'; B 0]`, which the default strategy can factor inaccurately, often
-want one of them:
+`pivot_tolerance` defaults to `0.1`. A value of `1.0` requests partial pivoting
+under the unsymmetric strategy. The symmetric strategy uses
+`sym_pivot_tolerance` for its preference for diagonal pivots. `strategy` takes
+UMFPACK's numeric value: `0` auto, `1` unsymmetric, `3` symmetric. These are
+controls that can reduce residuals on some saddle-point systems `[K B'; B 0]`:
 
 ```julia
 solve(prob, UMFPACKFactorization(control = (; strategy = 3, irstep = 2)))

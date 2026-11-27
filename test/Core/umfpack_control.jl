@@ -7,7 +7,6 @@ using LinearSolve, SparseArrays, LinearAlgebra, Test, Random
 @static if Base.USE_GPL_LIBS
     using SparseArrays.UMFPACK: JL_UMFPACK_IRSTEP, JL_UMFPACK_SYM_PIVOT_TOLERANCE,
         JL_UMFPACK_PRL, get_umfpack_control
-    using SparseArrays.LibSuiteSparse: UMFPACK_PIVOT_TOLERANCE, UMFPACK_STRATEGY
 
     # The control vector actually handed to UMFPACK for this cache.
     cache_control(cache) = cache.cacheval.control
@@ -100,48 +99,55 @@ using LinearSolve, SparseArrays, LinearAlgebra, Test, Random
         end
 
         # `pivot_tolerance` and `strategy` have no `JL_UMFPACK_*` alias on every
-        # supported Julia, so check them against SuiteSparse's own constants.
-        @testset "pivot_tolerance and strategy reach UMFPACK" begin
+        # supported Julia. Their one-based slots are 4 and 6.
+        @testset "$setting reaches only its own control slot" for (setting, value, slot) in
+            ((:pivot_tolerance, 1.0, 4), (:strategy, 3, 6))
+
             cache = init(
                 LinearProblem(copy(A), copy(b)),
-                UMFPACKFactorization(control = (; pivot_tolerance = 1.0, strategy = 3))
+                UMFPACKFactorization(control = NamedTuple{(setting,)}((value,)))
             )
             sol = solve!(cache)
             @test SciMLBase.successful_retcode(sol)
             control = cache_control(cache)
-            @test control[UMFPACK_PIVOT_TOLERANCE + 1] == 1.0
-            @test control[UMFPACK_STRATEGY + 1] == 3
-            # The defaults are untouched without them.
-            plain = init(LinearProblem(copy(A), copy(b)), UMFPACKFactorization())
-            solve!(plain)
-            @test cache_control(plain)[UMFPACK_PIVOT_TOLERANCE + 1] != 1.0
-            @test cache_control(plain)[UMFPACK_STRATEGY + 1] == 0
+            reference = get_umfpack_control(Float64, Int)
+            @test control[slot] == value
+            @test findall(.!isequal.(control, reference)) == [slot]
         end
 
         # A saddle-point matrix [K B'; B 0] with a weakly scaled constraint block
-        # loses digits under UMFPACK's default threshold pivoting (relative
-        # residual ~1e-11); full partial pivoting recovers them.
-        @testset "pivot_tolerance recovers accuracy on a saddle-point matrix" begin
+        # loses digits under UMFPACK's default threshold pivoting. The residual
+        # alone does not constrain the pressure block, so its error against the
+        # known solution is checked too. The coefficients are dyadic so that the
+        # manufactured right-hand side is exact in Float64.
+        @testset "pivot_tolerance improves accuracy on a saddle-point matrix" begin
             m = 50
             T = spdiagm(-1 => -ones(m - 1), 0 => 2ones(m), 1 => -ones(m - 1))
             L = kron(sparse(I, m, m), T) + kron(T, sparse(I, m, m))
             nu = size(L, 1)
-            K = blockdiag(L + 1.0e-2I, L + 1.0e-2I)
+            K = blockdiag(L + 2.0^-7 * I, L + 2.0^-7 * I)
             D = spdiagm(-1 => -ones(nu - 1), 1 => ones(nu - 1))
-            B = 1.0e-6 * [D D'][1:2:end, :]
+            B = 2.0^-20 * [D D'][1:2:end, :]
             np = size(B, 1)
             S = [K B'; B spzeros(np, np)]
-            rhs = S * ones(2nu + np)
-            function residual(alg)
+            exact = ones(2nu + np)
+            rhs = S * exact
+            pressure = (2nu + 1):(2nu + np)
+            function errors(alg)
                 sol = solve(LinearProblem(copy(S), copy(rhs)), alg)
                 @test SciMLBase.successful_retcode(sol)
-                return norm(S * sol.u - rhs) / norm(rhs)
+                return (
+                    residual = norm(S * sol.u - rhs) / norm(rhs),
+                    pressure = norm(sol.u[pressure] - exact[pressure]) / norm(exact[pressure]),
+                )
             end
-            default = residual(UMFPACKFactorization())
-            pivoted = residual(UMFPACKFactorization(control = (; pivot_tolerance = 1.0)))
-            @test pivoted < 1.0e-13
-            @test 100 * pivoted < default
-            @test residual(UMFPACKFactorization(control = (; strategy = 3))) < 1.0e-12
+            default = errors(UMFPACKFactorization())
+            pivoted = errors(UMFPACKFactorization(control = (; pivot_tolerance = 1.0)))
+            @test pivoted.residual < 1.0e-13
+            @test 100 * pivoted.residual < default.residual
+            @test pivoted.pressure < default.pressure
+            symmetric = errors(UMFPACKFactorization(control = (; strategy = 3)))
+            @test symmetric.residual < 1.0e-12
         end
 
         @testset "unnamed entries keep SparseArrays' defaults" begin

@@ -1988,7 +1988,10 @@ sides.
     left as `0`, a near-square grid is chosen automatically from the
     communicator size.
   - `options`: either `nothing`, a `NamedTuple` of `SuperLUDIST.Options` field
-    updates, or a prebuilt `SuperLUDIST.Options` object.
+    updates, or a prebuilt `SuperLUDIST.Options` object. Option values must be
+    representable in the field types of the selected SuperLU_DIST backend. The
+    solver uses `Int32` indices when the matrix dimensions and `nnz(A) + 1` fit
+    in `Int32`, and `Int64` indices otherwise.
   - `threads`: optional OpenMP thread count passed through
     `SuperLUDIST.superlu_set_num_threads`.
 

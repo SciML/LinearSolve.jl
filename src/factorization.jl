@@ -122,7 +122,14 @@ _ldiv!(x, A, b) = ldiv!(x, A, b)
     function _ldiv!(
             x::Vector{T}, A::LinearAlgebra.SVD{T}, b::Vector{T}
         ) where {T <: LinearAlgebra.BlasFloat}
-        return copyto!(x, A \ b)
+        return isempty(A.S) ? fill!(x, zero(T)) : copyto!(x, A \ b)
+    end
+end
+
+@static if VERSION < v"1.13"
+    # `ldiv!(::SVD, b)` reads `S[1]`, so an `A` with no rows or columns throws
+    function _ldiv!(x::Vector, A::LinearAlgebra.SVD, b::Vector)
+        return isempty(A.S) ? fill!(x, zero(eltype(x))) : ldiv!(x, A, b)
     end
 end
 

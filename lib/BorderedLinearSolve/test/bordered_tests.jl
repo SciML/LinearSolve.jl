@@ -132,6 +132,25 @@ end
         @test solk.σ ≈ xref[(n + 1):end] rtol = 1.0e-9
     end
 
+    @testset "a border may be one state, a tuple of states or a vector of states" begin
+        # At width one the correction sweeps took `c` itself for the state, so a tuple or a
+        # vector holding one state threw a `DimensionMismatch` once `k` was above zero.
+        n = 6
+        J = rand(n, n) + n * I; f = rand(n)
+        algs = (BorderingBLS(), BorderingBLS(; k = 2), DirectBLS())
+        for m in (1, 2), form in (:state, :tuple, :vector), alg in algs
+            form === :state && m > 1 && continue
+            bs = [rand(n) for _ in 1:m]; cs = [rand(n) for _ in 1:m]
+            border(x) = form === :state ? only(x) : form === :tuple ? Tuple(x) : x
+            d = m == 1 ? 1.5 : rand(m, m) + m * I; g = m == 1 ? 0.7 : rand(m)
+            sol = solve(BorderedLinearProblem(J, border(bs), border(cs), d, f, g), alg)
+            x = [J reduce(hcat, bs); reduce(hcat, cs)' d] \ vcat(f, g)
+            @test successful_retcode(sol)
+            @test sol.v ≈ x[1:n] rtol = 1.0e-9
+            @test sol.σ ≈ (m == 1 ? x[end] : x[(n + 1):end]) rtol = 1.0e-9
+        end
+    end
+
     @testset "every inner algorithm gives the right answer" begin
         # The GPU run found LUFactorization returning a wrong answer with a Success
         # retcode, which this suite could not have caught: the only test using an

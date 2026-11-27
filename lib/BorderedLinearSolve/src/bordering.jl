@@ -123,5 +123,6 @@ function SciMLBase.solve!(cache::BorderedCache{<:BorderingBLS})
 end
 
 _apply(J, v) = J * v
-_cdot_all(c, v) = _border_width(c) == 1 ? _cdot(c, v) : [_cdot(ci, v) for ci in _border_parts(c)]
+# A border of width one may be a single state, or a tuple or vector holding one.
+_cdot_all(c, v) = _border_width(c) == 1 ? _cdot(only(_border_parts(c)), v) : [_cdot(ci, v) for ci in _border_parts(c)]
 _dmul(d, σ) = d * σ

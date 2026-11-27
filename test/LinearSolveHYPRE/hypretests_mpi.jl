@@ -116,6 +116,29 @@ sol = solve!(cache)
 copy!(local_sol, sol.u)
 @test local_sol ≈ fill(2.0, local_size)
 
+# Local wrappers can be reassigned without confusing their local ranges with
+# the global problem size tracked by the cache.
+cache.A = cache.A
+cache.b = cache.b
+sol = solve!(cache)
+@test sol.resid < TOL
+copy!(local_sol, sol.u)
+@test local_sol ≈ fill(2.0, local_size)
+
+shifted_A = HYPREMatrix(comm, ilower + 1, iupper + 1)
+shifted_b = HYPREVector(comm, ilower + 1, iupper + 1)
+@test_throws DimensionMismatch (cache.A = shifted_A)
+@test_throws DimensionMismatch (cache.b = shifted_b)
+@test_throws DimensionMismatch SciMLBase.reinit!(
+    cache; A = shifted_A, b = shifted_b, u = cache.u
+)
+
+SciMLBase.reinit!(cache; A = cache.A, b = cache.b, u = cache.u)
+sol = solve!(cache)
+@test sol.resid < TOL
+copy!(local_sol, sol.u)
+@test local_sol ≈ fill(2.0, local_size)
+
 _, b_julia = get_julia_system(3.0)
 cache.b = b_julia
 sol = solve!(cache)
@@ -123,6 +146,13 @@ sol = solve!(cache)
 @test sol.iters > 0
 copy!(local_sol, sol.u)
 @test local_sol ≈ fill(3.0, local_size)
+
+_, b_julia = get_julia_system(4.0)
+SciMLBase.reinit!(cache; b = b_julia)
+sol = solve!(cache)
+@test sol.resid < TOL
+copy!(local_sol, sol.u)
+@test local_sol ≈ fill(4.0, local_size)
 
 # Automatic distributed construction failure retcode
 n_fail = 200

@@ -101,6 +101,7 @@ else
             @time @safetestset "Butterfly Factorization" include("Core/butterfly.jl")
             @time @safetestset "Mixed Precision" include("Core/test_mixed_precision.jl")
             @time @safetestset "Resize" include("Core/resize.jl")
+            @time @safetestset "Size Validation" include("Core/size_validation.jl")
             return @time @safetestset "SpecializingFactorizations" include("Core/specializing_factorizations.jl")
         end,
         groups = Dict(

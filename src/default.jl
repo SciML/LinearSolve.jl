@@ -166,7 +166,9 @@ function defaultalg(A, b, assump::OperatorAssumptions{Nothing})
     )
 end
 
-function defaultalg(A::SMatrix{S1, S2}, b, assump::OperatorAssumptions{Bool}) where {S1, S2}
+function defaultalg(
+        A::Union{SMatrix{S1, S2}, MMatrix{S1, S2}}, b, assump::OperatorAssumptions{Bool}
+    ) where {S1, S2}
     if S1 == S2
         return LUFactorization()
     else

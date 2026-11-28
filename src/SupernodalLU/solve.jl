@@ -431,23 +431,41 @@ function solve!(
         x::AbstractVector{Tv}, F::SupernodalLUFactor{Tv}, b::AbstractVector;
         refine::Union{Symbol, Integer} = :auto
     ) where {Tv}
-    nref = _refine_steps(F, refine)
+    _refine_solve!(x, F, b, _refine_steps(F, refine))
+    return x
+end
+
+# Solve with up to `nref` refinement steps. Returns `true` if a step was rejected
+# because it did not lower the residual.
+function _refine_solve!(
+        x::AbstractVector{Tv}, F::SupernodalLUFactor{Tv}, b::AbstractVector, nref::Integer
+    ) where {Tv}
     _solve_once!(x, F, b)
+    rejected = false
     if nref > 0
         r = F.ir_r
         dx = F.ir_dx
-        prevn = Inf
+        copyto!(r, b)
+        mul!(r, F.A, x, -one(Tv), one(Tv))           # r = b - A x
+        rn = norm(r)
         for _ in 1:nref
-            copyto!(r, b)
-            mul!(r, F.A, x, -one(Tv), one(Tv))       # r = b - A x
-            rn = norm(r)
-            (iszero(rn) || rn >= 0.5 * prevn) && break  # converged / stagnated
-            prevn = rn
+            (iszero(rn) || !isfinite(rn)) && break   # converged, or residual overflowed
             _solve_once!(dx, F, r)
-            x .+= dx
+            dx .+= x                                 # candidate; x is kept until accepted
+            copyto!(r, b)
+            mul!(r, F.A, dx, -one(Tv), one(Tv))
+            rn_new = norm(r)
+            if !(rn_new < rn)                        # not better (or NaN): keep x
+                rejected = true
+                break
+            end
+            copyto!(x, dx)
+            stagnated = rn_new >= 0.5 * rn
+            rn = rn_new
+            stagnated && break
         end
     end
-    return x
+    return rejected
 end
 
 function solve!(

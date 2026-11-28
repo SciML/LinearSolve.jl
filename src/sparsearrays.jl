@@ -915,14 +915,36 @@ function LinearSolve.pattern_changed(
     return getcolptr(Aold) != getcolptr(A) || rowvals(Aold) != rowvals(A)
 end
 
-# `‖Ay - b‖ / (‖A‖₁‖y‖ + ‖b‖)`, reusing the factor-owned residual buffer so the check
-# costs one sparse mat-vec and no allocation.
-function _snlu_backward_error(F, y::AbstractVector, b::AbstractVector)
+function _snlu_residual!(F, y, b)
     r = F.ir_r
     LinearAlgebra.mul!(r, F.A, y)
     r .-= b
+    return r
+end
+
+# `‖Ay - b‖ / (‖A‖₁‖y‖ + ‖b‖)`, reusing the factor-owned residual buffer so the check
+# costs one sparse mat-vec and no allocation.
+function _snlu_backward_error(F, y::AbstractVector, b::AbstractVector)
+    r = _snlu_residual!(F, y, b)
     denom = LinearAlgebra.opnorm(F.A, 1) * LinearAlgebra.norm(y) + LinearAlgebra.norm(b)
     return iszero(denom) ? zero(real(eltype(r))) : LinearAlgebra.norm(r) / denom
+end
+
+# Solve with the default refinement; also report whether refinement rejected a step.
+function _snlu_solve!(u, F, b)
+    u isa AbstractVector || return SNLU.solve!(u, F, b), false
+    return u, SNLU._refine_solve!(u, F, b, SNLU._refine_steps(F, :auto))
+end
+
+# max_i |r_i| / (|A| |y| + |b|)_i for r = A y - b, using F.ir_dx as scratch. Unlike a
+# norm of r, one large entry of b cannot hide the rows the perturbed pivots affect.
+function _snlu_rowwise_error(F, y::AbstractVector, b::AbstractVector, r::AbstractVector)
+    den, A = F.ir_dx, F.A
+    den .= abs.(b)
+    for j in axes(A, 2), k in SparseArrays.nzrange(A, j)
+        den[rowvals(A)[k]] += abs(nonzeros(A)[k]) * abs(y[j])
+    end
+    return maximum(i -> iszero(r[i]) ? zero(real(eltype(r))) : abs(r[i]) / real(den[i]), eachindex(r))
 end
 
 function SciMLBase.solve!(
@@ -955,7 +977,7 @@ function SciMLBase.solve!(
         cache.isfresh = false
     end
     F = LinearSolve.@get_cacheval(cache, :SupernodalLUFactorization)
-    y = SNLU.solve!(cache.u, F, cache.b)
+    y, rejected = _snlu_solve!(cache.u, F, cache.b)
     # A reused analysis carries the MC64 matching and its scaling, both derived from the
     # values of the matrix it was built on. New values can leave those stale and cost most
     # of the working precision without perturbing a pivot, so the check below cannot catch
@@ -972,20 +994,26 @@ function SciMLBase.solve!(
             )
             cache.cacheval = fact
             F = LinearSolve.@get_cacheval(cache, :SupernodalLUFactorization)
-            y = SNLU.solve!(cache.u, F, cache.b)
+            y, rejected = _snlu_solve!(cache.u, F, cache.b)
         end
     end
     # Static pivoting never aborts: a numerically singular system factors with
     # perturbed pivots and produces a finite but meaningless solution. When
-    # pivots were perturbed (rare), verify the residual (one sparse mat-vec)
-    # so singularity surfaces as `Infeasible` instead of a silent `Success`.
+    # pivots were perturbed (rare), verify the residual so singularity surfaces as `Infeasible`.
     ok = all(isfinite, y)
     if ok && SNLU.nperturbed(F) > 0
-        r = F.ir_r                      # factor-owned residual buffer
-        LinearAlgebra.mul!(r, F.A, y)
-        r .-= cache.b
         bn = LinearAlgebra.norm(cache.b)
-        ok = LinearAlgebra.norm(r) <= 1.0e-6 * max(bn, floatmin(real(eltype(r))))
+        limit = 1.0e-6 * max(bn, floatmin(real(eltype(F.ir_r))))
+        if rejected
+            # F.ir_dx holds the rejected candidate until the rowwise check reuses it.
+            trial_norm = LinearAlgebra.norm(_snlu_residual!(F, F.ir_dx, cache.b))
+            ok = isfinite(trial_norm) && trial_norm <= limit
+        end
+        if ok
+            r = _snlu_residual!(F, y, cache.b)
+            ok = LinearAlgebra.norm(r) <= limit &&
+                (!rejected || _snlu_rowwise_error(F, y, cache.b, r) <= 1.0e-6)
+        end
     end
     return if ok
         SciMLBase.build_linear_solution(

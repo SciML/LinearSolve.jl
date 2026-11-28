@@ -4,6 +4,7 @@
 # resolve.jl; these exercise the solver's own invariants.
 
 using LinearSolve, SparseArrays, LinearAlgebra, Random, Test
+using StableRNGs
 using RecursiveFactorization        # activates the RF/TriangularSolve kernels
 const SNLU = LinearSolve.SupernodalLU
 
@@ -103,6 +104,118 @@ end
     @test SNLU._refine_steps(Fp, :auto) == 3
     bp = randn(size(Ap, 1))
     @test_throws ArgumentError SNLU.solve!(similar(bp), Fp, bp; refine = :bogus)
+end
+
+@testset "refinement never returns a worse answer" begin
+    # The pivot d^2 is replaced by d, so the first correction is about 1/d and raises the
+    # residual. It must be rejected and the unrefined answer returned bit for bit: undoing
+    # it by subtraction loses x[1] to cancellation, and with a large b gives NaN.
+    res(A, b, x) = norm(mul!(copy(b), A, x, -1, 1))
+    for (T, p, huge) in ((Float32, 14, 1.0f32), (Float64, 28, 1.0e300)), s in (1, huge)
+        d, c = T(2)^(-2p), T(2)^(-p)
+        A = sparse(T[d * d 0 c; 0 1 d; c d 1])
+        b = T(s) * T[d, 0, c]
+        F = SNLU.snlu(
+            A; ordering = :natural, matching = false, relax = false, maxsuper = 1,
+            eps_pivot = Float64(d)
+        )
+        x0 = SNLU.solve(F, b; refine = 0)
+        dx = SNLU.solve(F, mul!(copy(b), A, x0, -1, 1); refine = 0)
+        @test SNLU.nperturbed(F) > 0 && !(res(A, b, x0 + dx) <= res(A, b, x0))  # step is worse
+        for refine in (1, 3, :auto)
+            @test SNLU.solve(F, b; refine = refine) == x0
+        end
+    end
+
+    # x0 is finite but the norm of b - A*x0 overflows, so no step can be judged.
+    A = sparse([2.0^-44 -2.0^36; 0 2.0^-48])
+    b = [2.0^972, -2.0^1004]
+    F = SNLU.snlu(
+        A; ordering = :natural, matching = false, relax = false, maxsuper = 1,
+        eps_pivot = 2.0^-20, check = false
+    )
+    x0 = SNLU.solve(F, b; refine = 0)
+    @test all(isfinite, x0) && !isfinite(res(A, b, x0))
+    for refine in (1, 3, :auto)
+        @test SNLU.solve(F, b; refine = refine) == x0
+    end
+
+    # The first step is accepted and the second is worse: the first must be kept.
+    A = sparse([2.0^24 -2.0^8; 1 -16])
+    b = [-2.0^-4, 0]
+    F = SNLU.snlu(
+        A; ordering = :natural, matching = false, relax = false, maxsuper = 1,
+        eps_pivot = 2.0^-20, check = false
+    )
+    x0 = SNLU.solve(F, b; refine = 0)
+    x1 = SNLU.solve(F, b; refine = 1)
+    x2 = x1 + SNLU.solve(F, mul!(copy(b), A, x1, -1, 1); refine = 0)
+    @test SNLU.nperturbed(F) > 0 && res(A, b, x1) < res(A, b, x0) / 2
+    @test !(res(A, b, x2) < res(A, b, x1))
+    @test SNLU.solve(F, b; refine = 3) == x1
+
+    A = spdiagm(0 => [2.0^-100, 1.0])
+    b = [1.0, 0.0]
+    F = SNLU.snlu(A; matching = false, eps_pivot = 2.0^-20)
+    x0 = SNLU.solve(F, b; refine = 0)
+    candidate = x0 + SNLU.solve(F, mul!(copy(b), A, x0, -1, 1); refine = 0)
+    @test candidate != x0
+    @test res(A, b, candidate) == res(A, b, x0)
+    @test SNLU.solve(F, b; refine = 3) == x0
+
+    # Weak random diagonal -> perturbed pivots; refinement still converges.
+    function weakdiag(seed; N = 30)
+        rng = StableRNG(seed)
+        L1 = spdiagm(-1 => -ones(N - 1), 0 => 2 * ones(N), 1 => -ones(N - 1))
+        A0 = kron(sparse(I, N, N), L1) + kron(L1, sparse(I, N, N))
+        n = size(A0, 1)
+        A = A0 - Diagonal(diag(A0)) + Diagonal(10.0 .^ (-6 .* rand(rng, n))) +
+            0.5 * sprandn(rng, n, n, 3 / n)
+        return A, A * randn(rng, n)
+    end
+    relres(A, b, x) = norm(b - A * x) / norm(b)
+
+    A, b = weakdiag(1)
+    F = SNLU.snlu(A; eps_pivot = 1.0e-4, matching = false)
+    @test relres(A, b, SNLU.solve(F, b; refine = 10)) <= 1.0e-14
+
+    x = similar(b)
+    SNLU.solve!(x, F, b; refine = 3)
+    @test (@allocated SNLU.solve!(x, F, b; refine = 3)) == 0
+end
+
+@testset "a stalled refinement cannot hide inaccurate rows" begin
+    # Two perturbed pivots leave rows 1 and 2 wrong and refinement makes them worse. The
+    # large b[3], in a row they don't touch, keeps the norm of the residual under the limit.
+    n, d = 1001, 1.0e-8
+    A = spdiagm(0 => [d / 8; d / 8; ones(n - 2)])
+    A[2, 1] = 7d / 8
+    for B in (2.0e6, 3.0e6)
+        b = [1.0; -1.0; B; zeros(n - 3)]
+        x_exact = [8 / d; -64 / d; B; zeros(n - 3)]
+        prob = LinearProblem(A, b)
+        sol = solve(prob, SupernodalLUFactorization())
+        @test sol.retcode == ReturnCode.Infeasible
+        sol = solve(prob)
+        @test sol.retcode == ReturnCode.Success
+        @test norm(sol.u - x_exact) / norm(x_exact) <= 1.0e-12
+    end
+end
+
+@testset "coupled rows with a rejected refinement" begin
+    n, d, B = 1001, 1.0e-8, 1.85e6
+    A = spdiagm(0 => [d / 8; d / 8; ones(n - 2)])
+    A[2, 1], A[1, 3], A[2, 3] = 7d / 8, 0.25, 0.5
+    b = [B / 4 + 1; B / 2 - 1; B; zeros(n - 3)]
+    x_exact = [8 / d; -64 / d; B; zeros(n - 3)]
+    prob = LinearProblem(A, b)
+    @test solve(prob, SupernodalLUFactorization()).retcode == ReturnCode.Infeasible
+    cache = init(prob)
+    sol = solve!(cache)
+    @test sol.retcode == ReturnCode.Success
+    @test cache.cacheval.fell_back_to_qr
+    # The infinity-norm condition number of A is 74 / d.
+    @test norm(sol.u - x_exact, Inf) / norm(x_exact, Inf) <= 8 * eps(Float64) * (74 / d)
 end
 
 @testset "residual check does not allocate a work vector" begin

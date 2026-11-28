@@ -303,6 +303,9 @@ mutable struct LinearCache{TA, Tb, Tu, Tp, Talg, Tc, Tl, Tr, Ttol, Tlv <: Linear
     # never `nothing`). `true` means the user permitted overwriting `A`, which
     # also permits in-place refactorization (e.g. `lu!(A)`) after `cache.A = X`.
     alias_A::Bool
+    # Temporary shaped like `b`, `nothing` until a `solve!` method first needs one.
+    # Its contents are undefined between solves.
+    scratch::Union{Nothing, Tb}
 end
 
 # `@inline` is load-bearing: `name` must constant-propagate into the body so the
@@ -341,6 +344,10 @@ end
     elseif name === :b
         # In case there is something that needs to be done when b is updated
         update_cacheval!(cache, :b, x)
+        # Released here: a solve may return before it next checks the shape
+        if cache.scratch !== nothing && axes(cache.scratch) != axes(x)
+            setfield!(cache, :scratch, nothing)
+        end
     elseif name === :cacheval && cache.alg isa DefaultLinearSolver
         @assert cache.cacheval isa DefaultLinearSolverInit
         return __setfield!(cache.cacheval, cache.alg, x)
@@ -919,7 +926,7 @@ function __init(
         typeof(sensealg), typeof(sparse_reduction),
     }(
         A, b, u0_, p, alg, cacheval, isfresh, precsisfresh, Pl, Pr, abstol, reltol,
-        maxiters, verbose_spec, assumptions, sensealg, sparse_reduction, alias_A
+        maxiters, verbose_spec, assumptions, sensealg, sparse_reduction, alias_A, nothing
     )
     return cache
 end

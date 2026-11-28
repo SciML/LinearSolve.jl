@@ -1,5 +1,6 @@
 using LinearSolve, LinearAlgebra, SparseArrays, Test
 using LinearSolve.Krylov
+using RecursiveArrayTools, SciMLOperators
 
 n = 100
 A1 = spdiagm(
@@ -153,4 +154,103 @@ end
     )
     sol = solve!(cache)
     @test norm(A1 * sol.u - b1) < 1.0e-6
+end
+
+@testset "warm start temporaries do not allocate per solve" begin
+    solve_bytes(cache) = @allocated solve!(cache)
+    precs = (A, p) -> (Diagonal(Vector(diag(A))), I)
+    # close enough to `b2` for the Hegedüs guess to be accepted
+    b3 = b2 .+ 0.1 .* cos.(1:n)
+    P = Diagonal(Vector(diag(A1)))
+    @testset "$constructor $mode" for constructor in (KrylovJL_GMRES, KrylovJL_FGMRES),
+            mode in (WarmStart.Previous, WarmStart.Hegedus)
+
+        cache = init(
+            LinearProblem(A1, copy(b2)), constructor(; precs, warm_start = mode);
+            abstol = tol, reltol = tol
+        )
+        solve!(cache)
+        for b in (b3, b2)
+            cache.b = b
+            solve!(cache)
+        end
+        cache.b = b3
+        twin = deepcopy(cache)
+        # a single temporary of `b`'s size would exceed this
+        @test solve_bytes(cache) < sizeof(b3)
+        cold = solve!(
+            init(LinearProblem(A1, copy(b3)), constructor(; precs); abstol = tol, reltol = tol)
+        )
+        # fewer iterations only if the guess was used
+        @test solve!(twin).iters < cold.iters
+        threshold = tol + tol * norm(P \ b3)
+        @test norm(P \ (b3 - A1 * cache.u)) <= threshold + 100 * eps() * norm(P \ b3)
+    end
+end
+
+@testset "warm start after the system size changes: $mode" for mode in
+    (WarmStart.Previous, WarmStart.Hegedus)
+
+    precs = (A, p) -> (Diagonal(Vector(diag(A))), I)
+    cache = init(
+        LinearProblem(A1, copy(b1)), KrylovJL_GMRES(; precs, warm_start = mode);
+        abstol = tol, reltol = tol
+    )
+    solve!(cache)
+    solve!(cache)
+    for m in (n ÷ 2, n)
+        A, b = A1[1:m, 1:m], b1[1:m]
+        reinit!(cache; A, b, u = ones(m))
+        @test norm(A * solve!(cache).u - b) < 1.0e-6
+    end
+end
+
+@testset "replacing b with another size releases the temporary" begin
+    precs = (A, p) -> (Diagonal(Vector(diag(A))), I)
+    cache = init(
+        LinearProblem(A1, copy(b1)), KrylovJL_GMRES(; precs, warm_start = WarmStart.Hegedus);
+        abstol = tol, reltol = tol
+    )
+    solve!(cache)
+    solve!(cache)
+    scratch = cache.scratch
+    @test scratch !== nothing
+    cache.b = copy(b2)
+    @test cache.scratch === scratch
+    # a zero guess returns before the temporary is looked at again
+    m = n ÷ 2
+    reinit!(cache; A = A1[1:m, 1:m], b = zeros(m), u = zeros(m))
+    @test cache.scratch === nothing
+    @test iszero(solve!(cache).u)
+    @test cache.scratch === nothing
+end
+
+@testset "partitioned right-hand side whose layout changes" begin
+    function copy_flat!(w, v, u, p, t)
+        for i in 1:5
+            w[i] = v[i]
+        end
+        return w
+    end
+    split_at(x, k) = ArrayPartition(fill(x, k), fill(x, 5 - k))
+    proto = split_at(1.0, 2)
+    A = FunctionOperator(copy_flat!, proto, proto; isinplace = true, islinear = true)
+    @testset "$mode" for mode in (WarmStart.Previous, WarmStart.Hegedus)
+        cache = init(LinearProblem(A, split_at(1.0, 2)), KrylovJL_GMRES(warm_start = mode))
+        solve!(cache)
+        cache.b = split_at(2.0, 3)
+        @test collect(solve!(cache).u) ≈ fill(2.0, 5)
+    end
+end
+
+@testset "partitioned right-hand side: unused temporaries are not allocated" begin
+    solve_bytes(cache) = @allocated solve!(cache)
+    b = ArrayPartition(ones(1000), ones(1000))
+    A = FunctionOperator((w, v, u, p, t) -> (w .= 2 .* v), b, b; isinplace = true, islinear = true)
+    cache = init(LinearProblem(A, b), KrylovJL_GMRES(warm_start = WarmStart.Previous))
+    solve!(cache)
+    solve!(cache)
+    # one partition's worth of bytes
+    @test solve_bytes(cache) < sizeof(b.x[1])
+    @test collect(cache.u) ≈ fill(0.5, 2000)
 end

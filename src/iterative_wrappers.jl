@@ -576,6 +576,19 @@ const _WARM_STARTABLE_WORKSPACES = Union{Krylov.GmresWorkspace, Krylov.FgmresWor
 const _HEGEDUS_MAX_RESIDUAL_RATIO = 0.5
 const _HEGEDUS_MIN_COSINE = sqrt(1 - _HEGEDUS_MAX_RESIDUAL_RATIO^2)
 
+# `cache.scratch`, allocated on first use and again when the size of `b` changes. `nothing`
+# unless `b` and `u` are dense vectors of one type and shape: `axes` does not describe the
+# layout of partitioned and other non-dense arrays.
+function _krylov_scratch!(cache)
+    b, u = cache.b, cache.u
+    (b isa DenseVector && typeof(u) === typeof(b) && axes(u) == axes(b)) || return nothing
+    scratch = cache.scratch
+    scratch !== nothing && axes(scratch) == axes(b) && return scratch
+    scratch = similar(b)
+    scratch isa typeof(b) && setfield!(cache, :scratch, scratch)
+    return scratch
+end
+
 """
     _krylov_warm_start!(workspace, cache, mode, M, atol, rtol) -> (atol, rtol)
 
@@ -593,8 +606,10 @@ function _krylov_warm_start!(workspace, cache, mode::WarmStart.T, M, atol, rtol)
     (u isa AbstractVector && eltype(u) <: Number) || return atol, rtol
     unorm = norm(u)
     (iszero(unorm) || !isfinite(unorm)) && return atol, rtol
+    # `Previous` without a left preconditioner needs no temporary
+    scratch = mode == WarmStart.Hegedus || M !== I ? _krylov_scratch!(cache) : nothing
     if mode == WarmStart.Hegedus
-        Au = mul!(similar(cache.b), cache.A, u)
+        Au = mul!(scratch === nothing ? similar(cache.b) : scratch, cache.A, u)
         d = real(dot(Au, Au))
         (iszero(d) || !isfinite(d)) && return atol, rtol
         Aub = dot(Au, cache.b)
@@ -602,11 +617,15 @@ function _krylov_warm_start!(workspace, cache, mode::WarmStart.T, M, atol, rtol)
         bnorm = norm(cache.b)
         (iszero(bnorm) || !isfinite(bnorm)) && return atol, rtol
         abs(Aub) < _HEGEDUS_MIN_COSINE * sqrt(d) * bnorm && return atol, rtol
-        Krylov.warm_start!(workspace, (Aub / d) .* u)
-        bnorm = M === I ? bnorm : norm(ldiv!(similar(cache.b), M, cache.b))
+        # `warm_start!` copies the guess, so `scratch` is free again afterwards
+        x0 = scratch === nothing ? (Aub / d) .* u : (scratch .= (Aub / d) .* u)
+        Krylov.warm_start!(workspace, x0)
+        bnorm = M === I ? bnorm :
+            norm(ldiv!(scratch === nothing ? similar(cache.b) : scratch, M, cache.b))
     else
         Krylov.warm_start!(workspace, u)
-        bnorm = M === I ? norm(cache.b) : norm(ldiv!(similar(cache.b), M, cache.b))
+        bnorm = M === I ? norm(cache.b) :
+            norm(ldiv!(scratch === nothing ? similar(cache.b) : scratch, M, cache.b))
     end
     return atol + rtol * bnorm, zero(rtol)
 end

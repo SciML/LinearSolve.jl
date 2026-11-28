@@ -915,12 +915,17 @@ function LinearSolve.pattern_changed(
     return getcolptr(Aold) != getcolptr(A) || rowvals(Aold) != rowvals(A)
 end
 
-# `‖Ay - b‖ / (‖A‖₁‖y‖ + ‖b‖)`, reusing the factor-owned residual buffer so the check
-# costs one sparse mat-vec and no allocation.
-function _snlu_backward_error(F, y::AbstractVector, b::AbstractVector)
+function _snlu_residual!(F, y, b)
     r = F.ir_r
     LinearAlgebra.mul!(r, F.A, y)
     r .-= b
+    return r
+end
+
+# `‖Ay - b‖ / (‖A‖₁‖y‖ + ‖b‖)`, reusing the factor-owned residual buffer so the check
+# costs one sparse mat-vec and no allocation.
+function _snlu_backward_error(F, y::AbstractVector, b::AbstractVector)
+    r = _snlu_residual!(F, y, b)
     denom = LinearAlgebra.opnorm(F.A, 1) * LinearAlgebra.norm(y) + LinearAlgebra.norm(b)
     return iszero(denom) ? zero(real(eltype(r))) : LinearAlgebra.norm(r) / denom
 end
@@ -994,17 +999,21 @@ function SciMLBase.solve!(
     end
     # Static pivoting never aborts: a numerically singular system factors with
     # perturbed pivots and produces a finite but meaningless solution. When
-    # pivots were perturbed (rare), verify the residual (one sparse mat-vec)
-    # so singularity surfaces as `Infeasible` instead of a silent `Success`.
+    # pivots were perturbed (rare), verify the residual so singularity surfaces as `Infeasible`.
     ok = all(isfinite, y)
     if ok && SNLU.nperturbed(F) > 0
-        r = F.ir_r                      # factor-owned residual buffer
-        LinearAlgebra.mul!(r, F.A, y)
-        r .-= cache.b
         bn = LinearAlgebra.norm(cache.b)
-        ok = LinearAlgebra.norm(r) <= 1.0e-6 * max(bn, floatmin(real(eltype(r))))
-        # Refinement stalled: also require every row to be accurate.
-        ok && rejected && (ok = _snlu_rowwise_error(F, y, cache.b, r) <= 1.0e-6)
+        limit = 1.0e-6 * max(bn, floatmin(real(eltype(F.ir_r))))
+        if rejected
+            # F.ir_dx holds the rejected candidate until the rowwise check reuses it.
+            trial_norm = LinearAlgebra.norm(_snlu_residual!(F, F.ir_dx, cache.b))
+            ok = isfinite(trial_norm) && trial_norm <= limit
+        end
+        if ok
+            r = _snlu_residual!(F, y, cache.b)
+            ok = LinearAlgebra.norm(r) <= limit &&
+                (!rejected || _snlu_rowwise_error(F, y, cache.b, r) <= 1.0e-6)
+        end
     end
     return if ok
         SciMLBase.build_linear_solution(

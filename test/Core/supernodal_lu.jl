@@ -154,6 +154,15 @@ end
     @test !(res(A, b, x2) < res(A, b, x1))
     @test SNLU.solve(F, b; refine = 3) == x1
 
+    A = spdiagm(0 => [2.0^-100, 1.0])
+    b = [1.0, 0.0]
+    F = SNLU.snlu(A; matching = false, eps_pivot = 2.0^-20)
+    x0 = SNLU.solve(F, b; refine = 0)
+    candidate = x0 + SNLU.solve(F, mul!(copy(b), A, x0, -1, 1); refine = 0)
+    @test candidate != x0
+    @test res(A, b, candidate) == res(A, b, x0)
+    @test SNLU.solve(F, b; refine = 3) == x0
+
     # Weak random diagonal -> perturbed pivots; refinement still converges.
     function weakdiag(seed; N = 30)
         rng = StableRNG(seed)
@@ -181,13 +190,32 @@ end
     n, d = 1001, 1.0e-8
     A = spdiagm(0 => [d / 8; d / 8; ones(n - 2)])
     A[2, 1] = 7d / 8
-    b = [1.0; -1.0; 2.0e6; zeros(n - 3)]
-    x_exact = [8 / d; -64 / d; 2.0e6; zeros(n - 3)]
-    sol = solve(LinearProblem(A, b), SupernodalLUFactorization())
-    @test sol.retcode == ReturnCode.Infeasible
-    sol = solve(LinearProblem(A, b))                          # default solver falls back to QR
+    for B in (2.0e6, 3.0e6)
+        b = [1.0; -1.0; B; zeros(n - 3)]
+        x_exact = [8 / d; -64 / d; B; zeros(n - 3)]
+        prob = LinearProblem(A, b)
+        sol = solve(prob, SupernodalLUFactorization())
+        @test sol.retcode == ReturnCode.Infeasible
+        sol = solve(prob)
+        @test sol.retcode == ReturnCode.Success
+        @test norm(sol.u - x_exact) / norm(x_exact) <= 1.0e-12
+    end
+end
+
+@testset "coupled rows with a rejected refinement" begin
+    n, d, B = 1001, 1.0e-8, 1.85e6
+    A = spdiagm(0 => [d / 8; d / 8; ones(n - 2)])
+    A[2, 1], A[1, 3], A[2, 3] = 7d / 8, 0.25, 0.5
+    b = [B / 4 + 1; B / 2 - 1; B; zeros(n - 3)]
+    x_exact = [8 / d; -64 / d; B; zeros(n - 3)]
+    prob = LinearProblem(A, b)
+    @test solve(prob, SupernodalLUFactorization()).retcode == ReturnCode.Infeasible
+    cache = init(prob)
+    sol = solve!(cache)
     @test sol.retcode == ReturnCode.Success
-    @test norm(sol.u - x_exact) / norm(x_exact) <= 1.0e-12
+    @test cache.cacheval.fell_back_to_qr
+    # The infinity-norm condition number of A is 74 / d.
+    @test norm(sol.u - x_exact, Inf) / norm(x_exact, Inf) <= 8 * eps(Float64) * (74 / d)
 end
 
 @testset "residual check does not allocate a work vector" begin

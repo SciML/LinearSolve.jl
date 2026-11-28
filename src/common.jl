@@ -344,6 +344,10 @@ end
     elseif name === :b
         # In case there is something that needs to be done when b is updated
         update_cacheval!(cache, :b, x)
+        # Released here: a solve may return before it next checks the shape
+        if cache.scratch !== nothing && axes(cache.scratch) != axes(x)
+            setfield!(cache, :scratch, nothing)
+        end
     elseif name === :cacheval && cache.alg isa DefaultLinearSolver
         @assert cache.cacheval isa DefaultLinearSolverInit
         return __setfield!(cache.cacheval, cache.alg, x)

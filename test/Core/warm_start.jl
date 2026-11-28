@@ -205,6 +205,26 @@ end
     end
 end
 
+@testset "replacing b with another size releases the temporary" begin
+    precs = (A, p) -> (Diagonal(Vector(diag(A))), I)
+    cache = init(
+        LinearProblem(A1, copy(b1)), KrylovJL_GMRES(; precs, warm_start = WarmStart.Hegedus);
+        abstol = tol, reltol = tol
+    )
+    solve!(cache)
+    solve!(cache)
+    scratch = cache.scratch
+    @test scratch !== nothing
+    cache.b = copy(b2)
+    @test cache.scratch === scratch
+    # a zero guess returns before the temporary is looked at again
+    m = n ÷ 2
+    reinit!(cache; A = A1[1:m, 1:m], b = zeros(m), u = zeros(m))
+    @test cache.scratch === nothing
+    @test iszero(solve!(cache).u)
+    @test cache.scratch === nothing
+end
+
 @testset "partitioned right-hand side whose layout changes" begin
     function copy_flat!(w, v, u, p, t)
         for i in 1:5

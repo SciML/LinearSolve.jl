@@ -161,6 +161,7 @@ end
     precs = (A, p) -> (Diagonal(Vector(diag(A))), I)
     # close enough to `b2` for the Hegedüs guess to be accepted
     b3 = b2 .+ 0.1 .* cos.(1:n)
+    P = Diagonal(Vector(diag(A1)))
     @testset "$constructor $mode" for constructor in (KrylovJL_GMRES, KrylovJL_FGMRES),
             mode in (WarmStart.Previous, WarmStart.Hegedus)
 
@@ -174,13 +175,33 @@ end
             solve!(cache)
         end
         cache.b = b3
-        guess = cache.cacheval.Δx
-        fill!(guess, NaN)
+        twin = deepcopy(cache)
         # a single temporary of `b`'s size would exceed this
         @test solve_bytes(cache) < sizeof(b3)
-        # overwritten only if this solve was warm started
-        @test length(guess) == n && all(isfinite, guess)
-        @test norm(A1 * cache.u - b3) < 1.0e-6
+        cold = solve!(
+            init(LinearProblem(A1, copy(b3)), constructor(; precs); abstol = tol, reltol = tol)
+        )
+        # fewer iterations only if the guess was used
+        @test solve!(twin).iters < cold.iters
+        threshold = tol + tol * norm(P \ b3)
+        @test norm(P \ (b3 - A1 * cache.u)) <= threshold + 100 * eps() * norm(P \ b3)
+    end
+end
+
+@testset "warm start after the system size changes: $mode" for mode in
+    (WarmStart.Previous, WarmStart.Hegedus)
+
+    precs = (A, p) -> (Diagonal(Vector(diag(A))), I)
+    cache = init(
+        LinearProblem(A1, copy(b1)), KrylovJL_GMRES(; precs, warm_start = mode);
+        abstol = tol, reltol = tol
+    )
+    solve!(cache)
+    solve!(cache)
+    for m in (n ÷ 2, n)
+        A, b = A1[1:m, 1:m], b1[1:m]
+        reinit!(cache; A, b, u = ones(m))
+        @test norm(A * solve!(cache).u - b) < 1.0e-6
     end
 end
 
